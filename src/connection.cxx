@@ -258,6 +258,18 @@ get_cluster_credentials(PyObject* pyObj_auth)
         auth.key_path = key_path;
     }
 
+    PyObject* pyObj_allowed_sasl_mechanisms = PyDict_GetItemString(pyObj_auth, "allowed_sasl_mechanisms");
+    if (pyObj_allowed_sasl_mechanisms != nullptr && PyList_Check(pyObj_allowed_sasl_mechanisms)) {
+        auth.allowed_sasl_mechanisms.clear();
+        size_t nargs = static_cast<size_t>(PyList_Size(pyObj_allowed_sasl_mechanisms));
+        size_t ii;
+        for (ii = 0; ii < nargs; ++ii) {
+            PyObject* pyOb_mechanism = PyList_GetItem(pyObj_allowed_sasl_mechanisms, ii);
+            auto mechanism = std::string(PyUnicode_AsUTF8(pyOb_mechanism));
+            auth.allowed_sasl_mechanisms.emplace_back(mechanism);
+        }
+    }
+
     return auth;
 }
 
@@ -1068,6 +1080,58 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
         PyErr_Clear();
     }
     Py_XDECREF(pyObj_tmp);
+
+    auto credentials = cluster_info.second.credentials();
+    PyObject* pyObj_creds = PyDict_New();
+
+    pyObj_tmp = PyUnicode_FromString(credentials.username.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_creds, "username", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(credentials.password.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_creds, "password", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(credentials.certificate_path.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_creds, "certificate_path", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(credentials.key_path.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_creds, "key_path", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    PyObject* pyObj_allowed_sasl_mechanisms = PyList_New(static_cast<Py_ssize_t>(0));
+    for (auto const& mech : credentials.allowed_sasl_mechanisms) {
+        pyObj_tmp = PyUnicode_FromString(mech.c_str());
+        if (-1 == PyList_Append(pyObj_allowed_sasl_mechanisms, pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_XDECREF(pyObj_tmp);
+    }
+    if (-1 == PyDict_SetItemString(pyObj_creds, "allowed_sasl_mechanisms", pyObj_allowed_sasl_mechanisms)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_allowed_sasl_mechanisms);
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "credentials", pyObj_creds)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_creds);
 
     return pyObj_opts;
 }

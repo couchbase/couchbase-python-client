@@ -25,7 +25,7 @@ from typing import (TYPE_CHECKING,
                     Union)
 from urllib.parse import parse_qs, urlparse
 
-from couchbase.auth import CertificateAuthenticator
+from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import (ClusterOptions,
@@ -63,7 +63,8 @@ class ClusterLogic:
         'certpath': {'cert_path': lambda x: x},
         'cert_path': {'cert_path': lambda x: x},
         'truststorepath': {'trust_store_path': lambda x: x},
-        'trust_store_path': {'trust_store_path': lambda x: x}
+        'trust_store_path': {'trust_store_path': lambda x: x},
+        'sasl_mech_force': {'allowed_sasl_mechanisms': lambda x: x.split(',')}
     }
 
     def __init__(self,  # noqa: C901
@@ -91,10 +92,16 @@ class ClusterLogic:
         # lets only pass in the authenticator, no kwargs
         auth_kwargs = {k: v for k, v in cluster_opts.items() if k in authenticator.valid_keys()}
         if isinstance(authenticator, CertificateAuthenticator) and 'trust_store_path' in auth_kwargs:
-            # the trust_store_path _should_ be in the cluster opts, however < = 3.x SDK allowed it in
+            # the trust_store_path _should_ be in the cluster opts, however <= 3.x SDK allowed it in
             # the CertificateAuthenticator, pop the trust_store_path from the auth_kwargs in case
             if 'trust_store_path' not in authenticator.as_dict():
                 auth_kwargs.pop('trust_store_path')
+        elif isinstance(authenticator, PasswordAuthenticator) and 'allowed_sasl_mechanisms' in auth_kwargs:
+            # the allowed_sasl_mechanisms _should_ only be in the auth opts, however <= 3.x SDK allowed
+            # sasl_mech_force in the query string, pop the allowed_sasl_mechanisms from the cluster_opts and
+            # set the authenticator's _allowed_sasl_mechanisms
+            authenticator._allowed_sasl_mechanisms = cluster_opts.pop('allowed_sasl_mechanisms')
+            auth_kwargs.pop('allowed_sasl_mechanisms')
 
         if len(auth_kwargs.keys()) > 0:
             raise InvalidArgumentException(

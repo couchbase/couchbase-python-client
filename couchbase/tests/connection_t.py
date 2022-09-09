@@ -410,7 +410,7 @@ class ConnectionTests:
         with pytest.raises(InvalidArgumentException):
             ClusterLogic(conn_string, cluster_opts)
 
-    def test_cluster_legacy_options(self, couchbase_config):
+    def test_cluster_legacy_ssl_no_verify(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
 
@@ -431,6 +431,7 @@ class ConnectionTests:
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
         assert auth_opts == expected_auth
+        assert auth_opts['allowed_sasl_mechanisms'] == ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1']
 
         # check as kwargs
         cluster = ClusterLogic(conn_string, authenticator=auth)
@@ -438,6 +439,7 @@ class ConnectionTests:
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
         assert auth_opts == expected_auth
+        assert auth_opts['allowed_sasl_mechanisms'] == ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1']
 
     def test_cluster_pw_auth_with_cert(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -722,3 +724,60 @@ class ConnectionTests:
 
         with pytest.raises(InvalidArgumentException):
             CONFIG_PROFILES.register_profile('test_profile', TestProfile())
+
+    def test_cluster_allowed_sasl_mechanisms(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        cluster = Cluster.connect(conn_string, ClusterOptions(auth))
+
+        client_opts = cluster._get_client_connection_info()
+        assert client_opts['credentials'] is not None
+        assert client_opts['credentials']['allowed_sasl_mechanisms'] == ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1']
+
+    def test_cluster_legacy_sasl_mech_force(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        expected_auth = auth.as_dict()
+        expected_auth['allowed_sasl_mechanisms'] = ['PLAIN']
+        cluster = ClusterLogic(f'{conn_string}?sasl_mech_force=PLAIN', ClusterOptions(auth))
+        auth_opts, cluster_opts = cluster._get_connection_opts()
+        assert cluster_opts is not None
+        assert cluster_opts == {}
+        assert auth_opts is not None
+        assert auth_opts == expected_auth
+
+    def test_cluster_legacy_sasl_mech_force_real(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        cluster = Cluster.connect(f'{conn_string}?sasl_mech_force=PLAIN', ClusterOptions(auth))
+
+        client_opts = cluster._get_client_connection_info()
+        assert client_opts['credentials'] is not None
+        assert client_opts['credentials']['allowed_sasl_mechanisms'] == ['PLAIN']
+
+    def test_cluster_ldap_auth(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator.ldap_compatible(username, pw)
+        assert isinstance(auth, PasswordAuthenticator)
+        expected_auth = auth.as_dict()
+        cluster = ClusterLogic(conn_string, ClusterOptions(auth))
+        auth_opts = cluster._get_connection_opts(auth_only=True)
+        assert auth_opts is not None
+        assert isinstance(auth_opts, dict)
+        assert auth_opts == expected_auth
+
+    def test_cluster_ldap_auth_real(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator.ldap_compatible(username, pw)
+        cluster = Cluster.connect(conn_string, ClusterOptions(auth))
+
+        client_opts = cluster._get_client_connection_info()
+        assert client_opts['credentials'] is not None
+        assert client_opts['credentials']['allowed_sasl_mechanisms'] == ['PLAIN']

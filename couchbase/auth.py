@@ -13,8 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from enum import IntEnum
-from typing import Optional
+from typing import (Any,
+                    Dict,
+                    Optional)
 
 
 class Authenticator(dict):
@@ -34,28 +38,39 @@ class PasswordAuthenticator(Authenticator):
     def __init__(self,
                  username,          # type: str
                  password,          # type: str
-                 cert_path=None     # type: Optional[str]
+                 cert_path=None,    # type: Optional[str]
+                 **kwargs           # type: Dict[str, Any]
                  ):
         """PasswordAuthenticator instance."""
         self._username = username
         self._password = password
         self._cert_path = cert_path
+        self._allowed_sasl_mechanisms = kwargs.get(
+            'allowed_sasl_mechanisms', ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1'])
 
         super().__init__(**self.as_dict())
 
     def valid_keys(self):
-        return ['username', 'password', 'cert_path']
+        return ['username', 'password', 'cert_path', 'allowed_sasl_mechanisms']
 
     def as_dict(self):
         d = {
             'username': self._username,
-            'password': self._password
+            'password': self._password,
+            'allowed_sasl_mechanisms': self._allowed_sasl_mechanisms
         }
         if self._cert_path is not None:
             # couchbase++ wants this to be the trust_certificate
             d['trust_store_path'] = self._cert_path
 
         return d
+
+    @staticmethod
+    def ldap_compatible(username,  # type: str
+                        password  # type: str
+                        ) -> PasswordAuthenticator:
+        auth = PasswordAuthenticator(username, password, allowed_sasl_mechanisms=['PLAIN'])
+        return auth
 
 
 class CertificateAuthenticator(Authenticator):
