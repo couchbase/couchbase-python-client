@@ -321,7 +321,7 @@ class SubdocumentErrorContext(KeyValueErrorContext):
         return self._subdoc_err_ctx.get("deleted", False)
 
     def __repr__(self):
-        return f'ViewErrorContext({self._get_base()})'
+        return f'SubdocumentErrorContext({self._get_base()})'
 
 
 ErrorContextType = Union[AnalyticsErrorContext,
@@ -398,6 +398,8 @@ class CouchbaseException(Exception):
             details.append(f'context={self._context}')
         if self._exc_info and 'cinfo' in self._exc_info:
             details.append('C Source={0}:{1}'.format(*self._exc_info['cinfo']))
+        if self._exc_info and 'inner_cause' in self._exc_info:
+            details.append('Inner cause={0}'.format(self._exc_info['inner_cause']))
         return "<{}>".format(", ".join(details))
 
 

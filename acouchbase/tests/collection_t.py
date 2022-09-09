@@ -763,17 +763,17 @@ class CollectionTests:
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
-        before = int(time() - 1.0)
-        try:
+        if expiry == -1:
+            with pytest.raises(InvalidArgumentException):
+                await cb.upsert(key, value, expiry=timedelta(seconds=expiry))
+        else:
+            before = int(time() - 1.0)
             result = await cb.upsert(key, value, expiry=timedelta(seconds=expiry))
             assert result.cas is not None
-        except InvalidArgumentException:
-            if expiry != -1:
-                raise
 
-        expiry_path = "$document.exptime"
-        res = await cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        res_expiry = res.content_as[int](0)
+            expiry_path = "$document.exptime"
+            res = await cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+            res_expiry = res.content_as[int](0)
 
-        after = int(time() + 1.0)
-        before + expiry <= res_expiry <= after + expiry
+            after = int(time() + 1.0)
+            before + expiry <= res_expiry <= after + expiry

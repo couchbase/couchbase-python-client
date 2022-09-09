@@ -19,12 +19,14 @@
 #define SUBDOC_OPS_H_
 
 #include "client.hxx"
+#include <core/impl/subdoc/opcode.hxx>
+#include <core/impl/subdoc/path_flags.hxx>
 
 struct mutate_in_spec {
     uint8_t op;
     uint8_t flags;
     char* path;
-    std::string value;
+    std::vector<std::byte> value;
 
     PyObject* pyObj_value;
     bool create_parents;

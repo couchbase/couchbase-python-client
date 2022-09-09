@@ -21,6 +21,46 @@
 #include <couchbase/cas.hxx>
 #include "utils.hxx"
 
+couchbase::core::impl::subdoc::opcode
+to_subdoc_opcode(std::uint8_t opcode)
+{
+    if (opcode == 0x00) {
+        return couchbase::core::impl::subdoc::opcode::get_doc;
+    } else if (opcode == 0x01) {
+        return couchbase::core::impl::subdoc::opcode::set_doc;
+    } else if (opcode == 0x04) {
+        return couchbase::core::impl::subdoc::opcode::remove_doc;
+    } else if (opcode == 0xc5) {
+        return couchbase::core::impl::subdoc::opcode::get;
+    } else if (opcode == 0xc6) {
+        return couchbase::core::impl::subdoc::opcode::exists;
+    } else if (opcode == 0xc7) {
+        return couchbase::core::impl::subdoc::opcode::dict_add;
+    } else if (opcode == 0xc8) {
+        return couchbase::core::impl::subdoc::opcode::dict_upsert;
+    } else if (opcode == 0xc9) {
+        return couchbase::core::impl::subdoc::opcode::remove;
+    } else if (opcode == 0xca) {
+        return couchbase::core::impl::subdoc::opcode::replace;
+    } else if (opcode == 0xcb) {
+        return couchbase::core::impl::subdoc::opcode::array_push_last;
+    } else if (opcode == 0xcc) {
+        return couchbase::core::impl::subdoc::opcode::array_push_first;
+    } else if (opcode == 0xcd) {
+        return couchbase::core::impl::subdoc::opcode::array_insert;
+    } else if (opcode == 0xce) {
+        return couchbase::core::impl::subdoc::opcode::array_add_unique;
+    } else if (opcode == 0xcf) {
+        return couchbase::core::impl::subdoc::opcode::counter;
+    } else if (opcode == 0xd2) {
+        return couchbase::core::impl::subdoc::opcode::get_count;
+    } else if (opcode == 0xd3) {
+        return couchbase::core::impl::subdoc::opcode::replace_body_with_xattr;
+    }
+
+    throw std::invalid_argument(fmt::format("Unknown subdoc op code: {}", opcode));
+}
+
 template<typename T>
 result*
 add_extras_to_result([[maybe_unused]] const T& t, result* res)
@@ -83,16 +123,23 @@ add_extras_to_result<couchbase::core::operations::lookup_in_response>(const couc
             }
             Py_DECREF(pyObj_tmp);
 
-            if (f.value.length()) {
-                pyObj_tmp = PyBytes_FromStringAndSize(f.value.c_str(), f.value.length());
-                if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
-                    Py_XDECREF(pyObj_fields);
-                    Py_XDECREF(pyObj_field);
-                    Py_XDECREF(pyObj_tmp);
-                    return nullptr;
-                }
-                Py_DECREF(pyObj_tmp);
+            try {
+                pyObj_tmp = binary_to_PyObject(f.value);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_TypeError, e.what());
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
             }
+            if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
             PyList_Append(pyObj_fields, pyObj_field);
             Py_DECREF(pyObj_field);
         }
@@ -122,7 +169,7 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couc
         PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
         for (int i = 0; i < resp.fields.size(); i++) {
             PyObject* pyObj_field = PyDict_New();
-            PyObject* pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields_meta[i].opcode));
+            PyObject* pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].opcode));
             if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
                 Py_XDECREF(pyObj_fields);
                 Py_XDECREF(pyObj_field);
@@ -131,7 +178,7 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couc
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields_meta[i].status));
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].status));
             if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
                 Py_XDECREF(pyObj_fields);
                 Py_XDECREF(pyObj_field);
@@ -318,8 +365,7 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
                                  std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     size_t ii;
-    couchbase::core::protocol::lookup_in_request_body::lookup_in_specs specs =
-      couchbase::core::protocol::lookup_in_request_body::lookup_in_specs{};
+    auto specs = std::vector<couchbase::core::impl::subdoc::command>{};
     for (ii = 0; ii < nspecs; ++ii) {
 
         struct lookup_in_spec new_spec = {};
@@ -332,6 +378,9 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
 
         if (!pyObj_spec) {
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
@@ -339,11 +388,27 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
 
         if (!PyArg_ParseTuple(pyObj_spec, "bsp", &new_spec.op, &new_spec.path, &new_spec.xattr)) {
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
-        specs.add_spec(new_spec.op, new_spec.xattr ? specs.path_flag_xattr : 0, new_spec.path);
+
+        try {
+            auto opcode = to_subdoc_opcode(new_spec.op);
+            specs.emplace_back(couchbase::core::impl::subdoc::command{
+              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr) });
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
     }
 
     couchbase::core::operations::lookup_in_request req{ options->id };
@@ -361,7 +426,7 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
                                  std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     size_t ii;
-    couchbase::mutate_in_specs mut_specs;
+    auto specs = std::vector<couchbase::core::impl::subdoc::command>{};
     for (ii = 0; ii < nspecs; ++ii) {
 
         struct mutate_in_spec new_spec = {};
@@ -374,6 +439,9 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
 
         if (!pyObj_spec) {
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
@@ -388,115 +456,44 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
                               &new_spec.expand_macros,
                               &new_spec.pyObj_value)) {
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
 
-        // **DO NOT DECREF** these -- things from tuples are borrowed references!!
-        PyObject* pyObj_value = nullptr;
-        std::string value = std::string();
-
         if (new_spec.pyObj_value) {
-            if (PyUnicode_Check(new_spec.pyObj_value)) {
-                value = std::string(PyUnicode_AsUTF8(new_spec.pyObj_value));
-            } else {
-                PyObject* pyObj_unicode = PyUnicode_FromEncodedObject(new_spec.pyObj_value, "utf-8", "strict");
-                value = std::string(PyUnicode_AsUTF8(pyObj_unicode));
-                Py_DECREF(pyObj_unicode);
-            }
-        }
-
-        switch (couchbase::core::protocol::subdoc_opcode(new_spec.op)) {
-            case couchbase::core::protocol::subdoc_opcode::array_push_last:
-            case couchbase::core::protocol::subdoc_opcode::array_push_first:
-            case couchbase::core::protocol::subdoc_opcode::array_insert:
-            case couchbase::core::protocol::subdoc_opcode::array_add_unique: {
-                if (!value.empty()) {
-                    value = value.substr(1, value.length() - 2);
+            try {
+                new_spec.value = PyObject_to_binary(new_spec.pyObj_value);
+            } catch (const std::exception& e) {
+                pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
+                if (barrier) {
+                    barrier->set_value(nullptr);
                 }
-                new_spec.value = value;
-                break;
-            }
-            default: {
-                new_spec.value = value;
-            }
-        };
-
-        switch (couchbase::core::protocol::subdoc_opcode(new_spec.op)) {
-            case couchbase::core::protocol::subdoc_opcode::dict_add: {
-                mut_specs.push_back(couchbase::mutate_in_specs::insert_raw(
-                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
-                                      .xattr(new_spec.xattr)
-                                      .create_path(new_spec.create_parents));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::dict_upsert: {
-                mut_specs.push_back(couchbase::mutate_in_specs::upsert_raw(
-                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
-                                      .xattr(new_spec.xattr)
-                                      .create_path(new_spec.create_parents));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::remove: {
-                mut_specs.push_back(couchbase::mutate_in_specs::remove(new_spec.path).xattr(new_spec.xattr));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::replace: {
-                mut_specs.push_back(couchbase::mutate_in_specs::replace_raw(
-                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
-                                      .xattr(new_spec.xattr));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::array_push_last: {
-                mut_specs.push_back(
-                  couchbase::mutate_in_specs::array_append_raw(new_spec.path, couchbase::core::utils::to_binary(new_spec.value))
-                    .xattr(new_spec.xattr)
-                    .create_path(new_spec.create_parents));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::array_push_first: {
-                mut_specs.push_back(
-                  couchbase::mutate_in_specs::array_prepend_raw(new_spec.path, couchbase::core::utils::to_binary(new_spec.value))
-                    .xattr(new_spec.xattr)
-                    .create_path(new_spec.create_parents));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::array_insert: {
-                mut_specs.push_back(
-                  couchbase::mutate_in_specs::array_insert_raw(new_spec.path, couchbase::core::utils::to_binary(new_spec.value))
-                    .xattr(new_spec.xattr)
-                    .create_path(new_spec.create_parents));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::array_add_unique: {
-                mut_specs.push_back(couchbase::mutate_in_specs::array_add_unique_raw(
-                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
-                                      .xattr(new_spec.xattr)
-                                      .create_path(new_spec.create_parents));
-                break;
-            }
-            case couchbase::core::protocol::subdoc_opcode::counter: {
-                auto value_i = static_cast<std::int64_t>(std::stoi(new_spec.value));
-                if (value_i < 0) {
-                    mut_specs.push_back(couchbase::mutate_in_specs::decrement(new_spec.path, -1 * value_i)
-                                          .xattr(new_spec.xattr)
-                                          .create_path(new_spec.create_parents));
-                } else {
-                    mut_specs.push_back(couchbase::mutate_in_specs::increment(new_spec.path, value_i)
-                                          .xattr(new_spec.xattr)
-                                          .create_path(new_spec.create_parents));
-                }
-                break;
-            }
-            default: {
-                pycbc_set_python_exception(
-                  PycbcError::InvalidArgument, __FILE__, __LINE__, "Invalide sub_document opcode provided for spec.");
                 Py_XDECREF(pyObj_callback);
                 Py_XDECREF(pyObj_errback);
                 return nullptr;
             }
-        };
+        }
+
+        try {
+            auto opcode = to_subdoc_opcode(new_spec.op);
+            specs.emplace_back(couchbase::core::impl::subdoc::command{
+              opcode,
+              new_spec.path,
+              new_spec.value,
+              couchbase::core::impl::subdoc::build_mutate_in_path_flags(new_spec.xattr, new_spec.create_parents, new_spec.expand_macros) });
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
     }
 
     couchbase::durability_level durability_level = couchbase::durability_level::none;
@@ -532,7 +529,7 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         req.expiry = options->expiry;
     }
     req.store_semantics = store_semantics;
-    req.specs = mut_specs.specs();
+    req.specs = specs;
     req.durability_level = durability_level;
     if (options->preserve_expiry) {
         req.preserve_expiry = options->preserve_expiry;
@@ -643,8 +640,13 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
     Py_XINCREF(pyObj_callback);
     Py_XINCREF(pyObj_errback);
 
-    auto barrier = std::make_shared<std::promise<PyObject*>>();
-    auto f = barrier->get_future();
+    std::shared_ptr<std::promise<PyObject*>> barrier = nullptr;
+    std::future<PyObject*> fut;
+    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+        barrier = std::make_shared<std::promise<PyObject*>>();
+        fut = barrier->get_future();
+    }
+
     switch (op_type) {
         case Operations::LOOKUP_IN: {
             struct lookup_in_options opts = { conn, id, Operations::LOOKUP_IN, timeout_ms, access_deleted == 1, pyObj_span, pyObj_spec };
@@ -680,7 +682,9 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
         }
         default: {
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized subdoc operation passed in.");
-            barrier->set_value(nullptr);
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             break;
@@ -688,7 +692,7 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
     };
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
         PyObject* ret = nullptr;
-        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_BEGIN_ALLOW_THREADS ret = fut.get();
         Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;

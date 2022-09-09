@@ -40,7 +40,7 @@ class DefaultJsonSerializer(Serializer):
                   value,  # type: Any
                   ) -> bytes:
 
-        return json.dumps(value, ensure_ascii=False).encode("utf-8")
+        return json.dumps(value, ensure_ascii=False).encode('utf-8')
 
     def deserialize(self,
                     value  # type: bytes

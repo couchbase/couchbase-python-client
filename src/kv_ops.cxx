@@ -107,6 +107,32 @@ add_extras_to_result<couchbase::core::operations::get_and_touch_response>(const 
     return add_flags_and_value_to_result(resp, res);
 }
 
+template<>
+result*
+add_extras_to_result<couchbase::core::operations::get_any_replica_response>(
+  const couchbase::core::operations::get_any_replica_response& resp,
+  result* res)
+{
+    if (-1 == PyDict_SetItemString(res->dict, "is_replica", resp.replica ? Py_True : Py_False)) {
+        return nullptr;
+    }
+
+    return add_flags_and_value_to_result(resp, res);
+}
+
+template<>
+result*
+add_extras_to_result<couchbase::core::operations::get_all_replicas_response::entry>(
+  const couchbase::core::operations::get_all_replicas_response::entry& resp,
+  result* res)
+{
+    if (-1 == PyDict_SetItemString(res->dict, "is_replica", resp.replica ? Py_True : Py_False)) {
+        return nullptr;
+    }
+
+    return add_flags_and_value_to_result(resp, res);
+}
+
 template<typename T>
 result*
 create_base_result_from_get_operation_response(const char* key, const T& resp)
@@ -114,6 +140,35 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
     res->ec = resp.ctx.ec();
+
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
+    if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
+        Py_XDECREF(pyObj_result);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (nullptr != key) {
+        pyObj_tmp = PyUnicode_FromString(key);
+        if (-1 == PyDict_SetItemString(res->dict, RESULT_KEY, pyObj_tmp)) {
+            Py_XDECREF(pyObj_result);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+    return res;
+}
+
+template<>
+result*
+create_base_result_from_get_operation_response<couchbase::core::operations::get_all_replicas_response::entry>(
+  const char* key,
+  const couchbase::core::operations::get_all_replicas_response::entry& resp)
+{
+    PyObject* pyObj_result = create_result_obj();
+    result* res = reinterpret_cast<result*>(pyObj_result);
 
     PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
@@ -244,6 +299,124 @@ create_result_from_get_operation_response(const char* key,
     PyGILState_Release(state);
 }
 
+template<>
+void
+create_result_from_get_operation_response<couchbase::core::operations::get_all_replicas_response>(
+  const char* key,
+  const couchbase::core::operations::get_all_replicas_response& resp,
+  PyObject* pyObj_callback,
+  PyObject* pyObj_errback,
+  std::shared_ptr<std::promise<PyObject*>> barrier,
+  result* multi_result)
+{
+    PyGILState_STATE state = PyGILState_Ensure();
+    PyObject* pyObj_args = NULL;
+    PyObject* pyObj_kwargs = nullptr;
+    PyObject* pyObj_exc = nullptr;
+    PyObject* pyObj_func = nullptr;
+    PyObject* pyObj_callback_res = nullptr;
+    auto set_exception = false;
+    streamed_result* streamed_res = nullptr;
+
+    if (resp.ctx.ec()) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
+        if (pyObj_errback == nullptr) {
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(pyObj_exc);
+            }
+        } else {
+            pyObj_func = pyObj_errback;
+            pyObj_args = PyTuple_New(1);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
+        }
+        // lets clear any errors
+        PyErr_Clear();
+    } else {
+        auto streamed_res = create_streamed_result_obj(couchbase::core::timeout_defaults::key_value_durable_timeout);
+        for (auto const& entry : resp.entries) {
+            auto res = create_base_result_from_get_operation_response(key, entry);
+            if (res == nullptr) {
+                set_exception = true;
+                break;
+            }
+            res = add_extras_to_result(entry, res);
+            streamed_res->rows->put(reinterpret_cast<PyObject*>(res));
+        }
+
+        if (PyErr_Occurred() != nullptr) {
+            set_exception = true;
+        } else if (!set_exception) {
+            Py_INCREF(Py_None);
+            streamed_res->rows->put(Py_None);
+            if (pyObj_callback == nullptr) {
+                if (multi_result != nullptr) {
+                    Py_INCREF(Py_True);
+                    barrier->set_value(Py_True);
+                    if (-1 == PyDict_SetItemString(multi_result->dict, key, reinterpret_cast<PyObject*>(streamed_res))) {
+                        // TODO:  not much we can do here...maybe?
+                        PyErr_Print();
+                        PyErr_Clear();
+                    }
+                    Py_DECREF(reinterpret_cast<PyObject*>(streamed_res));
+                } else {
+                    barrier->set_value(reinterpret_cast<PyObject*>(streamed_res));
+                }
+            } else {
+                pyObj_func = pyObj_callback;
+                pyObj_args = PyTuple_New(1);
+                PyTuple_SET_ITEM(pyObj_args, 0, reinterpret_cast<PyObject*>(streamed_res));
+            }
+        }
+    }
+
+    if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV read operation error.");
+        streamed_res->rows->put(pyObj_exc);
+        if (pyObj_errback == nullptr) {
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, reinterpret_cast<PyObject*>(streamed_res))) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(reinterpret_cast<PyObject*>(streamed_res));
+            }
+        } else {
+            pyObj_func = pyObj_errback;
+            pyObj_args = PyTuple_New(1);
+            PyTuple_SET_ITEM(pyObj_args, 0, reinterpret_cast<PyObject*>(streamed_res));
+        }
+    } else if (pyObj_func != nullptr) {
+        pyObj_callback_res = PyObject_Call(pyObj_func, pyObj_args, pyObj_kwargs);
+        if (pyObj_callback_res) {
+            Py_DECREF(pyObj_callback_res);
+        } else {
+            PyErr_Print();
+            // @TODO:  how to handle this situation?
+        }
+        Py_DECREF(pyObj_args);
+        Py_XDECREF(pyObj_kwargs);
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
+    }
+    PyGILState_Release(state);
+}
+
 template<typename Request>
 void
 do_get(connection& conn,
@@ -310,7 +483,9 @@ prepare_and_execute_read_op(struct read_options* options,
                         Py_INCREF(Py_False);
                         barrier->set_value(Py_False);
                     } else {
-                        barrier->set_value(nullptr);
+                        if (barrier) {
+                            barrier->set_value(nullptr);
+                        }
                         pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Project must be a list of strings.");
                         Py_XDECREF(pyObj_callback);
                         Py_XDECREF(pyObj_errback);
@@ -327,6 +502,18 @@ prepare_and_execute_read_op(struct read_options* options,
                 req.parent_span = std::make_shared<pycbc::request_span>(options->span);
             }
             do_get<couchbase::core::operations::get_projected_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            break;
+        }
+        case Operations::GET_ANY_REPLICA: {
+            couchbase::core::operations::get_any_replica_request req{ options->id, options->timeout_ms };
+            do_get<couchbase::core::operations::get_any_replica_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            break;
+        }
+        case Operations::GET_ALL_REPLICAS: {
+            couchbase::core::operations::get_all_replicas_request req{ options->id, options->timeout_ms };
+            do_get<couchbase::core::operations::get_all_replicas_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
@@ -397,7 +584,9 @@ prepare_and_execute_read_op(struct read_options* options,
                 barrier->set_value(Py_False);
                 break;
             } else {
-                barrier->set_value(nullptr);
+                if (barrier) {
+                    barrier->set_value(nullptr);
+                }
                 pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized get operation passed in.");
                 Py_XDECREF(pyObj_callback);
                 Py_XDECREF(pyObj_errback);
@@ -581,7 +770,9 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
                 barrier->set_value(Py_False);
                 Py_RETURN_NONE;
             }
-            barrier->set_value(nullptr);
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
@@ -715,7 +906,9 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
                 break;
             }
 
-            barrier->set_value(nullptr);
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized mutation operation passed in.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
@@ -905,7 +1098,9 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
             try {
                 pyObj_op_response = prepare_and_execute_mutation_op(&opts, pyObj_callback, pyObj_errback, barrier);
             } catch (const std::system_error& e) {
-                barrier->set_value(nullptr);
+                if (barrier) {
+                    barrier->set_value(nullptr);
+                }
                 pycbc_set_python_exception(e.code(), __FILE__, __LINE__, e.what());
                 Py_XDECREF(pyObj_callback);
                 Py_XDECREF(pyObj_errback);
@@ -915,6 +1110,8 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
         }
         case Operations::GET:
         case Operations::GET_PROJECTED:
+        case Operations::GET_ANY_REPLICA:
+        case Operations::GET_ALL_REPLICAS:
         case Operations::GET_AND_LOCK:
         case Operations::GET_AND_TOUCH:
         case Operations::TOUCH:
@@ -932,7 +1129,9 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
             try {
                 pyObj_op_response = prepare_and_execute_read_op(&opts, pyObj_callback, pyObj_errback, barrier);
             } catch (const std::system_error& e) {
-                barrier->set_value(nullptr);
+                if (barrier) {
+                    barrier->set_value(nullptr);
+                }
                 pycbc_set_python_exception(e.code(), __FILE__, __LINE__, e.what());
                 Py_XDECREF(pyObj_callback);
                 Py_XDECREF(pyObj_errback);
@@ -942,7 +1141,9 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
         }
         default: {
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized KV operation passed in.");
-            barrier->set_value(nullptr);
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             break;
@@ -1039,6 +1240,8 @@ handle_kv_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kw
                     }
                     case Operations::GET:
                     case Operations::GET_PROJECTED:
+                    case Operations::GET_ANY_REPLICA:
+                    case Operations::GET_ALL_REPLICAS:
                     case Operations::GET_AND_LOCK:
                     case Operations::GET_AND_TOUCH:
                     case Operations::TOUCH:

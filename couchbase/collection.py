@@ -60,8 +60,7 @@ from couchbase.options import (AppendMultiOptions,
                                get_valid_multi_args)
 from couchbase.pycbc_core import (binary_multi_operation,
                                   kv_multi_operation,
-                                  operations,
-                                  replica_read_multi_operation)
+                                  operations)
 from couchbase.result import (CounterResult,
                               ExistsResult,
                               GetReplicaResult,
@@ -1863,7 +1862,7 @@ class Collection(CollectionLogic):
                                                                           opts_type=GetAnyReplicaMultiOptions,
                                                                           **kwargs)
         op_type = operations.GET_ANY_REPLICA.value
-        res = replica_read_multi_operation(
+        res = kv_multi_operation(
             **self._get_connection_args(),
             op_type=op_type,
             op_args=op_args
@@ -1965,7 +1964,7 @@ class Collection(CollectionLogic):
                                                                           opts_type=GetAllReplicasMultiOptions,
                                                                           **kwargs)
         op_type = operations.GET_ALL_REPLICAS.value
-        res = replica_read_multi_operation(
+        res = kv_multi_operation(
             **self._get_connection_args(),
             op_type=op_type,
             op_args=op_args

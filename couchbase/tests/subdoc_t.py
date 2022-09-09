@@ -190,7 +190,6 @@ class SubDocumentTests:
         assert isinstance(result, LookupInResult)
         assert result.content_as[int](0) == 5
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_mutate_in_simple(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
@@ -199,8 +198,7 @@ class SubDocumentTests:
 
         result = cb.mutate_in(key,
                               (SD.upsert("city", "New City"),
-                               SD.replace("faa", "CTY")),
-                              MutateInOptions(expiry=timedelta(seconds=1000)))
+                               SD.replace("faa", "CTY")))
 
         value["city"] = "New City"
         value["faa"] = "CTY"
@@ -215,7 +213,6 @@ class SubDocumentTests:
         result = cb.get(key)
         assert value == result.content_as[dict]
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_mutate_in_simple_spec_as_list(self, cb_env, new_kvp):
         cb = cb_env.collection
         key = new_kvp.key
@@ -225,8 +222,7 @@ class SubDocumentTests:
 
         result = cb.mutate_in(key,
                               [SD.upsert("city", "New City"),
-                               SD.replace("faa", "CTY")],
-                              MutateInOptions(expiry=timedelta(seconds=1000)))
+                               SD.replace("faa", "CTY")])
 
         value["city"] = "New City"
         value["faa"] = "CTY"
@@ -268,7 +264,6 @@ class SubDocumentTests:
         # reset to norm
         cb.remove(key)
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_mutate_in_remove(self, cb_env, new_kvp):
 
         cb = cb_env.collection
@@ -530,7 +525,6 @@ class SubDocumentTests:
                          (SD.upsert('new_path', 'im new'),),
                          upsert_doc=True, replace_doc=True)
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_array_append(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
@@ -546,7 +540,6 @@ class SubDocumentTests:
         assert len(val["array"]) == 5
         assert val["array"][4] == 5
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_array_prepend(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
@@ -562,7 +555,6 @@ class SubDocumentTests:
         assert len(val["array"]) == 5
         assert val["array"][0] == 0
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_array_insert(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
@@ -612,7 +604,6 @@ class SubDocumentTests:
         # clean-up
         cb.remove(key)
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_array_append_multi_insert(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
@@ -645,7 +636,6 @@ class SubDocumentTests:
         assert len(pre_res) == 3
         assert pre_res == [1, 2, 3]
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_array_insert_multi_insert(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()

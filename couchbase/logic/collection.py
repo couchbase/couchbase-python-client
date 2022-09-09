@@ -12,7 +12,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import json
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -26,7 +26,6 @@ from couchbase.options import forward_args
 from couchbase.pycbc_core import (binary_operation,
                                   kv_operation,
                                   operations,
-                                  replica_read_operation,
                                   subdoc_operation)
 from couchbase.result import (CounterResult,
                               ExistsResult,
@@ -143,10 +142,10 @@ class CollectionLogic:
             :class:`~.exceptions.DocumentNotFoundException`: If the provided document key does not exist.
         """
         op_type = operations.GET_ANY_REPLICA.value
-        return replica_read_operation(**self._get_connection_args(),
-                                      **kwargs,
-                                      key=key,
-                                      op_type=op_type)
+        return kv_operation(**self._get_connection_args(),
+                            key=key,
+                            op_type=op_type,
+                            op_args=kwargs)
 
     def get_all_replicas(
         self,
@@ -167,10 +166,10 @@ class CollectionLogic:
             :class:`~.exceptions.DocumentNotFoundException`: If the provided document key does not exist.
         """
         op_type = operations.GET_ALL_REPLICAS.value
-        return replica_read_operation(**self._get_connection_args(),
-                                      **kwargs,
-                                      key=key,
-                                      op_type=op_type)
+        return kv_operation(**self._get_connection_args(),
+                            key=key,
+                            op_type=op_type,
+                            op_args=kwargs)
 
     def exists(
         self,
@@ -318,13 +317,13 @@ class CollectionLogic:
             op_type=op_type,
         )
 
-    def mutate_in(
+    def mutate_in(   # noqa: C901
         self,
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: MutateInOptions
         **kwargs,  # type: Any
-    ) -> Optional[MutateInResult]:
+    ) -> Optional[MutateInResult]:   # noqa: C901
         # no tc for sub-doc, use default JSON
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.pop('transcoder', self.default_transcoder)
@@ -367,12 +366,21 @@ class CollectionLogic:
             final_args["store_semantics"] = StoreSemantics.REPLACE
 
         final_spec = []
+        allowed_multi_ops = [SubDocOp.ARRAY_PUSH_FIRST,
+                             SubDocOp.ARRAY_PUSH_LAST,
+                             SubDocOp.ARRAY_ADD_UNIQUE,
+                             SubDocOp.ARRAY_INSERT]
+
         for s in spec:
             if len(s) == 6:
-                new_value = transcoder.encode_value(s[5])
                 tmp = list(s[:5])
-                # no need to propagate the flags
-                tmp.append(new_value[0])
+                if s[0] in allowed_multi_ops:
+                    new_value = json.dumps(s[5], ensure_ascii=False)
+                    # this is an array, need to remove brackets
+                    tmp.append(new_value[1:len(new_value)-1].encode('utf-8'))
+                else:
+                    # no need to propagate the flags
+                    tmp.append(transcoder.encode_value(s[5])[0])
                 final_spec.append(tuple(tmp))
             else:
                 final_spec.append(s)
