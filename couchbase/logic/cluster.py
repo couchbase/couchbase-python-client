@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 from typing import (TYPE_CHECKING,
                     Any,
@@ -50,6 +51,8 @@ from couchbase.transcoder import JSONTranscoder
 if TYPE_CHECKING:
     from couchbase.options import DiagnosticsOptions, PingOptions
     from couchbase.transcoder import Transcoder
+
+log = logging.getLogger(__name__)
 
 
 class ClusterLogic:
@@ -135,8 +138,7 @@ class ClusterLogic:
         self._server_version = None
 
     def __del__(self):
-        if hasattr(self, '_transactions') and self._transactions is not None:
-            self._transactions.close()
+        self._destroy_connection()
 
     @property
     def connection(self):
@@ -292,6 +294,7 @@ class ClusterLogic:
     def _close_cluster(self, **kwargs):
 
         # first close the transactions object, if any
+        log.debug("closing cluster")
         if self._transactions:
             self._transactions.close()
             del self._transactions
@@ -315,7 +318,7 @@ class ClusterLogic:
 
     def _destroy_connection(self):
         if hasattr(self, '_connection'):
-            del self._connection
+            self._connection = None
 
     def _get_cluster_info(self, **kwargs) -> Optional[ClusterInfoResult]:
 

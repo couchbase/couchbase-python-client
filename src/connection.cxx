@@ -125,10 +125,10 @@ close_connection_callback(PyObject* pyObj_conn,
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
-
     LOG_DEBUG("{}: close conn callback completed", "PYCBC");
     auto conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     conn->io_.stop();
+    // the pyObj_conn was incref'd before being passed into this callback, decref it here
     Py_DECREF(pyObj_conn);
     PyGILState_Release(state);
 }
@@ -676,7 +676,7 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
     // struct callback_context callback_ctx = { pyObj_callback, pyObj_errback };
     Py_XINCREF(pyObj_callback);
     Py_XINCREF(pyObj_errback);
-
+    Py_XINCREF(pyObj_conn);
     auto barrier = std::make_shared<std::promise<PyObject*>>();
     auto f = barrier->get_future();
     {
@@ -684,8 +684,10 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
         Py_BEGIN_ALLOW_THREADS conn->cluster_->close([pyObj_conn, pyObj_callback, pyObj_errback, callback_count, barrier]() mutable {
             if (callback_count == 0) {
                 close_connection_callback(pyObj_conn, pyObj_callback, pyObj_errback, barrier);
+            } else {
+                LOG_DEBUG("close callback called {} times already!", callback_count);
+                callback_count++;
             }
-            callback_count++;
         });
         Py_END_ALLOW_THREADS
     }

@@ -199,3 +199,9 @@ class ClusterDiagnosticsTests:
                 assert data[0]['remote'] is not None
                 assert data[0]['local'] is not None
                 assert data[0]['state'] is not None
+
+    # TODO: really we could use a separate test class to test things like opening/closing buckets, cluster, etc...
+    #    i.e. things that are not query, diagnostics, etc...  For now, lets just have this here
+    def test_multiple_close_cluster(self, cb_env):
+        for i in range(10):
+            cb_env.cluster.close()

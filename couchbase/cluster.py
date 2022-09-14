@@ -107,9 +107,8 @@ class Cluster(ClusterLogic):
 
     @BlockingWrapper.block(True)
     def _close_cluster(self):
-        res = super()._close_cluster()
-        if res is not None:
-            super()._destroy_connection()
+        super()._close_cluster()
+        super()._destroy_connection()
 
     @property
     def transactions(self) -> Transactions:
