@@ -25,10 +25,13 @@ from couchbase.exceptions import (CouchbaseException,
                                   InvalidArgumentException,
                                   UnAmbiguousTimeoutException)
 from couchbase.logic.cluster import ClusterLogic
-from couchbase.options import (ClusterOptions,
+from couchbase.options import (CONFIG_PROFILES,
+                               ClusterOptions,
                                ClusterTimeoutOptions,
                                ClusterTracingOptions,
+                               ConfigProfile,
                                IpProtocol,
+                               KnownConfigProfiles,
                                TLSVerifyMode)
 from couchbase.serializer import DefaultJsonSerializer
 from couchbase.transcoder import JSONTranscoder
@@ -602,3 +605,120 @@ class ConnectionTests:
 
         with pytest.raises(InvalidArgumentException):
             ClusterLogic(conn_string, authenticator=auth, trust_store_path=ts_path)
+
+    @pytest.mark.parametrize('profile',
+                             [KnownConfigProfiles.WanDevelopment, 'wan_development'])
+    def test_wan_config_profile(self, couchbase_config, profile):
+        expected_opts = {'bootstrap_timeout': 10000,
+                         'resolve_timeout': 2000,
+                         'connect_timeout': 20000,
+                         'key_value_timeout': 20000,
+                         'key_value_durable_timeout': 20000,
+                         'view_timeout': 120000,
+                         'query_timeout': 120000,
+                         'analytics_timeout': 120000,
+                         'search_timeout': 120000,
+                         'management_timeout': 120000}
+
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        opts.apply_profile(profile)
+        cluster = Cluster.connect(conn_string, opts)
+        client_opts = cluster._get_client_connection_info()
+        for k in expected_opts.keys():
+            assert client_opts[k] == expected_opts[k]
+
+    @pytest.mark.parametrize('profile',
+                             [KnownConfigProfiles.WanDevelopment, 'wan_development'])
+    def test_wan_config_profile_with_auth(self, couchbase_config, profile):
+        expected_opts = {'bootstrap_timeout': 10000,
+                         'resolve_timeout': 2000,
+                         'connect_timeout': 20000,
+                         'key_value_timeout': 20000,
+                         'key_value_durable_timeout': 20000,
+                         'view_timeout': 120000,
+                         'query_timeout': 120000,
+                         'analytics_timeout': 120000,
+                         'search_timeout': 120000,
+                         'management_timeout': 120000}
+
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        cluster = Cluster.connect(conn_string, ClusterOptions.create_options_with_profile(auth, profile))
+        client_opts = cluster._get_client_connection_info()
+        for k in expected_opts.keys():
+            assert client_opts[k] == expected_opts[k]
+
+    def test_custom_config_profile(self, couchbase_config):
+        expected_opts = {'bootstrap_timeout': 10000,
+                         'resolve_timeout': 2000,
+                         'connect_timeout': 5000,
+                         'key_value_timeout': 5000,
+                         'key_value_durable_timeout': 5000,
+                         'view_timeout': 60000,
+                         'query_timeout': 60000,
+                         'analytics_timeout': 60000,
+                         'search_timeout': 60000,
+                         'management_timeout': 60000}
+
+        class TestProfile(ConfigProfile):
+            def __init__(self):
+                super().__init__()
+
+            def apply(self,
+                      options  # type: ClusterOptions
+                      ) -> None:
+                options['kv_timeout'] = timedelta(seconds=5)
+                options['kv_durable_timeout'] = timedelta(seconds=5)
+                options['connect_timeout'] = timedelta(seconds=5)
+                options['analytics_timeout'] = timedelta(seconds=60)
+                options['query_timeout'] = timedelta(seconds=60)
+                options['search_timeout'] = timedelta(seconds=60)
+                options['management_timeout'] = timedelta(seconds=60)
+                options['views_timeout'] = timedelta(seconds=60)
+
+        CONFIG_PROFILES.register_profile('test_profile', TestProfile())
+
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        opts.apply_profile('test_profile')
+        cluster = Cluster.connect(conn_string, opts)
+        client_opts = cluster._get_client_connection_info()
+        for k in expected_opts.keys():
+            assert client_opts[k] == expected_opts[k]
+
+        profile = CONFIG_PROFILES.unregister_profile('test_profile')
+        assert isinstance(profile, ConfigProfile)
+
+    def test_config_profile_fail(self, couchbase_config):
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        with pytest.raises(InvalidArgumentException):
+            opts.apply_profile('test_profile')
+
+    def test_custom_config_profile_fail(self):
+
+        class TestProfile():
+            def __init__(self):
+                super().__init__()
+
+            def apply(self,
+                      options  # type: ClusterOptions
+                      ) -> None:
+                options['kv_timeout'] = timedelta(seconds=5)
+                options['kv_durable_timeout'] = timedelta(seconds=5)
+                options['connect_timeout'] = timedelta(seconds=5)
+                options['analytics_timeout'] = timedelta(seconds=60)
+                options['query_timeout'] = timedelta(seconds=60)
+                options['search_timeout'] = timedelta(seconds=60)
+                options['management_timeout'] = timedelta(seconds=60)
+                options['views_timeout'] = timedelta(seconds=60)
+
+        with pytest.raises(InvalidArgumentException):
+            CONFIG_PROFILES.register_profile('test_profile', TestProfile())

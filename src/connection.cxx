@@ -21,6 +21,54 @@
 #include "metrics.hxx"
 #include <core/io/ip_protocol.hxx>
 
+couchbase::core::io::ip_protocol
+pyObj_to_ip_protocol(std::string ip_protocol)
+{
+    if (ip_protocol.compare("force_ipv4") == 0) {
+        return couchbase::core::io::ip_protocol::force_ipv4;
+    } else if (ip_protocol.compare("force_ipv6") == 0) {
+        return couchbase::core::io::ip_protocol::force_ipv6;
+    } else {
+        return couchbase::core::io::ip_protocol::any;
+    }
+}
+
+PyObject*
+ip_protocol_to_pyObj(couchbase::core::io::ip_protocol ip_protocol)
+{
+    if (ip_protocol == couchbase::core::io::ip_protocol::force_ipv4) {
+        return PyUnicode_FromString("force_ipv4");
+    } else if (ip_protocol == couchbase::core::io::ip_protocol::force_ipv6) {
+        return PyUnicode_FromString("force_ipv6");
+    } else {
+        return PyUnicode_FromString("any");
+    }
+}
+
+couchbase::core::tls_verify_mode
+pyObj_to_tls_verify_mode(std::string tls_verify_mode)
+{
+    if (tls_verify_mode.compare("none") == 0) {
+        return couchbase::core::tls_verify_mode::none;
+    } else if (tls_verify_mode.compare("peer") == 0) {
+        return couchbase::core::tls_verify_mode::peer;
+    } else {
+        return couchbase::core::tls_verify_mode::none;
+    }
+}
+
+PyObject*
+tls_verify_mode_to_pyObj(couchbase::core::tls_verify_mode tls_verify_mode)
+{
+    if (tls_verify_mode == couchbase::core::tls_verify_mode::none) {
+        return PyUnicode_FromString("none");
+    } else if (tls_verify_mode == couchbase::core::tls_verify_mode::peer) {
+        return PyUnicode_FromString("peer");
+    } else {
+        return PyUnicode_FromString("none");
+    }
+}
+
 static void
 dealloc_conn(PyObject* obj)
 {
@@ -213,6 +261,21 @@ get_cluster_credentials(PyObject* pyObj_auth)
     return auth;
 }
 
+PyObject*
+get_metrics_options(const couchbase::core::metrics::logging_meter_options& logging_options)
+{
+    PyObject* pyObj_opts = PyDict_New();
+    std::chrono::duration<unsigned long long, std::milli> int_msec = logging_options.emit_interval;
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "emit_interval", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    return pyObj_opts;
+}
+
 void
 update_cluster_logging_meter_options(couchbase::core::cluster_options& options, PyObject* pyObj_emit_interval)
 {
@@ -229,6 +292,99 @@ update_cluster_logging_meter_options(couchbase::core::cluster_options& options, 
     if (has_logging_meter_options) {
         options.metrics_options = logging_options;
     }
+}
+
+PyObject*
+get_tracing_options(const couchbase::core::tracing::threshold_logging_options& tracing_options)
+{
+    PyObject* pyObj_opts = PyDict_New();
+    std::chrono::duration<unsigned long long, std::milli> int_msec = tracing_options.orphaned_emit_interval;
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "orphaned_emit_interval", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromSize_t(tracing_options.orphaned_sample_size);
+    if (-1 == PyDict_SetItemString(pyObj_opts, "orphaned_sample_size", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.threshold_emit_interval;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "threshold_emit_interval", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromSize_t(tracing_options.threshold_sample_size);
+    if (-1 == PyDict_SetItemString(pyObj_opts, "threshold_sample_size", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.key_value_threshold;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "key_value_threshold", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.query_threshold;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "query_threshold", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.view_threshold;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "view_threshold", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.search_threshold;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "search_threshold", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.analytics_threshold;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "analytics_threshold", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.management_threshold;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "management_threshold", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = tracing_options.eventing_threshold;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "eventing_threshold", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    return pyObj_opts;
 }
 
 void
@@ -470,14 +626,7 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
 
     PyObject* pyObj_use_ip_protocol = PyDict_GetItemString(pyObj_options, "use_ip_protocol");
     if (pyObj_use_ip_protocol != nullptr) {
-        auto use_ip_protocol = std::string(PyUnicode_AsUTF8(pyObj_use_ip_protocol));
-        if (use_ip_protocol.compare("force_ipv4") == 0) {
-            options.use_ip_protocol = couchbase::core::io::ip_protocol::force_ipv6;
-        } else if (use_ip_protocol.compare("force_ipv6") == 0) {
-            options.use_ip_protocol = couchbase::core::io::ip_protocol::force_ipv6;
-        } else {
-            options.use_ip_protocol = couchbase::core::io::ip_protocol::any;
-        }
+        options.use_ip_protocol = pyObj_to_ip_protocol(std::string(PyUnicode_AsUTF8(pyObj_use_ip_protocol)));
     }
 
     PyObject* pyObj_enable_dns_srv = PyDict_GetItemString(pyObj_options, "enable_dns_srv");
@@ -523,12 +672,7 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
 
     PyObject* pyObj_tls_verify = PyDict_GetItemString(pyObj_options, "tls_verify");
     if (pyObj_tls_verify != nullptr) {
-        auto tls_verify = std::string(PyUnicode_AsUTF8(pyObj_tls_verify));
-        if (tls_verify.compare("none") == 0) {
-            options.tls_verify = couchbase::core::tls_verify_mode::none;
-        } else if (tls_verify.compare("peer") == 0) {
-            options.tls_verify = couchbase::core::tls_verify_mode::peer;
-        }
+        options.tls_verify = pyObj_to_tls_verify_mode(std::string(PyUnicode_AsUTF8(pyObj_tls_verify)));
     }
 
     PyObject* pyObj_tcp_keep_alive_interval = PyDict_GetItemString(pyObj_options, "tcp_keep_alive_interval");
@@ -599,7 +743,15 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
 
     couchbase::core::utils::connection_string connection_str = couchbase::core::utils::parse_connection_string(conn_str);
     couchbase::core::cluster_credentials auth = get_cluster_credentials(pyObj_auth);
-    update_cluster_options(connection_str.options, pyObj_options, pyObj_auth);
+    try {
+        update_cluster_options(connection_str.options, pyObj_options, pyObj_auth);
+    } catch (const std::invalid_argument& e) {
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
+        return nullptr;
+    } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_Exception, e.what());
+        return nullptr;
+    }
 
     PyObject* pyObj_num_io_threads = PyDict_GetItemString(pyObj_options, "num_io_threads");
     int num_io_threads = 1;
@@ -643,6 +795,281 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
         Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
+}
+
+PyObject*
+get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
+{
+    PyObject* pyObj_conn = nullptr;
+    static const char* kw_list[] = { "", nullptr };
+
+    const char* kw_format = "O!";
+    int ret = PyArg_ParseTupleAndKeywords(args, kwargs, kw_format, const_cast<char**>(kw_list), &PyCapsule_Type, &pyObj_conn);
+
+    if (!ret) {
+        std::string msg = "Cannot get connection options. Unable to parse args/kwargs.";
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, msg.c_str());
+        return nullptr;
+    }
+
+    connection* conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
+    if (nullptr == conn) {
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
+        return nullptr;
+    }
+
+    auto cluster_info = conn->cluster_->origin();
+    if (cluster_info.first) {
+        Py_RETURN_NONE;
+    }
+    auto opts = cluster_info.second.options();
+    PyObject* pyObj_opts = PyDict_New();
+    std::chrono::duration<unsigned long long, std::milli> int_msec = opts.bootstrap_timeout;
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "bootstrap_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.resolve_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "resolve_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.connect_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "connect_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.key_value_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "key_value_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.key_value_durable_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "key_value_durable_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.view_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "view_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.query_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "query_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.analytics_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "analytics_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.search_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "search_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.management_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "management_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.dns_srv_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "dns_srv_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_tls", opts.enable_tls ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    pyObj_tmp = PyUnicode_FromString(opts.trust_certificate.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "trust_certificate", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_mutation_tokens", opts.enable_mutation_tokens ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_tcp_keep_alive", opts.enable_tcp_keep_alive ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    pyObj_tmp = ip_protocol_to_pyObj(opts.use_ip_protocol);
+    if (-1 == PyDict_SetItemString(pyObj_opts, "ip_protocol", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_dns_srv", opts.enable_dns_srv ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "show_queries", opts.show_queries ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_unordered_execution", opts.enable_unordered_execution ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 ==
+        PyDict_SetItemString(pyObj_opts, "enable_clustermap_notification", opts.enable_clustermap_notification ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_compression", opts.enable_compression ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_tracing", opts.enable_tracing ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "enable_metrics", opts.enable_metrics ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    pyObj_tmp = PyUnicode_FromString(opts.network.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "network", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = get_tracing_options(opts.tracing_options);
+    if (-1 == PyDict_SetItemString(pyObj_opts, "tracing_options", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = get_metrics_options(opts.metrics_options);
+    if (-1 == PyDict_SetItemString(pyObj_opts, "metrics_options", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = tls_verify_mode_to_pyObj(opts.tls_verify);
+    if (-1 == PyDict_SetItemString(pyObj_opts, "tls_verify", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "has_tracer", opts.tracer != nullptr ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "has_meter", opts.meter != nullptr ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+
+    int_msec = opts.tcp_keep_alive_interval;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "tcp_keep_alive_interval", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.config_poll_interval;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "config_poll_interval", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.config_poll_floor;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "config_poll_floor", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.config_idle_redial_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "config_idle_redial_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromSize_t(opts.max_http_connections);
+    if (-1 == PyDict_SetItemString(pyObj_opts, "max_http_connections", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    int_msec = opts.idle_http_connection_timeout;
+    pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "idle_http_connection_timeout", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(opts.user_agent_extra.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_opts, "user_agent_extra", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    return pyObj_opts;
 }
 
 PyObject*

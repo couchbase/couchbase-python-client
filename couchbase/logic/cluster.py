@@ -39,6 +39,7 @@ from couchbase.pycbc_core import (close_connection,
                                   cluster_mgmt_operations,
                                   create_connection,
                                   diagnostics_operation,
+                                  get_connection_info,
                                   management_operation,
                                   mgmt_operations,
                                   operations)
@@ -271,6 +272,17 @@ class ClusterLogic:
         if conn_only is True:
             return self._cluster_opts
         return self._auth, self._cluster_opts
+
+    def _get_client_connection_info(self) -> Dict[str, Any]:
+        """Get connection related options from the cxx client
+
+        **INTERNAL** not intended for use in public API.
+
+        Returns:
+            Dict[str, Any]: All connection related information.
+        """
+
+        return get_connection_info(self._connection)
 
     def _connect_cluster(self, **kwargs):
 

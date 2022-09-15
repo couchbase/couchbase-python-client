@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 import copy
-from abc import ABCMeta, abstractmethod
+from abc import (ABC,
+                 ABCMeta,
+                 abstractmethod)
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
@@ -34,6 +36,7 @@ from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.options import AcceptableInts  # noqa: F401
 from couchbase.logic.options import Compression  # noqa: F401
 from couchbase.logic.options import IpProtocol  # noqa: F401
+from couchbase.logic.options import KnownConfigProfiles  # noqa: F401
 from couchbase.logic.options import LockMode  # noqa: F401
 from couchbase.logic.options import TLSVerifyMode  # noqa: F401
 from couchbase.logic.options import get_valid_args  # noqa: F401
@@ -81,6 +84,7 @@ from couchbase.serializer import DefaultJsonSerializer
 # allows for imports only during type checking and not during runtime -- :)
 if TYPE_CHECKING:
     from couchbase._utils import JSONType
+    from couchbase.auth import Authenticator
     from couchbase.collection import Collection
     from couchbase.durability import DurabilityType, ServerDurability
     from couchbase.n1ql import QueryScanConsistency
@@ -140,6 +144,138 @@ class ClusterTimeoutOptions(ClusterTimeoutOptionsBase):
         config_idle_redial_timeout (timedelta, optional): Idle redial timeout. Defaults to None.
         config_total_timeout (timedelta, optional): **DEPRECATED** complete bootstrap timeout. Defaults to None.
     """
+
+
+class ConfigProfile(ABC):
+    """
+    **VOLATILE** This API is subject to change at any time.
+
+    This is an abstract base class intended to use with creating Configuration Profiles.  Any derived class
+    will need to implement the :meth:`apply` method.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    def apply(self,
+              options  # type: ClusterOptions
+              ) -> None:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Apply the provided options to ClusterOptions. This method will need to be implemented in derived classes.
+
+        Args:
+            options (:class:`~couchbase.options.ClusterOptions`): The options the profile will apply toward.
+        """
+        pass
+
+
+class WanDevelopmentProfile(ConfigProfile):
+    """
+    **VOLATILE** This API is subject to change at any time.
+
+    The WAN Development profile sets various timeout options that are useful when develoption in a WAN environment.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def apply(self,
+              options  # type: ClusterOptions
+              ) -> None:
+        # Need to use keys in couchbase.logic.ClusterTimeoutOptionsBase._VALID_OPTS
+        options['kv_timeout'] = timedelta(seconds=20)
+        options['kv_durable_timeout'] = timedelta(seconds=20)
+        options['connect_timeout'] = timedelta(seconds=20)
+        options['analytics_timeout'] = timedelta(seconds=120)
+        options['query_timeout'] = timedelta(seconds=120)
+        options['search_timeout'] = timedelta(seconds=120)
+        options['management_timeout'] = timedelta(seconds=120)
+        options['views_timeout'] = timedelta(seconds=120)
+
+
+class ConfigProfiles():
+    """
+    **VOLATILE** This API is subject to change at any time.
+
+    The `ConfigProfiles` class is responsible for keeping track of registered/known Configuration
+    Profiles.
+    """
+
+    def __init__(self):
+        self._profiles = {}
+        self.register_profile(KnownConfigProfiles.WanDevelopment.value, WanDevelopmentProfile())
+
+    def apply_profile(self,
+                      profile_name,  # type: str
+                      options  # type: ClusterOptions
+                      ) -> None:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Apply the provided ConfigProfile options.
+
+        Args:
+            profile_name (str):  The name of the profile to apply.
+            options (:class:`~couchbase.options.ClusterOptions`): The options to apply the ConfigProfile options
+                toward. The ConfigProfile options will override any matching option(s) previously set.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the specified profile is not registered.
+        """
+        if profile_name not in self._profiles:
+            raise InvalidArgumentException(f'{profile_name} is not a registered profile.')
+
+        self._profiles[profile_name].apply(options)
+
+    def register_profile(self,
+                         profile_name,  # type: str
+                         profile,  # type: ConfigProfile
+                         ) -> None:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Register a :class:`~couchbase.options.ConfigProfile`.
+
+        Args:
+            profile_name (str):  The name of the :class:`~couchbase.options.ConfigProfile` to register.
+            profile (:class:`~couchbase.options.ConfigProfile`): The :class:`~couchbase.options.ConfigProfile`
+                to register.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the specified profile is not derived
+            from :class:`~couchbase.options.ConfigProfile`.
+
+        """
+        if not issubclass(profile.__class__, ConfigProfile):
+            raise InvalidArgumentException('A Configuration Profile must be derived from ConfigProfile')
+
+        self._profiles[profile_name] = profile
+
+    def unregister_profile(self,
+                           profile_name  # type: str
+                           ) -> Optional[ConfigProfile]:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Unregister a :class:`~couchbase.options.ConfigProfile`.
+
+        Args:
+            profile_name (str):  The name of the :class:`~couchbase.options.ConfigProfile` to unregister.
+
+        Returns
+            Optional(:class:`~couchbase.options.ConfigProfile`): The unregistered :class:`~couchbase.options.ConfigProfile`
+        """  # noqa: E501
+
+        return self._profiles.pop(profile_name, None)
+
+
+"""
+**VOLATILE** The ConfigProfiles API is subject to change at any time.
+"""
+CONFIG_PROFILES = ConfigProfiles()
 
 
 class ClusterOptions(ClusterOptionsBase):
@@ -208,6 +344,50 @@ class ClusterOptions(ClusterOptionsBase):
         meter (:class:`~couchbase.metrics.CouchbaseMeter`, optional): Set an external meter.  Defaults to None,
             enabling the `logging_meter`.   Note when this is set, the `logging_meter_emit_interval` option is ignored.
     """
+
+    def apply_profile(self,
+                      profile_name  # type: Union[KnownConfigProfiles, str]
+                      ) -> None:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Apply the provided ConfigProfile options.
+
+        Args:
+            profile_name ([:class:`~couchbase.options.KnownConfigProfiles`, str]):  The name of the profile to apply
+                toward ClusterOptions.
+            authenticator (Union[:class:`~couchbase.auth.PasswordAuthenticator`, :class:`~couchbaes.auth.CertificateAuthenticator`]): An authenticator instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the specified profile is not registered.
+
+        """  # noqa: E501
+        prof_name = profile_name.value if isinstance(profile_name, KnownConfigProfiles) else profile_name
+        CONFIG_PROFILES.apply_profile(prof_name, self)
+
+    @classmethod
+    def create_options_with_profile(cls,
+                                    authenticator,  # type: Optional[Authenticator]
+                                    profile_name  # type: Union[KnownConfigProfiles, str]
+                                    ) -> ClusterOptions:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Create a ClusterOptions instance and apply the provided ConfigProfile options.
+
+        Args:
+            authenticator (Union[:class:`~couchbase.auth.PasswordAuthenticator`, :class:`~couchbaes.auth.CertificateAuthenticator`]): An authenticator instance.
+            profile_name ([:class:`~couchbase.options.KnownConfigProfiles`, str]):  The name of the profile to apply
+                toward ClusterOptions.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the specified profile is not registered.
+
+        """  # noqa: E501
+        opts = cls(authenticator)
+        prof_name = profile_name.value if isinstance(profile_name, KnownConfigProfiles) else profile_name
+        CONFIG_PROFILES.apply_profile(prof_name, opts)
+        return opts
 
 # Diagnostics Operations
 

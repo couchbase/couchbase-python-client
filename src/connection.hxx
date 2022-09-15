@@ -23,6 +23,9 @@ PyObject*
 handle_create_connection(PyObject* self, PyObject* args, PyObject* kwargs);
 
 PyObject*
+get_connection_info(PyObject* self, PyObject* args, PyObject* kwargs);
+
+PyObject*
 handle_close_connection(PyObject* self, PyObject* args, PyObject* kwargs);
 
 PyObject*

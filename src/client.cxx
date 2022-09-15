@@ -472,6 +472,16 @@ create_connection(PyObject* self, PyObject* args, PyObject* kwargs)
 }
 
 static PyObject*
+get_connection_information(PyObject* self, PyObject* args, PyObject* kwargs)
+{
+    PyObject* res = get_connection_info(self, args, kwargs);
+    if (res == nullptr && PyErr_Occurred() == nullptr) {
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to get connection information.");
+    }
+    return res;
+}
+
+static PyObject*
 close_connection(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_close_connection(self, args, kwargs);
@@ -483,6 +493,7 @@ close_connection(PyObject* self, PyObject* args, PyObject* kwargs)
 
 static struct PyMethodDef methods[] = {
     { "create_connection", (PyCFunction)create_connection, METH_VARARGS | METH_KEYWORDS, "Create connection object" },
+    { "get_connection_info", (PyCFunction)get_connection_information, METH_VARARGS | METH_KEYWORDS, "Get connection options" },
     { "open_or_close_bucket", (PyCFunction)open_or_close_bucket, METH_VARARGS | METH_KEYWORDS, "Open or close a bucket" },
     { "close_connection", (PyCFunction)close_connection, METH_VARARGS | METH_KEYWORDS, "Close a connection" },
     { "kv_operation", (PyCFunction)kv_operation, METH_VARARGS | METH_KEYWORDS, "Handle all key/value operations" },

@@ -324,6 +324,41 @@ class Compression(Enum):
     FORCE = "force"
 
 
+class KnownConfigProfiles(Enum):
+    """
+    **VOLATILE** This API is subject to change at any time.
+
+    Represents the name of a specific configuration profile that is associated with predetermined cluster options.
+
+    """
+    WanDevelopment = 'wan_development'
+
+    @classmethod
+    def from_str(cls, value  # type: str
+                 ) -> str:
+        if isinstance(value, str):
+            if value == cls.WanDevelopment.value:
+                return cls.WanDevelopment
+
+        raise InvalidArgumentException(message=(f"{value} is not a valid KnownConfigProfiles option. "
+                                                "Excepted str representation of type KnownConfigProfiles."))
+
+    @classmethod
+    def to_str(cls, value  # type: Union[KnownConfigProfiles, str]
+               ) -> str:
+        if isinstance(value, KnownConfigProfiles):
+            return value.value
+
+        # just retun the str to allow for future customer config profiles
+        if isinstance(value, str):
+            return value
+
+        raise InvalidArgumentException(message=(f"{value} is not a valid KnownConfigProfiles option. "
+                                                "Excepted config profile to be either of type "
+                                                "KnownConfigProfiles or str representation "
+                                                "of KnownConfigProfiles."))
+
+
 """
 
 Couchbase Python SDK Cluster related Options
