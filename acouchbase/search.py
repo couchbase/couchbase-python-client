@@ -35,6 +35,7 @@ class AsyncSearchRequest(SearchRequestLogic):
                  ):
         super().__init__(connection, encoded_query, **kwargs)
         self._loop = loop
+        self._rows = asyncio.Queue()
 
     @property
     def loop(self):

@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -1276,7 +1275,6 @@ class SearchRequestLogic:
         self._connection = connection
         self._encoded_query = encoded_query
         self.row_factory = row_factory
-        self._rows = asyncio.Queue()
         self._streaming_result = None
         self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None

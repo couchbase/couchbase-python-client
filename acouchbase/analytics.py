@@ -36,6 +36,7 @@ class AsyncAnalyticsRequest(AnalyticsRequestLogic):
                  ):
         super().__init__(connection, query_params, row_factory=row_factory, **kwargs)
         self._loop = loop
+        self._rows = asyncio.Queue()
 
     @property
     def loop(self):

@@ -15,6 +15,7 @@
 
 import json
 import pathlib
+import threading
 from copy import copy
 from datetime import timedelta
 from os import path
@@ -545,6 +546,30 @@ class SearchTests:
         with pytest.raises(QueryIndexNotFoundException):
             [r for r in res]
 
+    def test_search_query_in_thread(self, cb_env):
+        results = [None]
+
+        def run_test(cluster, search_idx, assert_fn, results):
+            try:
+                q = search.TermQuery('home')
+                result = cluster.search_query(search_idx, q, SearchOptions(limit=10))
+                assert_fn(result, 2)
+                assert result.metadata() is not None
+            except AssertionError:
+                results[0] = False
+            except Exception as ex:
+                results[0] = ex
+            else:
+                results[0] = True
+
+        t = threading.Thread(target=run_test, args=(
+            cb_env.cluster, self.TEST_INDEX_NAME, cb_env.assert_search_rows, results))
+        t.start()
+        t.join()
+
+        assert len(results) == 1
+        assert results[0] is True
+
 
 class SearchCollectionTests:
     TEST_INDEX_NAME = 'test-search-coll-index'
@@ -728,6 +753,30 @@ class SearchCollectionTests:
         assert all(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all())) is True
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c == cb_env.collection.name]) is True
+
+    def test_search_query_in_thread(self, cb_env):
+        results = [None]
+
+        def run_test(scope, search_idx, assert_fn, results):
+            try:
+                q = search.TermQuery('home')
+                result = scope.search_query(search_idx, q, SearchOptions(limit=10))
+                assert_fn(result, 2)
+                assert result.metadata() is not None
+            except AssertionError:
+                results[0] = False
+            except Exception as ex:
+                results[0] = ex
+            else:
+                results[0] = True
+
+        t = threading.Thread(target=run_test, args=(
+            cb_env.scope, self.TEST_INDEX_NAME, cb_env.assert_search_rows, results))
+        t.start()
+        t.join()
+
+        assert len(results) == 1
+        assert results[0] is True
 
 
 class SearchStringTests:

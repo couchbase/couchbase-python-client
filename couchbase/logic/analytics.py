@@ -13,7 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
 import json
 from datetime import timedelta
 from enum import Enum
@@ -390,7 +389,6 @@ class AnalyticsRequestLogic:
         self._connection = connection
         self._query_params = query_params
         self.row_factory = row_factory
-        self._rows = asyncio.Queue()
         self._streaming_result = None
         self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None

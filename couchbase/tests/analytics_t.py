@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import threading
 from datetime import datetime, timedelta
 
 import pytest
@@ -173,6 +174,28 @@ class AnalyticsTests:
             assert isinstance(warning, AnalyticsWarning)
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
+
+    def test_analytics_query_in_thread(self, cb_env):
+        results = [None]
+
+        def run_test(cluster, dataset_name, assert_fn, results):
+            try:
+                result = cluster.analytics_query(f"SELECT * FROM `{dataset_name}` LIMIT 2")
+                assert_fn(result, 2)
+                assert result.metadata() is not None
+            except AssertionError:
+                results[0] = False
+            except Exception as ex:
+                results[0] = ex
+            else:
+                results[0] = True
+
+        t = threading.Thread(target=run_test, args=(cb_env.cluster, self.DATASET_NAME, self.assert_rows, results))
+        t.start()
+        t.join()
+
+        assert len(results) == 1
+        assert results[0] is True
 
 
 class AnalyticsCollectionTests:
@@ -386,6 +409,28 @@ class AnalyticsCollectionTests:
             assert isinstance(warning, AnalyticsWarning)
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
+
+    def test_analytics_query_in_thread(self, cb_env):
+        results = [None]
+
+        def run_test(scope, collection_name, assert_fn, results):
+            try:
+                result = scope.analytics_query(f"SELECT * FROM `{collection_name}` LIMIT 2")
+                assert_fn(result, 2)
+                assert result.metadata() is not None
+            except AssertionError:
+                results[0] = False
+            except Exception as ex:
+                results[0] = ex
+            else:
+                results[0] = True
+
+        t = threading.Thread(target=run_test, args=(cb_env.scope, cb_env.collection.name, self.assert_rows, results))
+        t.start()
+        t.join()
+
+        assert len(results) == 1
+        assert results[0] is True
 
 
 class AnalyticsParamTests:

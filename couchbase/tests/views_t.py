@@ -15,6 +15,7 @@
 
 import json
 import pathlib
+import threading
 from datetime import timedelta
 from os import path
 
@@ -231,6 +232,32 @@ class ViewTests:
 
         with pytest.raises(DesignDocumentNotFoundException):
             [r for r in view_result]
+
+    def test_view_query_in_thread(self, cb_env):
+        results = [None]
+
+        def run_test(bucket, doc_name, view_name, opts, assert_fn, results):
+            try:
+                result = bucket.view_query(doc_name, view_name, opts)
+                assert_fn(result, opts['limit'])
+                assert result.metadata() is not None
+            except AssertionError:
+                results[0] = False
+            except Exception as ex:
+                results[0] = ex
+            else:
+                results[0] = True
+
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT)
+        t = threading.Thread(target=run_test, args=(cb_env.bucket, self.DOCNAME,
+                             self.TEST_VIEW_NAME, opts, self.assert_rows, results))
+        t.start()
+        t.join()
+
+        assert len(results) == 1
+        assert results[0] is True
 
 
 class ViewParamTests:

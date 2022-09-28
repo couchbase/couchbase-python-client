@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import threading
 from datetime import datetime, timedelta
 
 import pytest
@@ -262,6 +263,28 @@ class QueryTests:
             # self.assertIsNotNone(ex.context.endpoint)
             # self.assertIsNotNone(ex.context.error_response_body)
 
+    def test_query_in_thread(self, cb_env):
+        results = [None]
+
+        def run_test(cluster, assert_fn, results):
+            try:
+                result = cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 2")
+                assert_fn(result, 2)
+                assert result.metadata() is not None
+            except AssertionError:
+                results[0] = False
+            except Exception as ex:
+                results[0] = ex
+            else:
+                results[0] = True
+
+        t = threading.Thread(target=run_test, args=(cb_env.cluster, self.assert_rows, results))
+        t.start()
+        t.join()
+
+        assert len(results) == 1
+        assert results[0] is True
+
 
 class QueryCollectionTests:
     TEST_SCOPE = "test-scope"
@@ -430,6 +453,28 @@ class QueryCollectionTests:
             assert isinstance(warning, QueryWarning)
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
+
+    def test_query_in_thread(self, cb_env):
+        results = [None]
+
+        def run_test(scope, collection_name, assert_fn, results):
+            try:
+                result = scope.query(f"SELECT * FROM `{collection_name}` LIMIT 2")
+                assert_fn(result, 2)
+                assert result.metadata() is not None
+            except AssertionError:
+                results[0] = False
+            except Exception as ex:
+                results[0] = ex
+            else:
+                results[0] = True
+
+        t = threading.Thread(target=run_test, args=(cb_env.scope, cb_env.collection.name, self.assert_rows, results))
+        t.start()
+        t.join()
+
+        assert len(results) == 1
+        assert results[0] is True
 
 
 class QueryParamTests:
