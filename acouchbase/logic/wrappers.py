@@ -247,9 +247,9 @@ class AsyncWrapper:
                 if not self._connection:
                     bucket_conn_ft = self._scope._connect_bucket()
                     # in order to keep arg passing simple, add operation args to kwargs
-                    # This allows the _chain_futures callback to only worry about positional args
+                    # This allows the chain_futures callback to only worry about positional args
                     # outside the scope of the operation.
-                    # Since, the kwargs passed to _chain_futures only apply to the operation, _chain_futures
+                    # Since, the kwargs passed to chain_futures only apply to the operation, chain_futures
                     # can easily determine what it needs to pass to the original wrapped fn
                     kwargs["args"] = args
                     bucket_conn_ft.add_done_callback(
@@ -310,13 +310,13 @@ class AsyncWrapper:
                 if not self._connection:
                     bucket_conn_ft = self._scope._connect_bucket()
                     # in order to keep arg passing simple, add operation args to kwargs
-                    # This allows the _chain_futures callback to only worry about positional args
+                    # This allows the chain_futures callback to only worry about positional args
                     # outside the scope of the operation.
-                    # Since, the kwargs passed to _chain_futures only apply to the operation, _chain_futures
+                    # Since, the kwargs passed to chain_futures only apply to the operation, chain_futures
                     # can easily determine what it needs to pass to the original wrapped fn
                     kwargs["args"] = args
                     bucket_conn_ft.add_done_callback(
-                        partial(cls._chain_futures, ft, self, fn, set_connection=True, **kwargs))
+                        partial(cls.chain_futures, ft, self, fn, set_connection=True, **kwargs))
                 else:
                     call_async_fn(ft, self, fn, *args, **kwargs)
 

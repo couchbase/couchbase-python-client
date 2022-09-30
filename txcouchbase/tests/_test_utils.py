@@ -183,7 +183,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
                         stable = True
                         break
                     except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
-                        run_in_reactor_thread(self.deferred_sleep, 3)
+                        run_in_reactor_thread(TestEnvironment.deferred_sleep, 3)
                         continue
                     except Exception:
                         raise
@@ -331,9 +331,10 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
     def sleep(self, sleep_seconds  # type: float
               ) -> None:
-        run_in_reactor_thread(self.deferred_sleep, sleep_seconds)
+        run_in_reactor_thread(TestEnvironment.deferred_sleep, sleep_seconds)
 
-    def deferred_sleep(self, sleep_seconds  # type: float
+    @staticmethod
+    def deferred_sleep(sleep_seconds  # type: float
                        ) -> None:
         d = defer.Deferred()
         reactor.callLater(sleep_seconds, d.callback, "")
@@ -356,7 +357,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
                 return res
             except Exception:
                 print(f'trying {func} failed, sleeping for {seconds_between} seconds...')
-                run_in_reactor_thread(self.deferred_sleep, seconds_between)
+                run_in_reactor_thread(TestEnvironment.deferred_sleep, seconds_between)
 
     def try_n_times(self,
                     num_times,  # type: int
@@ -410,7 +411,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
                     run_in_reactor_thread(func, *args, **kwargs)
                 else:
                     func(*args, **kwargs)
-                run_in_reactor_thread(self.deferred_sleep, seconds_between)
+                run_in_reactor_thread(TestEnvironment.deferred_sleep, seconds_between)
             except expected_exceptions:
                 if raise_exception:
                     raise
