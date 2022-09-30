@@ -31,7 +31,17 @@ class SearchRequest(SearchRequestLogic):
                  encoded_query,
                  **kwargs
                  ):
-        super().__init__(connection, loop, encoded_query, **kwargs)
+        super().__init__(connection, encoded_query, **kwargs)
+        self._query_request_ftr = None
+        self._query_d = None
+        self._loop = loop
+
+    @property
+    def loop(self):
+        """
+        **INTERNAL**
+        """
+        return self._loop
 
     @classmethod
     def generate_search_request(cls, connection, loop, encoded_query, **kwargs):
