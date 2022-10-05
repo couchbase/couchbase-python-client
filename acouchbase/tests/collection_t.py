@@ -23,19 +23,16 @@ import pytest_asyncio
 import couchbase.subdocument as SD
 from acouchbase.cluster import get_event_loop
 from couchbase.diagnostics import ServiceType
-from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (CasMismatchException,
                                   DocumentExistsException,
                                   DocumentLockedException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
-                                  DurabilityImpossibleException,
                                   InvalidArgumentException,
                                   PathNotFoundException,
                                   TemporaryFailException)
 from couchbase.options import (GetOptions,
                                InsertOptions,
-                               RemoveOptions,
                                ReplaceOptions,
                                UpsertOptions)
 from couchbase.result import (ExistsResult,
@@ -630,126 +627,6 @@ class CollectionTests:
 
         assert active_cnt == 1
         assert replica_cnt >= active_cnt
-
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.asyncio
-    async def test_server_durable_upsert(self, cb_env, default_kvp_and_reset, num_replicas):
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-        value = default_kvp_and_reset.value
-
-        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-
-        if num_replicas > 1:
-            await cb.upsert(key, value,
-                            UpsertOptions(durability=durability))
-            result = await cb.get(key)
-            assert value == result.content_as[dict]
-        else:
-            try:
-                await cb.upsert(key, value,
-                                UpsertOptions(durability=durability))
-            except DurabilityImpossibleException:
-                pass  # this is okay -- server not setup correctly
-
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.asyncio
-    async def test_server_durable_insert(self, cb_env, new_kvp, num_replicas):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-
-        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-        if num_replicas > 1:
-            await cb.insert(key, value,
-                            InsertOptions(durability=durability))
-            result = await cb.get(key)
-            assert value == result.content_as[dict]
-        else:
-            try:
-                await cb.insert(key, value,
-                                InsertOptions(durability=durability))
-            except DurabilityImpossibleException:
-                pass  # this is okay -- server not setup correctly
-
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.asyncio
-    async def test_server_durable_replace(self, cb_env, default_kvp_and_reset, num_replicas):
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-        value = default_kvp_and_reset.value
-        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-
-        if num_replicas > 1:
-            await cb.replace(key, value,
-                             ReplaceOptions(durability=durability))
-            result = await cb.get(key)
-            assert value == result.content_as[dict]
-        else:
-            try:
-                await cb.replace(key, value,
-                                 ReplaceOptions(durability=durability))
-            except DurabilityImpossibleException:
-                pass  # this is okay -- server not setup correctly
-
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.asyncio
-    async def test_server_durable_remove(self, cb_env, default_kvp_and_reset, num_replicas):
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-
-        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-        if num_replicas > 1:
-            await cb.remove(key, RemoveOptions(durability=durability))
-            with pytest.raises(DocumentNotFoundException):
-                await cb.get(key)
-        else:
-            try:
-                await cb.remove(key, RemoveOptions(durability=durability))
-            except DurabilityImpossibleException:
-                pass  # this is okay -- server not setup correctly
-
-    @pytest.mark.asyncio
-    async def test_client_durable_upsert(self, cb_env, num_replicas):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.upsert(self.NOKEY, self.CONTENT,
-    #                    UpsertOptions(durability=durability))
-    #     result = self.cb.get(self.NOKEY)
-    #     self.assertEqual(self.CONTENT, result.content_as[dict])
-
-    @pytest.mark.asyncio
-    async def test_client_durable_insert(self, cb_env):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     num_replicas = self.bucket._bucket.configured_replica_count
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.insert(self.NOKEY, self.CONTENT,
-    #                    InsertOptions(durability=durability))
-    #     result = self.cb.get(self.NOKEY)
-    #     self.assertEqual(self.CONTENT, result.content_as[dict])
-
-    @pytest.mark.asyncio
-    async def test_client_durable_replace(self, cb_env):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     num_replicas = self.bucket._bucket.configured_replica_count
-    #     content = {"new": "content"}
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.replace(self.KEY, content,
-    #                     ReplaceOptions(durability=durability))
-    #     result = self.cb.get(self.KEY)
-    #     self.assertEqual(content, result.content_as[dict])
-
-    @pytest.mark.asyncio
-    async def test_client_durable_remove(self):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     num_replicas = self.bucket._bucket.configured_replica_count
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.remove(self.KEY, RemoveOptions(durability=durability))
-    #     self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
 
     # @TODO(jc): - should an expiry of -1 raise an InvalidArgumentException?
     @pytest.mark.usefixtures("check_xattr_supported")

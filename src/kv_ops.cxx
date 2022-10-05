@@ -603,7 +603,7 @@ create_base_result_from_mutation_operation_response(const char* key, const Respo
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas().value());
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_tmp);
         return nullptr;
@@ -619,22 +619,19 @@ create_base_result_from_mutation_operation_response(const char* key, const Respo
         Py_DECREF(pyObj_tmp);
     }
 
-    if (resp.mutation_token().has_value()) {
-        PyObject* pyObj_mutation_token = create_mutation_token_obj(resp.mutation_token().value());
-        if (-1 == PyDict_SetItemString(res->dict, RESULT_MUTATION_TOKEN, pyObj_mutation_token)) {
-            Py_XDECREF(pyObj_mutation_token);
-            return nullptr;
-        }
-        Py_DECREF(pyObj_mutation_token);
+    PyObject* pyObj_mutation_token = create_mutation_token_obj(resp.token);
+    if (-1 == PyDict_SetItemString(res->dict, RESULT_MUTATION_TOKEN, pyObj_mutation_token)) {
+        Py_XDECREF(pyObj_mutation_token);
+        return nullptr;
     }
+    Py_DECREF(pyObj_mutation_token);
 
     return res;
 }
 
-template<typename Context, typename Response>
+template<typename Response>
 void
 create_result_from_mutation_operation_response(const char* key,
-                                               const Context& ctx,
                                                const Response& resp,
                                                PyObject* pyObj_callback,
                                                PyObject* pyObj_errback,
@@ -649,8 +646,8 @@ create_result_from_mutation_operation_response(const char* key,
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
-    if (ctx.ec()) {
-        pyObj_exc = build_exception_from_context(ctx, __FILE__, __LINE__, "KV mutation operation error.");
+    if (resp.ctx.ec()) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV mutation operation error.");
         if (pyObj_errback == nullptr) {
             if (multi_result != nullptr) {
                 Py_INCREF(Py_False);
@@ -675,7 +672,7 @@ create_result_from_mutation_operation_response(const char* key,
     } else {
         auto res = create_base_result_from_mutation_operation_response(key, resp);
         if (res != nullptr) {
-            res->ec = ctx.ec();
+            res->ec = resp.ctx.ec();
             res = add_extras_to_result(resp, res);
         }
 
@@ -740,6 +737,23 @@ create_result_from_mutation_operation_response(const char* key,
     PyGILState_Release(state);
 }
 
+template<typename Request>
+void
+do_mutation(connection& conn,
+            Request& req,
+            PyObject* pyObj_callback,
+            PyObject* pyObj_errback,
+            std::shared_ptr<std::promise<PyObject*>> barrier,
+            result* multi_result = nullptr)
+{
+    using response_type = typename Request::response_type;
+    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(
+      req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](response_type resp) {
+          create_result_from_mutation_operation_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier, multi_result);
+      });
+    Py_END_ALLOW_THREADS
+}
+
 PyObject*
 prepare_and_execute_mutation_op(struct mutation_options* options,
                                 PyObject* pyObj_callback,
@@ -782,114 +796,91 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
 
     switch (options->op_type) {
         case Operations::INSERT: {
-            auto opts = couchbase::insert_options{}.timeout(options->timeout_ms);
-            if (options->expiry > std::chrono::seconds::zero()) {
-                if (options->expiry > FIFTY_YEARS) {
-                    opts.expiry(std::chrono::system_clock::now() + options->expiry);
-                } else {
-                    opts.expiry(options->expiry);
-                }
+            auto req = couchbase::core::operations::insert_request{ options->id };
+            req.timeout = options->timeout_ms;
+            req.value = value;
+            req.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
+            if (options->expiry > 0) {
+                req.expiry = options->expiry;
             }
-            if (options->durability_level != nullptr) {
-                opts.durability(*options->durability_level);
-            } else if (options->persist_to != nullptr && options->replicate_to != nullptr) {
-                opts.durability(*options->persist_to, *options->replicate_to);
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
             }
-            Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_insert_operation(
-              options->conn->cluster_,
-              options->id.bucket(),
-              options->id.scope(),
-              options->id.collection(),
-              options->id.key(),
-              couchbase::codec::encoded_value{ value, static_cast<uint32_t>(PyLong_AsLong(pyObj_flags)) },
-              opts.build(),
-              [key = options->id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](auto ctx, auto resp) {
-                  create_result_from_mutation_operation_response(
-                    key.c_str(), std::move(ctx), std::move(resp), pyObj_callback, pyObj_errback, barrier, multi_result);
-              });
-            Py_END_ALLOW_THREADS break;
+            if (options->use_legacy_durability) {
+                auto req_legacy_durability =
+                  couchbase::core::operations::insert_request_with_legacy_durability{ req, options->persist_to, options->replicate_to };
+                do_mutation(*(options->conn), req_legacy_durability, pyObj_callback, pyObj_errback, barrier, multi_result);
+                break;
+            }
+            req.durability_level = options->durability_level;
+            do_mutation(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            break;
         }
         case Operations::UPSERT: {
-            auto opts = couchbase::upsert_options{}.timeout(options->timeout_ms);
-            if (options->expiry > std::chrono::seconds::zero()) {
-                if (options->expiry > FIFTY_YEARS) {
-                    opts.expiry(std::chrono::system_clock::now() + options->expiry);
-                } else {
-                    opts.expiry(options->expiry);
-                }
+            auto req = couchbase::core::operations::upsert_request{ options->id };
+            req.timeout = options->timeout_ms;
+            req.value = value;
+            req.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
+            if (options->expiry > 0) {
+                req.expiry = options->expiry;
             }
             if (options->preserve_expiry) {
-                opts.preserve_expiry(options->preserve_expiry);
+                req.preserve_expiry = options->preserve_expiry;
             }
-            if (options->durability_level != nullptr) {
-                opts.durability(*options->durability_level);
-            } else if (options->persist_to != nullptr && options->replicate_to != nullptr) {
-                opts.durability(*options->persist_to, *options->replicate_to);
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
             }
-            Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_upsert_operation(
-              options->conn->cluster_,
-              options->id.bucket(),
-              options->id.scope(),
-              options->id.collection(),
-              options->id.key(),
-              couchbase::codec::encoded_value{ value, static_cast<uint32_t>(PyLong_AsLong(pyObj_flags)) },
-              opts.build(),
-              [key = options->id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](auto ctx, auto resp) {
-                  create_result_from_mutation_operation_response(
-                    key.c_str(), std::move(ctx), std::move(resp), pyObj_callback, pyObj_errback, barrier, multi_result);
-              });
-            Py_END_ALLOW_THREADS break;
+            if (options->use_legacy_durability) {
+                auto req_legacy_durability =
+                  couchbase::core::operations::upsert_request_with_legacy_durability{ req, options->persist_to, options->replicate_to };
+                do_mutation(*(options->conn), req_legacy_durability, pyObj_callback, pyObj_errback, barrier, multi_result);
+                break;
+            }
+            req.durability_level = options->durability_level;
+            do_mutation(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            break;
         }
         case Operations::REPLACE: {
-            auto opts = couchbase::replace_options{}.cas(options->cas).timeout(options->timeout_ms);
-            if (options->expiry > std::chrono::seconds::zero()) {
-                if (options->expiry > FIFTY_YEARS) {
-                    opts.expiry(std::chrono::system_clock::now() + options->expiry);
-                } else {
-                    opts.expiry(options->expiry);
-                }
+            auto req = couchbase::core::operations::replace_request{ options->id };
+            req.timeout = options->timeout_ms;
+            req.cas = options->cas;
+            req.value = value;
+            req.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
+            if (options->expiry > 0) {
+                req.expiry = options->expiry;
             }
             if (options->preserve_expiry) {
-                opts.preserve_expiry(options->preserve_expiry);
+                req.preserve_expiry = options->preserve_expiry;
             }
-            if (options->durability_level != nullptr) {
-                opts.durability(*options->durability_level);
-            } else if (options->persist_to != nullptr && options->replicate_to != nullptr) {
-                opts.durability(*options->persist_to, *options->replicate_to);
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
             }
-            Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_replace_operation(
-              options->conn->cluster_,
-              options->id.bucket(),
-              options->id.scope(),
-              options->id.collection(),
-              options->id.key(),
-              couchbase::codec::encoded_value{ value, static_cast<uint32_t>(PyLong_AsLong(pyObj_flags)) },
-              opts.build(),
-              [key = options->id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](auto ctx, auto resp) {
-                  create_result_from_mutation_operation_response(
-                    key.c_str(), std::move(ctx), std::move(resp), pyObj_callback, pyObj_errback, barrier, multi_result);
-              });
-            Py_END_ALLOW_THREADS break;
+            if (options->use_legacy_durability) {
+                auto req_legacy_durability =
+                  couchbase::core::operations::replace_request_with_legacy_durability{ req, options->persist_to, options->replicate_to };
+                do_mutation(*(options->conn), req_legacy_durability, pyObj_callback, pyObj_errback, barrier, multi_result);
+                break;
+            }
+            req.durability_level = options->durability_level;
+            do_mutation(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            break;
         }
         case Operations::REMOVE: {
-            auto opts = couchbase::remove_options{}.cas(options->cas).timeout(options->timeout_ms);
-            if (options->durability_level != nullptr) {
-                opts.durability(*options->durability_level);
-            } else if (options->persist_to != nullptr && options->replicate_to != nullptr) {
-                opts.durability(*options->persist_to, *options->replicate_to);
+            auto req = couchbase::core::operations::remove_request{ options->id };
+            req.timeout = options->timeout_ms;
+            req.cas = options->cas;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
             }
-            Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_remove_operation(
-              options->conn->cluster_,
-              options->id.bucket(),
-              options->id.scope(),
-              options->id.collection(),
-              options->id.key(),
-              opts.build(),
-              [key = options->id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](auto ctx, auto resp) {
-                  create_result_from_mutation_operation_response(
-                    key.c_str(), std::move(ctx), std::move(resp), pyObj_callback, pyObj_errback, barrier, multi_result);
-              });
-            Py_END_ALLOW_THREADS break;
+            if (options->use_legacy_durability) {
+                auto req_legacy_durability =
+                  couchbase::core::operations::remove_request_with_legacy_durability{ req, options->persist_to, options->replicate_to };
+                do_mutation(*(options->conn), req_legacy_durability, pyObj_callback, pyObj_errback, barrier, multi_result);
+                break;
+            }
+            req.durability_level = options->durability_level;
+            do_mutation(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            break;
         }
         default: {
             if (multi_result != nullptr) {
@@ -967,11 +958,10 @@ get_read_options(PyObject* op_args)
     return opts;
 }
 
-struct mutation_options
+mutation_options
 get_mutation_options(PyObject* op_args)
 {
-    struct mutation_options opts {
-    };
+    struct mutation_options opts;
 
     PyObject* pyObj_span = PyDict_GetItemString(op_args, "span");
     if (pyObj_span != nullptr) {
@@ -980,8 +970,7 @@ get_mutation_options(PyObject* op_args)
 
     PyObject* pyObj_expiry = PyDict_GetItemString(op_args, "expiry");
     if (pyObj_expiry != nullptr) {
-        auto expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_expiry));
-        opts.expiry = std::chrono::seconds(expiry);
+        opts.expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_expiry));
     }
 
     PyObject* pyObj_cas = PyDict_GetItemString(op_args, "cas");
@@ -1011,11 +1000,11 @@ get_mutation_options(PyObject* op_args)
     if (pyObj_durability) {
         if (PyDict_Check(pyObj_durability)) {
             auto durability = PyObject_to_durability(pyObj_durability);
-            opts.persist_to = &durability.first;
-            opts.replicate_to = &durability.second;
+            opts.use_legacy_durability = true;
+            opts.persist_to = durability.first;
+            opts.replicate_to = durability.second;
         } else if (PyLong_Check(pyObj_durability)) {
-            auto durability = PyObject_to_durability_level(pyObj_durability);
-            opts.durability_level = &durability;
+            opts.durability_level = PyObject_to_durability_level(pyObj_durability);
         }
     }
 

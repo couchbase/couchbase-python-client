@@ -23,17 +23,40 @@ from typing import (Dict,
 
 
 class ReplicateTo(IntEnum):
-    NONE = 0
-    ONE = 1
-    TWO = 2
-    THREE = 3
+    """
+    Specify the number of nodes to wait for replication.
+    """
+    NONE = 0    # Do not apply replication requirements.
+    ONE = 1     # Wait for replication to atleast one replica nodes
+    TWO = 2     # Wait for replication to atleast two replica nodes
+    THREE = 3   # Wait for replication to all three replica nodes.
 
 
 class PersistTo(IntEnum):
-    NONE = 0
-    ONE = 1  # cxx = ACTIVE
-    TWO = 2  # cxx = 1
-    THREE = 3  # cxx = 2
+    """
+    Specify the number of nodes to wait for persistance.
+
+    Use `~couchbase.durability.PersistToExtended` for extended functionality.  The
+    `~couchbase.durability.PersistToExtended` is the preferred enum for to use for the 4.x SDK.
+    """
+    NONE = 0    # Do not apply persistance requirements.
+    ONE = 2     # cxx: Wait for persistence to at least one node.
+    TWO = 3     # cxx: Wait for persistence to at least two nodes.
+    THREE = 4   # cxx: Wait for persistence to at least three nodes.
+
+
+class PersistToExtended(IntEnum):
+    """
+    Extends the `~couchbase.durability.PersistTo` enum to match the cxx client options.  This is the
+    preferred Enum, wihle the `~couchbase.durability.PersistTo` enum is around for 3.x compatibility.
+    """
+    NONE = 0    # Do not apply persistance requirements.
+    ACTIVE = 1  # Wait for persistence to active node.
+    ONE = 2     # Wait for persistence to at least one node.
+    TWO = 3     # Wait for persistence to at least two nodes.
+    THREE = 4   # Wait for persistence to at least three nodes.
+    # This is maximum possible persistence requirement, that includes active and all three replica nodes.
+    FOUR = 5    # Wait for persistence to at least all nodes.
 
 
 class Durability(IntEnum):
@@ -96,7 +119,7 @@ class ClientDurability:
 
     def __init__(self,
                  replicate_to=ReplicateTo.NONE,  # type: ReplicateTo
-                 persist_to=PersistTo.NONE  # type: PersistTo
+                 persist_to=PersistTo.NONE  # type: Union[PersistTo, PersistToExtended]
                  ):
         # type: (...) -> None
         """
@@ -117,7 +140,7 @@ class ClientDurability:
         return self._replicate_to
 
     @property
-    def persist_to(self) -> PersistTo:
+    def persist_to(self) -> Union[PersistTo, PersistToExtended]:
         return self._persist_to
 
 
@@ -148,8 +171,8 @@ class DurabilityParser:
                          ) -> Optional[Union[int, Dict[str, int]]]:
         if isinstance(durability, ClientDurability):
             return {
-                durability.replicate_to.name: durability.replicate_to.value,
-                durability.persist_to.name: durability.persist_to.value
+                'replicate_to': durability.replicate_to.value,
+                'persist_to': durability.persist_to.value
             }
 
         if isinstance(durability, ServerDurability):

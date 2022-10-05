@@ -18,6 +18,7 @@
 #pragma once
 
 #include "client.hxx"
+#include "tracing.hxx"
 #include <couchbase/append_options.hxx>
 #include <couchbase/decrement_options.hxx>
 #include <couchbase/increment_options.hxx>
@@ -29,33 +30,35 @@ struct counter_options {
     // required
     connection* conn;
     couchbase::core::document_id id;
-    Operations::OperationType op_type;
-    uint64_t delta;
+    Operations::OperationType op_type{ Operations::UNKNOWN };
+    uint64_t delta{ 1 };
 
     // optional
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    std::chrono::seconds expiry;
-    couchbase::durability_level* durability_level;
-    couchbase::replicate_to* replicate_to;
-    couchbase::persist_to* persist_to;
-    uint64_t initial_value;
-    PyObject* pyObj_span;
+    uint32_t expiry{ 0 };
+    couchbase::durability_level durability_level{ couchbase::durability_level::none };
+    bool use_legacy_durability{ false };
+    couchbase::replicate_to replicate_to{ couchbase::persist_to::none };
+    couchbase::persist_to persist_to{ couchbase::replicate_to::none };
+    std::optional<uint64_t> initial_value{};
+    PyObject* span = nullptr;
 };
 
 struct binary_mutation_options {
     // required
     connection* conn;
     couchbase::core::document_id id;
-    Operations::OperationType op_type;
-    PyObject* pyObj_value;
+    Operations::OperationType op_type{ Operations::UNKNOWN };
+    PyObject* pyObj_value = nullptr;
 
     // optional
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    couchbase::durability_level* durability_level;
-    couchbase::replicate_to* replicate_to;
-    couchbase::persist_to* persist_to;
+    couchbase::durability_level durability_level{ couchbase::durability_level::none };
+    bool use_legacy_durability{ false };
+    couchbase::replicate_to replicate_to{ couchbase::persist_to::none };
+    couchbase::persist_to persist_to{ couchbase::replicate_to::none };
     couchbase::cas cas;
-    PyObject* pyObj_span;
+    PyObject* span = nullptr;
 };
 
 PyObject*

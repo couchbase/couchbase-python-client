@@ -35,18 +35,18 @@ struct read_options {
     // common - required
     connection* conn;
     couchbase::core::document_id id;
-    Operations::OperationType op_type = Operations::UNKNOWN;
+    Operations::OperationType op_type{ Operations::UNKNOWN };
 
     // common - options
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
 
     // optional
-    bool with_expiry;
-    uint32_t expiry;
-    uint32_t lock_time;
+    bool with_expiry{ false };
+    uint32_t expiry{};
+    uint32_t lock_time{};
     couchbase::cas cas;
-    PyObject* span;
-    PyObject* project;
+    PyObject* span{ nullptr };
+    PyObject* project{ nullptr };
 
     // TODO:
     // retries?
@@ -60,20 +60,21 @@ struct mutation_options {
     // common - required
     connection* conn;
     couchbase::core::document_id id;
-    Operations::OperationType op_type = Operations::UNKNOWN;
-    PyObject* value; // not for REMOVE
+    Operations::OperationType op_type{ Operations::UNKNOWN };
+    PyObject* value{ nullptr }; // not for REMOVE
 
     // common - optional
-    couchbase::durability_level* durability_level;
-    couchbase::replicate_to* replicate_to;
-    couchbase::persist_to* persist_to;
-    std::chrono::seconds expiry;
+    couchbase::durability_level durability_level{ couchbase::durability_level::none };
+    bool use_legacy_durability{ false };
+    couchbase::replicate_to replicate_to{ couchbase::persist_to::none };
+    couchbase::persist_to persist_to{ couchbase::replicate_to::none };
+    uint32_t expiry{ 0 };
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    PyObject* span;
+    PyObject* span = nullptr;
 
     // optional: REPLACE
     couchbase::cas cas;
-    bool preserve_expiry;
+    bool preserve_expiry{ false };
 
     // TODO:
     // retries?
