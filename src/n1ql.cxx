@@ -19,33 +19,33 @@
 #include "exceptions.hxx"
 #include "result.hxx"
 #include "tracing.hxx"
-#include <core/query_scan_consistency.hxx>
-#include <core/query_profile_mode.hxx>
+#include <couchbase/query_scan_consistency.hxx>
+#include <couchbase/query_profile.hxx>
 
 std::string
-scan_consistency_type_to_string(couchbase::core::query_scan_consistency consistency)
+scan_consistency_type_to_string(couchbase::query_scan_consistency consistency)
 {
     switch (consistency) {
-        case couchbase::core::query_scan_consistency::not_bounded:
+        case couchbase::query_scan_consistency::not_bounded:
             return "not_bounded";
-        case couchbase::core::query_scan_consistency::request_plus:
+        case couchbase::query_scan_consistency::request_plus:
             return "request_plus";
     }
     // should not be able to reach here, since this is an enum class
     return "unknown";
 }
 
-couchbase::core::query_profile_mode
+couchbase::query_profile
 str_to_profile_mode(std::string profile_mode)
 {
     if (profile_mode.compare("off") == 0) {
-        return couchbase::core::query_profile_mode::off;
+        return couchbase::query_profile::off;
     }
     if (profile_mode.compare("phases") == 0) {
-        return couchbase::core::query_profile_mode::phases;
+        return couchbase::query_profile::phases;
     }
     if (profile_mode.compare("timings") == 0) {
-        return couchbase::core::query_profile_mode::timings;
+        return couchbase::query_profile::timings;
     }
     // TODO: better exception
     PyErr_SetString(PyExc_ValueError, "Invalid Profile Mode.");
@@ -53,14 +53,14 @@ str_to_profile_mode(std::string profile_mode)
 }
 
 std::string
-profile_mode_to_str(couchbase::core::query_profile_mode profile_mode)
+profile_mode_to_str(couchbase::query_profile profile_mode)
 {
     switch (profile_mode) {
-        case couchbase::core::query_profile_mode::off:
+        case couchbase::query_profile::off:
             return "off";
-        case couchbase::core::query_profile_mode::phases:
+        case couchbase::query_profile::phases:
             return "phases";
-        case couchbase::core::query_profile_mode::timings:
+        case couchbase::query_profile::timings:
             return "timings";
     }
     return "unknown profile_mode";
@@ -518,7 +518,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     // named parameters
-    std::map<std::string, couchbase::core::json_string> named_parameters{};
+    std::map<std::string, couchbase::core::json_string, std::less<>> named_parameters{};
     if (pyObj_named_parameters && PyDict_Check(pyObj_named_parameters)) {
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;
@@ -563,7 +563,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     if (scan_consistency != nullptr) {
-        req.scan_consistency = str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency);
+        req.scan_consistency = str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency);
     }
 
     if (profile_mode != nullptr) {
@@ -591,7 +591,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     // raw options
-    std::map<std::string, couchbase::core::json_string> raw_options{};
+    std::map<std::string, couchbase::core::json_string, std::less<>> raw_options{};
     if (pyObj_raw && PyDict_Check(pyObj_raw)) {
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;

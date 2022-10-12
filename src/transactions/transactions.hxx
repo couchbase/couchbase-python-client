@@ -18,10 +18,11 @@
 #pragma once
 
 #include "../client.hxx"
-#include <couchbase/transactions.hxx>
+#include <core/transactions.hxx>
 #include <core/operations/document_query.hxx>
 
 namespace tx = couchbase::transactions;
+namespace tx_core = couchbase::core::transactions;
 
 namespace pycbc_txns
 {
@@ -95,31 +96,31 @@ static PyObject*
 per_transaction_config__str__(PyObject*);
 
 struct transactions {
-    couchbase::transactions::transactions* txns;
+    tx_core::transactions* txns;
 
     explicit transactions(PyObject* pyObj_conn, tx::transaction_config& cfg)
       : txns(nullptr)
     {
         connection* c = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
-        txns = new tx::transactions(*c->cluster_, cfg);
+        txns = new tx_core::transactions(c->cluster_, cfg);
     }
 };
 
 struct attempt_context {
-    tx::async_attempt_context& ctx;
+    tx_core::async_attempt_context& ctx;
 
-    explicit attempt_context(tx::async_attempt_context& ctx)
+    explicit attempt_context(tx_core::async_attempt_context& ctx)
       : ctx(ctx)
     {
     }
 };
 
 struct transaction_get_result {
-    PyObject_HEAD tx::transaction_get_result* res;
+    PyObject_HEAD tx_core::transaction_get_result* res;
 };
 
 struct transaction_query_options {
-    PyObject_HEAD tx::transaction_query_options* opts;
+    PyObject_HEAD tx_core::transaction_query_options* opts;
 };
 
 static PyObject*

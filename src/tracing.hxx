@@ -17,12 +17,12 @@
 
 #pragma once
 
-#include <core/tracing/request_tracer.hxx>
+#include <couchbase/tracing/request_tracer.hxx>
 // NOLINTNEXTLINE
 #include "Python.h" // NOLINT
 #include <iostream>
 // convenient aliasing...
-namespace tracing = couchbase::core::tracing;
+namespace tracing = couchbase::tracing;
 
 namespace pycbc
 {

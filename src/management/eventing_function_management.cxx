@@ -19,7 +19,7 @@
 #include <core/management/eventing_function.hxx>
 #include <core/management/eventing_status.hxx>
 #include <core/operations/management/eventing_problem.hxx>
-#include <core/query_scan_consistency.hxx>
+#include <couchbase/query_scan_consistency.hxx>
 
 PyObject*
 build_eventing_function_status_functions(std::vector<couchbase::core::management::eventing::function_state> functions)
@@ -398,11 +398,11 @@ build_eventing_function_settings(const couchbase::core::management::eventing::fu
 
     if (settings.query_consistency.has_value()) {
         switch (settings.query_consistency.value()) {
-            case couchbase::core::query_scan_consistency::not_bounded: {
+            case couchbase::query_scan_consistency::not_bounded: {
                 pyObj_tmp = PyUnicode_FromString("not_bounded");
                 break;
             }
-            case couchbase::core::query_scan_consistency::request_plus: {
+            case couchbase::query_scan_consistency::request_plus: {
                 pyObj_tmp = PyUnicode_FromString("request_plus");
                 break;
             }
@@ -1293,9 +1293,9 @@ get_event_function_settings(PyObject* pyObj_settings)
     if (pyObj_query_consistency != nullptr) {
         auto query_consistency = std::string(PyUnicode_AsUTF8(pyObj_query_consistency));
         if (query_consistency.compare("not_bounded") == 0) {
-            settings.query_consistency = couchbase::core::query_scan_consistency::not_bounded;
+            settings.query_consistency = couchbase::query_scan_consistency::not_bounded;
         } else if (query_consistency.compare("request_plus") == 0) {
-            settings.query_consistency = couchbase::core::query_scan_consistency::request_plus;
+            settings.query_consistency = couchbase::query_scan_consistency::request_plus;
         }
     }
 

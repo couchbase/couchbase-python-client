@@ -20,7 +20,7 @@
 #include <queue>
 #include <core/logger/logger.hxx>
 #include <core/logger/configuration.hxx>
-#include <couchbase/transactions.hxx>
+#include <core/transactions.hxx>
 
 // the spdlog::log_msg uses string_view, since it doesn't want
 // copies.   Since we consume the log_msg then asych process it,
@@ -320,7 +320,7 @@ configure_logging(PyObject* self, PyObject* args, PyObject* kwargs)
     logger_settings.sink = std::make_shared<pycbc_logger_sink<std::mutex>>(pyObj_logger);
     auto level = convert_python_log_level(pyObj_level);
     logger_settings.log_level = level;
-    couchbase::transactions::create_loggers(logger_settings.log_level, logger_settings.sink);
+    couchbase::core::transactions::create_loggers(logger_settings.log_level, logger_settings.sink);
     couchbase::core::logger::create_file_logger(logger_settings);
     Py_RETURN_NONE;
 }

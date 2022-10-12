@@ -40,13 +40,13 @@ str_to_scan_consistency_type(std::string consistency)
 }
 
 std::string
-scan_consistency_type_to_string(couchbase::core::query_scan_consistency consistency);
+scan_consistency_type_to_string(couchbase::query_scan_consistency consistency);
 
 std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state);
 
 std::string
-profile_mode_to_str(couchbase::core::query_profile_mode profile_mode);
+profile_mode_to_str(couchbase::query_profile profile_mode);
 
-couchbase::core::query_profile_mode
+couchbase::query_profile
 str_to_profile_mode(std::string profile_mode);

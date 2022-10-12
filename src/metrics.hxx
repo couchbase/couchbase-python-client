@@ -17,11 +17,11 @@
 
 #pragma once
 
-#include <core/metrics/meter.hxx>
+#include <couchbase/metrics/meter.hxx>
 // NOLINTNEXTLINE
 #include "Python.h" // NOLINT
 
-namespace metrics = couchbase::core::metrics;
+namespace metrics = couchbase::metrics;
 
 namespace pycbc
 {

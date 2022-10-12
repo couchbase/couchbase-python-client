@@ -18,11 +18,13 @@
 
 #include "transactions.hxx"
 #include "../n1ql.hxx"
-#include <couchbase/cluster.hxx>
-#include <couchbase/transactions/transaction_get_result.hxx>
-#include <couchbase/transactions/internal/exceptions_internal.hxx>
+#include "../utils.hxx"
+#include <core/cluster.hxx>
+#include <core/transactions/transaction_get_result.hxx>
+#include <core/transactions/durability_level.hxx>
+#include <core/transactions/internal/exceptions_internal.hxx>
 #include <core/operations.hxx>
-#include <core/query_scan_consistency.hxx>
+#include <couchbase/query_scan_consistency.hxx>
 #include <sstream>
 
 void
@@ -152,7 +154,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
         Py_RETURN_NONE;
     }
     if (nullptr != durability_level) {
-        self->cfg->durability_level(static_cast<tx::durability_level>(PyLong_AsUnsignedLong(durability_level)));
+        self->cfg->durability_level(static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
     }
     if (nullptr != cleanup_window) {
         self->cfg->cleanup_window(std::chrono::microseconds(PyLong_AsUnsignedLongLong(cleanup_window)));
@@ -173,7 +175,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
         self->cfg->custom_metadata_collection(metadata_bucket, metadata_scope, metadata_collection);
     }
     if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency));
+        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     return reinterpret_cast<PyObject*>(self);
 }
@@ -211,7 +213,7 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
         Py_RETURN_NONE;
     }
     if (nullptr != durability_level) {
-        self->cfg->durability_level(static_cast<tx::durability_level>(PyLong_AsUnsignedLong(durability_level)));
+        self->cfg->durability_level(static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
     }
     if (nullptr != kv_timeout) {
         self->cfg->kv_timeout(std::chrono::milliseconds(PyLong_AsUnsignedLongLong(kv_timeout) / 1000));
@@ -220,7 +222,7 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
         self->cfg->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
     }
     if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency));
+        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
         self->cfg->custom_metadata_collection({ metadata_bucket, metadata_scope, metadata_collection });
@@ -264,7 +266,7 @@ pycbc_txns::per_transaction_config__str__(PyObject* self)
     stream << "per_transaction_config{";
     if (nullptr != cfg) {
         if (cfg->durability_level()) {
-            stream << "durability: " << durability_level_to_string(*cfg->durability_level()) << ", ";
+            stream << "durability: " << tx_core::durability_level_to_string(*cfg->durability_level()) << ", ";
         }
         if (cfg->kv_timeout()) {
             stream << "kv_timeout: " << cfg->kv_timeout()->count() << "ms, ";
@@ -363,7 +365,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     const char* kw_format = "|OOsssOOOOOssOOOO";
 
     auto self = reinterpret_cast<pycbc_txns::transaction_query_options*>(type->tp_alloc(type, 0));
-    self->opts = new tx::transaction_query_options();
+    self->opts = new tx_core::transaction_query_options();
     if (!PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
                                      kw_format,
@@ -417,7 +419,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
         self->opts->profile(str_to_profile_mode(profile_mode));
     }
     if (nullptr != scan_consistency) {
-        self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency));
+        self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
         if (PyErr_Occurred()) {
             return nullptr;
         }
@@ -485,7 +487,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
         PyObject* pyObj_key = nullptr;
         PyObject* pyObj_value = nullptr;
         Py_ssize_t pos = 0;
-        std::map<std::string, couchbase::core::json_string> params{};
+        std::map<std::string, couchbase::core::json_string, std::less<>> params{};
         while (PyDict_Next(pyObj_named_params, &pos, &pyObj_key, &pyObj_value)) {
             params[PyUnicode_AsUTF8(pyObj_key)] = couchbase::core::json_string(PyBytes_AsString(pyObj_value));
         }
@@ -592,7 +594,7 @@ PyObject*
 pycbc_txns::transaction_get_result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
     auto self = reinterpret_cast<pycbc_txns::transaction_get_result*>(type->tp_alloc(type, 0));
-    self->res = new tx::transaction_get_result();
+    self->res = new tx_core::transaction_get_result();
     return reinterpret_cast<PyObject*>(self);
 }
 
@@ -600,8 +602,8 @@ PyObject*
 pycbc_txns::transaction_get_result__str__(pycbc_txns::transaction_get_result* result)
 {
     const char* format_string = "transaction_get_result:{key=%s, cas=%llu, value=%s}";
-    return PyUnicode_FromFormat(
-      format_string, result->res->id().key().c_str(), result->res->cas(), result->res->content<std::string>().c_str());
+    auto value = couchbase::core::utils::json::generate(result->res->content<tao::json::value>());
+    return PyUnicode_FromFormat(format_string, result->res->id().key().c_str(), result->res->cas(), value.c_str());
 }
 
 void
@@ -630,10 +632,15 @@ pycbc_txns::transaction_get_result__get__(pycbc_txns::transaction_get_result* re
         return PyUnicode_FromString(result->res->id().key().c_str());
     }
     if (CAS == field_name) {
-        return PyLong_FromUnsignedLongLong(result->res->cas());
+        return PyLong_FromUnsignedLongLong(result->res->cas().value());
     }
     if (VALUE == field_name) {
-        return PyBytes_FromString(result->res->content<std::string>().c_str());
+        try {
+            return binary_to_PyObject(result->res->content());
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            Py_RETURN_NONE;
+        }
     }
     PyErr_SetString(PyExc_ValueError, fmt::format("unknown field_name {}", field_name).c_str());
     Py_RETURN_NONE;
@@ -802,27 +809,27 @@ convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false)
 
     try {
         std::rethrow_exception(err);
-    } catch (const tx::transaction_exception& e) {
+    } catch (const tx_core::transaction_exception& e) {
         pyObj_final_error = pyObj_txn_failed;
         switch (e.type()) {
-            case tx::failure_type::FAIL:
+            case tx_core::failure_type::FAIL:
                 pyObj_exc_type = pyObj_txn_failed;
                 break;
-            case tx::failure_type::COMMIT_AMBIGUOUS:
+            case tx_core::failure_type::COMMIT_AMBIGUOUS:
                 pyObj_exc_type = pyObj_txn_ambig;
                 break;
-            case tx::failure_type::EXPIRY:
+            case tx_core::failure_type::EXPIRY:
                 pyObj_exc_type = pyObj_txn_expired;
                 break;
         }
         message = e.what();
-    } catch (const tx::transaction_operation_failed& e) {
+    } catch (const tx_core::transaction_operation_failed& e) {
         pyObj_exc_type = pyObj_txn_op_failed;
         message = e.what();
-    } catch (const tx::query_parsing_failure& e) {
+    } catch (const tx_core::query_parsing_failure& e) {
         pyObj_exc_type = pyObj_query_parsing_failure;
         message = e.what();
-    } catch (const tx::query_exception& e) {
+    } catch (const tx_core::query_exception& e) {
         pyObj_exc_type = pyObj_couchbase_error;
         message = e.what();
     } catch (const std::exception& e) {
@@ -884,7 +891,7 @@ handle_returning_transaction_get_result(PyObject* pyObj_callback,
                                         PyObject* pyObj_errback,
                                         std::shared_ptr<std::promise<PyObject*>> barrier,
                                         std::exception_ptr err,
-                                        std::optional<couchbase::transactions::transaction_get_result> res)
+                                        std::optional<couchbase::core::transactions::transaction_get_result> res)
 {
     // TODO: flesh out transaction_get_result and exceptions...
     auto state = PyGILState_Ensure();
@@ -902,7 +909,7 @@ handle_returning_transaction_get_result(PyObject* pyObj_callback,
         auto result = reinterpret_cast<pycbc_txns::transaction_get_result*>(transaction_get_result_obj);
         // now lets copy it in
         // TODO: ideally we'd have a move constructor for transaction_get_result, but for now...
-        result->res = new tx::transaction_get_result(res.value());
+        result->res = new tx_core::transaction_get_result(res.value());
         if (nullptr == pyObj_callback) {
             barrier->set_value(transaction_get_result_obj);
         } else {
@@ -1029,7 +1036,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
     const char* scope = nullptr;
     const char* collection = nullptr;
     const char* key = nullptr;
-    std::string value;
+    tao::json::value value;
     TxOperations::TxOperationType op_type = TxOperations::UNKNOWN;
     const char* kw_list[] = { "ctx",      "bucket",  "scope", "collection_name", "key",  "op",
                               "callback", "errback", "value", "txn_get_result",  nullptr };
@@ -1055,8 +1062,16 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
         Py_RETURN_NONE;
     }
     if (nullptr != pyObj_value) {
-        value = PyBytes_AsString(pyObj_value);
-        LOG_DEBUG("value is {}", value);
+        char* buf;
+        Py_ssize_t nbuf;
+        if (PyBytes_AsStringAndSize(pyObj_value, &buf, &nbuf) == -1) {
+            pycbc_set_python_exception(
+              PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to determine bytes object from provided value.");
+            Py_RETURN_NONE;
+        }
+        auto size = py_ssize_t_to_size_t(nbuf);
+        value = couchbase::core::utils::json::parse(reinterpret_cast<const char*>(buf), size);
+        LOG_DEBUG("value is {}", buf);
     }
     if (nullptr == pyObj_ctx) {
         PyErr_SetString(PyExc_ValueError, "no attempt_context passed in");
@@ -1081,7 +1096,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
             }
             couchbase::core::document_id id{ bucket, scope, collection, key };
             Py_BEGIN_ALLOW_THREADS ctx->ctx.get_optional(
-              id, [barrier, pyObj_callback, pyObj_errback](std::exception_ptr err, std::optional<tx::transaction_get_result> res) {
+              id, [barrier, pyObj_callback, pyObj_errback](std::exception_ptr err, std::optional<tx_core::transaction_get_result> res) {
                   handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
               });
             Py_END_ALLOW_THREADS break;
@@ -1097,7 +1112,9 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
                 Py_RETURN_NONE;
             }
             Py_BEGIN_ALLOW_THREADS ctx->ctx.insert(
-              id, value, [barrier, pyObj_callback, pyObj_errback](std::exception_ptr err, std::optional<tx::transaction_get_result> res) {
+              id,
+              value,
+              [barrier, pyObj_callback, pyObj_errback](std::exception_ptr err, std::optional<tx_core::transaction_get_result> res) {
                   handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
               });
             Py_END_ALLOW_THREADS break;
@@ -1115,7 +1132,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
             Py_BEGIN_ALLOW_THREADS ctx->ctx.replace(
               *tx_get_result->res,
               value,
-              [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err, std::optional<tx::transaction_get_result> res) {
+              [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err, std::optional<tx_core::transaction_get_result> res) {
                   handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
               });
             Py_END_ALLOW_THREADS break;
@@ -1211,7 +1228,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     Py_XINCREF(pyObj_logic);
     auto barrier = std::make_shared<std::promise<PyObject*>>();
     auto f = barrier->get_future();
-    auto logic = [pyObj_logic](tx::async_attempt_context& ctx) {
+    auto logic = [pyObj_logic](tx_core::async_attempt_context& ctx) {
         auto state = PyGILState_Ensure();
         auto py_ctx = new pycbc_txns::attempt_context(ctx);
         PyObject* pyObj_ctx = PyCapsule_New(py_ctx, "ctx_", dealloc_attempt_context);
@@ -1245,7 +1262,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
             throw std::runtime_error(py_error_message);
         }
     };
-    auto cb = [pyObj_callback, pyObj_errback, barrier, pyObj_logic](std::optional<tx::transaction_exception> err,
+    auto cb = [pyObj_callback, pyObj_errback, barrier, pyObj_logic](std::optional<tx_core::transaction_exception> err,
                                                                     std::optional<tx::transaction_result> res) {
         auto state = PyGILState_Ensure();
         PyObject* args = nullptr;
