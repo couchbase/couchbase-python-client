@@ -544,6 +544,8 @@ class ClusterOptionsBase(dict):
         "transaction_config": {"transaction_config": lambda x: x},
         "tracer": {"tracer": lambda x: x},
         "meter": {"meter": lambda x: x},
+        "dns_nameserver": {"dns_nameserver": validate_str},
+        "dns_port": {"dns_port": validate_int},
     }
 
     @overload
@@ -581,6 +583,8 @@ class ClusterOptionsBase(dict):
         lockmode=None,  # type: Optional[LockMode]
         tracer=None,  # type: Optional[CouchbaseTracer]
         meter=None,  # type: Optional[CouchbaseMeter]
+        dns_nameserver=None,  # type: Optional[str]
+        dns_port=None,  # type: Optional[int]
     ):
         """ClusterOptions instance."""
 

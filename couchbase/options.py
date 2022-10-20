@@ -343,7 +343,9 @@ class ClusterOptions(ClusterOptionsBase):
             (see :class:`~.ClusterTracingOptions`) and then `enable_tracing` option are ignored.
         meter (:class:`~couchbase.metrics.CouchbaseMeter`, optional): Set an external meter.  Defaults to None,
             enabling the `logging_meter`.   Note when this is set, the `logging_meter_emit_interval` option is ignored.
-    """
+        dns_nameserver (str, optional):  **VOLATILE** This API is subject to change at any time. Set to configure custom DNS nameserver. Defaults to None.
+        dns_port (int, optional):  **VOLATILE** This API is subject to change at any time. Set to configure custom DNS port. Defaults to None.
+    """  # noqa: E501
 
     def apply_profile(self,
                       profile_name  # type: Union[KnownConfigProfiles, str]

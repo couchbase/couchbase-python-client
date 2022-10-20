@@ -729,6 +729,14 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
     if (pyObj_meter != nullptr) {
         options.meter = std::make_shared<pycbc::meter>(pyObj_meter);
     }
+
+    PyObject* pyObj_dns_nameserver = PyDict_GetItemString(pyObj_options, "dns_nameserver");
+    PyObject* pyObj_dns_port = PyDict_GetItemString(pyObj_options, "dns_port");
+    if (pyObj_dns_nameserver != nullptr && pyObj_dns_port != nullptr) {
+        auto nameserver = std::string(PyUnicode_AsUTF8(pyObj_dns_nameserver));
+        auto port = static_cast<uint16_t>(PyLong_AsUnsignedLong(pyObj_dns_port));
+        options.dns_config = couchbase::core::io::dns::dns_config(nameserver, port, options.dns_srv_timeout);
+    }
 }
 
 PyObject*
