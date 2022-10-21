@@ -244,6 +244,23 @@ class CouchbaseTestEnvironment():
         "type": "airport",
         "tz": "America/Chicago"
     }
+    DURABLE_KEY = "airport_3876"
+    DURABLE_CONTENT = {
+        "airportname": "Charlotte Douglas Intl",
+        "city": "Charlotte",
+        "country": "United States",
+        "faa": "CLT",
+        "geo":
+        {
+            "alt": 748,
+            "lat": 35.214,
+            "lon": -80.943139
+        },
+        "icao": "KCLT",
+        "id": 3876,
+        "type": "airport",
+        "tz": "America/New_York"
+    }
     NEW_KEY = "airport_3469"
     NEW_CONTENT = {
         "airportname": "San Francisco Intl",
@@ -317,6 +334,9 @@ class CouchbaseTestEnvironment():
 
     def get_default_key_value(self):
         return self.KEY, self.CONTENT
+
+    def default_durable_key_value(self):
+        return self.DURABLE_KEY, self.DURABLE_CONTENT
 
     def get_binary_keys(self):
         return self.UTF8_KEY, self.BYTES_KEY, self.COUNTER_KEY

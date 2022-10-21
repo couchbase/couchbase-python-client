@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import json
+from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -20,6 +21,7 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Union)
 
+from couchbase._utils import timedelta_as_microseconds
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.options import DeltaValueBase, SignedInt64Base
 from couchbase.options import forward_args
@@ -40,8 +42,6 @@ from couchbase.subdocument import (Spec,
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
-    from datetime import timedelta
-
     from couchbase._utils import JSONType
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
@@ -49,6 +49,7 @@ if TYPE_CHECKING:
                                    IncrementOptions,
                                    InsertOptions,
                                    MutateInOptions,
+                                   MutationOptions,
                                    PrependOptions,
                                    RemoveOptions,
                                    ReplaceOptions,
@@ -91,6 +92,20 @@ class CollectionLogic:
             "scope": self._scope.name,
             "collection_name": self.name
         }
+
+    def _get_mutation_options(self,
+                              *opts,  # type: MutationOptions
+                              **kwargs  # type: Dict[str, Any]
+                              ) -> Dict[str, Any]:
+        """**INTERNAL**
+        Parses the mutaiton operation options.  If synchronous durability has been set and no timeout provided, the
+        default timeout will be set to the default KV durable timeout (10 seconds).
+        """
+        args = forward_args(kwargs, *opts)
+        if 'durability' in args and isinstance(args['durability'], int) and 'timeout' not in args:
+            args['timeout'] = timedelta_as_microseconds(timedelta(seconds=10))
+
+        return args
 
     def get(
         self,
@@ -189,7 +204,7 @@ class CollectionLogic:
         *opts,  # type: InsertOptions
         **kwargs,  # type: Any
     ) -> Optional[MutationResult]:
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         transcoder = final_args.pop('transcoder', self.default_transcoder)
         transcoded_value = transcoder.encode_value(value)
         op_type = operations.INSERT.value
@@ -208,7 +223,7 @@ class CollectionLogic:
         *opts,  # type: UpsertOptions
         **kwargs,  # type: Any
     ) -> Optional[MutationResult]:
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         transcoder = final_args.pop('transcoder', self.default_transcoder)
         transcoded_value = transcoder.encode_value(value)
 
@@ -227,7 +242,7 @@ class CollectionLogic:
                 *opts,  # type: ReplaceOptions
                 **kwargs,  # type: Any
                 ) -> Optional[MutationResult]:
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         expiry = final_args.get("expiry", None)
         preserve_expiry = final_args.get("preserve_expiry", False)
         if expiry and preserve_expiry is True:
@@ -252,9 +267,10 @@ class CollectionLogic:
                *opts,  # type: RemoveOptions
                **kwargs,  # type: Any
                ) -> Optional[MutationResult]:
+        final_args = self._get_mutation_options(*opts, **kwargs)
         op_type = operations.REMOVE.value
         return kv_operation(
-            **self._get_connection_args(), key=key, op_type=op_type, op_args=forward_args(kwargs, *opts)
+            **self._get_connection_args(), key=key, op_type=op_type, op_args=final_args
         )
 
     def touch(self,
@@ -309,12 +325,13 @@ class CollectionLogic:
                   **kwargs,  # type: Any
                   ) -> Optional[LookupInResult]:
         op_type = operations.LOOKUP_IN.value
+        final_args = forward_args(kwargs)
         return subdoc_operation(
             **self._get_connection_args(),
-            **kwargs,
             key=key,
             spec=spec,
             op_type=op_type,
+            op_args=final_args
         )
 
     def mutate_in(   # noqa: C901
@@ -325,7 +342,7 @@ class CollectionLogic:
         **kwargs,  # type: Any
     ) -> Optional[MutateInResult]:   # noqa: C901
         # no tc for sub-doc, use default JSON
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         transcoder = final_args.pop('transcoder', self.default_transcoder)
 
         expiry = final_args.get('expiry', None)
@@ -388,10 +405,10 @@ class CollectionLogic:
         op_type = operations.MUTATE_IN.value
         return subdoc_operation(
             **self._get_connection_args(),
-            **final_args,
             key=key,
             spec=final_spec,
             op_type=op_type,
+            op_args=final_args
         )
 
     def _validate_delta_initial(self, delta=None, initial=None) -> None:
@@ -422,7 +439,7 @@ class CollectionLogic:
         *opts,  # type: IncrementOptions
         **kwargs,  # type: Any
     ) -> Optional[CounterResult]:
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         if not final_args.get('initial', None):
             final_args['initial'] = SignedInt64Base(0)
         if not final_args.get('delta', None):
@@ -445,7 +462,7 @@ class CollectionLogic:
         *opts,  # type: DecrementOptions
         **kwargs,  # type: Any
     ) -> Optional[CounterResult]:
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         if not final_args.get('initial', None):
             final_args['initial'] = SignedInt64Base(0)
         if not final_args.get('delta', None):
@@ -469,7 +486,7 @@ class CollectionLogic:
         *opts,  # type: AppendOptions
         **kwargs,  # type: Any
     ) -> Optional[MutationResult]:
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         if isinstance(value, str):
             value = value.encode("utf-8")
         elif isinstance(value, bytearray):
@@ -493,7 +510,7 @@ class CollectionLogic:
         *opts,  # type: PrependOptions
         **kwargs,  # type: Any
     ) -> Optional[MutationResult]:
-        final_args = forward_args(kwargs, *opts)
+        final_args = self._get_mutation_options(*opts, **kwargs)
         if isinstance(value, str):
             value = value.encode("utf-8")
         elif isinstance(value, bytearray):

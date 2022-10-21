@@ -105,6 +105,15 @@ class CollectionMultiTests:
         if kv_endpoints is None or len(kv_endpoints) < (num_replicas + 1):
             pytest.skip("Not all replicas are online")
 
+    @pytest.fixture(scope="class")
+    def num_nodes(self, cb_env):
+        return len(cb_env.cluster._cluster_info.nodes)
+
+    @pytest.fixture(scope="class")
+    def check_multi_node(self, num_nodes):
+        if num_nodes == 1:
+            pytest.skip("Test only for clusters with more than a single node.")
+
     def _make_sure_docs_exists(self, cb_env, keys):
         found = 0
         for k in keys:
@@ -249,6 +258,7 @@ class CollectionMultiTests:
         with pytest.raises(DocumentUnretrievableException):
             cb_env.collection.get_any_replica_multi(keys, GetAnyReplicaMultiOptions(return_exceptions=False))
 
+    @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas")
     def test_multi_get_all_replicas_simple(self, cb_env, kds):
         keys_and_docs = kds
@@ -269,6 +279,7 @@ class CollectionMultiTests:
                 assert isinstance(replica.is_replica, bool)
                 assert replica.content_as[dict] == keys_and_docs[k]
 
+    @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas")
     def test_multi_get_all_replicas_invalid_input(self, cb_env):
         keys_and_docs = {
@@ -280,6 +291,7 @@ class CollectionMultiTests:
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.get_all_replicas_multi(keys_and_docs)
 
+    @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas")
     def test_multi_get_all_replicas_fail(self, cb_env, fake_kds):
         keys_and_docs = fake_kds

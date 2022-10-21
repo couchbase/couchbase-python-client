@@ -20,6 +20,7 @@
 #include "result.hxx"
 #include <couchbase/cas.hxx>
 #include "utils.hxx"
+#include "tracing.hxx"
 
 couchbase::core::impl::subdoc::opcode
 to_subdoc_opcode(std::uint8_t opcode)
@@ -413,8 +414,12 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
 
     couchbase::core::operations::lookup_in_request req{ options->id };
     req.timeout = options->timeout_ms;
+    req.access_deleted = options->access_deleted;
     req.specs = specs;
-    do_subdoc_op<couchbase::core::operations::lookup_in_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+    if (nullptr != options->span) {
+        req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+    }
+    do_subdoc_op(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
     Py_RETURN_NONE;
 }
 
@@ -496,47 +501,134 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         }
     }
 
-    couchbase::durability_level durability_level = couchbase::durability_level::none;
-    if (options->durability != 0) {
-        durability_level = static_cast<couchbase::durability_level>(options->durability);
-    }
-
-    couchbase::cas cas = couchbase::cas{ 0 };
-    if (options->cas != 0) {
-        cas = couchbase::cas{ options->cas };
-    }
-
-    couchbase::store_semantics store_semantics;
-    switch (options->semantics) {
-        case 1: {
-            store_semantics = couchbase::store_semantics::upsert;
-            break;
-        }
-        case 2: {
-            store_semantics = couchbase::store_semantics::insert;
-            break;
-        }
-        default: {
-            store_semantics = couchbase::store_semantics::replace;
-            break;
-        }
-    };
-
     couchbase::core::operations::mutate_in_request req{ options->id };
-    req.cas = cas;
+    req.cas = options->cas;
+    req.specs = specs;
     req.timeout = options->timeout_ms;
     if (0 < options->expiry) {
         req.expiry = options->expiry;
     }
-    req.store_semantics = store_semantics;
-    req.specs = specs;
-    req.durability_level = durability_level;
-    if (options->preserve_expiry) {
-        req.preserve_expiry = options->preserve_expiry;
+    req.store_semantics = options->store_semantics;
+    req.access_deleted = options->access_deleted;
+    req.create_as_deleted = options->create_as_deleted;
+    req.preserve_expiry = options->preserve_expiry;
+    if (nullptr != options->span) {
+        req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+    }
+    if (options->use_legacy_durability) {
+        auto req_legacy_durability =
+          couchbase::core::operations::mutate_in_request_with_legacy_durability{ req, options->persist_to, options->replicate_to };
+        do_subdoc_op(*(options->conn), req_legacy_durability, pyObj_callback, pyObj_errback, barrier);
+        Py_RETURN_NONE;
+    }
+    req.durability_level = options->durability_level;
+    do_subdoc_op(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+    Py_RETURN_NONE;
+}
+
+struct lookup_in_options
+get_lookup_in_options(PyObject* op_args)
+{
+    struct lookup_in_options opts {
+    };
+
+    PyObject* pyObj_span = PyDict_GetItemString(op_args, "span");
+    if (pyObj_span != nullptr) {
+        opts.span = pyObj_span;
     }
 
-    do_subdoc_op<couchbase::core::operations::mutate_in_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
-    Py_RETURN_NONE;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+    PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
+    if (pyObj_timeout != nullptr) {
+        auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
+        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+        if (0 < timeout) {
+            opts.timeout_ms = timeout_ms;
+        }
+    }
+
+    PyObject* pyObj_access_deleted = PyDict_GetItemString(op_args, "access_deleted");
+    opts.access_deleted = pyObj_access_deleted != nullptr && pyObj_access_deleted == Py_True ? true : false;
+
+    return opts;
+}
+
+mutate_in_options
+get_mutate_in_options(PyObject* op_args)
+{
+    struct mutate_in_options opts;
+
+    PyObject* pyObj_span = PyDict_GetItemString(op_args, "span");
+    if (pyObj_span != nullptr) {
+        opts.span = pyObj_span;
+    }
+
+    PyObject* pyObj_expiry = PyDict_GetItemString(op_args, "expiry");
+    if (pyObj_expiry != nullptr) {
+        opts.expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_expiry));
+    }
+
+    PyObject* pyObj_cas = PyDict_GetItemString(op_args, "cas");
+    couchbase::cas cas = couchbase::cas{ 0 };
+    if (pyObj_cas != nullptr) {
+        auto cas_int = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_cas));
+        if (cas_int != 0) {
+            cas = couchbase::cas{ cas_int };
+        }
+    }
+    opts.cas = cas;
+
+    PyObject* pyObj_preserve_expiry = PyDict_GetItemString(op_args, "preserve_expiry");
+    opts.preserve_expiry = pyObj_preserve_expiry != nullptr && pyObj_preserve_expiry == Py_True ? true : false;
+
+    PyObject* pyObj_access_deleted = PyDict_GetItemString(op_args, "access_deleted");
+    opts.access_deleted = pyObj_access_deleted != nullptr && pyObj_access_deleted == Py_True ? true : false;
+
+    PyObject* pyObj_create_as_deleted = PyDict_GetItemString(op_args, "create_as_deleted");
+    opts.create_as_deleted = pyObj_create_as_deleted != nullptr && pyObj_create_as_deleted == Py_True ? true : false;
+
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+    PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
+    if (pyObj_timeout != nullptr) {
+        auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
+        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+        if (0 < timeout) {
+            opts.timeout_ms = timeout_ms;
+        }
+    }
+
+    PyObject* pyObj_semantics = PyDict_GetItemString(op_args, "store_semantics");
+    if (pyObj_semantics) {
+        auto semantics = static_cast<uint8_t>(PyLong_AsUnsignedLong(pyObj_semantics));
+        switch (semantics) {
+            case 1: {
+                opts.store_semantics = couchbase::store_semantics::upsert;
+                break;
+            }
+            case 2: {
+                opts.store_semantics = couchbase::store_semantics::insert;
+                break;
+            }
+            default: {
+                opts.store_semantics = couchbase::store_semantics::replace;
+                break;
+            }
+        };
+    }
+
+    PyObject* pyObj_durability = PyDict_GetItemString(op_args, "durability");
+    if (pyObj_durability) {
+        if (PyDict_Check(pyObj_durability)) {
+            auto durability = PyObject_to_durability(pyObj_durability);
+            opts.use_legacy_durability = true;
+            opts.persist_to = durability.first;
+            opts.replicate_to = durability.second;
+        } else if (PyLong_Check(pyObj_durability)) {
+            opts.durability_level = PyObject_to_durability_level(pyObj_durability);
+        }
+    }
+
+    return opts;
 }
 
 PyObject*
@@ -551,27 +643,13 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
     Operations::OperationType op_type = Operations::UNKNOWN;
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
-
-    // sometimes req, sometimes optional
-    PyObject* pyObj_spec = nullptr;
+    PyObject* pyObj_op_args = nullptr;
     PyObject* pyObj_span = nullptr;
-    PyObject* pyObj_durability = nullptr;
+    PyObject* pyObj_spec = nullptr;
 
-    // optional
-    uint8_t semantics = 0;
-    uint32_t expiry = 0;
-    uint64_t timeout = 0;
-    uint64_t cas = 0;
-    // booleans, but use int to read from kwargs
-    int access_deleted = 0;
-    int preserve_expiry = 0;
+    static const char* kw_list[] = { "conn", "bucket", "scope", "collection_name", "key", "op_type", "spec", "op_args", nullptr };
 
-    static const char* kw_list[] = {
-        "conn", "bucket",     "scope",           "collection_name", "key",     "op_type", "callback",       "errback",         "spec",
-        "span", "durability", "store_semantics", "expiry",          "timeout", "cas",     "access_deleted", "preserve_expiry", nullptr
-    };
-
-    const char* kw_format = "O!ssssI|OOOOObILLii";
+    const char* kw_format = "O!ssssI|OO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -583,17 +661,8 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
                                           &collection,
                                           &key,
                                           &op_type,
-                                          &pyObj_callback,
-                                          &pyObj_errback,
                                           &pyObj_spec,
-                                          &pyObj_span,
-                                          &pyObj_durability,
-                                          &semantics,
-                                          &expiry,
-                                          &timeout,
-                                          &cas,
-                                          &access_deleted,
-                                          &preserve_expiry);
+                                          &pyObj_op_args);
 
     if (!ret) {
         pycbc_set_python_exception(
@@ -627,16 +696,11 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
         return nullptr;
     }
 
-    couchbase::core::document_id id{ bucket, scope, collection, key };
-
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    if (0 < timeout) {
-        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
-    }
-
     // PyObjects that need to be around for the cxx client lambda
     // have their increment/decrement handled w/in the callback_context struct
     // struct callback_context callback_ctx = { pyObj_callback, pyObj_errback };
+    pyObj_callback = PyDict_GetItemString(pyObj_op_args, "callback");
+    pyObj_errback = PyDict_GetItemString(pyObj_op_args, "errback");
     Py_XINCREF(pyObj_callback);
     Py_XINCREF(pyObj_errback);
 
@@ -649,34 +713,20 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
 
     switch (op_type) {
         case Operations::LOOKUP_IN: {
-            struct lookup_in_options opts = { conn, id, Operations::LOOKUP_IN, timeout_ms, access_deleted == 1, pyObj_span, pyObj_spec };
+            auto opts = get_lookup_in_options(pyObj_op_args);
+            opts.conn = conn;
+            opts.id = couchbase::core::document_id{ bucket, scope, collection, key };
+            opts.op_type = op_type;
+            opts.specs = pyObj_spec;
             prepare_and_execute_lookup_in_op(&opts, nspecs, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case Operations::MUTATE_IN: {
-            uint8_t durability = 0;
-            uint8_t replicate_to = 0;
-            uint8_t persist_to = 0;
-            if (pyObj_durability) {
-                if (PyDict_Check(pyObj_durability)) {
-                    PyObject* pyObj_replicate_to = PyDict_GetItemString(pyObj_durability, "replicate_to");
-                    if (pyObj_replicate_to) {
-                        replicate_to = static_cast<uint8_t>(PyLong_AsLong(pyObj_replicate_to));
-                    }
-
-                    PyObject* pyObj_persist_to = PyDict_GetItemString(pyObj_durability, "persist_to");
-                    if (pyObj_persist_to) {
-                        persist_to = static_cast<uint8_t>(PyLong_AsLong(pyObj_persist_to));
-                    }
-                } else if (PyLong_Check(pyObj_durability)) {
-                    durability = static_cast<uint8_t>(PyLong_AsLong(pyObj_durability));
-                }
-            }
-
-            struct mutate_in_options opts = {
-                conn, id,         Operations::MUTATE_IN, durability,          replicate_to, persist_to, semantics, expiry,
-                cas,  timeout_ms, preserve_expiry == 1,  access_deleted == 1, pyObj_span,   pyObj_spec
-            };
+            auto opts = get_mutate_in_options(pyObj_op_args);
+            opts.conn = conn;
+            opts.id = couchbase::core::document_id{ bucket, scope, collection, key };
+            opts.op_type = op_type;
+            opts.specs = pyObj_spec;
             prepare_and_execute_mutate_in_op(&opts, nspecs, pyObj_callback, pyObj_errback, barrier);
             break;
         }

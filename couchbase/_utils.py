@@ -96,7 +96,6 @@ def timedelta_as_timestamp(
         raise InvalidArgumentException(f'Expected expiry seconds of zero (for no expiry) or greater, got {seconds}.')
 
     if seconds < THIRTY_DAYS_IN_SECONDS:
-        print(f'{seconds} < {THIRTY_DAYS_IN_SECONDS}')
         return seconds
 
     return seconds + int(time())

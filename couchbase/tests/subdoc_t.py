@@ -18,14 +18,8 @@ from datetime import datetime, timedelta
 import pytest
 
 import couchbase.subdocument as SD
-from couchbase.durability import (ClientDurability,
-                                  DurabilityLevel,
-                                  PersistTo,
-                                  ReplicateTo,
-                                  ServerDurability)
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
-                                  DurabilityImpossibleException,
                                   InvalidArgumentException,
                                   InvalidValueException,
                                   PathExistsException,
@@ -359,40 +353,6 @@ class SubDocumentTests:
                         seconds=5),
                     preserve_expiry=True),
             )
-
-    @pytest.mark.usefixtures("skip_if_less_than_alice")
-    def test_mutate_in_server_durability(self, cb_env, default_kvp_and_reset, num_replicas):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-        if num_replicas > 1:
-            cb.mutate_in(key,
-                         (SD.upsert("city", "New City"),
-                             SD.replace("faa", "CTY")),
-                         MutateInOptions(durability=ServerDurability(
-                             level=DurabilityLevel.PERSIST_TO_MAJORITY)))
-        else:
-            try:
-                cb.mutate_in(key,
-                             (SD.upsert("city", "New City"),
-                                 SD.replace("faa", "CTY")),
-                             MutateInOptions(durability=ServerDurability(
-                                 level=DurabilityLevel.PERSIST_TO_MAJORITY)))
-            except DurabilityImpossibleException:
-                pass  # this is okay -- server not setup correctly
-
-    # @pytest.mark.usefixtures("skip_if_less_than_alice")
-    def test_mutate_in_client_durability(self, cb_env, default_kvp_and_reset, num_replicas):
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-        durability = ClientDurability(
-            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-        cb.mutate_in(key,
-                     (SD.upsert("city", "New City"),
-                      SD.replace("faa", "CTY")),
-                     MutateInOptions(durability=durability))
 
     """
         @TODO(jc): verify the RFC store semantics terminology.  Should it really

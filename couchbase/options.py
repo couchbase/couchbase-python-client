@@ -1255,6 +1255,15 @@ class PrependMultiOptions(dict):
 NoValueMultiOptions = Union[GetMultiOptions, ExistsMultiOptions,
                             RemoveMultiOptions, TouchMultiOptions, LockMultiOptions, UnlockMultiOptions]
 MutationMultiOptions = Union[InsertMultiOptions, UpsertMultiOptions, ReplaceMultiOptions]
+MutationOptions = Union[InsertOptions,
+                        UpsertOptions,
+                        ReplaceOptions,
+                        RemoveOptions,
+                        MutateInOptions,
+                        AppendOptions,
+                        PrependOptions,
+                        IncrementOptions,
+                        DecrementOptions]
 
 
 class QueryOptions(QueryOptionsBase):

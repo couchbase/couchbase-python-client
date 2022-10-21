@@ -112,19 +112,26 @@ class CollectionTests:
         await cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
 
     @pytest_asyncio.fixture(scope="class")
-    async def check_replicas(self, cb_env):
+    async def num_replicas(self, cb_env):
         bucket_settings = await cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
         num_replicas = bucket_settings.get("num_replicas")
+        return num_replicas
+
+    @pytest_asyncio.fixture(scope="class")
+    async def check_replicas(self, cb_env, num_replicas):
         ping_res = await cb_env.bucket.ping()
         kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
         if kv_endpoints is None or len(kv_endpoints) < (num_replicas + 1):
             pytest.skip("Not all replicas are online")
 
-    @pytest_asyncio.fixture(scope="class")
-    async def num_replicas(self, cb_env):
-        bucket_settings = await cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
-        num_replicas = bucket_settings.get("num_replicas")
-        return num_replicas
+    @pytest.fixture(scope="class")
+    def num_nodes(self, cb_env):
+        return len(cb_env.cluster._cluster_info.nodes)
+
+    @pytest.fixture(scope="class")
+    def check_multi_node(self, num_nodes):
+        if num_nodes == 1:
+            pytest.skip("Test only for clusters with more than a single node.")
 
     @pytest.mark.asyncio
     async def test_exists(self, cb_env, default_kvp):
@@ -590,6 +597,7 @@ class CollectionTests:
         with pytest.raises(DocumentUnretrievableException):
             await cb_env.collection.get_any_replica('not-a-key')
 
+    @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas")
     @pytest.mark.asyncio
     async def test_get_all_replicas(self, cb_env, default_kvp):
@@ -604,12 +612,14 @@ class CollectionTests:
             except StopIteration:
                 break
 
+    @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas")
     @pytest.mark.asyncio
     async def test_get_all_replicas_fail(self, cb_env):
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.get_all_replicas('not-a-key')
 
+    @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas")
     @pytest.mark.asyncio
     async def test_get_all_replicas_results(self, cb_env, default_kvp):

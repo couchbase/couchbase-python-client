@@ -21,10 +21,8 @@ import pytest_asyncio
 
 import couchbase.subdocument as SD
 from acouchbase.cluster import get_event_loop
-from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
-                                  DurabilityImpossibleException,
                                   InvalidArgumentException,
                                   InvalidValueException,
                                   PathExistsException,
@@ -395,47 +393,6 @@ class SubDocumentTests:
                         seconds=5),
                     preserve_expiry=True),
             )
-
-    @pytest.mark.usefixtures("skip_if_less_than_alice")
-    @pytest.mark.asyncio
-    async def test_mutate_in_server_durability(self, cb_env, default_kvp_and_reset, num_replicas):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-        if num_replicas > 1:
-            await cb.mutate_in(key,
-                               (SD.upsert("city", "New City"),
-                                SD.replace("faa", "CTY")),
-                               MutateInOptions(durability=ServerDurability(
-                                   level=DurabilityLevel.PERSIST_TO_MAJORITY)))
-        else:
-            try:
-                await cb.mutate_in(key,
-                                   (SD.upsert("city", "New City"),
-                                    SD.replace("faa", "CTY")),
-                                   MutateInOptions(durability=ServerDurability(
-                                       level=DurabilityLevel.PERSIST_TO_MAJORITY)))
-            except DurabilityImpossibleException:
-                pass  # this is okay -- server not setup correctly
-
-    @pytest.mark.usefixtures("skip_if_less_than_alice")
-    @pytest.mark.asyncio
-    async def test_mutate_in_client_durability(self, cb_env, default_kvp_and_reset, num_replicas):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-
-    """
-        @TODO(jc): verify the RFC store semantics terminology.  Should it really
-        replace the _whole_ document?
-
-        https://github.com/couchbaselabs/sdk-rfcs/blob/master/rfc/0053-sdk3-crud.md
-        StoreSemantics - the storage action
-            Replace - replace the document, fail if it doesn't exist
-            Upsert - replace the document or create it if it doesn't exist (0x01)
-            Insert - create document, fail if it exists (0x02)
-
-    """
 
     @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio

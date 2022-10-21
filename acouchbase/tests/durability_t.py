@@ -18,6 +18,7 @@ from datetime import timedelta
 import pytest
 import pytest_asyncio
 
+import couchbase.subdocument as SD
 from acouchbase.cluster import get_event_loop
 from couchbase.durability import (ClientDurability,
                                   DurabilityLevel,
@@ -27,6 +28,7 @@ from couchbase.durability import (ClientDurability,
                                   ServerDurability)
 from couchbase.exceptions import DocumentNotFoundException, DurabilityImpossibleException
 from couchbase.options import (InsertOptions,
+                               MutateInOptions,
                                RemoveOptions,
                                ReplaceOptions,
                                UpsertOptions)
@@ -78,7 +80,7 @@ class DurabilityTests:
 
     @pytest_asyncio.fixture(name="default_kvp_and_reset")
     async def default_key_and_value_with_reset(self, cb_env) -> KVPair:
-        key, value = cb_env.get_default_key_value()
+        key, value = cb_env.default_durable_key_value()
         yield KVPair(key, value)
         await cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
 
@@ -412,3 +414,72 @@ class DurabilityTests:
         await cb.upsert(key, value, UpsertOptions(durability=durability))
         result = await cb.get(key)
         assert value == result.content_as[dict]
+
+    # Sub-document durable operations
+
+    @pytest.mark.usefixtures("check_sync_durability_supported")
+    @pytest.mark.usefixtures("check_multi_node")
+    @pytest.mark.usefixtures("check_has_replicas")
+    @pytest.mark.asyncio
+    async def test_server_durable_mutate_in(self, cb_env, default_kvp_and_reset):
+        if cb_env.is_mock_server:
+            pytest.skip("Mock will not return expiry in the xaddrs.")
+
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        value = default_kvp_and_reset.value
+        value['city'] = 'New City'
+        value['faa'] = 'CTY'
+
+        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+        await cb.mutate_in(key,
+                           (SD.upsert('city', 'New City'), SD.replace('faa', 'CTY')),
+                           MutateInOptions(durability=durability))
+        result = await cb.get(key)
+        assert value == result.content_as[dict]
+
+    @pytest.mark.usefixtures("check_sync_durability_supported")
+    @pytest.mark.usefixtures("check_single_node")
+    @pytest.mark.usefixtures("check_has_replicas")
+    @pytest.mark.asyncio
+    async def test_server_durable_mutate_in_single_node(self, cb_env, default_kvp_and_reset):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+        with pytest.raises(DurabilityImpossibleException):
+            await cb.mutate_in(key, (SD.upsert('city', 'New City'),), MutateInOptions(durability=durability))
+
+    @pytest.mark.usefixtures("check_multi_node")
+    @pytest.mark.usefixtures("check_has_replicas")
+    @pytest.mark.asyncio
+    async def test_client_durable_mutate_in(self, cb_env, default_kvp_and_reset, num_replicas):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        value = default_kvp_and_reset.value
+        value['city'] = 'New City'
+        value['faa'] = 'CTY'
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        await cb.mutate_in(key,
+                           (SD.upsert('city', 'New City'), SD.replace('faa', 'CTY')),
+                           MutateInOptions(durability=durability))
+        result = await cb.get(key)
+        assert value == result.content_as[dict]
+
+    @pytest.mark.usefixtures("check_multi_node")
+    @pytest.mark.usefixtures("check_has_replicas")
+    @pytest.mark.asyncio
+    async def test_client_durable_mutate_in_fail(self, cb_env, default_kvp_and_reset, num_replicas):
+        if num_replicas > 2:
+            pytest.skip("Too many replicas enabled.")
+
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        durability = ClientDurability(
+            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+        with pytest.raises(DurabilityImpossibleException):
+            await cb.mutate_in(key, (SD.upsert('city', 'New City'),), MutateInOptions(durability=durability))

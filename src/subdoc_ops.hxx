@@ -45,13 +45,13 @@ struct lookup_in_options {
     // required
     connection* conn;
     couchbase::core::document_id id;
-    Operations::OperationType op_type = Operations::LOOKUP_IN;
+    Operations::OperationType op_type{ Operations::LOOKUP_IN };
 
     // optional
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    bool access_deleted;
-    PyObject* span;
-    PyObject* specs;
+    bool access_deleted{ false };
+    PyObject* span{ nullptr };
+    PyObject* specs{ nullptr };
 
     // TODO:
     // retries?
@@ -62,24 +62,24 @@ struct mutate_in_options {
     // required
     connection* conn;
     couchbase::core::document_id id;
-    Operations::OperationType op_type = Operations::MUTATE_IN;
+    Operations::OperationType op_type{ Operations::MUTATE_IN };
 
     // optional
-    uint8_t durability;
-    uint8_t replicate_to;
-    uint8_t persist_to;
-    uint8_t semantics;
-    uint32_t expiry;
-    uint64_t cas;
+    couchbase::durability_level durability_level{ couchbase::durability_level::none };
+    bool use_legacy_durability{ false };
+    couchbase::replicate_to replicate_to{ couchbase::persist_to::none };
+    couchbase::persist_to persist_to{ couchbase::replicate_to::none };
+    couchbase::store_semantics store_semantics{ couchbase::store_semantics::replace };
+    uint32_t expiry{ 0 };
+    couchbase::cas cas;
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    bool preserve_expiry;
-    bool access_deleted;
-    PyObject* span;
-    PyObject* specs;
+    bool preserve_expiry{ false };
+    bool access_deleted{ false };
+    bool create_as_deleted{ false };
+    PyObject* span{ nullptr };
+    PyObject* specs{ nullptr };
 
     // TODO:
-    // durability_timeout;
-    // create_as_deleted;
     // retries?
     // partition?
 };
