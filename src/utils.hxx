@@ -19,9 +19,13 @@
 
 #include "Python.h" // NOLINT
 #include <core/utils/binary.hxx>
+#include <core/utils/json.hxx>
+#include <core/utils/join_strings.hxx>
 #include <couchbase/persist_to.hxx>
 #include <couchbase/replicate_to.hxx>
 #include <couchbase/durability_level.hxx>
+#include "n1ql.hxx"
+#include "tracing.hxx"
 #include <stdexcept>
 #include <string>
 #include <chrono>
@@ -32,6 +36,9 @@ couchbase::core::utils::binary
 PyObject_to_binary(PyObject*);
 PyObject*
 binary_to_PyObject(couchbase::core::utils::binary value);
+std::string
+binary_to_string(couchbase::core::utils::binary value);
+
 std::size_t py_ssize_t_to_size_t(Py_ssize_t);
 Py_ssize_t size_t_to_py_ssize_t(std::size_t);
 
@@ -43,3 +50,7 @@ std::pair<couchbase::persist_to, couchbase::replicate_to>
 PyObject_to_durability(PyObject*);
 couchbase::durability_level
 PyObject_to_durability_level(PyObject*);
+
+// TODO: consolidate these types of methods to another file that handles other requests as well
+couchbase::core::operations::query_request
+build_query_request(PyObject* pyObj_query_args);

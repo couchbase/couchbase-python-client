@@ -108,8 +108,9 @@ class HTTPErrorContext(ErrorContext):
 
 
 class KeyValueErrorContext(ErrorContext):
-    _KV_EC_KEYS = ["key", "bucket_name", "scope_name", "collection_name",
-                   "opaque", "status_code", "error_map_info", "extended_error_info"]
+    _KV_EC_KEYS = ['key', 'bucket_name', 'scope_name', 'collection_name',
+                   'opaque', 'status_code', 'error_map_info', 'extended_error_info',
+                   'retry_attempts', 'retry_reasons']
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1009,8 +1010,8 @@ class ExceptionMap(Enum):
 
 PYCBC_ERROR_MAP = {e.value: getattr(sys.modules[__name__], e.name) for e in ExceptionMap}
 
-KV_ERROR_CONTEXT_MAPPING = {'kv_locked': DocumentLockedException,
-                            'kv_temporary_failure': TemporaryFailException}
+KV_ERROR_CONTEXT_MAPPING = {'key_value_locked': DocumentLockedException,
+                            'key_value_temporary_failure': TemporaryFailException}
 
 QUERY_ERROR_MAPPING = {r'.*Keyspace not found.*': KeyspaceNotFoundException,
                        r'.*Scope not found.*': ScopeNotFoundException,

@@ -23,6 +23,7 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Optional)
 
+from couchbase.logic.supportability import Supportability
 from couchbase.options import TransactionQueryOptions
 from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryResults,
@@ -97,7 +98,7 @@ class Transactions(TransactionsLogic):
     @AsyncWrapper.inject_callbacks(TransactionResult)
     def run(self,
             txn_logic,  # type:  Callable[[AttemptContextLogic], None]
-            per_txn_config=None,  # type: Optional[TransactionOptions]
+            transaction_options=None,  # type: Optional[TransactionOptions]
             **kwargs) -> Awaitable[TransactionResult]:
         def wrapped_logic(c):
             try:
@@ -108,7 +109,14 @@ class Transactions(TransactionsLogic):
                 log.debug('wrapped_logic raised %s', e)
                 raise e
 
-        return super().run(wrapped_logic, per_txn_config, **kwargs)
+        opts = None
+        if transaction_options:
+            opts = transaction_options
+        if 'per_txn_config' in kwargs:
+            Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
+            opts = kwargs.pop('per_txn_config', None)
+
+        return super().run(wrapped_logic, opts, **kwargs)
 
     # TODO: make async?
     def close(self):

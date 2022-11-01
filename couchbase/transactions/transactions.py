@@ -22,6 +22,7 @@ from typing import (TYPE_CHECKING,
                     Optional)
 
 from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
+from couchbase.logic.supportability import Supportability
 from couchbase.options import TransactionQueryOptions
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
 
@@ -69,15 +70,15 @@ class Transactions(TransactionsLogic):
 
     def run(self,
             txn_logic,  # type: Callable[[AttemptContext], None]
-            per_txn_config=None,  # type: Optional[TransactionOptions]
+            transaction_options=None,  # type: Optional[TransactionOptions]
             **kwargs    # type: Dict[str, Any]
             ) -> TransactionResult:
         """ Run a set of operations within a transaction.
 
         Args:
             txn_logic (Callable[:class:`~couchbase.transactions.AttemptContext`]): The transaction logic to perform.
-            per_txn_config (:class:``): Options to override those in the :class:`couchbase.options.TransactionConfig`
-                for this transaction only.
+            transaction_options (:class:``): Options to override those in the :class:`couchbase.options.TransactionConfig`
+                for this transaction only. ** DEPRECATED ** Use transaction_config instead.
             **kwargs (Dict[str, Any]): Override options for this transaction only - currently unimplemented.
 
         Returns:
@@ -104,7 +105,7 @@ class Transactions(TransactionsLogic):
 
                 cluster.transactions.run(txn_logic
 
-        """
+        """  # noqa: E501
 
         def wrapped_txn_logic(c):
             try:
@@ -114,7 +115,14 @@ class Transactions(TransactionsLogic):
                 log.debug('wrapped_txn_logic got %s:%s, re-raising it', e.__class__.__name__, e)
                 raise e
 
-        return TransactionResult(**super().run(wrapped_txn_logic, per_txn_config))
+        opts = None
+        if transaction_options:
+            opts = transaction_options
+        if 'per_txn_config' in kwargs:
+            Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
+            opts = kwargs.pop('per_txn_config', None)
+
+        return TransactionResult(**super().run(wrapped_txn_logic, opts))
 
     def close(self):
         super().close()

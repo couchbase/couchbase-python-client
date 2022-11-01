@@ -145,20 +145,20 @@ retry_reason_to_string(couchbase::retry_reason reason)
             return "service_not_available";
         case couchbase::retry_reason::node_not_available:
             return "node_not_available";
-        case couchbase::retry_reason::kv_not_my_vbucket:
-            return "kv_not_my_vbucket";
-        case couchbase::retry_reason::kv_collection_outdated:
-            return "kv_collection_outdated";
-        case couchbase::retry_reason::kv_error_map_retry_indicated:
-            return "kv_error_map_retry_indicated";
-        case couchbase::retry_reason::kv_locked:
-            return "kv_locked";
-        case couchbase::retry_reason::kv_temporary_failure:
-            return "kv_temporary_failure";
-        case couchbase::retry_reason::kv_sync_write_in_progress:
-            return "kv_sync_write_in_progress";
-        case couchbase::retry_reason::kv_sync_write_re_commit_in_progress:
-            return "kv_sync_write_re_commit_in_progress";
+        case couchbase::retry_reason::key_value_not_my_vbucket:
+            return "key_value_not_my_vbucket";
+        case couchbase::retry_reason::key_value_collection_outdated:
+            return "key_value_collection_outdated";
+        case couchbase::retry_reason::key_value_error_map_retry_indicated:
+            return "key_value_error_map_retry_indicated";
+        case couchbase::retry_reason::key_value_locked:
+            return "key_value_locked";
+        case couchbase::retry_reason::key_value_temporary_failure:
+            return "key_value_temporary_failure";
+        case couchbase::retry_reason::key_value_sync_write_in_progress:
+            return "key_value_sync_write_in_progress";
+        case couchbase::retry_reason::key_value_sync_write_re_commit_in_progress:
+            return "key_value_sync_write_re_commit_in_progress";
         case couchbase::retry_reason::service_response_code_indicated:
             return "service_response_code_indicated";
         case couchbase::retry_reason::circuit_breaker_open:
@@ -213,10 +213,12 @@ build_kv_error_map_info(couchbase::key_value_error_map_info error_info)
 
     PyObject* attr_set = PySet_New(nullptr);
     for (auto attr : error_info.attributes()) {
-        if (-1 == PySet_Add(attr_set, PyLong_FromLong(static_cast<uint16_t>(attr)))) {
+        pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(attr));
+        if (-1 == PySet_Add(attr_set, pyObj_tmp)) {
             PyErr_Print();
             PyErr_Clear();
         }
+        Py_DECREF(pyObj_tmp);
     }
     Py_ssize_t set_size = PySet_Size(attr_set);
     if (set_size > 0) {

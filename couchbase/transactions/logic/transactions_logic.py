@@ -15,9 +15,12 @@
 
 import logging
 from typing import (TYPE_CHECKING,
+                    Any,
                     Callable,
+                    Dict,
                     Optional)
 
+from couchbase.logic.supportability import Supportability
 from couchbase.pycbc_core import (create_transactions,
                                   destroy_transactions,
                                   run_transaction)
@@ -45,12 +48,17 @@ class TransactionsLogic:
         log.info('created transactions object using config=%s, serializer=%s', self._config, self._serializer)
 
     def run(self,
-            logic,  # type: Callable[[AttemptContextLogic], None]
-            per_txn_config=None,  # type: Optional[TransactionOptions],
-            **kwargs
+            logic,                     # type: Callable[[AttemptContextLogic], None]
+            transaction_options=None,  # type: Optional[TransactionOptions]
+            **kwargs                   # type: Optional[Dict[str, Any]]
             ):
-        if per_txn_config:
-            kwargs['per_txn_config'] = per_txn_config._base
+        print(transaction_options)
+        print(f'kwargs: {kwargs}')
+        if transaction_options:
+            kwargs['transaction_options'] = transaction_options._base
+        if 'per_txn_config' in kwargs:
+            Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
+            kwargs['transaction_options'] = kwargs.pop('per_txn_config', None)
         return run_transaction(txns=self._txns, logic=logic, **kwargs)
 
     def close(self, **kwargs):

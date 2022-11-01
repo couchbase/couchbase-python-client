@@ -37,6 +37,13 @@ binary_to_PyObject(couchbase::core::utils::binary value)
     return PyBytes_FromStringAndSize(buf, nbuf);
 }
 
+std::string
+binary_to_string(couchbase::core::utils::binary value)
+{
+    auto json = couchbase::core::utils::json::parse_binary(value);
+    return couchbase::core::utils::json::generate(json);
+}
+
 std::size_t
 py_ssize_t_to_size_t(Py_ssize_t value)
 {
@@ -141,4 +148,269 @@ PyObject_to_durability_level(PyObject* pyObj_durability_level)
             return couchbase::durability_level::none;
         }
     }
+}
+
+couchbase::core::operations::query_request
+build_query_request(PyObject* pyObj_query_args)
+{
+    couchbase::core::operations::query_request req;
+    PyObject* pyObj_statement = PyDict_GetItemString(pyObj_query_args, "statement");
+    if (pyObj_statement != nullptr) {
+        if (PyUnicode_Check(pyObj_statement)) {
+            req.statement = std::string(PyUnicode_AsUTF8(pyObj_statement));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "Query statement is not a string.");
+            return {};
+        }
+    }
+
+    PyObject* pyObj_adhoc = PyDict_GetItemString(pyObj_query_args, "adhoc");
+    req.adhoc = pyObj_adhoc != nullptr && pyObj_adhoc == Py_True ? true : false;
+
+    PyObject* pyObj_metrics = PyDict_GetItemString(pyObj_query_args, "metrics");
+    req.metrics = pyObj_metrics != nullptr && pyObj_metrics == Py_True ? true : false;
+
+    PyObject* pyObj_readonly = PyDict_GetItemString(pyObj_query_args, "readonly");
+    req.readonly = pyObj_readonly != nullptr && pyObj_readonly == Py_True ? true : false;
+
+    PyObject* pyObj_flex_index = PyDict_GetItemString(pyObj_query_args, "flex_index");
+    req.flex_index = pyObj_flex_index != nullptr && pyObj_flex_index == Py_True ? true : false;
+
+    PyObject* pyObj_preserve_expiry = PyDict_GetItemString(pyObj_query_args, "preserve_expiry");
+    req.preserve_expiry = pyObj_preserve_expiry != nullptr && pyObj_preserve_expiry == Py_True ? true : false;
+
+    PyObject* pyObj_max_parallelism = PyDict_GetItemString(pyObj_query_args, "max_parallelism");
+    if (nullptr != pyObj_max_parallelism) {
+        req.max_parallelism = PyLong_AsUnsignedLongLong(pyObj_max_parallelism);
+    }
+
+    PyObject* pyObj_scan_cap = PyDict_GetItemString(pyObj_query_args, "scan_cap");
+    if (nullptr != pyObj_scan_cap) {
+        req.scan_cap = PyLong_AsUnsignedLongLong(pyObj_scan_cap);
+    }
+
+    PyObject* pyObj_scan_wait = PyDict_GetItemString(pyObj_query_args, "scan_wait");
+    if (nullptr != pyObj_scan_wait) {
+        // comes in as microseconds
+        req.scan_wait = std::chrono::milliseconds(PyLong_AsUnsignedLongLong(pyObj_scan_wait) / 1000ULL);
+    }
+
+    PyObject* pyObj_pipeline_batch = PyDict_GetItemString(pyObj_query_args, "pipeline_batch");
+    if (nullptr != pyObj_pipeline_batch) {
+        req.pipeline_batch = PyLong_AsUnsignedLongLong(pyObj_pipeline_batch);
+    }
+
+    PyObject* pyObj_pipeline_cap = PyDict_GetItemString(pyObj_query_args, "pipeline_cap");
+    if (nullptr != pyObj_pipeline_cap) {
+        req.pipeline_cap = PyLong_AsUnsignedLongLong(pyObj_pipeline_cap);
+    }
+
+    PyObject* pyObj_scan_consistency = PyDict_GetItemString(pyObj_query_args, "scan_consistency");
+    if (pyObj_scan_consistency != nullptr) {
+        if (PyUnicode_Check(pyObj_scan_consistency)) {
+            req.scan_consistency =
+              str_to_scan_consistency_type<couchbase::query_scan_consistency>(std::string(PyUnicode_AsUTF8(pyObj_scan_consistency)));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "scan_consistency is not a string.");
+        }
+        if (PyErr_Occurred()) {
+            return {};
+        }
+    }
+
+    PyObject* pyObj_mutation_state = PyDict_GetItemString(pyObj_query_args, "mutation_state");
+    if (pyObj_mutation_state != nullptr && PyList_Check(pyObj_mutation_state)) {
+        req.mutation_state = get_mutation_state(pyObj_mutation_state);
+    }
+
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(pyObj_query_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        if (PyUnicode_Check(pyObj_bucket_name)) {
+            req.bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "bucket_name is not a string.");
+            return {};
+        }
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(pyObj_query_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        if (PyUnicode_Check(pyObj_scope_name)) {
+            req.scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "scope_name is not a string.");
+            return {};
+        }
+    }
+
+    PyObject* pyObj_scope_qualifier = PyDict_GetItemString(pyObj_query_args, "scope_qualifier");
+    if (pyObj_scope_qualifier != nullptr) {
+        if (PyUnicode_Check(pyObj_scope_qualifier)) {
+            req.scope_qualifier = std::string(PyUnicode_AsUTF8(pyObj_scope_qualifier));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "scope_qualifier is not a string.");
+            return {};
+        }
+    }
+
+    PyObject* pyObj_client_context_id = PyDict_GetItemString(pyObj_query_args, "client_context_id");
+    if (pyObj_client_context_id != nullptr) {
+        if (PyUnicode_Check(pyObj_client_context_id)) {
+            req.client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "client_context_id is not a string.");
+            return {};
+        }
+    }
+
+    PyObject* pyObj_timeout = PyDict_GetItemString(pyObj_query_args, "timeout");
+    if (nullptr != pyObj_timeout) {
+        // comes in as microseconds
+        req.timeout = std::chrono::milliseconds(PyLong_AsUnsignedLongLong(pyObj_timeout) / 1000ULL);
+    } else {
+        req.timeout = couchbase::core::timeout_defaults::query_timeout;
+    }
+
+    PyObject* pyObj_profile_mode = PyDict_GetItemString(pyObj_query_args, "profile_mode");
+    if (pyObj_profile_mode != nullptr) {
+        if (PyUnicode_Check(pyObj_profile_mode)) {
+            req.profile = str_to_profile_mode(std::string(PyUnicode_AsUTF8(pyObj_profile_mode)));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "profile_mode is not a string.");
+        }
+        if (PyErr_Occurred()) {
+            return {};
+        }
+    }
+
+    PyObject* pyObj_send_to_node = PyDict_GetItemString(pyObj_query_args, "send_to_node");
+    if (pyObj_send_to_node != nullptr) {
+        if (PyUnicode_Check(pyObj_send_to_node)) {
+            req.send_to_node = std::string(PyUnicode_AsUTF8(pyObj_send_to_node));
+        } else {
+            PyErr_SetString(PyExc_ValueError, "send_to_node is not a string.");
+            return {};
+        }
+    }
+
+    PyObject* pyObj_span = PyDict_GetItemString(pyObj_query_args, "span");
+    if (pyObj_span != nullptr) {
+        req.parent_span = std::make_shared<pycbc::request_span>(pyObj_span);
+    }
+
+    PyObject* pyObj_raw = PyDict_GetItemString(pyObj_query_args, "raw");
+    std::map<std::string, couchbase::core::json_string, std::less<>> raw_options{};
+    if (pyObj_raw && PyDict_Check(pyObj_raw)) {
+        PyObject *pyObj_key, *pyObj_value;
+        Py_ssize_t pos = 0;
+
+        // PyObj_key and pyObj_value are borrowed references
+        while (PyDict_Next(pyObj_raw, &pos, &pyObj_key, &pyObj_value)) {
+            std::string k;
+            if (PyUnicode_Check(pyObj_key)) {
+                k = std::string(PyUnicode_AsUTF8(pyObj_key));
+            } else {
+                PyErr_SetString(PyExc_ValueError, "Raw option key is not a string.  The raw option should be a dict[str, JSONString].");
+                return {};
+            }
+            if (k.empty()) {
+                PyErr_SetString(PyExc_ValueError, "Raw option key is empty!  The raw option should be a dict[str, JSONString].");
+                return {};
+            }
+
+            if (PyBytes_Check(pyObj_value)) {
+                try {
+                    auto res = PyObject_to_binary(pyObj_value);
+                    // this will crash b/c txns query_options expects a std::vector<std::byte>
+                    // auto res = std::string(PyBytes_AsString(pyObj_value));
+                    raw_options.emplace(k, couchbase::core::json_string{ std::move(res) });
+                } catch (const std::exception& e) {
+                    PyErr_SetString(PyExc_ValueError,
+                                    "Unable to parse raw option value.  The raw option should be a dict[str, JSONString].");
+                }
+            } else {
+                PyErr_SetString(PyExc_ValueError, "Raw option value not a string.  The raw option should be a dict[str, JSONString].");
+                return {};
+            }
+        }
+    }
+    if (raw_options.size() > 0) {
+        req.raw = raw_options;
+    }
+
+    PyObject* pyObj_positional_parameters = PyDict_GetItemString(pyObj_query_args, "positional_parameters");
+    std::vector<couchbase::core::json_string> positional_parameters{};
+    if (pyObj_positional_parameters && PyList_Check(pyObj_positional_parameters)) {
+        size_t nargs = static_cast<size_t>(PyList_Size(pyObj_positional_parameters));
+        size_t ii;
+        for (ii = 0; ii < nargs; ++ii) {
+            PyObject* pyOb_param = PyList_GetItem(pyObj_positional_parameters, ii);
+            if (!pyOb_param) {
+                PyErr_SetString(PyExc_ValueError, "Unable to parse positional parameter.");
+                return {};
+            }
+            // PyList_GetItem returns borrowed ref, inc while using, decr after done
+            Py_INCREF(pyOb_param);
+            if (PyBytes_Check(pyOb_param)) {
+                try {
+                    auto res = PyObject_to_binary(pyOb_param);
+                    positional_parameters.push_back(couchbase::core::json_string{ std::move(res) });
+                } catch (const std::exception& e) {
+                    PyErr_SetString(
+                      PyExc_ValueError,
+                      "Unable to parse positional paramter option value. Positional parameter options must all be json strings.");
+                }
+            } else {
+                PyErr_SetString(PyExc_ValueError,
+                                "Unable to parse positional parameter.  Positional parameter options must all be json strings.");
+                return {};
+            }
+            Py_DECREF(pyOb_param);
+            pyOb_param = nullptr;
+        }
+    }
+    if (positional_parameters.size() > 0) {
+        req.positional_parameters = positional_parameters;
+    }
+
+    PyObject* pyObj_named_parameters = PyDict_GetItemString(pyObj_query_args, "named_parameters");
+    std::map<std::string, couchbase::core::json_string, std::less<>> named_parameters{};
+    if (pyObj_named_parameters && PyDict_Check(pyObj_named_parameters)) {
+        PyObject *pyObj_key, *pyObj_value;
+        Py_ssize_t pos = 0;
+
+        // PyObj_key and pyObj_value are borrowed references
+        while (PyDict_Next(pyObj_named_parameters, &pos, &pyObj_key, &pyObj_value)) {
+            std::string k;
+            if (PyUnicode_Check(pyObj_key)) {
+                k = std::string(PyUnicode_AsUTF8(pyObj_key));
+            } else {
+                PyErr_SetString(PyExc_ValueError,
+                                "Named parameter key is not a string.  Named parameters should be a dict[str, JSONString].");
+                return {};
+            }
+            if (k.empty()) {
+                PyErr_SetString(PyExc_ValueError, "Named parameter key is empty. Named parameters should be a dict[str, JSONString].");
+                return {};
+            }
+            if (PyBytes_Check(pyObj_value)) {
+                try {
+                    auto res = PyObject_to_binary(pyObj_value);
+                    named_parameters.emplace(k, couchbase::core::json_string{ std::move(res) });
+                } catch (const std::exception& e) {
+                    PyErr_SetString(PyExc_ValueError,
+                                    "Unable to parse named parameter option.  Named parameters should be a dict[str, JSONString].");
+                }
+            } else {
+                PyErr_SetString(PyExc_ValueError,
+                                "Named parameter value not a string.  Named parameters should be a dict[str, JSONString].");
+                return {};
+            }
+        }
+    }
+    if (named_parameters.size() > 0) {
+        req.named_parameters = named_parameters;
+    }
+
+    return req;
 }

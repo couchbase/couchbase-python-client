@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import timedelta
 from enum import Enum
 from typing import (TYPE_CHECKING,
@@ -334,6 +333,7 @@ class N1QLQuery:
     def __init__(self, query, *args, **kwargs):
 
         self._params = {"statement": query}
+        self._serializer = DefaultJsonSerializer()
         self._raw = None
         if args:
             self._add_pos_args(*args)
@@ -350,15 +350,8 @@ class N1QLQuery:
             `$` identifier.
 
         """
-        # named_params = {}
-        # for k in kv:
-        #     named_params["${0}".format(k)] = json.dumps(kv[k])
-        # couchbase++ wants all args JSONified
-        named_params = {f'${k}': json.dumps(v) for k, v in kv.items()}
-
         arg_dict = self._params.setdefault("named_parameters", {})
-        arg_dict.update(named_params)
-        # return self
+        arg_dict.update(kv)
 
     def _add_pos_args(self, *args):
         """
@@ -367,9 +360,7 @@ class N1QLQuery:
         :param args: Values to be used
         """
         arg_array = self._params.setdefault("positional_parameters", [])
-        # couchbase++ wants all args JSONified
-        json_args = [json.dumps(arg) for arg in args]
-        arg_array.extend(json_args)
+        arg_array.extend(args)
 
     def set_option(self, name, value):
         """
@@ -385,7 +376,22 @@ class N1QLQuery:
 
     @property
     def params(self) -> Dict[str, Any]:
-        return self._params
+        params = self._params
+
+        # couchbase++ wants all args JSONified,
+        # For now encode to bytes to make couchbase::json_string <--> std::vector<std::byte> easier
+        raw = params.pop('raw', None)
+        if raw:
+            params['raw'] = {f'{k}': self._serializer.serialize(v) for k, v in raw.items()}
+
+        positional_args = params.pop('positional_parameters', None)
+        if positional_args:
+            params['positional_parameters'] = [self._serializer.serialize(arg) for arg in positional_args]
+
+        named_params = params.pop('named_parameters', None)
+        if named_params:
+            params['named_parameters'] = {f'${k}': self._serializer.serialize(v) for k, v in named_params.items()}
+        return params
 
     @property
     def metrics(self) -> bool:
@@ -642,8 +648,7 @@ class N1QLQuery:
         for k in value.keys():
             if not isinstance(k, str):
                 raise TypeError("key for raw value must be str")
-        raw_params = {f'{k}': json.dumps(v) for k, v in value.items()}
-        self.set_option('raw', raw_params)
+        self.set_option('raw', value)
 
     @property
     def span(self) -> Optional[CouchbaseSpan]:
@@ -768,8 +773,8 @@ class QueryRequestLogic:
         self._started_streaming = True
         n1ql_kwargs = {
             'conn': self._connection,
+            'query_args': self.params,
         }
-        n1ql_kwargs.update(self.params)
 
         # this is for txcouchbase...
         callback = kwargs.pop('callback', None)

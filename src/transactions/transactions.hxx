@@ -27,6 +27,10 @@ namespace tx_core = couchbase::core::transactions;
 namespace pycbc_txns
 {
 
+// @TODO: PYCBC-1425, is this the right approach?
+using pycbc_txn_complete_callback =
+  std::function<void(std::optional<tx_core::transaction_exception>, std::optional<tx::transaction_result>)>;
+
 class TxOperations
 {
   public:
@@ -72,11 +76,11 @@ class TxOperations
 };
 
 struct transaction_config {
-    PyObject_HEAD tx::transaction_config* cfg;
+    PyObject_HEAD tx::transactions_config* cfg;
 };
 
-struct per_transaction_config {
-    PyObject_HEAD tx::per_transaction_config* cfg;
+struct transaction_options {
+    PyObject_HEAD tx::transaction_options* opts;
 };
 
 static PyObject*
@@ -87,18 +91,18 @@ static PyObject*
 transaction_config__to_dict__(PyObject*);
 
 static PyObject*
-per_transaction_config__new__(PyTypeObject*, PyObject*, PyObject*);
+transaction_options__new__(PyTypeObject*, PyObject*, PyObject*);
 static void
-per_transaction_config__dealloc__(pycbc_txns::per_transaction_config*);
+transaction_options__dealloc__(pycbc_txns::transaction_options*);
 static PyObject*
-per_transaction_config__to_dict__(PyObject*);
+transaction_options__to_dict__(PyObject*);
 static PyObject*
-per_transaction_config__str__(PyObject*);
+transaction_options__str__(PyObject*);
 
 struct transactions {
     tx_core::transactions* txns;
 
-    explicit transactions(PyObject* pyObj_conn, tx::transaction_config& cfg)
+    explicit transactions(PyObject* pyObj_conn, const tx::transactions_config& cfg)
       : txns(nullptr)
     {
         connection* c = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
@@ -120,7 +124,7 @@ struct transaction_get_result {
 };
 
 struct transaction_query_options {
-    PyObject_HEAD tx_core::transaction_query_options* opts;
+    PyObject_HEAD tx::transaction_query_options* opts;
 };
 
 static PyObject*

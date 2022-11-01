@@ -28,31 +28,6 @@
 #include <sstream>
 
 void
-pycbc_txns::dealloc_transactions(PyObject* obj)
-{
-    auto txns = reinterpret_cast<pycbc_txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
-    txns->txns->close();
-    delete txns->txns;
-    LOG_DEBUG("dealloc transactions");
-}
-
-void
-pycbc_txns::dealloc_attempt_context(PyObject* obj)
-{
-    auto ctx = reinterpret_cast<pycbc_txns::attempt_context*>(PyCapsule_GetPointer(obj, "ctx_"));
-    delete ctx;
-    LOG_DEBUG("dealloc attempt_context");
-}
-
-void
-pycbc_txns::transaction_config__dealloc__(pycbc_txns::transaction_config* cfg)
-{
-    delete cfg->cfg;
-    Py_TYPE(cfg)->tp_free((PyObject*)cfg);
-    LOG_DEBUG("dealloc transaction_config");
-}
-
-void
 add_to_dict(PyObject* dict, std::string key, std::string value)
 {
     PyObject* pyObj_value = PyUnicode_FromString(value.c_str());
@@ -74,37 +49,61 @@ add_to_dict(PyObject* dict, std::string key, bool value)
     PyDict_SetItemString(dict, key.c_str(), value ? Py_True : Py_False);
 }
 
+void
+pycbc_txns::dealloc_transactions(PyObject* obj)
+{
+    auto txns = reinterpret_cast<pycbc_txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
+    txns->txns->close();
+    delete txns->txns;
+    LOG_DEBUG("dealloc transactions");
+}
+
+void
+pycbc_txns::dealloc_attempt_context(PyObject* obj)
+{
+    auto ctx = reinterpret_cast<pycbc_txns::attempt_context*>(PyCapsule_GetPointer(obj, "ctx_"));
+    delete ctx;
+    LOG_DEBUG("dealloc attempt_context");
+}
+
+/* pycbc_txns::transaction_config type methods */
+
+void
+pycbc_txns::transaction_config__dealloc__(pycbc_txns::transaction_config* cfg)
+{
+    delete cfg->cfg;
+    Py_TYPE(cfg)->tp_free((PyObject*)cfg);
+    LOG_DEBUG("dealloc transaction_config");
+}
+
 PyObject*
 pycbc_txns::transaction_config__to_dict__(PyObject* self)
 {
     auto conf = reinterpret_cast<pycbc_txns::transaction_config*>(self);
     PyObject* retval = PyDict_New();
     add_to_dict(retval, "durability_level", static_cast<int64_t>(conf->cfg->durability_level()));
-    add_to_dict(retval, "cleanup_window", static_cast<int64_t>(conf->cfg->cleanup_window().count()));
+    add_to_dict(retval, "cleanup_window", static_cast<int64_t>(conf->cfg->cleanup_config().cleanup_window().count()));
     if (conf->cfg->kv_timeout()) {
         add_to_dict(retval, "kv_timeout", static_cast<int64_t>(conf->cfg->kv_timeout()->count()));
     }
     add_to_dict(retval, "expiration_time", static_cast<int64_t>(conf->cfg->expiration_time().count()));
-    add_to_dict(retval, "cleanup_lost_attempts", conf->cfg->cleanup_lost_attempts());
-    add_to_dict(retval, "cleanup_client_attempts", conf->cfg->cleanup_client_attempts());
-    add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(conf->cfg->scan_consistency()));
-    if (conf->cfg->custom_metadata_collection()) {
+    add_to_dict(retval, "cleanup_lost_attempts", conf->cfg->cleanup_config().cleanup_lost_attempts());
+    add_to_dict(retval, "cleanup_client_attempts", conf->cfg->cleanup_config().cleanup_client_attempts());
+    add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(conf->cfg->query_config().scan_consistency()));
+    if (conf->cfg->metadata_collection()) {
         std::string meta = fmt::format("{}.{}.{}",
-                                       conf->cfg->custom_metadata_collection()->bucket,
-                                       conf->cfg->custom_metadata_collection()->scope,
-                                       conf->cfg->custom_metadata_collection()->collection);
+                                       conf->cfg->metadata_collection()->bucket,
+                                       conf->cfg->metadata_collection()->scope,
+                                       conf->cfg->metadata_collection()->collection);
         add_to_dict(retval, "metadata_collection", meta);
     }
     return retval;
 }
 
-void
-pycbc_txns::per_transaction_config__dealloc__(pycbc_txns::per_transaction_config* cfg)
-{
-    delete cfg->cfg;
-    Py_TYPE(cfg)->tp_free((PyObject*)cfg);
-    LOG_DEBUG("dealloc per_transaction_config");
-}
+static PyMethodDef transaction_config_methods[] = {
+    { "to_dict", (PyCFunction)pycbc_txns::transaction_config__to_dict__, METH_NOARGS, PyDoc_STR("transaction_config as a dict") },
+    { NULL, NULL, 0, NULL }
+};
 
 PyObject*
 pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
@@ -134,7 +133,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
     const char* kw_format = "|OOOOOOssss";
     auto self = reinterpret_cast<pycbc_txns::transaction_config*>(type->tp_alloc(type, 0));
 
-    self->cfg = new tx::transaction_config();
+    self->cfg = new tx::transactions_config();
 
     if (!PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
@@ -157,7 +156,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
         self->cfg->durability_level(static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
     }
     if (nullptr != cleanup_window) {
-        self->cfg->cleanup_window(std::chrono::microseconds(PyLong_AsUnsignedLongLong(cleanup_window)));
+        self->cfg->cleanup_config().cleanup_window(std::chrono::microseconds(PyLong_AsUnsignedLongLong(cleanup_window)));
     }
     if (nullptr != kv_timeout) {
         self->cfg->kv_timeout(std::chrono::milliseconds(PyLong_AsUnsignedLongLong(kv_timeout) / 1000));
@@ -166,131 +165,20 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
         self->cfg->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
     }
     if (nullptr != cleanup_lost_attempts) {
-        self->cfg->cleanup_lost_attempts(!!PyObject_IsTrue(cleanup_lost_attempts));
+        self->cfg->cleanup_config().cleanup_lost_attempts(!!PyObject_IsTrue(cleanup_lost_attempts));
     }
     if (nullptr != cleanup_client_attempts) {
-        self->cfg->cleanup_client_attempts(!!PyObject_IsTrue(cleanup_client_attempts));
+        self->cfg->cleanup_config().cleanup_client_attempts(!!PyObject_IsTrue(cleanup_client_attempts));
     }
     if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
-        self->cfg->custom_metadata_collection(metadata_bucket, metadata_scope, metadata_collection);
+        auto keyspace = tx::transaction_keyspace{ metadata_bucket, metadata_scope, metadata_collection };
+        self->cfg->metadata_collection(keyspace);
     }
     if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        self->cfg->query_config().scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     return reinterpret_cast<PyObject*>(self);
 }
-
-PyObject*
-pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
-{
-    PyObject* durability_level = nullptr;
-    PyObject* kv_timeout = nullptr;
-    PyObject* expiration_time = nullptr;
-    char* scan_consistency = nullptr;
-    char* metadata_bucket = nullptr;
-    char* metadata_scope = nullptr;
-    char* metadata_collection = nullptr;
-
-    const char* kw_list[] = { "durability_level", "kv_timeout",     "expiration_time",     "scan_consistency",
-                              "metadata_bucket",  "metadata_scope", "metadata_collection", nullptr };
-    const char* kw_format = "|OOOssss";
-    auto self = reinterpret_cast<pycbc_txns::per_transaction_config*>(type->tp_alloc(type, 0));
-
-    self->cfg = new tx::per_transaction_config();
-    LOG_DEBUG("per_transaction_config__new__ called");
-    if (!PyArg_ParseTupleAndKeywords(args,
-                                     kwargs,
-                                     kw_format,
-                                     const_cast<char**>(kw_list),
-                                     &durability_level,
-                                     &kv_timeout,
-                                     &expiration_time,
-                                     &scan_consistency,
-                                     &metadata_bucket,
-                                     &metadata_scope,
-                                     &metadata_collection)) {
-        PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-        Py_RETURN_NONE;
-    }
-    if (nullptr != durability_level) {
-        self->cfg->durability_level(static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
-    }
-    if (nullptr != kv_timeout) {
-        self->cfg->kv_timeout(std::chrono::milliseconds(PyLong_AsUnsignedLongLong(kv_timeout) / 1000));
-    }
-    if (nullptr != expiration_time) {
-        self->cfg->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
-    }
-    if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
-    }
-    if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
-        self->cfg->custom_metadata_collection({ metadata_bucket, metadata_scope, metadata_collection });
-    }
-
-    return reinterpret_cast<PyObject*>(self);
-}
-
-PyObject*
-pycbc_txns::per_transaction_config__to_dict__(PyObject* self)
-{
-    auto conf = reinterpret_cast<pycbc_txns::per_transaction_config*>(self);
-    PyObject* retval = PyDict_New();
-    if (conf->cfg->kv_timeout()) {
-        add_to_dict(retval, "kv_timeout", static_cast<int64_t>(conf->cfg->kv_timeout()->count()));
-    }
-    if (conf->cfg->expiration_time()) {
-        add_to_dict(retval, "expiration_time", static_cast<int64_t>(conf->cfg->expiration_time()->count()));
-    }
-    if (conf->cfg->durability_level()) {
-        add_to_dict(retval, "durability_level", static_cast<int64_t>(conf->cfg->durability_level().value()));
-    }
-    if (conf->cfg->scan_consistency()) {
-        add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(*conf->cfg->scan_consistency()));
-    }
-    if (conf->cfg->custom_metadata_collection()) {
-        std::string meta = fmt::format("{}.{}.{}",
-                                       conf->cfg->custom_metadata_collection()->bucket,
-                                       conf->cfg->custom_metadata_collection()->scope,
-                                       conf->cfg->custom_metadata_collection()->collection);
-        add_to_dict(retval, "metadata_collection", meta);
-    }
-    return retval;
-}
-
-PyObject*
-pycbc_txns::per_transaction_config__str__(PyObject* self)
-{
-    auto cfg = reinterpret_cast<pycbc_txns::per_transaction_config*>(self)->cfg;
-    std::stringstream stream;
-    stream << "per_transaction_config{";
-    if (nullptr != cfg) {
-        if (cfg->durability_level()) {
-            stream << "durability: " << tx_core::durability_level_to_string(*cfg->durability_level()) << ", ";
-        }
-        if (cfg->kv_timeout()) {
-            stream << "kv_timeout: " << cfg->kv_timeout()->count() << "ms, ";
-        }
-        if (cfg->expiration_time()) {
-            stream << "expiration_time: " << cfg->expiration_time()->count() << "ns, ";
-        }
-        if (cfg->scan_consistency()) {
-            stream << "scan_consistency: " << scan_consistency_type_to_string(*cfg->scan_consistency());
-        }
-    }
-    stream << "}";
-    return PyUnicode_FromString(stream.str().c_str());
-}
-
-static PyMethodDef transaction_config_methods[] = {
-    { "to_dict", (PyCFunction)pycbc_txns::transaction_config__to_dict__, METH_NOARGS, PyDoc_STR("transaction_config as a dict") },
-    { NULL, NULL, 0, NULL }
-};
-
-static PyMethodDef per_transaction_config_methods[] = {
-    { "to_dict", (PyCFunction)pycbc_txns::per_transaction_config__to_dict__, METH_NOARGS, PyDoc_STR("per_transaction_config as a dict") },
-    { NULL, NULL, 0, NULL }
-};
 
 static PyTypeObject
 init_transaction_config_type()
@@ -308,257 +196,142 @@ init_transaction_config_type()
 
 static PyTypeObject transaction_config_type = init_transaction_config_type();
 
-static PyTypeObject
-init_per_transaction_config_type()
+/* pycbc_txns::transaction_options type methods */
+
+void
+pycbc_txns::transaction_options__dealloc__(pycbc_txns::transaction_options* opts)
 {
-    PyTypeObject r = {};
-    r.tp_name = "pycbc_core.per_transaction_config";
-    r.tp_doc = "Per-Transaction configuration";
-    r.tp_basicsize = sizeof(pycbc_txns::per_transaction_config);
-    r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-    r.tp_new = pycbc_txns::per_transaction_config__new__;
-    r.tp_str = (reprfunc)pycbc_txns::per_transaction_config__str__;
-    r.tp_dealloc = (destructor)pycbc_txns::per_transaction_config__dealloc__;
-    r.tp_methods = per_transaction_config_methods;
-    return r;
+    delete opts->opts;
+    Py_TYPE(opts)->tp_free((PyObject*)opts);
+    LOG_DEBUG("dealloc transaction_options");
 }
 
-static PyTypeObject per_transaction_config_type = init_per_transaction_config_type();
+PyObject*
+pycbc_txns::transaction_options__to_dict__(PyObject* self)
+{
+    auto opts = reinterpret_cast<pycbc_txns::transaction_options*>(self);
+    PyObject* retval = PyDict_New();
+    if (opts->opts->kv_timeout()) {
+        add_to_dict(retval, "kv_timeout", static_cast<int64_t>(opts->opts->kv_timeout()->count()));
+    }
+    if (opts->opts->expiration_time()) {
+        add_to_dict(retval, "expiration_time", static_cast<int64_t>(opts->opts->expiration_time()->count()));
+    }
+    if (opts->opts->durability_level()) {
+        add_to_dict(retval, "durability_level", static_cast<int64_t>(opts->opts->durability_level().value()));
+    }
+    if (opts->opts->scan_consistency()) {
+        add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(*opts->opts->scan_consistency()));
+    }
+    if (opts->opts->metadata_collection()) {
+        std::string meta = fmt::format("{}.{}.{}",
+                                       opts->opts->metadata_collection()->bucket,
+                                       opts->opts->metadata_collection()->scope,
+                                       opts->opts->metadata_collection()->collection);
+        add_to_dict(retval, "metadata_collection", meta);
+    }
+    return retval;
+}
 
 PyObject*
-pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
+pycbc_txns::transaction_options__str__(PyObject* self)
 {
-    PyObject* pyObj_raw = nullptr;
-    PyObject* pyObj_ad_hoc = nullptr;
+    auto opts = reinterpret_cast<pycbc_txns::transaction_options*>(self)->opts;
+    std::stringstream stream;
+    stream << "transaction_options{";
+    if (nullptr != opts) {
+        if (opts->durability_level()) {
+            stream << "durability: " << tx_core::durability_level_to_string(*opts->durability_level()) << ", ";
+        }
+        if (opts->kv_timeout()) {
+            stream << "kv_timeout: " << opts->kv_timeout()->count() << "ms, ";
+        }
+        if (opts->expiration_time()) {
+            stream << "expiration_time: " << opts->expiration_time()->count() << "ns, ";
+        }
+        if (opts->scan_consistency()) {
+            stream << "scan_consistency: " << scan_consistency_type_to_string(*opts->scan_consistency());
+        }
+    }
+    stream << "}";
+    return PyUnicode_FromString(stream.str().c_str());
+}
+
+static PyMethodDef transaction_options_methods[] = {
+    { "to_dict", (PyCFunction)pycbc_txns::transaction_options__to_dict__, METH_NOARGS, PyDoc_STR("transaction_options as a dict") },
+    { NULL, NULL, 0, NULL }
+};
+
+PyObject*
+pycbc_txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
+{
+    PyObject* durability_level = nullptr;
+    PyObject* kv_timeout = nullptr;
+    PyObject* expiration_time = nullptr;
     char* scan_consistency = nullptr;
-    char* profile_mode = nullptr;
-    char* client_context_id = nullptr;
-    PyObject* pyObj_scan_wait = nullptr;
-    PyObject* pyObj_read_only = nullptr;
-    PyObject* pyObj_scan_cap = nullptr;
-    PyObject* pyObj_pipeline_batch = nullptr;
-    PyObject* pyObj_pipeline_cap = nullptr;
-    char* scope = nullptr;
-    char* bucket = nullptr;
-    PyObject* pyObj_metrics = nullptr;
-    PyObject* pyObj_max_parallelism = nullptr;
-    PyObject* pyObj_positional_params = nullptr;
-    PyObject* pyObj_named_params = nullptr;
+    char* metadata_bucket = nullptr;
+    char* metadata_scope = nullptr;
+    char* metadata_collection = nullptr;
 
-    const char* kw_list[] = { "raw",
-                              "ad_hoc",
-                              "scan_consistency",
-                              "profile_mode",
-                              "client_context_id",
-                              "scan_wait",
-                              "read_only",
-                              "scan_cap",
-                              "pipeline_batch",
-                              "pipeline_cap",
-                              "scope",
-                              "bucket",
-                              "metrics",
-                              "max_parallelism",
-                              "positional_parameters",
-                              "named_parameters",
-                              nullptr };
-    const char* kw_format = "|OOsssOOOOOssOOOO";
+    const char* kw_list[] = { "durability_level", "kv_timeout",     "expiration_time",     "scan_consistency",
+                              "metadata_bucket",  "metadata_scope", "metadata_collection", nullptr };
+    const char* kw_format = "|OOOssss";
+    auto self = reinterpret_cast<pycbc_txns::transaction_options*>(type->tp_alloc(type, 0));
 
-    auto self = reinterpret_cast<pycbc_txns::transaction_query_options*>(type->tp_alloc(type, 0));
-    self->opts = new tx_core::transaction_query_options();
+    self->opts = new tx::transaction_options();
+    LOG_DEBUG("transaction_options__new__ called");
     if (!PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
                                      kw_format,
                                      const_cast<char**>(kw_list),
-                                     &pyObj_raw,
-                                     &pyObj_ad_hoc,
+                                     &durability_level,
+                                     &kv_timeout,
+                                     &expiration_time,
                                      &scan_consistency,
-                                     &profile_mode,
-                                     &client_context_id,
-                                     &pyObj_scan_wait,
-                                     &pyObj_read_only,
-                                     &pyObj_scan_cap,
-                                     &pyObj_pipeline_batch,
-                                     &pyObj_pipeline_cap,
-                                     &scope,
-                                     &bucket,
-                                     &pyObj_metrics,
-                                     &pyObj_max_parallelism,
-                                     &pyObj_positional_params,
-                                     &pyObj_named_params)) {
+                                     &metadata_bucket,
+                                     &metadata_scope,
+                                     &metadata_collection)) {
         PyErr_SetString(PyExc_ValueError, "couldn't parse args");
         Py_RETURN_NONE;
     }
-    auto opts = reinterpret_cast<pycbc_txns::transaction_query_options*>(self)->opts;
-    if (nullptr != pyObj_max_parallelism) {
-        self->opts->max_parallelism(PyLong_AsUnsignedLongLong(pyObj_max_parallelism));
+    if (nullptr != durability_level) {
+        self->opts->durability_level(static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
     }
-    if (nullptr != scope && nullptr != bucket) {
-        self->opts->bucket_name(bucket);
-        self->opts->scope_name(scope);
+    if (nullptr != kv_timeout) {
+        self->opts->kv_timeout(std::chrono::milliseconds(PyLong_AsUnsignedLongLong(kv_timeout) / 1000));
     }
-    if (nullptr != pyObj_pipeline_cap) {
-        self->opts->pipeline_cap(PyLong_AsUnsignedLongLong(pyObj_pipeline_cap));
-    }
-    if (nullptr != pyObj_pipeline_batch) {
-        self->opts->pipeline_batch(PyLong_AsUnsignedLongLong(pyObj_pipeline_batch));
-    }
-    if (nullptr != pyObj_scan_cap) {
-        self->opts->scan_cap(PyLong_AsUnsignedLongLong(pyObj_scan_cap));
-    }
-    if (nullptr != pyObj_read_only) {
-        self->opts->readonly(!!PyObject_IsTrue(pyObj_read_only));
-    }
-    if (nullptr != pyObj_scan_wait) {
-        self->opts->scan_wait(std::chrono::milliseconds(PyLong_AsUnsignedLongLong(pyObj_scan_wait) / 1000));
-    }
-    if (nullptr != client_context_id) {
-        self->opts->client_context_id(client_context_id);
-    }
-    if (nullptr != profile_mode) {
-        self->opts->profile(str_to_profile_mode(profile_mode));
+    if (nullptr != expiration_time) {
+        self->opts->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
     }
     if (nullptr != scan_consistency) {
         self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
-        if (PyErr_Occurred()) {
-            return nullptr;
-        }
     }
-    if (nullptr != pyObj_ad_hoc) {
-        self->opts->ad_hoc(!!PyObject_IsTrue(pyObj_ad_hoc));
-    }
-    if (nullptr != pyObj_metrics) {
-        self->opts->metrics(!!PyObject_IsTrue(pyObj_metrics));
-    }
-    if (nullptr != pyObj_raw) {
-        if (!PyDict_Check(pyObj_raw)) {
-            PyErr_SetString(PyExc_ValueError, "raw option isn't a dict!  The raw option should be a dict[str, JSONString].");
-            return nullptr;
-        }
-        PyObject *pyObj_key, *pyObj_value;
-        Py_ssize_t pos = 0;
-
-        while (PyDict_Next(pyObj_raw, &pos, &pyObj_key, &pyObj_value)) {
-            std::string k;
-            if (PyUnicode_Check(pyObj_key)) {
-                k = std::string(PyUnicode_AsUTF8(pyObj_key));
-            } else {
-                PyErr_SetString(PyExc_ValueError, "Raw option key not a string!  The raw option should be a dict[str, JSONString].");
-                return nullptr;
-            }
-            if (k.empty()) {
-                PyErr_SetString(PyExc_ValueError, "Key is empty!  The raw option should be a dict[str, JSONString].");
-                return nullptr;
-            }
-            if (PyBytes_Check(pyObj_value)) {
-                couchbase::core::json_string val(std::string(PyBytes_AsString(pyObj_value)));
-                self->opts->raw(k, val);
-            } else {
-                PyErr_SetString(PyExc_ValueError, "Raw option value not a string!  The raw option should be a dict[str, JSONString].");
-                return nullptr;
-            }
-        }
-        pyObj_key = nullptr;
-        pyObj_value = nullptr;
+    if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
+        auto keyspace = tx::transaction_keyspace{ metadata_bucket, metadata_scope, metadata_collection };
+        self->opts->metadata_collection(keyspace);
     }
 
-    if (nullptr != pyObj_positional_params) {
-        if (!PyList_Check(pyObj_positional_params)) {
-            PyErr_SetString(PyExc_ValueError, "Positional parameters options must be a list.");
-            return nullptr;
-        }
-        std::vector<couchbase::core::json_string> pos_opts{};
-        for (size_t i = 0; i < PyList_Size(pyObj_positional_params); i++) {
-            PyObject* pyObj_value = PyList_GetItem(pyObj_positional_params, i);
-            if (PyBytes_Check(pyObj_value)) {
-                pos_opts.emplace_back(PyBytes_AsString(pyObj_value));
-            } else {
-                PyErr_SetString(PyExc_ValueError, "Positional parameter options must all be json strings");
-                return nullptr;
-            }
-        }
-        self->opts->positional_parameters(pos_opts);
-    }
-    if (nullptr != pyObj_named_params) {
-        if (!PyDict_Check(pyObj_named_params)) {
-            PyErr_SetString(PyExc_ValueError, "Named parameter options must be a dict[str, JSONType]");
-            return nullptr;
-        }
-        PyObject* pyObj_key = nullptr;
-        PyObject* pyObj_value = nullptr;
-        Py_ssize_t pos = 0;
-        std::map<std::string, couchbase::core::json_string, std::less<>> params{};
-        while (PyDict_Next(pyObj_named_params, &pos, &pyObj_key, &pyObj_value)) {
-            params[PyUnicode_AsUTF8(pyObj_key)] = couchbase::core::json_string(PyBytes_AsString(pyObj_value));
-        }
-        self->opts->named_parameters(params);
-    }
     return reinterpret_cast<PyObject*>(self);
 }
 
-PyObject*
-pycbc_txns::transaction_query_options__to_dict__(PyObject* self)
+static PyTypeObject
+init_transaction_options_type()
 {
-    auto opts = reinterpret_cast<pycbc_txns::transaction_query_options*>(self);
-    PyObject* retval = PyDict_New();
-    auto req = opts->opts->query_request();
-    PyObject* raw = PyDict_New();
-    for (auto const& [key, val] : req.raw) {
-        add_to_dict(raw, key, val.str());
-    }
-    PyDict_SetItemString(retval, "raw", raw);
-    Py_DECREF(raw);
-    add_to_dict(retval, "adhoc", req.adhoc);
-    if (req.scan_consistency) {
-        add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(req.scan_consistency.value()));
-    }
-    add_to_dict(retval, "profile", profile_mode_to_str(req.profile));
-    if (req.client_context_id) {
-        add_to_dict(retval, "client_context_id", req.client_context_id.value());
-    }
-    if (req.scan_wait) {
-        add_to_dict(retval, "scan_wait", static_cast<int64_t>(req.scan_wait->count()));
-    }
-    add_to_dict(retval, "read_only", req.readonly);
-    if (req.scan_cap) {
-        add_to_dict(retval, "scan_cap", static_cast<int64_t>(req.scan_cap.value()));
-    }
-    if (req.pipeline_batch) {
-        add_to_dict(retval, "pipeline_batch", static_cast<int64_t>(req.pipeline_batch.value()));
-    }
-    if (req.pipeline_cap) {
-        add_to_dict(retval, "pipeline_cap", static_cast<int64_t>(req.pipeline_cap.value()));
-    }
-    if (req.scope_name) {
-        add_to_dict(retval, "scope", req.scope_name.value());
-    }
-    if (req.bucket_name) {
-        add_to_dict(retval, "bucket", req.bucket_name.value());
-    }
-    add_to_dict(retval, "metrics", req.metrics);
-    if (req.max_parallelism) {
-        add_to_dict(retval, "max_parallelism", static_cast<int64_t>(req.max_parallelism.value()));
-    }
-    if (!req.positional_parameters.empty()) {
-        PyObject* pyObj_pos = PyList_New(0);
-        for (auto& val : req.positional_parameters) {
-            PyObject* pyObj_val = PyUnicode_FromString(val.str().c_str());
-            PyList_Append(pyObj_pos, pyObj_val);
-            Py_DECREF(pyObj_val);
-        }
-        PyDict_SetItemString(retval, "positional_parameters", pyObj_pos);
-        Py_DECREF(pyObj_pos);
-    }
-    if (!req.named_parameters.empty()) {
-        PyObject* pyObj_named = PyDict_New();
-        for (auto& [key, value] : req.named_parameters) {
-            add_to_dict(pyObj_named, key, value.str());
-        }
-        PyDict_SetItemString(retval, "named_parameters", pyObj_named);
-        Py_DECREF(pyObj_named);
-    }
-    return retval;
+    PyTypeObject r = {};
+    r.tp_name = "pycbc_core.transaction_options";
+    r.tp_doc = "Transaction options";
+    r.tp_basicsize = sizeof(pycbc_txns::transaction_options);
+    r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    r.tp_new = pycbc_txns::transaction_options__new__;
+    r.tp_str = (reprfunc)pycbc_txns::transaction_options__str__;
+    r.tp_dealloc = (destructor)pycbc_txns::transaction_options__dealloc__;
+    r.tp_methods = transaction_options_methods;
+    return r;
 }
+
+static PyTypeObject transaction_options_type = init_transaction_options_type();
+
+/* pycbc_txns::transaction_query_options type methods */
 
 void
 pycbc_txns::transaction_query_options__dealloc__(pycbc_txns::transaction_query_options* opts)
@@ -568,11 +341,158 @@ pycbc_txns::transaction_query_options__dealloc__(pycbc_txns::transaction_query_o
     LOG_DEBUG("dealloc transaction_query_options");
 }
 
+PyObject*
+pycbc_txns::transaction_query_options__to_dict__(PyObject* self)
+{
+    auto opts = reinterpret_cast<pycbc_txns::transaction_query_options*>(self);
+    PyObject* retval = PyDict_New();
+    auto query_opts = opts->opts->get_query_options().build();
+    add_to_dict(retval, "adhoc", query_opts.adhoc);
+    add_to_dict(retval, "metrics", query_opts.metrics);
+    add_to_dict(retval, "read_only", query_opts.readonly);
+    add_to_dict(retval, "flex_index", query_opts.flex_index);
+    add_to_dict(retval, "preserve_expiry", query_opts.preserve_expiry);
+    if (query_opts.max_parallelism.has_value()) {
+        add_to_dict(retval, "max_parallelism", static_cast<int64_t>(query_opts.max_parallelism.value()));
+    }
+    if (query_opts.scan_cap.has_value()) {
+        add_to_dict(retval, "scan_cap", static_cast<int64_t>(query_opts.scan_cap.value()));
+    }
+    if (query_opts.scan_wait) {
+        add_to_dict(retval, "scan_wait", static_cast<int64_t>(query_opts.scan_wait->count()));
+    }
+    if (query_opts.pipeline_batch.has_value()) {
+        add_to_dict(retval, "pipeline_batch", static_cast<int64_t>(query_opts.pipeline_batch.value()));
+    }
+    if (query_opts.pipeline_cap.has_value()) {
+        add_to_dict(retval, "pipeline_cap", static_cast<int64_t>(query_opts.pipeline_cap.value()));
+    }
+    if (query_opts.scope_qualifier.has_value()) {
+        add_to_dict(retval, "scope_qualifier", query_opts.scope_qualifier.value());
+    }
+    if (query_opts.client_context_id.has_value()) {
+        add_to_dict(retval, "client_context_id", query_opts.client_context_id.value());
+    }
+    if (query_opts.scan_consistency.has_value()) {
+        add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(query_opts.scan_consistency.value()));
+    }
+    add_to_dict(retval, "profile", profile_mode_to_str(query_opts.profile));
+
+    if (!query_opts.raw.empty()) {
+        PyObject* raw = PyDict_New();
+        for (auto const& [key, val] : query_opts.raw) {
+            auto val_str = binary_to_string(val);
+            add_to_dict(raw, key, val_str);
+        }
+        PyDict_SetItemString(retval, "raw", raw);
+        Py_DECREF(raw);
+    }
+
+    if (!query_opts.positional_parameters.empty()) {
+        PyObject* pyObj_pos = PyList_New(0);
+        for (auto& val : query_opts.positional_parameters) {
+            auto val_str = binary_to_string(val);
+            PyObject* pyObj_val = PyUnicode_FromString(val_str.c_str());
+            PyList_Append(pyObj_pos, pyObj_val);
+            Py_DECREF(pyObj_val);
+        }
+        PyDict_SetItemString(retval, "positional_parameters", pyObj_pos);
+        Py_DECREF(pyObj_pos);
+    }
+    if (!query_opts.named_parameters.empty()) {
+        PyObject* pyObj_named = PyDict_New();
+        for (auto& [key, value] : query_opts.named_parameters) {
+            auto val_str = binary_to_string(value);
+            add_to_dict(pyObj_named, key, val_str);
+        }
+        PyDict_SetItemString(retval, "named_parameters", pyObj_named);
+        Py_DECREF(pyObj_named);
+    }
+    return retval;
+}
+
 static PyMethodDef transaction_query_options_methods[] = { { "to_dict",
                                                              (PyCFunction)pycbc_txns::transaction_query_options__to_dict__,
                                                              METH_NOARGS,
                                                              PyDoc_STR("transaction_query_options as a dict") },
                                                            { NULL, NULL, 0, NULL } };
+
+PyObject*
+pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
+{
+    PyObject* pyObj_query_args = nullptr;
+    const char* kw_list[] = { "query_args", nullptr };
+    const char* kw_format = "|O";
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, kw_format, const_cast<char**>(kw_list), &pyObj_query_args)) {
+        PyErr_SetString(PyExc_ValueError, "couldn't parse args");
+        Py_RETURN_NONE;
+    }
+    auto self = reinterpret_cast<pycbc_txns::transaction_query_options*>(type->tp_alloc(type, 0));
+    auto req = build_query_request(pyObj_query_args);
+    if (PyErr_Occurred()) {
+        return nullptr;
+    }
+    self->opts = new tx::transaction_query_options();
+    self->opts->ad_hoc(req.adhoc);
+    self->opts->metrics(req.metrics);
+    self->opts->readonly(req.readonly);
+    // @TODO:  add flex index to txn QueryOptions eventually?
+    // self->opts->flex_index(req.flex_index);
+    if (req.max_parallelism.has_value()) {
+        self->opts->max_parallelism(req.max_parallelism.value());
+    }
+    if (req.scan_cap.has_value()) {
+        self->opts->scan_cap(req.scan_cap.value());
+    }
+    if (req.scan_wait.has_value()) {
+        self->opts->scan_wait(req.scan_wait.value());
+    }
+    if (req.scan_cap.has_value()) {
+        self->opts->scan_cap(req.scan_cap.value());
+    }
+    if (req.pipeline_batch.has_value()) {
+        self->opts->pipeline_batch(req.pipeline_batch.value());
+    }
+    if (req.pipeline_cap.has_value()) {
+        self->opts->pipeline_cap(req.pipeline_cap.value());
+    }
+    if (req.scope_qualifier.has_value()) {
+        self->opts->scope_qualifier(req.scope_qualifier.value());
+    } else if (req.scope_name.has_value()) {
+        if (req.bucket_name.has_value()) {
+            self->opts->scope_qualifier(fmt::format("default:`{}`.`{}`", req.bucket_name.value(), req.scope_name.value()));
+        }
+    }
+    if (req.client_context_id.has_value()) {
+        self->opts->client_context_id(req.client_context_id.value());
+    }
+    if (req.scan_consistency.has_value()) {
+        self->opts->scan_consistency(req.scan_consistency.value());
+    }
+    self->opts->profile(req.profile);
+    if (req.raw.size() > 0) {
+        std::map<std::string, std::vector<std::byte>, std::less<>> raw_options{};
+        for (auto& [name, option] : req.raw) {
+            raw_options[name] = std::move(option.bytes());
+        }
+        self->opts->encoded_raw_options(raw_options);
+    }
+    if (req.positional_parameters.size() > 0) {
+        std::vector<std::vector<std::byte>> positional_params{};
+        for (auto& param : req.positional_parameters) {
+            positional_params.emplace_back(std::move(param.bytes()));
+        }
+        self->opts->encoded_positional_parameters(positional_params);
+    }
+    if (req.named_parameters.size() > 0) {
+        std::map<std::string, std::vector<std::byte>, std::less<>> named_params{};
+        for (auto& [name, param] : req.named_parameters) {
+            named_params[name] = std::move(param.bytes());
+        }
+        self->opts->encoded_named_parameters(named_params);
+    }
+    return reinterpret_cast<PyObject*>(self);
+}
 
 static PyTypeObject
 init_transaction_query_options_type()
@@ -590,12 +510,14 @@ init_transaction_query_options_type()
 
 static PyTypeObject transaction_query_options_type = init_transaction_query_options_type();
 
-PyObject*
-pycbc_txns::transaction_get_result__new__(PyTypeObject* type, PyObject*, PyObject*)
+/* pycbc_txns::transaction_query_options type methods */
+
+void
+pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result)
 {
-    auto self = reinterpret_cast<pycbc_txns::transaction_get_result*>(type->tp_alloc(type, 0));
-    self->res = new tx_core::transaction_get_result();
-    return reinterpret_cast<PyObject*>(self);
+    delete result->res;
+    Py_TYPE(result)->tp_free((PyObject*)result);
+    LOG_DEBUG("dealloc transaction_get_result");
 }
 
 PyObject*
@@ -604,14 +526,6 @@ pycbc_txns::transaction_get_result__str__(pycbc_txns::transaction_get_result* re
     const char* format_string = "transaction_get_result:{key=%s, cas=%llu, value=%s}";
     auto value = couchbase::core::utils::json::generate(result->res->content<tao::json::value>());
     return PyUnicode_FromFormat(format_string, result->res->id().key().c_str(), result->res->cas(), value.c_str());
-}
-
-void
-pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result)
-{
-    delete result->res;
-    Py_TYPE(result)->tp_free((PyObject*)result);
-    LOG_DEBUG("dealloc transaction_get_result");
 }
 
 // TODO: a better way later, perhaps an exposed enum like operations
@@ -650,6 +564,14 @@ static PyMethodDef transaction_get_result_methods[] = {
     { "get", (PyCFunction)pycbc_txns::transaction_get_result__get__, METH_VARARGS, PyDoc_STR("get field in result object") },
     { NULL, NULL, 0, NULL }
 };
+
+PyObject*
+pycbc_txns::transaction_get_result__new__(PyTypeObject* type, PyObject*, PyObject*)
+{
+    auto self = reinterpret_cast<pycbc_txns::transaction_get_result*>(type->tp_alloc(type, 0));
+    self->res = new tx_core::transaction_get_result();
+    return reinterpret_cast<PyObject*>(self);
+}
 
 static PyTypeObject
 init_transaction_get_result_type()
@@ -705,14 +627,13 @@ pycbc_txns::add_transaction_objects(PyObject* pyObj_module)
                         if (PyModule_AddObject(pyObj_module,
                                                "transaction_query_options",
                                                reinterpret_cast<PyObject*>(&transaction_query_options_type)) == 0) {
-                            if (PyType_Ready(&per_transaction_config_type) == 0) {
-                                Py_INCREF(&per_transaction_config_type);
-                                if (PyModule_AddObject(pyObj_module,
-                                                       "per_transaction_config",
-                                                       reinterpret_cast<PyObject*>(&per_transaction_config_type)) == 0) {
+                            if (PyType_Ready(&transaction_options_type) == 0) {
+                                Py_INCREF(&transaction_options_type);
+                                if (PyModule_AddObject(
+                                      pyObj_module, "transaction_options", reinterpret_cast<PyObject*>(&transaction_options_type)) == 0) {
                                     return pyObj_module;
                                 }
-                                Py_DECREF(&per_transaction_config_type);
+                                Py_DECREF(&transaction_options_type);
                             }
                         }
                         Py_DECREF(&transaction_query_options_type);
@@ -1194,8 +1115,8 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     PyObject* pyObj_logic = nullptr;
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
-    PyObject* pyObj_per_txn_config = nullptr;
-    const char* kw_list[] = { "txns", "logic", "callback", "errback", "per_txn_config", nullptr };
+    PyObject* pyObj_transaction_options = nullptr;
+    const char* kw_list[] = { "txns", "logic", "callback", "errback", "transaction_options", nullptr };
     const char* kw_format = "O!O|OOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
@@ -1206,7 +1127,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
                                           &pyObj_logic,
                                           &pyObj_callback,
                                           &pyObj_errback,
-                                          &pyObj_per_txn_config);
+                                          &pyObj_transaction_options);
     if (!ret) {
         PyErr_SetString(PyExc_ValueError, "couldn't parse args");
         return nullptr;
@@ -1216,9 +1137,9 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
         PyErr_SetString(PyExc_ValueError, "passed null transactions");
         return nullptr;
     }
-    if (nullptr != pyObj_per_txn_config) {
-        if (!PyObject_IsInstance(pyObj_per_txn_config, reinterpret_cast<PyObject*>(&per_transaction_config_type))) {
-            PyErr_SetString(PyExc_ValueError, "expected a valid per_transaction_config object");
+    if (nullptr != pyObj_transaction_options) {
+        if (!PyObject_IsInstance(pyObj_transaction_options, reinterpret_cast<PyObject*>(&transaction_options_type))) {
+            PyErr_SetString(PyExc_ValueError, "expected a valid transaction_options object");
             return nullptr;
         }
     }
@@ -1291,19 +1212,21 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
         Py_XDECREF(pyObj_logic);
         PyGILState_Release(state);
     };
-    tx::per_transaction_config* cfg = nullptr;
-    if (nullptr != pyObj_per_txn_config && Py_None != pyObj_per_txn_config) {
-        cfg = reinterpret_cast<pycbc_txns::per_transaction_config*>(pyObj_per_txn_config)->cfg;
+    tx::transaction_options* opts = nullptr;
+    if (nullptr != pyObj_transaction_options && Py_None != pyObj_transaction_options) {
+        opts = reinterpret_cast<pycbc_txns::transaction_options*>(pyObj_transaction_options)->opts;
     }
-    Py_BEGIN_ALLOW_THREADS if (nullptr == cfg)
+    Py_BEGIN_ALLOW_THREADS if (nullptr == opts)
     {
-        txns->txns->run(logic, cb);
+        // @TODO: PYCBC-1425, is this the right approach?
+        txns->txns->run(logic, std::forward<pycbc_txns::pycbc_txn_complete_callback>(cb));
     }
     else
     {
-        auto expiry = cfg->expiration_time();
+        auto expiry = opts->expiration_time();
         LOG_DEBUG("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
-        txns->txns->run(*cfg, logic, cb);
+        // @TODO: PYCBC-1425, is this the right approach?
+        txns->txns->run(*opts, logic, std::forward<pycbc_txns::pycbc_txn_complete_callback>(cb));
     }
     Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)
     {

@@ -26,6 +26,7 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable,
                     Optional,
+                    Tuple,
                     TypeVar,
                     Union,
                     overload)
@@ -76,8 +77,8 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      UpsertOptionsBase,
                                      ViewOptionsBase,
                                      WaitUntilReadyOptionsBase)
-from couchbase.pycbc_core import (per_transaction_config,
-                                  transaction_config,
+from couchbase.pycbc_core import (transaction_config,
+                                  transaction_options,
                                   transaction_query_options)
 from couchbase.serializer import DefaultJsonSerializer
 
@@ -1573,7 +1574,7 @@ class TransactionOptions:
         # don't pass None
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
-        self._base = per_transaction_config(**kwargs)
+        self._base = transaction_options(**kwargs)
 
     def __str__(self):
         return f'TransactionOptions(base_:{self._base}'
@@ -1708,8 +1709,8 @@ class TransactionQueryOptions:
         # TODO: mapping similar to the options elsewhere.
         scope = kwargs.pop("scope", None)
         if scope:
-            kwargs["bucket"] = scope.bucket_name
-            kwargs["scope"] = scope.name
+            kwargs["bucket_name"] = scope.bucket_name
+            kwargs["scope_name"] = scope.name
         if kwargs.get("scan_wait", None):
             kwargs["scan_wait"] = kwargs["scan_wait"].total_seconds/1000
         if kwargs.get("scan_consistency", None):
@@ -1723,7 +1724,10 @@ class TransactionQueryOptions:
                 kwargs['raw'][k] = DefaultJsonSerializer().serialize(v)
         adhoc = kwargs.pop("adhoc", None)
         if adhoc is not None:
-            kwargs["ad_hoc"] = adhoc
+            kwargs["adhoc"] = adhoc
+        readonly = kwargs.pop("read_only", None)
+        if readonly is not None:
+            kwargs["readonly"] = readonly
         profile = kwargs.pop("profile", None)
         if profile:
             kwargs["profile_mode"] = profile.value
@@ -1735,4 +1739,24 @@ class TransactionQueryOptions:
         if named:
             kwargs["named_parameters"] = {key: DefaultJsonSerializer().serialize(val) for key, val in named.items()}
 
-        self._base = transaction_query_options(**kwargs)
+        self._base = transaction_query_options(query_args=kwargs)
+
+    def split_scope_qualifier(self,
+                              remove_backticks=True  # type: Optional[bool]
+                              ) -> Optional[Tuple[str, str]]:
+        scope_qualifier = self._base.to_dict().get('scope_qualifier', None)
+        if not scope_qualifier:
+            return None
+
+        # expected format namespace:`bucket`:`scope`
+        namespace_tokens = scope_qualifier.split(':')
+        if len(namespace_tokens) != 2:
+            return None
+
+        bucket_tokens = namespace_tokens[1].split('.')
+        if len(bucket_tokens) == 2:
+            if remove_backticks:
+                return bucket_tokens[0].replace('`', ''), bucket_tokens[1].replace('`', '')
+            return bucket_tokens[0], bucket_tokens[1]
+
+        return None

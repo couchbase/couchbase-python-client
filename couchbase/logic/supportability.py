@@ -57,6 +57,20 @@ class Supportability:
             return cls
         return decorator
 
+    @staticmethod
+    def method_param_deprecated(param,  # type: str
+                                use_instead  # type: str
+                                ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the provided param is deprecated.
+
+        Args:
+            param (str): The name of the deprecated param
+            use_instead (str): The name of the param to use instead of the deprecated param.
+        """
+        message = (f"Method parameter {param} is deprecated and will be removed in a future relase."
+                   f"Use {use_instead} instead.")
+        warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
+
 
 class RemoveProperty:
     """Used to override a get descriptor for a class property and raise an AttributeError to prevent access.

@@ -18,7 +18,7 @@
 #include "n1ql.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
-#include "tracing.hxx"
+#include "utils.hxx"
 #include <couchbase/query_scan_consistency.hxx>
 #include <couchbase/query_profile.hxx>
 
@@ -373,112 +373,30 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
 {
     // need these for all operations
     PyObject* pyObj_conn = nullptr;
-    char* statement = nullptr;
-
-    char* scan_consistency = nullptr;
-    char* bucket_name = nullptr;
-    char* scope_name = nullptr;
-    char* scope_qualifier = nullptr;
-    char* client_context_id = nullptr;
-    char* profile_mode = nullptr;
-    char* send_to_node = nullptr;
-    uint64_t timeout = 0;
-    uint64_t max_parallelism = 0;
-    uint64_t scan_cap = 0;
-    uint64_t scan_wait = 0;
-    uint64_t pipeline_batch = 0;
-    uint64_t pipeline_cap = 0;
-    // booleans, but use int to read from kwargs
-    int adhoc = 1;
-    int metrics = 0;
-    int readonly = 0;
-    int flex_index = 0;
-    int preserve_expiry = 0;
-
-    PyObject* pyObj_mutation_state = nullptr;
-    PyObject* pyObj_raw = nullptr;
-    PyObject* pyObj_named_parameters = nullptr;
-    PyObject* pyObj_positional_parameters = nullptr;
-    PyObject* pyObj_serializer = nullptr;
+    PyObject* pyObj_query_args = nullptr;
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
     PyObject* pyObj_row_callback = nullptr;
-    PyObject* pyObj_span = nullptr;
 
-    static const char* kw_list[] = { "conn",
-                                     "statement",
-                                     "bucket_name",
-                                     "scope_name",
-                                     "scope_qualifier",
-                                     "client_context_id",
-                                     "scan_consistency",
-                                     "profile_mode",
-                                     "send_to_node",
-                                     "timeout",
-                                     "max_parallelism",
-                                     "scan_cap",
-                                     "scan_wait",
-                                     "pipeline_batch",
-                                     "pipeline_cap",
-                                     "adhoc",
-                                     "metrics",
-                                     "readonly",
-                                     "flex_index",
-                                     "preserve_expiry",
-                                     "positional_parameters",
-                                     "named_parameters",
-                                     "mutation_state",
-                                     "raw",
-                                     "serializer",
-                                     "callback",
-                                     "errback",
-                                     "row_callback",
-                                     "span",
-                                     nullptr };
+    static const char* kw_list[] = { "conn", "query_args", "callback", "errback", "row_callback", nullptr };
 
-    const char* kw_format = "O!s|sssssssLLLLLLiiiiiOOOOOOOOO";
+    const char* kw_format = "O!|OOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
                                           const_cast<char**>(kw_list),
                                           &PyCapsule_Type,
                                           &pyObj_conn,
-                                          &statement,
-                                          &bucket_name,
-                                          &scope_name,
-                                          &scope_qualifier,
-                                          &client_context_id,
-                                          &scan_consistency,
-                                          &profile_mode,
-                                          &send_to_node,
-                                          &timeout,
-                                          &max_parallelism,
-                                          &scan_cap,
-                                          &scan_wait,
-                                          &pipeline_batch,
-                                          &pipeline_cap,
-                                          &adhoc,
-                                          &metrics,
-                                          &readonly,
-                                          &flex_index,
-                                          &preserve_expiry,
-                                          &pyObj_positional_parameters,
-                                          &pyObj_named_parameters,
-                                          &pyObj_mutation_state,
-                                          &pyObj_raw,
-                                          &pyObj_serializer,
+                                          &pyObj_query_args,
                                           &pyObj_callback,
                                           &pyObj_errback,
-                                          &pyObj_row_callback,
-                                          &pyObj_span);
+                                          &pyObj_row_callback);
     if (!ret) {
         PyErr_SetString(PyExc_ValueError, "Unable to parse arguments");
         return nullptr;
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::query_timeout;
-
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
         PyErr_SetString(PyExc_ValueError, "passed null connection");
@@ -486,130 +404,9 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
     PyErr_Clear();
 
-    if (0 < timeout) {
-        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
-    }
-
-    couchbase::core::operations::query_request req{ statement };
-    // positional parameters
-    std::vector<couchbase::core::json_string> positional_parameters{};
-    if (pyObj_positional_parameters && PyList_Check(pyObj_positional_parameters)) {
-        size_t nargs = static_cast<size_t>(PyList_Size(pyObj_positional_parameters));
-        size_t ii;
-        for (ii = 0; ii < nargs; ++ii) {
-            PyObject* pyOb_param = PyList_GetItem(pyObj_positional_parameters, ii);
-            if (!pyOb_param) {
-                // TODO:  handle this better
-                PyErr_SetString(PyExc_ValueError, "Unable to parse positional argument.");
-                return nullptr;
-            }
-            // PyList_GetItem returns borrowed ref, inc while using, decr after done
-            Py_INCREF(pyOb_param);
-            if (PyUnicode_Check(pyOb_param)) {
-                auto res = std::string(PyUnicode_AsUTF8(pyOb_param));
-                positional_parameters.push_back(couchbase::core::json_string{ std::move(res) });
-            }
-            Py_DECREF(pyOb_param);
-            pyOb_param = nullptr;
-        }
-    }
-    if (positional_parameters.size() > 0) {
-        req.positional_parameters = positional_parameters;
-    }
-
-    // named parameters
-    std::map<std::string, couchbase::core::json_string, std::less<>> named_parameters{};
-    if (pyObj_named_parameters && PyDict_Check(pyObj_named_parameters)) {
-        PyObject *pyObj_key, *pyObj_value;
-        Py_ssize_t pos = 0;
-
-        // PyObj_key and pyObj_value are borrowed references
-        while (PyDict_Next(pyObj_named_parameters, &pos, &pyObj_key, &pyObj_value)) {
-            std::string k;
-            if (PyUnicode_Check(pyObj_key)) {
-                k = std::string(PyUnicode_AsUTF8(pyObj_key));
-            }
-            if (PyUnicode_Check(pyObj_value) && !k.empty()) {
-                auto res = std::string(PyUnicode_AsUTF8(pyObj_value));
-                named_parameters.emplace(k, couchbase::core::json_string{ std::move(res) });
-            }
-        }
-    }
-    if (named_parameters.size() > 0) {
-        req.named_parameters = named_parameters;
-    }
-
-    req.timeout = timeout_ms;
-    req.adhoc = adhoc == 1;
-    req.metrics = metrics == 1;
-    req.readonly = readonly == 1;
-    req.flex_index = flex_index == 1;
-    req.preserve_expiry = preserve_expiry == 1;
-
-    if (0 < max_parallelism) {
-        req.max_parallelism = max_parallelism;
-    }
-    if (0 < scan_cap) {
-        req.scan_cap = scan_cap;
-    }
-    if (0 < scan_wait) {
-        req.scan_wait = std::chrono::milliseconds(std::max(0ULL, scan_wait / 1000ULL));
-    }
-    if (0 < pipeline_batch) {
-        req.pipeline_batch = pipeline_batch;
-    }
-    if (0 < pipeline_cap) {
-        req.pipeline_cap = pipeline_cap;
-    }
-
-    if (scan_consistency != nullptr) {
-        req.scan_consistency = str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency);
-    }
-
-    if (profile_mode != nullptr) {
-        req.profile = str_to_profile_mode(profile_mode);
-    }
-
-    if (client_context_id != nullptr) {
-        req.client_context_id = std::string(client_context_id);
-    }
-
-    if (send_to_node != nullptr) {
-        req.send_to_node = std::string(send_to_node);
-    }
-
-    if (scope_qualifier != nullptr) {
-        req.scope_qualifier = std::string(scope_qualifier);
-    }
-
-    if (pyObj_mutation_state != nullptr && PyList_Check(pyObj_mutation_state)) {
-        req.mutation_state = get_mutation_state(pyObj_mutation_state);
-    }
-
-    if (pyObj_span != nullptr) {
-        req.parent_span = std::make_shared<pycbc::request_span>(pyObj_span);
-    }
-
-    // raw options
-    std::map<std::string, couchbase::core::json_string, std::less<>> raw_options{};
-    if (pyObj_raw && PyDict_Check(pyObj_raw)) {
-        PyObject *pyObj_key, *pyObj_value;
-        Py_ssize_t pos = 0;
-
-        // PyObj_key and pyObj_value are borrowed references
-        while (PyDict_Next(pyObj_raw, &pos, &pyObj_key, &pyObj_value)) {
-            std::string k;
-            if (PyUnicode_Check(pyObj_key)) {
-                k = std::string(PyUnicode_AsUTF8(pyObj_key));
-            }
-            if (PyUnicode_Check(pyObj_value) && !k.empty()) {
-                auto res = std::string(PyUnicode_AsUTF8(pyObj_value));
-                raw_options.emplace(k, couchbase::core::json_string{ std::move(res) });
-            }
-        }
-    }
-    if (raw_options.size() > 0) {
-        req.raw = raw_options;
+    auto req = build_query_request(pyObj_query_args);
+    if (PyErr_Occurred()) {
+        return nullptr;
     }
 
     // PyObjects that need to be around for the cxx client lambda

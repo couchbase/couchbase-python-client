@@ -358,14 +358,15 @@ class TransactionTests:
         assert cfg_cap is not None
         assert cfg_cap == cap
 
-    def test_scope(self, cb_env):
+    def test_scope_qualifier(self, cb_env):
         cfg = TransactionQueryOptions(scope=cb_env.collection._scope)
-        cfg_scope = cfg._base.to_dict().get("scope", None)
-        cfg_bucket = cfg._base.to_dict().get("bucket", None)
-        assert cfg_bucket is not None
-        assert cfg_scope is not None
-        assert cfg_bucket == cb_env.collection._scope.bucket_name
-        assert cfg_scope == cb_env.collection._scope.name
+        cfg_scope_qualifier = cfg._base.to_dict().get("scope_qualifier", None)
+        expected = f'default:`{cb_env.collection._scope.bucket_name}`.`{cb_env.collection._scope.name}`'
+        assert cfg_scope_qualifier is not None
+        assert cfg_scope_qualifier == expected
+        bucket, scope = cfg.split_scope_qualifier()
+        assert bucket == cb_env.collection._scope.bucket_name
+        assert scope == cb_env.collection._scope.name
 
     def test_max_parallelism(self):
         max = 100
