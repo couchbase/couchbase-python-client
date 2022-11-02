@@ -23,6 +23,7 @@
 #include "structmember.h"
 #include <core/cluster.hxx>
 #include <core/logger/logger.hxx>
+#include <core/meta/version.hxx>
 #include <list>
 #include <thread>
 #include "result.hxx"

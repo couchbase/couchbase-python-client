@@ -101,6 +101,11 @@ add_constants(PyObject* module)
         Py_XDECREF(module);
         return;
     }
+    auto cxxcbc_metadata = couchbase::core::meta::sdk_build_info_json();
+    if (PyModule_AddStringConstant(module, "CXXCBC_METADATA", cxxcbc_metadata.c_str())) {
+        Py_XDECREF(module);
+        return;
+    }
 }
 
 std::string
@@ -519,10 +524,6 @@ static struct PyMethodDef methods[] = {
       (PyCFunction)pycbc_txns::destroy_transactions,
       METH_VARARGS | METH_KEYWORDS,
       "shut down transactions object" },
-    { "configure_logging",
-      (PyCFunction)configure_logging,
-      METH_VARARGS | METH_KEYWORDS,
-      "configure logging to use specific python logger" },
     { nullptr, nullptr, 0, nullptr }
 };
 
@@ -562,6 +563,11 @@ PyInit_pycbc_core(void)
         return nullptr;
     }
 
+    PyObject* pycbc_logger_type;
+    if (pycbc_logger_type_init(&pycbc_logger_type) < 0) {
+        return nullptr;
+    }
+
     m = PyModule_Create(&pycbc_core_module);
     if (m == nullptr) {
         return nullptr;
@@ -591,6 +597,13 @@ PyInit_pycbc_core(void)
     Py_INCREF(mutation_token_type);
     if (PyModule_AddObject(m, "mutation_token", mutation_token_type) < 0) {
         Py_DECREF(mutation_token_type);
+        Py_DECREF(m);
+        return nullptr;
+    }
+
+    Py_INCREF(pycbc_logger_type);
+    if (PyModule_AddObject(m, "pycbc_logger", pycbc_logger_type) < 0) {
+        Py_DECREF(pycbc_logger_type);
         Py_DECREF(m);
         return nullptr;
     }

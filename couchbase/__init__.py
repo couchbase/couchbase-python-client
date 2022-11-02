@@ -16,13 +16,11 @@
 try:
     # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
     # This is particularly helpful on M1 macs (PYCBC-1386).
-    import ssl  # noqa: F401
-
-    import couchbase.pycbc_core  # noqa: F401
+    import ssl  # noqa: F401 # nopep8 # isort:skip # noqa: E402
+    import couchbase.pycbc_core  # noqa: F401 # nopep8 # isort:skip # noqa: E402
 except ImportError:
-    import os
-    import sys
-
+    import os  # nopep8 # isort:skip # noqa: E402
+    import sys  # nopep8 # isort:skip # noqa: E402
     # should only need to do this on Windows w/ Python >= 3.8 due to the changes made for how DLLs are resolved
     if sys.platform.startswith('win32') and (3, 8) <= sys.version_info:
         open_ssl_dir = os.getenv('PYCBC_OPENSSL_DIR')
@@ -41,13 +39,96 @@ except ImportError:
                    'Set PYCBC_OPENSSL_DIR to location where OpenSSL libraries can be found.'))
 
 
-import logging
+import json  # nopep8 # isort:skip # noqa: E402
+import logging  # nopep8 # isort:skip # noqa: E402
+from typing import (List,
+                    Optional,
+                    Tuple)
+
+from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger
+
+_PYCBC_LOGGER = pycbc_logger()
+_CXXCBC_METADATA_JSON = json.loads(CXXCBC_METADATA)
+
+
+"""
+
+pycbc teardown methods
+
+"""
+import atexit  # nopep8 # isort:skip # noqa: E402
+
+
+def _pycbc_teardown(**kwargs):
+    """**INTERNAL**"""
+    global _PYCBC_LOGGER
+    if _PYCBC_LOGGER:
+        # TODO:  see about synchronizing the logger's shutdown here
+        _PYCBC_LOGGER = None
+
+
+atexit.register(_pycbc_teardown)
+
+"""
+
+Metadata + version methods
+
+"""
+_METADATA_KEYS = ['openssl_default_cert_dir',
+                  'openssl_default_cert_file',
+                  'openssl_headers',
+                  'openssl_runtime',
+                  'txns_forward_compat_extensions',
+                  'txns_forward_compat_protocol_version',
+                  'version']
+
+
+def get_metadata(as_str=False, detailed=False):
+    metadata = _CXXCBC_METADATA_JSON if detailed is True else {
+        k: v for k, v in _CXXCBC_METADATA_JSON.items() if k in _METADATA_KEYS}
+    return json.dumps(metadata) if as_str is True else metadata
+
+
+def get_transactions_protocol() -> Optional[Tuple[Optional[float], Optional[List[str]]]]:
+    """Get the transactions protocol version and supported extensions.
+
+    Returns:
+        Optional[Tuple[Optional[float], Optional[List[str]]]]: The transactions protocol version and
+        support extensions, if found in the cxx client's metadata.
+    """
+    if not _CXXCBC_METADATA_JSON:
+        return None
+
+    version = _CXXCBC_METADATA_JSON.get('txns_forward_compat_protocol_version', None)
+    if version:
+        version = float(version)
+    extensions = _CXXCBC_METADATA_JSON.get('txns_forward_compat_extensions', None)
+    if extensions:
+        extensions = extensions.split(',')
+    return version, extensions
+
+
+"""
+
+Logging methods
+
+"""
+
+
+def configure_console_logger():
+    import os
+    log_level = os.getenv('PYCBC_LOG_LEVEL', None)
+    if log_level:
+        _PYCBC_LOGGER.create_console_logger(log_level.lower())
+        logging.getLogger().debug(get_metadata(as_str=True))
 
 
 def configure_logging(name, level=logging.INFO, parent_logger=None):
-    from couchbase.pycbc_core import configure_logging
     if parent_logger:
         name = f'{parent_logger.name}.{name}'
-    print(name)
-    configure_logging(logging.getLogger(name), level)
-    logging.info("created child logger %s", name)
+    logger = logging.getLogger(name)
+    _PYCBC_LOGGER.configure_logging_sink(logger, level)
+    logger.debug(get_metadata(as_str=True))
+
+
+configure_console_logger()

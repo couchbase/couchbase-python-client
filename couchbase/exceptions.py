@@ -767,6 +767,10 @@ class QueueEmpty(Exception):
     Thrown if a datastructure queue is empty
     """
 
+
+class UnsuccessfulOperationException(CouchbaseException):
+    """Thrown when a specific pycbc_core operation is unsuccessful."""
+
 # Ratelimiting
 
 
@@ -1006,6 +1010,7 @@ class ExceptionMap(Enum):
     DesignDocumentNotFoundException = 502
     InternalSDKException = 5000
     HTTPException = 5001
+    UnsuccessfulOperationException = 5002
 
 
 PYCBC_ERROR_MAP = {e.value: getattr(sys.modules[__name__], e.name) for e in ExceptionMap}
