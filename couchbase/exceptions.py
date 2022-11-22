@@ -921,8 +921,24 @@ class PathNotFoundException(CouchbaseException):
 
 
 class PathTooBigException(CouchbaseException):
+    """Indicates that the reference path is too long, or contains too many independent components."""
+
     def __init__(self, message=None, **kwargs):
-        """Indicates that the reference path is too long, or contains too many independent components."""
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class RangeScanCompletedException(CouchbaseException):
+    """Indicates the range scan has completed."""
+
+    def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
@@ -935,8 +951,9 @@ class PathTooBigException(CouchbaseException):
 
 
 class PathTooDeepException(CouchbaseException):
+    """Indicates that the reference path contains too many levels to parse."""
+
     def __init__(self, message=None, **kwargs):
-        """Indicates that the reference path contains too many levels to parse."""
         if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
@@ -949,11 +966,27 @@ class PathTooDeepException(CouchbaseException):
 
 
 class ValueTooDeepException(CouchbaseException):
+    """
+        Indicates that the value provided, if inserted into the document,
+        would cause the document to become too deep for the server to accept.
+    """
+
     def __init__(self, message=None, **kwargs):
-        """
-            Indicates that the value provided, if inserted into the document,
-            would cause the document to become too deep for the server to accept.
-        """
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class MutationTokenOutdatedException(CouchbaseException):
+    """Indicates that the vbucket uuid requirements do not align with the server."""
+
+    def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
@@ -1099,6 +1132,19 @@ class CollectionAlreadyExistsException(CouchbaseException):
 
 
 class CollectionNotFoundException(CouchbaseException):
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class UnsupportedOperation(CouchbaseException):
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
@@ -1814,6 +1860,8 @@ class ExceptionMap(Enum):
     ParsingFailedException = 8
     CasMismatchException = 9
     BucketNotFoundException = 10
+    CollectionNotFoundException = 11
+    UnsupportedOperation = 12
     AmbiguousTimeoutException = 13
     UnAmbiguousTimeoutException = 14
     FeatureUnavailableException = 15
@@ -1834,6 +1882,8 @@ class ExceptionMap(Enum):
     PathMismatchException = 114
     InvalidValueException = 119
     PathExistsException = 123
+    MutationTokenOutdatedException = 133
+    RangeScanCompletedException = 134
     DatasetNotFoundException = 303
     DataverseNotFoundException = 304
     DatasetAlreadyExistsException = 305

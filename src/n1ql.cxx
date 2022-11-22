@@ -19,8 +19,6 @@
 #include "exceptions.hxx"
 #include "result.hxx"
 #include "utils.hxx"
-#include <couchbase/query_scan_consistency.hxx>
-#include <couchbase/query_profile.hxx>
 
 std::string
 scan_consistency_type_to_string(couchbase::query_scan_consistency consistency)
@@ -33,23 +31,6 @@ scan_consistency_type_to_string(couchbase::query_scan_consistency consistency)
     }
     // should not be able to reach here, since this is an enum class
     return "unknown";
-}
-
-couchbase::query_profile
-str_to_profile_mode(std::string profile_mode)
-{
-    if (profile_mode.compare("off") == 0) {
-        return couchbase::query_profile::off;
-    }
-    if (profile_mode.compare("phases") == 0) {
-        return couchbase::query_profile::phases;
-    }
-    if (profile_mode.compare("timings") == 0) {
-        return couchbase::query_profile::timings;
-    }
-    // TODO: better exception
-    PyErr_SetString(PyExc_ValueError, "Invalid Profile Mode.");
-    return {};
 }
 
 std::string

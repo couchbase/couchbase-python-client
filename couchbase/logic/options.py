@@ -791,6 +791,38 @@ class UpsertOptionsBase(DurabilityOptionBlockBase):
         super().__init__(**kwargs)
 
 
+class ScanOptionsBase(OptionsTimeoutBase):
+    @overload
+    def __init__(
+            self,
+            timeout=None,  # type: Optional[timedelta]
+            ids_only=None,  # type: Optional[bool]
+            consistent_with=None,  # type: Optional[MutationState]
+            batch_byte_limit=None,  # type: Optional[int]
+            batch_item_limit=None,  # type: Optional[int]
+            batch_time_limit=None,  # type: Optional[timedelta]
+            transcoder=None,  # type: Optional[Transcoder]
+            concurrency=None,  # type: Optional[int]
+            span=None,  # type: Optional[Any]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout',
+                'ids_only',
+                'consistent_with',
+                'batch_byte_limit',
+                'batch_item_limit',
+                'concurrency',
+                'transcoder',
+                'span']
+
+
 class ReplaceOptionsBase(DurabilityOptionBlockBase):
     @overload
     def __init__(self,

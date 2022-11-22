@@ -18,17 +18,18 @@
 #pragma once
 
 #include "client.hxx"
+#include "utils.hxx"
 #include <queue>
-#include <couchbase/mutation_token.hxx>
+#include <core/scan_result.hxx>
 
 template<class T>
 class rows_queue
 {
   public:
     rows_queue()
-      : _rows()
-      , _mut()
-      , _cond()
+      : rows_()
+      , mut_()
+      , cv_()
     {
     }
 
@@ -38,36 +39,39 @@ class rows_queue
 
     void put(T row)
     {
-        std::lock_guard<std::mutex> lock(_mut);
-        _rows.push(row);
-        _cond.notify_one();
+        std::lock_guard<std::mutex> lock(mut_);
+        rows_.push(row);
+        cv_.notify_one();
     }
 
     T get(std::chrono::milliseconds timeout_ms)
     {
-        std::unique_lock<std::mutex> lock(_mut);
+        std::unique_lock<std::mutex> lock(mut_);
 
-        while (_rows.empty()) {
+        while (rows_.empty()) {
             auto now = std::chrono::system_clock::now();
-            if (_cond.wait_until(lock, now + timeout_ms) == std::cv_status::timeout) {
+            if (cv_.wait_until(lock, now + timeout_ms) == std::cv_status::timeout) {
                 // this will cause iternext to return nullptr, which stops iteration
                 return nullptr;
             }
         }
-        auto row = _rows.front();
-        _rows.pop();
+
+        auto row = rows_.front();
+        rows_.pop();
         return row;
     }
 
     int size()
     {
-        return _rows.size();
+        std::lock_guard<std::mutex> lock(mut_);
+        return rows_.size();
     }
 
   private:
-    std::queue<T> _rows;
-    std::mutex _mut;
-    std::condition_variable _cond;
+    std::queue<T> rows_;
+    std::mutex mut_;
+    bool cancel_streaming_{ false };
+    std::condition_variable cv_;
 };
 
 struct result {
@@ -102,3 +106,13 @@ pycbc_streamed_result_type_init(PyObject** ptr);
 
 streamed_result*
 create_streamed_result_obj(std::chrono::milliseconds timeout_ms);
+
+struct scan_iterator {
+    PyObject_HEAD std::shared_ptr<couchbase::core::scan_result> scan_result;
+};
+
+int
+pycbc_scan_iterator_type_init(PyObject** ptr);
+
+scan_iterator*
+create_scan_iterator_obj(couchbase::core::scan_result result);

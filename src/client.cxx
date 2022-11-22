@@ -22,6 +22,7 @@
 #include "connection.hxx"
 #include "exceptions.hxx"
 #include "kv_ops.hxx"
+#include "kv_range_scan.hxx"
 #include "subdoc_ops.hxx"
 #include "diagnostics.hxx"
 #include "binary_ops.hxx"
@@ -375,6 +376,16 @@ kv_multi_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 }
 
 static PyObject*
+kv_range_scan_operation(PyObject* self, PyObject* args, PyObject* kwargs)
+{
+    scan_iterator* res = handle_kv_range_scan_op(self, args, kwargs);
+    if (res == nullptr && PyErr_Occurred() == nullptr) {
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform KV range scan operation.");
+    }
+    return reinterpret_cast<PyObject*>(res);
+}
+
+static PyObject*
 subdoc_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_subdoc_op(self, args, kwargs);
@@ -503,6 +514,10 @@ static struct PyMethodDef methods[] = {
     { "close_connection", (PyCFunction)close_connection, METH_VARARGS | METH_KEYWORDS, "Close a connection" },
     { "kv_operation", (PyCFunction)kv_operation, METH_VARARGS | METH_KEYWORDS, "Handle all key/value operations" },
     { "kv_multi_operation", (PyCFunction)kv_multi_operation, METH_VARARGS | METH_KEYWORDS, "Handle all key/value multi operations" },
+    { "kv_range_scan_operation",
+      (PyCFunction)kv_range_scan_operation,
+      METH_VARARGS | METH_KEYWORDS,
+      "Handle all key/value range scan operations" },
     { "subdoc_operation", (PyCFunction)subdoc_operation, METH_VARARGS | METH_KEYWORDS, "Handle all subdoc operations" },
     { "binary_operation", (PyCFunction)binary_operation, METH_VARARGS | METH_KEYWORDS, "Handle all binary operations" },
     { "binary_multi_operation", (PyCFunction)binary_multi_operation, METH_VARARGS | METH_KEYWORDS, "Handle all binary multi operations" },
@@ -553,6 +568,11 @@ PyInit_pycbc_core(void)
         return nullptr;
     }
 
+    PyObject* scan_iterator_type;
+    if (pycbc_scan_iterator_type_init(&scan_iterator_type) < 0) {
+        return nullptr;
+    }
+
     PyObject* streamed_result_type;
     if (pycbc_streamed_result_type_init(&streamed_result_type) < 0) {
         return nullptr;
@@ -583,6 +603,13 @@ PyInit_pycbc_core(void)
     Py_INCREF(exception_base_type);
     if (PyModule_AddObject(m, "exception", exception_base_type) < 0) {
         Py_DECREF(exception_base_type);
+        Py_DECREF(m);
+        return nullptr;
+    }
+
+    Py_INCREF(scan_iterator_type);
+    if (PyModule_AddObject(m, "scan_iterator", scan_iterator_type) < 0) {
+        Py_DECREF(scan_iterator_type);
         Py_DECREF(m);
         return nullptr;
     }

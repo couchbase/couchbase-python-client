@@ -23,13 +23,15 @@ from couchbase.management.logic.buckets_logic import ConflictResolutionType  # n
 from couchbase.management.logic.buckets_logic import EjectionMethod  # noqa: F401
 from couchbase.management.logic.buckets_logic import EvictionPolicyType  # noqa: F401
 from couchbase.management.logic.buckets_logic import StorageBackend  # noqa: F401
-from couchbase.management.logic.buckets_logic import (BucketManagerLogic,
+from couchbase.management.logic.buckets_logic import (BucketDescribeResult,
+                                                      BucketManagerLogic,
                                                       BucketSettings,
                                                       CreateBucketSettings)
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
 # @TODO:  lets deprecate import of options from couchbase.management.buckets
-from couchbase.management.options import (CreateBucketOptions,
+from couchbase.management.options import (BucketDescribeOptions,
+                                          CreateBucketOptions,
                                           DropBucketOptions,
                                           FlushBucketOptions,
                                           GetAllBucketOptions,
@@ -166,3 +168,26 @@ class BucketManager(BucketManagerLogic):
                 flushing disabled.
         """
         return super().flush_bucket(bucket_name, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(BucketDescribeResult, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
+    def bucket_describe(self,
+                        bucket_name,   # type: str
+                        *options,      # type: BucketDescribeOptions
+                        **kwargs       # type: Dict[str, Any]
+                        ) -> BucketDescribeResult:
+        """Provides details on provided the bucket.
+
+        Args:
+            bucket_name (str): The name of the bucket to flush.
+            options (:class:`~couchbase.management.options.BucketDescribeOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`.BucketDescribeResult`: Key-value pair details describing the bucket.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+        """
+        return super().bucket_describe(bucket_name, *options, **kwargs)

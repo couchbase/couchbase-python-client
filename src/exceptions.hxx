@@ -86,11 +86,12 @@ retry_reason_to_string(couchbase::retry_reason reason);
 // start - needed for Pycbc error code
 enum class PycbcError {
     InvalidArgument = 3,
+    FeatureUnavailable = 15,
     InternalSDKError = 5000,
     HTTPError = 5001,
     UnsuccessfulOperation,
     UnableToBuildResult,
-    CallbackUnsuccessful
+    CallbackUnsuccessful,
 };
 
 namespace std

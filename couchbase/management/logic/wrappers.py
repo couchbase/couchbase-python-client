@@ -65,6 +65,13 @@ def get_all_bucket_settings(res, return_cls):
     return buckets
 
 
+def get_bucket_describe_result(res, return_cls):
+    bucket_info = res.raw_result.get('bucket_info', None)
+    if bucket_info:
+        return return_cls(**bucket_info)
+    return None
+
+
 """
 
 Collection mgmt helpers for parsing returned results
@@ -323,6 +330,8 @@ def handle_bucket_mgmt_response(ret, fn_name, return_cls):
         retval = get_bucket_settings(ret, return_cls)
     elif fn_name == 'get_all_buckets':
         retval = get_all_bucket_settings(ret, return_cls)
+    elif fn_name == 'bucket_describe':
+        retval = get_bucket_describe_result(ret, return_cls)
     else:
         retval = return_cls(ret)
 

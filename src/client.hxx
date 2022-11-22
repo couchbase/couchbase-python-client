@@ -24,6 +24,7 @@
 #include <core/cluster.hxx>
 #include <core/logger/logger.hxx>
 #include <core/meta/version.hxx>
+#include <core/agent_group.hxx>
 #include <list>
 #include <thread>
 #include "result.hxx"
@@ -58,7 +59,10 @@ class Operations
         APPEND,
         PREPEND,
         N1QL_QUERY,
-        CLUSTER_MGMT_CLUSTER_INFO
+        CLUSTER_MGMT_CLUSTER_INFO,
+        KV_RANGE_SCAN,
+        KV_PREFIX_SCAN,
+        KV_SAMPLING_SCAN
     };
 
     Operations()
@@ -109,7 +113,10 @@ class Operations
                           "APPEND "
                           "PREPEND "
                           "N1QL_QUERY "
-                          "CLUSTER_MGMT_CLUSTER_INFO";
+                          "CLUSTER_MGMT_CLUSTER_INFO "
+                          "KV_RANGE_SCAN "
+                          "KV_PREFIX_SCAN "
+                          "KV_SAMPLING_SCAN";
 
         return ops;
     }
@@ -276,6 +283,7 @@ str_to_service_type(std::string svc);
 
 extern PyTypeObject result_type;
 extern PyTypeObject exception_base_type;
+extern PyTypeObject scan_iterator_type;
 extern PyTypeObject streamed_result_type;
 extern PyTypeObject mutation_token_type;
 

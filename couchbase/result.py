@@ -34,7 +34,8 @@ from couchbase.diagnostics import (ClusterState,
                                    ServiceType)
 from couchbase.exceptions import (CLIENT_ERROR_MAP,
                                   CouchbaseException,
-                                  ErrorMapper)
+                                  ErrorMapper,
+                                  InvalidArgumentException)
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.pycbc_core import exception, result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
@@ -914,6 +915,108 @@ class HttpResult:
         orig  # type: result
     ):
         self._orig = orig
+
+
+class ScanResult(Result):
+
+    def __init__(self, orig, ids_only):
+        super().__init__(orig)
+        self._ids_only = ids_only
+
+    @property
+    def id(self) -> Optional[str]:
+        """
+            Optional[str]: Id for the operation, if it exists.
+        """
+        return self._orig.raw_result.get("key", None)
+
+    @property
+    def ids_only(self) -> bool:
+        """
+            bool: True is KV range scan request options set ids_only to True.  False otherwise.
+        """
+        return self._ids_only
+
+    @property
+    def cas(self) -> int:
+        """
+            Optional[int]: The CAS of the document, if it exists
+        """
+        if self.ids_only:
+            raise InvalidArgumentException(("No cas available when scan is requested with "
+                                            "`ScanOptions` ids_only set to True."))
+        return self._orig.raw_result.get("cas", 0)
+
+    @property
+    def expiry_time(self) -> Optional[datetime]:
+        """
+            Optional[datetime]: The expiry of the document, if it was requested.
+        """
+        if self.ids_only:
+            raise InvalidArgumentException(("No expiry_time available when scan is requested with "
+                                            "`ScanOptions` ids_only set to True."))
+        time_ms = self._orig.raw_result.get("expiry", None)
+        if time_ms:
+            return datetime.fromtimestamp(time_ms)
+        return None
+
+    @property
+    def content_as(self) -> Any:
+        """
+            Any: The contents of the document.
+
+            Get the value as a dict::
+
+                res = collection.get(key)
+                value = res.content_as[dict]
+
+            Raises:
+                :class:`~couchbase.exceptions.InvalidArgumentException`: If called when KV range scan options set
+                    without_content to True.
+
+        """
+        if self.ids_only:
+            raise InvalidArgumentException(("No content available when scan is requested with "
+                                            "`ScanOptions` ids_only set to True."))
+        return ContentProxy(self.value)
+
+    def __repr__(self):
+        return "ScanResult:{}".format(self._orig)
+
+
+class ScanResultIterable:
+    def __init__(
+        self,
+        scan_request
+    ):
+        self._request = scan_request
+
+    def rows(self):
+        """The rows which have been returned by the query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
+        # avoid circular import
+        from acouchbase.kv_range_scan import AsyncRangeScanRequest  # noqa: F811
+        if isinstance(self._request, AsyncRangeScanRequest):
+            return self.__aiter__()
+        return self.__iter__()
+
+    def cancel_scan(self):
+        self._request.cancel_scan()
+
+    def __iter__(self):
+        return self._request.__iter__()
+
+    def __aiter__(self):
+        return self._request.__aiter__()
+
+    def __repr__(self):
+        return "ScanResultIterable:{}".format(self._request)
 
 
 class QueryResult:

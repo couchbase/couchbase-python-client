@@ -60,6 +60,7 @@ class ServerFeatures(Enum):
     RateLimiting = 'rate_limiting'
     Txns = 'txns'
     TxnQueries = 'txn_queries'
+    KeyValueRangeScan = 'kv_range_scan'
 
 
 class EnvironmentFeatures:
@@ -121,6 +122,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.PreserveExpiry,
                                 ServerFeatures.QueryUserDefinedFunctions]
 
+    AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KeyValueRangeScan]
+
     @staticmethod
     def is_feature_supported(feature,  # type: str
                              server_version,  # type: float
@@ -148,6 +151,28 @@ class EnvironmentFeatures:
             try:
                 supported = EnvironmentFeatures.supports_feature(feature, server_version, mock_server_type)
                 if supported is not None:
+                    pytest.skip(supported)
+            except TypeError:
+                pytest.skip("Unable to determine server version")
+            except Exception:
+                raise
+
+    @staticmethod
+    def check_if_feature_not_supported(features,  # type: Union[str, List[str]]
+                                       server_version,  # type: float
+                                       mock_server_type=None  # type: Optional[MockServerType]
+                                       ) -> None:
+
+        features_list = []
+        if isinstance(features, str):
+            features_list.append(features)
+        else:
+            features_list.extend(features)
+
+        for feature in features_list:
+            try:
+                supported = EnvironmentFeatures.supports_feature(feature, server_version, mock_server_type)
+                if supported is None:
                     pytest.skip(supported)
             except TypeError:
                 pytest.skip("Unable to determine server version")
@@ -244,6 +269,16 @@ class EnvironmentFeatures:
 
             if server_version < 7.1:
                 return (f'Feature: {feature} only supported on server versions >= 7.1. '
+                        f'Using server version: {server_version}.')
+
+            return None
+
+        if feature in map(lambda f: f.value, EnvironmentFeatures.AT_LEAST_V7_5_0_FEATURES):
+            if is_mock_server:
+                return f'Mock server does not support feature: {feature}'
+
+            if server_version < 7.5:
+                return (f'Feature: {feature} only supported on server versions >= 7.5. '
                         f'Using server version: {server_version}.')
 
             return None

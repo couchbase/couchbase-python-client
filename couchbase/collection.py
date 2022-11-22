@@ -36,6 +36,7 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   QueueEmpty)
 from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.kv_range_scan import RangeScanRequest
 from couchbase.logic import (BlockingWrapper,
                              decode_replicas,
                              decode_value)
@@ -54,6 +55,7 @@ from couchbase.options import (AppendMultiOptions,
                                PrependMultiOptions,
                                RemoveMultiOptions,
                                ReplaceMultiOptions,
+                               ScanOptions,
                                TouchMultiOptions,
                                UnlockMultiOptions,
                                UpsertMultiOptions,
@@ -74,7 +76,8 @@ from couchbase.result import (CounterResult,
                               MultiMutationResult,
                               MutateInResult,
                               MutationResult,
-                              OperationResult)
+                              OperationResult,
+                              ScanResultIterable)
 from couchbase.subdocument import (array_addunique,
                                    array_append,
                                    array_prepend,
@@ -89,6 +92,7 @@ if TYPE_CHECKING:
     from datetime import timedelta
 
     from couchbase._utils import JSONType
+    from couchbase.kv_range_scan import ScanType
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    ExistsOptions,
@@ -977,6 +981,58 @@ class Collection(CollectionLogic):
 
         """
         return super().mutate_in(key, spec, *opts, **kwargs)
+
+    def scan(self, scan_type,  # type: ScanType
+             *opts,  # type: ScanOptions
+             **kwargs,  # type: Dict[str, Any]
+             ) -> ScanResultIterable:
+        """Execute a key-value range scan operation from the collection.
+
+        **VOLATILE** This API is subject to change at any time.
+
+        Args:
+            scan_type (:class:`~couchbase.kv_range_scan.ScanType`): Either a :class:`~couchbase.kv_range_scan.RangeScan`,
+                :class:`~couchbase.kv_range_scan.PrefixScan` or
+                :class:`~couchbase.kv_range_scan.SamplingScan` instance.
+            opts (:class:`~couchbase.options.ScanOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.ScanOptions`
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If scan_type is not either a RangeScan or SamplingScan instance.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If sort option is provided and is incorrect type.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If consistent_with option is provided and is not a
+
+        Returns:
+            :class:`~couchbase.result.ScanResultIterable`: An instance of :class:`~couchbase.result.ScanResultIterable`.
+
+        Examples:
+
+            Simple range scan operation::
+
+                from couchbase.kv_range_scan import RangeScan
+                from couchbase.options import ScanOptions
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                scan_type = RangeScan(ScanTerm('airline-00'), ScanTerm('airline-99'))
+                scan_iter = collection.scan(scan_type, ScanOptions(ids_only=True))
+
+                for res in scan_iter:
+                    print(res)
+
+
+        """  # noqa: E501
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            final_args['transcoder'] = self.default_transcoder
+        scan_args = super().build_scan_args(scan_type, **final_args)
+        range_scan_request = RangeScanRequest(**scan_args)
+        return ScanResultIterable(range_scan_request)
 
     def binary(self) -> BinaryCollection:
         """Creates a BinaryCollection instance, allowing access to various binary operations

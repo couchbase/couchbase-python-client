@@ -31,7 +31,9 @@ from typing import (TYPE_CHECKING,
                     Union,
                     overload)
 
-from couchbase._utils import timedelta_as_microseconds, timedelta_as_timestamp
+from couchbase._utils import (timedelta_as_microseconds,
+                              timedelta_as_timestamp,
+                              validate_int)
 from couchbase.durability import DurabilityParser
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.options import AcceptableInts  # noqa: F401
@@ -68,6 +70,7 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      QueryOptionsBase,
                                      RemoveOptionsBase,
                                      ReplaceOptionsBase,
+                                     ScanOptionsBase,
                                      SearchOptionsBase,
                                      SignedInt64Base,
                                      TouchOptionsBase,
@@ -644,6 +647,33 @@ class UpsertOptions(UpsertOptionsBase):
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
     """
+
+
+class ScanOptions(ScanOptionsBase):
+    """Available options to for a key-value scan operation.
+
+    **VOLATILE** This API is subject to change at any time.
+
+    .. warning::
+        Importing options from ``couchbase.collection`` is deprecated.
+        All options should be imported from ``couchbase.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            range scan operation timeout.
+        ids_only (bool, optional): Specifies that scan should only return document ids. Defaults to False.
+        consistent_with (:class:`~couchbase.mutation_state.MutationState`, optional): Specifies a
+            :class:`~couchbase.mutation_state.MutationState` which the scan should be consistent with. Defaults to None.
+        batch_byte_limit (int, optional): The limit applied to the number of bytes returned from the server
+            for each partition batch. Defaults to 15k.
+        batch_item_limit (int, optional): The limit applied to the number of items returned from the server
+            for each partition batch. Defaults to 50.
+        transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~couchbase.transcoder.JsonTranscoder`.
+        concurrency (int, optional): The upper bound on the number of vbuckets that should be scanned in parallel.
+            Defaults to 1.
+    """  # noqa: E501
+
 
 # Sub-document Operations
 
@@ -1711,7 +1741,10 @@ class DefaultForwarder(Forwarder):
                 "disable_scoring": lambda dis_score: True if dis_score else None
             },
             "preserve_expiry": {"preserve_expiry": lambda x: x},
-            "report_id": {"report_id": lambda x: str(x)}
+            "report_id": {"report_id": lambda x: str(x)},
+            "batch_byte_limit": {"batch_byte_limit": validate_int},
+            "batch_item_limit": {"batch_item_limit": validate_int},
+            "concurrency": {"concurrency": validate_int}
         }
 
 

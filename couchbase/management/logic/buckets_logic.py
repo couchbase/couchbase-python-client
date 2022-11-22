@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from typing import (TYPE_CHECKING,
@@ -47,7 +48,8 @@ from couchbase.pycbc_core import (bucket_mgmt_operations,
                                   mgmt_operations)
 
 if TYPE_CHECKING:
-    from couchbase.management.options import (CreateBucketOptions,
+    from couchbase.management.options import (BucketDescribeOptions,
+                                              CreateBucketOptions,
                                               DropBucketOptions,
                                               FlushBucketOptions,
                                               GetAllBucketOptions,
@@ -241,6 +243,36 @@ class BucketManagerLogic:
             "conn": self._connection,
             "mgmt_op": mgmt_operations.BUCKET.value,
             "op_type": bucket_mgmt_operations.FLUSH_BUCKET.value
+        }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        mgmt_kwargs["op_args"] = {
+            "bucket_name": bucket_name
+        }
+
+        final_args = forward_args(kwargs, *options)
+        if final_args.get("timeout", None) is not None:
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+    def bucket_describe(self,
+                        bucket_name,   # type: str
+                        *options,      # type: BucketDescribeOptions
+                        **kwargs       # type: Any
+                        ) -> None:
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.BUCKET.value,
+            "op_type": bucket_mgmt_operations.BUCKET_DESCRIBE.value
         }
 
         callback = kwargs.pop('callback', None)
@@ -539,3 +571,13 @@ class CreateBucketSettings(BucketSettings):
     def conflict_resolution_type(self):
         # type: (...) -> ConflictResolutionType
         return self.get('conflict_resolution_type')
+
+
+@dataclass
+class BucketDescribeResult:
+    name: str = None
+    uuid: str = None
+    number_of_nodes: int = None
+    number_of_replicas: int = None
+    bucket_capabilities: List[str] = None
+    storage_backend: str = None

@@ -144,6 +144,28 @@ class FlushBucketOptions(dict):
 
         super().__init__(**kwargs)
 
+
+class BucketDescribeOptions(dict):
+    """Available options to for a :class:`~couchbase.management.buckets.BucketManager`'s bucket describe operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
+    def __init__(
+        self,
+        timeout=None  # type: Optional[timedelta]
+    ):
+        kwargs = {}
+        if timeout:
+            kwargs["timeout"] = timeout
+
+        super().__init__(**kwargs)
+
 # Collection Management API
 
 

@@ -23,7 +23,11 @@ from typing import (TYPE_CHECKING,
 
 from couchbase._utils import timedelta_as_microseconds
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.kv_range_scan import (PrefixScan,
+                                     RangeScan,
+                                     SamplingScan)
 from couchbase.logic.options import DeltaValueBase, SignedInt64Base
+from couchbase.mutation_state import MutationState
 from couchbase.options import forward_args
 from couchbase.pycbc_core import (binary_operation,
                                   kv_operation,
@@ -533,3 +537,64 @@ class CollectionLogic:
                                 op_type=op_type,
                                 value=value,
                                 op_args=final_args)
+
+    def build_scan_args(self,  # noqa: C901
+                        scan_type,  # type: Union[RangeScan, PrefixScan, SamplingScan]
+                        **kwargs,  # type: Dict[str, Any]
+                        ) -> Dict[str, Any]:
+        """** INTERNAL **
+
+        Args:
+            scan_type (Union[RangeScan, PrefixScan, SamplingScan]): Either a :class:`~couchbase.kv_range_scan.RangeScan`, a
+              :class:`~couchbase.kv_range_scan.PrefixScan` or a :class:`~couchbase.kv_range_scan.SamplingScan` instance.
+            kwargs (Dict[str, Any]): Options for scan operation.
+
+        Raises:
+            InvalidArgumentException: If scan_type is not either a RangeScan, PrefixScan or SamplingScan instance.
+            InvalidArgumentException: If sort option is provided and is incorrect type.
+            InvalidArgumentException: If consistent_with option is provided and is not a valid state
+            InvalidArgumentException: If concurrency is not positive
+            InvalidArgumentException: If sampling scan limit is not positive
+
+        Returns:
+            Dict[str, Any]: Parsed and processed scan operation arguments.
+        """  # noqa: E501
+        op_type = None
+        if 'concurrency' in kwargs and kwargs['concurrency'] < 1:
+            raise InvalidArgumentException('Concurrency option must be positive')
+
+        if isinstance(scan_type, RangeScan):
+            op_type = operations.KV_RANGE_SCAN.value
+            if scan_type.start is not None:
+                kwargs['start'] = scan_type.start.to_dict()
+            if scan_type.end is not None:
+                kwargs['end'] = scan_type.end.to_dict()
+        elif isinstance(scan_type, PrefixScan):
+            op_type = operations.KV_PREFIX_SCAN.value
+            kwargs['prefix'] = scan_type.prefix
+        elif isinstance(scan_type, SamplingScan):
+            op_type = operations.KV_SAMPLING_SCAN.value
+            if scan_type.limit <= 0:
+                raise InvalidArgumentException('Sampling scan limit must be positive')
+            kwargs['limit'] = scan_type.limit
+            if scan_type.seed is not None:
+                kwargs['seed'] = scan_type.seed
+        else:
+            raise InvalidArgumentException('scan_type must be Union[RangeScan, PrefixScan, SamplingScan]')
+
+        transcoder = kwargs.pop('transcoder', None)
+
+        consistent_with = kwargs.pop('consistent_with', None)
+        if consistent_with:
+            if not (isinstance(consistent_with, MutationState) and len(consistent_with._sv) > 0):
+                raise InvalidArgumentException('Passed empty or invalid mutation state')
+            else:
+                kwargs['consistent_with'] = list(token.as_dict() for token in consistent_with._sv)
+
+        return_args = {
+            'transcoder': transcoder,
+            'op_type': op_type,
+            'op_args': kwargs,
+        }
+        return_args.update(**self._get_connection_args())
+        return return_args

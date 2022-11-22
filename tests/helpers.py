@@ -126,6 +126,7 @@ class ServerFeatures(Enum):
     RateLimiting = 'rate_limiting'
     Txns = 'txns'
     TxnQueries = 'txn_queries'
+    KvRangeScan = 'kv_range_scan'
 
 
 # mock and real server (all versions) should have these features
@@ -150,7 +151,8 @@ FEATURES_NOT_IN_MOCK = [ServerFeatures.Analytics,
                         ServerFeatures.TxnQueries,
                         ServerFeatures.UserGroupManagement,
                         ServerFeatures.UserManagement,
-                        ServerFeatures.ViewIndexManagement]
+                        ServerFeatures.ViewIndexManagement,
+                        ServerFeatures.KvRangeScan]
 
 FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -184,6 +186,8 @@ AT_LEAST_V7_1_0_FEATURES = [ServerFeatures.RateLimiting,
                             ServerFeatures.EventingFunctionManagement,
                             ServerFeatures.PreserveExpiry]
 
+AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan]
+
 # Only set the baseline needed
 TEST_SUITE_MAP = {
     'analytics_t': [ServerFeatures.Analytics],
@@ -201,6 +205,7 @@ TEST_SUITE_MAP = {
     'datastructures_t': [ServerFeatures.Subdoc],
     'durability_t': [ServerFeatures.KeyValue],
     'eventingmgmt_t': [ServerFeatures.EventingFunctionManagement],
+    'kv_range_scan_t': [ServerFeatures.KvRangeScan],
     'metrics_t': [ServerFeatures.Collections],
     'mutation_tokens_t': [ServerFeatures.KeyValue],
     'query_t': [ServerFeatures.Query, ServerFeatures.QueryIndexManagement],
@@ -453,6 +458,11 @@ class CouchbaseTestEnvironment():
                 return self.server_version_short >= 7.1
             return not self.is_mock_server
 
+        if feature in map(lambda f: f.value, AT_LEAST_V7_5_0_FEATURES):
+            if self.is_real_server:
+                return self.server_version_short >= 7.5
+            return not self.is_mock_server
+
         raise CouchbaseTestEnvironmentException(f"Unable to determine if server has provided feature: {feature}")
 
     def feature_not_supported_text(self, feature  # type: str  # noqa: C901
@@ -506,6 +516,12 @@ class CouchbaseTestEnvironment():
         if feature in map(lambda f: f.value, AT_LEAST_V7_1_0_FEATURES):
             if self.is_real_server:
                 return (f'Feature: {feature} only supported on server versions >= 7.1. '
+                        f'Using server version: {self.server_version}.')
+            return f'Mock server does not support feature: {feature}'
+
+        if feature in map(lambda f: f.value, AT_LEAST_V7_5_0_FEATURES):
+            if self.is_real_server:
+                return (f'Feature: {feature} only supported on server versions >= 7.5. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 

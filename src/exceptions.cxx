@@ -363,6 +363,8 @@ get_pycbc_exception_class(PyObject* pyObj_exc_module, std::error_code ec)
             return PyObject_GetAttrString(pyObj_exc_module, "HTTPException");
         case PycbcError::UnsuccessfulOperation:
             return PyObject_GetAttrString(pyObj_exc_module, "UnsuccessfulOperationException");
+        case PycbcError::FeatureUnavailable:
+            return PyObject_GetAttrString(pyObj_exc_module, "FeatureUnavailableException");
         case PycbcError::UnableToBuildResult:
         case PycbcError::CallbackUnsuccessful:
         case PycbcError::InternalSDKError:

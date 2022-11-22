@@ -353,7 +353,7 @@ create_result_from_bucket_mgmt_response(const couchbase::core::operations::manag
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyBool_FromLong(static_cast<int>(resp.info.number_of_nodes));
+    pyObj_tmp = PyLong_FromLong(static_cast<int>(resp.info.number_of_nodes));
     if (-1 == PyDict_SetItemString(pyObj_bucket_info, "number_of_nodes", pyObj_tmp)) {
         Py_XDECREF(result_obj);
         Py_DECREF(pyObj_bucket_info);
@@ -362,7 +362,7 @@ create_result_from_bucket_mgmt_response(const couchbase::core::operations::manag
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyBool_FromLong(static_cast<int>(resp.info.number_of_replicas));
+    pyObj_tmp = PyLong_FromLong(static_cast<int>(resp.info.number_of_replicas));
     if (-1 == PyDict_SetItemString(pyObj_bucket_info, "number_of_replicas", pyObj_tmp)) {
         Py_XDECREF(result_obj);
         Py_DECREF(pyObj_bucket_info);
@@ -370,6 +370,20 @@ create_result_from_bucket_mgmt_response(const couchbase::core::operations::manag
         return nullptr;
     }
     Py_DECREF(pyObj_tmp);
+
+    PyObject* pyObj_capabilities = PyList_New(static_cast<Py_ssize_t>(0));
+    for (auto const& capability : resp.info.bucket_capabilities) {
+        pyObj_tmp = PyUnicode_FromString(capability.c_str());
+        PyList_Append(pyObj_capabilities, pyObj_tmp);
+        Py_DECREF(pyObj_tmp);
+    }
+    if (-1 == PyDict_SetItemString(pyObj_bucket_info, "bucket_capabilities", pyObj_capabilities)) {
+        Py_XDECREF(result_obj);
+        Py_DECREF(pyObj_bucket_info);
+        Py_XDECREF(pyObj_capabilities);
+        return nullptr;
+    }
+    Py_DECREF(pyObj_capabilities);
 
     switch (resp.info.storage_backend) {
         case couchbase::core::management::cluster::bucket_storage_backend::couchstore: {
