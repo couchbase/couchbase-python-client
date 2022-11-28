@@ -101,13 +101,17 @@ class ViewTests:
 
     def assert_rows(self,
                     result,  # type: ViewResult
-                    expected_count):
-        count = 0
+                    expected_count,
+                    return_rows=False):
         assert isinstance(result, ViewResult)
+        rows = []
         for row in result.rows():
             assert row is not None
-            count += 1
-        assert count >= expected_count
+            rows.append(row)
+        assert len(rows) >= expected_count
+
+        if return_rows is True:
+            return rows
 
     def test_view_query(self, cb_env):
 
@@ -118,6 +122,42 @@ class ViewTests:
                                                namespace=DesignDocumentNamespace.DEVELOPMENT)
 
         self.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    def test_view_query_ascending(self, cb_env):
+
+        expected_count = 10
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               limit=expected_count,
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                               order=ViewOrdering.ASCENDING)
+
+        rows = self.assert_rows(view_result, expected_count, return_rows=True)
+        results = list(map(lambda r: r.key, rows))
+        sorted_results = sorted(results, key=lambda x: x[0], reverse=True)
+        assert results == sorted_results
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    def test_view_query_descending(self, cb_env):
+
+        expected_count = 10
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               limit=expected_count,
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                               order=ViewOrdering.DESCENDING)
+
+        rows = self.assert_rows(view_result, expected_count, return_rows=True)
+        results = list(map(lambda r: r.key, rows))
+        sorted_results = sorted(results, key=lambda x: x[0])
+        assert results == sorted_results
 
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)

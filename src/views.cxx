@@ -354,9 +354,9 @@ get_view_request(PyObject* op_args)
     PyObject* pyObj_order = PyDict_GetItemString(op_args, "order");
     if (pyObj_order != nullptr) {
         auto order = std::string(PyUnicode_AsUTF8(pyObj_order));
-        if (order.compare("ascending") == 0) {
+        if (order.compare("false") == 0) {
             req.order = couchbase::core::view_sort_order::ascending;
-        } else if (order.compare("descending") == 0) {
+        } else if (order.compare("true") == 0) {
             req.order = couchbase::core::view_sort_order::descending;
         }
     }
