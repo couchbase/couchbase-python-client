@@ -165,19 +165,29 @@ build_query_request(PyObject* pyObj_query_args)
     }
 
     PyObject* pyObj_adhoc = PyDict_GetItemString(pyObj_query_args, "adhoc");
-    req.adhoc = pyObj_adhoc != nullptr && pyObj_adhoc == Py_True ? true : false;
+    if (pyObj_adhoc != nullptr) {
+        req.adhoc = pyObj_adhoc == Py_True ? true : false;
+    }
 
     PyObject* pyObj_metrics = PyDict_GetItemString(pyObj_query_args, "metrics");
-    req.metrics = pyObj_metrics != nullptr && pyObj_metrics == Py_True ? true : false;
+    if (pyObj_metrics != nullptr) {
+        req.metrics = pyObj_metrics == Py_True ? true : false;
+    }
 
     PyObject* pyObj_readonly = PyDict_GetItemString(pyObj_query_args, "readonly");
-    req.readonly = pyObj_readonly != nullptr && pyObj_readonly == Py_True ? true : false;
+    if (pyObj_readonly != nullptr) {
+        req.readonly = pyObj_readonly == Py_True ? true : false;
+    }
 
     PyObject* pyObj_flex_index = PyDict_GetItemString(pyObj_query_args, "flex_index");
-    req.flex_index = pyObj_flex_index != nullptr && pyObj_flex_index == Py_True ? true : false;
+    if (pyObj_flex_index != nullptr) {
+        req.flex_index = pyObj_flex_index == Py_True ? true : false;
+    }
 
     PyObject* pyObj_preserve_expiry = PyDict_GetItemString(pyObj_query_args, "preserve_expiry");
-    req.preserve_expiry = pyObj_preserve_expiry != nullptr && pyObj_preserve_expiry == Py_True ? true : false;
+    if (pyObj_preserve_expiry != nullptr) {
+        req.preserve_expiry = pyObj_preserve_expiry == Py_True ? true : false;
+    }
 
     PyObject* pyObj_max_parallelism = PyDict_GetItemString(pyObj_query_args, "max_parallelism");
     if (nullptr != pyObj_max_parallelism) {

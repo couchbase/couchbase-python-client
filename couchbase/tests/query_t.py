@@ -113,6 +113,18 @@ class QueryTests:
         assert result.metadata().metrics() is not None
         assert result._request.params.get('adhoc', None) is False
 
+    def test_simple_query_explain(self, cb_env):
+        result = cb_env.cluster.query(f"EXPLAIN SELECT * FROM `{cb_env.bucket.name}` LIMIT 2",
+                                      QueryOptions(metrics=True))
+        rows = []
+        for r in result.rows():
+            rows.append(r)
+
+        assert len(rows) == 1
+        assert 'plan' in rows[0]
+        assert result.metadata() is not None
+        assert result.metadata().metrics() is not None
+
     def test_simple_query_with_positional_params(self, cb_env):
         result = cb_env.cluster.query(
             f"SELECT * FROM `{cb_env.bucket.name}` WHERE country LIKE $1 LIMIT 2", 'United%')
