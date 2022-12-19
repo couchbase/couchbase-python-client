@@ -105,4 +105,4 @@ class MutationState:
         raise NotImplementedError("Feature currently not implemented in 4.x series of the Python SDK")
 
     def __repr__(self):
-        return "MutationState:{}".format(self._token)
+        return "MutationState:{}".format(self._sv)
