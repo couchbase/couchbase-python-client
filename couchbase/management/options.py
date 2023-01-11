@@ -330,6 +330,21 @@ class UpsertUserOptions(UserOptions):
     """
 
 
+class ChangePasswordOptions(UserOptions):
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s change password user
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
+            to ``local``.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
+
 class DropUserOptions(UserOptions):
     """Available options to for a :class:`~couchbase.management.users.UserManager`'s drop user
     operation.

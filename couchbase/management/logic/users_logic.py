@@ -38,7 +38,8 @@ from couchbase.pycbc_core import (management_operation,
                                   user_mgmt_operations)
 
 if TYPE_CHECKING:
-    from couchbase.management.options import (DropGroupOptions,
+    from couchbase.management.options import (ChangePasswordOptions,
+                                              DropGroupOptions,
                                               DropUserOptions,
                                               GetAllGroupsOptions,
                                               GetAllUsersOptions,
@@ -205,6 +206,38 @@ class UserManagerLogic:
             "conn": self._connection,
             "mgmt_op": mgmt_operations.USER.value,
             "op_type": user_mgmt_operations.DROP_USER.value,
+            "op_args": op_args
+        }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        if final_args.get("timeout", None) is not None:
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+    def change_password(self,
+                        new_password,  # type: str
+                        *options,     # type: ChangePasswordOptions
+                        **kwargs      # type: Any
+                        ) -> None:
+
+        final_args = forward_args(kwargs, *options)
+
+        op_args = {
+            "password": new_password
+        }
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.USER.value,
+            "op_type": user_mgmt_operations.CHANGE_PASSWORD.value,
             "op_args": op_args
         }
 

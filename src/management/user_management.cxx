@@ -905,6 +905,18 @@ handle_user_mgmt_op(connection* conn, struct user_mgmt_options* options, PyObjec
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
+        case UserManagementOperations::CHANGE_PASSWORD: {
+            PyObject* pyObj_newPassword = PyDict_GetItemString(options->op_args, "password");
+            auto newPassword = std::string(PyUnicode_AsUTF8(pyObj_newPassword));
+
+            couchbase::core::operations::management::change_password_request req{};
+            req.newPassword = newPassword;
+            req.timeout = options->timeout_ms;
+
+            res = do_user_mgmt_op<couchbase::core::operations::management::change_password_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
+            break;
+        }
         case UserManagementOperations::GET_ROLES: {
             couchbase::core::operations::management::role_get_all_request req{};
             req.timeout = options->timeout_ms;

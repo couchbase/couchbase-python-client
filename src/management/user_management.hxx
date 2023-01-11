@@ -29,6 +29,7 @@ class UserManagementOperations
         GET_USER,
         GET_ALL_USERS,
         DROP_USER,
+        CHANGE_PASSWORD,
         GET_ROLES,
         UPSERT_GROUP,
         GET_GROUP,
@@ -66,11 +67,12 @@ class UserManagementOperations
                           "GET_USER "
                           "GET_ALL_USERS "
                           "DROP_USER "
+                          "CHANGE_PASSWORD "
                           "GET_ROLES "
                           "UPSERT_GROUP "
                           "GET_GROUP "
                           "GET_ALL_GROUPS "
-                          "DROP_GROUP";
+                          "DROP_GROUP ";
 
         return ops;
     }

@@ -14,10 +14,12 @@
 #  limitations under the License.
 
 import re
+from datetime import timedelta
 
 import pytest
 
-from couchbase.exceptions import (CouchbaseException,
+from couchbase.exceptions import (AuthenticationException,
+                                  CouchbaseException,
                                   FeatureUnavailableException,
                                   GroupNotFoundException,
                                   InvalidArgumentException,
@@ -29,7 +31,11 @@ from couchbase.management.options import (DropUserOptions,
 from couchbase.management.users import (Group,
                                         Role,
                                         User)
+from couchbase.options import ClusterOptions
+from tests.helpers import ClusterInformation
 
+from ..auth import PasswordAuthenticator
+from ..cluster import Cluster
 from ._test_utils import TestEnvironment
 
 
@@ -222,6 +228,50 @@ class UserManagementTests:
         assert user_metadata.user.display_name == user.display_name
 
         cb_env.um.drop_user(user.username, DropUserOptions(domain_name="local"))
+
+    def test_user_change_password(self, cb_env):
+        username = 'change-password-user'
+        admin_role = Role(name='admin')
+        original_password = 'original_password'
+        new_password = 'new_password'
+
+        change_password_user = User(username=username,
+                                    display_name="Change Password User",
+                                    roles=admin_role,
+                                    password=original_password)
+        # Upsert user
+        cb_env.um.upsert_user(change_password_user, UpsertUserOptions(domain_name="local"))
+
+        # Authenticate as change-password-user.
+        # Done in a while loop to emulate retry
+        auth = PasswordAuthenticator(username, original_password)
+        new_cluster = None
+        while True:
+            try:
+                new_cluster = Cluster.connect(cb_env.cluster._connstr, ClusterOptions(auth))
+            except AuthenticationException:
+                continue
+            break
+
+        # Change password
+        new_cluster.users().change_password(new_password)
+
+        # Assert can authenticate using new password
+        success_auth = PasswordAuthenticator(username, new_password)
+        while True:
+            try:
+                success_cluster = Cluster.connect(cb_env.cluster._connstr, ClusterOptions(success_auth))
+            except AuthenticationException:
+                continue
+            success_cluster.close()
+            break
+
+        # Assert cannot authenticate using old password
+        fail_auth = PasswordAuthenticator(username, original_password)
+        with pytest.raises(AuthenticationException):
+            Cluster.connect(cb_env.cluster._connstr, ClusterOptions(fail_auth))
+
+        new_cluster.close()
 
     def test_external_user(self, cb_env):
         """

@@ -26,7 +26,8 @@ from couchbase.management.logic.users_logic import (Group,
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
 # @TODO:  lets deprecate import of options from couchbase.management.users
-from couchbase.management.options import (DropGroupOptions,
+from couchbase.management.options import (ChangePasswordOptions,
+                                          DropGroupOptions,
                                           DropUserOptions,
                                           GetAllGroupsOptions,
                                           GetAllUsersOptions,
@@ -48,7 +49,7 @@ class UserManager(UserManagerLogic):
                  *options,  # type: GetUserOptions
                  **kwargs   # type: Any
                  ) -> UserAndMetadata:
-        """Returns a user by it's username.
+        """Returns a user by its username.
 
         Args:
             username (str): The name of the user to retrieve.
@@ -123,6 +124,29 @@ class UserManager(UserManagerLogic):
             :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
         """
         return super().drop_user(username, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
+    def change_password(self,
+                        new_password,  # type: str
+                        *options,     # type: ChangePasswordOptions
+                        **kwargs      # type: Any
+                        ) -> None:
+        """Changes the password of the currently authenticated user. SDK must be re-started and a new connection
+         established after running, as the previous credentials will no longer be valid.
+
+         Args:
+             new_password (str): The new password for the user
+             options (:class:`~couchbase.management.options.ChangePasswordOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided group argument contains an
+                invalid value or type.
+
+        """
+        return super().change_password(new_password, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(RoleAndDescription, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_roles(self,
