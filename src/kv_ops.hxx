@@ -66,8 +66,8 @@ struct mutation_options {
     // common - optional
     couchbase::durability_level durability_level{ couchbase::durability_level::none };
     bool use_legacy_durability{ false };
-    couchbase::replicate_to replicate_to{ couchbase::persist_to::none };
-    couchbase::persist_to persist_to{ couchbase::replicate_to::none };
+    couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
+    couchbase::persist_to persist_to{ couchbase::persist_to::none };
     uint32_t expiry{ 0 };
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     PyObject* span = nullptr;

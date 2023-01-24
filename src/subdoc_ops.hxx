@@ -67,8 +67,8 @@ struct mutate_in_options {
     // optional
     couchbase::durability_level durability_level{ couchbase::durability_level::none };
     bool use_legacy_durability{ false };
-    couchbase::replicate_to replicate_to{ couchbase::persist_to::none };
-    couchbase::persist_to persist_to{ couchbase::replicate_to::none };
+    couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
+    couchbase::persist_to persist_to{ couchbase::persist_to::none };
     couchbase::store_semantics store_semantics{ couchbase::store_semantics::replace };
     uint32_t expiry{ 0 };
     couchbase::cas cas;
