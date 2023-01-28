@@ -55,7 +55,7 @@ pycbc_txns::dealloc_transactions(PyObject* obj)
     auto txns = reinterpret_cast<pycbc_txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
     txns->txns->close();
     delete txns->txns;
-    LOG_DEBUG("dealloc transactions");
+    CB_LOG_DEBUG("dealloc transactions");
 }
 
 void
@@ -63,7 +63,7 @@ pycbc_txns::dealloc_attempt_context(PyObject* obj)
 {
     auto ctx = reinterpret_cast<pycbc_txns::attempt_context*>(PyCapsule_GetPointer(obj, "ctx_"));
     delete ctx;
-    LOG_DEBUG("dealloc attempt_context");
+    CB_LOG_DEBUG("dealloc attempt_context");
 }
 
 /* pycbc_txns::transaction_config type methods */
@@ -73,7 +73,7 @@ pycbc_txns::transaction_config__dealloc__(pycbc_txns::transaction_config* cfg)
 {
     delete cfg->cfg;
     Py_TYPE(cfg)->tp_free((PyObject*)cfg);
-    LOG_DEBUG("dealloc transaction_config");
+    CB_LOG_DEBUG("dealloc transaction_config");
 }
 
 PyObject*
@@ -203,7 +203,7 @@ pycbc_txns::transaction_options__dealloc__(pycbc_txns::transaction_options* opts
 {
     delete opts->opts;
     Py_TYPE(opts)->tp_free((PyObject*)opts);
-    LOG_DEBUG("dealloc transaction_options");
+    CB_LOG_DEBUG("dealloc transaction_options");
 }
 
 PyObject*
@@ -279,7 +279,7 @@ pycbc_txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyObj
     auto self = reinterpret_cast<pycbc_txns::transaction_options*>(type->tp_alloc(type, 0));
 
     self->opts = new tx::transaction_options();
-    LOG_DEBUG("transaction_options__new__ called");
+    CB_LOG_DEBUG("transaction_options__new__ called");
     if (!PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
                                      kw_format,
@@ -338,7 +338,7 @@ pycbc_txns::transaction_query_options__dealloc__(pycbc_txns::transaction_query_o
 {
     delete opts->opts;
     Py_TYPE(opts)->tp_free((PyObject*)opts);
-    LOG_DEBUG("dealloc transaction_query_options");
+    CB_LOG_DEBUG("dealloc transaction_query_options");
 }
 
 PyObject*
@@ -517,7 +517,7 @@ pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result
 {
     delete result->res;
     Py_TYPE(result)->tp_free((PyObject*)result);
-    LOG_DEBUG("dealloc transaction_get_result");
+    CB_LOG_DEBUG("dealloc transaction_get_result");
 }
 
 PyObject*
@@ -750,7 +750,7 @@ convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false)
     } catch (const tx_core::query_parsing_failure& e) {
         pyObj_exc_type = pyObj_query_parsing_failure;
         message = e.what();
-    } catch (const tx_core::query_exception& e) {
+    } catch (const tx_core::op_exception& e) {
         pyObj_exc_type = pyObj_couchbase_error;
         message = e.what();
     } catch (const std::exception& e) {
@@ -992,7 +992,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
         }
         auto size = py_ssize_t_to_size_t(nbuf);
         value = couchbase::core::utils::json::parse(reinterpret_cast<const char*>(buf), size);
-        LOG_DEBUG("value is {}", buf);
+        CB_LOG_DEBUG("value is {}", buf);
     }
     if (nullptr == pyObj_ctx) {
         PyErr_SetString(PyExc_ValueError, "no attempt_context passed in");
@@ -1071,7 +1071,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
         }
         default:
             // return error!
-            LOG_DEBUG("unknown op {}", op_type);
+            CB_LOG_DEBUG("unknown op {}", op_type);
             PyErr_SetString(PyExc_ValueError, "unknown txn operation");
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
@@ -1224,7 +1224,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     else
     {
         auto expiry = opts->expiration_time();
-        LOG_DEBUG("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
+        CB_LOG_DEBUG("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
         // @TODO: PYCBC-1425, is this the right approach?
         txns->txns->run(*opts, logic, std::forward<pycbc_txns::pycbc_txn_complete_callback>(cb));
     }

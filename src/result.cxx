@@ -89,7 +89,7 @@ result_dealloc([[maybe_unused]] result* self)
         PyDict_Clear(self->dict);
         Py_DECREF(self->dict);
     }
-    // LOG_DEBUG("pycbc - dealloc result: result->refcnt: {}, result->dict->refcnt: {}", Py_REFCNT(self), Py_REFCNT(self->dict));
+    // CB_LOG_DEBUG("pycbc - dealloc result: result->refcnt: {}, result->dict->refcnt: {}", Py_REFCNT(self), Py_REFCNT(self->dict));
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -150,7 +150,7 @@ static void
 mutation_token_dealloc([[maybe_unused]] mutation_token* self)
 {
     delete self->token;
-    // LOG_DEBUG("pycbc - dealloc mutation_token: token->refcnt: {}", Py_REFCNT(self));
+    // CB_LOG_DEBUG("pycbc - dealloc mutation_token: token->refcnt: {}", Py_REFCNT(self));
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -239,7 +239,7 @@ PyTypeObject streamed_result_type = { PyObject_HEAD_INIT(NULL) 0 };
 static void
 streamed_result_dealloc([[maybe_unused]] streamed_result* self)
 {
-    // LOG_DEBUG("pycbc - dealloc streamed_result: result->refcnt: {}", Py_REFCNT(self));
+    // CB_LOG_DEBUG("pycbc - dealloc streamed_result: result->refcnt: {}", Py_REFCNT(self));
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 

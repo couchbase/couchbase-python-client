@@ -35,7 +35,7 @@ class value_recorder : public metrics::value_recorder
         // A value_recorder is only created from meter::get_value_recorder, which is responsible for obtaining the GIL
         Py_INCREF(pyObj_recorder_);
         pyObj_record_value_ = PyObject_GetAttrString(pyObj_recorder_, "record_value");
-        LOG_DEBUG("{}: created value_recorder", "PYCBC");
+        CB_LOG_DEBUG("{}: created value_recorder", "PYCBC");
     }
 
     ~value_recorder() override
@@ -44,7 +44,7 @@ class value_recorder : public metrics::value_recorder
         Py_DECREF(pyObj_recorder_);
         Py_DECREF(pyObj_record_value_);
         PyGILState_Release(state);
-        LOG_DEBUG("{}: destroyed value_recorder", "PYCBC");
+        CB_LOG_DEBUG("{}: destroyed value_recorder", "PYCBC");
     }
 
     void record_value(std::int64_t value) override

@@ -85,7 +85,7 @@ dealloc_conn(PyObject* obj)
             }
         }
     }
-    LOG_DEBUG("{}: dealloc_conn completed", "PYCBC");
+    CB_LOG_DEBUG("{}: dealloc_conn completed", "PYCBC");
     delete conn;
 }
 
@@ -137,7 +137,7 @@ bucket_op_callback(std::error_code ec,
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
-    LOG_DEBUG("{}: open/close bucket callback completed", "PYCBC");
+    CB_LOG_DEBUG("{}: open/close bucket callback completed", "PYCBC");
     PyGILState_Release(state);
 }
 
@@ -163,7 +163,7 @@ close_connection_callback(PyObject* pyObj_conn,
 
     if (pyObj_func != nullptr) {
         pyObj_callback_res = PyObject_CallObject(pyObj_func, pyObj_args);
-        LOG_DEBUG("{}: return from close conn callback.", "PYCBC");
+        CB_LOG_DEBUG("{}: return from close conn callback.", "PYCBC");
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
         } else {
@@ -173,7 +173,7 @@ close_connection_callback(PyObject* pyObj_conn,
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
-    LOG_DEBUG("{}: close conn callback completed", "PYCBC");
+    CB_LOG_DEBUG("{}: close conn callback completed", "PYCBC");
     auto conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     conn->io_.stop();
     // the pyObj_conn was incref'd before being passed into this callback, decref it here
@@ -226,7 +226,7 @@ create_connection_callback(PyObject* pyObj_conn,
         Py_XDECREF(pyObj_errback);
     }
     Py_DECREF(pyObj_conn);
-    LOG_DEBUG("{}: create conn callback completed", "PYCBC");
+    CB_LOG_DEBUG("{}: create conn callback completed", "PYCBC");
     PyGILState_Release(state);
 }
 
@@ -1184,7 +1184,7 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
             if (callback_count == 0) {
                 close_connection_callback(pyObj_conn, pyObj_callback, pyObj_errback, barrier);
             } else {
-                LOG_DEBUG("close callback called {} times already!", callback_count);
+                CB_LOG_DEBUG("close callback called {} times already!", callback_count);
                 callback_count++;
             }
         });

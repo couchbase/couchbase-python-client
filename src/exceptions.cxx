@@ -75,7 +75,7 @@ exception_base_dealloc(exception_base* self)
         Py_DECREF(self->exc_info);
     }
     Py_TYPE(self)->tp_free((PyObject*)self);
-    LOG_DEBUG("{}: exception_base_dealloc completed", "PYCBC");
+    CB_LOG_DEBUG("{}: exception_base_dealloc completed", "PYCBC");
 }
 
 static PyObject*
