@@ -41,7 +41,6 @@ pycbc_logger__configure_logging_sink__(PyObject* self, PyObject* args, PyObject*
     logger_settings.sink = logger->logger_sink_;
     auto level = convert_python_log_level(pyObj_level);
     logger_settings.log_level = level;
-    couchbase::core::transactions::create_loggers(logger_settings.log_level, logger_settings.sink);
     couchbase::core::logger::create_file_logger(logger_settings);
     Py_RETURN_NONE;
 }
@@ -125,6 +124,7 @@ convert_spdlog_level(spdlog::level::level_enum lvl)
         case spdlog::level::level_enum::off:
             return 0;
         case spdlog::level::level_enum::trace:
+            return 5;
         case spdlog::level::level_enum::debug:
             return 10;
         case spdlog::level::level_enum::info:
@@ -147,8 +147,10 @@ convert_python_log_level(PyObject* level)
     switch (lvl) {
         case 0:
             return couchbase::core::logger::level::off;
-        case 10:
+        case 5:
             return couchbase::core::logger::level::trace;
+        case 10:
+            return couchbase::core::logger::level::debug;
         case 20:
             return couchbase::core::logger::level::info;
         case 30:

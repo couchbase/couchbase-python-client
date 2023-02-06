@@ -39,8 +39,10 @@ except ImportError:
                    'Set PYCBC_OPENSSL_DIR to location where OpenSSL libraries can be found.'))
 
 
+""" Add support for logging, adding a TRACE level to logging """
 import json  # nopep8 # isort:skip # noqa: E402
 import logging  # nopep8 # isort:skip # noqa: E402
+from functools import partial, partialmethod
 from typing import (List,
                     Optional,
                     Tuple)
@@ -49,6 +51,10 @@ from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger
 
 _PYCBC_LOGGER = pycbc_logger()
 _CXXCBC_METADATA_JSON = json.loads(CXXCBC_METADATA)
+logging.TRACE = 5
+logging.addLevelName(logging.TRACE, 'TRACE')
+logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
+logging.trace = partial(logging.log, logging.TRACE)
 
 
 """
