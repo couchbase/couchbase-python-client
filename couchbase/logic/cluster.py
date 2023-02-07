@@ -47,11 +47,10 @@ from couchbase.result import (ClusterInfoResult,
                               DiagnosticsResult,
                               PingResult)
 from couchbase.serializer import DefaultJsonSerializer, Serializer
-from couchbase.transcoder import JSONTranscoder
+from couchbase.transcoder import JSONTranscoder, Transcoder
 
 if TYPE_CHECKING:
     from couchbase.options import DiagnosticsOptions, PingOptions
-    from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)
 
@@ -160,9 +159,21 @@ class ClusterLogic:
     @property
     def default_transcoder(self) -> Optional[Transcoder]:
         """
-        **INTERNAL**
+        **INTERNAL** not intended for use in public API.
         """
         return self._default_transcoder
+
+    @default_transcoder.setter
+    def default_transcoder(self,
+                           value  # type: Transcoder
+                           ):
+        """
+        **INTERNAL** not intended for use in public API.
+        """
+        if not issubclass(value.__class__, Transcoder):
+            raise InvalidArgumentException('Cannot set default transcoder to non Transcoder type.')
+
+        self._default_transcoder = value
 
     @property
     def default_serializer(self) -> Optional[Serializer]:

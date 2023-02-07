@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,5 +13,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .test_features import EnvironmentFeatures  # noqa: F401
-from .test_features import ServerFeatures  # noqa: F401
+from collections import namedtuple
+from enum import IntEnum
+
+
+class CollectionType(IntEnum):
+    DEFAULT = 1
+    NAMED = 2
+
+
+class CouchbaseTestEnvironmentException(Exception):
+    """Raised when something with the test environment is incorrect."""
+
+
+KVPair = namedtuple("KVPair", "key value")

@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -23,159 +23,21 @@ from couchbase.exceptions import (DocumentNotFoundException,
                                   InvalidArgumentException,
                                   QueueEmpty)
 from couchbase.result import OperationResult
+from tests.environments import CollectionType
 
-from ._test_utils import CollectionType, TestEnvironment
 
+class DatastructuresTestSuite:
 
-class LegacyDatastructuresTests:
+    TEST_MANIFEST = [
+        'test_list',
+        'test_map',
+        'test_queue',
+        'test_sets',
+    ]
 
-    TEST_DS_KEY = 'ds-key'
-
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
-
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
-
-        yield cb_env
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times_till_exception(5, 3,
-                                              cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
-
-    @pytest.fixture()
-    def remove_ds(self, cb_env) -> None:
-        yield
-        try:
-            cb_env.collection.remove(self.TEST_DS_KEY)
-        except DocumentNotFoundException:
-            pass
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    @pytest.mark.usefixtures("remove_ds")
     def test_list(self, cb_env):
-        cb = cb_env.collection
-
-        with pytest.raises(DocumentNotFoundException):
-            cb.list_append(self.TEST_DS_KEY, 'world')
-
-        cb.list_append(self.TEST_DS_KEY, 'world', create=True)
-        rv = cb.list_get(self.TEST_DS_KEY, 0)
-        assert str(rv) == 'world'
-
-        cb.list_prepend(self.TEST_DS_KEY, 'hello')
-        rv = cb.list_get(self.TEST_DS_KEY, 0)
-        assert str(rv) == 'hello'
-        rv = cb.list_get(self.TEST_DS_KEY, 1)
-        assert str(rv) == 'world'
-        assert 2 == cb.list_size(self.TEST_DS_KEY)
-
-        with pytest.raises(DocumentNotFoundException):
-            cb.list_get('not-a-key', 0)
-
-        cb.list_remove(self.TEST_DS_KEY, 1)
-        res = cb.get(self.TEST_DS_KEY)
-        assert ['hello'] == res.content_as[list]
-
-        cb.list_append(self.TEST_DS_KEY, 'world')
-        res = cb.get(self.TEST_DS_KEY)
-        assert ['hello', 'world'] == res.content_as[list]
-
-        cb.list_set(self.TEST_DS_KEY, 1, 'after')
-        res = cb.get(self.TEST_DS_KEY)
-        assert ['hello', 'after'] == res.content_as[list]
-
-    @pytest.mark.usefixtures("remove_ds")
-    def test_map(self, cb_env):
-        cb = cb_env.collection
-
-        with pytest.raises(DocumentNotFoundException):
-            cb.map_add(self.TEST_DS_KEY, 'key1', 'val1')
-
-        cb.map_add(self.TEST_DS_KEY, 'key1', 'val1', create=True)
-
-        rv = cb.map_get(self.TEST_DS_KEY, 'key1')
-        assert rv == 'val1'
-
-        assert 1 == cb.map_size(self.TEST_DS_KEY)
-
-        with pytest.raises(IndexError):
-            cb.map_remove(self.TEST_DS_KEY, 'key2')
-
-        cb.map_remove(self.TEST_DS_KEY, 'key1')
-        assert 0 == cb.map_size(self.TEST_DS_KEY)
-
-    @pytest.mark.usefixtures("remove_ds")
-    def test_sets(self, cb_env):
-        cb = cb_env.collection
-
-        with pytest.raises(DocumentNotFoundException):
-            cb.set_add(self.TEST_DS_KEY, 123)
-
-        rv = cb.set_add(self.TEST_DS_KEY, 123, create=True)
-        assert isinstance(rv, OperationResult)
-        rv = cb.set_add(self.TEST_DS_KEY, 123)
-        assert rv is None
-        assert 1 == cb.set_size(self.TEST_DS_KEY)
-        assert cb.set_contains(self.TEST_DS_KEY, 123) is True
-
-        rv = cb.set_remove(self.TEST_DS_KEY, 123)
-        assert 0 == cb.set_size(self.TEST_DS_KEY)
-        rv = cb.set_remove(self.TEST_DS_KEY, 123)
-        assert rv is None
-        assert cb.set_contains(self.TEST_DS_KEY, 123) is False
-
-    @pytest.mark.usefixtures("remove_ds")
-    def test_queue(self, cb_env):
-        cb = cb_env.collection
-
-        with pytest.raises(DocumentNotFoundException):
-            cb.queue_push(self.TEST_DS_KEY, 1)
-
-        rv = cb.queue_push(self.TEST_DS_KEY, 1, create=True)
-        assert isinstance(rv, OperationResult)
-        cb.queue_push(self.TEST_DS_KEY, 2)
-        cb.queue_push(self.TEST_DS_KEY, 3)
-
-        # Pop the items now
-        assert cb.queue_pop(self.TEST_DS_KEY) == 1
-        assert cb.queue_pop(self.TEST_DS_KEY) == 2
-        assert cb.queue_pop(self.TEST_DS_KEY) == 3
-        with pytest.raises(QueueEmpty):
-            cb.queue_pop(self.TEST_DS_KEY)
-
-
-class DatastructuresTests:
-
-    TEST_DS_KEY = 'ds-key'
-
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
-
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
-
-        yield cb_env
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times_till_exception(5, 3,
-                                              cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
-
-    @pytest.fixture()
-    def remove_ds(self, cb_env) -> None:
-        yield
-        try:
-            cb_env.collection.remove(self.TEST_DS_KEY)
-        except DocumentNotFoundException:
-            pass
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    @pytest.mark.usefixtures("remove_ds")
-    def test_list(self, cb_env):
-
-        cb_list = cb_env.collection.couchbase_list(self.TEST_DS_KEY)
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_list = cb_env.collection.couchbase_list(key)
         assert isinstance(cb_list, CouchbaseList)
 
         cb_list.append('world')
@@ -191,15 +53,15 @@ class DatastructuresTests:
         assert 2 == cb_list.size()
 
         cb_list.remove_at(1)
-        res = cb_env.collection.get(self.TEST_DS_KEY)
+        res = cb_env.collection.get(key)
         assert ['hello'] == res.content_as[list]
 
         cb_list.append('world')
-        res = cb_env.collection.get(self.TEST_DS_KEY)
+        res = cb_env.collection.get(key)
         assert ['hello', 'world'] == res.content_as[list]
 
         cb_list.set_at(1, 'after')
-        res = cb_env.collection.get(self.TEST_DS_KEY)
+        res = cb_env.collection.get(key)
         assert ['hello', 'after'] == res.content_as[list]
 
         res = cb_list.get_all()
@@ -216,10 +78,9 @@ class DatastructuresTests:
 
         assert 0 == cb_list.size()
 
-    @pytest.mark.usefixtures("remove_ds")
     def test_map(self, cb_env):
-
-        cb_map = cb_env.collection.couchbase_map(self.TEST_DS_KEY)
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_map = cb_env.collection.couchbase_map(key)
         assert isinstance(cb_map, CouchbaseMap)
 
         cb_map.add('key1', 'val1')
@@ -260,10 +121,9 @@ class DatastructuresTests:
         cb_map.clear()
         assert 0 == cb_map.size()
 
-    @pytest.mark.usefixtures("remove_ds")
     def test_sets(self, cb_env):
-
-        cb_set = cb_env.collection.couchbase_set(self.TEST_DS_KEY)
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_set = cb_env.collection.couchbase_set(key)
         assert isinstance(cb_set, CouchbaseSet)
 
         rv = cb_set.add(123)
@@ -287,9 +147,9 @@ class DatastructuresTests:
         cb_set.clear()
         assert 0 == cb_set.size()
 
-    @pytest.mark.usefixtures("remove_ds")
     def test_queue(self, cb_env):
-        cb_queue = cb_env.collection.couchbase_queue(self.TEST_DS_KEY)
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_queue = cb_env.collection.couchbase_queue(key)
         assert isinstance(cb_queue, CouchbaseQueue)
 
         cb_queue.push(1)
@@ -316,3 +176,149 @@ class DatastructuresTests:
         cb_queue.clear()
 
         assert 0 == cb_queue.size()
+
+
+class LegacyDatastructuresTestSuite:
+
+    TEST_MANIFEST = [
+        'test_list',
+        'test_map',
+        'test_queue',
+        'test_sets',
+    ]
+
+    def test_list(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.list_append(key, 'world')
+
+        cb_env.collection.list_append(key, 'world', create=True)
+        rv = cb_env.collection.list_get(key, 0)
+        assert str(rv) == 'world'
+
+        cb_env.collection.list_prepend(key, 'hello')
+        rv = cb_env.collection.list_get(key, 0)
+        assert str(rv) == 'hello'
+        rv = cb_env.collection.list_get(key, 1)
+        assert str(rv) == 'world'
+        assert 2 == cb_env.collection.list_size(key)
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.list_get('not-a-key', 0)
+
+        cb_env.collection.list_remove(key, 1)
+        res = cb_env.collection.get(key)
+        assert ['hello'] == res.content_as[list]
+
+        cb_env.collection.list_append(key, 'world')
+        res = cb_env.collection.get(key)
+        assert ['hello', 'world'] == res.content_as[list]
+
+        cb_env.collection.list_set(key, 1, 'after')
+        res = cb_env.collection.get(key)
+        assert ['hello', 'after'] == res.content_as[list]
+
+    def test_map(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.map_add(key, 'key1', 'val1')
+
+        cb_env.collection.map_add(key, 'key1', 'val1', create=True)
+
+        rv = cb_env.collection.map_get(key, 'key1')
+        assert rv == 'val1'
+
+        assert 1 == cb_env.collection.map_size(key)
+
+        with pytest.raises(IndexError):
+            cb_env.collection.map_remove(key, 'key2')
+
+        cb_env.collection.map_remove(key, 'key1')
+        assert 0 == cb_env.collection.map_size(key)
+
+    def test_sets(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.set_add(key, 123)
+
+        rv = cb_env.collection.set_add(key, 123, create=True)
+        assert isinstance(rv, OperationResult)
+        rv = cb_env.collection.set_add(key, 123)
+        assert rv is None
+        assert 1 == cb_env.collection.set_size(key)
+        assert cb_env.collection.set_contains(key, 123) is True
+
+        rv = cb_env.collection.set_remove(key, 123)
+        assert 0 == cb_env.collection.set_size(key)
+        rv = cb_env.collection.set_remove(key, 123)
+        assert rv is None
+        assert cb_env.collection.set_contains(key, 123) is False
+
+    def test_queue(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.queue_push(key, 1)
+
+        rv = cb_env.collection.queue_push(key, 1, create=True)
+        assert isinstance(rv, OperationResult)
+        cb_env.collection.queue_push(key, 2)
+        cb_env.collection.queue_push(key, 3)
+
+        # Pop the items now
+        assert cb_env.collection.queue_pop(key) == 1
+        assert cb_env.collection.queue_pop(key) == 2
+        assert cb_env.collection.queue_pop(key) == 3
+        with pytest.raises(QueueEmpty):
+            cb_env.collection.queue_pop(key)
+
+
+class ClassicDatastructuresTests(DatastructuresTestSuite):
+
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicDatastructuresTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicDatastructuresTests) if valid_test_method(meth)]
+        compare = set(DatastructuresTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
+    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        cb_base_env.enable_bucket_mgmt()
+        cb_base_env.setup(request.param, __name__)
+
+        yield cb_base_env
+
+        cb_base_env.teardown(request.param)
+
+
+class ClassicLegacyDatastructuresTests(LegacyDatastructuresTestSuite):
+
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicLegacyDatastructuresTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicLegacyDatastructuresTests) if valid_test_method(meth)]
+        compare = set(LegacyDatastructuresTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
+    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        cb_base_env.enable_bucket_mgmt()
+        cb_base_env.setup(request.param, __name__)
+
+        yield cb_base_env
+
+        cb_base_env.teardown(request.param)

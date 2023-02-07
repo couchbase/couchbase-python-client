@@ -13,114 +13,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Dict, List
-
 import pytest
 
-from couchbase.exceptions import CouchbaseException, DocumentNotFoundException
-from couchbase.metrics import CouchbaseMeter, CouchbaseValueRecorder
-
-from ._test_utils import KVPair, TestEnvironment
+from couchbase.exceptions import CouchbaseException
+from tests.environments.tracing_and_metrics_environment import TracingAndMetricsTestEnvironment
 
 
-class BasicValueRecorder(CouchbaseValueRecorder):
-    def __init__(self):
-        self._values = []
-        super().__init__()
+class MetricsTestSuite:
 
-    @property
-    def values(self) -> List[int]:
-        return self._values
-
-    def record_value(self, value: int) -> None:
-        self._values.append(value)
-
-
-class NoOpRecorder(CouchbaseValueRecorder):
-    def __init__(self):
-        super().__init__()
-
-    def record_value(self, value: int) -> None:
-        pass
-
-
-class BasicMeter(CouchbaseMeter):
-    _CB_OPERATION = 'db.couchbase.operations'
-    _CB_SERVICE = 'db.couchbase.service'
-    _CB_OP = 'db.operation'
-
-    def __init__(self):
-        self._recorders = {'NOOP': NoOpRecorder()}
-        super().__init__()
-
-    def value_recorder(self,
-                       name,      # type: str
-                       tags       # type: Dict[str, str]
-                       ) -> CouchbaseValueRecorder:
-
-        if name != self._CB_OPERATION:
-            return self._recorders['NOOP']
-
-        svc = tags.get(self._CB_SERVICE, None)
-        if not svc:
-            return self._recorders['NOOP']
-
-        op_type = tags.get(self._CB_OP, None)
-        if not op_type:
-            return self._recorders['NOOP']
-
-        key = f'{svc}::{op_type}'
-        recorder = self._recorders.get(key, None)
-        if recorder:
-            return recorder
-
-        recorder = BasicValueRecorder()
-        self._recorders[key] = recorder
-        return recorder
-
-    def recorders(self) -> Dict[str, CouchbaseValueRecorder]:
-        return self._recorders
-
-    def reset(self) -> None:
-        self._recorders = {'NOOP': NoOpRecorder()}
-
-
-class MetricsTests:
-    METER = BasicMeter()
-
-    @pytest.fixture(scope="class", name="cb_env")
-    def couchbase_test_environment(self, couchbase_config):
-
-        cb_env = TestEnvironment.get_environment(__name__,
-                                                 couchbase_config,
-                                                 manage_buckets=True,
-                                                 meter=self.METER)
-        cb_env.try_n_times(3, 5, cb_env.load_data)
-
-        yield cb_env
-        cb_env.try_n_times(3, 5, cb_env.purge_data)
-
-    @pytest.fixture(name="default_kvp")
-    def default_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.get_default_key_value()
-        yield KVPair(key, value)
-
-    @pytest.fixture(name="new_kvp")
-    def new_key_and_value_with_reset(self, cb_env) -> KVPair:
-        key, value = cb_env.get_new_key_value()
-        yield KVPair(key, value)
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb_env.collection.remove,
-                                          key,
-                                          expected_exceptions=(DocumentNotFoundException,),
-                                          reset_on_timeout=True,
-                                          reset_num_times=3)
+    TEST_MANIFEST = [
+        'test_custom_logging_meter_kv',
+    ]
 
     @pytest.fixture()
     def skip_if_mock(self, cb_env):
         if cb_env.is_mock_server:
-            pytest.skip("Test needs real server")
+            pytest.skip('Test needs real server')
 
     # @TODO(jc): CXXCBC-207
     # @pytest.fixture()
@@ -137,52 +45,68 @@ class MetricsTests:
     #                                 cb_env.bucket.name,
     #                                 expected_exceptions=(QueryIndexNotFoundException))
 
-    def _validate_metrics(self, op):
-        # default recorder is NOOP
-        keys = list(self.METER.recorders().keys())
-        values = list(self.METER.recorders().values())
-        assert len(self.METER.recorders()) == 2
-        assert op in keys[1]
-        assert isinstance(values[1], BasicValueRecorder)
-        assert len(values[1].values) == 1
-        assert isinstance(values[1].values[0], int)
-
-    @pytest.mark.parametrize("op", ["get", "upsert", "insert", "replace", "remove"])
-    def test_custom_logging_meter_kv(self, cb_env, default_kvp, new_kvp, op):
-        self.METER.reset()
-        cb = cb_env.collection
-        operation = getattr(cb, op)
+    @pytest.mark.parametrize('op', ['get', 'upsert', 'insert', 'replace', 'remove'])
+    def test_custom_logging_meter_kv(self, cb_env, op):
+        cb_env.meter.reset()
+        operation = getattr(cb_env.collection, op)
         try:
             if op == 'insert':
-                operation(new_kvp.key, new_kvp.value)
+                key, value = cb_env.get_new_doc()
+                operation(key, value)
             elif op in ['get', 'remove']:
-                operation(default_kvp.key)
+                key = cb_env.get_existing_doc(key_only=True)
+                operation(key)
             else:
-                operation(default_kvp.key, default_kvp.value)
+                key, value = cb_env.get_existing_doc()
+                operation(key, value)
         except CouchbaseException:
             pass
 
-        self._validate_metrics(op)
+        cb_env.validate_metrics(op)
 
     # @TODO(jc): CXXCBC-207
-    # @pytest.mark.usefixtures("skip_if_mock")
+    # @pytest.mark.usefixtures('skip_if_mock')
     # @pytest.mark.usefixtures("setup_query")
     # def test_custom_logging_meter_query(self, cb_env):
-    #     self.METER.reset()
+    #     cb_env.meter.reset()
     #     result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 2").execute()
     #     self._validate_metrics('n1ql')
 
     # @TODO(jc): CXXCBC-207
-    # @pytest.mark.usefixtures("skip_if_mock")
+    # @pytest.mark.usefixtures('skip_if_mock')
     # def test_custom_logging_meter_analytics(self, cb_env):
-    #     self.METER.reset()
+    #     cb_env.meter.reset()
 
     # @TODO(jc): CXXCBC-207
-    # @pytest.mark.usefixtures("skip_if_mock")
+    # @pytest.mark.usefixtures('skip_if_mock')
     # def test_custom_logging_meter_search(self, cb_env, default_kvp, new_kvp, op):
-    #     self.METER.reset()
+    #     cb_env.meter.reset()
 
     # @TODO(jc): CXXCBC-207
-    # @pytest.mark.usefixtures("skip_if_mock")
+    # @pytest.mark.usefixtures('skip_if_mock')
     # def test_custom_logging_meter_views(self, cb_env, default_kvp, new_kvp, op):
-    #     self.METER.reset()
+    #     cb_env.meter.reset()
+
+
+class ClassicMetricsTests(MetricsTestSuite):
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicMetricsTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicMetricsTests) if valid_test_method(meth)]
+        compare = set(MetricsTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self, cb_base_env, test_manifest_validated):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        # a new environment and cluster is created
+        cb_env = TracingAndMetricsTestEnvironment.from_environment(cb_base_env,
+                                                                   create_meter=True)
+        cb_env.setup(num_docs=10)
+        yield cb_env
+        cb_env.teardown()
+        cb_env.cluster.close()

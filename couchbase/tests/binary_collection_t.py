@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -22,275 +22,174 @@ from couchbase.options import (DecrementOptions,
                                SignedInt64)
 from couchbase.result import CounterResult, MutationResult
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
+from tests.environments import CollectionType
+from tests.environments.binary_environment import BinaryTestEnvironment
+from tests.environments.test_environment import TestEnvironment
 
-from ._test_utils import (CollectionType,
-                          KVPair,
-                          TestEnvironment)
 
+class BinaryCollectionTestSuite:
 
-class BinaryCollectionTests:
+    TEST_MANIFEST = [
+        'test_append_bytes',
+        'test_append_bytes_not_empty',
+        'test_append_string',
+        'test_append_string_nokey',
+        'test_append_string_not_empty',
+        'test_counter_bad_delta_value',
+        'test_counter_bad_initial_value',
+        'test_counter_decrement',
+        'test_counter_decrement_initial_value',
+        'test_counter_decrement_non_default',
+        'test_counter_increment',
+        'test_counter_increment_initial_value',
+        'test_counter_increment_non_default',
+        'test_prepend_bytes',
+        'test_prepend_bytes_not_empty',
+        'test_prepend_string',
+        'test_prepend_string_nokey',
+        'test_prepend_string_not_empty',
+        'test_signed_int_64',
+        'test_unsigned_int',
+    ]
 
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param, manage_buckets=True)
-
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
-
-        yield cb_env
-
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times_till_exception(5, 3,
-                                              cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
-
-    # key/value fixtures
-
-    @pytest.fixture(name='utf8_empty_kvp')
-    def utf8_key_and_empty_value(self, cb_env) -> KVPair:
-        key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data)
-        yield KVPair(key, value)
-        cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
-
-    @pytest.fixture(name='utf8_kvp')
-    def utf8_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data, start_value='XXXX')
-        yield KVPair(key, value)
-        cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
-
-    @pytest.fixture(name='bytes_empty_kvp')
-    def bytes_key_and_empty_value(self, cb_env) -> KVPair:
-        key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data)
-        yield KVPair(key, value)
-        cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
-
-    @pytest.fixture(name='bytes_kvp')
-    def bytes_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data, start_value=b'XXXX')
-        yield KVPair(key, value)
-        cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
-
-    @pytest.fixture(name='counter_empty_kvp')
-    def counter_key_and_empty_value(self, cb_env) -> KVPair:
-        key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data)
-        yield KVPair(key, value)
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb_env.collection.remove,
-                                          key,
-                                          expected_exceptions=(DocumentNotFoundException,))
-
-    @pytest.fixture(name='counter_kvp')
-    def counter_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data, start_value=100)
-        yield KVPair(key, value)
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb_env.collection.remove,
-                                          key,
-                                          expected_exceptions=(DocumentNotFoundException,))
-
-    @pytest.fixture(scope="class")
-    def check_sync_durability_supported(self, cb_env):
-        cb_env.check_if_feature_supported('sync_durability')
-
-    @pytest.fixture(scope="class")
-    def num_replicas(self, cb_env):
-        bucket_settings = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
-        num_replicas = bucket_settings.get("num_replicas")
-        return num_replicas
-
-    # tests
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_append_string(self, cb_env, utf8_empty_kvp):
-        cb = cb_env.collection
-        key = utf8_empty_kvp.key
-        result = cb.binary().append(key, 'foo')
+    def test_append_bytes(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('bytes_empty', key_only=True)
+        result = cb_env.collection.binary().append(key, b'XXX')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
         # make sure it really worked
-        result = cb.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo'
-
-    def test_append_string_not_empty(self, cb_env, utf8_kvp):
-        cb = cb_env.collection
-        key = utf8_kvp.key
-        value = utf8_kvp.value
-        result = cb.binary().append(key, 'foo')
-        assert isinstance(result, MutationResult)
-        assert result.cas is not None
-        result = cb.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == value + 'foo'
-
-    def test_append_string_nokey(self, cb_env, utf8_empty_kvp):
-        cb = cb_env.collection
-        key = utf8_empty_kvp.key
-        cb.remove(key)
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb.get,
-                                          key,
-                                          expected_exceptions=(DocumentNotFoundException,))
-
-        # @TODO(jc):  3.2.x SDK tests for NotStoredException
-        with pytest.raises(DocumentNotFoundException):
-            cb.binary().append(key, 'foo')
-
-    def test_append_bytes(self, cb_env, bytes_empty_kvp):
-        cb = cb_env.collection
-        key = bytes_empty_kvp.key
-        result = cb.binary().append(key, b'XXX')
-        assert isinstance(result, MutationResult)
-        assert result.cas is not None
-        # make sure it really worked
-        result = cb.get(key, transcoder=RawBinaryTranscoder())
+        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
         assert result.content_as[bytes] == b'XXX'
 
-    def test_append_bytes_not_empty(self, cb_env, bytes_kvp):
-        cb = cb_env.collection
-        key = bytes_kvp.key
-        value = bytes_kvp.value
+    def test_append_bytes_not_empty(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('bytes')
 
-        result = cb.binary().append(key, 'foo')
+        result = cb_env.collection.binary().append(key, 'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = cb.get(key, transcoder=RawBinaryTranscoder())
+        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
         assert result.content_as[bytes] == value + b'foo'
 
-    def test_prepend_string(self, cb_env, utf8_empty_kvp):
-        cb = cb_env.collection
-        key = utf8_empty_kvp.key
-        result = cb.binary().prepend(key, 'foo')
+    def test_append_string(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+        result = cb_env.collection.binary().append(key, 'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
         # make sure it really worked
-        result = cb.get(key, transcoder=RawStringTranscoder())
+        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert result.content_as[str] == 'foo'
 
-    def test_prepend_string_not_empty(self, cb_env, utf8_kvp):
-        cb = cb_env.collection
-        key = utf8_kvp.key
-        value = utf8_kvp.value
-
-        result = cb.binary().prepend(key, 'foo')
+    def test_append_string_not_empty(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('utf8')
+        result = cb_env.collection.binary().append(key, 'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = cb.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo' + value
+        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == value + 'foo'
 
-    def test_prepend_string_nokey(self, cb_env, utf8_empty_kvp):
-        cb = cb_env.collection
-        key = utf8_empty_kvp.key
-        cb.remove(key)
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb.get,
-                                          key,
-                                          expected_exceptions=(DocumentNotFoundException,))
-
+    def test_append_string_nokey(self, cb_env):
         # @TODO(jc):  3.2.x SDK tests for NotStoredException
         with pytest.raises(DocumentNotFoundException):
-            cb.binary().prepend(key, 'foo')
+            cb_env.collection.binary().append(TestEnvironment.NOT_A_KEY, 'foo')
 
-    def test_prepend_bytes(self, cb_env, bytes_empty_kvp):
-        cb = cb_env.collection
-        key = bytes_empty_kvp.key
-        result = cb.binary().prepend(key, b'XXX')
-        assert isinstance(result, MutationResult)
-        assert result.cas is not None
-        # make sure it really worked
-        result = cb.get(key, transcoder=RawBinaryTranscoder())
-        assert result.content_as[bytes] == b'XXX'
+    def test_counter_bad_delta_value(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('counter_empty')
 
-    def test_prepend_bytes_not_empty(self, cb_env, bytes_kvp):
-        cb = cb_env.collection
-        key = bytes_kvp.key
-        value = bytes_kvp.value
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.binary().increment(key, delta=5)
 
-        result = cb.binary().prepend(key, b'foo')
-        assert isinstance(result, MutationResult)
-        assert result.cas is not None
-        result = cb.get(key, transcoder=RawBinaryTranscoder())
-        assert result.content_as[bytes] == b'foo' + value
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.binary().decrement(key, delta=5)
 
-    def test_counter_increment_initial_value(self, cb_env, counter_empty_kvp):
-        cb = cb_env.collection
-        key = counter_empty_kvp.key
+    def test_counter_bad_initial_value(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('counter_empty')
 
-        result = cb.binary().increment(key, IncrementOptions(initial=SignedInt64(100)))
-        assert isinstance(result, CounterResult)
-        assert result.cas is not None
-        assert result.content == 100
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.binary().increment(key, initial=100)
 
-    def test_counter_decrement_initial_value(self, cb_env, counter_empty_kvp):
-        cb = cb_env.collection
-        key = counter_empty_kvp.key
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.binary().decrement(key, initial=100)
 
-        result = cb.binary().decrement(key, DecrementOptions(initial=SignedInt64(100)))
-        assert isinstance(result, CounterResult)
-        assert result.cas is not None
-        assert result.content == 100
-
-    def test_counter_increment(self, cb_env, counter_kvp):
-        cb = cb_env.collection
-        key = counter_kvp.key
-        value = counter_kvp.value
-
-        result = cb.binary().increment(key)
-        assert isinstance(result, CounterResult)
-        assert result.cas is not None
-        assert result.content == value + 1
-
-    def test_counter_decrement(self, cb_env, counter_kvp):
-        cb = cb_env.collection
-        key = counter_kvp.key
-        value = counter_kvp.value
-
-        result = cb.binary().decrement(key)
+    def test_counter_decrement(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('counter')
+        result = cb_env.collection.binary().decrement(key)
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == value - 1
 
-    def test_counter_increment_non_default(self, cb_env, counter_kvp):
-        cb = cb_env.collection
-        key = counter_kvp.key
-        value = counter_kvp.value
-
-        result = cb.binary().increment(key, IncrementOptions(delta=DeltaValue(3)))
+    def test_counter_decrement_initial_value(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('counter_empty')
+        result = cb_env.collection.binary().decrement(key, DecrementOptions(initial=SignedInt64(100)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
-        assert result.content == value + 3
+        assert result.content == 100
 
-    def test_counter_decrement_non_default(self, cb_env, counter_kvp):
-        cb = cb_env.collection
-        key = counter_kvp.key
-        value = counter_kvp.value
-
-        result = cb.binary().decrement(key, DecrementOptions(delta=DeltaValue(3)))
+    def test_counter_decrement_non_default(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('counter')
+        result = cb_env.collection.binary().decrement(key, DecrementOptions(delta=DeltaValue(3)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == value - 3
 
-    def test_counter_bad_initial_value(self, cb_env, counter_empty_kvp):
-        cb = cb_env.collection
-        key = counter_empty_kvp.key
+    def test_counter_increment(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('counter')
+        result = cb_env.collection.binary().increment(key)
+        assert isinstance(result, CounterResult)
+        assert result.cas is not None
+        assert result.content == value + 1
 
-        with pytest.raises(InvalidArgumentException):
-            cb.binary().increment(key, initial=100)
+    def test_counter_increment_initial_value(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('counter_empty')
+        result = cb_env.collection.binary().increment(key, IncrementOptions(initial=SignedInt64(100)))
+        assert isinstance(result, CounterResult)
+        assert result.cas is not None
+        assert result.content == 100
 
-        with pytest.raises(InvalidArgumentException):
-            cb.binary().decrement(key, initial=100)
+    def test_counter_increment_non_default(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('counter')
+        result = cb_env.collection.binary().increment(key, IncrementOptions(delta=DeltaValue(3)))
+        assert isinstance(result, CounterResult)
+        assert result.cas is not None
+        assert result.content == value + 3
 
-    def test_counter_bad_delta_value(self, cb_env, counter_empty_kvp):
-        cb = cb_env.collection
-        key = counter_empty_kvp.key
+    def test_prepend_bytes(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('bytes_empty', key_only=True)
+        result = cb_env.collection.binary().prepend(key, b'XXX')
+        assert isinstance(result, MutationResult)
+        assert result.cas is not None
+        # make sure it really worked
+        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
+        assert result.content_as[bytes] == b'XXX'
 
-        with pytest.raises(InvalidArgumentException):
-            cb.binary().increment(key, delta=5)
+    def test_prepend_bytes_not_empty(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('bytes')
+        result = cb_env.collection.binary().prepend(key, b'foo')
+        assert isinstance(result, MutationResult)
+        assert result.cas is not None
+        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
+        assert result.content_as[bytes] == b'foo' + value
 
-        with pytest.raises(InvalidArgumentException):
-            cb.binary().decrement(key, delta=5)
+    def test_prepend_string(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+        result = cb_env.collection.binary().prepend(key, 'foo')
+        assert isinstance(result, MutationResult)
+        assert result.cas is not None
+        # make sure it really worked
+        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == 'foo'
+
+    def test_prepend_string_nokey(self, cb_env):
+        # @TODO(jc):  3.2.x SDK tests for NotStoredException
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.binary().prepend(TestEnvironment.NOT_A_KEY, 'foo')
+
+    def test_prepend_string_not_empty(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('utf8')
+        result = cb_env.collection.binary().prepend(key, 'foo')
+        assert isinstance(result, MutationResult)
+        assert result.cas is not None
+        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == 'foo' + value
 
     def test_unsigned_int(self):
         with pytest.raises(InvalidArgumentException):
@@ -312,3 +211,28 @@ class BinaryCollectionTests:
         assert 0x7FFFFFFFFFFFFFFF == x.value
         x = SignedInt64(-0x7FFFFFFFFFFFFFFF - 1)
         assert -0x7FFFFFFFFFFFFFFF - 1 == x.value
+
+
+class ClassicBinaryCollectionTests(BinaryCollectionTestSuite):
+
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicBinaryCollectionTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicBinaryCollectionTests) if valid_test_method(meth)]
+        compare = set(BinaryCollectionTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
+    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        cb_env = BinaryTestEnvironment.from_environment(cb_base_env)
+        cb_env.enable_bucket_mgmt()
+        cb_env.setup(request.param, __name__)
+
+        yield cb_env
+
+        cb_env.teardown(request.param)

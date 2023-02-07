@@ -16,105 +16,131 @@
 import pytest
 
 import couchbase.subdocument as SD
-from couchbase.exceptions import DocumentNotFoundException
-
-from ._test_utils import (CollectionType,
-                          KVPair,
-                          TestEnvironment)
+from tests.environments import CollectionType
+from tests.environments.test_environment import TestEnvironment
 
 
-class MutationTokensEnabledTests:
+class MutationTokensDisabledTestSuite:
 
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
+    TEST_MANIFEST = [
+        'test_mutation_tokens_disabled_insert',
+        'test_mutation_tokens_disabled_mutate_in',
+        'test_mutation_tokens_disabled_remove',
+        'test_mutation_tokens_disabled_replace',
+        'test_mutation_tokens_disabled_upsert',
+    ]
 
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+    def test_mutation_tokens_disabled_insert(self, cb_env):
+        key, value = cb_env.get_new_doc()
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.insert, key, value)
+        assert result.mutation_token() is None
 
-        yield cb_env
-        if request.param == CollectionType.NAMED:
-            cb_env.try_n_times_till_exception(5, 3,
-                                              cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
+    def test_mutation_tokens_disabled_mutate_in(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+        result = TestEnvironment.try_n_times(5,
+                                             3,
+                                             cb_env.collection.mutate_in,
+                                             key,
+                                             (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model'),))
+        assert result.mutation_token() is None
 
-    @pytest.fixture(name="new_kvp")
-    def new_key_and_value_with_reset(self, cb_env) -> KVPair:
-        key, value = cb_env.get_new_key_value()
-        yield KVPair(key, value)
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb_env.collection.remove,
-                                          key,
-                                          expected_exceptions=(DocumentNotFoundException,),
-                                          reset_on_timeout=True,
-                                          reset_num_times=3)
+    def test_mutation_tokens_disabled_remove(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.remove, key)
+        assert result.mutation_token() is None
 
-    def verify_mutation_tokens(self, bucket_name, result):
-        mutation_token = result.mutation_token()
-        assert mutation_token is not None
-        partition_id, partition_uuid, sequence_number, mt_bucket_name = mutation_token.as_tuple()
-        assert isinstance(partition_id, int)
-        assert isinstance(partition_uuid, int)
-        assert isinstance(sequence_number, int)
-        assert bucket_name == mt_bucket_name
+    def test_mutation_tokens_disabled_replace(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.replace, key, value)
+        assert result.mutation_token() is None
 
-    def test_mutation_tokens_upsert(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        result = cb_env.try_n_times(5, 3, cb.upsert, key, value)
-        self.verify_mutation_tokens(cb_env.bucket.name, result)
-
-    def test_mutation_tokens_insert(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        result = cb_env.try_n_times(5, 3, cb.insert, key, value)
-        self.verify_mutation_tokens(cb_env.bucket.name, result)
-
-    def test_mutation_tokens_replace(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        cb_env.try_n_times(5, 3, cb.upsert, key, value)
-        result = cb_env.try_n_times(5, 3, cb.replace, key, value)
-        self.verify_mutation_tokens(cb_env.bucket.name, result)
-
-    def test_mutation_tokens_remove(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        cb_env.try_n_times(5, 3, cb.upsert, key, value)
-        result = cb_env.try_n_times(5, 3, cb.remove, key)
-        self.verify_mutation_tokens(cb_env.bucket.name, result)
-
-    # @TODO: c++ client does not provide mutation token for touch
-    # def test_mutation_tokens_touch(self, cb_env, new_kvp):
-    #     cb = cb_env.collection
-    #     key = new_kvp.key
-    #     value = new_kvp.value
-    #     cb.upsert(key, value)
-    #     result = cb.touch(key, timedelta(seconds=3))
-    #     self.verify_mutation_tokens(cb_env.bucket.name, result)
-
-    def test_mutation_tokens_mutate_in(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-
-        def cas_matches(key, cas):
-            result = cb.get(key)
-            if result.cas == cas:
-                return result
-            raise Exception("nope")
-
-        res = cb_env.try_n_times(5, 3, cb.upsert, key, {"a": "aaa", "b": {"c": {"d": "yo!"}}})
-        cas = res.cas
-        cb_env.try_n_times(10, 3, cas_matches, key, cas)
-        result = cb_env.try_n_times(5, 3, cb.mutate_in, key, (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),))
-        self.verify_mutation_tokens(cb_env.bucket.name, result)
+    def test_mutation_tokens_disabled_upsert(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.upsert, key, value)
+        assert result.mutation_token() is None
 
 
-# @TODO: need to update client settings first
-class MutationTokensDisabledTests:
-    pass
+class MutationTokensEnabledTestSuite:
+
+    TEST_MANIFEST = [
+        'test_mutation_tokens_enabled_insert',
+        'test_mutation_tokens_enabled_mutate_in',
+        'test_mutation_tokens_enabled_remove',
+        'test_mutation_tokens_enabled_replace',
+        'test_mutation_tokens_enabled_upsert',
+    ]
+
+    def test_mutation_tokens_enabled_insert(self, cb_env):
+        key, value = cb_env.get_new_doc()
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.insert, key, value)
+        cb_env.verify_mutation_tokens(cb_env.bucket.name, result)
+
+    def test_mutation_tokens_enabled_mutate_in(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+        result = TestEnvironment.try_n_times(5,
+                                             3,
+                                             cb_env.collection.mutate_in,
+                                             key,
+                                             (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model'),))
+        cb_env.verify_mutation_tokens(cb_env.bucket.name, result)
+
+    def test_mutation_tokens_enabled_remove(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.remove, key)
+        cb_env.verify_mutation_tokens(cb_env.bucket.name, result)
+
+    def test_mutation_tokens_enabled_replace(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.replace, key, value)
+        cb_env.verify_mutation_tokens(cb_env.bucket.name, result)
+
+    def test_mutation_tokens_enabled_upsert(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        result = TestEnvironment.try_n_times(5, 3, cb_env.collection.upsert, key, value)
+        cb_env.verify_mutation_tokens(cb_env.bucket.name, result)
+
+
+# @TODO(jc) - C++ client does not seem to honor disabling of mutation tokens
+# class ClassicMutationTokensDisabledTests(MutationTokensDisabledTestSuite):
+
+#     @pytest.fixture(scope='class')
+#     def test_manifest_validated(self):
+#         def valid_test_method(meth):
+#             attr = getattr(ClassicMutationTokensDisabledTests, meth)
+#             return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+#         method_list = [meth for meth in dir(ClassicMutationTokensDisabledTests) if valid_test_method(meth)]
+#         compare = set(MutationTokensDisabledTestSuite.TEST_MANIFEST).difference(method_list)
+#         return compare
+
+#     @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
+#     def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
+#         if test_manifest_validated:
+#             pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+#         cb_env = TestEnvironment.get_environment(couchbase_config=cb_base_env.config,
+#                                         data_provider=cb_base_env.data_provider,
+#                                         enable_mutation_tokens=False)
+#         cb_env.setup(request.param)
+#         yield cb_env
+#         cb_env.teardown(request.param)
+#         cb_env.cluster.close()
+
+class ClassicMutationTokensEnabledTests(MutationTokensEnabledTestSuite):
+
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicMutationTokensEnabledTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicMutationTokensEnabledTests) if valid_test_method(meth)]
+        compare = set(MutationTokensEnabledTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
+    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        cb_base_env.setup(request.param)
+        yield cb_base_env
+        cb_base_env.teardown(request.param)

@@ -1,0 +1,123 @@
+{
+    "doc_config": {
+        "docid_prefix_delim": "",
+        "docid_regexp": "",
+        "mode": "type_field",
+        "type_field": "type"
+    },
+    "mapping": {
+        "default_analyzer": "standard",
+        "default_datetime_parser": "dateTimeOptional",
+        "default_field": "_all",
+        "default_mapping": {
+            "dynamic": true,
+            "enabled": false
+        },
+        "default_type": "_default",
+        "docvalues_dynamic": true,
+        "index_dynamic": false,
+        "store_dynamic": false,
+        "type_field": "_type",
+        "types": {
+            "vehicle": {
+                "dynamic": false,
+                "enabled": true,
+                "properties": {
+                    "make": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "make",
+                                "store": true,
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    "model": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "model",
+                                "store": true,
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    "year": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "year",
+                                "store": true,
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "description": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "description",
+                                "store": true,
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    "rating": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "rating",
+                                "store": true,
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "last_updated": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "last_updated",
+                                "store": true,
+                                "type": "datetime"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "store": {
+        "indexType": "scorch"
+    }
+}

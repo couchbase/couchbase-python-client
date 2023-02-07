@@ -69,6 +69,7 @@ repos:
               txcouchbase/tests/|
               couchbase/tests/|
               tests/mock_server.py|
+              tests/environments/|
               simple_acouchbase.py|
               simple_couchbase.py|
               simple_txcouchbase.py|

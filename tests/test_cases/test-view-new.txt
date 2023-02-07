@@ -1,0 +1,14 @@
+function(doc, meta) {
+  switch (doc.type) {
+    case "dealership":
+      if (doc.batch) {
+        emit([doc.batch, meta.id]);
+      }
+      break;
+    case "vehicle":
+      if (doc.batch) {
+        emit([doc.batch, meta.id]);
+      }
+      break;
+  }
+}

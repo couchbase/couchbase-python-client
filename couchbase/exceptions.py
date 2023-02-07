@@ -1020,7 +1020,9 @@ KV_ERROR_CONTEXT_MAPPING = {'key_value_locked': DocumentLockedException,
 
 QUERY_ERROR_MAPPING = {r'.*Keyspace not found.*': KeyspaceNotFoundException,
                        r'.*Scope not found.*': ScopeNotFoundException,
-                       r'.*No index available.*': QueryIndexNotFoundException}
+                       r'.*No index available.*': QueryIndexNotFoundException,
+                       r'.*[iI]ndex.*not found.*': QueryIndexNotFoundException,
+                       r'.*[iI]ndex.*already exists.*': QueryIndexAlreadyExistsException}
 
 
 class ErrorMapper:

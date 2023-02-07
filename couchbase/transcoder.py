@@ -79,6 +79,13 @@ class Transcoder(ABC):
                      ) -> Any:
         raise NotImplementedError()
 
+    @classmethod
+    def __subclasshook__(cls, subclass):
+        return (hasattr(subclass, 'encode_value') and
+                callable(subclass.encode_value) and
+                hasattr(subclass, 'decode_value') and
+                callable(subclass.decode_value))
+
 
 class JSONTranscoder(Transcoder):
 

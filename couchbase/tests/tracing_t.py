@@ -26,103 +26,36 @@ from couchbase.options import (AnalyticsOptions,
                                UpsertOptions,
                                ViewOptions)
 from couchbase.search import TermQuery
-from couchbase.tracing import CouchbaseSpan, CouchbaseTracer
-
-from ._test_utils import KVPair, TestEnvironment
+from tests.environments.tracing_and_metrics_environment import TracingAndMetricsTestEnvironment
 
 
-class TestSpan(CouchbaseSpan):
-    def __init__(self, name):
-        super().__init__(None)
-        self.finished_ = False
-        self.name_ = name
-        self.attributes_ = dict()
-        self.parent_ = None
-        self._span = None
+class TracerTestsSuite:
+    TEST_MANIFEST = [
+        'test_http',
+        'test_kv',
+    ]
 
-    def set_attribute(self, key, value):
-        self.attributes_[key] = value
-
-    def set_parent(self, parent):
-        self.parent_ = parent
-
-    def get_parent(self):
-        return self.parent_
-
-    def finish(self):
-        self.finished_ = True
-
-    def is_finished(self):
-        return self.finished_
-
-    def get_attributes(self):
-        return self.attributes_
-
-    def get_name(self):
-        return self.name_
-
-
-class TestTracer(CouchbaseTracer):
-    def __init__(self):
-        self.spans_ = list()
-
-    def start_span(self, name, parent=None, **kwargs):
-        span = TestSpan(name)
-        span.set_parent(parent)
-        self.spans_.append(span)
-        return span
-
-    def reset(self):
-        self.spans_ = list()
-
-    def spans(self):
-        return self.spans_
-
-
-class TracerTests:
-    TRACER = TestTracer()
-
-    @pytest.fixture(scope="class", name="cb_env")
-    def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(__name__,
-                                                 couchbase_config,
-                                                 manage_buckets=True,
-                                                 tracer=self.TRACER)
-        cb_env.try_n_times(3, 5, cb_env.load_data)
-        self.TRACER.reset()
-        yield cb_env
-        cb_env.try_n_times(3, 5, cb_env.purge_data)
-        self.TRACER.reset()
-
-    @pytest.fixture(name="default_kvp")
-    def default_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.get_default_key_value()
-        yield KVPair(key, value)
-
-    @pytest.fixture(name="skip_if_mock")
+    @pytest.fixture(scope='class')
     def skip_if_mock(self, cb_env):
         if cb_env.is_mock_server:
-            pytest.skip("Test needs real server")
+            pytest.skip('Test needs real server')
 
-    @pytest.mark.parametrize("op, span_name, opts, value", [
-        ("get", "cb.get", GetOptions, None),
-        ("upsert", "cb.upsert", UpsertOptions, {"some": "thing"}),
-        ("insert", "cb.insert", InsertOptions, {"some": "thing"}),
-        ("replace", "cb.replace", ReplaceOptions, {"some": "thing"}),
-        ("remove", "cb.remove", RemoveOptions, None),
+    @pytest.mark.parametrize('op, span_name, opts, value', [
+        ('get', 'cb.get', GetOptions, None),
+        ('upsert', 'cb.upsert', UpsertOptions, {'some': 'thing'}),
+        ('insert', 'cb.insert', InsertOptions, {'some': 'thing'}),
+        ('replace', 'cb.replace', ReplaceOptions, {'some': 'thing'}),
+        ('remove', 'cb.remove', RemoveOptions, None),
     ])
     @pytest.mark.parametrize("with_parent", [True, False])
-    def test_kv(self, cb_env, default_kvp, op, span_name, opts, value, with_parent):
-        # @TODO(): Pending CXXCBC-211 as recent changes do not allow for the parent_span to be passed in as an option
-        if with_parent is True and op in ['upsert', 'insert', 'replace', 'remove']:
-            pytest.skip("Pending CXXCBC-211")
+    def test_kv(self, cb_env, op, span_name, opts, value, with_parent):
         # have to reset between parameterized runs
-        self.TRACER.reset()
+        cb_env.tracer.reset()
         cb = cb_env.collection
         parent = None
         if with_parent:
-            parent = self.TRACER.start_span(f'parent_{op}')
-        key = default_kvp.key
+            parent = cb_env.tracer.start_span(f'parent_{op}')
+        key = cb_env.get_existing_doc(key_only=True)
         options = opts(span=parent)
         operation = getattr(cb, op)
         try:
@@ -133,7 +66,7 @@ class TracerTests:
         except CouchbaseException:
             pass  # insert will fail, who cares.
 
-        spans = self.TRACER.spans()
+        spans = cb_env.tracer.spans()
         if with_parent:
             assert len(spans) == 2
             span = spans.pop(0)
@@ -145,20 +78,20 @@ class TracerTests:
         assert spans[0].get_name() == span_name
         assert spans[0].get_parent() == parent
 
-    @pytest.mark.parametrize("http_op, http_span_name, http_opts, query, extra", [
-        ("query", "cb.query", QueryOptions, "Select 1", None),
-        ("analytics_query", "cb.analytics", AnalyticsOptions, "Select 1", None),
-        ("search_query", "cb.search", SearchOptions, "whatever", TermQuery("foo")),
-        ("view_query", "cb.views", ViewOptions, "whatever", "whatever_else")
+    @pytest.mark.parametrize('http_op, http_span_name, http_opts, query, extra', [
+        ('query', 'cb.query', QueryOptions, 'Select 1', None),
+        ('analytics_query', 'cb.analytics', AnalyticsOptions, "Select 1", None),
+        ('search_query', 'cb.search', SearchOptions, 'whatever', TermQuery('foo')),
+        ('view_query', 'cb.views', ViewOptions, 'whatever', 'whatever_else')
     ])
-    @pytest.mark.parametrize("http_with_parent", [True, False])
-    @pytest.mark.usefixtures("skip_if_mock")
+    @pytest.mark.parametrize('http_with_parent', [True, False])
+    @pytest.mark.usefixtures('skip_if_mock')
     def test_http(self, cb_env, http_op, http_span_name, http_opts, query, extra, http_with_parent):
-        self.TRACER.reset()
-        cb = cb_env.bucket if http_op == "view_query" else cb_env.cluster
+        cb_env.tracer.reset()
+        cb = cb_env.bucket if http_op == 'view_query' else cb_env.cluster
         parent = None
         if http_with_parent:
-            parent = self.TRACER.start_span(f'parent_{http_op}')
+            parent = cb_env.tracer.start_span(f'parent_{http_op}')
         options = http_opts(span=parent)
         operation = getattr(cb, http_op)
         result = None
@@ -171,7 +104,7 @@ class TracerTests:
                 assert r is not None
         except CouchbaseException:
             pass
-        spans = self.TRACER.spans()
+        spans = cb_env.tracer.spans()
         if http_with_parent:
             assert len(spans) == 2
             span = spans.pop(0)
@@ -181,3 +114,27 @@ class TracerTests:
         assert spans[0].is_finished() is True
         assert spans[0].get_name() == http_span_name
         assert spans[0].get_parent() == parent
+
+
+class ClassicTracerTests(TracerTestsSuite):
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicTracerTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicTracerTests) if valid_test_method(meth)]
+        compare = set(TracerTestsSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self, cb_base_env, test_manifest_validated):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        # a new environment and cluster is created
+        cb_env = TracingAndMetricsTestEnvironment.from_environment(cb_base_env,
+                                                                   create_tracer=True)
+        cb_env.setup(num_docs=10)
+        yield cb_env
+        cb_env.teardown()
+        cb_env.cluster.close()
