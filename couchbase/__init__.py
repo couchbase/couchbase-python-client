@@ -13,6 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import platform
+from functools import partial, partialmethod
+from typing import (List,
+                    Optional,
+                    Tuple)
+
+from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger
+
 try:
     # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
     # This is particularly helpful on M1 macs (PYCBC-1386).
@@ -38,16 +46,25 @@ except ImportError:
                    'Most likely due to not finding OpenSSL libraries. '
                    'Set PYCBC_OPENSSL_DIR to location where OpenSSL libraries can be found.'))
 
+try:
+    from couchbase._version import __version__
+except ImportError:
+    __version__ = '0.0.0-could-not-find-version'
+
+PYCBC_VERSION = f'pycbc/{__version__}'
+
+try:
+    python_version_info = platform.sys.version.split(' ')
+    if len(python_version_info) > 0:
+        PYCBC_VERSION = f'{PYCBC_VERSION} (python/{python_version_info[0]})'
+except Exception:  # nosec
+    pass
+
 
 """ Add support for logging, adding a TRACE level to logging """
 import json  # nopep8 # isort:skip # noqa: E402
 import logging  # nopep8 # isort:skip # noqa: E402
-from functools import partial, partialmethod
-from typing import (List,
-                    Optional,
-                    Tuple)
 
-from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger
 
 _PYCBC_LOGGER = pycbc_logger()
 _CXXCBC_METADATA_JSON = json.loads(CXXCBC_METADATA)

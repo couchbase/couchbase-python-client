@@ -226,7 +226,6 @@ class ConnectionTestSuite:
         cluster = ClusterLogic(f'{conn_string}?sasl_mech_force=PLAIN', ClusterOptions(auth))
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
-        assert cluster_opts == {}
         assert auth_opts is not None
         assert auth_opts == expected_auth
 
@@ -273,7 +272,6 @@ class ConnectionTestSuite:
             "config_poll_interval": timedelta(seconds=30),
             "config_poll_floor": timedelta(seconds=30),
             "max_http_connections": 10,
-            "user_agent_extra": 'Python SDK',
             "logging_meter_emit_interval": timedelta(seconds=30),
             "num_io_threads": 1
         }
@@ -305,17 +303,25 @@ class ConnectionTestSuite:
         cluster_opts = ClusterOptions(auth, **opts)
         cluster = ClusterLogic(conn_string, cluster_opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
+        user_agent = cluster_opts.pop('user_agent_extra', None)
         assert cluster_opts is not None
         assert isinstance(cluster_opts, dict)
         assert cluster_opts == expected_opts
+        assert user_agent is not None
+        assert 'pycbc/' in user_agent
+        assert 'python/' in user_agent
 
         # check via kwargs
         cluster_opts = ClusterOptions(auth)
         cluster = ClusterLogic(conn_string, cluster_opts, **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
+        user_agent = cluster_opts.pop('user_agent_extra', None)
         assert cluster_opts is not None
         assert isinstance(cluster_opts, dict)
         assert cluster_opts == expected_opts
+        assert user_agent is not None
+        assert 'pycbc/' in user_agent
+        assert 'python/' in user_agent
 
     def test_cluster_pw_auth(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -765,7 +771,11 @@ class ConnectionTestSuite:
                 cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator(
                     'Administrator', 'password'), bootstrap_timeout=timedelta(seconds=1))
 
+            user_agent = cl._cluster_opts.pop('user_agent_extra', None)
             assert expected_opts == cl._cluster_opts
+            assert user_agent is not None
+            assert 'pycbc/' in user_agent
+            assert 'python/' in user_agent
             expected_conn_str = conn_str.split('?')[0]
             assert expected_conn_str == cl._connstr
         except CouchbaseException:

@@ -25,6 +25,7 @@ from typing import (TYPE_CHECKING,
                     Union)
 from urllib.parse import parse_qs, urlparse
 
+from couchbase import PYCBC_VERSION
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import InvalidArgumentException
@@ -138,6 +139,8 @@ class ClusterLogic:
         self._default_transcoder = cluster_opts.pop("transcoder", None)
         if not self._default_transcoder:
             self._default_transcoder = JSONTranscoder()
+
+        cluster_opts['user_agent_extra'] = PYCBC_VERSION
 
         self._cluster_opts = cluster_opts
         self._connection = None
