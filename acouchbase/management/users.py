@@ -27,7 +27,8 @@ from couchbase.management.logic.users_logic import (Group,
                                                     UserManagerLogic)
 
 if TYPE_CHECKING:
-    from couchbase.management.options import (DropGroupOptions,
+    from couchbase.management.options import (ChangePasswordOptions,
+                                              DropGroupOptions,
                                               DropUserOptions,
                                               GetAllGroupsOptions,
                                               GetAllUsersOptions,
@@ -82,6 +83,14 @@ class UserManager(UserManagerLogic):
                   **kwargs   # type: Any
                   ) -> Awaitable[None]:
         super().drop_user(username, *options, **kwargs)
+
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
+    def change_password(self,
+                        new_password,  # type: str
+                        *options,     # type: ChangePasswordOptions
+                        **kwargs      # type: Any
+                        ) -> Awaitable[None]:
+        super().change_password(new_password, *options, **kwargs)
 
     @AsyncMgmtWrapper.inject_callbacks(RoleAndDescription, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_roles(self,
