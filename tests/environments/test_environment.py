@@ -549,8 +549,20 @@ class TestEnvironment:
         assert mutation_token is not None
         partition_id, partition_uuid, sequence_number, mt_bucket_name = mutation_token.as_tuple()
         assert isinstance(partition_id, int)
+        assert partition_id != 0
         assert isinstance(partition_uuid, int)
+        assert partition_uuid != 0
         assert isinstance(sequence_number, int)
+        assert sequence_number != 0
+        assert bucket_name == mt_bucket_name
+
+    def verify_mutation_tokens_disabled(self, bucket_name, result):
+        mutation_token = result.mutation_token()
+        assert mutation_token is not None
+        partition_id, partition_uuid, sequence_number, mt_bucket_name = mutation_token.as_tuple()
+        assert partition_id != 0
+        assert partition_uuid == 0
+        assert sequence_number == 0
         assert bucket_name == mt_bucket_name
 
     @classmethod  # noqa: C901

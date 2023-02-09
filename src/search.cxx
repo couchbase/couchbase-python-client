@@ -18,8 +18,8 @@
 #include "search.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
-#include "n1ql.hxx"
 #include "tracing.hxx"
+#include "utils.hxx"
 #include <core/search_highlight_style.hxx>
 #include <core/search_scan_consistency.hxx>
 

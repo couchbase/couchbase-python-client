@@ -66,32 +66,6 @@ profile_mode_to_str(couchbase::query_profile profile_mode)
     return "unknown profile_mode";
 }
 
-std::vector<couchbase::mutation_token>
-get_mutation_state(PyObject* pyObj_mutation_state)
-{
-    std::vector<couchbase::mutation_token> mut_state{};
-    size_t ntokens = static_cast<size_t>(PySet_GET_SIZE(pyObj_mutation_state));
-    for (size_t ii = 0; ii < ntokens; ++ii) {
-
-        PyObject* pyObj_mut_token = PyList_GetItem(pyObj_mutation_state, ii);
-        PyObject* pyObj_bucket_name = PyDict_GetItemString(pyObj_mut_token, "bucket_name");
-        auto bucket_name = std::string{ PyUnicode_AsUTF8(pyObj_bucket_name) };
-
-        PyObject* pyObj_partition_uuid = PyDict_GetItemString(pyObj_mut_token, "partition_uuid");
-        auto partition_uuid = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_partition_uuid));
-
-        PyObject* pyObj_sequence_number = PyDict_GetItemString(pyObj_mut_token, "sequence_number");
-        auto sequence_number = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_sequence_number));
-
-        PyObject* pyObj_partition_id = PyDict_GetItemString(pyObj_mut_token, "partition_id");
-        auto partition_id = static_cast<uint16_t>(PyLong_AsUnsignedLong(pyObj_partition_id));
-
-        auto token = couchbase::mutation_token{ partition_uuid, sequence_number, partition_id, bucket_name };
-        mut_state.emplace_back(token);
-    }
-    return mut_state;
-}
-
 PyObject*
 get_result_metrics(couchbase::core::operations::query_response::query_metrics metrics)
 {

@@ -15,6 +15,7 @@
 
 
 import threading
+import uuid
 from copy import copy
 from datetime import datetime, timedelta
 
@@ -956,6 +957,7 @@ class SearchTestSuite:
         'test_cluster_search_fields',
         'test_cluster_search_highlight',
         'test_cluster_search_numeric_facets',
+        'test_cluster_search_ryow',
         'test_cluster_search_scan_consistency',
         'test_cluster_search_term_facets',
         'test_cluster_search_top_level_facets',
@@ -1130,6 +1132,24 @@ class SearchTestSuite:
         assert result_facet.field == facet_name
         assert all(map(lambda ft: isinstance(ft, SearchNumericRangeFacet), result_facet.numeric_ranges)) is True
         assert len(result_facet.numeric_ranges) <= facet.limit
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_cluster_search_ryow(self, cb_env):
+        key, value = cb_env.get_new_doc()
+        # need to make sure content is unique
+        content = str(uuid.uuid4())[:8]
+        value['description'] = content
+        q = search.TermQuery(content)
+        res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME,
+                                          q,
+                                          SearchOptions(limit=10))
+        cb_env.assert_rows(res, 0)
+        res = cb_env.collection.insert(key, value)
+        ms = MutationState().add_mutation_token(res.mutation_token())
+        res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME,
+                                          q,
+                                          SearchOptions(limit=10, consistent_with=ms))
+        cb_env.assert_rows(res, 1)
 
     def test_cluster_search_term_facets(self, cb_env):
 

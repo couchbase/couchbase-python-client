@@ -51,6 +51,7 @@ class QueryCollectionTestSuite:
         'test_query_fully_qualified',
         'test_query_in_thread',
         'test_query_metadata',
+        'test_query_ryow',
         'test_query_with_metrics',
         'test_scope_query',
         'test_scope_query_with_named_params_in_options',
@@ -136,6 +137,16 @@ class QueryCollectionTestSuite:
             assert isinstance(warning, QueryWarning)
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
+
+    def test_query_ryow(self, cb_env):
+        key, value = cb_env.get_new_doc()
+        result = cb_env.scope.query(f'SELECT * FROM `{cb_env.collection.name}` USE KEYS "{key}"')
+        cb_env.assert_rows(result, 0)
+        res = cb_env.collection.insert(key, value)
+        ms = MutationState().add_mutation_token(res.mutation_token())
+        result = cb_env.scope.query(f'SELECT * FROM `{cb_env.collection.name}` USE KEYS "{key}"',
+                                    QueryOptions(consistent_with=ms))
+        cb_env.assert_rows(result, 1)
 
     def test_query_with_metrics(self, cb_env):
         initial = datetime.now()
@@ -231,7 +242,7 @@ class QueryParamTestSuite:
         assert query.consistency == QueryScanConsistency.AT_PLUS
 
         q_mt = query.params.get('mutation_state', None)
-        assert isinstance(q_mt, set)
+        assert isinstance(q_mt, list)
         assert len(q_mt) == 1
         assert q_mt.pop() == mt
 
@@ -252,7 +263,7 @@ class QueryParamTestSuite:
         assert query.consistency == QueryScanConsistency.AT_PLUS
 
         q_mt = query.params.get('mutation_state', None)
-        assert isinstance(q_mt, set)
+        assert isinstance(q_mt, list)
         assert len(q_mt) == 1
         assert q_mt.pop() == mt
 
@@ -273,7 +284,7 @@ class QueryParamTestSuite:
         assert query.consistency == QueryScanConsistency.AT_PLUS
 
         q_mt = query.params.get('mutation_state', None)
-        assert isinstance(q_mt, set)
+        assert isinstance(q_mt, list)
         assert len(q_mt) == 2
         assert next((m for m in q_mt if m == mt2), None) is not None
 
@@ -486,6 +497,7 @@ class QueryTestSuite:
         'test_query_in_thread',
         'test_query_metadata',
         'test_query_raw_options',
+        'test_query_ryow',
         'test_query_with_metrics',
         'test_query_with_profile',
         'test_simple_query',
@@ -615,6 +627,16 @@ class QueryTestSuite:
 
         result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` WHERE batch LIKE $1 LIMIT 1",
                                       QueryOptions(raw={'args': [f'{batch_id}%']}))
+        cb_env.assert_rows(result, 1)
+
+    def test_query_ryow(self, cb_env):
+        key, value = cb_env.get_new_doc()
+        result = cb_env.cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` USE KEYS "{key}"')
+        cb_env.assert_rows(result, 0)
+        res = cb_env.collection.insert(key, value)
+        ms = MutationState().add_mutation_token(res.mutation_token())
+        result = cb_env.cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` USE KEYS "{key}"',
+                                      QueryOptions(consistent_with=ms))
         cb_env.assert_rows(result, 1)
 
     def test_query_with_metrics(self, cb_env):

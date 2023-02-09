@@ -54,3 +54,6 @@ PyObject_to_durability_level(PyObject*);
 // TODO: consolidate these types of methods to another file that handles other requests as well
 couchbase::core::operations::query_request
 build_query_request(PyObject* pyObj_query_args);
+
+std::vector<couchbase::mutation_token>
+get_mutation_state(PyObject* pyObj_mutation_state);
