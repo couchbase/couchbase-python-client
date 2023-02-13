@@ -19,8 +19,6 @@ from typing import (List,
                     Optional,
                     Tuple)
 
-from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger
-
 try:
     # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
     # This is particularly helpful on M1 macs (PYCBC-1386).
@@ -65,6 +63,7 @@ except Exception:  # nosec
 import json  # nopep8 # isort:skip # noqa: E402
 import logging  # nopep8 # isort:skip # noqa: E402
 
+from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger  # nopep8 # isort:skip # noqa: E402
 
 _PYCBC_LOGGER = pycbc_logger()
 _CXXCBC_METADATA_JSON = json.loads(CXXCBC_METADATA)
