@@ -64,7 +64,7 @@ class ClusterLogic:
         'cert_path': {'cert_path': lambda x: x},
         'truststorepath': {'trust_store_path': lambda x: x},
         'trust_store_path': {'trust_store_path': lambda x: x},
-        'sasl_mech_force': {'allowed_sasl_mechanisms': lambda x: x.split(',')}
+        'sasl_mech_force': {'sasl_mech_force': lambda x: x.split(',') if isinstance(x, str) else x}
     }
 
     def __init__(self,  # noqa: C901
@@ -96,12 +96,26 @@ class ClusterLogic:
             # the CertificateAuthenticator, pop the trust_store_path from the auth_kwargs in case
             if 'trust_store_path' not in authenticator.as_dict():
                 auth_kwargs.pop('trust_store_path')
-        elif isinstance(authenticator, PasswordAuthenticator) and 'allowed_sasl_mechanisms' in auth_kwargs:
-            # the allowed_sasl_mechanisms _should_ only be in the auth opts, however <= 3.x SDK allowed
-            # sasl_mech_force in the query string, pop the allowed_sasl_mechanisms from the cluster_opts and
-            # set the authenticator's _allowed_sasl_mechanisms
-            authenticator._allowed_sasl_mechanisms = cluster_opts.pop('allowed_sasl_mechanisms')
-            auth_kwargs.pop('allowed_sasl_mechanisms')
+        elif (
+            isinstance(authenticator, PasswordAuthenticator) and
+            any(map(lambda mech: mech in auth_kwargs, ['sasl_mech_force', 'allowed_sasl_mechanisms']))
+        ):
+            # 3.x SDK allowed sasl_mech_force in the query string, 4.x is going to allow allowed_sasl_mechanisms
+            # in the query string, if the PasswordAuthenticator's static ldap_compatible() method has been used
+            # it takes precendence.
+            # Set the PasswordAuthenticator's allowed_sasl_mechanisms, if not already set, to the value(s) found in the
+            # connection string.  Note that allowed_sasl_mechanisms takes precendence over sasl_mech_force.
+            for sasl_key in ['sasl_mech_force', 'allowed_sasl_mechanisms']:
+                if sasl_key not in cluster_opts:
+                    continue
+                # pop from auth_kwargs to satisfy future check
+                auth_kwargs.pop(sasl_key)
+                if authenticator._allowed_sasl_mechanisms is not None:
+                    continue
+                if isinstance(cluster_opts[sasl_key], str):
+                    authenticator._allowed_sasl_mechanisms = [cluster_opts[sasl_key]]
+                else:
+                    authenticator._allowed_sasl_mechanisms = cluster_opts[sasl_key]
 
         if len(auth_kwargs.keys()) > 0:
             raise InvalidArgumentException(
@@ -250,8 +264,23 @@ class ClusterLogic:
         query_str = parsed_conn.query
         options = parse_qs(query_str)
         # @TODO:  issue warning if it is overriding cluster options?
-        legacy_query_str_opts = {k: v[0] for k, v in options.items() if k in self._LEGACY_CONNSTR_QUERY_ARGS.keys()}
-        query_str_opts = {k: v[0] for k, v in options.items() if k not in self._LEGACY_CONNSTR_QUERY_ARGS.keys()}
+        legacy_query_str_opts = {}
+        for k, v in options.items():
+            if k not in self._LEGACY_CONNSTR_QUERY_ARGS.keys():
+                continue
+            if len(v) > 1:
+                legacy_query_str_opts[k] = v
+            else:
+                legacy_query_str_opts[k] = v[0]
+
+        query_str_opts = {}
+        for k, v in options.items():
+            if k in self._LEGACY_CONNSTR_QUERY_ARGS.keys():
+                continue
+            if len(v) > 1:
+                query_str_opts[k] = v
+            else:
+                query_str_opts[k] = v[0]
         return conn_str, query_str_opts, legacy_query_str_opts
 
     def _parse_legacy_query_options(self, **query_opts  # type: Dict[str, Any]

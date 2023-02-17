@@ -47,13 +47,12 @@ class PasswordAuthenticator(Authenticator):
         self._username = username
         self._password = password
         self._cert_path = cert_path
-        self._allowed_sasl_mechanisms = kwargs.get(
-            'allowed_sasl_mechanisms', ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1'])
+        self._allowed_sasl_mechanisms = kwargs.get('allowed_sasl_mechanisms', None)
 
         super().__init__(**self.as_dict())
 
     def valid_keys(self):
-        return ['username', 'password', 'cert_path', 'allowed_sasl_mechanisms']
+        return ['username', 'password', 'cert_path', 'sasl_mech_force', 'allowed_sasl_mechanisms']
 
     def as_dict(self):
         d = {

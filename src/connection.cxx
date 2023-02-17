@@ -260,14 +260,18 @@ get_cluster_credentials(PyObject* pyObj_auth)
 
     PyObject* pyObj_allowed_sasl_mechanisms = PyDict_GetItemString(pyObj_auth, "allowed_sasl_mechanisms");
     if (pyObj_allowed_sasl_mechanisms != nullptr && PyList_Check(pyObj_allowed_sasl_mechanisms)) {
-        auth.allowed_sasl_mechanisms.clear();
+        if (auth.allowed_sasl_mechanisms.has_value()) {
+            auth.allowed_sasl_mechanisms.value().clear();
+        }
         size_t nargs = static_cast<size_t>(PyList_Size(pyObj_allowed_sasl_mechanisms));
         size_t ii;
+        std::vector<std::string> allowed_sasl_mechanisms{};
         for (ii = 0; ii < nargs; ++ii) {
             PyObject* pyOb_mechanism = PyList_GetItem(pyObj_allowed_sasl_mechanisms, ii);
             auto mechanism = std::string(PyUnicode_AsUTF8(pyOb_mechanism));
-            auth.allowed_sasl_mechanisms.emplace_back(mechanism);
+            allowed_sasl_mechanisms.emplace_back(mechanism);
         }
+        auth.allowed_sasl_mechanisms = allowed_sasl_mechanisms;
     }
 
     return auth;
@@ -1121,14 +1125,17 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     Py_XDECREF(pyObj_tmp);
 
     PyObject* pyObj_allowed_sasl_mechanisms = PyList_New(static_cast<Py_ssize_t>(0));
-    for (auto const& mech : credentials.allowed_sasl_mechanisms) {
-        pyObj_tmp = PyUnicode_FromString(mech.c_str());
-        if (-1 == PyList_Append(pyObj_allowed_sasl_mechanisms, pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
+    if (credentials.allowed_sasl_mechanisms.has_value()) {
+        for (auto const& mech : credentials.allowed_sasl_mechanisms.value()) {
+            pyObj_tmp = PyUnicode_FromString(mech.c_str());
+            if (-1 == PyList_Append(pyObj_allowed_sasl_mechanisms, pyObj_tmp)) {
+                PyErr_Print();
+                PyErr_Clear();
+            }
+            Py_XDECREF(pyObj_tmp);
         }
-        Py_XDECREF(pyObj_tmp);
     }
+
     if (-1 == PyDict_SetItemString(pyObj_creds, "allowed_sasl_mechanisms", pyObj_allowed_sasl_mechanisms)) {
         PyErr_Print();
         PyErr_Clear();

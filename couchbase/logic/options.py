@@ -515,6 +515,7 @@ TransactionConfig = Union[Dict[str, Any], Any]
 class ClusterOptionsBase(dict):
 
     _VALID_OPTS = {
+        'allowed_sasl_mechanisms': {'allowed_sasl_mechanisms': lambda x: x.split(',') if isinstance(x, str) else x},
         "authenticator": {"authenticator": lambda x: x},
         "enable_tls": {"enable_tls": validate_bool},
         "enable_mutation_tokens": {"enable_mutation_tokens": validate_bool},

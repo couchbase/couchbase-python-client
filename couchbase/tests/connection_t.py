@@ -40,7 +40,6 @@ from tests.environments import CollectionType
 
 class ConnectionTestSuite:
     TEST_MANIFEST = [
-        'test_cluster_allowed_sasl_mechanisms',
         'test_cluster_auth_fail',
         'test_cluster_cert_auth',
         'test_cluster_cert_auth_fail',
@@ -56,6 +55,9 @@ class ConnectionTestSuite:
         'test_cluster_pw_auth_with_cert',
         'test_cluster_pw_auth_with_cert_connstr',
         'test_cluster_pw_auth_with_cert_kwargs',
+        'test_cluster_sasl_mech_default',
+        'test_cluster_sasl_mech_legacy_multiple',
+        'test_cluster_sasl_mech_multiple',
         'test_cluster_timeout_options',
         'test_cluster_timeout_options_fail',
         'test_cluster_timeout_options_kwargs',
@@ -70,18 +72,6 @@ class ConnectionTestSuite:
         'test_wan_config_profile',
         'test_wan_config_profile_with_auth',
     ]
-
-    # creating a new connection, allow retries
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_cluster_allowed_sasl_mechanisms(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        auth = PasswordAuthenticator(username, pw)
-        cluster = Cluster.connect(conn_string, ClusterOptions(auth))
-
-        client_opts = cluster._get_client_connection_info()
-        assert client_opts['credentials'] is not None
-        assert client_opts['credentials']['allowed_sasl_mechanisms'] == ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1']
 
     def test_cluster_auth_fail(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -362,7 +352,7 @@ class ConnectionTestSuite:
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
         assert auth_opts == expected_auth
-        assert auth_opts['allowed_sasl_mechanisms'] == ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1']
+        assert auth_opts['allowed_sasl_mechanisms'] is None
 
         # check as kwargs
         cluster = ClusterLogic(conn_string, authenticator=auth)
@@ -370,7 +360,7 @@ class ConnectionTestSuite:
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
         assert auth_opts == expected_auth
-        assert auth_opts['allowed_sasl_mechanisms'] == ['SCRAM-SHA512', 'SCRAM-SHA256', 'SCRAM-SHA1']
+        assert auth_opts['allowed_sasl_mechanisms'] is None
 
     def test_cluster_pw_auth_with_cert(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -424,6 +414,58 @@ class ConnectionTestSuite:
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
+        assert auth_opts == expected_auth
+
+    # creating a new connection, allow retries
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_cluster_sasl_mech_default(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        cluster = Cluster.connect(f'{conn_string}', ClusterOptions(auth))
+
+        client_opts = cluster._get_client_connection_info()
+        assert client_opts['credentials'] is not None
+        assert client_opts['credentials']['allowed_sasl_mechanisms'] == []
+
+    def test_cluster_sasl_mech_legacy_multiple(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        expected_auth = auth.as_dict()
+        expected_auth['allowed_sasl_mechanisms'] = ['SCRAM-SHA512', 'SCRAM-SHA256']
+        conn_str = f'{conn_string}?sasl_mech_force=SCRAM-SHA512&sasl_mech_force=SCRAM-SHA256'
+        cluster = ClusterLogic(conn_str, ClusterOptions(auth))
+        auth_opts, cluster_opts = cluster._get_connection_opts()
+        assert cluster_opts is not None
+        assert auth_opts is not None
+        assert auth_opts == expected_auth
+
+        cluster = ClusterLogic(f'{conn_string}?sasl_mech_force=SCRAM-SHA512,SCRAM-SHA256', ClusterOptions(auth))
+        auth_opts, cluster_opts = cluster._get_connection_opts()
+        assert cluster_opts is not None
+        assert auth_opts is not None
+        assert auth_opts == expected_auth
+
+    def test_cluster_sasl_mech_multiple(self, couchbase_config):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        expected_auth = auth.as_dict()
+        expected_auth['allowed_sasl_mechanisms'] = ['SCRAM-SHA512', 'SCRAM-SHA256']
+        conn_str = f'{conn_string}?allowed_sasl_mechanisms=SCRAM-SHA512&allowed_sasl_mechanisms=SCRAM-SHA256'
+        cluster = ClusterLogic(conn_str, ClusterOptions(auth))
+        auth_opts, cluster_opts = cluster._get_connection_opts()
+        assert cluster_opts is not None
+        assert auth_opts is not None
+        assert auth_opts == expected_auth
+
+        cluster = ClusterLogic(f'{conn_string}?allowed_sasl_mechanisms=SCRAM-SHA512,SCRAM-SHA256', ClusterOptions(auth))
+        auth_opts, cluster_opts = cluster._get_connection_opts()
+        assert cluster_opts is not None
+        assert auth_opts is not None
         assert auth_opts == expected_auth
 
     @pytest.mark.parametrize('opts, expected_opts',
@@ -864,20 +906,18 @@ class ConnectionTestSuite:
 
 class ClassicConnectionTests(ConnectionTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self):
         def valid_test_method(meth):
             attr = getattr(ClassicConnectionTests, meth)
             return callable(attr) and not meth.startswith('__') and meth.startswith('test')
         method_list = [meth for meth in dir(ClassicConnectionTests) if valid_test_method(meth)]
-        compare = set(ConnectionTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+        test_list = set(ConnectionTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
+        if test_list:
+            pytest.fail(f'Test manifest not validated.  Missing/extra tests: {test_list}.')
 
     @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
+    def couchbase_test_environment(self, cb_base_env, request):
         cb_base_env.setup(request.param)
         yield cb_base_env
         cb_base_env.teardown(request.param)

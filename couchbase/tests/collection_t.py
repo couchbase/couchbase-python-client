@@ -27,7 +27,6 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException,
-                                  PathNotFoundException,
                                   TemporaryFailException)
 from couchbase.options import (GetOptions,
                                InsertOptions,
@@ -378,13 +377,15 @@ class CollectionTestSuite:
 
     def test_project_bad_path(self, cb_env):
         key = cb_env.get_existing_doc(key_only=True)
-        with pytest.raises(PathNotFoundException):
-            cb_env.collection.get(key, GetOptions(project=['some', 'qzx']))
+        # CXXCBC-295 - b8bb98c31d377100934dd4b33998f0a118df41e8, bad path no longer raises PathNotFoundException
+        result = cb_env.collection.get(key, GetOptions(project=['qzx']))
+        assert result.cas is not None
+        res_dict = result.content_as[dict]
+        assert res_dict == {}
+        assert 'qzx' not in res_dict
 
     def test_project_project_not_list(self, cb_env):
         key = cb_env.get_existing_doc(key_only=True)
-        # TODO:  better exception
-        # with pytest.raises(Exception, match=r"Unable to perform kv operation\."):
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.get(key, GetOptions(project='thiswontwork'))
 
