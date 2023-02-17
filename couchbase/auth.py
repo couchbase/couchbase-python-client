@@ -20,6 +20,8 @@ from typing import (Any,
                     Dict,
                     Optional)
 
+from couchbase.exceptions import InvalidArgumentException
+
 
 class Authenticator(dict):
     pass
@@ -89,6 +91,18 @@ class CertificateAuthenticator(Authenticator):
                  trust_store_path=None     # type: Optional[str]
                  ):
         """CertificateAuthenticator instance."""
+        if not isinstance(cert_path, str):
+            msg = 'The cert_path must be a str representing the path to the client certificate.'
+            raise InvalidArgumentException(msg)
+
+        if not isinstance(key_path, str):
+            msg = 'The key_path must be a str representing the path to the client key.'
+            raise InvalidArgumentException(msg)
+
+        if trust_store_path is not None and not isinstance(trust_store_path, str):
+            msg = 'The trust_store_path must be a str representing the path to the certificate trust store.'
+            raise InvalidArgumentException(msg)
+
         self._trust_store_path = trust_store_path
         self._cert_path = cert_path
         self._key_path = key_path

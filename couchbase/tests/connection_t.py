@@ -120,6 +120,34 @@ class ConnectionTestSuite:
             'trust_store_path': ts_path
         }
 
+        with pytest.raises(InvalidArgumentException):
+            auth = CertificateAuthenticator(expected_auth)
+
+        auth_copy = copy(expected_auth)
+        auth_copy['cert_path'] = None
+        with pytest.raises(InvalidArgumentException):
+            auth = CertificateAuthenticator(expected_auth)
+
+        auth_copy = copy(expected_auth)
+        auth_copy['cert_path'] = {}
+        with pytest.raises(InvalidArgumentException):
+            auth = CertificateAuthenticator(expected_auth)
+
+        auth_copy = copy(expected_auth)
+        auth_copy['key_path'] = None
+        with pytest.raises(InvalidArgumentException):
+            auth = CertificateAuthenticator(expected_auth)
+
+        auth_copy = copy(expected_auth)
+        auth_copy['key_path'] = {}
+        with pytest.raises(InvalidArgumentException):
+            auth = CertificateAuthenticator(expected_auth)
+
+        auth_copy = copy(expected_auth)
+        auth_copy['trust_store_path'] = {}
+        with pytest.raises(InvalidArgumentException):
+            auth = CertificateAuthenticator(expected_auth)
+
         auth = CertificateAuthenticator(**expected_auth)
         with pytest.raises(InvalidArgumentException):
             ClusterLogic(conn_string, ClusterOptions(auth), trust_store_path=ts_path)
