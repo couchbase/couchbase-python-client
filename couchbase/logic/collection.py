@@ -69,6 +69,13 @@ class CollectionLogic:
         self._connection = scope.connection
 
     @property
+    def connection(self):
+        """
+        **INTERNAL**
+        """
+        return self._connection
+
+    @property
     def default_transcoder(self) -> Optional[Transcoder]:
         return self._scope.default_transcoder
 

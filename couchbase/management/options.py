@@ -482,14 +482,16 @@ class GetAllQueryIndexOptions(dict):
     all indexes operation.
 
     .. note::
-        All management options should be imported from ``couchbase.management.options``.
+        All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): Specifies the collection of the indexes.
-        scope_name (str, optional): Specifies the scope of the indexes.
+        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the collection of the indexes.
+        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the scope of the indexes.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
     @overload
     def __init__(self,
                  timeout=None,          # type: Optional[timedelta]
@@ -508,20 +510,22 @@ class CreateQueryIndexOptions(dict):
     index operation.
 
     .. note::
-        All management options should be imported from ``couchbase.management.options``.
+        All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): Specifies the collection of the index.
+        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the collection of the index.
         condition (str, optional): Specifies the 'where' condition for partial index creation.
         deferred (bool, optional): Specifies whether this index creation should be deferred until
             a later point in time when they can be explicitly built together.
         ignore_if_exists (bool, optional): Whether or not the call should ignore the
             index already existing when determining whether the call was successful.
         num_replicas (int, optional): The number of replicas of this index that should be created.
-        scope_name (str, optional): Specifies the scope of the index.
+        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
     @overload
     def __init__(self,
                  timeout=None,          # type: Optional[timedelta]
@@ -546,10 +550,11 @@ class CreatePrimaryQueryIndexOptions(dict):
     primary index operation.
 
     .. note::
-        All management options should be imported from ``couchbase.management.options``.
+        All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): Specifies the collection of the index.
+        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the collection of the index.
         condition (str, optional): Specifies the 'where' condition for partial index creation.
         deferred (bool, optional): Specifies whether this index creation should be deferred until
             a later point in time when they can be explicitly built together.
@@ -557,10 +562,11 @@ class CreatePrimaryQueryIndexOptions(dict):
             index already existing when determining whether the call was successful.
         index_name (str, optional): Specifies the name of the primary index.
         num_replicas (int, optional): The number of replicas of this index that should be created.
-        scope_name (str, optional): Specifies the scope of the index.
+        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
     @overload
     def __init__(self,
                  index_name=None,        # type: Optional[str]
@@ -586,16 +592,18 @@ class DropQueryIndexOptions(dict):
     index operation.
 
     .. note::
-        All management options should be imported from ``couchbase.management.options``.
+        All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): Specifies the collection of the index.
+        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the collection of the index.
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the
             index not existing when determining whether the call was successful.
-        scope_name (str, optional): Specifies the scope of the index.
+        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
     @overload
     def __init__(self,
                  ignore_if_not_exists=None,   # type: Optional[bool]
@@ -615,17 +623,19 @@ class DropPrimaryQueryIndexOptions(dict):
     primary index operation.
 
     .. note::
-        All management options should be imported from ``couchbase.management.options``.
+        All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): Specifies the collection of the index.
+        collection_name (str, optional): ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the collection of the index.
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the
             index not existing when determining whether the call was successful.
         index_name (str, optional): Specifies the name of the primary index.
-        scope_name (str, optional): Specifies the scope of the index.
+        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
     @overload
     def __init__(self,
                  index_name=None,            # type: Optional[str]
@@ -646,16 +656,18 @@ class WatchQueryIndexOptions(dict):
     indexes operation.
 
     .. note::
-        All management options should be imported from ``couchbase.management.options``.
+        All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): Specifies the collection of the index.
-        scope_name (str, optional): Specifies the scope of the index.
+        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the collection of the index.
+        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
         watch_primary (bool, optional): Specifies whether the primary indexes should
             be watched as well.
-    """
+    """  # noqa: E501
     @overload
     def __init__(self,
                  watch_primary=None,      # type: Optional[bool]
@@ -675,14 +687,16 @@ class BuildDeferredQueryIndexOptions(dict):
     deferred indexes operation.
 
     .. note::
-        All management options should be imported from ``couchbase.management.options``.
+        All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): Specifies the collection of the index.
-        scope_name (str, optional): Specifies the scope of the index.
+        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the collection of the index.
+        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+            Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
     @overload
     def __init__(self,
                  timeout=None,          # type: Optional[timedelta]

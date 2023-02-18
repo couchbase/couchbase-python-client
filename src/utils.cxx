@@ -233,32 +233,12 @@ build_query_request(PyObject* pyObj_query_args)
         req.mutation_state = get_mutation_state(pyObj_mutation_state);
     }
 
-    PyObject* pyObj_bucket_name = PyDict_GetItemString(pyObj_query_args, "bucket_name");
-    if (pyObj_bucket_name != nullptr) {
-        if (PyUnicode_Check(pyObj_bucket_name)) {
-            req.bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+    PyObject* pyObj_query_context = PyDict_GetItemString(pyObj_query_args, "query_context");
+    if (pyObj_query_context != nullptr) {
+        if (PyUnicode_Check(pyObj_query_context)) {
+            req.query_context = std::string(PyUnicode_AsUTF8(pyObj_query_context));
         } else {
-            PyErr_SetString(PyExc_ValueError, "bucket_name is not a string.");
-            return {};
-        }
-    }
-
-    PyObject* pyObj_scope_name = PyDict_GetItemString(pyObj_query_args, "scope_name");
-    if (pyObj_scope_name != nullptr) {
-        if (PyUnicode_Check(pyObj_scope_name)) {
-            req.scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
-        } else {
-            PyErr_SetString(PyExc_ValueError, "scope_name is not a string.");
-            return {};
-        }
-    }
-
-    PyObject* pyObj_scope_qualifier = PyDict_GetItemString(pyObj_query_args, "scope_qualifier");
-    if (pyObj_scope_qualifier != nullptr) {
-        if (PyUnicode_Check(pyObj_scope_qualifier)) {
-            req.scope_qualifier = std::string(PyUnicode_AsUTF8(pyObj_scope_qualifier));
-        } else {
-            PyErr_SetString(PyExc_ValueError, "scope_qualifier is not a string.");
+            PyErr_SetString(PyExc_ValueError, "query_context is not a string.");
             return {};
         }
     }

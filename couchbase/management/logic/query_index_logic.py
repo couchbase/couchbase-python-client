@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -58,10 +58,10 @@ class QueryIndexManagerLogic:
                                                 **kwargs)
 
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.QUERY_INDEX.value,
-            "op_type": query_index_mgmt_operations.CREATE_INDEX.value,
-            "op_args": op_args
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.QUERY_INDEX.value,
+            'op_type': query_index_mgmt_operations.CREATE_INDEX.value,
+            'op_args': op_args
         }
 
         callback = kwargs.pop('callback', None)
@@ -72,8 +72,8 @@ class QueryIndexManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        if kwargs.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = kwargs.get("timeout")
+        if kwargs.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = kwargs.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -86,8 +86,8 @@ class QueryIndexManagerLogic:
 
         # @TODO: validate scope/collection?
 
-        primary = kwargs.get("primary", False)
-        condition = kwargs.get("condition", None)
+        primary = kwargs.get('primary', False)
+        condition = kwargs.get('condition', None)
 
         if primary and fields:
             raise TypeError('Cannot create primary index with explicit fields')
@@ -111,15 +111,15 @@ class QueryIndexManagerLogic:
                 op_args['fields'] = fields
             else:
                 op_args['fields'] = list(fields)
-        if kwargs.get("ignore_if_exists", False) is True:
+        if kwargs.get('ignore_if_exists', False) is True:
             op_args['ignore_if_exists'] = kwargs.get('ignore_if_exists')
-        if kwargs.get("scope_name", None) is not None:
+        if kwargs.get('scope_name', None) is not None:
             op_args['scope_name'] = kwargs.get('scope_name')
-        if kwargs.get("collection_name", None) is not None:
+        if kwargs.get('collection_name', None) is not None:
             op_args['collection_name'] = kwargs.get('collection_name')
-        if kwargs.get("deferred", None) is not None:
+        if kwargs.get('deferred', None) is not None:
             op_args['deferred'] = kwargs.get('deferred')
-        if kwargs.get("num_replicas", None) is not None:
+        if kwargs.get('num_replicas', None) is not None:
             op_args['num_replicas'] = kwargs.get('num_replicas')
 
         return op_args
@@ -142,23 +142,23 @@ class QueryIndexManagerLogic:
         if index_name:
             op_args['index_name'] = index_name
 
-        if kwargs.get("scope_name", None) is not None:
+        if kwargs.get('scope_name', None) is not None:
             op_args['scope_name'] = kwargs.get('scope_name')
 
-        if kwargs.get("collection_name", None) is not None:
+        if kwargs.get('collection_name', None) is not None:
             op_args['collection_name'] = kwargs.get('collection_name')
 
         if ignore_if_not_exists is True or ignore_missing is True:
             op_args['ignore_if_does_not_exist'] = True
 
-        if kwargs.get("primary", False) is True:
+        if kwargs.get('primary', False) is True:
             op_args['is_primary'] = kwargs.get('primary')
 
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.QUERY_INDEX.value,
-            "op_type": query_index_mgmt_operations.DROP_INDEX.value,
-            "op_args": op_args
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.QUERY_INDEX.value,
+            'op_type': query_index_mgmt_operations.DROP_INDEX.value,
+            'op_args': op_args
         }
 
         callback = kwargs.pop('callback', None)
@@ -169,8 +169,8 @@ class QueryIndexManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        if kwargs.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = kwargs.get("timeout")
+        if kwargs.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = kwargs.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -206,7 +206,7 @@ class QueryIndexManagerLogic:
 
         kwargs['primary'] = True
         final_args = forward_args(kwargs, *options)
-        index_name = final_args.pop("index_name", None)
+        index_name = final_args.pop('index_name', None)
         return self._create_index(bucket_name, [], index_name, **final_args)
 
     def drop_index(self,
@@ -246,7 +246,7 @@ class QueryIndexManagerLogic:
         """
         kwargs['primary'] = True
         final_args = forward_args(kwargs, *options)
-        index_name = final_args.pop("index_name", None)
+        index_name = final_args.pop('index_name', None)
         return self._drop_index(bucket_name, index_name, **final_args)
 
     def get_all_indexes(self,
@@ -260,17 +260,17 @@ class QueryIndexManagerLogic:
         }
         final_args = forward_args(kwargs, *options)
 
-        if final_args.get("scope_name", None) is not None:
+        if final_args.get('scope_name', None) is not None:
             op_args['scope_name'] = final_args.get('scope_name')
 
-        if final_args.get("collection_name", None) is not None:
+        if final_args.get('collection_name', None) is not None:
             op_args['collection_name'] = final_args.get('collection_name')
 
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.QUERY_INDEX.value,
-            "op_type": query_index_mgmt_operations.GET_ALL_INDEXES.value,
-            "op_args": op_args
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.QUERY_INDEX.value,
+            'op_type': query_index_mgmt_operations.GET_ALL_INDEXES.value,
+            'op_args': op_args
         }
 
         callback = kwargs.pop('callback', None)
@@ -281,8 +281,8 @@ class QueryIndexManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -305,17 +305,17 @@ class QueryIndexManagerLogic:
         }
         final_args = forward_args(kwargs, *options)
 
-        if final_args.get("scope_name", None) is not None:
+        if final_args.get('scope_name', None) is not None:
             op_args['scope_name'] = final_args.get('scope_name')
 
-        if final_args.get("collection_name", None) is not None:
+        if final_args.get('collection_name', None) is not None:
             op_args['collection_name'] = final_args.get('collection_name')
 
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.QUERY_INDEX.value,
-            "op_type": query_index_mgmt_operations.BUILD_DEFERRED_INDEXES.value,
-            "op_args": op_args
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.QUERY_INDEX.value,
+            'op_type': query_index_mgmt_operations.BUILD_DEFERRED_INDEXES.value,
+            'op_args': op_args
         }
 
         callback = kwargs.pop('callback', None)
@@ -326,8 +326,8 @@ class QueryIndexManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 

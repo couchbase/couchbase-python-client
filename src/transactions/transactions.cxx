@@ -367,9 +367,6 @@ pycbc_txns::transaction_query_options__to_dict__(PyObject* self)
     if (query_opts.pipeline_cap.has_value()) {
         add_to_dict(retval, "pipeline_cap", static_cast<int64_t>(query_opts.pipeline_cap.value()));
     }
-    if (query_opts.scope_qualifier.has_value()) {
-        add_to_dict(retval, "scope_qualifier", query_opts.scope_qualifier.value());
-    }
     if (query_opts.client_context_id.has_value()) {
         add_to_dict(retval, "client_context_id", query_opts.client_context_id.value());
     }
@@ -455,13 +452,6 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     }
     if (req.pipeline_cap.has_value()) {
         self->opts->pipeline_cap(req.pipeline_cap.value());
-    }
-    if (req.scope_qualifier.has_value()) {
-        self->opts->scope_qualifier(req.scope_qualifier.value());
-    } else if (req.scope_name.has_value()) {
-        if (req.bucket_name.has_value()) {
-            self->opts->scope_qualifier(fmt::format("default:`{}`.`{}`", req.bucket_name.value(), req.scope_name.value()));
-        }
     }
     if (req.client_context_id.has_value()) {
         self->opts->client_context_id(req.client_context_id.value());

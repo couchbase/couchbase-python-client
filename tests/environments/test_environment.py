@@ -328,14 +328,20 @@ class TestEnvironment:
         self._efm = self.cluster.eventing_functions()
         return self
 
-    def enable_query_mgmt(self) -> TestEnvironment:
+    def enable_query_mgmt(self, from_collection=False) -> TestEnvironment:
         EnvironmentFeatures.check_if_feature_supported('query_index_mgmt',
                                                        self.server_version_short,
                                                        self.mock_server_type)
-        if not hasattr(self.cluster, 'query_indexes'):
+        if not from_collection and not hasattr(self.cluster, 'query_indexes'):
             pytest.skip('Query index management not available on cluster.')
 
-        self._qixm = self.cluster.query_indexes()
+        if not from_collection and not hasattr(self.collection, 'query_indexes'):
+            pytest.skip('Query index management not available on collection.')
+
+        if from_collection:
+            self._qixm = self.collection.query_indexes()
+        else:
+            self._qixm = self.cluster.query_indexes()
         return self
 
     def enable_search_mgmt(self) -> TestEnvironment:
@@ -505,12 +511,24 @@ class TestEnvironment:
             self.cm.drop_scope(self.TEST_SCOPE)
             self.cm.create_scope(self.TEST_SCOPE)
 
+        TestEnvironment.try_n_times_till_exception(5,
+                                                   1,
+                                                   self.cm.create_scope,
+                                                   self.TEST_SCOPE,
+                                                   expected_exceptions=(ScopeAlreadyExistsException,))
+
         self._collection_spec = CollectionSpec(self.TEST_COLLECTION, self.TEST_SCOPE)
         try:
             self.cm.create_collection(self._collection_spec)
         except CollectionAlreadyExistsException:
             self.cm.drop_collection(self._collection_spec)
             self.cm.create_collection(self._collection_spec)
+
+        TestEnvironment.try_n_times_till_exception(5,
+                                                   1,
+                                                   self.cm.create_collection,
+                                                   self._collection_spec,
+                                                   expected_exceptions=(CollectionAlreadyExistsException,))
 
         c = self.get_collection(self.TEST_SCOPE, self.TEST_COLLECTION, bucket_name=self.bucket.name)
         if c is None:

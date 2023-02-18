@@ -41,6 +41,7 @@ from couchbase.logic import (BlockingWrapper,
                              decode_value)
 from couchbase.logic.collection import CollectionLogic
 from couchbase.logic.supportability import Supportability
+from couchbase.management.queries import CollectionQueryIndexManager
 from couchbase.options import (AppendMultiOptions,
                                DecrementMultiOptions,
                                ExistsMultiOptions,
@@ -2504,6 +2505,16 @@ class Collection(CollectionLogic):
             op_args=op_args
         )
         return MultiCounterResult(res, return_exceptions)
+
+    def query_indexes(self) -> CollectionQueryIndexManager:
+        """
+        Get a :class:`~couchbase.management.queries.CollectionQueryIndexManager` which can be used to manage the query
+        indexes of this cluster.
+
+        Returns:
+            :class:`~couchbase.management.queries.CollectionQueryIndexManager`: A :class:`~couchbase.management.queries.CollectionQueryIndexManager` instance.
+        """  # noqa: E501
+        return CollectionQueryIndexManager(self.connection, self._scope.bucket_name, self._scope.name, self.name)
 
     @staticmethod
     def default_name():

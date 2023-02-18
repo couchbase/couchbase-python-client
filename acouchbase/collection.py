@@ -28,6 +28,7 @@ from acouchbase.datastructures import (CouchbaseList,
                                        CouchbaseQueue,
                                        CouchbaseSet)
 from acouchbase.logic import AsyncWrapper
+from acouchbase.management.queries import CollectionQueryIndexManager
 from couchbase.logic.collection import CollectionLogic
 from couchbase.options import forward_args
 from couchbase.result import (CounterResult,
@@ -1074,6 +1075,20 @@ class AsyncCollection(CollectionLogic):
 
         """
         return CouchbaseQueue(key, self)
+
+    def query_indexes(self) -> CollectionQueryIndexManager:
+        """
+        Get a :class:`~acouchbase.management.queries.CollectionQueryIndexManager` which can be used to manage the query
+        indexes of this cluster.
+
+        Returns:
+            :class:`~acouchbase.management.queries.CollectionQueryIndexManager`: A :class:`~acouchbase.management.queries.CollectionQueryIndexManager` instance.
+        """  # noqa: E501
+        return CollectionQueryIndexManager(self.connection,
+                                           self.loop,
+                                           self._scope.bucket_name,
+                                           self._scope.name,
+                                           self.name)
 
     @staticmethod
     def default_name():

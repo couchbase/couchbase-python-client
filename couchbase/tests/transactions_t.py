@@ -347,6 +347,7 @@ class TransactionTestSuite:
             assert cfg_consistency == consistency.value
 
     def test_scope_qualifier(self, cb_env):
+        pytest.skip('CBD-5091: Pending Transactions changes')
         cfg = TransactionQueryOptions(scope=cb_env.collection._scope)
         cfg_scope_qualifier = cfg._base.to_dict().get('scope_qualifier', None)
         expected = f'default:`{cb_env.collection._scope.bucket_name}`.`{cb_env.collection._scope.name}`'

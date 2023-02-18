@@ -17,10 +17,10 @@
 
 #include "query_index_management.hxx"
 #include "../exceptions.hxx"
-#include <core/management/query_index.hxx>
+#include <couchbase/management/query_index.hxx>
 
 PyObject*
-build_query_index(const couchbase::core::management::query::index& index)
+build_query_index(const couchbase::management::query::index& index)
 {
     PyObject* pyObj_index = PyDict_New();
     if (index.is_primary) {
@@ -545,23 +545,17 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
             break;
         }
         case QueryIndexManagementOperations::BUILD_DEFERRED_INDEXES: {
-            auto opts = couchbase::build_query_index_options{}.timeout(options->timeout_ms);
+            couchbase::core::operations::management::query_index_build_deferred_request req{};
+            req.bucket_name = bucket_name;
+            req.timeout = options->timeout_ms;
             if (!scope_name.empty()) {
-                opts.scope_name(scope_name);
+                req.scope_name = scope_name;
             }
             if (!collection_name.empty()) {
-                opts.collection_name(collection_name);
+                req.collection_name = collection_name;
             }
-            {
-                Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_build_deferred_indexes(
-                  conn->cluster_, bucket_name, opts.build(), [pyObj_callback, pyObj_errback, barrier](auto resp) {
-                      create_result_from_query_index_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
-                  });
-                Py_END_ALLOW_THREADS
-            }
-            // for async ops
-            Py_INCREF(Py_None);
-            res = Py_None;
+            res = do_query_index_mgmt_op<couchbase::core::operations::management::query_index_build_deferred_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         default: {

@@ -410,7 +410,7 @@ class QueryParamTestSuite:
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['scope_qualifier'] = 'bucket.scope'
+        exp_opts['query_context'] = 'bucket.scope'
         assert query.params == exp_opts
 
     def test_params_readonly(self, base_opts):

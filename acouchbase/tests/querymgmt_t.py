@@ -895,3 +895,301 @@ class QueryIndexCollectionManagementTests:
         assert len(all_ixs) != len(collection_ixs)
         assert len(all_ixs) == 4
         assert len(collection_ixs) == 2
+
+
+class CollectionQueryIndexManagerTests:
+
+    TEST_SCOPE = "test-scope"
+    TEST_COLLECTION = "test-collection"
+
+    @pytest_asyncio.fixture(scope="class")
+    def event_loop(self):
+        loop = get_event_loop()
+        yield loop
+        loop.close()
+
+    @pytest_asyncio.fixture(scope="class", name="cb_env")
+    async def couchbase_test_environment(self, couchbase_config):
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True,
+                                                       manage_collections=True,
+                                                       manage_query_indexes=True)
+
+        await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+        cb_env.cixm = cb_env.collection.query_indexes()
+
+        yield cb_env
+        await cb_env.try_n_times(5, 3, self._clear_all_indexes, cb_env, ignore_fail=True)
+        await cb_env.try_n_times_till_exception(5, 3,
+                                                cb_env.teardown_named_collections,
+                                                raise_if_no_exception=False)
+        del cb_env.cixm
+
+    async def _drop_all_indexes(self, cb_env, indexes, scope_name='_default', collection_name='_default'):
+        for index in indexes:
+            # @TODO:  will need to update once named primary allowed
+            if index.is_primary:
+                await cb_env.cixm.drop_primary_index()
+            else:
+                await cb_env.cixm.drop_index(index.name)
+        for _ in range(10):
+            indexes = await cb_env.cixm.get_all_indexes()
+            if 0 == len(indexes):
+                return True
+            await asyncio.sleep(2)
+
+        return False
+
+    async def _clear_all_indexes(self, cb_env, ignore_fail=False):
+        # Drop all indexes!
+        for scope_col in [(self.TEST_SCOPE, self.TEST_COLLECTION), ('_default', '_default')]:
+            indexes = await cb_env.cixm.get_all_indexes()
+
+            success = await self._drop_all_indexes(cb_env, indexes)
+            if success:
+                continue
+            elif ignore_fail is True:
+                continue
+            else:
+                pytest.xfail(
+                    "Indexes were not dropped after {} waits of {} seconds each".format(10, 3))
+
+    @pytest.fixture(scope="class")
+    def check_query_index_mgmt_supported(self, cb_env):
+        cb_env.check_if_feature_supported('query_index_mgmt')
+
+    @pytest.fixture(scope="class", name="fqdn")
+    def get_fqdn(self, cb_env):
+        return f'`{cb_env.bucket.name}`.`{self.TEST_SCOPE}`.`{self.TEST_COLLECTION}`'
+
+    @pytest_asyncio.fixture()
+    async def clear_all_indexes(self, cb_env):
+        await self._clear_all_indexes(cb_env)
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_create_primary(self, cb_env, fqdn):
+        await cb_env.cixm.create_primary_index(CreatePrimaryQueryIndexOptions(timeout=timedelta(seconds=60)))
+
+        # Ensure we can issue a query
+        n1ql = f'SELECT * FROM {fqdn} LIMIT 1'
+
+        await cb_env.cluster.query(n1ql).execute()
+        # Drop the primary index
+        await cb_env.cixm.drop_primary_index()
+        # Ensure we get an error when executing the query
+        with pytest.raises(QueryIndexNotFoundException):
+            await cb_env.cluster.query(n1ql).execute()
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_create_primary_ignore_if_exists(self, cb_env):
+        await cb_env.cixm.create_primary_index()
+        await cb_env.cixm.create_primary_index(CreatePrimaryQueryIndexOptions(ignore_if_exists=True))
+
+        with pytest.raises(QueryIndexAlreadyExistsException):
+            await cb_env.cixm.create_primary_index()
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_create_primary_ignore_if_exists_kwargs(self, cb_env):
+        await cb_env.cixm.create_primary_index()
+        await cb_env.cixm.create_primary_index(ignore_if_exists=True)
+
+        with pytest.raises(QueryIndexAlreadyExistsException):
+            await cb_env.cixm.create_primary_index()
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_drop_primary(self, cb_env):
+        # create an index so we can drop
+        await cb_env.cixm.create_primary_index(timeout=timedelta(seconds=60))
+
+        await cb_env.cixm.drop_primary_index(timeout=timedelta(seconds=60))
+        # this should fail now
+        with pytest.raises(QueryIndexNotFoundException):
+            await cb_env.cixm.drop_primary_index()
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_drop_primary_ignore_if_not_exists(self, cb_env):
+        await cb_env.cixm.drop_primary_index(ignore_if_not_exists=True)
+        await cb_env.cixm.drop_primary_index(DropPrimaryQueryIndexOptions(ignore_if_not_exists=True))
+        with pytest.raises(QueryIndexNotFoundException):
+            await cb_env.cixm.drop_primary_index()
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_create_secondary_indexes(self, cb_env, fqdn):
+        ixname = 'ix2'
+        fields = ('fld1', 'fld2')
+        await cb_env.cixm.create_index(ixname, fields=fields, timeout=timedelta(seconds=120))
+        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(
+            fqdn, *fields)
+        await cb_env.cluster.query(n1ql).execute()
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_create_secondary_indexes_condition(self, cb_env):
+        ixname = 'ix2'
+        fields = ('fld1', 'fld2')
+
+        await cb_env.try_n_times_till_exception(10,
+                                                5,
+                                                cb_env.cixm.drop_index,
+                                                ixname,
+                                                expected_exceptions=(QueryIndexNotFoundException,),)
+        condition = '((`fld1` = 1) and (`fld2` = 2))'
+        await cb_env.cixm.create_index(ixname,
+                                       fields,
+                                       CreateQueryIndexOptions(timeout=timedelta(days=1), condition=condition))
+
+        async def check_index():
+            indexes = await cb_env.cixm.get_all_indexes()
+            result = next((idx for idx in indexes if idx.name == ixname), None)
+            assert result is not None
+            return result
+        result = await cb_env.try_n_times(10, 5, check_index)
+        assert result.condition == condition
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_drop_secondary_indexes(self, cb_env, fqdn):
+        ixname = 'ix2'
+        fields = ('fld1', 'fld2')
+        await cb_env.cixm.create_index(ixname, fields=fields, timeout=timedelta(seconds=120))
+
+        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(
+            fqdn, *fields)
+
+        # Drop the index
+        await cb_env.cixm.drop_index(ixname)
+        # Issue the query again
+        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
+            await cb_env.cluster.query(n1ql).execute()
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_create_index_no_fields(self, cb_env):
+        # raises a TypeError b/c not providing fields means
+        #   create_index() is missing a required positional param
+        with pytest.raises(TypeError):
+            await cb_env.cixm.create_index('noFields')
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_create_secondary_indexes_ignore_if_exists(self, cb_env):
+        ixname = 'ix2'
+        await cb_env.cixm.create_index(ixname, fields=['hello'])
+        await cb_env.cixm.create_index(ixname, fields=['hello'], ignore_if_exists=True)
+        await cb_env.cixm.create_index(ixname, ['hello'], CreateQueryIndexOptions(ignore_if_exists=True))
+        with pytest.raises(QueryIndexAlreadyExistsException):
+            await cb_env.cixm.create_index(ixname, fields=['hello'])
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env):
+        # Create it
+        ixname = 'ix2'
+        await cb_env.cixm.create_index(ixname, ['hello'])
+        # Drop it
+        await cb_env.cixm.drop_index(ixname)
+        await cb_env.cixm.drop_index(ixname, ignore_if_not_exists=True)
+        await cb_env.cixm.drop_index(ixname, DropQueryIndexOptions(ignore_if_not_exists=True))
+        with pytest.raises(QueryIndexNotFoundException):
+            await cb_env.cixm.drop_index(ixname)
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_list_indexes(self, cb_env):
+        # start with no indexes
+        ixs = await cb_env.cixm.get_all_indexes()
+        assert len(ixs) == 0
+
+        # Create the primary index
+        await cb_env.cixm.create_primary_index()
+        ixs = await cb_env.cixm.get_all_indexes()
+        assert len(ixs) == 1
+        assert ixs[0].is_primary is True
+        assert ixs[0].name == '#primary'
+        assert ixs[0].bucket_name == cb_env.bucket.name
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_index_partition_info(self, cb_env, fqdn):
+        # use query to create index w/ partition, cannot do that via manager ATM
+        n1ql = f'CREATE INDEX idx_fld1 ON {fqdn}(fld1) PARTITION BY HASH(fld1)'
+        await cb_env.cluster.query(n1ql).execute()
+        ixs = await cb_env.cixm.get_all_indexes()
+        idx = next((ix for ix in ixs if ix.name == "idx_fld1"), None)
+        assert idx is not None
+        assert idx.partition is not None
+        assert idx.partition == 'HASH(`fld1`)'
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_watch(self, cb_env):
+        # Create primary index
+        await cb_env.cixm.create_primary_index(deferred=True)
+        ixs = await cb_env.cixm.get_all_indexes()
+        assert len(ixs) == 1
+        assert ixs[0].state == 'deferred'
+
+        # Create a bunch of other indexes
+        for n in range(5):
+            defer = False
+            if n % 2 == 0:
+                defer = True
+            await cb_env.cixm.create_index(f'ix{n}', fields=[f'fld{n}'], deferred=defer)
+
+        ixs = await cb_env.cixm.get_all_indexes()
+        assert len(ixs) == 6
+        # by not building deffered indexes, should timeout
+        with pytest.raises(WatchQueryIndexTimeoutException):
+            await cb_env.cixm.watch_indexes([i.name for i in ixs],
+                                            WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_deferred(self, cb_env):
+        # Create primary index
+        await cb_env.cixm.create_primary_index(deferred=True)
+        ixs = await cb_env.cixm.get_all_indexes()
+        assert len(ixs) == 1
+        assert ixs[0].state == 'deferred'
+
+        # Create a bunch of other indexes
+        for n in range(5):
+            await cb_env.cixm.create_index(f'ix{n}', [f'fld{n}'], CreateQueryIndexOptions(deferred=True))
+
+        ixs = await cb_env.cixm.get_all_indexes()
+        assert len(ixs) == 6
+
+        ix_names = list(map(lambda i: i.name, ixs))
+
+        await cb_env.cixm.build_deferred_indexes()
+        await cb_env.cixm.watch_indexes(ix_names,
+                                        WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
+        await cb_env.cixm.watch_indexes(ix_names,
+                                        WatchQueryIndexOptions(timeout=timedelta(seconds=30),
+                                                               watch_primary=True))  # Should be OK again
+        with pytest.raises(QueryIndexNotFoundException):
+            await cb_env.cixm.watch_indexes(['idontexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))

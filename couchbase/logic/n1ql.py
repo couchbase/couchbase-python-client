@@ -573,12 +573,12 @@ class N1QLQuery:
 
     @property
     def query_context(self) -> Optional[str]:
-        return self._params.get('scope_qualifier', None)
+        return self._params.get('query_context', None)
 
     @query_context.setter
     def query_context(self, value  # type: str
                       ) -> None:
-        self.set_option('scope_qualifier', value)
+        self.set_option('query_context', value)
 
     @property
     def send_to_node(self) -> Optional[str]:
