@@ -38,8 +38,8 @@ struct counter_options {
     uint32_t expiry{ 0 };
     couchbase::durability_level durability_level{ couchbase::durability_level::none };
     bool use_legacy_durability{ false };
-    couchbase::replicate_to replicate_to{ couchbase::persist_to::none };
-    couchbase::persist_to persist_to{ couchbase::replicate_to::none };
+    couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
+    couchbase::persist_to persist_to{ couchbase::persist_to::none };
     std::optional<uint64_t> initial_value{};
     PyObject* span = nullptr;
 };
