@@ -113,6 +113,57 @@ The source control is available  on :python_sdk_github:`Github <>`.
 Once you have cloned the repository, you may contribute changes through our gerrit server.
 For more details see :python_sdk_contribute:`CONTRIBUTING.md <>`.
 
+Migrating from 3.x to 4.x
+===========================
+
+The Python SDK 4.x implements the :python_sdk_api_version:`SDK API 3 spec <>`, so all the steps outlined in the :python_sdk_api_version:`SDK 3 migration docs <>` apply to a migration from a Python SDK 2.x directly to Python SDK 4.x.
+
+Importantly, the Python SDK 4.x has been substantially reworked to use a new backend (Couchbase++ instead of libcouchbase.)
+Though the API surfaces are intended to be compatible, any code that relies on undocumented or uncommitted internal details is not guaranteed to work.
+Key areas that have been reworked:
+
+* The ``couchbase_core`` package has been removed. The 4.x SDK provides appropriate import paths within the ``couchbase`` package (or possibly the ``acouchbase``/``txcouchbase`` packages if using one of the async APIs) for anything that is needed with respect to the APIs provided by the SDK.
+* As there is a new backend, the previous ``_libcouchbase`` c-extension has been removed
+* Remnants of the 2.x API in previous Python 3.x SDK versions have been removed or deprecated
+
+  * Key items that have been **removed**:
+
+    * The ``ClassicAuthenticator`` class
+    * Key-value operations are no longer available with a ``bucket`` instance. Use a ``collection`` instance for key-value operations.
+    * A ``cluster`` and ``bucket`` instance do not inherit from the same base class
+    * The ``Client`` class has been removed
+    * ``Items`` API
+    * ``Admin`` cluster
+
+  * Key items that have been **deprecated**:
+
+    * Datastructure methods provided by the ``collection`` instance have been deprecated and replaced with their respective APIs (i.e. ``CouchbaseList``, ``CouchbaseMap``, ``CouchbaseQueue`` and ``CouchbaseSet``)
+    * ``OperationResult`` (deprecated, still available from ``couchbase.result``)
+    * ``ValueResult`` (deprecated, still available from ``couchbase.result``)
+
+* Import paths have been reorganized to follow consistent patterns.  While the import paths that existed in 3.x SDK are mostly available (see previous points on removal of ``couchbase_core`` package), some paths are deprecated and will be removed in a future release.
+
+  * All authenticators should be imported from ``couchbase.auth``
+  * All constants should be imported from ``couchbase.constants``
+  * All options should be imported from ``couchbase.options``
+  * All management options should be imported from ``couchbase.management.options``
+  * All results should be imported from ``couchbase.result``
+  * All exceptions should be imported from ``couchbase.exceptions``
+  * Enumerations and Classes related to operations should be imported from that operation's path.  For example, ``QueryScanConsistency`` should be imported from ``couchbase.n1ql`` (i.e. ``from couchbase.n1ql import QueryScanConsistency``)
+
+* Changes to the async APIs (``acouchbase`` and ``txcouchbase``):
+
+  * While multi-operations (``get_multi``, ``upsert_multi``, etc.) still exist for the ``couchbase`` API they have been removed from the async APIs (``acouchbase`` and ``txcouchbase``) as each of the async APIs are built with libraries that have mechanisms to handle multi/bulk operations (``asyncio`` has ``asyncio.gather(...)`` and ``Twisted`` has ``DeferredList(...)``).
+  * If using the ``txcouchbase`` API, the reactor that should be installed is the ``asyncioreactor``.  Therefore, the ``txcouchbase`` package *needs* to be imported prior to importing the ``reactor``.  See example import below.
+
+    .. code-block:: python
+
+        # this is new with Python SDK 4.x, it needs to be imported prior to
+        # importing the twisted reactor
+        import txcouchbase
+
+        from twisted.internet import reactor
+
 License
 =======================
 

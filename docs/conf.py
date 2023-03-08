@@ -107,6 +107,10 @@ extlinks = {
         ('https://docs.couchbase.com/python-sdk/current/project-docs/sdk-release-notes.html', None),
     'python_sdk_compatibility':
         ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html', None),
+    'python_sdk_3x_migration':
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/migrating-sdk-code-to-3.n.html', None),
+    'python_sdk_api_version':
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#api-version', None),
     'python_sdk_forums': ('https://forums.couchbase.com/c/python-sdk/10', None),
     'python_sdk_license': ('https://github.com/couchbase/couchbase-python-client/blob/master/LICENSE', None),
     'python_sdk_contribute':

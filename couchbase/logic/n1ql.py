@@ -59,8 +59,8 @@ class QueryProfile(Enum):
     Specifies the profiling mode for a query.
 
     .. warning::
-        Importing :class:`.QueryScanConsistency` from ``couchbase.cluster`` is deprecated.
-        :class:`.QueryScanConsistency` should be imported from ``couchbase.n1ql``.
+        Importing :class:`.QueryProfile` from ``couchbase.cluster`` is deprecated.
+        :class:`.QueryProfile` should be imported from ``couchbase.n1ql``.
 
     """
 
