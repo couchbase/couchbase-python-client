@@ -89,7 +89,9 @@ class pycbc_logger_sink : public spdlog::sinks::sink
 
     void log(const spdlog::details::log_msg& msg) final
     {
-        log_it_(msg);
+        if (0 == _Py_IsFinalizing()) {
+            log_it_(msg);
+        }
     }
 
     void flush() final{};
@@ -178,8 +180,10 @@ class pycbc_logger_sink : public spdlog::sinks::sink
         pyObj_value = PyUnicode_FromStringAndSize(msg.payload.data(), msg.payload.size());
         PyTuple_SetItem(retval, 4, pyObj_value);
         // args
+        Py_INCREF(Py_None);
         PyTuple_SetItem(retval, 5, Py_None);
         // exc_info
+        Py_INCREF(Py_None);
         PyTuple_SetItem(retval, 6, Py_None);
         // func
         if (nullptr != msg.source.funcname) {

@@ -179,6 +179,9 @@ if sanitizers:
     for x in sanitizers.split(','):
         cmake_extra_args += [f'-DENABLE_SANITIZER_{x.upper()}=ON']
 
+if os.getenv('PYCBC_VERBOSE_MAKEFILE', None):
+    cmake_extra_args += ['-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON']
+
 # now pop these in CMAKE_COMMON_VARIABLES, and they will be used by cmake...
 os.environ['CMAKE_COMMON_VARIABLES'] = ' '.join(cmake_extra_args)
 

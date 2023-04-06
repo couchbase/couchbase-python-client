@@ -19,8 +19,7 @@ cmake_policy(SET CMP0091 NEW)
 include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 
 # MultiThreaded$<$<CONFIG:Debug>:Debug>DLL for /MD compile flag
 # MultiThreaded$<$<CONFIG:Debug>:Debug> for /MT compile flag
@@ -31,6 +30,7 @@ if(WIN32)
 endif()
 
 project(couchbase_client)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (PYTHON_VERSION_EXACT)
     set(Python_FIND_VIRTUALENV FIRST)
