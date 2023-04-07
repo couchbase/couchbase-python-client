@@ -722,12 +722,6 @@ get_search_request(PyObject* op_args)
         }
     }
 
-    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
-    if (pyObj_scope_name != nullptr) {
-        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
-        req.scope_name = scope_name;
-    }
-
     PyObject* pyObj_collections = PyDict_GetItemString(op_args, "collections");
     if (pyObj_collections != nullptr && PyList_Check(pyObj_collections)) {
         size_t ncollections = static_cast<size_t>(PyList_GET_SIZE(pyObj_collections));

@@ -573,13 +573,6 @@ update_cluster_timeout_options(couchbase::core::cluster_options& options, PyObje
         options.management_timeout = management_timeout_ms;
     }
 
-    PyObject* pyObj_dns_srv_timeout = PyDict_GetItemString(pyObj_timeout_opts, "dns_srv_timeout");
-    if (pyObj_dns_srv_timeout != nullptr) {
-        auto dns_srv_timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_dns_srv_timeout));
-        auto dns_srv_timeout_ms = std::chrono::milliseconds(std::max(0ULL, dns_srv_timeout / 1000ULL));
-        options.dns_srv_timeout = dns_srv_timeout_ms;
-    }
-
     PyObject* pyObj_idle_http_connection_timeout = PyDict_GetItemString(pyObj_timeout_opts, "idle_http_connection_timeout");
     if (pyObj_idle_http_connection_timeout != nullptr) {
         auto idle_http_connection_timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_idle_http_connection_timeout));
@@ -736,10 +729,19 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
 
     PyObject* pyObj_dns_nameserver = PyDict_GetItemString(pyObj_options, "dns_nameserver");
     PyObject* pyObj_dns_port = PyDict_GetItemString(pyObj_options, "dns_port");
+    PyObject* pyObj_dns_srv_timeout = nullptr;
+    if (pyObj_timeout_opts != nullptr) {
+        pyObj_dns_srv_timeout = PyDict_GetItemString(pyObj_timeout_opts, "dns_srv_timeout");
+    }
     if (pyObj_dns_nameserver != nullptr && pyObj_dns_port != nullptr) {
         auto nameserver = std::string(PyUnicode_AsUTF8(pyObj_dns_nameserver));
         auto port = static_cast<uint16_t>(PyLong_AsUnsignedLong(pyObj_dns_port));
-        options.dns_config = couchbase::core::io::dns::dns_config(nameserver, port, options.dns_srv_timeout);
+        auto dns_srv_timeout_ms = couchbase::core::timeout_defaults::dns_srv_timeout;
+        if (pyObj_dns_srv_timeout != nullptr) {
+            auto dns_srv_timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_dns_srv_timeout));
+            dns_srv_timeout_ms = std::chrono::milliseconds(std::max(0ULL, dns_srv_timeout / 1000ULL));
+        }
+        options.dns_config = couchbase::core::io::dns::dns_config(nameserver, port, dns_srv_timeout_ms);
     }
 }
 
@@ -928,7 +930,7 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     }
     Py_XDECREF(pyObj_tmp);
 
-    int_msec = opts.dns_srv_timeout;
+    int_msec = opts.dns_config.timeout();
     pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
     if (-1 == PyDict_SetItemString(pyObj_opts, "dns_srv_timeout", pyObj_tmp)) {
         PyErr_Print();

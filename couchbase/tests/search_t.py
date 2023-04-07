@@ -16,6 +16,7 @@
 
 import threading
 import uuid
+import warnings
 from copy import copy
 from datetime import datetime, timedelta
 
@@ -711,13 +712,22 @@ class SearchParamTestSuite:
     def test_params_scope_collections(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
         opts = SearchOptions(scope_name='test-scope', collections=['test-collection-1', 'test-collection-2'])
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            cb_env.TEST_INDEX_NAME, q, opts
-        )
+        caught_warnings = []
+        warnings.resetwarnings()
+        with warnings.catch_warnings(record=True) as ws:
+            search_query = search.SearchQueryBuilder.create_search_query_object(
+                cb_env.TEST_INDEX_NAME, q, opts
+            )
+            caught_warnings = ws
         exp_opts = base_opts.copy()
+        # We still need to check for the scope_name option until we actually remove the option.
+        # The option is deprecated and not sent to the C++ client, but it still in the search_query.params
+        # until we send the params over to the C++ client.
         exp_opts['scope_name'] = 'test-scope'
         exp_opts['collections'] = ['test-collection-1', 'test-collection-2']
         assert search_query.params == exp_opts
+        assert len(caught_warnings) == 1
+        assert 'The scope_name option is not used by the search API.' in caught_warnings[0].message.args[0]
 
     def test_params_serializer(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
@@ -1563,7 +1573,6 @@ class ClassicSearchParamTests(SearchParamTestSuite):
             pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
 
         cb_env = SearchTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_search_mgmt()
         cb_env.setup(request.param, test_suite=self.__class__.__name__)
         yield cb_env
         cb_env.teardown(request.param, test_suite=self.__class__.__name__)

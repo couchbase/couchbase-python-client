@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import warnings
+from typing import Optional
 
 
 class CouchbaseDeprecationWarning(UserWarning):
@@ -67,9 +68,29 @@ class Supportability:
             param (str): The name of the deprecated param
             use_instead (str): The name of the param to use instead of the deprecated param.
         """
-        message = (f"Method parameter {param} is deprecated and will be removed in a future relase."
+        message = (f"Method parameter {param} is deprecated and will be removed in a future release. "
                    f"Use {use_instead} instead.")
         warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
+
+    @staticmethod
+    def option_deprecated(param,  # type: str
+                          use_instead=None,  # type: Optional[str]
+                          message=None,  # type: Optional[str]
+                          ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the provided param is deprecated.
+
+        Args:
+            param (str): The name of the deprecated param
+            use_instead (Optional, str): The name of the param to use instead of the deprecated param.
+            message (Optional, str): A message to have in the warning to add context.
+        """
+        msg = f"Option {param} is deprecated and will be removed in a future release. "
+        if use_instead:
+            msg += f"Use {use_instead} instead. "
+        if message:
+            msg += message
+
+        warnings.warn(msg, CouchbaseDeprecationWarning, stacklevel=2)
 
 
 class RemoveProperty:

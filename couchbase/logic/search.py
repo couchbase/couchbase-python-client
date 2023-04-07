@@ -33,6 +33,7 @@ from couchbase._utils import is_null_or_empty, to_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import SearchOptionsBase
+from couchbase.logic.supportability import Supportability
 from couchbase.options import (SearchOptions,
                                UnsignedInt32,
                                UnsignedInt64)
@@ -947,6 +948,10 @@ class SearchQueryBuilder:
         query = json.dumps(self._query.encodable)
         params['query'] = query
         for k in self._VALID_OPTS.keys():
+            # deprecate the scope_name option, no need to pass it to the C++ client
+            # as the search API will not use
+            if k in ['scope_name']:
+                continue
             if k in self._params:
                 params[k] = self._params.get(k)
 
@@ -1158,11 +1163,13 @@ class SearchQueryBuilder:
 
     @property
     def scope_name(self) -> Optional[str]:
+        Supportability.option_deprecated('scope_name', message='The scope_name option is not used by the search API.')
         return self._params.get('scope_name', None)
 
     @scope_name.setter
     def scope_name(self, value  # type: str
                    ) -> None:
+        Supportability.option_deprecated('scope_name', message='The scope_name option is not used by the search API.')
         self.set_option('scope_name', value)
 
     @property
