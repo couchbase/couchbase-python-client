@@ -52,8 +52,6 @@ class TransactionsLogic:
             transaction_options=None,  # type: Optional[TransactionOptions]
             **kwargs                   # type: Optional[Dict[str, Any]]
             ):
-        print(transaction_options)
-        print(f'kwargs: {kwargs}')
         if transaction_options:
             kwargs['transaction_options'] = transaction_options._base
         if 'per_txn_config' in kwargs:
