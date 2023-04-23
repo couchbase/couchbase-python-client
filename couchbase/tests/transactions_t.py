@@ -15,12 +15,13 @@
 
 import json
 from datetime import timedelta
-from time import sleep
 
 import pytest
 
 from couchbase.durability import DurabilityLevel, ServerDurability
-from couchbase.exceptions import (ParsingFailedException,
+from couchbase.exceptions import (DocumentExistsException,
+                                  DocumentNotFoundException,
+                                  ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed,
                                   TransactionOperationFailed)
@@ -30,6 +31,7 @@ from couchbase.options import (TransactionConfig,
                                TransactionQueryOptions)
 from couchbase.transactions import TransactionKeyspace, TransactionResult
 from tests.environments import CollectionType
+from tests.environments.test_environment import TestEnvironment
 from tests.test_features import EnvironmentFeatures
 
 
@@ -43,7 +45,11 @@ class TransactionTestSuite:
         'test_client_context_id',
         'test_expiration_time',
         'test_get',
+        'test_get_lambda_raises_doc_not_found',
+        'test_get_inner_exc_doc_not_found',
         'test_insert',
+        'test_insert_lambda_raises_doc_exists',
+        'test_insert_inner_exc_doc_exists',
         'test_kv_timeout',
         'test_max_parallelism',
         'test_metadata_collection',
@@ -55,10 +61,14 @@ class TransactionTestSuite:
         'test_positional_params',
         'test_profile_mode',
         'test_query',
+        'test_query_lambda_raises_parsing_failure',
+        'test_query_inner_exc_parsing_failure',
         'test_raw',
         'test_read_only',
         'test_remove',
+        'test_remove_fail_bad_cas',
         'test_replace',
+        'test_replace_fail_bad_cas',
         'test_rollback',
         'test_rollback_eating_exceptions',
         'test_scan_consistency',
@@ -141,6 +151,49 @@ class TransactionTestSuite:
 
         cb_env.cluster.transactions.run(txn_logic)
 
+    def test_get_lambda_raises_doc_not_found(self, cb_env):
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            try:
+                ctx.get(cb_env.collection, key)
+            except Exception as ex:
+                err_msg = f"Expected to raise DocumentNotFoundException, not {ex.__class__.__name__}"
+                assert isinstance(ex, DocumentNotFoundException), err_msg
+
+            raise Exception('User raised exception.')
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert 'User raised exception.' in str(ex)
+        except Exception as ex:
+            pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
+
+        assert num_attempts == 1
+
+    def test_get_inner_exc_doc_not_found(self, cb_env):
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.get(cb_env.collection, key)
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert ex.inner_cause is not None
+            assert isinstance(ex.inner_cause, DocumentNotFoundException)
+        except Exception as ex:
+            pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
+
+        assert num_attempts == 1
+
     def test_insert(self, cb_env):
         key, value = cb_env.get_new_doc()
 
@@ -150,6 +203,49 @@ class TransactionTestSuite:
         cb_env.cluster.transactions.run(txn_logic)
         get_result = cb_env.collection.get(key)
         assert get_result.content_as[dict] == value
+
+    def test_insert_lambda_raises_doc_exists(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            try:
+                ctx.insert(cb_env.collection, key, value)
+            except Exception as ex:
+                err_msg = f"Expected to raise DocumentExistsException, not {ex.__class__.__name__}"
+                assert isinstance(ex, DocumentExistsException), err_msg
+
+            raise Exception('User raised exception.')
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert 'User raised exception.' in str(ex)
+        except Exception as ex:
+            pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
+
+        assert num_attempts == 1
+
+    def test_insert_inner_exc_doc_exists(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.insert(cb_env.collection, key, value)
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert ex.inner_cause is not None
+            assert isinstance(ex.inner_cause, DocumentExistsException)
+        except Exception as ex:
+            pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
+
+        assert num_attempts == 1
 
     @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
     @pytest.mark.parametrize('kv_timeout', [timedelta(seconds=30), timedelta(milliseconds=2)])
@@ -197,12 +293,14 @@ class TransactionTestSuite:
 
         def txn_logic(ctx):
             ctx.insert(cb_env.collection, key, {'some': 'thing'})
-            sleep(0.001)
+            TestEnvironment.sleep(0.001)
             ctx.get(cb_env.collection, key)
 
         with pytest.raises(TransactionExpired):
-            cb_env.cluster.transactions.run(txn_logic, TransactionOptions(expiration_time=timedelta(microseconds=1)))
-        assert cb_env.collection.exists(key).exists is False
+            cb_env.cluster.transactions.run(txn_logic,
+                                            TransactionOptions(expiration_time=timedelta(microseconds=1)))
+        res = cb_env.collection.exists(key)
+        assert res.exists is False
 
     def test_pipeline_batch(self):
         batch = 100
@@ -246,7 +344,51 @@ class TransactionTestSuite:
                 TransactionQueryOptions(metrics=False))
 
         cb_env.cluster.transactions.run(txn_logic)
-        assert cb_env.collection.exists(key).exists
+        res = cb_env.collection.exists(key)
+        assert res.exists is True
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_lambda_raises_parsing_failure(self, cb_env):
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            try:
+                ctx.query('This is not N1QL!', TransactionQueryOptions(metrics=False))
+            except Exception as ex:
+                err_msg = f"Expected to raise ParsingFailedException, not {ex.__class__.__name__}"
+                assert isinstance(ex, ParsingFailedException), err_msg
+
+            raise Exception('User raised exception.')
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert 'User raised exception.' in str(ex)
+        except Exception as ex:
+            pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
+
+        assert num_attempts == 1
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_inner_exc_parsing_failure(self, cb_env):
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.query('This is not N1QL!', TransactionQueryOptions(metrics=False))
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert ex.inner_cause is not None
+            assert isinstance(ex.inner_cause, ParsingFailedException)
+        except Exception as ex:
+            pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
+
+        assert num_attempts == 1
 
     @pytest.mark.parametrize('raw', [{'key1': 'yo'}, {'key1': 5, 'key2': 'foo'}, {'key': [1, 2, 3]}])
     def test_raw(self, raw):
@@ -276,6 +418,33 @@ class TransactionTestSuite:
         result = cb_env.collection.exists(key)
         assert result.exists is False
 
+    def test_remove_fail_bad_cas(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        # txn will retry until timeout
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            rem_res = ctx.get(cb_env.collection, key)
+            ctx.replace(rem_res, {'what': 'new content!'})
+            try:
+                ctx.remove(rem_res)
+            except Exception as ex:
+                assert isinstance(ex, TransactionOperationFailed)
+                assert 'transaction expired' in ex.message or 'cas_mismatch' in ex.message
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic, TransactionOptions(expiration_time=timedelta(seconds=2)))
+        except Exception as ex:
+            assert isinstance(ex, TransactionExpired)
+            assert 'transaction expired' in ex.message or 'expired in auto' in ex.message
+
+        assert num_attempts > 1
+        # txn should fail, so doc should exist
+        res = cb_env.collection.get(key)
+        assert res.content_as[dict] == value
+
     def test_replace(self, cb_env):
         key, value = cb_env.get_existing_doc()
         new_value = {'some': 'thing else'}
@@ -293,6 +462,33 @@ class TransactionTestSuite:
         cb_env.cluster.transactions.run(txn_logic)
         result = cb_env.collection.get(key)
         assert result.content_as[dict] == new_value
+
+    def test_replace_fail_bad_cas(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        # txn will retry until timeout
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            rem_res = ctx.get(cb_env.collection, key)
+            ctx.replace(rem_res, {'foo': 'bar'})
+            try:
+                ctx.replace(rem_res, {'foo': 'baz'})
+            except Exception as ex:
+                assert isinstance(ex, TransactionOperationFailed)
+                assert 'transaction expired' in ex.message or 'cas_mismatch' in ex.message
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic, TransactionOptions(expiration_time=timedelta(seconds=2)))
+        except Exception as ex:
+            assert isinstance(ex, TransactionExpired)
+            assert 'transaction expired' in ex.message or 'expired in auto' in ex.message
+
+        assert num_attempts > 1
+        # txn should fail, so doc should have original content
+        res = cb_env.collection.get(key)
+        assert res.content_as[dict] == value
 
     def test_rollback(self, cb_env):
         key, value = cb_env.get_new_doc()
@@ -318,14 +514,19 @@ class TransactionTestSuite:
             try:
                 ctx.insert(cb_env.collection, key, {'this': 'should fail'})
                 pytest.fail("insert of existing key should have failed")
-            except TransactionOperationFailed:
+            except DocumentExistsException:
                 # just eat the exception
                 pass
             except Exception as e2:
                 pytest.fail(f"Expected insert to raise TransactionOperationFailed, not {e2.__class__.__name__}")
 
-        with pytest.raises(TransactionFailed):
+        try:
             cb_env.cluster.transactions.run(txn_logic)
+        except Exception as ex:
+            assert isinstance(ex, TransactionFailed)
+            # the inner cause should be a DocumentExistsException for this example
+            # if pytest.fail() occurred this will not be the case, thus failing the test
+            assert isinstance(ex.inner_cause, DocumentExistsException)
 
         result = cb_env.collection.get(key)
         assert result.cas == cas
@@ -393,14 +594,14 @@ class ClassicTransactionTests(TransactionTestSuite):
         return compare
 
     @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
+    def couchbase_test_environment(self, cb_base_txn_env, test_manifest_validated, request):
         if test_manifest_validated:
             pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
 
         EnvironmentFeatures.check_if_feature_supported('txns',
-                                                       cb_base_env.server_version_short,
-                                                       cb_base_env.mock_server_type)
+                                                       cb_base_txn_env.server_version_short,
+                                                       cb_base_txn_env.mock_server_type)
 
-        cb_base_env.setup(request.param)
-        yield cb_base_env
-        cb_base_env.teardown(request.param)
+        cb_base_txn_env.setup(request.param)
+        yield cb_base_txn_env
+        cb_base_txn_env.teardown(request.param)

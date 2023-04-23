@@ -21,7 +21,10 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Optional)
 
-from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
+from couchbase.exceptions import (CouchbaseException,
+                                  ErrorMapper,
+                                  TransactionsErrorContext)
+from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.supportability import Supportability
 from couchbase.options import TransactionQueryOptions
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
@@ -50,6 +53,8 @@ class BlockingWrapper:
                     log.debug('%s returned %s', fn.__name__, ret)
                     if isinstance(ret, Exception):
                         raise ret
+                    if isinstance(ret, BaseCouchbaseException):
+                        raise ErrorMapper.build_exception(ret)
                     if return_cls is None:
                         return None
                     if return_cls is TransactionGetResult:

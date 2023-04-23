@@ -23,6 +23,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Optional)
 
+from couchbase.exceptions import ErrorMapper
+from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.supportability import Supportability
 from couchbase.options import TransactionQueryOptions
 from couchbase.transactions import (TransactionGetResult,
@@ -52,22 +54,29 @@ class AsyncWrapper:
 
                 def on_ok(res):
                     log.debug('%s completed, with %s', fn.__name__, res)
-                    try:
-                        if return_cls is TransactionGetResult:
-                            result = return_cls(res, self._serializer)
-                        else:
-                            result = return_cls(res) if return_cls is not None else None
-                        self._loop.call_soon_threadsafe(ftr.set_result, result)
-                    except Exception as e:
-                        log.error('on_ok raised %s, %s', e, e.__cause__)
-                        self._loop.call_soon_threadsafe(ftr.set_exception, e)
+                    # BUG(PYCBC-1476): We might not need this once txn bug is fixed
+                    if isinstance(res, BaseCouchbaseException):
+                        self._loop.call_soon_threadsafe(ftr.set_exception, ErrorMapper.build_exception(res))
+                    else:
+                        try:
+                            if return_cls is TransactionGetResult:
+                                result = return_cls(res, self._serializer)
+                            else:
+                                result = return_cls(res) if return_cls is not None else None
+                            self._loop.call_soon_threadsafe(ftr.set_result, result)
+                        except Exception as e:
+                            log.error('on_ok raised %s, %s', e, e.__cause__)
+                            self._loop.call_soon_threadsafe(ftr.set_exception, e)
 
                 def on_err(exc):
                     log.error('%s got on_err called with %s', fn.__name__, exc)
                     try:
                         if not exc:
-                            raise RuntimeError(f'unknown error calling {fn.__name__}')
-                        self._loop.call_soon_threadsafe(ftr.set_exception, exc)
+                            exc = RuntimeError(f'unknown error calling {fn.__name__}')
+                        if isinstance(exc, BaseCouchbaseException):
+                            self._loop.call_soon_threadsafe(ftr.set_exception, ErrorMapper.build_exception(exc))
+                        else:
+                            self._loop.call_soon_threadsafe(ftr.set_exception, exc)
                     except Exception as e:
                         self._loop.call_soon_threadsafe(ftr.set_exception, e)
 

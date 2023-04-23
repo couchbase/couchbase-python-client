@@ -45,9 +45,14 @@ class TransactionGetResult:
     @property
     def content_as(self):
         if not self._decoded_value:
-            self._decoded_value = self._serializer.deserialize(self._res.get("value"))
-            log.debug('result has decoded value %s', self._decoded_value)
-        return ContentProxy(self._decoded_value)
+            val = self._res.get('value')
+            if val:
+                self._decoded_value = self._serializer.deserialize(self._res.get("value"))
+                log.debug(f'Result has decoded value {self._decoded_value}')
+                return ContentProxy(self._decoded_value)
+
+        log.debug('Result is missing decoded value ')
+        return ContentProxy('')
 
     def __str__(self):
         return f'TransactionGetResult{{id={self.id}, cas={self.cas}, value={self.content_as[str]} }}'

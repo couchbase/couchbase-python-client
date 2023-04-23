@@ -30,7 +30,6 @@ class TransactionKeyspace:
         pass
 
     def __init__(self, **kwargs):
-        print(f"TransactionKeyspace called with {kwargs}")
         self._bucket = None
         self._scope = None
         self._collection = None

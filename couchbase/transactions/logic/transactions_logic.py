@@ -52,14 +52,17 @@ class TransactionsLogic:
             transaction_options=None,  # type: Optional[TransactionOptions]
             **kwargs                   # type: Optional[Dict[str, Any]]
             ):
-        print(transaction_options)
-        print(f'kwargs: {kwargs}')
         if transaction_options:
             kwargs['transaction_options'] = transaction_options._base
         if 'per_txn_config' in kwargs:
             Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
             kwargs['transaction_options'] = kwargs.pop('per_txn_config', None)
-        return run_transaction(txns=self._txns, logic=logic, **kwargs)
+
+        try:
+            return run_transaction(txns=self._txns, logic=logic, **kwargs)
+        except Exception as e:
+            log.debug('txn_logic.run() got %s:%s, re-raising it', e.__class__.__name__, e)
+            raise e
 
     def close(self, **kwargs):
         log.info('shutting down transactions...')

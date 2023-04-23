@@ -376,11 +376,34 @@ class CouchbaseException(Exception):
             self._context = ErrorContext.from_dict(**base_ec)
         return self._context
 
+    @property
+    def message(self) -> Optional[str]:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Returns:
+            Optional[str]: Exception's error message, if it exists.
+        """
+        if self._message:
+            return self._message
+        if self._base:
+            return self._base.strerror().replace('_', ' ')
+
+    @property
+    def inner_cause(self) -> Optional[Exception]:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Returns:
+            Optional[Exception]: Exception's inner cause, if it exists.
+        """
+        return self._exc_info.get('inner_cause', None)
+
     @classmethod
     def pycbc_create_exception(cls, base=None, message=None):
         return cls(base=base, message=message)
 
-    def __str__(self):
+    def __repr__(self):
         from couchbase._utils import is_null_or_empty
         details = []
         if self._base:
@@ -402,6 +425,9 @@ class CouchbaseException(Exception):
         if self._exc_info and 'inner_cause' in self._exc_info:
             details.append('Inner cause={0}'.format(self._exc_info['inner_cause']))
         return "<{}>".format(", ".join(details))
+
+    def __str__(self):
+        return self.__repr__()
 
 
 # common errors
@@ -507,6 +533,17 @@ class InternalSDKException(CouchbaseException):
 class DocumentNotFoundException(CouchbaseException):
     """Indicates that the referenced document does not exist."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class DocumentUnretrievableException(CouchbaseException):
     """Indicates that the referenced document does not exist and therefore no replicas are found."""
@@ -519,6 +556,17 @@ class DocumentLockedException(CouchbaseException):
 
 class DocumentExistsException(CouchbaseException):
     """Indicates that the referenced document exists already, but the operation was not expecting it to exist."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class DurabilityInvalidLevelException(CouchbaseException):
@@ -570,6 +618,17 @@ class ParsingFailedException(CouchbaseException):
     """
     Raised when the query service is unable to parse a N1QL query
     """
+
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class AlreadyQueriedException(CouchbaseException):
@@ -799,8 +858,19 @@ class TransactionException(CouchbaseException):
     Base class for any transaction-related exception
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
+
+    def __repr__(self):
+        # handle inheritance structure
+        if type(self).__name__ != 'TransactionException':
+            return super().__repr__()
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class TransactionOperationFailed(TransactionException):
@@ -810,11 +880,16 @@ class TransactionOperationFailed(TransactionException):
     The transaction will be rolled back no matter what, but this error can give some context as to why it failed.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return f'TransactionOperationFailed{{{super().__str__}}}'
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class TransactionFailed(TransactionException):
@@ -824,8 +899,16 @@ class TransactionFailed(TransactionException):
      No actors can see any changes made by this transaction.
      """
 
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
     def __str__(self):
-        return f'TransactionFailed{{{super().__str__()}}}'
+        return self.__repr__()
 
 
 class TransactionExpired(TransactionException):
@@ -836,8 +919,16 @@ class TransactionExpired(TransactionException):
     contents of this transaction.The transaction exceeded the expiry set in the TransactionConfig, and was rolled back.
     """
 
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
     def __str__(self):
-        return f'TransactionExpired{{{super().__str__()}}}'
+        return self.__repr__()
 
 
 class TransactionCommitAmbiguous(TransactionException):
@@ -858,8 +949,16 @@ class TransactionCommitAmbiguous(TransactionException):
     forwards if it did.
     """
 
+    def __init__(self, message=None, **kwargs):
+        if message and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
     def __str__(self):
-        return f'TransactionCommitAmbiguous{{{super().__str__()}}}'
+        return self.__repr__()
 
 # Field Level Encryption Exceptions
 

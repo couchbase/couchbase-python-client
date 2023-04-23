@@ -701,13 +701,39 @@ init_transaction_exception_type(const char* klass)
     return PyObject_GetAttrString(couchbase_exceptions, klass);
 }
 
+void
+build_inner_exception(PyObject* pyObj_inner_exc,
+                      PyObject* pyObj_type,
+                      PyObject* pyObj_value,
+                      PyObject* pyObj_traceback,
+                      const char* file,
+                      int line)
+{
+    if (pyObj_type != nullptr) {
+        PyErr_NormalizeException(&pyObj_type, &pyObj_value, &pyObj_traceback);
+        if (-1 == PyDict_SetItemString(pyObj_inner_exc, "inner_cause", pyObj_value)) {
+            PyErr_Print();
+            // the important key is the "inner_cause", if this fails just don't populate the dict
+            // we will check for the "inner_cause" key later in convert_to_python_exc_type()
+            return;
+        }
+        PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+        if (-1 == PyDict_SetItemString(pyObj_inner_exc, "cinfo", pyObj_cinfo)) {
+            PyErr_Print();
+        }
+        Py_XDECREF(pyObj_cinfo);
+    }
+}
+
 PyObject*
-convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false)
+convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false, PyObject* pyObj_inner_exc = nullptr)
 {
     static PyObject* pyObj_txn_failed = init_transaction_exception_type("TransactionFailed");
     static PyObject* pyObj_txn_expired = init_transaction_exception_type("TransactionExpired");
     static PyObject* pyObj_txn_ambig = init_transaction_exception_type("TransactionCommitAmbiguous");
     static PyObject* pyObj_txn_op_failed = init_transaction_exception_type("TransactionOperationFailed");
+    static PyObject* pyObj_document_exists_ex = init_transaction_exception_type("DocumentExistsException");
+    static PyObject* pyObj_document_not_found_ex = init_transaction_exception_type("DocumentNotFoundException");
     static PyObject* pyObj_query_parsing_failure = init_transaction_exception_type("ParsingFailedException");
     static PyObject* pyObj_couchbase_error = init_transaction_exception_type("CouchbaseException");
     PyObject* pyObj_error_ctx = PyDict_New();
@@ -740,6 +766,12 @@ convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false)
     } catch (const tx_core::query_parsing_failure& e) {
         pyObj_exc_type = pyObj_query_parsing_failure;
         message = e.what();
+    } catch (const tx_core::document_exists& e) {
+        pyObj_exc_type = pyObj_document_exists_ex;
+        message = e.what();
+    } catch (const tx_core::document_not_found& e) {
+        pyObj_exc_type = pyObj_document_exists_ex;
+        message = e.what();
     } catch (const tx_core::op_exception& e) {
         pyObj_exc_type = pyObj_couchbase_error;
         message = e.what();
@@ -753,6 +785,13 @@ convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false)
     PyObject* tmp = PyUnicode_FromString(message);
     PyDict_SetItemString(pyObj_error_ctx, "message", tmp);
     Py_DECREF(tmp);
+    if (pyObj_inner_exc != nullptr) {
+        tmp = PyDict_GetItemString(pyObj_inner_exc, "inner_cause");
+        if (tmp != nullptr) {
+            PyDict_SetItemString(pyObj_error_ctx, "exc_info", pyObj_inner_exc);
+            Py_DECREF(pyObj_inner_exc);
+        }
+    }
     PyObject* pyObj_args = PyTuple_New(0);
     pyObj_final_error = PyObject_Call(pyObj_exc_type, pyObj_args, pyObj_error_ctx);
     Py_DECREF(pyObj_args);
@@ -816,15 +855,27 @@ handle_returning_transaction_get_result(PyObject* pyObj_callback,
             func = pyObj_errback;
         }
     } else {
-        PyObject* transaction_get_result_obj = PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_result_type), nullptr);
-        auto result = reinterpret_cast<pycbc_txns::transaction_get_result*>(transaction_get_result_obj);
-        // now lets copy it in
-        // TODO: ideally we'd have a move constructor for transaction_get_result, but for now...
-        result->res = new tx_core::transaction_get_result(res.value());
-        if (nullptr == pyObj_callback) {
-            barrier->set_value(transaction_get_result_obj);
+        PyObject* pyObj_get_result = nullptr;
+
+        // BUG(PYCBC-1476): We should revert to using direct get
+        // operations once the underlying issue has been resolved.
+        if (!res.has_value()) {
+            pyObj_get_result = pycbc_build_exception(couchbase::errc::make_error_code(couchbase::errc::key_value::document_not_found),
+                                                     __FILE__,
+                                                     __LINE__,
+                                                     "Txn get op: document not found.");
         } else {
-            args = PyTuple_Pack(1, transaction_get_result_obj);
+            pyObj_get_result = PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_result_type), nullptr);
+            auto result = reinterpret_cast<pycbc_txns::transaction_get_result*>(pyObj_get_result);
+            // now lets copy it in
+            // TODO: ideally we'd have a move constructor for transaction_get_result, but for now...
+            result->res = new tx_core::transaction_get_result(res.value());
+        }
+
+        if (nullptr == pyObj_callback) {
+            barrier->set_value(pyObj_get_result);
+        } else {
+            args = PyTuple_Pack(1, pyObj_get_result);
             func = pyObj_callback;
         }
     }
@@ -1137,9 +1188,13 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     Py_XINCREF(pyObj_errback);
     Py_XINCREF(pyObj_callback);
     Py_XINCREF(pyObj_logic);
+    // create a placeholder for potentially storing inner exception for TransactionFailed
+    // make sure the container sticks around
+    PyObject* pyObj_inner_exc = PyDict_New();
+    Py_INCREF(pyObj_inner_exc);
     auto barrier = std::make_shared<std::promise<PyObject*>>();
     auto f = barrier->get_future();
-    auto logic = [pyObj_logic](tx_core::async_attempt_context& ctx) {
+    auto logic = [pyObj_logic, pyObj_inner_exc](tx_core::async_attempt_context& ctx) {
         auto state = PyGILState_Ensure();
         auto py_ctx = new pycbc_txns::attempt_context(ctx);
         PyObject* pyObj_ctx = PyCapsule_New(py_ctx, "ctx_", dealloc_attempt_context);
@@ -1160,21 +1215,30 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
                 // raise a c++ exception to insure rollback.
                 py_error = true;
                 if (nullptr != pyObj_exc_value) {
-                    py_error_message = PyUnicode_AsUTF8(PyObject_Repr(pyObj_exc_value));
+                    PyObject* pyObj_exc_message = PyObject_GetAttrString(pyObj_exc_value, "message");
+                    if (pyObj_exc_message == nullptr || pyObj_exc_message == Py_None) {
+                        pyObj_exc_message = PyObject_Repr(pyObj_exc_value);
+                    }
+                    py_error_message = PyUnicode_AsUTF8(pyObj_exc_message);
+                    Py_XDECREF(pyObj_exc_message);
+                    build_inner_exception(pyObj_inner_exc, pyObj_exc_type, pyObj_exc_value, pyObj_exc_trace, __FILE__, __LINE__);
                 }
             }
         }
-        // eat the exception in any case
+        // Decrement references and eat the exception since we captured the inner exception
+        // for instances in which we want to keep the inner exception
+        Py_XDECREF(pyObj_exc_type);
+        Py_XDECREF(pyObj_exc_value);
+        Py_XDECREF(pyObj_exc_trace);
         PyErr_Restore(nullptr, nullptr, nullptr);
-
         PyGILState_Release(state);
         // now we raise an exception so we will rollback
         if (py_error) {
             throw std::runtime_error(py_error_message);
         }
     };
-    auto cb = [pyObj_callback, pyObj_errback, barrier, pyObj_logic](std::optional<tx_core::transaction_exception> err,
-                                                                    std::optional<tx::transaction_result> res) {
+    auto cb = [pyObj_callback, pyObj_errback, barrier, pyObj_logic, pyObj_inner_exc](std::optional<tx_core::transaction_exception> err,
+                                                                                     std::optional<tx::transaction_result> res) {
         auto state = PyGILState_Ensure();
         PyObject* args = nullptr;
         PyObject* func = nullptr;
@@ -1182,7 +1246,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
             if (nullptr == pyObj_errback) {
                 barrier->set_exception(std::make_exception_ptr(*err));
             } else {
-                args = PyTuple_Pack(1, convert_to_python_exc_type(std::make_exception_ptr(*err)));
+                args = PyTuple_Pack(1, convert_to_python_exc_type(std::make_exception_ptr(*err), false, pyObj_inner_exc));
                 func = pyObj_errback;
             }
         } else {
@@ -1198,6 +1262,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
             PyObject_CallObject(func, args);
             Py_DECREF(pyObj_errback);
             Py_DECREF(pyObj_callback);
+            Py_DECREF(pyObj_inner_exc);
         }
         Py_XDECREF(pyObj_logic);
         PyGILState_Release(state);
@@ -1214,7 +1279,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     else
     {
         auto expiry = opts->expiration_time();
-        CB_LOG_DEBUG("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
+        CB_LOG_DEBUG("calling transactions.run with expiry {}ns", expiry.has_value() ? expiry->count() : 0);
         // @TODO: PYCBC-1425, is this the right approach?
         txns->txns->run(*opts, logic, std::forward<pycbc_txns::pycbc_txn_complete_callback>(cb));
     }
@@ -1230,12 +1295,10 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
         }
         Py_END_ALLOW_THREADS if (err)
         {
-            return convert_to_python_exc_type(err, true);
+            retval = convert_to_python_exc_type(err, true, pyObj_inner_exc);
+            Py_DECREF(pyObj_inner_exc);
         }
-        else
-        {
-            return retval;
-        }
+        return retval;
     }
     Py_RETURN_NONE;
 }

@@ -24,5 +24,8 @@ class TransactionResult(dict):
     def unstaging_complete(self) -> bool:
         return self.get("unstaging_complete", None)
 
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
     def __str__(self):
-        return f'TransactionResult:{super().__str__()}'
+        return f"{type(self).__name__}({super().__str__()})"
