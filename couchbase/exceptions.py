@@ -439,29 +439,94 @@ class InternalServerFailureException(CouchbaseException):
         Search: HTTP 500
     """
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class TimeoutException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class MissingConnectionException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class AmbiguousTimeoutException(CouchbaseException):
-    """ AmbiguousTimeoutException """
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class TemporaryFailException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class UnAmbiguousTimeoutException(CouchbaseException):
-    """ UnAmbiguousTimeoutException """
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class RequestCanceledException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class InvalidArgumentException(CouchbaseException):
@@ -469,18 +534,44 @@ class InvalidArgumentException(CouchbaseException):
         and/or invalid type.
     """
 
-    def __init__(self, msg=None, **kwargs):
-        if msg:
-            kwargs['message'] = msg
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class AuthenticationException(CouchbaseException):
     """Indicates that an error occurred authenticating the user to the cluster."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class CasMismatchException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 CASMismatchException = CasMismatchException
@@ -489,18 +580,44 @@ CASMismatchException = CasMismatchException
 class BucketNotFoundException(CouchbaseException):
     """Indicates that the bucket being referenced does not exist."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class ValueFormatException(CouchbaseException):
     """Failed to decode or encode value"""
 
-    def __init__(self, msg=None, **kwargs):
-        if msg:
-            kwargs['message'] = msg
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class HTTPException(CouchbaseException):
-    """HTTP error"""
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class ServiceUnavailableException(CouchbaseException):
@@ -510,9 +627,31 @@ class ServiceUnavailableException(CouchbaseException):
         and views or n1ql queries should be performed
     """
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class FeatureUnavailableException(CouchbaseException):
     """Raised when feature that is not available with the current server version is used."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class InternalSDKException(CouchbaseException):
@@ -522,10 +661,16 @@ class InternalSDKException(CouchbaseException):
     not be seeing this message)
     """
 
-    def __init__(self, msg=None, **kwargs):
-        if msg:
-            kwargs['message'] = msg
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # kv errors
 
@@ -534,7 +679,7 @@ class DocumentNotFoundException(CouchbaseException):
     """Indicates that the referenced document does not exist."""
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -548,17 +693,39 @@ class DocumentNotFoundException(CouchbaseException):
 class DocumentUnretrievableException(CouchbaseException):
     """Indicates that the referenced document does not exist and therefore no replicas are found."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class DocumentLockedException(CouchbaseException):
     """Indicates that the referenced document could not be used as it is currently locked,
     likely by another actor in the system."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class DocumentExistsException(CouchbaseException):
     """Indicates that the referenced document exists already, but the operation was not expecting it to exist."""
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -572,9 +739,31 @@ class DocumentExistsException(CouchbaseException):
 class DurabilityInvalidLevelException(CouchbaseException):
     """Given durability level is invalid"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class DurabilityImpossibleException(CouchbaseException):
     """Given durability requirements are impossible to achieve"""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class DurabilitySyncWriteInProgressException(CouchbaseException):
@@ -582,28 +771,94 @@ class DurabilitySyncWriteInProgressException(CouchbaseException):
     SyncWrite pending. Client would typically retry (possibly with backoff).
     Similar to ELOCKED"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class DurabilitySyncWriteAmbiguousException(CouchbaseException):
     """There is a synchronous mutation pending for given key
     The SyncWrite request has not completed in the specified time and has ambiguous
     result - it may Succeed or Fail; but the final value is not yet known"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class PathNotFoundException(CouchbaseException):
     """Indicates that the reference path was not found."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class PathExistsException(CouchbaseException):
     """Indicates that the reference path already existed, but the operation expected that it did not."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class PathMismatchException(CouchbaseException):
     """Indicates that the referenced path made incorrect assumptions about the structure of a document,
     for instance attempting to access a field as an object when in fact it is an array."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class InvalidValueException(CouchbaseException):
     """Indicates the provided value was invalid for the operation."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # @TODO:  How to Deprecate?
 
@@ -620,7 +875,7 @@ class ParsingFailedException(CouchbaseException):
     """
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -637,13 +892,31 @@ class AlreadyQueriedException(CouchbaseException):
     have already been iterated over.
     """
 
-    def __init__(self, message='Previously iterated over results.'):
-        super().__init__(message=message)
+    def __init__(self, message='Previously iterated over results.', **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class KeyspaceNotFoundException(CouchbaseException):
     """Keyspace not found (collection or bucket does not exist)"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Search Exceptions
 
@@ -653,40 +926,111 @@ class NoChildrenException(CouchbaseException):
     Compound query is missing children"
     """
 
-    def __init__(self, message='No child queries'):
-        super().__init__(message=message)
+    def __init__(self, message='No child queries.', **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Bucket Mgmt
 
 
 class BucketAlreadyExistsException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class BucketDoesNotExistException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class BucketNotFlushableException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Scope/Collection mgmt
 
 
 class CollectionAlreadyExistsException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class CollectionNotFoundException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class ScopeAlreadyExistsException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class ScopeNotFoundException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # User mgmt
 
@@ -694,9 +1038,31 @@ class ScopeNotFoundException(CouchbaseException):
 class GroupNotFoundException(CouchbaseException):
     """ The RBAC Group was not found"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class UserNotFoundException(CouchbaseException):
     """ The RBAC User was not found"""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Query index mgmt
 
@@ -704,34 +1070,61 @@ class UserNotFoundException(CouchbaseException):
 class QueryIndexAlreadyExistsException(CouchbaseException):
     """ The query index already exists"""
 
-    def __init__(self, msg=None, **kwargs):
-        if msg:
-            kwargs['message'] = msg
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class QueryIndexNotFoundException(CouchbaseException):
     """ The query index was not found"""
 
-    def __init__(self, msg=None, **kwargs):
-        if msg:
-            kwargs['message'] = msg
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class WatchQueryIndexTimeoutException(CouchbaseException):
     """Unable to find all requested indexes online within specified timeout"""
 
-    def __init__(self, msg=None, **kwargs):
-        if msg:
-            kwargs['message'] = msg
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
         super().__init__(**kwargs)
 
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Search Index mgmttest_bad_scope_query
 
+
 class SearchIndexNotFoundException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Analytics mgmt
 
@@ -739,37 +1132,107 @@ class SearchIndexNotFoundException(CouchbaseException):
 class DataverseAlreadyExistsException(CouchbaseException):
     """Raised when attempting to create dataverse when it already exists"""
 
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class DataverseNotFoundException(CouchbaseException):
     """Raised when attempting to drop a dataverse which does not exist"""
 
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class DatasetNotFoundException(CouchbaseException):
     """Raised when attempting to drop a dataset which does not exist."""
 
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class DatasetAlreadyExistsException(CouchbaseException):
     """Raised when attempting to create a dataset which already exists"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class AnalyticsLinkExistsException(CouchbaseException):
     """Raised when attempting to create an analytics link which already exists"""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class AnalyticsLinkNotFoundException(CouchbaseException):
     """Raised when attempting to replace or drop an analytics link that does not exists"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
 # Views mgmt
 
 
 class DesignDocumentNotFoundException(CouchbaseException):
-    """"""
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Eventing function mgmt
 
@@ -777,34 +1240,121 @@ class DesignDocumentNotFoundException(CouchbaseException):
 class EventingFunctionNotFoundException(CouchbaseException):
     """Raised when an eventing function is not found"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class EventingFunctionCompilationFailureException(CouchbaseException):
     """Raised when compilation of an eventing function failed"""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class EventingFunctionIdenticalKeyspaceException(CouchbaseException):
     """Raised when the source and metadata keyspaces are the same"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class EventingFunctionNotBootstrappedException(CouchbaseException):
     """Raised when an eventing function is deployed but not “fully” bootstrapped"""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class EventingFunctionNotDeployedException(CouchbaseException):
     """Raised when an eventing function is not deployed, but the action expects it to be deployed"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class EventingFunctionNotUnDeployedException(CouchbaseException):
     """Raised when an eventing function is deployed, but the action expects it to be undeployed"""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class EventingFunctionAlreadyDeployedException(CouchbaseException):
     """Raised when an eventing function has already been deployed"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class EventingFunctionCollectionNotFoundException(CouchbaseException):
     """Raised when collection in specified keyspace is not found"""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # python client only errors
 
@@ -812,23 +1362,74 @@ class EventingFunctionCollectionNotFoundException(CouchbaseException):
 class FeatureNotFoundException(CouchbaseException):
     """Thrown when feature is not supported by server version."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class InvalidIndexException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class MissingTokenException(CouchbaseException):
-    pass
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
-class QueueEmpty(Exception):
+class QueueEmpty(CouchbaseException):
     """
     Thrown if a datastructure queue is empty
     """
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class UnsuccessfulOperationException(CouchbaseException):
     """Thrown when a specific pycbc_core operation is unsuccessful."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Ratelimiting
 
@@ -841,6 +1442,17 @@ class RateLimitedException(CouchbaseException):
     The server decided that the caller must be rate limited due to
     exceeding a rate threshold."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class QuotaLimitedException(CouchbaseException):
     """
@@ -850,8 +1462,19 @@ class QuotaLimitedException(CouchbaseException):
     The server decided that the caller must be limited due to exceeding
     a quota threshold."""
 
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 # Transaction errors
+
 
 class TransactionException(CouchbaseException):
     """
@@ -859,7 +1482,7 @@ class TransactionException(CouchbaseException):
     """
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -881,7 +1504,7 @@ class TransactionOperationFailed(TransactionException):
     """
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -900,7 +1523,7 @@ class TransactionFailed(TransactionException):
      """
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -920,7 +1543,7 @@ class TransactionExpired(TransactionException):
     """
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -950,7 +1573,7 @@ class TransactionCommitAmbiguous(TransactionException):
     """
 
     def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
+        if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)
 
@@ -961,6 +1584,8 @@ class TransactionCommitAmbiguous(TransactionException):
         return self.__repr__()
 
 # Field Level Encryption Exceptions
+
+# @TODO:  Need to look at FLE library to make updates here
 
 
 class CryptoException(CouchbaseException):
@@ -1054,6 +1679,9 @@ class InvalidCipherTextException(CryptoException):
 # CXX Error Map
 
 
+# @TODO:  do we need this?  I think w/ the initial 4.x rewrite it was
+#         possible to pass in an excpetion w/ a result object, but I
+#         do not think we do this anymore.  Need to confirm.
 CLIENT_ERROR_MAP = dict(
     {
         2: RequestCanceledException,
