@@ -304,7 +304,7 @@ class SearchParamTestSuite:
         q_mt = search_query.params.get('mutation_state', None)
         assert isinstance(q_mt, list)
         assert len(q_mt) == 1
-        assert q_mt[0] == mt
+        assert q_mt[0] == mt.as_dict()
 
     def test_daterange_query(self, cb_env):
         with pytest.raises(TypeError):
@@ -1156,6 +1156,23 @@ class SearchTestSuite:
         cb_env.assert_rows(res, 0)
         res = cb_env.collection.insert(key, value)
         ms = MutationState().add_mutation_token(res.mutation_token())
+        res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME,
+                                          q,
+                                          SearchOptions(limit=10, consistent_with=ms))
+        cb_env.assert_rows(res, 1)
+
+        # prior to PYCBC-1477 the SDK _could_ crash w/ this this sort of MS creation
+        key, value = cb_env.get_new_doc()
+        # need to make sure content is unique
+        content = str(uuid.uuid4())[:8]
+        value['description'] = content
+        q = search.TermQuery(content)
+        res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME,
+                                          q,
+                                          SearchOptions(limit=10))
+        cb_env.assert_rows(res, 0)
+        res = cb_env.collection.insert(key, value)
+        ms = MutationState(res)
         res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME,
                                           q,
                                           SearchOptions(limit=10, consistent_with=ms))

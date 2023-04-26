@@ -1159,7 +1159,7 @@ class SearchQueryBuilder:
             raise TypeError('Passed empty or invalid state')
         # 3.x SDK had to set the consistency, couchbase++ will take care of that for us
         self._params.pop('scan_consistency', None)
-        self.set_option('mutation_state', list(value._sv))
+        self.set_option('mutation_state', list(mt.as_dict() for mt in value._sv))
 
     @property
     def scope_name(self) -> Optional[str]:

@@ -244,7 +244,7 @@ class QueryParamTestSuite:
         q_mt = query.params.get('mutation_state', None)
         assert isinstance(q_mt, list)
         assert len(q_mt) == 1
-        assert q_mt.pop() == mt
+        assert q_mt.pop() == mt.as_dict()
 
         # Ensure no dups
         ms = MutationState()
@@ -265,7 +265,7 @@ class QueryParamTestSuite:
         q_mt = query.params.get('mutation_state', None)
         assert isinstance(q_mt, list)
         assert len(q_mt) == 1
-        assert q_mt.pop() == mt
+        assert q_mt.pop() == mt.as_dict()
 
         # Try with a second bucket
         ms = MutationState()
@@ -286,7 +286,7 @@ class QueryParamTestSuite:
         q_mt = query.params.get('mutation_state', None)
         assert isinstance(q_mt, list)
         assert len(q_mt) == 2
-        assert next((m for m in q_mt if m == mt2), None) is not None
+        assert next((m for m in q_mt if m == mt2.as_dict()), None) is not None
 
     def test_encoded_consistency(self):
         q_str = 'SELECT * FROM default'
@@ -631,12 +631,21 @@ class QueryTestSuite:
 
     def test_query_ryow(self, cb_env):
         key, value = cb_env.get_new_doc()
-        result = cb_env.cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` USE KEYS "{key}"')
+        q_str = f'SELECT * FROM `{cb_env.bucket.name}` USE KEYS "{key}"'
+        result = cb_env.cluster.query(q_str)
         cb_env.assert_rows(result, 0)
         res = cb_env.collection.insert(key, value)
         ms = MutationState().add_mutation_token(res.mutation_token())
-        result = cb_env.cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` USE KEYS "{key}"',
-                                      QueryOptions(consistent_with=ms))
+        result = cb_env.cluster.query(q_str, QueryOptions(consistent_with=ms))
+        cb_env.assert_rows(result, 1)
+
+        # prior to PYCBC-1477 the SDK _could_ crash w/ this this sort of MS creation
+        key, value = cb_env.get_new_doc()
+        result = cb_env.cluster.query(q_str)
+        cb_env.assert_rows(result, 0)
+        res = cb_env.collection.insert(key, value)
+        ms = MutationState(res)
+        result = cb_env.cluster.query(q_str, QueryOptions(consistent_with=ms))
         cb_env.assert_rows(result, 1)
 
     def test_query_with_metrics(self, cb_env):
