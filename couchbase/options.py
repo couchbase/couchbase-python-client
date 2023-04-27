@@ -552,7 +552,7 @@ class InsertOptions(InsertOptionsBase):
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             key-value operation timeout.
-        expiry (int, optional): Specifies the expiry time for this document.
+        expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
@@ -589,7 +589,7 @@ class ReplaceOptions(ReplaceOptionsBase):
             this value, indicating that the document has changed.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             key-value operation timeout.
-        expiry (int, optional): Specifies the expiry time for this document.
+        expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
         preserve_expiry (bool, optional): Specifies that any existing expiry on the document should be preserved.
@@ -634,7 +634,7 @@ class UpsertOptions(UpsertOptionsBase):
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             key-value operation timeout.
-        expiry (int, optional): Specifies the expiry time for this document.
+        expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
         preserve_expiry (bool, optional): Specifies that any existing expiry on the document should be preserved.
@@ -907,7 +907,7 @@ class UpsertMultiOptions(dict):
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             key-value operation timeout.
-        expiry (int, optional): Specifies the expiry time for this document.
+        expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
         preserve_expiry (bool, optional): Specifies that any existing expiry on the document should be preserved.
@@ -949,7 +949,7 @@ class InsertMultiOptions(dict):
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             key-value operation timeout.
-        expiry (int, optional): Specifies the expiry time for this document.
+        expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
@@ -990,7 +990,7 @@ class ReplaceMultiOptions(dict):
             this value, indicating that the document has changed.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             key-value operation timeout.
-        expiry (int, optional): Specifies the expiry time for this document.
+        expiry (timedelta, optional): Specifies the expiry time for this document.
         preserve_expiry (bool, optional): Specifies that any existing expiry on the document should be preserved.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
