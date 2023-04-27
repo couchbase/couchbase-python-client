@@ -130,8 +130,8 @@ class ClusterTimeoutOptions(ClusterTimeoutOptionsBase):
     be overridden on a per operation basis.
 
     Args:
-        bootstrap_timeout (timedelta, optional): bootstrap timeout. Defaults to None.
-        resolve_timeout (timedelta, optional): resolve timeout. Defaults to None.
+        bootstrap_timeout (timedelta, optional): Overall bootstrap timeout. Defaults to None.
+        resolve_timeout (timedelta, optional): Time to resolve hostnames. Defaults to None.
         connect_timeout (timedelta, optional): connect timeout. Defaults to None.
         kv_timeout (timedelta, optional): KV operations timeout. Defaults to None.
         kv_durable_timeout (timedelta, optional): KV durability operations timeout. Defaults to None.
@@ -140,7 +140,7 @@ class ClusterTimeoutOptions(ClusterTimeoutOptionsBase):
         analytics_timeout (timedelta, optional): analytics operations timeout. Defaults to None.
         search_timeout (timedelta, optional): search operations timeout. Defaults to None.
         management_timeout (timedelta, optional): management operations timeout. Defaults to None.
-        dns_srv_timeout (timedelta, optional): DNS SRV connection timeout. Defaults to None.
+        dns_srv_timeout (timedelta, optional): Time to make DNS-SRV query. Defaults to None.
         idle_http_connection_timeout (timedelta, optional): Idle HTTP connection timeout. Defaults to None.
         config_idle_redial_timeout (timedelta, optional): Idle redial timeout. Defaults to None.
         config_total_timeout (timedelta, optional): **DEPRECATED** complete bootstrap timeout. Defaults to None.
@@ -195,6 +195,9 @@ class WanDevelopmentProfile(ConfigProfile):
         options['search_timeout'] = timedelta(seconds=120)
         options['management_timeout'] = timedelta(seconds=120)
         options['views_timeout'] = timedelta(seconds=120)
+        options['dns_srv_timeout'] = timedelta(seconds=20)  # time to make DNS-SRV query
+        options['resolve_timeout'] = timedelta(seconds=20)  # time to resolve hostnames
+        options['bootstrap_timeout'] = timedelta(seconds=120)  # overall bootstrap timeout
 
 
 class ConfigProfiles():

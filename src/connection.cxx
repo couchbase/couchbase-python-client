@@ -645,7 +645,7 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
 
     PyObject* pyObj_show_queries = PyDict_GetItemString(pyObj_options, "show_queries");
     if (pyObj_show_queries != nullptr && pyObj_show_queries == Py_True) {
-        options.enable_dns_srv = true;
+        options.show_queries = true;
     }
 
     PyObject* pyObj_enable_unordered_execution = PyDict_GetItemString(pyObj_options, "enable_unordered_execution");
@@ -733,9 +733,10 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
     if (pyObj_timeout_opts != nullptr) {
         pyObj_dns_srv_timeout = PyDict_GetItemString(pyObj_timeout_opts, "dns_srv_timeout");
     }
-    if (pyObj_dns_nameserver != nullptr && pyObj_dns_port != nullptr) {
-        auto nameserver = std::string(PyUnicode_AsUTF8(pyObj_dns_nameserver));
-        auto port = static_cast<uint16_t>(PyLong_AsUnsignedLong(pyObj_dns_port));
+    if (pyObj_dns_srv_timeout != nullptr || pyObj_dns_nameserver != nullptr || pyObj_dns_port != nullptr) {
+        auto nameserver =
+          pyObj_dns_nameserver != nullptr ? std::string(PyUnicode_AsUTF8(pyObj_dns_nameserver)) : options.dns_config.nameserver();
+        auto port = pyObj_dns_port != nullptr ? static_cast<uint16_t>(PyLong_AsUnsignedLong(pyObj_dns_port)) : options.dns_config.port();
         auto dns_srv_timeout_ms = couchbase::core::timeout_defaults::dns_srv_timeout;
         if (pyObj_dns_srv_timeout != nullptr) {
             auto dns_srv_timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_dns_srv_timeout));

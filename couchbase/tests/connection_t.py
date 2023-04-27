@@ -736,6 +736,7 @@ class ConnectionTestSuite:
     def test_custom_config_profile(self, couchbase_config):
         expected_opts = {'bootstrap_timeout': 10000,
                          'resolve_timeout': 2000,
+                         'dns_srv_timeout': 5000,
                          'connect_timeout': 5000,
                          'key_value_timeout': 5000,
                          'key_value_durable_timeout': 5000,
@@ -754,6 +755,7 @@ class ConnectionTestSuite:
                       ) -> None:
                 options['kv_timeout'] = timedelta(seconds=5)
                 options['kv_durable_timeout'] = timedelta(seconds=5)
+                options['dns_srv_timeout'] = timedelta(seconds=5)
                 options['connect_timeout'] = timedelta(seconds=5)
                 options['analytics_timeout'] = timedelta(seconds=60)
                 options['query_timeout'] = timedelta(seconds=60)
@@ -858,9 +860,10 @@ class ConnectionTestSuite:
     @pytest.mark.parametrize('profile',
                              [KnownConfigProfiles.WanDevelopment, 'wan_development'])
     def test_wan_config_profile(self, couchbase_config, profile):
-        expected_opts = {'bootstrap_timeout': 10000,
-                         'resolve_timeout': 2000,
+        expected_opts = {'bootstrap_timeout': 120000,
+                         'resolve_timeout': 20000,
                          'connect_timeout': 20000,
+                         'dns_srv_timeout': 20000,
                          'key_value_timeout': 20000,
                          'key_value_durable_timeout': 20000,
                          'view_timeout': 120000,
@@ -884,9 +887,10 @@ class ConnectionTestSuite:
     @pytest.mark.parametrize('profile',
                              [KnownConfigProfiles.WanDevelopment, 'wan_development'])
     def test_wan_config_profile_with_auth(self, couchbase_config, profile):
-        expected_opts = {'bootstrap_timeout': 10000,
-                         'resolve_timeout': 2000,
+        expected_opts = {'bootstrap_timeout': 120000,
+                         'resolve_timeout': 20000,
                          'connect_timeout': 20000,
+                         'dns_srv_timeout': 20000,
                          'key_value_timeout': 20000,
                          'key_value_durable_timeout': 20000,
                          'view_timeout': 120000,
