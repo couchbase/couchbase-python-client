@@ -225,13 +225,18 @@ class AsyncBucket(BucketLogic):
                     print(f'Found row: {row}')
 
         """
+        request_args = dict()
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
+
         query = ViewQuery.create_view_query_object(
             self.name, design_doc, view_name, *view_options, **kwargs
         )
         return ViewResult(AsyncViewRequest.generate_view_request(self.connection,
                                                                  self.loop,
                                                                  query.as_encodable(),
-                                                                 default_serializer=self.default_serializer))
+                                                                 **request_args))
 
     def collections(self) -> CollectionManager:
         """

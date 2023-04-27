@@ -24,8 +24,8 @@ pytest_plugins = [
 _DIAGNOSTIC_TESTS = [
     "acouchbase/tests/bucket_t.py::BucketDiagnosticsTests",
     "acouchbase/tests/cluster_t.py::ClusterDiagnosticsTests",
-    "couchbase/tests/bucket_t.py::BucketDiagnosticsTests",
-    "couchbase/tests/cluster_t.py::ClusterDiagnosticsTests",
+    "couchbase/tests/bucket_t.py::ClassicBucketDiagnosticsTests",
+    "couchbase/tests/cluster_t.py::ClassicClusterDiagnosticsTests",
 ]
 
 _KV_TESTS = [
@@ -35,15 +35,15 @@ _KV_TESTS = [
     "acouchbase/tests/binary_collection_t.py::BinaryCollectionTests",
     "acouchbase/tests/datastructures_t.py::DatastructuresTests",
     "acouchbase/tests/transcoder_t.py::DefaultTranscoderTests",
-    "couchbase/tests/collection_t.py::CollectionTests",
-    "couchbase/tests/collection_multi_t.py::CollectionMultiTests",
-    "couchbase/tests/subdoc_t.py::SubDocumentTests",
-    "couchbase/tests/mutation_tokens_t.py::MutationTokensEnabledTests",
-    "couchbase/tests/binary_collection_t.py::BinaryCollectionTests",
-    "couchbase/tests/binary_collection_multi_t.py::BinaryCollectionMultiTests",
-    "couchbase/tests/datastructures_t.py::DatastructuresTests",
-    "couchbase/tests/datastructures_t.py::LegacyDatastructuresTests",
-    "couchbase/tests/transcoder_t.py::DefaultTranscoderTests",
+    "couchbase/tests/collection_t.py::ClassicCollectionTests",
+    "couchbase/tests/collection_multi_t.py::ClassicCollectionMultiTests",
+    "couchbase/tests/subdoc_t.py::ClassicSubDocumentTests",
+    "couchbase/tests/mutation_tokens_t.py::ClassicMutationTokensEnabledTests",
+    "couchbase/tests/binary_collection_t.py::ClassicBinaryCollectionTests",
+    "couchbase/tests/binary_collection_multi_t.py::ClassicBinaryCollectionMultiTests",
+    "couchbase/tests/datastructures_t.py::ClassicDatastructuresTests",
+    "couchbase/tests/datastructures_t.py::ClassicLegacyDatastructuresTests",
+    "couchbase/tests/transcoder_t.py::ClassicDefaultTranscoderTests",
     "txcouchbase/tests/collection_t.py::CollectionTests",
     "txcouchbase/tests/subdoc_t.py::SubDocumentTests",
     "txcouchbase/tests/mutation_tokens_t.py::MutationTokensEnabledTests",
@@ -52,22 +52,23 @@ _KV_TESTS = [
 ]
 
 _STREAMING_TESTS = [
-    "acouchbase/tests/query_t.py::QueryTests",
-    "acouchbase/tests/query_t.py::QueryCollectionTests",
-    "acouchbase/tests/analytics_t.py::AnalyticsTests",
-    "acouchbase/tests/analytics_t.py::AnalyticsCollectionTests",
-    "acouchbase/tests/search_t.py::SearchTests",
-    "acouchbase/tests/search_t.py::SearchCollectionTests",
-    "acouchbase/tests/views_t.py::ViewTests",
-    "couchbase/tests/query_t.py::QueryTests",
-    "couchbase/tests/query_t.py::QueryCollectionTests",
-    "couchbase/tests/query_t.py::QueryParamTests",
-    "couchbase/tests/analytics_t.py::AnalyticsTests",
-    "couchbase/tests/analytics_t.py::AnalyticsCollectionTests",
-    "couchbase/tests/search_t.py::SearchTests",
-    "couchbase/tests/search_t.py::SearchCollectionTests",
-    "couchbase/tests/search_t.py::SearchStringTests",
-    "couchbase/tests/views_t.py::ViewTests",
+    "acouchbase/tests/query_t.py::ClassicQueryTests",
+    "acouchbase/tests/query_t.py::ClassicQueryCollectionTests",
+    "acouchbase/tests/analytics_t.py::ClassicAnalyticsTests",
+    "acouchbase/tests/analytics_t.py::ClassicAnalyticsCollectionTests",
+    "acouchbase/tests/search_t.py::ClassicSearchTests",
+    "acouchbase/tests/search_t.py::ClassicSearchCollectionTests",
+    "acouchbase/tests/views_t.py::ClassicViewsTests",
+    "couchbase/tests/analytics_params_t.py::ClassicAnalyticsParamTests",
+    "couchbase/tests/analytics_t.py::ClassicAnalyticsTests",
+    "couchbase/tests/analytics_t.py::ClassicAnalyticsCollectionTests",
+    "couchbase/tests/query_params_t.py::ClassicQueryParamTests",
+    "couchbase/tests/query_t.py::ClassicQueryTests",
+    "couchbase/tests/query_t.py::ClassicQueryCollectionTests",
+    "couchbase/tests/search_params_t.py::ClassicSearchParamTests",
+    "couchbase/tests/search_t.py::ClassicSearchTests",
+    "couchbase/tests/search_t.py::ClassicSearchCollectionTests",
+    "couchbase/tests/views_t.py::ClassicViewsTests",
 ]
 
 _MGMT_TESTS = [
@@ -81,32 +82,32 @@ _MGMT_TESTS = [
     "acouchbase/tests/searchmgmt_t.py::SearchIndexManagementTests",
     "acouchbase/tests/usermgmt_t.py::UserManagementTests",
     "acouchbase/tests/viewmgmt_t.py::ViewIndexManagementTests",
-    "couchbase/tests/analyticsmgmt_t.py::AnalyticsManagementTests",
-    "couchbase/tests/analyticsmgmt_t.py::AnalyticsManagementLinksTests",
-    "couchbase/tests/bucketmgmt_t.py::BucketManagementTests",
-    "couchbase/tests/collectionmgmt_t.py::CollectionManagementTests",
-    "couchbase/tests/eventingmgmt_t.py::EventingManagementTests",
-    "couchbase/tests/querymgmt_t.py::QueryIndexManagementTests",
-    "couchbase/tests/querymgmt_t.py::QueryIndexCollectionManagementTests",
-    "couchbase/tests/searchmgmt_t.py::SearchIndexManagementTests",
-    "couchbase/tests/usermgmt_t.py::UserManagementTests",
-    "couchbase/tests/viewmgmt_t.py::ViewIndexManagementTests"
+    "couchbase/tests/analyticsmgmt_t.py::ClassicAnalyticsManagementTests",
+    "couchbase/tests/analyticsmgmt_t.py::ClassicAnalyticsManagementLinksTests",
+    "couchbase/tests/bucketmgmt_t.py::ClassicBucketManagementTests",
+    "couchbase/tests/collectionmgmt_t.py::ClassicCollectionManagementTests",
+    "couchbase/tests/eventingmgmt_t.py::ClassicEventingManagementTests",
+    "couchbase/tests/querymgmt_t.py::ClassicQueryIndexManagementTests",
+    "couchbase/tests/querymgmt_t.py::ClassicQueryIndexCollectionManagementTests",
+    "couchbase/tests/searchmgmt_t.py::ClassicSearchIndexManagementTests",
+    "couchbase/tests/usermgmt_t.py::ClassicUserManagementTests",
+    "couchbase/tests/viewmgmt_t.py::ClassicViewIndexManagementTests"
 ]
 
 _SLOW_MGMT_TESTS = [
     "acouchbase/tests/eventingmgmt_t.py::EventingManagementTests",
-    "couchbase/tests/eventingmgmt_t.py::EventingManagementTests",
+    "couchbase/tests/eventingmgmt_t.py::ClassicEventingManagementTests",
 ]
 
 _MISC_TESTS = [
     "acouchbase/tests/rate_limit_t.py::RateLimitTests",
-    "couchbase/tests/connection_t.py::ConnectionTests"
-    "couchbase/tests/rate_limit_t.py::RateLimitTests",
+    "couchbase/tests/connection_t.py::ClassicConnectionTests"
+    "couchbase/tests/rate_limit_t.py::ClassicRateLimitTests",
 ]
 
 _TXNS_TESTS = [
-    "acouchbase/tests/transactions_t.py::AsyncTransactionsTests",
-    "couchbase/tests/transactions_t.py::TransactionTests",
+    "acouchbase/tests/transactions_t.py::ClassicTransactionTests",
+    "couchbase/tests/transactions_t.py:ClassicTransactionTests",
 ]
 
 

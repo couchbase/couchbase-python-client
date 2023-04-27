@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,128 +13,59 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
+
 from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import get_event_loop
 from couchbase.analytics import (AnalyticsMetaData,
                                  AnalyticsMetrics,
                                  AnalyticsStatus,
                                  AnalyticsWarning)
 from couchbase.exceptions import DatasetNotFoundException, DataverseNotFoundException
 from couchbase.options import AnalyticsOptions, UnsignedInt64
-from couchbase.result import AnalyticsResult
+from tests.environments import CollectionType
+from tests.environments.analytics_environment import AsyncAnalyticsTestEnvironment
 
-from ._test_utils import TestEnvironment
 
-
-class AnalyticsTests:
-
-    DATASET_NAME = 'test-dataset'
-
-    @pytest_asyncio.fixture(scope="class")
-    def event_loop(self):
-        loop = get_event_loop()
-        yield loop
-        loop.close()
-
-    @pytest_asyncio.fixture(scope="class", name="cb_env")
-    async def couchbase_test_environment(self, couchbase_config):
-        cb_env = await TestEnvironment.get_environment(__name__,
-                                                       couchbase_config,
-                                                       manage_analytics=True)
-
-        # setup
-        await cb_env.try_n_times(5, 3, cb_env.load_data)
-        await cb_env.try_n_times(3, 5, self._setup_analytics, cb_env)
-
-        yield cb_env
-        # teardown
-        await cb_env.try_n_times(3, 5, self._teardown_analytics, cb_env)
-
-    async def _setup_analytics(self, cb_env):
-        await cb_env.am.create_dataset(self.DATASET_NAME,
-                                       cb_env.bucket.name,
-                                       ignore_if_exists=True)
-        await cb_env.am.connect_link()
-
-        q_str = f'SELECT COUNT(1) AS doc_count FROM `{self.DATASET_NAME}`;'
-
-        for _ in range(10):
-            res = cb_env.cluster.analytics_query(q_str)
-            rows = [r async for r in res.rows()]
-            if len(rows) > 0 and rows[0].get('doc_count', 0) > 10:
-                break
-            print(f'Found {len(rows)} records, waiting a bit...')
-            await asyncio.sleep(5)
-
-    async def _teardown_analytics(self, cb_env):
-        await cb_env.try_n_times_till_exception(3, 5,
-                                                cb_env.purge_data,
-                                                raise_if_no_exception=False)
-        await cb_env.am.disconnect_link()
-        await cb_env.am.drop_dataset(self.DATASET_NAME, ignore_if_not_exists=True)
-
-    async def assert_rows(self,
-                          result,  # type: AnalyticsResult
-                          expected_count):
-        count = 0
-        assert isinstance(result, AnalyticsResult)
-        async for row in result.rows():
-            assert row is not None
-            count += 1
-        assert count >= expected_count
+class AnalyticsCollectionTestSuite:
+    TEST_MANIFEST = [
+        'test_analytics_metadata',
+        'test_analytics_with_metrics',
+        'test_bad_query_context',
+        'test_bad_scope_query',
+        'test_cluster_query_context',
+        'test_query_fully_qualified',
+        'test_scope_query',
+        'test_scope_query_fqdn',
+        'test_scope_query_with_named_params_in_options',
+        'test_scope_query_with_positional_params_in_options',
+    ]
 
     @pytest.mark.asyncio
-    async def test_simple_query(self, cb_env):
-        result = cb_env.cluster.analytics_query(f"SELECT * FROM `{self.DATASET_NAME}` LIMIT 1")
-        await self.assert_rows(result, 1)
-
-    @pytest.mark.asyncio
-    async def test_query_positional_params(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
-                                                AnalyticsOptions(positional_parameters=["airline"]))
-        await self.assert_rows(result, 1)
-
-    @pytest.mark.asyncio
-    async def test_query_positional_params_no_option(self, cb_env):
-        result = cb_env.cluster.analytics_query(
-            f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $1 LIMIT 1', 'airline')
-        await self.assert_rows(result, 1)
-
-    @pytest.mark.asyncio
-    async def test_query_positional_params_override(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
-                                                AnalyticsOptions(positional_parameters=['abcdefg']), 'airline')
-        await self.assert_rows(result, 1)
-
-    @pytest.mark.asyncio
-    async def test_query_named_parameters(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
-                                                AnalyticsOptions(named_parameters={'atype': 'airline'}))
-        await self.assert_rows(result, 1)
-
-    @pytest.mark.asyncio
-    async def test_query_named_parameters_no_options(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
-                                                atype='airline')
-        await self.assert_rows(result, 1)
-
-    @pytest.mark.asyncio
-    async def test_query_named_parameters_override(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
-                                                AnalyticsOptions(named_parameters={'atype': 'abcdefg'}),
-                                                atype='airline')
-        await self.assert_rows(result, 1)
+    async def test_analytics_metadata(self, cb_env):
+        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2')
+        await cb_env.assert_rows(result, 2)
+        metadata = result.metadata()  # type: AnalyticsMetaData
+        assert isinstance(metadata, AnalyticsMetaData)
+        for id_meth in (metadata.client_context_id, metadata.request_id):
+            id_res = id_meth()
+            fail_msg = "{} failed".format(id_meth)
+            assert isinstance(id_res, str), fail_msg
+        assert metadata.status() == AnalyticsStatus.SUCCESS
+        assert isinstance(metadata.signature(), (str, dict))
+        assert isinstance(metadata.warnings(), (list))
+        for warning in metadata.warnings():
+            assert isinstance(warning, AnalyticsWarning)
+            assert isinstance(warning.message(), str)
+            assert isinstance(warning.code(), int)
 
     @pytest.mark.asyncio
     async def test_analytics_with_metrics(self, cb_env):
         initial = datetime.now()
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` LIMIT 1')
-        await self.assert_rows(result, 1)
+        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 1')
+        await cb_env.assert_rows(result, 1)
         taken = datetime.now() - initial
         metadata = result.metadata()  # type: AnalyticsMetaData
         metrics = metadata.metrics()
@@ -159,136 +90,34 @@ class AnalyticsTests:
         assert metrics.error_count() == UnsignedInt64(0)
 
     @pytest.mark.asyncio
-    async def test_analytics_metadata(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` LIMIT 2')
-        await self.assert_rows(result, 2)
-        metadata = result.metadata()  # type: AnalyticsMetaData
-        assert isinstance(metadata, AnalyticsMetaData)
-        for id_meth in (metadata.client_context_id, metadata.request_id):
-            id_res = id_meth()
-            fail_msg = "{} failed".format(id_meth)
-            assert isinstance(id_res, str), fail_msg
-        assert metadata.status() == AnalyticsStatus.SUCCESS
-        assert isinstance(metadata.signature(), (str, dict))
-        assert isinstance(metadata.warnings(), (list))
-        for warning in metadata.warnings():
-            assert isinstance(warning, AnalyticsWarning)
-            assert isinstance(warning.message(), str)
-            assert isinstance(warning.code(), int)
+    async def test_bad_query_context(self, cb_env):
+        # test w/ no context
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.collection.name} `LIMIT 2')
+        # @TODO: DatasetNotFoundException
+        with pytest.raises(DatasetNotFoundException):
+            await cb_env.assert_rows(result, 2)
 
-
-class AnalyticsCollectionTests:
-
-    DATASET_NAME = 'test-dataset'
-
-    @pytest_asyncio.fixture(scope="class")
-    def event_loop(self):
-        loop = get_event_loop()
-        yield loop
-        loop.close()
-
-    @pytest_asyncio.fixture(scope="class", name="cb_env")
-    async def couchbase_test_environment(self, couchbase_config):
-        cb_env = await TestEnvironment.get_environment(__name__,
-                                                       couchbase_config,
-                                                       manage_analytics=True,
-                                                       manage_collections=True)
-
-        await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
-
-        # setup
-        await cb_env.try_n_times(5, 3, cb_env.load_data)
-        await self.create_analytics_collections(cb_env)
-
-        yield cb_env
-
-        # teardown
-        await cb_env.try_n_times_till_exception(3, 5,
-                                                cb_env.purge_data,
-                                                raise_if_no_exception=False)
-        await self.tear_down_analytics_collections(cb_env)
-        await cb_env.try_n_times_till_exception(5, 3,
-                                                cb_env.teardown_named_collections,
-                                                raise_if_no_exception=False)
-
-    """
-        Setup queries:
-            Create dataverse:
-                CREATE DATAVERSE `default`.`test-scope` IF NOT EXISTS;
-
-            Create dataset:
-                USE `default`.`test-scope`;
-                CREATE DATASET IF NOT EXISTS `test-collection` ON `default`.`test-scope`.`test-collection`;
-
-            Connect Link:
-                USE `default`.`test-scope`; CONNECT LINK Local;
-    """
-
-    async def create_analytics_collections(self, cb_env):
-        dv_fqdn = f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        q_str = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; CREATE DATASET IF NOT EXISTS `{cb_env.collection.name}` ON {cb_env.fqdn}'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; CONNECT LINK Local;'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        context_fqdn = f'default:`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        q_str = f'SELECT COUNT(1) AS doc_count FROM `{cb_env.collection.name}`;'
-
-        for _ in range(10):
-            res = cb_env.cluster.analytics_query(q_str, query_context=context_fqdn)
-            rows = [r async for r in res.rows()]
-            if len(rows) > 0 and rows[0].get('doc_count', 0) > 10:
-                break
-            print(f'Found {len(rows)} records, waiting a bit...')
-            await asyncio.sleep(5)
-
-    """
-        Tear-down queries:
-            Disconnect Link:
-                USE `default`.`test-scope`; DISCONNECT LINK Local;
-
-            Droo dataset:
-                USE `default`.`test-scope`; DROP DATASET `test-collection` IF EXISTS;
-
-            Drop dataverse:
-                DROP DATAVERSE `default`.`test-scope` IF EXISTS;
-    """
-
-    async def tear_down_analytics_collections(self, cb_env):
-        dv_fqdn = f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        q_str = f'USE {dv_fqdn}; DISCONNECT LINK Local;'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; DROP DATASET `{cb_env.collection.name}` IF EXISTS;'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'DROP DATAVERSE {dv_fqdn} IF EXISTS;'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-    async def assert_rows(self,
-                          result,  # type: AnalyticsResult
-                          expected_count):
-        count = 0
-        assert isinstance(result, AnalyticsResult)
-        async for row in result.rows():
-            assert row is not None
-            count += 1
-        assert count >= expected_count
+        # test w/ bad scope
+        q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
+        result = cb_env.cluster.analytics_query(
+            f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', AnalyticsOptions(query_context=q_context))
+        # @TODO: DataverseNotFoundException
+        with pytest.raises(DataverseNotFoundException):
+            await cb_env.assert_rows(result, 2)
 
     @pytest.mark.asyncio
-    async def test_query_fully_qualified(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2')
-        await self.assert_rows(result, 2)
+    async def test_bad_scope_query(self, cb_env):
+        q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
+        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
+                                              AnalyticsOptions(query_context=q_context))
+        with pytest.raises(DataverseNotFoundException):
+            await cb_env.assert_rows(result, 2)
+
+        q_context = f'default:`fake-bucket`.`{cb_env.scope.name}`'
+        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
+                                              query_context=q_context)
+        with pytest.raises(DataverseNotFoundException):
+            await cb_env.assert_rows(result, 2)
 
     @pytest.mark.asyncio
     async def test_cluster_query_context(self, cb_env):
@@ -297,31 +126,22 @@ class AnalyticsCollectionTests:
         a_opts = AnalyticsOptions(query_context=q_context)
         result = cb_env.cluster.analytics_query(
             f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', a_opts)
-        await self.assert_rows(result, 2)
+        await cb_env.assert_rows(result, 2)
 
         # test with kwargs
         result = cb_env.cluster.analytics_query(
             f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', query_context=q_context)
-        await self.assert_rows(result, 2)
+        await cb_env.assert_rows(result, 2)
 
     @pytest.mark.asyncio
-    async def test_bad_query_context(self, cb_env):
-        # test w/ no context
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.collection.name} `LIMIT 2')
-        with pytest.raises(DatasetNotFoundException):
-            await self.assert_rows(result, 2)
-
-        # test w/ bad scope
-        q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
-        result = cb_env.cluster.analytics_query(
-            f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', AnalyticsOptions(query_context=q_context))
-        with pytest.raises(DataverseNotFoundException):
-            await self.assert_rows(result, 2)
+    async def test_query_fully_qualified(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2')
+        await cb_env.assert_rows(result, 2)
 
     @pytest.mark.asyncio
     async def test_scope_query(self, cb_env):
         result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2')
-        await self.assert_rows(result, 2)
+        await cb_env.assert_rows(result, 2)
 
     @pytest.mark.asyncio
     async def test_scope_query_fqdn(self, cb_env):
@@ -330,40 +150,59 @@ class AnalyticsCollectionTests:
             pytest.skip("Analytics scope query format not allowed on server versions >= 7.1")
 
         result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2', query_context='')
-        await self.assert_rows(result, 2)
-
-    @pytest.mark.asyncio
-    async def test_bad_scope_query(self, cb_env):
-        q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
-        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
-                                              AnalyticsOptions(query_context=q_context))
-        with pytest.raises(DataverseNotFoundException):
-            await self.assert_rows(result, 2)
-
-        q_context = f'default:`fake-bucket`.`{cb_env.scope.name}`'
-        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
-                                              query_context=q_context)
-        with pytest.raises(DataverseNotFoundException):
-            await self.assert_rows(result, 2)
-
-    @pytest.mark.asyncio
-    async def test_scope_query_with_positional_params_in_options(self, cb_env):
-        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` WHERE country LIKE $1 LIMIT 1',
-                                              AnalyticsOptions(positional_parameters=['United%']))
-        await self.assert_rows(result, 1)
+        await cb_env.assert_rows(result, 2)
 
     @pytest.mark.asyncio
     async def test_scope_query_with_named_params_in_options(self, cb_env):
-        q_str = f'SELECT * FROM `{cb_env.collection.name}` WHERE country LIKE $country LIMIT 1'
+        q_str = f'SELECT * FROM `{cb_env.collection.name}` WHERE batch LIKE $batch LIMIT 1'
         result = cb_env.scope.analytics_query(q_str,
-                                              AnalyticsOptions(named_parameters={'country': 'United%'}))
-        await self.assert_rows(result, 1)
+                                              AnalyticsOptions(named_parameters={'batch': f'{cb_env.get_batch_id()}%'}))
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_scope_query_with_positional_params_in_options(self, cb_env):
+        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` WHERE batch LIKE $1 LIMIT 1',
+                                              AnalyticsOptions(positional_parameters=[f'{cb_env.get_batch_id()}%']))
+        await cb_env.assert_rows(result, 1)
+
+
+class AnalyticsTestSuite:
+    TEST_MANIFEST = [
+        'test_analytics_metadata',
+        'test_analytics_with_metrics',
+        'test_query_named_parameters',
+        'test_query_named_parameters_no_options',
+        'test_query_named_parameters_override',
+        'test_query_positional_params',
+        'test_query_positional_params_no_option',
+        'test_query_positional_params_override',
+        'test_query_raw_options',
+        'test_simple_query',
+    ]
+
+    @pytest.mark.asyncio
+    async def test_analytics_metadata(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 2')
+        await cb_env.assert_rows(result, 2)
+        metadata = result.metadata()  # type: AnalyticsMetaData
+        isinstance(metadata, AnalyticsMetaData)
+        for id_meth in (metadata.client_context_id, metadata.request_id):
+            id_res = id_meth()
+            fail_msg = "{} failed".format(id_meth)
+            assert isinstance(id_res, str), fail_msg
+        assert metadata.status() == AnalyticsStatus.SUCCESS
+        assert isinstance(metadata.signature(), (str, dict))
+        assert isinstance(metadata.warnings(), (list))
+        for warning in metadata.warnings():
+            assert isinstance(warning, AnalyticsWarning)
+            assert isinstance(warning.message(), str)
+            assert isinstance(warning.code(), int)
 
     @pytest.mark.asyncio
     async def test_analytics_with_metrics(self, cb_env):
         initial = datetime.now()
-        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 1')
-        await self.assert_rows(result, 1)
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 1')
+        await cb_env.assert_rows(result, 1)
         taken = datetime.now() - initial
         metadata = result.metadata()  # type: AnalyticsMetaData
         metrics = metadata.metrics()
@@ -388,19 +227,101 @@ class AnalyticsCollectionTests:
         assert metrics.error_count() == UnsignedInt64(0)
 
     @pytest.mark.asyncio
-    async def test_analytics_metadata(self, cb_env):
-        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2')
-        await self.assert_rows(result, 2)
-        metadata = result.metadata()  # type: AnalyticsMetaData
-        assert isinstance(metadata, AnalyticsMetaData)
-        for id_meth in (metadata.client_context_id, metadata.request_id):
-            id_res = id_meth()
-            fail_msg = "{} failed".format(id_meth)
-            assert isinstance(id_res, str), fail_msg
-        assert metadata.status() == AnalyticsStatus.SUCCESS
-        assert isinstance(metadata.signature(), (str, dict))
-        assert isinstance(metadata.warnings(), (list))
-        for warning in metadata.warnings():
-            assert isinstance(warning, AnalyticsWarning)
-            assert isinstance(warning.message(), str)
-            assert isinstance(warning.code(), int)
+    async def test_query_named_parameters(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
+                                                AnalyticsOptions(named_parameters={'atype': 'vehicle'}))
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_query_named_parameters_no_options(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
+                                                atype='vehicle')
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_query_named_parameters_override(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
+                                                AnalyticsOptions(named_parameters={'atype': 'abcdefg'}),
+                                                atype='vehicle')
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_query_positional_params(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
+                                                AnalyticsOptions(positional_parameters=["vehicle"]))
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_query_positional_params_no_option(self, cb_env):
+        result = cb_env.cluster.analytics_query(
+            f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1', 'vehicle')
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_query_positional_params_override(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
+                                                AnalyticsOptions(positional_parameters=['abcdefg']), 'vehicle')
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_query_raw_options(self, cb_env):
+        # via raw, we should be able to pass any option
+        # if using named params, need to match full name param in query
+        # which is different for when we pass in name_parameters via their specific
+        # query option (i.e. include the $ when using raw)
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT $1',
+                                                AnalyticsOptions(raw={'$atype': 'vehicle', 'args': [1]}))
+        await cb_env.assert_rows(result, 1)
+
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
+                                                AnalyticsOptions(raw={'args': ['vehicle']}))
+        await cb_env.assert_rows(result, 1)
+
+    @pytest.mark.asyncio
+    async def test_simple_query(self, cb_env):
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 1')
+        await cb_env.assert_rows(result, 1)
+
+
+class ClassicAnalyticsCollectionTests(AnalyticsCollectionTestSuite):
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicAnalyticsCollectionTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicAnalyticsCollectionTests) if valid_test_method(meth)]
+        compare = set(AnalyticsCollectionTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest_asyncio.fixture(scope='class', name='cb_env', params=[CollectionType.NAMED])
+    async def couchbase_test_environment(self, acb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        acb_env = AsyncAnalyticsTestEnvironment.from_environment(acb_base_env)
+        acb_env.enable_analytics_mgmt()
+        await acb_env.setup(request.param)
+        yield acb_env
+        await acb_env.teardown(request.param)
+
+
+class ClassicAnalyticsTests(AnalyticsTestSuite):
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicAnalyticsTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicAnalyticsTests) if valid_test_method(meth)]
+        compare = set(AnalyticsTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest_asyncio.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
+    async def couchbase_test_environment(self, acb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        acb_env = AsyncAnalyticsTestEnvironment.from_environment(acb_base_env)
+        acb_env.enable_analytics_mgmt()
+        await acb_env.setup(request.param)
+        yield acb_env
+        await acb_env.teardown(request.param)

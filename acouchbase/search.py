@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Awaitable
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
@@ -33,9 +34,10 @@ class AsyncSearchRequest(SearchRequestLogic):
                  encoded_query,
                  **kwargs
                  ):
+        num_workers = kwargs.pop('num_workers', 2)
         super().__init__(connection, encoded_query, **kwargs)
         self._loop = loop
-        self._rows = asyncio.Queue()
+        self._tp_executor = ThreadPoolExecutor(num_workers)
 
     @property
     def loop(self):
@@ -74,7 +76,7 @@ class AsyncSearchRequest(SearchRequestLogic):
 
         return self
 
-    async def _get_next_row(self):
+    def _get_next_row(self):
         if self.done_streaming is True:
             return
 
@@ -85,12 +87,11 @@ class AsyncSearchRequest(SearchRequestLogic):
         if row is None:
             raise StopAsyncIteration
 
-        await self._rows.put(self._deserialize_row(row))
+        return self._deserialize_row(row)
 
     async def __anext__(self):
         try:
-            await self._get_next_row()
-            return self._rows.get_nowait()
+            return await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
         except asyncio.QueueEmpty:
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls('Unexpected QueueEmpty exception caught when doing Search query.')

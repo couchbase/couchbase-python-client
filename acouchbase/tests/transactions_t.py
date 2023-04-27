@@ -20,7 +20,6 @@ from datetime import timedelta
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import get_event_loop
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
@@ -79,12 +78,6 @@ class TransactionTestSuite:
         'test_transaction_config_durability',
         'test_transaction_result',
     ]
-
-    @pytest_asyncio.fixture(scope='class')
-    def event_loop(self):
-        loop = get_event_loop()
-        yield loop
-        loop.close()
 
     @pytest.fixture(scope='class')
     def check_txn_queries_supported(self, cb_env):
@@ -621,15 +614,9 @@ class ClassicTransactionTests(TransactionTestSuite):
         return compare
 
     @pytest_asyncio.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    async def couchbase_test_environment(self, test_env, test_manifest_validated, request):
+    async def couchbase_test_environment(self, acb_base_txn_env, test_manifest_validated, request):
         if test_manifest_validated:
             pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        couchbase_config, data_provider = test_env
-        transaction_config = TransactionConfig(durability=ServerDurability(DurabilityLevel.NONE))
-        acb_base_txn_env = await AsyncTestEnvironment.get_environment(couchbase_config=couchbase_config,
-                                                                      data_provider=data_provider,
-                                                                      transaction_config=transaction_config)
 
         EnvironmentFeatures.check_if_feature_supported('txns',
                                                        acb_base_txn_env.server_version_short,

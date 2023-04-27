@@ -14,6 +14,8 @@
 #  limitations under the License.
 
 import asyncio
+import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Awaitable
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
@@ -25,6 +27,8 @@ from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.n1ql import N1QLQuery  # noqa: F401
 from couchbase.logic.n1ql import QueryRequestLogic
 
+logger = logging.getLogger(__name__)
+
 
 class AsyncN1QLRequest(QueryRequestLogic):
     def __init__(self,
@@ -34,9 +38,10 @@ class AsyncN1QLRequest(QueryRequestLogic):
                  row_factory=lambda x: x,
                  **kwargs
                  ):
+        num_workers = kwargs.pop('num_workers', 2)
         super().__init__(connection, query_params, row_factory=row_factory, **kwargs)
         self._loop = loop
-        self._rows = asyncio.Queue()
+        self._tp_executor = ThreadPoolExecutor(num_workers)
 
     @property
     def loop(self):
@@ -75,23 +80,22 @@ class AsyncN1QLRequest(QueryRequestLogic):
 
         return self
 
-    async def _get_next_row(self):
+    def _get_next_row(self):
         if self.done_streaming is True:
             return
 
+        # this is a blocking operation
         row = next(self._streaming_result)
         if isinstance(row, CouchbaseBaseException):
             raise ErrorMapper.build_exception(row)
-        # should only be None one query request is complete and _no_ errors found
+        # should only be None once query request is complete and _no_ errors found
         if row is None:
             raise StopAsyncIteration
-        # this should allow the event loop to pick up something else
-        await self._rows.put(self.serializer.deserialize(row))
+        return self.serializer.deserialize(row)
 
     async def __anext__(self):
         try:
-            await self._get_next_row()
-            return self._rows.get_nowait()
+            return await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
         except asyncio.QueueEmpty:
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls('Unexpected QueueEmpty exception caught when doing N1QL query.')

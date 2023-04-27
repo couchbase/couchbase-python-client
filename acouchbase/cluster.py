@@ -428,12 +428,16 @@ class AsyncCluster(ClusterLogic):
 
         """
 
+        request_args = dict()
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
         query = N1QLQuery.create_query_object(
             statement, *options, **kwargs)
         return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self.connection,
                                                                   self.loop,
                                                                   query.params,
-                                                                  default_serializer=self.default_serializer))
+                                                                  **request_args))
 
     def analytics_query(
         self,  # type: Cluster
@@ -510,13 +514,17 @@ class AsyncCluster(ClusterLogic):
 
         """  # noqa: E501
 
+        request_args = dict()
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
+
         query = AnalyticsQuery.create_query_object(
             statement, *options, **kwargs)
-        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(
-            self.connection,
-            self.loop,
-            query.params,
-            default_serializer=self.default_serializer))
+        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
+                                                                                self.loop,
+                                                                                query.params,
+                                                                                **request_args))
 
     def search_query(
         self,
@@ -612,13 +620,17 @@ class AsyncCluster(ClusterLogic):
                     print(f'Locations: {row.locations}')
 
         """
+        request_args = dict()
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
         query = SearchQueryBuilder.create_search_query_object(
             index, query, *options, **kwargs
         )
         return SearchResult(AsyncSearchRequest.generate_search_request(self.connection,
                                                                        self.loop,
                                                                        query.as_encodable(),
-                                                                       default_serializer=self.default_serializer))
+                                                                       **request_args))
 
     def buckets(self) -> BucketManager:
         """

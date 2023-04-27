@@ -29,8 +29,10 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 import pytest
+import pytest_asyncio
 
 from acouchbase.cluster import Cluster as AsyncCluster
+from acouchbase.cluster import get_event_loop
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.durability import DurabilityLevel, ServerDurability
@@ -947,3 +949,26 @@ def couchbase_base_txn_environment(test_env):
     return TestEnvironment.get_environment(couchbase_config=couchbase_config,
                                            data_provider=data_provider,
                                            transaction_config=transaction_config)
+
+
+@pytest_asyncio.fixture(scope='session')
+def event_loop():
+    loop = get_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest_asyncio.fixture(scope='session', name='acb_base_env')
+async def acouchbase_base_environment(test_env):
+    couchbase_config, data_provider = test_env
+    return await AsyncTestEnvironment.get_environment(couchbase_config=couchbase_config,
+                                                      data_provider=data_provider)
+
+
+@pytest_asyncio.fixture(scope='session', name='acb_base_txn_env')
+async def acouchbase_base_txn_environment(test_env):
+    couchbase_config, data_provider = test_env
+    transaction_config = TransactionConfig(durability=ServerDurability(DurabilityLevel.NONE))
+    return await AsyncTestEnvironment.get_environment(couchbase_config=couchbase_config,
+                                                      data_provider=data_provider,
+                                                      transaction_config=transaction_config)

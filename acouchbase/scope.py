@@ -187,6 +187,11 @@ class AsyncScope:
                 opt = o
                 opts.remove(o)
 
+        request_args = dict()
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
+
         # set the query context as this bucket and scope if not provided
         if not ('query_context' in opt or 'query_context' in kwargs):
             kwargs['query_context'] = '`{}`.`{}`'.format(self.bucket_name, self.name)
@@ -195,7 +200,8 @@ class AsyncScope:
             statement, opt, **kwargs)
         return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self.connection,
                                                                   self.loop,
-                                                                  query.params))
+                                                                  query.params,
+                                                                  **request_args))
 
     def analytics_query(
         self,
@@ -277,6 +283,11 @@ class AsyncScope:
                 opt = o
                 opts.remove(o)
 
+        request_args = dict()
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
+
         # set the query context as this bucket and scope if not provided
         if not ('query_context' in opt or 'query_context' in kwargs):
             kwargs['query_context'] = 'default:`{}`.`{}`'.format(self.bucket_name, self.name)
@@ -285,7 +296,8 @@ class AsyncScope:
             statement, *options, **kwargs)
         return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
                                                                                 self.loop,
-                                                                                query.params))
+                                                                                query.params,
+                                                                                **request_args))
 
     def search_query(
         self,
@@ -388,6 +400,11 @@ class AsyncScope:
                 opt = o
                 opts.remove(o)
 
+        request_args = dict()
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
+
         # set the scope_name as this scope if not provided
         if not ('scope_name' in opt or 'scope_name' in kwargs):
             kwargs['scope_name'] = f'{self.name}'
@@ -397,7 +414,8 @@ class AsyncScope:
         )
         return SearchResult(AsyncSearchRequest.generate_search_request(self.connection,
                                                                        self.loop,
-                                                                       query.as_encodable()))
+                                                                       query.as_encodable(),
+                                                                       **request_args))
 
     @staticmethod
     def default_name():

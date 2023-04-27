@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,270 +13,31 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
-import pathlib
-from os import path
 
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import DesignDocumentNotFoundException
-from couchbase.management.views import (DesignDocument,
-                                        DesignDocumentNamespace,
-                                        View)
+from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
-from couchbase.result import ViewResult
 from couchbase.views import ViewMetaData, ViewOrdering
+from tests.environments import CollectionType
+from tests.environments.views_environment import AsyncViewsTestEnvironment
 
-from ._test_utils import TestEnvironment
 
-
-class ViewTests:
-
-    TEST_VIEW_NAME = 'test-view'
-    TEST_VIEW_PATH = path.join(pathlib.Path(__file__).parent.parent.parent,
-                               'tests',
-                               'test_cases',
-                               f'{TEST_VIEW_NAME}.txt')
-
-    DOCNAME = 'test-ddoc'
-
-    @pytest_asyncio.fixture(scope="class")
-    def event_loop(self):
-        loop = get_event_loop()
-        yield loop
-        loop.close()
-
-    @pytest.fixture(scope='class')
-    def test_ddoc(self):
-        view_data = None
-        with open(self.TEST_VIEW_PATH) as view_file:
-            view_data = view_file.read()
-
-        view = View(map=view_data)
-        ddoc = DesignDocument(name=self.DOCNAME, views={self.TEST_VIEW_NAME: view})
-        return ddoc
-
-    @pytest_asyncio.fixture(scope="class", name="cb_env")
-    async def couchbase_test_environment(self, couchbase_config, test_ddoc):
-        cb_env = await TestEnvironment.get_environment(__name__,
-                                                       couchbase_config,
-                                                       manage_buckets=True,
-                                                       manage_view_indexes=True)
-
-        await self.create_ddoc(cb_env, test_ddoc)
-        await cb_env.try_n_times(5, 3, cb_env.load_data)
-        # let it load a bit...
-        for _ in range(5):
-            row_count_good = await self._check_row_count(cb_env, 5)
-            if not row_count_good:
-                print('Waiting for view to load, sleeping a bit...')
-                await asyncio.sleep(5)
-        yield cb_env
-        await cb_env.try_n_times_till_exception(3, 5,
-                                                cb_env.purge_data,
-                                                raise_if_no_exception=False)
-        await self.drop_ddoc(cb_env, test_ddoc)
-
-    async def create_ddoc(self, cb_env, test_ddoc):
-        await cb_env.vixm.upsert_design_document(test_ddoc, DesignDocumentNamespace.DEVELOPMENT)
-
-    async def drop_ddoc(self, cb_env, test_ddoc):
-        try:
-            await cb_env.vixm.drop_design_document(test_ddoc.name, DesignDocumentNamespace.DEVELOPMENT)
-        except DesignDocumentNotFoundException:
-            pass
-        except Exception as ex:
-            raise ex
-
-    async def _check_row_count(self, cb_env,
-                               min_count  # type: int
-                               ) -> bool:
-
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               limit=min_count,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
-        count = 0
-        async for _ in view_result.rows():
-            count += 1
-        return count >= min_count
-
-    async def assert_rows(self,
-                          result,  # type: ViewResult
-                          expected_count,
-                          return_rows=False):
-
-        assert isinstance(result, ViewResult)
-        rows = []
-        async for row in result.rows():
-            assert row is not None
-            rows.append(row)
-        assert len(rows) >= expected_count
-
-        if return_rows is True:
-            return rows
-
-    @pytest.mark.asyncio
-    async def test_view_query(self, cb_env):
-
-        expected_count = 10
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               limit=expected_count,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
-
-        await self.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_ascending(self, cb_env):
-
-        expected_count = 10
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               limit=expected_count,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
-                                               order=ViewOrdering.ASCENDING)
-
-        rows = await self.assert_rows(view_result, expected_count, return_rows=True)
-        results = list(map(lambda r: r.key, rows))
-        sorted_results = sorted(results, key=lambda x: x[0], reverse=True)
-        assert results == sorted_results
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_descending(self, cb_env):
-
-        expected_count = 10
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               limit=expected_count,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
-                                               order=ViewOrdering.DESCENDING)
-
-        rows = await self.assert_rows(view_result, expected_count, return_rows=True)
-        results = list(map(lambda r: r.key, rows))
-        sorted_results = sorted(results, key=lambda x: x[0])
-        assert results == sorted_results
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_key(self, cb_env):
-
-        expected_count = 1
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           key=["101 Coffee Shop", "landmark_11769"])
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               opts)
-
-        await self.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_keys(self, cb_env):
-
-        expected_count = 5
-        keys = [["101 Coffee Shop", "landmark_11769"],
-                ["Ace Hotel DTLA", "hotel_16630"],
-                ["airline_1316", "route_25068"],
-                ["airline_1355", "route_14484"],
-                ["airline_1355", "route_14817"]]
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           keys=keys)
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               opts)
-
-        await self.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_startkey(self, cb_env):
-
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           startkey=["101 Coffee Shop", "landmark_11769"])
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               opts)
-
-        await self.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_endkey(self, cb_env):
-
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           endkey=["airline_1355", "route_14817"])
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               opts)
-
-        await self.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_startkey_docid(self, cb_env):
-
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           startkey_docid="landmark_11769")
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               opts)
-
-        await self.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    @pytest.mark.asyncio
-    async def test_view_query_endkey_docid(self, cb_env):
-
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           endkey_docid="route_14817")
-        view_result = cb_env.bucket.view_query(self.DOCNAME,
-                                               self.TEST_VIEW_NAME,
-                                               opts)
-
-        await self.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
+class ViewsTestSuite:
+    TEST_MANIFEST = [
+        'test_bad_view_query',
+        'test_view_query',
+        'test_view_query_ascending',
+        'test_view_query_descending',
+        'test_view_query_endkey',
+        'test_view_query_endkey_docid',
+        'test_view_query_key',
+        'test_view_query_keys',
+        'test_view_query_startkey',
+        'test_view_query_startkey_docid',
+    ]
 
     @pytest.mark.asyncio
     async def test_bad_view_query(self, cb_env):
@@ -287,3 +48,184 @@ class ViewTests:
 
         with pytest.raises(DesignDocumentNotFoundException):
             [r async for r in view_result]
+
+    @pytest.mark.asyncio
+    async def test_view_query(self, cb_env):
+
+        expected_count = 10
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               limit=expected_count,
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
+
+        await cb_env.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_ascending(self, cb_env):
+
+        expected_count = 10
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               limit=expected_count,
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                               order=ViewOrdering.ASCENDING)
+
+        rows = await cb_env.assert_rows(view_result, expected_count, return_rows=True)
+        results = list(map(lambda r: r.key, rows))
+        sorted_results = sorted(results, key=lambda x: x[0], reverse=True)
+        assert results == sorted_results
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_descending(self, cb_env):
+        expected_count = 10
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               limit=expected_count,
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                               order=ViewOrdering.DESCENDING)
+
+        rows = await cb_env.assert_rows(view_result, expected_count, return_rows=True)
+        results = list(map(lambda r: r.key, rows))
+        sorted_results = sorted(results, key=lambda x: x[0])
+        assert results == sorted_results
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_endkey(self, cb_env):
+        batch_id = cb_env.get_batch_id()
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           endkey=[f'{batch_id}::10', f'{batch_id}::20'])
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+
+        await cb_env.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_endkey_docid(self, cb_env):
+        batch_id = cb_env.get_batch_id()
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           endkey_docid=f'{batch_id}::15')
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+
+        await cb_env.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_key(self, cb_env):
+        batch_id = cb_env.get_batch_id()
+        expected_count = 1
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           key=[f'{batch_id}', f'{batch_id}::10'])
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+
+        await cb_env.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_keys(self, cb_env):
+        batch_id = cb_env.get_batch_id()
+        expected_count = 5
+        keys = [[f'{batch_id}', f'{batch_id}::0'],
+                [f'{batch_id}', f'{batch_id}::1'],
+                [f'{batch_id}', f'{batch_id}::2'],
+                [f'{batch_id}', f'{batch_id}::3'],
+                [f'{batch_id}', f'{batch_id}::4']]
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           keys=keys)
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+
+        await cb_env.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_startkey(self, cb_env):
+        batch_id = cb_env.get_batch_id()
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           startkey=[f'{batch_id}', f'{batch_id}::0'])
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+
+        await cb_env.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_startkey_docid(self, cb_env):
+        batch_id = cb_env.get_batch_id()
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           startkey_docid=f'{batch_id}::0')
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+
+        await cb_env.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+
+class ClassicViewsTests(ViewsTestSuite):
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicViewsTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicViewsTests) if valid_test_method(meth)]
+        compare = set(ViewsTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest_asyncio.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
+    async def couchbase_test_environment(self, acb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        acb_env = AsyncViewsTestEnvironment.from_environment(acb_base_env)
+        acb_env.enable_views_mgmt()
+        await acb_env.setup(request.param)
+        yield acb_env
+        await acb_env.teardown(request.param)

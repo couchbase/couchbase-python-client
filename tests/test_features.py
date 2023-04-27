@@ -46,6 +46,7 @@ class ServerFeatures(Enum):
     BucketStorageBackend = 'bucket_storage_backend'
     CustomConflictResolution = 'custom_conflict_resolution'
     QueryIndexManagement = 'query_index_mgmt'
+    QueryUserDefinedFunctions = 'query_user_defined_functions'
     SearchIndexManagement = 'search_index_mgmt'
     ViewIndexManagement = 'view_index_mgmt'
     GetMeta = 'get_meta'
@@ -78,6 +79,7 @@ class EnvironmentFeatures:
                             ServerFeatures.GetMeta,
                             ServerFeatures.Query,
                             ServerFeatures.QueryIndexManagement,
+                            ServerFeatures.QueryUserDefinedFunctions,
                             ServerFeatures.RateLimiting,
                             ServerFeatures.Search,
                             ServerFeatures.SearchIndexManagement,
@@ -116,7 +118,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.BucketStorageBackend,
                                 ServerFeatures.CustomConflictResolution,
                                 ServerFeatures.EventingFunctionManagement,
-                                ServerFeatures.PreserveExpiry]
+                                ServerFeatures.PreserveExpiry,
+                                ServerFeatures.QueryUserDefinedFunctions]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str
