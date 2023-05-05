@@ -133,8 +133,8 @@ class ContentSubdocProxy:
             # TODO:  implement exc_from_rc()??
             status = self._content[index].get("status", None)
             if not status:
-                raise DocumentNotFoundException(
-                    f"Could not find document for key: {self._key}")
+                # An attribute value is None
+                pass
             if status == SubDocStatus.PathNotFound:
                 path = self._content[index].get("path", None)
                 raise PathNotFoundException(
