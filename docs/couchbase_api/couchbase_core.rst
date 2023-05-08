@@ -73,8 +73,10 @@ Collection
     .. autoproperty:: name
     .. automethod:: exists
     .. automethod:: get
+    .. automethod:: get_all_replicas
     .. automethod:: get_and_lock
     .. automethod:: get_and_touch
+    .. automethod:: get_any_replica
     .. automethod:: insert
     .. automethod:: lookup_in
     .. automethod:: mutate_in
