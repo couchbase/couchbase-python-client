@@ -20,6 +20,7 @@ import warnings
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
+                    List,
                     Optional,
                     Tuple,
                     Union)
@@ -239,7 +240,7 @@ class ClusterLogic:
         """Parse the provided connection string
 
         The provided connection string will be parsed to split the connection string
-        and the the query options.  Query options will be split into legacy options
+        and the query options.  Query options will be split into legacy options
         and 'current' options.
 
         Args:
@@ -262,7 +263,26 @@ class ClusterLogic:
         else:
             conn_str = f'{parsed_conn.netloc}{parsed_conn.path}'
         query_str = parsed_conn.query
+        query_str_opts, legacy_query_str_opts = self._parse_query_string_options(query_str)
+
+        return conn_str, query_str_opts, legacy_query_str_opts
+
+    def _parse_query_string_options(self,
+                                    query_str
+                                    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Parse the query string options
+
+        Query options will be split into legacy options and 'current' options. The values for the
+        'current' options are cast to integers or booleans where applicable
+
+        Args:
+            query_str (str): The query string.
+
+        Returns:
+            Tuple[Dict[str, Any], Dict[str, Any]]: The parsed current options and legacy options.
+        """
         options = parse_qs(query_str)
+
         # @TODO:  issue warning if it is overriding cluster options?
         legacy_query_str_opts = {}
         for k, v in options.items():
@@ -277,11 +297,33 @@ class ClusterLogic:
         for k, v in options.items():
             if k in self._LEGACY_CONNSTR_QUERY_ARGS.keys():
                 continue
-            if len(v) > 1:
-                query_str_opts[k] = v
-            else:
-                query_str_opts[k] = v[0]
-        return conn_str, query_str_opts, legacy_query_str_opts
+            query_str_opts[k] = self._parse_query_string_value(v)
+
+        return query_str_opts, legacy_query_str_opts
+
+    def _parse_query_string_value(self,
+                                  value  # type: List[str]
+                                  ) -> Union[List[str], str, bool, int]:
+        """Parse a query string value
+
+        The provided value is a list of at least one element. Returns either a list of strings or a single element
+        which might be cast to an integer or a boolean if that's appropriate.
+
+        Args:
+            value (List[str]): The query string value.
+
+        Returns:
+            Union[List[str], str, bool, int]: The parsed current options and legacy options.
+        """
+
+        if len(value) > 1:
+            return value
+        v = value[0]
+        if v.isnumeric():
+            return int(v)
+        elif v.lower() in ['true', 'false']:
+            return v.lower() == 'true'
+        return v
 
     def _parse_legacy_query_options(self, **query_opts  # type: Dict[str, Any]
                                     ) -> Dict[str, Any]:

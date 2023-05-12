@@ -623,6 +623,11 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
         }
     }
 
+    PyObject* pyObj_disable_mozilla_ca_certificates = PyDict_GetItemString(pyObj_options, "disable_mozilla_ca_certificates");
+    if (pyObj_disable_mozilla_ca_certificates != nullptr && pyObj_disable_mozilla_ca_certificates == Py_True) {
+        options.disable_mozilla_ca_certificates = true;
+    }
+
     PyObject* pyObj_enable_mut_tokens = PyDict_GetItemString(pyObj_options, "enable_mutation_tokens");
     if (pyObj_enable_mut_tokens != nullptr && pyObj_enable_mut_tokens == Py_False) {
         options.enable_mutation_tokens = false;
@@ -950,6 +955,12 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
         PyErr_Clear();
     }
     Py_XDECREF(pyObj_tmp);
+
+    if (-1 ==
+        PyDict_SetItemString(pyObj_opts, "disable_mozilla_ca_certificates", opts.disable_mozilla_ca_certificates ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
 
     if (-1 == PyDict_SetItemString(pyObj_opts, "enable_mutation_tokens", opts.enable_mutation_tokens ? Py_True : Py_False)) {
         PyErr_Print();

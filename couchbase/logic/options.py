@@ -540,6 +540,7 @@ class ClusterOptionsBase(dict):
         "user_agent_extra": {"user_agent_extra": validate_str},
         "trust_store_path": {"trust_store_path": validate_str},
         "cert_path": {"cert_path": validate_str},
+        "disable_mozilla_ca_certificates": {"disable_mozilla_ca_certificates": validate_bool},
         "logging_meter_emit_interval": {"emit_interval": timedelta_as_microseconds},
         "num_io_threads": {"num_io_threads": validate_int},
         "transaction_config": {"transaction_config": lambda x: x},
@@ -586,6 +587,7 @@ class ClusterOptionsBase(dict):
         meter=None,  # type: Optional[CouchbaseMeter]
         dns_nameserver=None,  # type: Optional[str]
         dns_port=None,  # type: Optional[int]
+        disable_mozilla_ca_certificates=None,  # type: Optional[bool]
     ):
         """ClusterOptions instance."""
 

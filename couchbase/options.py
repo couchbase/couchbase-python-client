@@ -324,6 +324,8 @@ class ClusterOptions(ClusterOptionsBase):
         network (str, optional): Set to False to disable compression. Defaults to True (enabled).
         tls_verify (Union[str, :class:`.TLSVerifyMode`], optional): Set tls verify mode. Defaults to
             TLSVerifyMode.PEER.
+        disable_mozilla_ca_certificates (bool, optional): Set to True to disable loading Mozilla's list of CA
+            certificates for TLS verification. Defaults to False (enabled).
         serializer (:class:`~.serializer.Serializer`, optional): Global serializer to translate JSON to Python objects.
             Defaults to :class:`~.serializer.DefaultJsonSerializer`.
         transcoder (:class:`~.transcoder.Transcoder`, optional): Global transcoder to use for kv-operations.

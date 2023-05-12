@@ -68,6 +68,7 @@ class ConnectionTestSuite:
         'test_custom_config_profile',
         'test_custom_config_profile_fail',
         'test_invalid_connection_strings',
+        'test_connection_string_options',
         'test_valid_connection_strings',
         'test_wan_config_profile',
         'test_wan_config_profile_with_auth',
@@ -284,6 +285,7 @@ class ConnectionTestSuite:
             "enable_metrics": True,
             "network": 'external',
             "tls_verify": TLSVerifyMode.NO_VERIFY,
+            "disable_mozilla_ca_certificates": False,
             "serializer": DefaultJsonSerializer(),
             "transcoder": JSONTranscoder(),
             "tcp_keep_alive_interval": timedelta(seconds=30),
@@ -842,6 +844,30 @@ class ConnectionTestSuite:
             else:
                 cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator(
                     'Administrator', 'password'), bootstrap_timeout=timedelta(seconds=1))
+
+            user_agent = cl._cluster_opts.pop('user_agent_extra', None)
+            assert expected_opts == cl._cluster_opts
+            assert user_agent is not None
+            assert 'pycbc/' in user_agent
+            assert 'python/' in user_agent
+            expected_conn_str = conn_str.split('?')[0]
+            assert expected_conn_str == cl._connstr
+        except CouchbaseException:
+            pass
+        except Exception as ex:
+            pytest.fail(f'Unexpected exception occurred: {ex}')
+
+    @pytest.mark.parametrize('conn_str, expected_opts',
+                             [('couchbase://10.0.0.1?num_io_threads=1',
+                               {'num_io_threads': 1}),
+                              ('couchbase://10.0.0.1?max_http_connections=4&disable_mozilla_ca_certificates=False',
+                               {'max_http_connections': 4, 'disable_mozilla_ca_certificates': False}),
+                              ('couchbase://10.0.0.1?an_invalid_option=10',
+                               {}),
+                              ])
+    def test_connection_string_options(self, conn_str, expected_opts):
+        try:
+            cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator('Administrator', 'password'))
 
             user_agent = cl._cluster_opts.pop('user_agent_extra', None)
             assert expected_opts == cl._cluster_opts
