@@ -688,14 +688,12 @@ build_exception_from_context(const couchbase::core::error_context::search& ctx,
     }
     Py_DECREF(pyObj_tmp);
 
-    if (ctx.query.has_value()) {
-        pyObj_tmp = PyUnicode_FromString(ctx.query.value().c_str());
-        if (-1 == PyDict_SetItemString(pyObj_error_context, SEARCH_QUERY, pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
+    pyObj_tmp = PyUnicode_FromString(ctx.query.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_error_context, SEARCH_QUERY, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
     }
+    Py_DECREF(pyObj_tmp);
 
     if (ctx.parameters.has_value()) {
         pyObj_tmp = PyUnicode_FromString(ctx.parameters.value().c_str());
