@@ -297,7 +297,7 @@ If seeing issues when trying to build (steps in [](#)), some things to check/try
 ## Build the Python SDK
 Clone this Python SDK repository:
 ```console
-git clone https://github.com/couchbase/couchbase-python-client.git
+git clone --depth 1 --recurse-submodules https://github.com/couchbase/couchbase-python-client.git
 ```
 
 Move into the directory created after cloning the Python SDK repository:
