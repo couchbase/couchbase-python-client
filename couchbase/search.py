@@ -49,6 +49,9 @@ from couchbase.logic.search_queries import ConjunctionQuery  # noqa: F401
 from couchbase.logic.search_queries import DateRangeQuery  # noqa: F401
 from couchbase.logic.search_queries import DisjunctionQuery  # noqa: F401
 from couchbase.logic.search_queries import DocIdQuery  # noqa: F401
+from couchbase.logic.search_queries import GeoBoundingBoxQuery  # noqa: F401
+from couchbase.logic.search_queries import GeoDistanceQuery  # noqa: F401
+from couchbase.logic.search_queries import GeoPolygonQuery  # noqa: F401
 from couchbase.logic.search_queries import MatchAllQuery  # noqa: F401
 from couchbase.logic.search_queries import MatchNoneQuery  # noqa: F401
 from couchbase.logic.search_queries import MatchOperator  # noqa: F401
