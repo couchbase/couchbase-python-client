@@ -501,10 +501,10 @@ python -m pytest -m pycbc_acouchbase --asyncio-mode=strict -v -p no:warnings
 We welcome contributions from the community!  Please see follow the steps outlined [here](https://github.com/couchbase/couchbase-python-client/blob/master/CONTRIBUTING.md) to get started.
 
 The Python SDK uses pre-commit in order to handle linting, formatting and verifying the code base.
-pre-commit can be installed either by install the dev-requirements:
+pre-commit can be installed either by installing the development requirements:
 
 ```
-python3 -m pip install -r dev-requirements.txt
+python3 -m pip install -r dev_requirements.txt
 ```
 
 Or by installing pre-commit separately
