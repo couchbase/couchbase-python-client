@@ -34,16 +34,10 @@ from couchbase.diagnostics import (ClusterState,
                                    ServiceType)
 from couchbase.exceptions import (CLIENT_ERROR_MAP,
                                   CouchbaseException,
-                                  DocumentNotFoundException,
-                                  ErrorMapper,
-                                  InvalidIndexException,
-                                  PathExistsException,
-                                  PathMismatchException,
-                                  PathNotFoundException,
-                                  SubdocCantInsertValueException)
+                                  ErrorMapper)
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.pycbc_core import exception, result
-from couchbase.subdocument import SubDocStatus
+from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
 
 
 class Result:
@@ -124,34 +118,7 @@ class ContentSubdocProxy:
         self._key = key
 
     def _parse_content_at_index(self, index, type_):
-        if index > len(self._content) - 1 or index < 0:
-            raise InvalidIndexException(
-                f"Provided index ({index}) is invalid.")
-
-        item = self._content[index].get("value", None)
-        if item is None:
-            # TODO:  implement exc_from_rc()??
-            status = self._content[index].get("status", None)
-            if not status:
-                raise DocumentNotFoundException(
-                    f"Could not find document for key: {self._key}")
-            if status == SubDocStatus.PathNotFound:
-                path = self._content[index].get("path", None)
-                raise PathNotFoundException(
-                    f"Path ({path}) could not be found for key: {self._key}")
-            if status == SubDocStatus.PathMismatch:
-                path = self._content[index].get("path", None)
-                raise PathMismatchException(
-                    f"Path ({path}) mismatch for key: {self._key}")
-            if status == SubDocStatus.ValueCannotInsert:
-                path = self._content[index].get("path", None)
-                raise SubdocCantInsertValueException(
-                    f"Cannot insert value at path ({path}) for key: {self._key}")
-            if status == SubDocStatus.PathExists:
-                path = self._content[index].get("path", None)
-                raise PathExistsException(
-                    f"Path ({path}) already exists for key: {self._key}")
-
+        item = parse_subdocument_content_as(self._content, index, self._key)
         return type_(item)
 
     def __getitem__(self,
@@ -706,13 +673,7 @@ class LookupInResult(Result):
         Returns:
             bool: True if the path exists.  False if the path does not exist.
         """
-
-        if index > len(self.value) - 1 or index < 0:
-            raise InvalidIndexException(
-                f"Provided index ({index}) is invalid.")
-
-        exists = self.value[index].get("exists", None)
-        return exists is not None and exists is True
+        return parse_subdocument_exists(self.value, index, self.key)
 
     @property
     def content_as(self) -> ContentSubdocProxy:

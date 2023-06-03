@@ -124,22 +124,24 @@ add_extras_to_result<couchbase::core::operations::lookup_in_response>(const couc
             }
             Py_DECREF(pyObj_tmp);
 
-            try {
-                pyObj_tmp = binary_to_PyObject(f.value);
-            } catch (const std::exception& e) {
-                PyErr_SetString(PyExc_TypeError, e.what());
-                Py_XDECREF(pyObj_fields);
-                Py_XDECREF(pyObj_field);
-                Py_XDECREF(pyObj_tmp);
-                return nullptr;
+            if (f.value.size() > 0) {
+                try {
+                    pyObj_tmp = binary_to_PyObject(f.value);
+                } catch (const std::exception& e) {
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    Py_XDECREF(pyObj_fields);
+                    Py_XDECREF(pyObj_field);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
+                if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+                    Py_XDECREF(pyObj_fields);
+                    Py_XDECREF(pyObj_field);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
+                Py_DECREF(pyObj_tmp);
             }
-            if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
-                Py_XDECREF(pyObj_fields);
-                Py_XDECREF(pyObj_field);
-                Py_XDECREF(pyObj_tmp);
-                return nullptr;
-            }
-            Py_DECREF(pyObj_tmp);
 
             PyList_Append(pyObj_fields, pyObj_field);
             Py_DECREF(pyObj_field);

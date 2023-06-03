@@ -136,9 +136,8 @@ class SubDocumentTests:
         result = await cb.lookup_in(key, (SD.exists("geo"),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
-        # no value content w/ EXISTS operation
-        with pytest.raises(DocumentNotFoundException):
-            result.content_as[bool](0)
+        # PYCBC-1480, update exists to follow RFC
+        assert result.content_as[bool](0) is True
 
     @pytest.mark.asyncio
     async def test_lookup_in_simple_exists_bad_path(self, cb_env, default_kvp):
@@ -146,9 +145,16 @@ class SubDocumentTests:
         key = default_kvp.key
         result = await cb.lookup_in(key, (SD.exists("qzzxy"),))
         assert isinstance(result, LookupInResult)
-        assert result.exists(0) is False
+        assert not result.exists(0)
+        assert result.content_as[bool](0) is False
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_simple_get_bad_path(self, cb_env, default_kvp):
+        key = default_kvp.key
+        result = await cb_env.collection.lookup_in(key, (SD.get('qzzxy'),))
+        assert isinstance(result, LookupInResult)
         with pytest.raises(PathNotFoundException):
-            result.content_as[bool](0)
+            result.content_as[str](0)
 
     @pytest.mark.asyncio
     async def test_lookup_in_one_path_not_found(self, cb_env, default_kvp):
@@ -157,11 +163,10 @@ class SubDocumentTests:
         result = await cb.lookup_in(key, (SD.exists("geo"), SD.exists("qzzxy"),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
-        assert result.exists(1) is False
-        with pytest.raises(DocumentNotFoundException):
-            result.content_as[bool](0)
-        with pytest.raises(PathNotFoundException):
-            result.content_as[bool](1)
+        assert not result.exists(1)
+        # PYCBC-1480, update exists to follow RFC
+        assert result.content_as[bool](0) is True
+        result.content_as[bool](1) is False
 
     @pytest.mark.asyncio
     async def test_lookup_in_simple_long_path(self, cb_env, new_kvp):
@@ -175,6 +180,21 @@ class SubDocumentTests:
         result = await cb.lookup_in(key, (SD.get("long_path.a.b.c"),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[str](0) == value["long_path"]["a"]["b"]["c"]
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_valid_path_null_content(self, cb_env, new_kvp):
+        key = new_kvp.key
+        value = new_kvp.value
+        # add empty value to doc
+        value['empty_field'] = None
+        await cb_env.collection.upsert(key, value)
+        res = await cb_env.try_n_times(10, 3, cb_env.collection.get, key)
+        assert 'empty_field' in res.content_as[dict]
+        result = await cb_env.collection.lookup_in(key, (SD.get('empty_field'),))
+        assert isinstance(result, LookupInResult)
+        # type(None) provides a <class 'NoneType'> which we can then create an instance of
+        # in order to check that it is in fact None
+        assert result.content_as[type](0)() is None
 
     @pytest.mark.asyncio
     async def test_lookup_in_multiple_specs(self, cb_env, default_kvp):

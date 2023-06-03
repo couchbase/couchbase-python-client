@@ -18,9 +18,24 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     Iterable,
+                    List,
                     Optional)
 
-from couchbase.exceptions import InvalidArgumentException
+from couchbase.exceptions import (CouchbaseException,
+                                  DeltaInvalidException,
+                                  DocumentNotFoundException,
+                                  DocumentNotJsonException,
+                                  InvalidArgumentException,
+                                  InvalidIndexException,
+                                  NumberTooBigException,
+                                  PathExistsException,
+                                  PathInvalidException,
+                                  PathMismatchException,
+                                  PathNotFoundException,
+                                  PathTooBigException,
+                                  PathTooDeepException,
+                                  SubdocCantInsertValueException,
+                                  ValueTooDeepException)
 from couchbase.logic.supportability import Supportability
 
 if TYPE_CHECKING:
@@ -143,6 +158,76 @@ class ArrayValues(tuple):
 
     def __repr__(self):
         return 'ArrayValues({0})'.format(tuple.__repr__(self))
+
+
+def parse_subdocument_content_as(content,  # type: List[Dict[str, Any]]
+                                 index,    # type: int
+                                 key,      # type: str
+                                 ) -> Any:
+    if index > len(content) - 1 or index < 0:
+        raise InvalidIndexException(f"Provided index is invalid. Index={index}.")
+
+    status = content[index].get('status', None)
+    if status is None:
+        raise DocumentNotFoundException(f"Could not find document. Key={key}.")
+
+    op_code = content[index].get('opcode', None)
+    if op_code == SubDocOp.EXISTS:
+        return parse_subdocument_exists(content, index, key)
+    if status == 0:
+        return content[index].get('value', None)
+
+    path = content[index].get('path', None)
+    parse_subdocument_status(status, path, key)
+
+
+def parse_subdocument_exists(content,  # type: List[Dict[str, Any]]
+                             index,    # type: int
+                             key,      # type: str
+                             ) -> bool:
+    if index > len(content) - 1 or index < 0:
+        raise InvalidIndexException(f"Provided index is invalid. Index={index}.")
+
+    status = content[index].get('status', None)
+    if status is None:
+        raise DocumentNotFoundException(f"Could not find document. Key={key}.")
+
+    path = content[index].get('path', None)
+    if status == 0:
+        return True
+    elif status == SubDocStatus.PathNotFound:
+        return False
+
+    parse_subdocument_status(status, path, key)
+
+
+def parse_subdocument_status(status, path, key):  # noqa: C901
+    if status == SubDocStatus.PathNotFound:
+        raise PathNotFoundException(f"Path could not be found. Path={path}, key={key}.")
+    if status == SubDocStatus.PathMismatch:
+        raise PathMismatchException(f"Path mismatch. Path={path}, key={key}.")
+    if status == SubDocStatus.PathInvalid:
+        raise PathInvalidException(f"Path is invalid. Path={path}, key={key}.")
+    if status == SubDocStatus.PathTooBig:
+        msg = f"Path is too long, or contains too many independent components. Path={path}, key={key}."
+        raise PathTooBigException(msg)
+    if status == SubDocStatus.TooDeep:
+        raise PathTooDeepException(f"Path contains too many levels to parse. Path={path}, key={key}.")
+    if status == SubDocStatus.ValueCannotInsert:
+        raise SubdocCantInsertValueException(f"Cannot insert value. Path={path}, key={key}.")
+    if status == SubDocStatus.DocNotJson:
+        raise DocumentNotJsonException(f"Cannot operate on non-JSON document. Path={path}, key={key}.")
+    if status == SubDocStatus.NumRangeError:
+        msg = f"Value is outside the valid range for arithmetic operations. Path={path}, key={key}."
+        raise NumberTooBigException(msg)
+    if status == SubDocStatus.DeltaInvalid:
+        raise DeltaInvalidException(f"Delta value specified for operation is too large. Path={path}, key={key}.")
+    if status == SubDocStatus.PathExists:
+        raise PathExistsException(f"Path already exists. Path={path}, key={key}.")
+    if status == SubDocStatus.ValueTooDeep:
+        raise ValueTooDeepException(f"Value too deep for document. Path={path}, key={key}.")
+
+    raise CouchbaseException(f"Unknown status. Status={status}, path={path}, key={key}")
 
 
 def exists(

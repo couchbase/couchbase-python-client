@@ -675,8 +675,8 @@ class InternalSDKException(CouchbaseException):
 # kv errors
 
 
-class DocumentNotFoundException(CouchbaseException):
-    """Indicates that the referenced document does not exist."""
+class DeltaInvalidException(CouchbaseException):
+    """Indicates the delta value specified for an operation is too large."""
 
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
@@ -690,8 +690,8 @@ class DocumentNotFoundException(CouchbaseException):
         return self.__repr__()
 
 
-class DocumentUnretrievableException(CouchbaseException):
-    """Indicates that the referenced document does not exist and therefore no replicas are found."""
+class DocumentExistsException(CouchbaseException):
+    """Indicates that the referenced document exists already, but the operation was not expecting it to exist."""
 
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
@@ -721,8 +721,8 @@ class DocumentLockedException(CouchbaseException):
         return self.__repr__()
 
 
-class DocumentExistsException(CouchbaseException):
-    """Indicates that the referenced document exists already, but the operation was not expecting it to exist."""
+class DocumentNotFoundException(CouchbaseException):
+    """Indicates that the referenced document does not exist."""
 
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
@@ -736,8 +736,23 @@ class DocumentExistsException(CouchbaseException):
         return self.__repr__()
 
 
-class DurabilityInvalidLevelException(CouchbaseException):
-    """Given durability level is invalid"""
+class DocumentNotJsonException(CouchbaseException):
+    """Indicates a sub-document operation was attempted on a non-JSON document."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class DocumentUnretrievableException(CouchbaseException):
+    """Indicates that the referenced document does not exist and therefore no replicas are found."""
 
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
@@ -766,10 +781,8 @@ class DurabilityImpossibleException(CouchbaseException):
         return self.__repr__()
 
 
-class DurabilitySyncWriteInProgressException(CouchbaseException):
-    """Returned if an attempt is made to mutate a key which already has a
-    SyncWrite pending. Client would typically retry (possibly with backoff).
-    Similar to ELOCKED"""
+class DurabilityInvalidLevelException(CouchbaseException):
+    """Given durability level is invalid"""
 
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
@@ -800,8 +813,10 @@ class DurabilitySyncWriteAmbiguousException(CouchbaseException):
         return self.__repr__()
 
 
-class PathNotFoundException(CouchbaseException):
-    """Indicates that the reference path was not found."""
+class DurabilitySyncWriteInProgressException(CouchbaseException):
+    """Returned if an attempt is made to mutate a key which already has a
+    SyncWrite pending. Client would typically retry (possibly with backoff).
+    Similar to ELOCKED"""
 
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
@@ -815,8 +830,52 @@ class PathNotFoundException(CouchbaseException):
         return self.__repr__()
 
 
+class InvalidValueException(CouchbaseException):
+    """Indicates the provided value was invalid for the operation."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class NumberTooBigException(CouchbaseException):
+    def __init__(self, message=None, **kwargs):
+        """Indicates existing number is outside the valid range for arithmetic operations."""
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
 class PathExistsException(CouchbaseException):
     """Indicates that the reference path already existed, but the operation expected that it did not."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class PathInvalidException(CouchbaseException):
+    """Indicates that the reference path was not syntactically correct."""
 
     def __init__(self, message=None, **kwargs):
         if message and isinstance(message, str) and 'message' not in kwargs:
@@ -846,10 +905,55 @@ class PathMismatchException(CouchbaseException):
         return self.__repr__()
 
 
-class InvalidValueException(CouchbaseException):
-    """Indicates the provided value was invalid for the operation."""
+class PathNotFoundException(CouchbaseException):
+    """Indicates that the reference path was not found."""
 
     def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class PathTooBigException(CouchbaseException):
+    def __init__(self, message=None, **kwargs):
+        """Indicates that the reference path is too long, or contains too many independent components."""
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class PathTooDeepException(CouchbaseException):
+    def __init__(self, message=None, **kwargs):
+        """Indicates that the reference path contains too many levels to parse."""
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class ValueTooDeepException(CouchbaseException):
+    def __init__(self, message=None, **kwargs):
+        """
+            Indicates that the value provided, if inserted into the document,
+            would cause the document to become too deep for the server to accept.
+        """
         if message and isinstance(message, str) and 'message' not in kwargs:
             kwargs['message'] = message
         super().__init__(**kwargs)

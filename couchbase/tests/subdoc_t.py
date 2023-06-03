@@ -61,8 +61,10 @@ class SubDocumentTestSuite:
         'test_lookup_in_simple_exists',
         'test_lookup_in_simple_exists_bad_path',
         'test_lookup_in_simple_get',
+        'test_lookup_in_simple_get_bad_path',
         'test_lookup_in_simple_get_spec_as_list',
         'test_lookup_in_simple_long_path',
+        'test_lookup_in_valid_path_null_content',
         'test_mutate_in_expiry',
         'test_mutate_in_insert_semantics',
         'test_mutate_in_insert_semantics_fail',
@@ -311,7 +313,7 @@ class SubDocumentTestSuite:
                                                    SD.get('manufacturer.geo.accuracy'),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[int](0) == 0
-        assert result.exists(1) is True
+        assert result.exists(1)
         assert result.content_as[dict](2) == value['manufacturer']
         assert result.content_as[str](3) == value['manufacturer']['geo']['accuracy']
 
@@ -321,34 +323,38 @@ class SubDocumentTestSuite:
             key, (SD.exists('batch'), SD.exists('qzzxy'),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
-        assert result.exists(1) is False
-        with pytest.raises(DocumentNotFoundException):
-            result.content_as[bool](0)
-        with pytest.raises(PathNotFoundException):
-            result.content_as[bool](1)
+        assert not result.exists(1)
+        # PYCBC-1480, update exists to follow RFC
+        assert result.content_as[bool](0) is True
+        assert result.content_as[bool](1) is False
 
     def test_lookup_in_simple_exists(self, cb_env):
         key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
         result = cb_env.collection.lookup_in(key, (SD.exists('batch'),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
-        # no value content w/ EXISTS operation
-        with pytest.raises(DocumentNotFoundException):
-            result.content_as[bool](0)
+        # PYCBC-1480, update exists to follow RFC
+        assert result.content_as[bool](0) is True
 
     def test_lookup_in_simple_exists_bad_path(self, cb_env):
         key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        result = cb_env.collection.lookup_in(key, (SD.exists("qzzxy"),))
+        result = cb_env.collection.lookup_in(key, (SD.exists('qzzxy'),))
         assert isinstance(result, LookupInResult)
-        assert result.exists(0) is False
-        with pytest.raises(PathNotFoundException):
-            result.content_as[bool](0)
+        assert not result.exists(0)
+        assert result.content_as[bool](0) is False
 
     def test_lookup_in_simple_get(self, cb_env):
         key, value = cb_env.get_existing_doc_by_type('vehicle')
         result = cb_env.collection.lookup_in(key, (SD.get('batch'),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[str](0) == value['batch']
+
+    def test_lookup_in_simple_get_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = cb_env.collection.lookup_in(key, (SD.get('qzzxy'),))
+        assert isinstance(result, LookupInResult)
+        with pytest.raises(PathNotFoundException):
+            result.content_as[str](0)
 
     def test_lookup_in_simple_get_spec_as_list(self, cb_env):
         key, value = cb_env.get_existing_doc_by_type('vehicle')
@@ -363,6 +369,16 @@ class SubDocumentTestSuite:
             key, (SD.get('manufacturer.geo.location.tz'),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[str](0) == value['manufacturer']['geo']['location']['tz']
+
+    def test_lookup_in_valid_path_null_content(self, cb_env):
+        key, value = cb_env.get_new_doc_by_type('vehicle')
+        value['empty_field'] = None
+        cb_env.collection.upsert(key, value)
+        res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert 'empty_field' in res.content_as[dict]
+        result = cb_env.collection.lookup_in(key, (SD.get('empty_field'), SD.get('batch')))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[lambda x: x](0) is None
 
     @pytest.mark.usefixtures("check_xattr_supported")
     @pytest.mark.usefixtures('skip_if_go_caves')
