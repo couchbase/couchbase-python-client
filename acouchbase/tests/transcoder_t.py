@@ -15,6 +15,7 @@
 
 import json
 from datetime import timedelta
+from typing import Any, Tuple
 
 import pytest
 import pytest_asyncio
@@ -32,12 +33,27 @@ from couchbase.options import (GetAndLockOptions,
 from couchbase.transcoder import (LegacyTranscoder,
                                   RawBinaryTranscoder,
                                   RawJSONTranscoder,
-                                  RawStringTranscoder)
+                                  RawStringTranscoder,
+                                  Transcoder)
 
 from ._test_utils import (CollectionType,
                           FakeTestObj,
                           KVPair,
                           TestEnvironment)
+
+
+class ZeroFlagsTranscoder(Transcoder):
+    def encode_value(self,
+                     value,  # type: Any
+                     ) -> Tuple[bytes, int]:
+        return json.dumps(value, ensure_ascii=False).encode('utf-8'), 0
+
+    def decode_value(self,
+                     value,  # type: bytes
+                     flags  # type: int
+                     ) -> Any:
+        # ignoring flags...only for test purposes
+        return json.loads(value.decode('utf-8'))
 
 
 class DefaultTranscoderTests:
@@ -111,6 +127,19 @@ class DefaultTranscoderTests:
         await cb.upsert(key, value)
         value['new_content'] = 'new content!'
         await cb.replace(key, value)
+        res = await cb.get(key)
+        result = res.content_as[dict]
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result == value
+
+    @pytest.mark.asyncio
+    async def test_default_tc_flags_zero(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+        value = new_kvp.value
+
+        await cb.upsert(key, value, transcoder=ZeroFlagsTranscoder())
         res = await cb.get(key)
         result = res.content_as[dict]
         assert result is not None
@@ -786,6 +815,14 @@ class LegacyTranscoderTests:
     async def test_legacy_tc_json_upsert(self, cb_env, json_kvp):
         key, value = json_kvp
         await cb_env.collection.upsert(key, value)
+        res = await cb_env.collection.get(key)
+        assert isinstance(res.value, dict)
+        assert value == res.content_as[dict]
+
+    @pytest.mark.asyncio
+    async def test_legacy_tc_flags_zero(self, cb_env, json_kvp):
+        key, value = json_kvp
+        await cb_env.collection.upsert(key, value, transcoder=ZeroFlagsTranscoder())
         res = await cb_env.collection.get(key)
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]

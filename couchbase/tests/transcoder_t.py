@@ -15,9 +15,11 @@
 
 import json
 from datetime import timedelta
+from typing import Any, Tuple
 
 import pytest
 
+from couchbase.constants import FMT_JSON
 from couchbase.exceptions import (DocumentLockedException,
                                   DocumentNotFoundException,
                                   ValueFormatException)
@@ -29,10 +31,25 @@ from couchbase.transcoder import (JSONTranscoder,
                                   LegacyTranscoder,
                                   RawBinaryTranscoder,
                                   RawJSONTranscoder,
-                                  RawStringTranscoder)
+                                  RawStringTranscoder,
+                                  Transcoder)
 from tests.environments import CollectionType
 from tests.environments.test_environment import TestEnvironment
 from tests.environments.transcoder_environment import FakeTestObj, TranscoderTestEnvironment
+
+
+class ZeroFlagsTranscoder(Transcoder):
+    def encode_value(self,
+                     value,  # type: Any
+                     ) -> Tuple[bytes, int]:
+        return json.dumps(value, ensure_ascii=False).encode('utf-8'), 0
+
+    def decode_value(self,
+                     value,  # type: bytes
+                     flags  # type: int
+                     ) -> Any:
+        # ignoring flags...only for test purposes
+        return json.loads(value.decode('utf-8'))
 
 
 class DefaultTranscoderTestSuite:
@@ -41,6 +58,8 @@ class DefaultTranscoderTestSuite:
         'test_default_tc_binary_replace',
         'test_default_tc_binary_upsert',
         'test_default_tc_bytearray_upsert',
+        'test_default_tc_decoding',
+        'test_default_tc_flags_zero',
         'test_default_tc_json_insert',
         'test_default_tc_json_replace',
         'test_default_tc_json_upsert',
@@ -68,6 +87,23 @@ class DefaultTranscoderTestSuite:
         key, value = cb_env.get_existing_doc_by_type('bytes')
         with pytest.raises(ValueFormatException):
             cb_env.collection.upsert(key, bytearray(value))
+
+    def test_default_tc_decoding(self):
+        tc = JSONTranscoder()
+        content = {'foo': 'bar'}
+        value, flags = tc.encode_value(content)
+        assert flags == FMT_JSON
+        decoded = tc.decode_value(value, None)
+        assert content == decoded
+        decoded = tc.decode_value(value, 0)
+        assert content == decoded
+
+    def test_default_tc_flags_zero(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('json')
+        cb_env.collection.upsert(key, value, transcoder=ZeroFlagsTranscoder())
+        res = cb_env.collection.get(key)
+        assert isinstance(res.value, dict)
+        assert value == res.content_as[dict]
 
     def test_default_tc_json_insert(self, cb_env):
         key, value = cb_env.get_new_doc_by_type('json')
@@ -212,6 +248,8 @@ class LegacyTranscoderTestSuite:
         'test_legacy_tc_bytes_insert',
         'test_legacy_tc_bytes_replace',
         'test_legacy_tc_bytes_upsert',
+        'test_legacy_tc_decoding',
+        'test_legacy_tc_flags_zero',
         'test_legacy_tc_json_insert',
         'test_legacy_tc_json_replace',
         'test_legacy_tc_json_upsert',
@@ -245,6 +283,23 @@ class LegacyTranscoderTestSuite:
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
+
+    def test_legacy_tc_decoding(self):
+        tc = LegacyTranscoder()
+        content = {'foo': 'bar'}
+        value, flags = tc.encode_value(content)
+        assert flags == FMT_JSON
+        decoded = tc.decode_value(value, None)
+        assert content == decoded
+        decoded = tc.decode_value(value, 0)
+        assert content == decoded
+
+    def test_legacy_tc_flags_zero(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('json')
+        cb_env.collection.upsert(key, value, transcoder=ZeroFlagsTranscoder())
+        res = cb_env.collection.get(key)
+        assert isinstance(res.value, dict)
+        assert value == res.content_as[dict]
 
     def test_legacy_tc_json_insert(self, cb_env):
         key, value = cb_env.get_new_doc_by_type('json')

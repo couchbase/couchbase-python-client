@@ -34,10 +34,6 @@ from couchbase.exceptions import exception as CouchbaseBaseException
 
 
 def decode_value(transcoder, value, flags, is_subdoc=False):
-    # if no flags, just assume default
-    if not flags:
-        flags = FMT_JSON
-
     if is_subdoc is False:
         return transcoder.decode_value(value, flags)
 
@@ -47,7 +43,8 @@ def decode_value(transcoder, value, flags, is_subdoc=False):
             tmp = copy(f)
             old = tmp.pop('value', None)
             if old:
-                tmp['value'] = transcoder.decode_value(old, flags)
+                # no custom transcoder for subdoc ops, use JSON
+                tmp['value'] = transcoder.decode_value(old, FMT_JSON)
             final_value.append(tmp)
         else:
             final_value.append(f)
