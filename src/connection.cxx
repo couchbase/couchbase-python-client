@@ -749,6 +749,11 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
         }
         options.dns_config = couchbase::core::io::dns::dns_config(nameserver, port, dns_srv_timeout_ms);
     }
+
+    PyObject* pyObj_dump_configuration = PyDict_GetItemString(pyObj_options, "dump_configuration");
+    if (pyObj_dump_configuration != nullptr && pyObj_dump_configuration == Py_True) {
+        options.dump_configuration = true;
+    }
 }
 
 PyObject*
@@ -1161,6 +1166,11 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
         PyErr_Clear();
     }
     Py_XDECREF(pyObj_creds);
+
+    if (-1 == PyDict_SetItemString(pyObj_opts, "dump_configuration", opts.dump_configuration ? Py_True : Py_False)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
 
     return pyObj_opts;
 }

@@ -351,6 +351,7 @@ class ClusterOptions(ClusterOptionsBase):
             enabling the `logging_meter`.   Note when this is set, the `logging_meter_emit_interval` option is ignored.
         dns_nameserver (str, optional):  **VOLATILE** This API is subject to change at any time. Set to configure custom DNS nameserver. Defaults to None.
         dns_port (int, optional):  **VOLATILE** This API is subject to change at any time. Set to configure custom DNS port. Defaults to None.
+        dump_configuration (bool, optional): Set to True to dump every new configuration when TRACE level logging. Defaults to False (disabled).
     """  # noqa: E501
 
     def apply_profile(self,

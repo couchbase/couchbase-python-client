@@ -548,6 +548,7 @@ class ClusterOptionsBase(dict):
         "meter": {"meter": lambda x: x},
         "dns_nameserver": {"dns_nameserver": validate_str},
         "dns_port": {"dns_port": validate_int},
+        "dump_configuration": {"dump_configuration": validate_bool},
     }
 
     @overload
@@ -588,6 +589,7 @@ class ClusterOptionsBase(dict):
         dns_nameserver=None,  # type: Optional[str]
         dns_port=None,  # type: Optional[int]
         disable_mozilla_ca_certificates=None,  # type: Optional[bool]
+        dump_configuration=None,  # type: Optional[bool]
     ):
         """ClusterOptions instance."""
 

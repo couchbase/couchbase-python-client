@@ -293,7 +293,8 @@ class ConnectionTestSuite:
             "config_poll_floor": timedelta(seconds=30),
             "max_http_connections": 10,
             "logging_meter_emit_interval": timedelta(seconds=30),
-            "num_io_threads": 1
+            "num_io_threads": 1,
+            'dump_configuration': True,
         }
 
         expected_opts = copy(opts)
@@ -858,8 +859,8 @@ class ConnectionTestSuite:
             pytest.fail(f'Unexpected exception occurred: {ex}')
 
     @pytest.mark.parametrize('conn_str, expected_opts',
-                             [('couchbase://10.0.0.1?num_io_threads=1',
-                               {'num_io_threads': 1}),
+                             [('couchbase://10.0.0.1?num_io_threads=1&dump_configuration=true',
+                               {'num_io_threads': 1, 'dump_configuration': True}),
                               ('couchbase://10.0.0.1?max_http_connections=4&disable_mozilla_ca_certificates=False',
                                {'max_http_connections': 4, 'disable_mozilla_ca_certificates': False}),
                               ('couchbase://10.0.0.1?an_invalid_option=10',
