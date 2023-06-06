@@ -78,6 +78,7 @@ class SearchQuery:
         """
         pass
 
+
 # Single Term Queries
 
 
@@ -169,6 +170,7 @@ class DocIdQuery(SearchQuery):
     def ids(self, value  # type: str
             ) -> None:
         self.set_prop('ids', value)
+
     # ids = _genprop(list, 'ids', doc="""
     # List of document IDs to use
     # """)
@@ -307,16 +309,26 @@ class RegexQuery(SearchQuery):
     """
     Search documents for fields matching a given regular expression
     """
-    _TERMPROP = 'regex'
+    _TERMPROP = 'regexp'
 
     @property
     def regex(self) -> str:
-        return self._json_.get('regex', None)
+        return self._json_.get('regexp', None)
 
     @regex.setter
     def regex(self, value  # type: str
               ) -> None:
-        self.set_prop('regex', value)
+        self.set_prop('regexp', value)
+
+    @property
+    def regexp(self) -> str:
+        return self._json_.get('regexp', None)
+
+    @regexp.setter
+    def regexp(self, value  # type: str
+               ) -> None:
+        self.set_prop('regexp', value)
+
     # regex = _genprop_str('regexp', doc="Regular expression to use")
 
 
@@ -336,6 +348,7 @@ class BooleanFieldQuery(SearchQuery):
              ) -> None:
         self.set_prop('bool', value)
     # bool = _genprop(bool, 'bool', doc='Boolean value to search for')
+
 
 # Geo Queries
 
@@ -440,6 +453,7 @@ class GeoPolygonQuery(SearchQuery):
     # polygon_points = _genprop(
     #     _locations_conv, 'polygon_points',
     #     doc='List of tuples `(lon, lat)` for the points of a polygon')
+
 
 # Range Queries
 
@@ -546,6 +560,7 @@ class DateRangeQuery(SearchQuery):
         """
         super().__init__()
         _QueryBuilder._validate_range_query(self, start, end, **kwargs)
+
     #     super(DateRangeQuery, self).__init__(start, end, **kwargs)
 
     _MINMAX = 'start', 'end'

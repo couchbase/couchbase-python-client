@@ -717,7 +717,7 @@ class SearchParamTestSuite:
     def test_regexp_query(self, cb_env):
         exp_json = {
             'query': {
-                'regex': 'some?regex'
+                'regexp': 'some?regex'
             },
             'index_name': cb_env.TEST_INDEX_NAME
         }
