@@ -361,7 +361,8 @@ class SearchTestSuite:
                                           SearchOptions(limit=10))
         cb_env.assert_rows(res, 0)
         res = cb_env.collection.insert(key, value)
-        ms = MutationState().add_mutation_token(res.mutation_token())
+        ms = MutationState()
+        ms.add_mutation_token(res.mutation_token())
         res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME,
                                           q,
                                           SearchOptions(limit=10, consistent_with=ms))

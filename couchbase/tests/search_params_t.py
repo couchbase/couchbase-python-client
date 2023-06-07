@@ -115,7 +115,8 @@ class SearchParamTestSuite:
             'query': {
                 'bool': True
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.BooleanFieldQuery(True)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -242,7 +243,8 @@ class SearchParamTestSuite:
             'query': {
                 'ids': ['foo', 'bar', 'baz']
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
 
         q.ids = ['foo', 'bar', 'baz']
@@ -310,7 +312,8 @@ class SearchParamTestSuite:
             'query': {
                 'match_all': None
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.MatchAllQuery()
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -324,7 +327,8 @@ class SearchParamTestSuite:
             'query': {
                 'match_none': None
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.MatchNoneQuery()
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -342,7 +346,8 @@ class SearchParamTestSuite:
                 'field': 'field'
             },
             'limit': 10,
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
 
         q = search.MatchPhraseQuery('salty beers', boost=1.5, analyzer='analyzer',
@@ -369,7 +374,8 @@ class SearchParamTestSuite:
                 'operator': 'or'
             },
             'limit': 10,
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
 
         q = search.MatchQuery('salty beers', boost=1.5, analyzer='analyzer',
@@ -661,7 +667,8 @@ class SearchParamTestSuite:
             'query': {
                 'terms': ['salty', 'beers']
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.PhraseQuery('salty', 'beers')
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -691,7 +698,8 @@ class SearchParamTestSuite:
                 'prefix': 'someterm',
                 'boost': 1.5
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.PrefixQuery('someterm', boost=1.5)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -705,7 +713,8 @@ class SearchParamTestSuite:
             'query': {
                 'foo': 'bar'
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.RawQuery({'foo': 'bar'})
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -719,7 +728,8 @@ class SearchParamTestSuite:
             'query': {
                 'regexp': 'some?regex'
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.RegexQuery('some?regex')
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -736,7 +746,8 @@ class SearchParamTestSuite:
             },
             'explain': True,
             'limit': 10,
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.QueryStringQuery('q*ry', boost=2.0)
         opts = search.SearchOptions(limit=10, explain=True)
@@ -766,7 +777,8 @@ class SearchParamTestSuite:
                 'field': 'field'
             },
             'index_name': cb_env.TEST_INDEX_NAME,
-            'explain': True
+            'explain': True,
+            'metrics': True,
         }
 
         assert exp_json == encoded_q
@@ -809,7 +821,8 @@ class SearchParamTestSuite:
                 'wildcard': 'f*o',
                 'field': 'wc',
             },
-            'index_name': cb_env.TEST_INDEX_NAME
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
         }
         q = search.WildcardQuery('f*o', field='wc')
         search_query = search.SearchQueryBuilder.create_search_query_object(

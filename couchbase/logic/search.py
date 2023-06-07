@@ -947,13 +947,9 @@ class SearchQueryBuilder:
         }
         query = json.dumps(self._query.encodable)
         params['query'] = query
-        for k in self._VALID_OPTS.keys():
-            # deprecate the scope_name option, no need to pass it to the C++ client
-            # as the search API will not use
-            if k in ['scope_name']:
-                continue
-            if k in self._params:
-                params[k] = self._params.get(k)
+        # deprecate the scope_name option, no need to pass it to the C++ client
+        # as the search API will not use
+        params.update({k: v for k, v in self._params.items() if k not in ['scope_name']})
 
         if self.facets:
             encoded_facets = {}
