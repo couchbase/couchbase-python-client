@@ -694,7 +694,7 @@ class AppendOptions(AppendOptionsBase):
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from
             this value, indicating that the document has changed.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
-            subdocument operation timeout.
+            key-value operation timeout.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
     """
@@ -711,7 +711,7 @@ class PrependOptions(PrependOptionsBase):
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from
             this value, indicating that the document has changed.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
-            subdocument operation timeout.
+            key-value operation timeout.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
     """
@@ -726,7 +726,7 @@ class IncrementOptions(IncrementOptionsBase):
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
-            subdocument operation timeout.
+            key-value operation timeout.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
         delta (:class:`.DeltaValue`, optional): The amount to increment the key. Defaults to 1.
@@ -744,7 +744,7 @@ class DecrementOptions(DecrementOptionsBase):
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
-            subdocument operation timeout.
+            key-value operation timeout.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
             for this operation.
         delta (:class:`.DeltaValue`, optional): The amount to increment the key. Defaults to 1.
@@ -774,7 +774,7 @@ class GetAllReplicasMultiOptions(dict):
         per_key_options (Dict[str, :class:`.GetAllReplicasOptions`], optional): Specify
             :class:`.GetAllReplicasOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -808,7 +808,7 @@ class GetAnyReplicaMultiOptions(dict):
         per_key_options (Dict[str, :class:`.GetAnyReplicaOptions`], optional): Specify
             :class:`.GetAnyReplicaOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -846,7 +846,7 @@ class GetMultiOptions(dict):
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
         per_key_options (Dict[str, :class:`.GetOptions`], optional): Specify :class:`.GetOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -881,7 +881,7 @@ class ExistsMultiOptions(dict):
             key-value operation timeout.
         per_key_options (Dict[str, :class:`.ExistsOptions`], optional): Specify :class:`.ExistsOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -918,7 +918,7 @@ class UpsertMultiOptions(dict):
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
         per_key_options (Dict[str, :class:`.UpsertOptions`], optional): Specify :class:`.UpsertOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -959,7 +959,7 @@ class InsertMultiOptions(dict):
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
         per_key_options (Dict[str, :class:`.InsertOptions`], optional): Specify :class:`.InsertOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -1001,7 +1001,7 @@ class ReplaceMultiOptions(dict):
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
         per_key_options (Dict[str, :class:`.ReplaceOptions`], optional): Specify :class:`.ReplaceOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -1044,7 +1044,7 @@ class RemoveMultiOptions(dict):
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
         per_key_options (Dict[str, :class:`.RemoveOptions`], optional): Specify :class:`.RemoveOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -1078,7 +1078,7 @@ class TouchMultiOptions(dict):
             key-value operation timeout.
         per_key_options (Dict[str, :class:`.TouchOptions`], optional): Specify :class:`.TouchOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -1110,7 +1110,7 @@ class LockMultiOptions(dict):
         per_key_options (Dict[str, :class:`.GetAndLockOptions`], optional): Specify :class:`.GetAndLockOptions` per
             key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -1143,7 +1143,7 @@ class UnlockMultiOptions(dict):
         per_key_options (Dict[str, :class:`.UnlockOptions`], optional): Specify :class:`.UnlockOptions` per
             key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
-            Exception without raising.  Default to True.
+            Exception without raising.  Defaults to True.
     """
     @overload
     def __init__(
@@ -1164,11 +1164,28 @@ class UnlockMultiOptions(dict):
 
 
 class IncrementMultiOptions(dict):
+    """Available options to for a binary multi-increment operation.
+
+    Options can be set at a global level (i.e. for all increment operations handled with this multi-increment operation).
+    Use *per_key_options* to set specific :class:`.IncrementOptions` for specific keys.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
+            for this operation.
+        delta (:class:`.DeltaValue`, optional): The amount to increment the key. Defaults to 1.
+        initial (:class:`.SignedInt64`, optional): The initial value to use for the document if it does not already
+            exist. Defaults to 0.
+        per_key_options (Dict[str, :class:`.IncrementOptions`], optional): Specify :class:`.IncrementOptions` per
+            key.
+        return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
+            Exception without raising.  Defaults to True.
+    """  # noqa: E501
     @overload
     def __init__(
         self,
         timeout=None,      # type: Optional[timedelta]
-        expiry=None,       # type: Optional[timedelta]
         durability=None,   # type: Optional[DurabilityType]
         delta=None,         # type: Optional[DeltaValue]
         initial=None,      # type: Optional[SignedInt64]
@@ -1184,16 +1201,33 @@ class IncrementMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls):
-        return ['timeout', 'expiry', 'durability', 'delta',
+        return ['timeout', 'durability', 'delta',
                 'initial', 'span', 'per_key_options', 'return_exceptions']
 
 
 class DecrementMultiOptions(dict):
+    """Available options to for a binary multi-decrement operation.
+
+    Options can be set at a global level (i.e. for all decrement operations handled with this multi-decrement operation).
+    Use *per_key_options* to set specific :class:`.DecrementOptions` for specific keys.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
+            for this operation.
+        delta (:class:`.DeltaValue`, optional): The amount to decrement the key. Defaults to 1.
+        initial (:class:`.SignedInt64`, optional): The initial value to use for the document if it does not already
+            exist. Defaults to 0.
+        per_key_options (Dict[str, :class:`.DecrementOptions`], optional): Specify :class:`.DecrementOptions` per
+            key.
+        return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
+            Exception without raising.  Defaults to True.
+    """  # noqa: E501
     @overload
     def __init__(
         self,
         timeout=None,      # type: Optional[timedelta]
-        expiry=None,       # type: Optional[timedelta]
         durability=None,   # type: Optional[DurabilityType]
         delta=None,         # type: Optional[DeltaValue]
         initial=None,      # type: Optional[SignedInt64]
@@ -1209,11 +1243,27 @@ class DecrementMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls):
-        return ['timeout', 'expiry', 'durability', 'delta',
+        return ['timeout', 'durability', 'delta',
                 'initial', 'span', 'per_key_options', 'return_exceptions']
 
 
 class AppendMultiOptions(dict):
+    """Available options to for a binary multi-append operation.
+
+    Options can be set at a global level (i.e. for all append operations handled with this multi-append operation).
+    Use *per_key_options* to set specific :class:`.AppendOptions` for specific keys.
+
+    Args:
+        cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from
+            this value, indicating that the document has changed.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
+            for this operation.
+        per_key_options (Dict[str, :class:`.AppendOptions`], optional): Specify :class:`.AppendOptions` per key.
+        return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
+            Exception without raising.  Defaults to True.
+    """  # noqa: E501
     @overload
     def __init__(
         self,
@@ -1237,6 +1287,22 @@ class AppendMultiOptions(dict):
 
 
 class PrependMultiOptions(dict):
+    """Available options to for a binary multi-prepend operation.
+
+    Options can be set at a global level (i.e. for all prepend operations handled with this multi-prepend operation).
+    Use *per_key_options* to set specific :class:`.PrependOptions` for specific keys.
+
+    Args:
+        cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from
+            this value, indicating that the document has changed.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability
+            for this operation.
+        per_key_options (Dict[str, :class:`.PrependOptions`], optional): Specify :class:`.PrependOptions` per key.
+        return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
+            Exception without raising.  Defaults to True.
+    """  # noqa: E501
     @overload
     def __init__(
         self,
@@ -1288,7 +1354,7 @@ class QueryOptions(QueryOptionsBase):
         scan_consistency (:class:`~couchbase.n1ql.QueryScanConsistency`, optional): Specifies the consistency
             requirements when executing the query.
         adhoc (bool, optional): Specifies whether this is an ad-hoc query, or if it should be prepared for
-            faster execution in the future. Default to True.
+            faster execution in the future. Defaults to True.
         client_context_id (str, optional): The returned client context id for this query. Defaults to None.
         max_parallelism (int, optional): This is an advanced option, see the query service reference for more
             information on the proper use and tuning of this option. Defaults to None.
@@ -1678,7 +1744,7 @@ class TransactionQueryOptions:
             raw (Dict[str, Any], optional): Specifies any additional parameters which should be passed to the query
                 engine when executing the query. Defaults to None.
             adhoc (bool, optional): Specifies whether this is an ad-hoc query, or if it should be prepared for
-                faster execution in the future. Default to True.
+                faster execution in the future. Defaults to True.
             scan_consistency (:class:`~couchbase.analytics.AnalyticsScanConsistency`, optional): Specifies
                 the consistency requirements when executing the transactional query.
             profile (:class:`~couchbase.n1ql.QueryProfile`, optional): Specifies the level of profiling that should

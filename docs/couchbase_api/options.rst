@@ -33,6 +33,29 @@ PrependOptions
 
 .. autoclass:: PrependOptions
 
+Binary Multi
+=================
+
+AppendMultiOptions
+++++++++++++++++++++++
+
+.. autoclass:: AppendMultiOptions
+
+DecrementMultiOptions
+++++++++++++++++++++++
+
+.. autoclass:: DecrementMultiOptions
+
+IncrementMultiOptions
+++++++++++++++++++++++
+
+.. autoclass:: IncrementMultiOptions
+
+PrependMultiOptions
+++++++++++++++++++++++
+
+.. autoclass:: PrependMultiOptions
+
 Cluster
 =================
 
