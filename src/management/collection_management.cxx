@@ -73,6 +73,17 @@ create_result_from_collection_mgmt_response<couchbase::core::operations::managem
             }
             Py_DECREF(pyObj_tmp);
 
+            pyObj_tmp = PyLong_FromUnsignedLong(collection.max_expiry);
+            if (-1 == PyDict_SetItemString(pyObj_collection_spec, "max_expiry", pyObj_tmp)) {
+                Py_XDECREF(pyObj_scopes);
+                Py_XDECREF(pyObj_collections);
+                Py_DECREF(pyObj_scope_spec);
+                Py_DECREF(pyObj_collection_spec);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
             PyList_Append(pyObj_collections, pyObj_collection_spec);
             Py_DECREF(pyObj_collection_spec);
         }

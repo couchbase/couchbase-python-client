@@ -29,6 +29,7 @@ from couchbase.exceptions import (CollectionAlreadyExistsException,
                                   RateLimitedException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException)
+from couchbase.logic.supportability import Supportability
 from couchbase.options import forward_args
 from couchbase.pycbc_core import (collection_mgmt_operations,
                                   management_operation,
@@ -220,11 +221,33 @@ class CollectionManagerLogic:
 class CollectionSpec(object):
     def __init__(self,
                  collection_name,           # type: str
-                 scope_name='_default',     # type: str
-                 max_ttl=None               # type: timedelta
+                 scope_name='_default',     # type: Optional[str]
+                 max_expiry=None,           # type: Optional[timedelta]
+                 max_ttl=None,              # type: Optional[timedelta]
                  ):
         self._name, self._scope_name = collection_name, scope_name
-        self._max_ttl = max_ttl
+        # in the event users utilize kwargs, set max_expiry if not set and max_ttl is set
+        if max_ttl is not None:
+            Supportability.class_property_deprecated('max_ttl', 'max_expiry')
+            if max_expiry is None:
+                max_expiry = max_ttl
+        self._max_expiry = max_expiry
+
+    @property
+    def max_expiry(self) -> Optional[timedelta]:
+        """
+            Optional[timedelta]: The expiry for documents in the collection.
+        """
+        return self._max_expiry
+
+    @property
+    def max_ttl(self) -> Optional[timedelta]:
+        """
+            **DEPRECATED**
+            Optional[timedelta]: The expiry for documents in the collection.
+        """
+        Supportability.class_property_deprecated('max_ttl', 'max_expiry')
+        return self._max_expiry
 
     @property
     def name(self) -> str:
@@ -239,13 +262,6 @@ class CollectionSpec(object):
             str: The name of the collection's scope
         """
         return self._scope_name
-
-    @property
-    def max_ttl(self) -> Optional[timedelta]:
-        """
-            Optional[timedelta]: The expiry for documents in the collection.
-        """
-        return self._max_ttl
 
 
 class ScopeSpec(object):

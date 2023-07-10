@@ -101,8 +101,10 @@ class CollectionManagementTests:
         assert scope.name == "_default"
         assert len(scope.collections) == 1
         collection = scope.collections[0]
+        assert isinstance(collection, CollectionSpec)
         assert collection.name == "_default"
         assert collection.scope_name == "_default"
+        assert collection.max_expiry is not None
 
     # deprecated
     # @pytest.mark.asyncio

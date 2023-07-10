@@ -78,10 +78,10 @@ def get_all_scopes(res, return_cls):
     # TODO: better exception?
     if raw_scopes:
         for s in raw_scopes:
-            scope = return_cls[0](s["name"], list())
-            for c in s["collections"]:
+            scope = return_cls[0](s['name'], list())
+            for c in s['collections']:
                 scope.collections.append(
-                    return_cls[1](c["name"], c["scope_name"]))
+                    return_cls[1](c['name'], c['scope_name'], c['max_expiry']))
             scopes.append(scope)
 
     return scopes

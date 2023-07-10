@@ -167,6 +167,12 @@ class CollectionManagementTestSuite:
         assert any(map(lambda s: s.name == '_default', scopes))
         for scope_name in scope_names:
             assert any(map(lambda s: s.name == scope_name, scopes))
+        for s in scopes:
+            for c in s.collections:
+                assert isinstance(c, CollectionSpec)
+                assert isinstance(c.name, str)
+                assert isinstance(c.scope_name, str)
+                assert c.max_expiry is not None
 
 
 class ClassicCollectionManagementTests(CollectionManagementTestSuite):

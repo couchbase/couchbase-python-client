@@ -59,6 +59,20 @@ class Supportability:
         return decorator
 
     @staticmethod
+    def class_property_deprecated(property,  # type: str
+                                  use_instead  # type: str
+                                  ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the provided class property is deprecated.
+
+        Args:
+            property (str): The name of the deprecated property
+            use_instead (str): The name of the property to use instead of the deprecated property.
+        """
+        message = (f"Class property {property} is deprecated and will be removed in a future release. "
+                   f"Use {use_instead} instead.")
+        warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
+
+    @staticmethod
     def method_param_deprecated(param,  # type: str
                                 use_instead  # type: str
                                 ) -> None:
