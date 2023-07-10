@@ -823,7 +823,7 @@ class ConnectionTestSuite:
                                           'couchbases://10.0.0.1:11222,10.0.0.2,10.0.0.3:11207',
                                           'couchbase://10.0.0.1;10.0.0.2:11210;10.0.0.3',
                                           'couchbase://[3ffe:2a00:100:7031::1]',
-                                          'couchbases://[::ffff.192.168.0.1]:11207,[::ffff.192.168.0.2]:11207',
+                                          'couchbases://[::ffff:192.168.0.1]:11207,[::ffff:192.168.0.2]:11207',
                                           'couchbase://test.local:11210?key=value',
                                           'http://fqdn',
                                           'http://fqdn?key=value',
