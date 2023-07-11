@@ -324,6 +324,7 @@ class N1QLQuery:
         "metrics": {"metrics": lambda x: x},
         "flex_index": {"flex_index": lambda x: x},
         "preserve_expiry": {"preserve_expiry": lambda x: x},
+        "use_replica": {"use_replica": lambda x: x},
         "serializer": {"serializer": lambda x: x},
         "positional_parameters": {},
         "named_parameters": {},
@@ -635,6 +636,15 @@ class N1QLQuery:
     def preserve_expiry(self, value  # type: bool
                         ) -> None:
         self.set_option('preserve_expiry', value)
+
+    @property
+    def use_replica(self) -> Optional[bool]:
+        return self._params.get('use_replica', None)
+
+    @use_replica.setter
+    def use_replica(self, value  # type: Optional[bool]
+                    ) -> None:
+        self.set_option('use_replica', value)
 
     @property
     def raw(self) -> Optional[Dict[str, Any]]:

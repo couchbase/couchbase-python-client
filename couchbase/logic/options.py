@@ -1063,6 +1063,7 @@ class QueryOptionsBase(dict):
         metrics=None,  # type: Optional[bool]
         flex_index=None,  # type: Optional[bool]
         preserve_expiry=None,  # type: Optional[bool]
+        use_replica=None,  # type: Optional[bool]
         consistent_with=None,  # type: Optional[MutationState]
         send_to_node=None,  # type: Optional[str]
         raw=None,  # type: Optional[Dict[str,Any]]

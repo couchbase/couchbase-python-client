@@ -1378,6 +1378,10 @@ class QueryOptions(QueryOptionsBase):
             Defaults to False.
         flex_index (bool, optional): Specifies whether flex-indexes should be enabled. Allowing the use of full-text
             search from the query service. Defaults to False.
+        preserve_expiry (bool, optional): Specifies that any existing expiry on the document should be preserved.
+            Defaults to False.
+        use_replica (bool, optional): Specifies that the query engine should use replica nodes for KV fetches if the
+            active node is down. Defaults to None.
         consistent_with (:class:`~couchbase.mutation_state.MutationState`, optional): Specifies a
             :class:`~couchbase.mutation_state.MutationState` which the query should be consistent with. Defaults to
             None.

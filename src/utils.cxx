@@ -189,6 +189,16 @@ build_query_request(PyObject* pyObj_query_args)
         req.preserve_expiry = pyObj_preserve_expiry == Py_True ? true : false;
     }
 
+    PyObject* pyObj_use_replica = PyDict_GetItemString(pyObj_query_args, "use_replica");
+    if (pyObj_use_replica != nullptr) {
+        // If use_replica is None don't set the option (In this case None and False are not equivalent)
+        if (pyObj_use_replica == Py_True) {
+            req.use_replica = true;
+        } else if (pyObj_use_replica == Py_False) {
+            req.use_replica = false;
+        }
+    }
+
     PyObject* pyObj_max_parallelism = PyDict_GetItemString(pyObj_query_args, "max_parallelism");
     if (nullptr != pyObj_max_parallelism) {
         req.max_parallelism = PyLong_AsUnsignedLongLong(pyObj_max_parallelism);

@@ -48,6 +48,7 @@ class QueryParamTestSuite:
         'test_params_scan_wait',
         'test_params_serializer',
         'test_params_timeout',
+        'test_params_use_replica',
     ]
 
     @pytest.fixture(scope='class')
@@ -226,6 +227,22 @@ class QueryParamTestSuite:
         query = N1QLQuery.create_query_object(q_str)
         assert query.params.get('preserve_expiry', None) is None
         assert query.preserve_expiry is False
+
+    def test_params_use_replica(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(use_replica=True)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+        assert query.params.get('use_replica', None) is True
+        assert query.use_replica is True
+
+        q_opts = QueryOptions(use_replica=False)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+        assert query.params.get('use_replica', None) is False
+        assert query.use_replica is False
+
+        query = N1QLQuery.create_query_object(q_str)
+        assert query.params.get('use_replica', None) is None
+        assert query.use_replica is None
 
     def test_params_profile(self, base_opts):
         q_str = 'SELECT * FROM default'
