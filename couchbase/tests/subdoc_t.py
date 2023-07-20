@@ -73,6 +73,7 @@ class SubDocumentTestSuite:
         'test_mutate_in_preserve_expiry_fails',
         'test_mutate_in_preserve_expiry_not_used',
         'test_mutate_in_remove',
+        'test_mutate_in_remove_blank_path',
         'test_mutate_in_replace_semantics',
         'test_mutate_in_replace_semantics_fail',
         'test_mutate_in_replace_semantics_kwargs',
@@ -532,6 +533,13 @@ class SubDocumentTestSuite:
         cb_env.collection.mutate_in(key, [SD.remove('manufacturer.geo')])
         result = cb_env.collection.get(key)
         assert 'geo' not in result.content_as[dict]['manufacturer']
+
+    def test_mutate_in_remove_blank_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        cb_env.collection.mutate_in(key, [SD.remove('')])
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get(key)
 
     @pytest.mark.usefixtures('skip_if_go_caves')
     def test_mutate_in_replace_semantics(self, cb_env):

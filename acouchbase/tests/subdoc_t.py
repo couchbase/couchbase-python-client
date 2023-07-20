@@ -310,13 +310,11 @@ class SubDocumentTests:
         assert expiry is not None
         assert expiry > 0
         expires_in = (datetime.fromtimestamp(expiry) - datetime.now()).total_seconds()
-        # when running local, this can be be up to 1050, so just make sure > 0
+        # when running local, this can be up to 1050, so just make sure > 0
         assert expires_in > 0
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_remove(self, cb_env, new_kvp):
-
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
@@ -326,6 +324,18 @@ class SubDocumentTests:
         await cb.mutate_in(key, [SD.remove('geo.alt')])
         result = await cb.get(key)
         assert 'alt' not in result.content_as[dict]['geo']
+
+    @pytest.mark.asyncio
+    async def test_mutate_in_remove_blank_path(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+        value = new_kvp.value
+        await cb.upsert(key, value)
+        await cb_env.try_n_times(10, 3, cb.get, key)
+
+        await cb.mutate_in(key, [SD.remove('')])
+        with pytest.raises(DocumentNotFoundException):
+            await cb.get(key)
 
     @pytest.mark.usefixtures("skip_if_less_than_cheshire_cat")
     @pytest.mark.asyncio

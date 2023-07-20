@@ -378,6 +378,8 @@ def remove(path,                     # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
+    if not path:
+        return Spec(SubDocOp.REMOVE_DOC, '', False, xattr, False)
     return Spec(SubDocOp.REMOVE, path, False, xattr, False)
 
 
