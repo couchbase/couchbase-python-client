@@ -52,6 +52,7 @@ class ConnectionTestSuite:
         'test_cluster_legacy_ssl_no_verify',
         'test_cluster_options',
         'test_cluster_pw_auth',
+        'test_cluster_pw_auth_fail',
         'test_cluster_pw_auth_with_cert',
         'test_cluster_pw_auth_with_cert_connstr',
         'test_cluster_pw_auth_with_cert_kwargs',
@@ -112,32 +113,32 @@ class ConnectionTestSuite:
         }
 
         with pytest.raises(InvalidArgumentException):
-            auth = CertificateAuthenticator(expected_auth)
+            CertificateAuthenticator(expected_auth)
 
         auth_copy = copy(expected_auth)
         auth_copy['cert_path'] = None
         with pytest.raises(InvalidArgumentException):
-            auth = CertificateAuthenticator(expected_auth)
+            CertificateAuthenticator(**auth_copy)
 
         auth_copy = copy(expected_auth)
         auth_copy['cert_path'] = {}
         with pytest.raises(InvalidArgumentException):
-            auth = CertificateAuthenticator(expected_auth)
+            CertificateAuthenticator(**auth_copy)
 
         auth_copy = copy(expected_auth)
         auth_copy['key_path'] = None
         with pytest.raises(InvalidArgumentException):
-            auth = CertificateAuthenticator(expected_auth)
+            CertificateAuthenticator(**auth_copy)
 
         auth_copy = copy(expected_auth)
         auth_copy['key_path'] = {}
         with pytest.raises(InvalidArgumentException):
-            auth = CertificateAuthenticator(expected_auth)
+            CertificateAuthenticator(**auth_copy)
 
         auth_copy = copy(expected_auth)
         auth_copy['trust_store_path'] = {}
         with pytest.raises(InvalidArgumentException):
-            auth = CertificateAuthenticator(expected_auth)
+            CertificateAuthenticator(**auth_copy)
 
         auth = CertificateAuthenticator(**expected_auth)
         with pytest.raises(InvalidArgumentException):
@@ -365,6 +366,38 @@ class ConnectionTestSuite:
         assert auth_opts == expected_auth
         assert auth_opts['allowed_sasl_mechanisms'] is None
 
+    def test_cluster_pw_auth_fail(self):
+        expected_auth = {
+            'username': 'Administrator',
+            'password': 'password',
+        }
+
+        # this is OK
+        auth = PasswordAuthenticator(**expected_auth)
+        assert isinstance(auth, PasswordAuthenticator)
+
+        with pytest.raises(InvalidArgumentException):
+            PasswordAuthenticator(None, None)
+
+        auth_copy = copy(expected_auth)
+        auth_copy['username'] = None
+        with pytest.raises(InvalidArgumentException):
+            PasswordAuthenticator(*auth_copy.values())
+
+        auth_copy = copy(expected_auth)
+        auth_copy['password'] = None
+        with pytest.raises(InvalidArgumentException):
+            PasswordAuthenticator(*auth_copy.values())
+
+        with pytest.raises(InvalidArgumentException):
+            PasswordAuthenticator(*expected_auth.values(), cert_path={})
+
+        with pytest.raises(InvalidArgumentException):
+            PasswordAuthenticator(*expected_auth.values(), allowed_sasl_mechanisms={})
+
+        with pytest.raises(InvalidArgumentException):
+            PasswordAuthenticator(*expected_auth.values(), allowed_sasl_mechanisms=['PLAIN', 1])
+
     def test_cluster_pw_auth_with_cert(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
@@ -466,6 +499,20 @@ class ConnectionTestSuite:
         assert auth_opts == expected_auth
 
         cluster = ClusterLogic(f'{conn_string}?allowed_sasl_mechanisms=SCRAM-SHA512,SCRAM-SHA256', ClusterOptions(auth))
+        auth_opts, cluster_opts = cluster._get_connection_opts()
+        assert cluster_opts is not None
+        assert auth_opts is not None
+        assert auth_opts == expected_auth
+
+        auth = PasswordAuthenticator(username, pw, allowed_sasl_mechanisms='SCRAM-SHA512,SCRAM-SHA256')
+        cluster = ClusterLogic(f'{conn_string}', ClusterOptions(auth))
+        auth_opts, cluster_opts = cluster._get_connection_opts()
+        assert cluster_opts is not None
+        assert auth_opts is not None
+        assert auth_opts == expected_auth
+
+        auth = PasswordAuthenticator(username, pw, allowed_sasl_mechanisms=['SCRAM-SHA512', 'SCRAM-SHA256'])
+        cluster = ClusterLogic(f'{conn_string}', ClusterOptions(auth))
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None

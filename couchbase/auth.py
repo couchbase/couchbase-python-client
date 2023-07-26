@@ -44,10 +44,36 @@ class PasswordAuthenticator(Authenticator):
                  **kwargs           # type: Dict[str, Any]
                  ):
         """PasswordAuthenticator instance."""
+        if not isinstance(username, str):
+            msg = 'The username must be a str.'
+            raise InvalidArgumentException(msg)
+
+        if not isinstance(password, str):
+            msg = 'The password must be a str.'
+            raise InvalidArgumentException(msg)
+
+        if cert_path is not None and not isinstance(cert_path, str):
+            msg = 'The cert_path must be a str representing the path to the certificate trust store.'
+            raise InvalidArgumentException(msg)
+
+        allowed_sasl_mechanisms = kwargs.pop('allowed_sasl_mechanisms', None)
+        if allowed_sasl_mechanisms is not None:
+            msg = None
+            if isinstance(allowed_sasl_mechanisms, str):
+                allowed_sasl_mechanisms = allowed_sasl_mechanisms.split(',')
+            if isinstance(allowed_sasl_mechanisms, list):
+                if not all(map(lambda x: isinstance(x, str), allowed_sasl_mechanisms)):
+                    msg = 'The allowed_sasl_mechanisms must be a list of str SASL mechanisms.'
+            else:
+                msg = ('The allowed_sasl_mechanisms must be a list of str SASL mechanisms '
+                       ' or a comma separated str of SASL mechanisms.')
+            if msg:
+                raise InvalidArgumentException(msg)
+
         self._username = username
         self._password = password
         self._cert_path = cert_path
-        self._allowed_sasl_mechanisms = kwargs.get('allowed_sasl_mechanisms', None)
+        self._allowed_sasl_mechanisms = allowed_sasl_mechanisms
 
         super().__init__(**self.as_dict())
 
