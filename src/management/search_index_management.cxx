@@ -74,6 +74,14 @@ build_search_index(couchbase::core::management::search::index index)
     }
     Py_DECREF(pyObj_tmp);
 
+    pyObj_tmp = PyUnicode_FromString(index.source_type.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_index, "source_type", pyObj_tmp)) {
+        Py_DECREF(pyObj_index);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
     if (!index.source_params_json.empty()) {
         pyObj_tmp = PyUnicode_FromString(index.source_params_json.c_str());
         if (-1 == PyDict_SetItemString(pyObj_index, "source_params_json", pyObj_tmp)) {

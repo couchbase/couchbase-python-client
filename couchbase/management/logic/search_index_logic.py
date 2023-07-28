@@ -647,8 +647,8 @@ class SearchIndex:
             plan_params = json.loads(json_data.get('plan_params_json'))
 
         return cls(json_data.get('name'),
-                   json_data.get('type'),
                    json_data.get('source_type'),
+                   json_data.get('type'),
                    json_data.get('source_name', None),
                    json_data.get('uuid', None),
                    params,
