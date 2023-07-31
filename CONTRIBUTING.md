@@ -1,76 +1,75 @@
-We've decided to use "Gerrit" for our code review system, making it
-easier for all of us to contribute with code and comments.
+# Contributing
 
-  1. Visit http://review.couchbase.org and "Register" for an account
-  2. Review http://review.couchbase.org/static/individual_agreement.html
-  3. Agree to agreement by visiting http://review.couchbase.org/#/settings/agreements
-  4. If you do not receive an email, please contact us
-  5. Check out the Python SDK area http://review.couchbase.org/#/q/status:open+project:couchbase-python-client,n,z
+In addition to filing bugs, you may contribute by submitting patches to fix bugs in the library. Contributions may be submitted to <http://review.couchbase.com>.  We use Gerrit as our code review system - and thus submitting a change requires an account there. While Github pull requests are not ignored, Gerrit pull requests will be responded to more quickly (and most likely with more detail).
 
-We normally don't go looking for stuff in gerrit, so you should add at
-least me (jared.casey@couchbase.com) as a reviewer for your patch (and
-I'll know who else to add and add them for you).
+For something to be accepted into the codebase, it must be formatted properly and have undergone proper testing. Please see the [README guidelines](https://github.com/couchbase/couchbase-python-client#contributing) for details on formatting and linting.
 
-## Contributing Using Repo Tool
+## Branches and Tags
 
-If you haven't done so already you should
-download the repo from http://code.google.com/p/git-repo/downloads/list
-and put it in your path.
+* The `master` branch represents the mainline branch. The master branch typically consists of content going into the next release.
+* For older series of the Couchbase Python SDK see the corresponding branches: 2.x = `release25` and 3.x = `release32`.
 
-All you should need to set up your development environment should be:
+## Contributing Patches
 
-    ~$ mkdir sdk
-    ~$ cd sdk
-    ~/sdk$ repo init -u https://github.com/vmx/manifest.git -m sdks/python.xml
-    ~/sdk$ repo sync
-    ~/sdk$ repo start my-branch-name --all
-    ~/sdk$ cd python
-    ~/sdk/python$ python setup.py build_ext --inplace
+If you wish to contribute a new feature or a bug fix to the library, try to follow the following guidelines to help ensure your change gets merged upstream.
 
-You can work in the branch just as in any other git branch. Once you
-are happy with your changes commit them as usual. Every commit will
-show up as separate change within Gerrit, so you might want to squash
-your commits into a single one before you upload them to gerrit with
-the following command:
+### Before you begin
 
-    ~/sdk/python$ repo upload
+For any code change, ensure the new code you write looks similar to the code surrounding it. We have no strict code style policies, but do request that your code stand out as little as possible from its surrounding neighborhood (unless of course your change is stylistic in nature).
 
-You might experience a problem trying to upload the patches if you've
-selected a different login name at review.couchbase.org than your login
-name. Don't worry, all you need to do is to add the following to your
-~/.gitconfig file:
+If your change is going to involve a substantial amount of time or effort, please attempt to discuss it with the project developers first who will provide assistance and direction where possible.
 
-    [review "review.couchbase.org"]
-            username = your-gerrit-username
+#### For new features
 
+Ensure the feature you are adding does not already exist, and think about how this feature may be useful for other users. In general less intrusive changes are more likely to be accepted.
 
-## Contributing Using Plain Git
+#### For fixing bugs
 
-If you not so familiar with repo tool and its workflow there is an
-alternative way to do the same job. Just complete the Gerrit
-registration steps above and clone the source repository
-(remember the repository on github.com is just a mirror):
+Ensure the bug you are fixing is actually a bug (and not a usage) error, and that it has not been fixed in a more recent version. Please read the [release notes](https://docs.couchbase.com/python-sdk/current/project-docs/sdk-release-notes.html) as well as the [issue tracker](https://issues.couchbase.com/projects/PYCBC/issues/) to see a list of open and resolved issues.
 
-    ~/sdk$ git clone ssh://YOURNAME@review.couchbase.org:29418/couchbase-python-client.git
+### Code Review
 
-Install [`commit-msg` hook][1]:
+#### Signing up on Gerrit
 
-    ~/sdk$ cd couchbase-python-client
-    ~/sdk/couchbase-python-client$ scp -p -P 29418 YOURNAME@review.couchbase.org:hooks/commit-msg .git/hooks/
+Everything that is merged into the library goes through a code review process.  The code review process is done via [Gerrit](http://review.couchbase.org).
 
-Make your changes and upload them for review:
+To sign up for a Gerrit account, go to http://review.couchbase.org and click on the _Register_ link at the top right. Once you've signed in you will need to agree to the CLA (Contributor License Agreement) by going you your Gerrit account page and selecting the _Agreements_ link on the left. When you've done that, everything should flow through just fine.  Be sure that you have registered your email address at http://review.couchbase.org/#/settings/contact as many sign-up methods won't pass emails along.  Note that your email address in your code commit and in the Gerrit settings must match.
 
-    ~/sdk/couchbase-python-client$ git commit
-    ~/sdk/couchbase-python-client$ git push origin HEAD:refs/for/master
+Add your public SSH key to Gerrit before submitting.
 
-If you need to fix or add something to your patch, do it and re-upload
-the changes (all you need is to keep `Change-Id:` line the same to
-allow gerrit to track the patch.
+#### Setting up your fork with Gerrit
 
-    ~/couchbase-python-client % git commit --amend
-    ~/couchbase-python-client % git push origin HEAD:refs/for/master
+Assuming you have a repository created like so:
 
-Happy hacking!
+```
+$ git clone https://github.com/couchbase/couchbase-python-client.git
+```
 
+you can simply perform two simple steps to get started with Gerrit:
 
-[1]: http://review.couchbase.org/Documentation/user-changeid.html
+```
+$ git remote add gerrit ssh://${USERNAME}@review.couchbase.org:29418/couchbase-python-client
+$ scp -P 29418 ${USERNAME}@review.couchbase.org:hooks/commit-msg .git/hooks
+$ chmod a+x .git/hooks/commit-msg
+```
+
+The last change is required for annotating each commit message with a special header known as `Change-Id`. This allows Gerrit to group together different revisions of the same patch.
+
+#### Pushing a changeset
+
+Now that you have your change and a Gerrit account to push to, you need to upload the change for review. To do so, invoke the following incantation:
+
+```
+$ git push gerrit HEAD:refs/for/master
+```
+
+Where `gerrit` is the name of the _remote_ added earlier. You may encounter some errors when pushing. The most common are:
+
+* "You are not authorized to push to this repository". You will get this if your account has not yet been approved.  Please reach out in the [forums](https://www.couchbase.com/forums/c/python-sdk/10) if blocked.
+* "Missing Change-Id". You need to install the `commit-msg` hook as described above.  Note that even once you do this, you will need to ensure that any prior commits already have this header - this may be done by doing an interactive rebase (e.g.  `git rebase -i origin/master` and selecting `reword` for all the commits; which will automatically fill in the Change-Id).
+
+Once you've pushed your changeset you can add people to review. Currently these are:
+
+* Jared Casey
+* Dimitris Christodoulou
+* Sergey Avseyev
