@@ -153,4 +153,21 @@ def configure_logging(name, level=logging.INFO, parent_logger=None):
     logger.debug(get_metadata(as_str=True))
 
 
+def enable_protocol_logger_to_save_network_traffic_to_file(filename  # type: str
+                                                           ):
+    """
+    **VOLATILE** This API is subject to change at any time.
+
+    Exposes the underlying couchbase++ library protocol logger.  This method is for logging/debugging
+    purposes and must be used with caution as network details will be logged to the provided file.
+
+    Args:
+        filename (str): The name of the file the protocol logger will write to.
+
+    Raises:
+        InvalidArgumentException: If a filename is not provided.
+    """
+    _PYCBC_LOGGER.enable_protocol_logger(filename)
+
+
 configure_console_logger()

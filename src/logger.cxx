@@ -78,6 +78,23 @@ pycbc_logger__create_console_logger__(PyObject* self, PyObject* args, PyObject* 
     Py_RETURN_NONE;
 }
 
+PyObject*
+pycbc_logger__enable_protocol_logger__(PyObject* self, PyObject* args, PyObject* kwargs)
+{
+    char* filename = nullptr;
+    const char* kw_list[] = { "filename", nullptr };
+    const char* kw_format = "s";
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, kw_format, const_cast<char**>(kw_list), &filename)) {
+        pycbc_set_python_exception(
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot enable the protocol logger.  Unable to parse args/kwargs.");
+        return nullptr;
+    }
+    couchbase::core::logger::configuration configuration{};
+    configuration.filename = std::string{ filename };
+    couchbase::core::logger::create_protocol_logger(configuration);
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef pycbc_logger_methods[] = { { "configure_logging_sink",
                                                 (PyCFunction)pycbc_logger__configure_logging_sink__,
                                                 METH_VARARGS | METH_KEYWORDS,
@@ -86,6 +103,10 @@ static PyMethodDef pycbc_logger_methods[] = { { "configure_logging_sink",
                                                 (PyCFunction)pycbc_logger__create_console_logger__,
                                                 METH_VARARGS | METH_KEYWORDS,
                                                 PyDoc_STR("Create a console logger") },
+                                              { "enable_protocol_logger",
+                                                (PyCFunction)pycbc_logger__enable_protocol_logger__,
+                                                METH_VARARGS | METH_KEYWORDS,
+                                                PyDoc_STR("Enables the protocol logger") },
                                               { NULL } };
 
 static PyObject*
