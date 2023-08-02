@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,621 +13,217 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
 from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
 
 import couchbase.subdocument as SD
-from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
+                                  DocumentUnretrievableException,
                                   InvalidArgumentException,
                                   InvalidValueException,
                                   PathExistsException,
                                   PathMismatchException,
                                   PathNotFoundException)
-from couchbase.options import MutateInOptions
+from couchbase.options import GetOptions, MutateInOptions
 from couchbase.result import (GetResult,
+                              LookupInReplicaResult,
                               LookupInResult,
                               MutateInResult)
+from tests.environments import CollectionType
+from tests.environments.subdoc_environment import AsyncSubdocTestEnvironment
+from tests.environments.test_environment import AsyncTestEnvironment
+from tests.mock_server import MockServerType
+from tests.test_features import EnvironmentFeatures
 
-from ._test_utils import (CollectionType,
-                          KVPair,
-                          TestEnvironment)
 
+class SubDocumentTestSuite:
 
-class SubDocumentTests:
-
-    NO_KEY = "not-a-key"
+    TEST_MANIFEST = [
+        'test_array_add_unique',
+        'test_array_add_unique_create_parents',
+        'test_array_add_unique_fail',
+        'test_array_append',
+        'test_array_append_create_parents',
+        'test_array_append_multi_insert',
+        'test_array_as_document',
+        'test_array_insert',
+        'test_array_insert_multi_insert',
+        'test_array_prepend',
+        'test_array_prepend_create_parents',
+        'test_array_prepend_multi_insert',
+        'test_count',
+        'test_decrement',
+        'test_decrement_create_parents',
+        'test_increment',
+        'test_increment_create_parents',
+        'test_insert_create_parents',
+        'test_lookup_in_multiple_specs',
+        'test_lookup_in_one_path_not_found',
+        'test_lookup_in_simple_exists',
+        'test_lookup_in_simple_exists_bad_path',
+        'test_lookup_in_simple_get',
+        'test_lookup_in_simple_get_bad_path',
+        'test_lookup_in_simple_get_spec_as_list',
+        'test_lookup_in_simple_long_path',
+        'test_lookup_in_valid_path_null_content',
+        'test_lookup_in_any_replica_get',
+        'test_lookup_in_any_replica_get_full',
+        'test_lookup_in_any_replica_get_bad_path',
+        'test_lookup_in_any_replica_exists',
+        'test_lookup_in_any_replica_exists_bad_path',
+        'test_lookup_in_any_replica_bad_key',
+        'test_lookup_in_any_replica_multiple_specs',
+        'test_lookup_in_all_replicas_get',
+        'test_lookup_in_all_replicas_get_full',
+        'test_lookup_in_all_replicas_get_bad_path',
+        'test_lookup_in_all_replicas_exists',
+        'test_lookup_in_all_replicas_exists_bad_path',
+        'test_lookup_in_all_replicas_bad_key',
+        'test_lookup_in_all_replicas_multiple_specs',
+        'test_mutate_in_expiry',
+        'test_mutate_in_insert_semantics',
+        'test_mutate_in_insert_semantics_fail',
+        'test_mutate_in_insert_semantics_kwargs',
+        'test_mutate_in_preserve_expiry',
+        'test_mutate_in_preserve_expiry_fails',
+        'test_mutate_in_preserve_expiry_not_used',
+        'test_mutate_in_remove',
+        'test_mutate_in_remove_blank_path',
+        'test_mutate_in_replace_semantics',
+        'test_mutate_in_replace_semantics_fail',
+        'test_mutate_in_replace_semantics_kwargs',
+        'test_mutate_in_simple',
+        'test_mutate_in_simple_spec_as_list',
+        'test_mutate_in_store_semantics_fail',
+        'test_mutate_in_upsert_semantics',
+        'test_mutate_in_upsert_semantics_kwargs',
+        'test_upsert_create_parents'
+    ]
 
     @pytest.fixture(scope="class")
-    def event_loop(self):
-        loop = get_event_loop()
-        yield loop
-        loop.close()
-
-    @pytest_asyncio.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    async def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = await TestEnvironment.get_environment(__name__,
-                                                       couchbase_config,
-                                                       request.param,
-                                                       manage_buckets=True)
-        if request.param == CollectionType.NAMED:
-            await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
-
-        await cb_env.try_n_times(3, 5, cb_env.load_data)
-        yield cb_env
-        await cb_env.try_n_times_till_exception(3, 5,
-                                                cb_env.purge_data,
-                                                raise_if_no_exception=False)
-        if request.param == CollectionType.NAMED:
-            await cb_env.try_n_times_till_exception(5, 3,
-                                                    cb_env.teardown_named_collections,
-                                                    raise_if_no_exception=False)
+    def check_preserve_expiry_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('preserve_expiry',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type)
 
     @pytest.fixture(scope="class")
-    def skip_if_less_than_cheshire_cat(self, cb_env):
-        if cb_env.cluster.server_version_short < 7.0:
-            pytest.skip("Feature only available on CBS >= 7.0")
+    def check_xattr_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('xattr',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type)
 
     @pytest.fixture(scope="class")
-    def skip_if_less_than_alice(self, cb_env):
-        if cb_env.cluster.server_version_short < 6.5:
-            pytest.skip("Feature only available on CBS >= 6.5")
+    def skip_if_go_caves(self, cb_env):
+        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
+            pytest.skip("GoCAVES does not like this operation.")
 
     @pytest.fixture(scope="class")
-    def skip_mock_mutate_in(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES + couchbase++ not playing nice...")
-
-    @pytest_asyncio.fixture(scope="class")
-    async def num_replicas(self, cb_env):
-        bucket_settings = await cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
-        num_replicas = bucket_settings.get("num_replicas")
-        return num_replicas
-
-    @pytest_asyncio.fixture(name="new_kvp")
-    async def new_key_and_value_with_reset(self, cb_env) -> KVPair:
-        key, value = await cb_env.get_new_key_value()
-        yield KVPair(key, value)
-        await cb_env.try_n_times_till_exception(10,
-                                                1,
-                                                cb_env.collection.remove,
-                                                key,
-                                                expected_exceptions=(DocumentNotFoundException,),
-                                                reset_on_timeout=True,
-                                                reset_num_times=3)
-
-    @pytest.fixture(name="default_kvp")
-    def default_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.get_default_key_value()
-        yield KVPair(key, value)
-
-    @pytest_asyncio.fixture(name="default_kvp_and_reset")
-    async def default_key_and_value_with_reset(self, cb_env) -> KVPair:
-        key, value = cb_env.get_default_key_value()
-        yield KVPair(key, value)
-        await cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
+    def check_replica_read_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('subdoc_replica_read',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type)
 
     @pytest.mark.asyncio
-    async def test_lookup_in_simple_get(self, cb_env, default_kvp):
-        cb = cb_env.collection
-        key = default_kvp.key
-        value = default_kvp.value
-        result = await cb.lookup_in(key, (SD.get("geo"),))
-        assert isinstance(result, LookupInResult)
-        assert result.content_as[dict](0) == value["geo"]
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_array_add_unique(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.array_addunique('array', 6),))
+        assert isinstance(result, MutateInResult)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        val = result.content_as[dict]
+        assert isinstance(val['array'], list)
+        assert len(val['array']) == 6
+        assert 6 in val['array']
 
     @pytest.mark.asyncio
-    async def test_lookup_in_simple_get_spec_as_list(self, cb_env, default_kvp):
-        cb = cb_env.collection
-        key = default_kvp.key
-        value = default_kvp.value
-        result = await cb.lookup_in(key, [SD.get("geo")])
-        assert isinstance(result, LookupInResult)
-        assert result.content_as[dict](0) == value["geo"]
-
-    @pytest.mark.asyncio
-    async def test_lookup_in_simple_exists(self, cb_env, default_kvp):
-        cb = cb_env.collection
-        key = default_kvp.key
-        result = await cb.lookup_in(key, (SD.exists("geo"),))
-        assert isinstance(result, LookupInResult)
-        assert result.exists(0)
-        # PYCBC-1480, update exists to follow RFC
-        assert result.content_as[bool](0) is True
-
-    @pytest.mark.asyncio
-    async def test_lookup_in_simple_exists_bad_path(self, cb_env, default_kvp):
-        cb = cb_env.collection
-        key = default_kvp.key
-        result = await cb.lookup_in(key, (SD.exists("qzzxy"),))
-        assert isinstance(result, LookupInResult)
-        assert not result.exists(0)
-        assert result.content_as[bool](0) is False
-
-    @pytest.mark.asyncio
-    async def test_lookup_in_simple_get_bad_path(self, cb_env, default_kvp):
-        key = default_kvp.key
-        result = await cb_env.collection.lookup_in(key, (SD.get('qzzxy'),))
-        assert isinstance(result, LookupInResult)
-        with pytest.raises(PathNotFoundException):
-            result.content_as[str](0)
-
-    @pytest.mark.asyncio
-    async def test_lookup_in_one_path_not_found(self, cb_env, default_kvp):
-        cb = cb_env.collection
-        key = default_kvp.key
-        result = await cb.lookup_in(key, (SD.exists("geo"), SD.exists("qzzxy"),))
-        assert isinstance(result, LookupInResult)
-        assert result.exists(0)
-        assert not result.exists(1)
-        # PYCBC-1480, update exists to follow RFC
-        assert result.content_as[bool](0) is True
-        result.content_as[bool](1) is False
-
-    @pytest.mark.asyncio
-    async def test_lookup_in_simple_long_path(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        # add longer path to doc
-        value["long_path"] = {"a": {"b": {"c": "yo!"}}}
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.lookup_in(key, (SD.get("long_path.a.b.c"),))
-        assert isinstance(result, LookupInResult)
-        assert result.content_as[str](0) == value["long_path"]["a"]["b"]["c"]
-
-    @pytest.mark.asyncio
-    async def test_lookup_in_valid_path_null_content(self, cb_env, new_kvp):
-        key = new_kvp.key
-        value = new_kvp.value
-        # add empty value to doc
-        value['empty_field'] = None
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_array_add_unique_create_parents(self, cb_env):
+        key, value = cb_env.get_new_doc_by_type('array')
         await cb_env.collection.upsert(key, value)
-        res = await cb_env.try_n_times(10, 3, cb_env.collection.get, key)
-        assert 'empty_field' in res.content_as[dict]
-        result = await cb_env.collection.lookup_in(key, (SD.get('empty_field'),))
-        assert isinstance(result, LookupInResult)
-        # type(None) provides a <class 'NoneType'> which we can then create an instance of
-        # in order to check that it is in fact None
-        assert result.content_as[type](0)() is None
-
-    @pytest.mark.asyncio
-    async def test_lookup_in_multiple_specs(self, cb_env, default_kvp):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
-        cb = cb_env.collection
-        key = default_kvp.key
-        value = default_kvp.value
-        result = await cb.lookup_in(key,
-                                    (SD.get("$document.exptime", xattr=True),
-                                     SD.exists("geo"),
-                                        SD.get("geo"),
-                                        SD.get("geo.alt"),))
-        assert isinstance(result, LookupInResult)
-        assert result.content_as[int](0) == 0
-        assert result.exists(1) is True
-        assert result.content_as[dict](2) == value["geo"]
-        assert result.content_as[int](3) == value["geo"]["alt"]
-
-    @pytest.mark.asyncio
-    async def test_count(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["count"] = [1, 2, 3, 4, 5]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.lookup_in(key, (SD.count("count"),))
-        assert isinstance(result, LookupInResult)
-        assert result.content_as[int](0) == 5
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_mutate_in_simple(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-
-        result = await cb.mutate_in(key,
-                                    (SD.upsert("city", "New City"),
-                                     SD.replace("faa", "CTY")),
-                                    MutateInOptions(expiry=timedelta(seconds=1000)))
-
-        value["city"] = "New City"
-        value["faa"] = "CTY"
-
-        async def cas_matches(cb, new_cas):
-            r = await cb.get(key)
-            if new_cas != r.cas:
-                raise Exception(f"{new_cas} != {r.cas}")
-
-        await cb_env.try_n_times(10, 3, cas_matches, cb, result.cas)
-
-        result = await cb.get(key)
-        assert value == result.content_as[dict]
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_mutate_in_simple_spec_as_list(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-
-        result = await cb.mutate_in(key,
-                                    [SD.upsert("city", "New City"),
-                                     SD.replace("faa", "CTY")],
-                                    MutateInOptions(expiry=timedelta(seconds=1000)))
-
-        value["city"] = "New City"
-        value["faa"] = "CTY"
-
-        async def cas_matches(cb, new_cas):
-            r = await cb.get(key)
-            if new_cas != r.cas:
-                raise Exception(f"{new_cas} != {r.cas}")
-
-        await cb_env.try_n_times(10, 3, cas_matches, cb, result.cas)
-
-        result = await cb.get(key)
-        assert value == result.content_as[dict]
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_expiry(self, cb_env, new_kvp):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-
-        result = await cb.mutate_in(key,
-                                    (SD.upsert("city", "New City"),
-                                     SD.replace("faa", "CTY")),
-                                    MutateInOptions(expiry=timedelta(seconds=1000)))
-
-        async def cas_matches(cb, new_cas):
-            r = await cb.get(key)
-            if new_cas != r.cas:
-                raise Exception(f"{new_cas} != {r.cas}")
-
-        await cb_env.try_n_times(10, 3, cas_matches, cb, result.cas)
-
-        expiry_path = "$document.exptime"
-        res = await cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        expiry = res.content_as[int](0)
-        assert expiry is not None
-        assert expiry > 0
-        expires_in = (datetime.fromtimestamp(expiry) - datetime.now()).total_seconds()
-        # when running local, this can be up to 1050, so just make sure > 0
-        assert expires_in > 0
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_remove(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-
-        await cb.mutate_in(key, [SD.remove('geo.alt')])
-        result = await cb.get(key)
-        assert 'alt' not in result.content_as[dict]['geo']
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_remove_blank_path(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-
-        await cb.mutate_in(key, [SD.remove('')])
-        with pytest.raises(DocumentNotFoundException):
-            await cb.get(key)
-
-    @pytest.mark.usefixtures("skip_if_less_than_cheshire_cat")
-    @pytest.mark.asyncio
-    async def test_mutate_in_preserve_expiry_not_used(self, cb_env, default_kvp_and_reset):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-
-        await cb.mutate_in(key,
-                           (SD.upsert("city", "New City"),
-                            SD.replace("faa", "CTY")),
-                           MutateInOptions(expiry=timedelta(seconds=5)))
-
-        expiry_path = "$document.exptime"
-        res = await cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        expiry1 = res.content_as[int](0)
-
-        await cb.mutate_in(key, (SD.upsert("city", "Updated City"),))
-        res = await cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        expiry2 = res.content_as[int](0)
-
-        assert expiry1 is not None
-        assert expiry2 is not None
-        assert expiry1 != expiry2
-        # if expiry was set, should be expired by now
-        await asyncio.sleep(3)
-        result = await cb.get(key)
-        assert isinstance(result, GetResult)
-        assert result.content_as[dict]['city'] == 'Updated City'
-
-    @pytest.mark.usefixtures("skip_if_less_than_cheshire_cat")
-    @pytest.mark.asyncio
-    async def test_mutate_in_preserve_expiry(self, cb_env, default_kvp_and_reset):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-
-        await cb.mutate_in(key,
-                           (SD.upsert("city", "New City"),
-                            SD.replace("faa", "CTY")),
-                           MutateInOptions(expiry=timedelta(seconds=2)))
-
-        expiry_path = "$document.exptime"
-        res = await cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        expiry1 = res.content_as[int](0)
-
-        await cb.mutate_in(key, (SD.upsert("city", "Updated City"),),
-                           MutateInOptions(preserve_expiry=True))
-        res = await cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        expiry2 = res.content_as[int](0)
-
-        assert expiry1 is not None
-        assert expiry2 is not None
-        assert expiry1 == expiry2
-        # if expiry was set, should be expired by now
-        await asyncio.sleep(3)
-        with pytest.raises(DocumentNotFoundException):
-            await cb.get(key)
-
-    @pytest.mark.usefixtures("skip_if_less_than_cheshire_cat")
-    @pytest.mark.asyncio
-    async def test_mutate_in_preserve_expiry_fails(self, cb_env, default_kvp_and_reset):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-        with pytest.raises(InvalidArgumentException):
-            await cb.mutate_in(
-                key,
-                (SD.insert("c", "ccc"),),
-                MutateInOptions(preserve_expiry=True),
-            )
-
-        with pytest.raises(InvalidArgumentException):
-            await cb.mutate_in(
-                key,
-                (SD.replace("c", "ccc"),),
-                MutateInOptions(
-                    expiry=timedelta(
-                        seconds=5),
-                    preserve_expiry=True),
-            )
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_mutate_in_upsert_semantics(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-
-        with pytest.raises(DocumentNotFoundException):
-            await cb.get(key)
-
-        await cb.mutate_in(key,
-                           (SD.upsert('new_path', 'im new'),),
-                           MutateInOptions(store_semantics=SD.StoreSemantics.UPSERT))
-
-        res = await cb_env.try_n_times(10, 3, cb.get, key)
-        assert res.content_as[dict] == {'new_path': 'im new'}
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_mutate_in_upsert_semantics_kwargs(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-
-        with pytest.raises(DocumentNotFoundException):
-            await cb.get(key)
-
-        await cb.mutate_in(key,
-                           (SD.upsert('new_path', 'im new'),),
-                           upsert_doc=True)
-
-        res = await cb_env.try_n_times(10, 3, cb.get, key)
-        assert res.content_as[dict] == {'new_path': 'im new'}
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_mutate_in_insert_semantics(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-
-        with pytest.raises(DocumentNotFoundException):
-            await cb.get(key)
-
-        await cb.mutate_in(key,
-                           (SD.insert('new_path', 'im new'),),
-                           MutateInOptions(store_semantics=SD.StoreSemantics.INSERT))
-
-        res = await cb_env.try_n_times(10, 3, cb.get, key)
-        assert res.content_as[dict] == {'new_path': 'im new'}
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_mutate_in_insert_semantics_kwargs(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-
-        with pytest.raises(DocumentNotFoundException):
-            await cb.get(key)
-
-        await cb.mutate_in(key,
-                           (SD.insert('new_path', 'im new'),),
-                           insert_doc=True)
-
-        res = await cb_env.try_n_times(10, 3, cb.get, key)
-        assert res.content_as[dict] == {'new_path': 'im new'}
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_insert_semantics_fail(self, cb_env, default_kvp_and_reset):
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-
-        with pytest.raises(DocumentExistsException):
-            await cb.mutate_in(key,
-                               (SD.insert('new_path', 'im new'),),
-                               insert_doc=True)
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_replace_semantics(self, cb_env, default_kvp_and_reset):
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-
-        await cb.mutate_in(key,
-                           (SD.upsert('new_path', 'im new'),),
-                           MutateInOptions(store_semantics=SD.StoreSemantics.REPLACE))
-
-        res = await cb_env.try_n_times(10, 3, cb.get, key)
-        assert res.content_as[dict]['new_path'] == 'im new'
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_replace_semantics_kwargs(self, cb_env, default_kvp_and_reset):
-        cb = cb_env.collection
-        key = default_kvp_and_reset.key
-
-        await cb.mutate_in(key,
-                           (SD.upsert('new_path', 'im new'),),
-                           replace_doc=True)
-
-        res = await cb_env.try_n_times(10, 3, cb.get, key)
-        assert res.content_as[dict]['new_path'] == 'im new'
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_replace_semantics_fail(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-
-        with pytest.raises(DocumentNotFoundException):
-            await cb.mutate_in(key,
-                               (SD.upsert('new_path', 'im new'),),
-                               replace_doc=True)
-
-    @pytest.mark.asyncio
-    async def test_mutate_in_store_semantics_fail(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-
-        with pytest.raises(InvalidArgumentException):
-            await cb.mutate_in(key,
-                               (SD.upsert('new_path', 'im new'),),
-                               insert_doc=True, upsert_doc=True)
-
-        with pytest.raises(InvalidArgumentException):
-            await cb.mutate_in(key,
-                               (SD.upsert('new_path', 'im new'),),
-                               insert_doc=True, replace_doc=True)
-
-        with pytest.raises(InvalidArgumentException):
-            await cb.mutate_in(key,
-                               (SD.upsert('new_path', 'im new'),),
-                               upsert_doc=True, replace_doc=True)
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_array_append(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["array"] = [1, 2, 3, 4]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_append("array", 5),))
+        await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        result = await cb_env.collection.mutate_in(key, (
+            SD.array_addunique("new.set", "new", create_parents=True),
+            SD.array_addunique("new.set", "unique"),
+            SD.array_addunique("new.set", "set")))
         assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
+        result = await cb_env.collection.get(key)
+        new_set = result.content_as[dict]["new"]["set"]
+        assert isinstance(new_set, list)
+        assert "new" in new_set
+        assert "unique" in new_set
+        assert "set" in new_set
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_array_add_unique_fail(self, cb_env):
+        key = "simple-key"
+        value = {
+            "a": "aaa",
+            "b": [0, 1, 2, 3],
+            "c": [1.25, 1.5, {"nested": ["str", "array"]}],
+        }
+        await cb_env.collection.upsert(key, value)
+        await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+
+        with pytest.raises(PathExistsException):
+            await cb_env.collection.mutate_in(key, (SD.array_addunique("b", 3),))
+
+        with pytest.raises(InvalidValueException):
+            await cb_env.collection.mutate_in(key, (SD.array_addunique("b", [4, 5, 6]),))
+
+        with pytest.raises(InvalidValueException):
+            await cb_env.collection.mutate_in(key, (SD.array_addunique("b", {"c": "d"}),))
+
+        with pytest.raises(PathMismatchException):
+            await cb_env.collection.mutate_in(key, (SD.array_addunique("c", 2),))
+
+    @pytest.mark.asyncio
+    async def test_array_append(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.array_append('array', 6),))
+        assert isinstance(result, MutateInResult)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
-        assert isinstance(val["array"], list)
-        assert len(val["array"]) == 5
-        assert val["array"][4] == 5
+        assert isinstance(val['array'], list)
+        assert len(val['array']) == 6
+        assert val['array'][5] == 6
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
-    async def test_array_prepend(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["array"] = [1, 2, 3, 4]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_prepend("array", 0),))
+    async def test_array_append_create_parents(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(key, (
+            SD.array_append('new.array', 'Hello,', create_parents=True),
+            SD.array_append('new.array', 'World!'),))
         assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['new']['array'] == [
+            'Hello,', 'World!']
+
+    @pytest.mark.asyncio
+    async def test_array_append_multi_insert(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.array_append('array', 8, 9, 10),))
+        assert isinstance(result, MutateInResult)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
-        assert isinstance(val["array"], list)
-        assert len(val["array"]) == 5
-        assert val["array"][0] == 0
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_array_insert(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["array"] = [1, 2, 4, 5]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_insert("array.[2]", 3),))
-        assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
-        val = result.content_as[dict]
-        assert isinstance(val["array"], list)
-        assert len(val["array"]) == 5
-        assert val["array"][2] == 3
+        assert isinstance(val['array'], list)
+        app_res = val['array'][5:]
+        assert len(app_res) == 3
+        assert app_res == [8, 9, 10]
 
     @pytest.mark.asyncio
-    async def test_array_add_unique(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["array"] = [0, 1, 2, 3]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_addunique("array", 4),))
+    async def test_array_as_document(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array_only', key_only=True)
+        result = await cb_env.collection.mutate_in(key, (SD.array_append(
+            '', 2), SD.array_prepend('', 0), SD.array_insert('[1]', 1),))
         assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
-        val = result.content_as[dict]
-        assert isinstance(val["array"], list)
-        assert len(val["array"]) == 5
-        assert 4 in val["array"]
-
-    @pytest.mark.asyncio
-    async def test_array_as_document(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        await cb.upsert(key, [])
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_append("", 2), SD.array_prepend("", 0), SD.array_insert("[1]", 1),))
-        assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[list]
         assert isinstance(val, list)
         assert len(val) == 3
@@ -635,208 +231,682 @@ class SubDocumentTests:
         assert val[1] == 1
         assert val[2] == 2
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
-    async def test_array_append_multi_insert(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["array"] = [1, 2, 3, 4, 5, 6, 7]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_append("array", 8, 9, 10),))
+    async def test_array_insert(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.array_insert('array.[2]', 10),))
         assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
-        assert isinstance(val["array"], list)
-        app_res = val["array"][7:]
-        assert len(app_res) == 3
-        assert app_res == [8, 9, 10]
+        assert isinstance(val['array'], list)
+        assert len(val['array']) == 6
+        assert val['array'][2] == 10
 
     @pytest.mark.asyncio
-    async def test_array_prepend_multi_insert(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["array"] = [4, 5, 6, 7, 8, 9, 10]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_prepend("array", 1, 2, 3),))
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_array_insert_multi_insert(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.array_insert('array.[3]', 6, 7, 8),))
         assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
-        assert isinstance(val["array"], list)
-        pre_res = val["array"][:3]
-        assert len(pre_res) == 3
-        assert pre_res == [1, 2, 3]
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_array_insert_multi_insert(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["array"] = [1, 2, 3, 4, 8, 9, 10]
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.array_insert("array.[4]", 5, 6, 7),))
-        assert isinstance(result, MutateInResult)
-        result = await cb_env.try_n_times(10, 3, cb.get, key)
-        val = result.content_as[dict]
-        assert isinstance(val["array"], list)
-        ins_res = val["array"][4:7]
+        assert isinstance(val['array'], list)
+        ins_res = val['array'][3:6]
         assert len(ins_res) == 3
-        assert ins_res == [5, 6, 7]
-
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
-    @pytest.mark.asyncio
-    async def test_array_add_unique_fail(self, cb_env):
-        cb = cb_env.collection
-        key = "simple-key"
-        value = {
-            "a": "aaa",
-            "b": [0, 1, 2, 3],
-            "c": [1.25, 1.5, {"nested": ["str", "array"]}],
-        }
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        with pytest.raises(PathExistsException):
-            await cb.mutate_in(key, (SD.array_addunique("b", 3),))
-
-        with pytest.raises(InvalidValueException):
-            await cb.mutate_in(key, (SD.array_addunique("b", [4, 5, 6]),))
-
-        with pytest.raises(InvalidValueException):
-            await cb.mutate_in(key, (SD.array_addunique("b", {"c": "d"}),))
-
-        with pytest.raises(PathMismatchException):
-            await cb.mutate_in(key, (SD.array_addunique("c", 2),))
-
-        # reset
-        await cb.remove(key)
+        assert ins_res == [6, 7, 8]
 
     @pytest.mark.asyncio
-    async def test_increment(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["count"] = 100
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.increment("count", 50),))
+    async def test_array_prepend(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.array_prepend('array', 0),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["count"] == 150
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        val = result.content_as[dict]
+        assert isinstance(val['array'], list)
+        assert len(val['array']) == 6
+        assert val['array'][0] == 0
 
     @pytest.mark.asyncio
-    async def test_decrement(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        value["count"] = 100
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.decrement("count", 50),))
+    async def test_array_prepend_create_parents(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(key, (
+            SD.array_prepend('new.array', 'World!', create_parents=True),
+            SD.array_prepend('new.array', 'Hello,'),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["count"] == 50
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['new']['array'] == [
+            'Hello,', 'World!']
 
     @pytest.mark.asyncio
-    async def test_insert_create_parents(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.insert("new.path", "parents created", create_parents=True),))
+    async def test_array_prepend_multi_insert(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.array_prepend('array', -2, -1, 0),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["new"]["path"] == "parents created"
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        val = result.content_as[dict]
+        assert isinstance(val['array'], list)
+        pre_res = val['array'][:3]
+        assert len(pre_res) == 3
+        assert pre_res == [-2, -1, 0]
 
     @pytest.mark.asyncio
-    async def test_upsert_create_parents(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.upsert("new.path", "parents created", create_parents=True),))
-        assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["new"]["path"] == "parents created"
+    async def test_count(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.lookup_in(key, (SD.count('array'),))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[int](0) == 5
 
     @pytest.mark.asyncio
-    async def test_array_append_create_parents(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (
-            SD.array_append("new.array", "Hello,", create_parents=True),
-            SD.array_append("new.array", "World!"),))
+    async def test_decrement(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('count', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.decrement('count', 50),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["new"]["array"] == [
-            "Hello,", "World!"]
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['count'] == 50
 
     @pytest.mark.asyncio
-    async def test_array_prepend_create_parents(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (
-            SD.array_prepend("new.array", "World!", create_parents=True),
-            SD.array_prepend("new.array", "Hello,"),))
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_decrement_create_parents(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.decrement('new.counter', 100, create_parents=True),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["new"]["array"] == [
-            "Hello,", "World!"]
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['new']['counter'] == -100
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
-    async def test_array_add_unique_create_parents(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (
-            SD.array_addunique("new.set", "new", create_parents=True),
-            SD.array_addunique("new.set", "unique"),
-            SD.array_addunique("new.set", "set")))
+    async def test_increment(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('count', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.increment('count', 50),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        new_set = result.content_as[dict]["new"]["set"]
-        assert isinstance(new_set, list)
-        assert "new" in new_set
-        assert "unique" in new_set
-        assert "set" in new_set
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['count'] == 150
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
-    async def test_increment_create_parents(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.increment("new.counter", 100, create_parents=True),))
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_increment_create_parents(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('count', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.increment('new.counter', 100, create_parents=True),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["new"]["counter"] == 100
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['new']['counter'] == 100
 
-    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
-    async def test_decrement_create_parents(self, cb_env, new_kvp):
-        cb = cb_env.collection
-        key = new_kvp.key
-        value = new_kvp.value
-        await cb.upsert(key, value)
-        await cb_env.try_n_times(10, 3, cb.get, key)
-        result = await cb.mutate_in(key, (SD.decrement("new.counter", 100, create_parents=True),))
+    async def test_insert_create_parents(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.insert('new.path', 'parents created', create_parents=True),))
         assert isinstance(result, MutateInResult)
-        result = await cb.get(key)
-        assert result.content_as[dict]["new"]["counter"] == -100
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['new']['path'] == 'parents created'
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("check_xattr_supported")
+    async def test_lookup_in_multiple_specs(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in(key, (SD.get('$document.exptime', xattr=True),
+                                                   SD.exists('manufacturer'),
+                                                   SD.get('manufacturer'),
+                                                   SD.get('manufacturer.geo.accuracy'),))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[int](0) == 0
+        assert result.exists(1)
+        assert result.content_as[dict](2) == value['manufacturer']
+        assert result.content_as[str](3) == value['manufacturer']['geo']['accuracy']
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_one_path_not_found(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in(
+            key, (SD.exists('batch'), SD.exists('qzzxy'),))
+        assert isinstance(result, LookupInResult)
+        assert result.exists(0)
+        assert not result.exists(1)
+        # PYCBC-1480, update exists to follow RFC
+        assert result.content_as[bool](0) is True
+        assert result.content_as[bool](1) is False
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_simple_exists(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in(key, (SD.exists('batch'),))
+        assert isinstance(result, LookupInResult)
+        assert result.exists(0)
+        # PYCBC-1480, update exists to follow RFC
+        assert result.content_as[bool](0) is True
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_simple_exists_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in(key, (SD.exists('qzzxy'),))
+        assert isinstance(result, LookupInResult)
+        assert not result.exists(0)
+        assert result.content_as[bool](0) is False
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_simple_get(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in(key, (SD.get('batch'),))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[str](0) == value['batch']
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_simple_get_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in(key, (SD.get('qzzxy'),))
+        assert isinstance(result, LookupInResult)
+        with pytest.raises(PathNotFoundException):
+            result.content_as[str](0)
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_simple_get_spec_as_list(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in(key, [SD.get('batch')])
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[str](0) == value['batch']
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_simple_long_path(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        result = await cb_env.collection.lookup_in(
+            key, (SD.get('manufacturer.geo.location.tz'),))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[str](0) == value['manufacturer']['geo']['location']['tz']
+
+    @pytest.mark.asyncio
+    async def test_lookup_in_valid_path_null_content(self, cb_env):
+        key, value = cb_env.get_new_doc_by_type('vehicle')
+        value['empty_field'] = None
+        await cb_env.collection.upsert(key, value)
+        res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert 'empty_field' in res.content_as[dict]
+        result = await cb_env.collection.lookup_in(key, (SD.get('empty_field'), SD.get('batch')))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[lambda x: x](0) is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_get(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('batch')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['batch']
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_get_full(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get_full()])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[dict](0) == value
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_get_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('qzzxy')])
+        assert isinstance(result, LookupInReplicaResult)
+        with pytest.raises(PathNotFoundException):
+            result.content_as[str](0)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_exists(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.exists('batch')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.exists(0)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_exists_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.exists('qzzxy')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert not result.exists(0)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_bad_key(self, cb_env):
+        with pytest.raises(DocumentUnretrievableException):
+            await cb_env.collection.lookup_in_any_replica('asdfgh', [SD.exists('batch')])
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_multiple_specs(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('batch'), SD.exists('manufacturer.city')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['batch']
+        assert result.exists(1)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_get(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['batch']
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_get_full(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get_full()])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[dict](0) == value
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_get_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('qzzxy')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            with pytest.raises(PathNotFoundException):
+                result.content_as[str](0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_exists(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.exists('batch')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.exists(0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_exists_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.exists('qzzxy')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert not result.exists(0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_bad_key(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.lookup_in_all_replicas('asdfgh', [SD.exists('batch')])
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_multiple_specs(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch'), SD.exists('manufacturer.city')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['batch']
+            assert result.exists(1)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("check_xattr_supported")
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_expiry(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.mutate_in(key,
+                                                   (SD.upsert("make", "New Make"),
+                                                    SD.replace("model", "New Model")),
+                                                   MutateInOptions(expiry=timedelta(seconds=1000)))
+
+        async def cas_matches(cb, new_cas):
+            r = await cb.get(key)
+            if new_cas != r.cas:
+                raise Exception(f"{new_cas} != {r.cas}")
+
+        await AsyncTestEnvironment.try_n_times(10, 3, cas_matches, cb_env.collection, result.cas)
+
+        result = await cb_env.collection.get(key, GetOptions(with_expiry=True))
+        expires_in = (result.expiry_time - datetime.now()).total_seconds()
+        assert expires_in > 0 and expires_in < 1021
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_insert_semantics(self, cb_env):
+        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.get(key)
+
+        await cb_env.collection.mutate_in(key,
+                                          (SD.insert('new_path', 'im new'),),
+                                          MutateInOptions(store_semantics=SD.StoreSemantics.INSERT))
+
+        res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_insert_semantics_kwargs(self, cb_env):
+        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.get(key)
+
+        await cb_env.collection.mutate_in(key,
+                                          (SD.insert('new_path', 'im new'),),
+                                          insert_doc=True)
+
+        res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_insert_semantics_fail(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        with pytest.raises(DocumentExistsException):
+            await cb_env.collection.mutate_in(key,
+                                              (SD.insert('new_path', 'im new'),),
+                                              insert_doc=True)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_preserve_expiry_supported')
+    async def test_mutate_in_preserve_expiry(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        await cb_env.collection.mutate_in(key,
+                                          (SD.upsert('make', 'New Make'),
+                                           SD.replace('model', 'New Model')),
+                                          MutateInOptions(expiry=timedelta(seconds=2)))
+
+        expiry_path = '$document.exptime'
+        res = await AsyncTestEnvironment.try_n_times(10,
+                                                     3,
+                                                     cb_env.collection.lookup_in,
+                                                     key,
+                                                     (SD.get(expiry_path, xattr=True),))
+        expiry1 = res.content_as[int](0)
+
+        await cb_env.collection.mutate_in(key,
+                                          (SD.upsert('make', 'Updated Make'),),
+                                          MutateInOptions(preserve_expiry=True))
+        res = await AsyncTestEnvironment.try_n_times(10,
+                                                     3,
+                                                     cb_env.collection.lookup_in,
+                                                     key,
+                                                     (SD.get(expiry_path, xattr=True),))
+        expiry2 = res.content_as[int](0)
+
+        assert expiry1 is not None
+        assert expiry2 is not None
+        assert expiry1 == expiry2
+        # if expiry was set, should be expired by now
+        await AsyncTestEnvironment.sleep(3)
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.get(key)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_preserve_expiry_supported')
+    async def test_mutate_in_preserve_expiry_fails(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.collection.mutate_in(
+                key,
+                (SD.insert('c', 'ccc'),),
+                MutateInOptions(preserve_expiry=True),
+            )
+
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.collection.mutate_in(
+                key,
+                (SD.replace('c', 'ccc'),),
+                MutateInOptions(
+                    expiry=timedelta(seconds=5),
+                    preserve_expiry=True),
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_preserve_expiry_supported')
+    async def test_mutate_in_preserve_expiry_not_used(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        await cb_env.collection.mutate_in(
+            key,
+            (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model')),
+            MutateInOptions(expiry=timedelta(seconds=5))
+        )
+
+        expiry_path = '$document.exptime'
+        res = await AsyncTestEnvironment.try_n_times(
+            10, 3, cb_env.collection.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+        expiry1 = res.content_as[int](0)
+
+        await cb_env.collection.mutate_in(key, (SD.upsert('make', 'Updated Make'),))
+        res = await AsyncTestEnvironment.try_n_times(
+            10, 3, cb_env.collection.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+        expiry2 = res.content_as[int](0)
+
+        assert expiry1 is not None
+        assert expiry2 is not None
+        assert expiry1 != expiry2
+        # if expiry was set, should be expired by now
+        await AsyncTestEnvironment.sleep(3)
+        result = await cb_env.collection.get(key)
+        assert isinstance(result, GetResult)
+        assert result.content_as[dict]['make'] == 'Updated Make'
+
+    @pytest.mark.asyncio
+    async def test_mutate_in_remove(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        await cb_env.collection.mutate_in(key, [SD.remove('manufacturer.geo')])
+        result = await cb_env.collection.get(key)
+        assert 'geo' not in result.content_as[dict]['manufacturer']
+
+    @pytest.mark.asyncio
+    async def test_mutate_in_remove_blank_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        await cb_env.collection.mutate_in(key, [SD.remove('')])
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.get(key)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_replace_semantics(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        await cb_env.collection.mutate_in(
+            key,
+            (SD.upsert('new_path', 'im new'),),
+            MutateInOptions(store_semantics=SD.StoreSemantics.REPLACE)
+        )
+
+        res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert res.content_as[dict]['new_path'] == 'im new'
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_replace_semantics_fail(self, cb_env):
+        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.mutate_in(
+                key,
+                (SD.upsert('new_path', 'im new'),),
+                replace_doc=True
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_replace_semantics_kwargs(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        await cb_env.collection.mutate_in(
+            key,
+            (SD.upsert('new_path', 'im new'),),
+            replace_doc=True)
+
+        res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert res.content_as[dict]['new_path'] == 'im new'
+
+    @pytest.mark.asyncio
+    async def test_mutate_in_simple(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.mutate_in(
+            key,
+            (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model'))
+        )
+
+        value['make'] = 'New Make'
+        value['model'] = 'New Model'
+
+        async def cas_matches(cb, new_cas):
+            r = await cb.get(key)
+            if new_cas != r.cas:
+                raise Exception(f"{new_cas} != {r.cas}")
+
+        await AsyncTestEnvironment.try_n_times(10, 3, cas_matches, cb_env.collection, result.cas)
+
+        result = await cb_env.collection.get(key)
+        assert value == result.content_as[dict]
+
+    @pytest.mark.asyncio
+    async def test_mutate_in_simple_spec_as_list(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.mutate_in(
+            key,
+            [SD.upsert('make', 'New Make'), SD.replace('model', 'New Model')]
+        )
+
+        value['make'] = 'New Make'
+        value['model'] = 'New Model'
+
+        async def cas_matches(cb, new_cas):
+            r = await cb.get(key)
+            if new_cas != r.cas:
+                raise Exception(f"{new_cas} != {r.cas}")
+
+        await AsyncTestEnvironment.try_n_times(10, 3, cas_matches, cb_env.collection, result.cas)
+
+        result = await cb_env.collection.get(key)
+        assert value == result.content_as[dict]
+
+    @pytest.mark.asyncio
+    async def test_mutate_in_store_semantics_fail(self, cb_env):
+        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.collection.mutate_in(key,
+                                              (SD.upsert('new_path', 'im new'),),
+                                              insert_doc=True, upsert_doc=True)
+
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.collection.mutate_in(key,
+                                              (SD.upsert('new_path', 'im new'),),
+                                              insert_doc=True, replace_doc=True)
+
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.collection.mutate_in(key,
+                                              (SD.upsert('new_path', 'im new'),),
+                                              upsert_doc=True, replace_doc=True)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_upsert_semantics(self, cb_env):
+        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.get(key)
+
+        await cb_env.collection.mutate_in(key,
+                                          (SD.upsert('new_path', 'im new'),),
+                                          MutateInOptions(store_semantics=SD.StoreSemantics.UPSERT))
+
+        res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    async def test_mutate_in_upsert_semantics_kwargs(self, cb_env):
+        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.get(key)
+
+        await cb_env.collection.mutate_in(
+            key,
+            (SD.upsert('new_path', 'im new'),),
+            upsert_doc=True
+        )
+
+        res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    @pytest.mark.asyncio
+    async def test_upsert_create_parents(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.upsert('new.path', 'parents created', create_parents=True),))
+        assert isinstance(result, MutateInResult)
+        result = await cb_env.collection.get(key)
+        assert result.content_as[dict]['new']['path'] == 'parents created'
+
+
+# For whatever reason GoCAVES is rather flaky w/ subdocument tests
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
+class ClassicSubDocumentTests(SubDocumentTestSuite):
+
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicSubDocumentTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicSubDocumentTests) if valid_test_method(meth)]
+        compare = set(SubDocumentTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest_asyncio.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
+    async def couchbase_test_environment(self, acb_base_env, test_manifest_validated, request):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        acb_env = AsyncSubdocTestEnvironment.from_environment(acb_base_env)
+        acb_env.enable_bucket_mgmt()
+        await acb_env.setup(request.param)
+
+        yield acb_env
+
+        await acb_env.teardown(request.param)

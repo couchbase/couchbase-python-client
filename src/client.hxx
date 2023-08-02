@@ -52,6 +52,8 @@ class Operations
         REMOVE,
         MUTATE_IN,
         LOOKUP_IN,
+        LOOKUP_IN_ALL_REPLICAS,
+        LOOKUP_IN_ANY_REPLICA,
         DIAGNOSTICS,
         PING,
         INCREMENT,
@@ -106,6 +108,8 @@ class Operations
                           "REMOVE "
                           "MUTATE_IN "
                           "LOOKUP_IN "
+                          "LOOKUP_IN_ALL_REPLICAS "
+                          "LOOKUP_IN_ANY_REPLICA "
                           "DIAGNOSTICS "
                           "PING "
                           "INCREMENT "

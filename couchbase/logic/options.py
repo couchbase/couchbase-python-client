@@ -988,6 +988,34 @@ class LookupInOptionsBase(DurabilityOptionBlockBase):
         super().__init__(**kwargs)
 
 
+class LookupInAllReplicasOptionsBase(OptionsTimeoutBase):
+    @overload
+    def __init__(self,
+                 timeout=None,  # type: Optional[timedelta]
+                 span=None,  # type: Optional[Any]
+                 serializer=None,  # type: Optional[Serializer]
+                 ) -> None:
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
+class LookupInAnyReplicaOptionsBase(OptionsTimeoutBase):
+    @overload
+    def __init__(self,
+                 timeout=None,  # type: Optional[timedelta]
+                 span=None,  # type: Optional[Any]
+                 serializer=None,  # type: Optional[Serializer]
+                 ) -> None:
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
 class MutateInOptionsBase(DurabilityOptionBlockBase):
     @overload
     def __init__(self,

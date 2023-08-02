@@ -127,6 +127,7 @@ class ServerFeatures(Enum):
     Txns = 'txns'
     TxnQueries = 'txn_queries'
     KvRangeScan = 'kv_range_scan'
+    SubdocReplicaRead = 'subdoc_replica_read'
 
 
 # mock and real server (all versions) should have these features
@@ -186,7 +187,8 @@ AT_LEAST_V7_1_0_FEATURES = [ServerFeatures.RateLimiting,
                             ServerFeatures.EventingFunctionManagement,
                             ServerFeatures.PreserveExpiry]
 
-AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan]
+AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan,
+                            ServerFeatures.SubdocReplicaRead]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {

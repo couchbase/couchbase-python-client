@@ -37,6 +37,7 @@ from couchbase.result import (CounterResult,
                               ExistsResult,
                               GetReplicaResult,
                               GetResult,
+                              LookupInReplicaResult,
                               LookupInResult,
                               MutateInResult,
                               MutationResult)
@@ -336,6 +337,36 @@ class CollectionLogic:
                   **kwargs,  # type: Any
                   ) -> Optional[LookupInResult]:
         op_type = operations.LOOKUP_IN.value
+        final_args = forward_args(kwargs)
+        return subdoc_operation(
+            **self._get_connection_args(),
+            key=key,
+            spec=spec,
+            op_type=op_type,
+            op_args=final_args
+        )
+
+    def lookup_in_all_replicas(self,
+                               key,  # type: str
+                               spec,  # type: Iterable[Spec]
+                               **kwargs,  # type: Any
+                               ) -> Optional[Iterable[LookupInReplicaResult]]:
+        op_type = operations.LOOKUP_IN_ALL_REPLICAS.value
+        final_args = forward_args(kwargs)
+        return subdoc_operation(
+            **self._get_connection_args(),
+            key=key,
+            spec=spec,
+            op_type=op_type,
+            op_args=final_args
+        )
+
+    def lookup_in_any_replica(self,
+                              key,  # type: str
+                              spec,  # type: Iterable[Spec]
+                              **kwargs,  # type: Any
+                              ) -> Optional[LookupInReplicaResult]:
+        op_type = operations.LOOKUP_IN_ANY_REPLICA.value
         final_args = forward_args(kwargs)
         return subdoc_operation(
             **self._get_connection_args(),

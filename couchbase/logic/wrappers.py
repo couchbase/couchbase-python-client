@@ -52,7 +52,7 @@ def decode_value(transcoder, value, flags, is_subdoc=False):
     return final_value
 
 
-def decode_replicas(transcoder, result, return_cls):
+def decode_replicas(transcoder, result, return_cls, is_subdoc=False):
     while True:
         try:
             res = next(result)
@@ -68,7 +68,7 @@ def decode_replicas(transcoder, result, return_cls):
 
             value = res.raw_result.get('value', None)
             flags = res.raw_result.get('flags', None)
-            res.raw_result['value'] = decode_value(transcoder, value, flags)
+            res.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_subdoc)
             yield return_cls(res)
 
 
@@ -115,15 +115,18 @@ class BlockingWrapper:
                     if isinstance(ret, BaseCouchbaseException):
                         raise ErrorMapper.build_exception(ret)
 
-                    # special case for get_all_replicas
-                    if fn.__name__ == '_get_all_replicas_internal':
-                        return decode_replicas(transcoder, ret, return_cls)
+                    is_subdoc = fn.__name__ in [
+                        '_lookup_in_internal', '_lookup_in_any_replica_internal', '_lookup_in_all_replicas_internal'
+                    ]
+
+                    # special case for get_all_replicas and lookup_in_all_replicas
+                    if fn.__name__ in ['_get_all_replicas_internal', '_lookup_in_all_replicas_internal']:
+                        return decode_replicas(transcoder, ret, return_cls, is_subdoc=is_subdoc)
 
                     value = ret.raw_result.get('value', None)
                     flags = ret.raw_result.get('flags', None)
 
-                    is_suboc = fn.__name__ == '_lookup_in_internal'
-                    ret.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_suboc)
+                    ret.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_subdoc)
                     if return_cls is None:
                         return None
                     elif return_cls is True:

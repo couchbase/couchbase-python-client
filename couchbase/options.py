@@ -62,6 +62,8 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      GetOptionsBase,
                                      IncrementOptionsBase,
                                      InsertOptionsBase,
+                                     LookupInAllReplicasOptionsBase,
+                                     LookupInAnyReplicaOptionsBase,
                                      LookupInOptionsBase,
                                      MutateInOptionsBase,
                                      OptionsTimeoutBase,
@@ -680,6 +682,32 @@ class ScanOptions(ScanOptionsBase):
 
 
 class LookupInOptions(LookupInOptionsBase):
+    """Available options to for a subdocument lookup-in operation.
+
+    .. warning::
+        Importing options from ``couchbase.collection`` is deprecated.
+        All options should be imported from ``couchbase.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            subdocument operation timeout.
+    """
+
+
+class LookupInAnyReplicaOptions(LookupInAnyReplicaOptionsBase):
+    """Available options to for a subdocument lookup-in operation.
+
+    .. warning::
+        Importing options from ``couchbase.collection`` is deprecated.
+        All options should be imported from ``couchbase.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            subdocument operation timeout.
+    """
+
+
+class LookupInAllReplicasOptions(LookupInAllReplicasOptionsBase):
     """Available options to for a subdocument lookup-in operation.
 
     .. warning::

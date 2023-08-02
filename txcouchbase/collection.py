@@ -30,6 +30,7 @@ from couchbase.result import (CounterResult,
                               ExistsResult,
                               GetReplicaResult,
                               GetResult,
+                              LookupInReplicaResult,
                               LookupInResult,
                               MutateInResult,
                               MutationResult)
@@ -50,6 +51,8 @@ if TYPE_CHECKING:
                                    GetOptions,
                                    IncrementOptions,
                                    InsertOptions,
+                                   LookupInAllReplicasOptions,
+                                   LookupInAnyReplicaOptions,
                                    LookupInOptions,
                                    MutateInOptions,
                                    PrependOptions,
@@ -270,6 +273,52 @@ class Collection(CollectionLogic):
         **kwargs,  # type: Dict[str, Any]
     ) -> LookupInResult:
         super().lookup_in(key, spec, **kwargs)
+
+    def lookup_in_any_replica(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        *opts,  # type: LookupInAnyReplicaOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> LookupInReplicaResult:
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+        return self._lookup_in_any_replica_internal(key, spec, **final_args)
+
+    @TxWrapper.inject_callbacks_and_decode(LookupInReplicaResult)
+    def _lookup_in_any_replica_internal(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        **kwargs,  # type: Dict[str, Any]
+    ) -> LookupInReplicaResult:
+        super().lookup_in_any_replica(key, spec, **kwargs)
+
+    def lookup_in_all_replicas(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        *opts,  # type: LookupInAllReplicasOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Iterable[LookupInReplicaResult]:
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+        return self._lookup_in_all_replicas_internal(key, spec, **final_args)
+
+    @TxWrapper.inject_callbacks_and_decode(LookupInReplicaResult)
+    def _lookup_in_all_replicas_internal(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Iterable[LookupInReplicaResult]:
+        super().lookup_in_all_replicas(key, spec, **kwargs)
 
     @TxWrapper.inject_callbacks(MutateInResult)
     def mutate_in(

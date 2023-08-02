@@ -58,6 +58,18 @@ struct lookup_in_options {
     // partition?
 };
 
+struct lookup_in_replica_options {
+    // required
+    connection* conn;
+    couchbase::core::document_id id;
+    Operations::OperationType op_type;
+
+    // optional
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+    PyObject* span{ nullptr };
+    PyObject* specs{ nullptr };
+};
+
 struct mutate_in_options {
     // required
     connection* conn;

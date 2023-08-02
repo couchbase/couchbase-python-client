@@ -257,17 +257,21 @@ class TxWrapper:
 
                 def on_ok(res):
                     try:
-                        # special case for get_all_replicas
-                        if fn.__name__ == '_get_all_replicas_internal':
-                            self.loop.call_soon_threadsafe(ft.set_result,
-                                                           decode_replicas(transcoder, res, return_cls))
+                        is_subdoc = fn.__name__ in [
+                            '_lookup_in_internal', '_lookup_in_any_replica_internal', '_lookup_in_all_replicas_internal'
+                        ]
+
+                        # special case for get_all_replicas and lookup_in_all_replicas
+                        if fn.__name__ in ['_get_all_replicas_internal', '_lookup_in_all_replicas_internal']:
+                            self.loop.call_soon_threadsafe(
+                                ft.set_result, decode_replicas(transcoder, res, return_cls, is_subdoc=is_subdoc)
+                            )
                             return
 
                         value = res.raw_result.get('value', None)
                         flags = res.raw_result.get('flags', None)
 
-                        is_suboc = fn.__name__ == '_lookup_in_internal'
-                        res.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_suboc)
+                        res.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_subdoc)
 
                         if return_cls is None:
                             retval = None

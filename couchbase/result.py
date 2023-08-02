@@ -692,6 +692,43 @@ class LookupInResult(Result):
         return "LookupInResult:{}".format(self._orig)
 
 
+class LookupInReplicaResult(Result):
+    def exists(self,  # type: LookupInReplicaResult
+               index  # type: int
+               ) -> bool:
+        """Check if the subdocument path exists.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidIndexException`: If the provided index is out of range.
+
+        Returns:
+            bool: True if the path exists.  False if the path does not exist.
+        """
+        return parse_subdocument_exists(self.value, index, self.key)
+
+    @property
+    def content_as(self) -> ContentSubdocProxy:
+        """
+            :class:`.ContentSubdocProxy`: A proxy to return the value at the specified index.
+
+            Get first value as a dict::
+
+                res = collection.lookup_in(key, (SD.get("geo"), SD.exists("city")))
+                value = res.content_as[dict](0)
+        """
+        return ContentSubdocProxy(self.value, self.key)
+
+    @property
+    def is_replica(self) -> bool:
+        """
+            bool: True if the result is a replica, False otherwise.
+        """
+        return self._orig.raw_result.get('is_replica')
+
+    def __repr__(self):
+        return "LookupInReplicaResult:{}".format(self._orig)
+
+
 class MutateInResult(MutationResult):
 
     @property

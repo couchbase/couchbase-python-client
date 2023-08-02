@@ -71,6 +71,196 @@ add_extras_to_result([[maybe_unused]] const T& t, result* res)
 
 template<>
 result*
+add_extras_to_result<couchbase::core::operations::lookup_in_any_replica_response>(
+  const couchbase::core::operations::lookup_in_any_replica_response& resp,
+  result* res)
+{
+    if (!res->ec) {
+        PyObject* pyObj_tmp = PyBool_FromLong(static_cast<long>(resp.is_replica));
+        if (-1 == PyDict_SetItemString(res->dict, "is_replica", pyObj_tmp)) {
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
+
+        PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
+        for (auto f : resp.fields) {
+            PyObject* pyObj_field = PyDict_New();
+
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
+            if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
+            if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
+            if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
+            if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
+            if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            if (f.value.size() > 0) {
+                try {
+                    pyObj_tmp = binary_to_PyObject(f.value);
+                } catch (const std::exception& e) {
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    Py_XDECREF(pyObj_fields);
+                    Py_XDECREF(pyObj_field);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
+                if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+                    Py_XDECREF(pyObj_fields);
+                    Py_XDECREF(pyObj_field);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
+                Py_DECREF(pyObj_tmp);
+            }
+
+            PyList_Append(pyObj_fields, pyObj_field);
+            Py_DECREF(pyObj_field);
+        }
+
+        if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+            Py_XDECREF(pyObj_fields);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_fields);
+    }
+    return res;
+}
+
+template<>
+result*
+add_extras_to_result<couchbase::core::operations::lookup_in_all_replicas_response::entry>(
+  const couchbase::core::operations::lookup_in_all_replicas_response::entry& resp,
+  result* res)
+{
+    if (!res->ec) {
+        PyObject* pyObj_tmp = PyBool_FromLong(static_cast<long>(resp.is_replica));
+        if (-1 == PyDict_SetItemString(res->dict, "is_replica", pyObj_tmp)) {
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
+
+        PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
+        for (auto f : resp.fields) {
+            PyObject* pyObj_field = PyDict_New();
+
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
+            if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
+            if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
+            if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
+            if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
+            if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
+                Py_XDECREF(pyObj_fields);
+                Py_XDECREF(pyObj_field);
+                Py_XDECREF(pyObj_tmp);
+                return nullptr;
+            }
+            Py_DECREF(pyObj_tmp);
+
+            if (f.value.size() > 0) {
+                try {
+                    pyObj_tmp = binary_to_PyObject(f.value);
+                } catch (const std::exception& e) {
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    Py_XDECREF(pyObj_fields);
+                    Py_XDECREF(pyObj_field);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
+                if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+                    Py_XDECREF(pyObj_fields);
+                    Py_XDECREF(pyObj_field);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
+                Py_DECREF(pyObj_tmp);
+            }
+
+            PyList_Append(pyObj_fields, pyObj_field);
+            Py_DECREF(pyObj_field);
+        }
+
+        if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+            Py_XDECREF(pyObj_fields);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_fields);
+    }
+    return res;
+}
+
+template<>
+result*
 add_extras_to_result<couchbase::core::operations::lookup_in_response>(const couchbase::core::operations::lookup_in_response& resp,
                                                                       result* res)
 {
@@ -272,6 +462,38 @@ create_base_result_from_subdoc_op_response(const char* key, const T& resp)
     return res;
 }
 
+template<>
+result*
+create_base_result_from_subdoc_op_response(const char* key, const couchbase::core::operations::lookup_in_all_replicas_response::entry& resp)
+{
+    PyObject* pyObj_result = create_result_obj();
+    result* res = reinterpret_cast<result*>(pyObj_result);
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
+    if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
+        Py_XDECREF(pyObj_result);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (-1 == PyDict_SetItemString(res->dict, RESULT_FLAGS, Py_None)) {
+        Py_XDECREF(pyObj_result);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+    }
+
+    if (nullptr != key) {
+        pyObj_tmp = PyUnicode_FromString(key);
+        if (-1 == PyDict_SetItemString(res->dict, RESULT_KEY, pyObj_tmp)) {
+            Py_XDECREF(pyObj_result);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+    return res;
+}
+
 template<typename T>
 void
 create_result_from_subdoc_op_response(const char* key,
@@ -330,6 +552,87 @@ create_result_from_subdoc_op_response(const char* key,
     }
 
     if (!set_exception && pyObj_func != nullptr) {
+        pyObj_callback_res = PyObject_Call(pyObj_func, pyObj_args, pyObj_kwargs);
+        if (pyObj_callback_res) {
+            Py_DECREF(pyObj_callback_res);
+        } else {
+            PyErr_Print();
+            // @TODO:  how to handle this situation?
+        }
+        Py_DECREF(pyObj_args);
+        Py_XDECREF(pyObj_kwargs);
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
+    }
+    PyGILState_Release(state);
+}
+
+template<>
+void
+create_result_from_subdoc_op_response(const char* key,
+                                      const couchbase::core::operations::lookup_in_all_replicas_response& resp,
+                                      PyObject* pyObj_callback,
+                                      PyObject* pyObj_errback,
+                                      std::shared_ptr<std::promise<PyObject*>> barrier)
+{
+    PyGILState_STATE state = PyGILState_Ensure();
+    PyObject* pyObj_args = NULL;
+    PyObject* pyObj_kwargs = nullptr;
+    PyObject* pyObj_exc = nullptr;
+    PyObject* pyObj_func = nullptr;
+    PyObject* pyObj_callback_res = nullptr;
+    auto set_exception = false;
+
+    auto streamed_res = create_streamed_result_obj(couchbase::core::timeout_defaults::key_value_durable_timeout);
+
+    if (resp.ctx.ec().value()) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Subdoc operation error.");
+        if (pyObj_errback == nullptr) {
+            barrier->set_value(pyObj_exc);
+        } else {
+            pyObj_func = pyObj_errback;
+            pyObj_args = PyTuple_New(1);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
+        }
+        // lets clear any errors
+        PyErr_Clear();
+    } else {
+        for (auto const& entry : resp.entries) {
+            auto res = create_base_result_from_subdoc_op_response(key, entry);
+            if (res == nullptr) {
+                set_exception = true;
+                break;
+            }
+            res = add_extras_to_result(entry, res);
+            streamed_res->rows->put(reinterpret_cast<PyObject*>(res));
+        }
+
+        if (PyErr_Occurred() != nullptr) {
+            set_exception = true;
+        } else if (!set_exception) {
+            Py_INCREF(Py_None);
+            streamed_res->rows->put(Py_None);
+            if (pyObj_callback == nullptr) {
+                barrier->set_value(reinterpret_cast<PyObject*>(streamed_res));
+            } else {
+                pyObj_func = pyObj_callback;
+                pyObj_args = PyTuple_New(1);
+                PyTuple_SET_ITEM(pyObj_args, 0, reinterpret_cast<PyObject*>(streamed_res));
+            }
+        }
+    }
+
+    if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Subdoc operation error.");
+        streamed_res->rows->put(pyObj_exc);
+        if (pyObj_errback == nullptr) {
+            barrier->set_value(reinterpret_cast<PyObject*>(streamed_res));
+        } else {
+            pyObj_func = pyObj_errback;
+            pyObj_args = PyTuple_New(1);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
+        }
+    } else if (pyObj_func != nullptr) {
         pyObj_callback_res = PyObject_Call(pyObj_func, pyObj_args, pyObj_kwargs);
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
@@ -417,6 +720,134 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
     couchbase::core::operations::lookup_in_request req{ options->id };
     req.timeout = options->timeout_ms;
     req.access_deleted = options->access_deleted;
+    req.specs = specs;
+    if (nullptr != options->span) {
+        req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+    }
+    do_subdoc_op(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+    Py_RETURN_NONE;
+}
+
+PyObject*
+prepare_and_execute_lookup_in_any_replica_op(struct lookup_in_replica_options* options,
+                                             size_t nspecs,
+                                             PyObject* pyObj_callback,
+                                             PyObject* pyObj_errback,
+                                             std::shared_ptr<std::promise<PyObject*>> barrier)
+{
+    size_t ii;
+    auto specs = std::vector<couchbase::core::impl::subdoc::command>{};
+    for (ii = 0; ii < nspecs; ++ii) {
+
+        struct lookup_in_spec new_spec = {};
+        PyObject* pyObj_spec = nullptr;
+        if (PyTuple_Check(options->specs)) {
+            pyObj_spec = PyTuple_GetItem(options->specs, ii);
+        } else {
+            pyObj_spec = PyList_GetItem(options->specs, ii);
+        }
+
+        if (!pyObj_spec) {
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
+
+        if (!PyArg_ParseTuple(pyObj_spec, "bsp", &new_spec.op, &new_spec.path, &new_spec.xattr)) {
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
+
+        try {
+            auto opcode = to_subdoc_opcode(new_spec.op);
+            specs.emplace_back(couchbase::core::impl::subdoc::command{
+              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr) });
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
+    }
+
+    couchbase::core::operations::lookup_in_any_replica_request req{ options->id };
+    req.timeout = options->timeout_ms;
+    req.specs = specs;
+    if (nullptr != options->span) {
+        req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+    }
+    do_subdoc_op(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+    Py_RETURN_NONE;
+}
+
+PyObject*
+prepare_and_execute_lookup_in_all_replicas_op(struct lookup_in_replica_options* options,
+                                              size_t nspecs,
+                                              PyObject* pyObj_callback,
+                                              PyObject* pyObj_errback,
+                                              std::shared_ptr<std::promise<PyObject*>> barrier)
+{
+    size_t ii;
+    auto specs = std::vector<couchbase::core::impl::subdoc::command>{};
+    for (ii = 0; ii < nspecs; ++ii) {
+
+        struct lookup_in_spec new_spec = {};
+        PyObject* pyObj_spec = nullptr;
+        if (PyTuple_Check(options->specs)) {
+            pyObj_spec = PyTuple_GetItem(options->specs, ii);
+        } else {
+            pyObj_spec = PyList_GetItem(options->specs, ii);
+        }
+
+        if (!pyObj_spec) {
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
+
+        if (!PyArg_ParseTuple(pyObj_spec, "bsp", &new_spec.op, &new_spec.path, &new_spec.xattr)) {
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
+
+        try {
+            auto opcode = to_subdoc_opcode(new_spec.op);
+            specs.emplace_back(couchbase::core::impl::subdoc::command{
+              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr) });
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
+            if (barrier) {
+                barrier->set_value(nullptr);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
+        }
+    }
+
+    couchbase::core::operations::lookup_in_all_replicas_request req{ options->id };
+    req.timeout = options->timeout_ms;
     req.specs = specs;
     if (nullptr != options->span) {
         req.parent_span = std::make_shared<pycbc::request_span>(options->span);
@@ -551,6 +982,29 @@ get_lookup_in_options(PyObject* op_args)
 
     PyObject* pyObj_access_deleted = PyDict_GetItemString(op_args, "access_deleted");
     opts.access_deleted = pyObj_access_deleted != nullptr && pyObj_access_deleted == Py_True ? true : false;
+
+    return opts;
+}
+
+lookup_in_replica_options
+get_lookup_in_replica_options(PyObject* op_args)
+{
+    struct lookup_in_replica_options opts;
+
+    PyObject* pyObj_span = PyDict_GetItemString(op_args, "span");
+    if (pyObj_span != nullptr) {
+        opts.span = pyObj_span;
+    }
+
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+    PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
+    if (pyObj_timeout != nullptr) {
+        auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
+        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+        if (0 < timeout) {
+            opts.timeout_ms = timeout_ms;
+        }
+    }
 
     return opts;
 }
@@ -721,6 +1175,24 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
             opts.op_type = op_type;
             opts.specs = pyObj_spec;
             prepare_and_execute_lookup_in_op(&opts, nspecs, pyObj_callback, pyObj_errback, barrier);
+            break;
+        }
+        case Operations::LOOKUP_IN_ALL_REPLICAS: {
+            auto opts = get_lookup_in_replica_options(pyObj_op_args);
+            opts.conn = conn;
+            opts.id = couchbase::core::document_id{ bucket, scope, collection, key };
+            opts.op_type = op_type;
+            opts.specs = pyObj_spec;
+            prepare_and_execute_lookup_in_all_replicas_op(&opts, nspecs, pyObj_callback, pyObj_errback, barrier);
+            break;
+        }
+        case Operations::LOOKUP_IN_ANY_REPLICA: {
+            auto opts = get_lookup_in_replica_options(pyObj_op_args);
+            opts.conn = conn;
+            opts.id = couchbase::core::document_id{ bucket, scope, collection, key };
+            opts.op_type = op_type;
+            opts.specs = pyObj_spec;
+            prepare_and_execute_lookup_in_any_replica_op(&opts, nspecs, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case Operations::MUTATE_IN: {

@@ -61,6 +61,7 @@ class ServerFeatures(Enum):
     Txns = 'txns'
     TxnQueries = 'txn_queries'
     KeyValueRangeScan = 'kv_range_scan'
+    SubdocReplicaRead = 'subdoc_replica_read'
 
 
 class EnvironmentFeatures:
@@ -122,7 +123,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.PreserveExpiry,
                                 ServerFeatures.QueryUserDefinedFunctions]
 
-    AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KeyValueRangeScan]
+    AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KeyValueRangeScan,
+                                ServerFeatures.SubdocReplicaRead]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str
@@ -141,6 +143,7 @@ class EnvironmentFeatures:
                                    mock_server_type=None  # type: Optional[MockServerType]
                                    ) -> None:
 
+        print(f"Server version = {server_version}")
         features_list = []
         if isinstance(features, str):
             features_list.append(features)

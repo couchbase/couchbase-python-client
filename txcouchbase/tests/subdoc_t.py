@@ -21,6 +21,7 @@ import couchbase.subdocument as SD
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
+                                  DocumentUnretrievableException,
                                   DurabilityImpossibleException,
                                   InvalidArgumentException,
                                   InvalidValueException,
@@ -29,6 +30,7 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathNotFoundException)
 from couchbase.options import GetOptions, MutateInOptions
 from couchbase.result import (GetResult,
+                              LookupInReplicaResult,
                               LookupInResult,
                               MutateInResult)
 
@@ -70,6 +72,10 @@ class SubDocumentTests:
     @pytest.fixture(scope="class")
     def check_xattr_supported(self, cb_env):
         cb_env.check_if_feature_supported('xattr')
+
+    @pytest.fixture(scope="class")
+    def check_replica_read_supported(self, cb_env):
+        cb_env.check_if_feature_supported('subdoc_replica_read')
 
     @pytest.fixture(scope="class")
     def num_replicas(self, cb_env):
@@ -128,9 +134,7 @@ class SubDocumentTests:
         result = run_in_reactor_thread(cb.lookup_in, key, (SD.exists("geo"),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
-        # no value content w/ EXISTS operation
-        with pytest.raises(DocumentNotFoundException):
-            result.content_as[bool](0)
+        assert result.content_as[bool](0)
 
     def test_lookup_in_simple_exists_bad_path(self, cb_env):
         cb = cb_env.collection
@@ -138,8 +142,7 @@ class SubDocumentTests:
         result = run_in_reactor_thread(cb.lookup_in, key, (SD.exists("qzzxy"),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0) is False
-        with pytest.raises(PathNotFoundException):
-            result.content_as[bool](0)
+        assert not result.content_as[bool](0)
 
     def test_lookup_in_one_path_not_found(self, cb_env):
         cb = cb_env.collection
@@ -150,10 +153,8 @@ class SubDocumentTests:
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
         assert result.exists(1) is False
-        with pytest.raises(DocumentNotFoundException):
-            result.content_as[bool](0)
-        with pytest.raises(PathNotFoundException):
-            result.content_as[bool](1)
+        assert result.content_as[bool](0)
+        assert not result.content_as[bool](1)
 
     def test_lookup_in_simple_long_path(self, cb_env):
         cb = cb_env.collection
@@ -194,6 +195,153 @@ class SubDocumentTests:
         result = run_in_reactor_thread(cb.lookup_in, key, (SD.count("count"),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[int](0) == 5
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_get(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        result = run_in_reactor_thread(cb.lookup_in_any_replica, key, [SD.get('city')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['city']
+        assert result.is_replica is not None
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_get_full(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        result = run_in_reactor_thread(cb.lookup_in_any_replica, key, [SD.get_full()])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[dict](0) == value
+        assert result.is_replica is not None
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_get_bad_path(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        result = run_in_reactor_thread(cb.lookup_in_any_replica, key, [SD.get('qzzxy')])
+        assert isinstance(result, LookupInReplicaResult)
+        with pytest.raises(PathNotFoundException):
+            result.content_as[str](0)
+        assert result.is_replica is not None
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_exists(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        result = run_in_reactor_thread(cb.lookup_in_any_replica, key, [SD.exists('country')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.exists(0)
+        assert result.is_replica is not None
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_exists_bad_path(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        result = run_in_reactor_thread(cb.lookup_in_any_replica, key, [SD.exists('qzzxy')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert not result.exists(0)
+        assert result.is_replica is not None
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_bad_key(self, cb_env):
+        cb = cb_env.collection
+        with pytest.raises(DocumentUnretrievableException):
+            run_in_reactor_thread(cb.lookup_in_any_replica, 'asdfgh', [SD.exists('country')])
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_multiple_specs(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        result = run_in_reactor_thread(cb.lookup_in_any_replica, key, [SD.get('country'), SD.exists('geo.lat')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['country']
+        assert result.exists(1)
+        assert result.is_replica is not None
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_get(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        results = run_in_reactor_thread(cb.lookup_in_all_replicas, key, [SD.get('city')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['city']
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_get_full(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        results = run_in_reactor_thread(cb.lookup_in_all_replicas, key, [SD.get_full()])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[dict](0) == value
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_get_bad_path(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        results = run_in_reactor_thread(cb.lookup_in_all_replicas, key, [SD.get('qzzxy')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            with pytest.raises(PathNotFoundException):
+                result.content_as[str](0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_exists(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        results = run_in_reactor_thread(cb.lookup_in_all_replicas, key, [SD.exists('country')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.exists(0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_exists_bad_path(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        results = run_in_reactor_thread(cb.lookup_in_all_replicas, key, [SD.exists('qzzxy')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert not result.exists(0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_bad_key(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            run_in_reactor_thread(cb_env.collection.lookup_in_all_replicas, 'asdfgh', [SD.exists('country')])
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_multiple_specs(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        results = run_in_reactor_thread(cb.lookup_in_all_replicas, key, [SD.get('country'), SD.exists('geo.lat')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['country']
+            assert result.exists(1)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
 
     @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_mutate_in_simple(self, cb_env):

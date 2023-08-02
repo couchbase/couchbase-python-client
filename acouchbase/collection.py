@@ -36,6 +36,7 @@ from couchbase.result import (CounterResult,
                               ExistsResult,
                               GetReplicaResult,
                               GetResult,
+                              LookupInReplicaResult,
                               LookupInResult,
                               MutateInResult,
                               MutationResult,
@@ -56,6 +57,8 @@ if TYPE_CHECKING:
                                    GetOptions,
                                    IncrementOptions,
                                    InsertOptions,
+                                   LookupInAllReplicasOptions,
+                                   LookupInAnyReplicaOptions,
                                    LookupInOptions,
                                    MutateInOptions,
                                    PrependOptions,
@@ -897,6 +900,191 @@ class AsyncCollection(CollectionLogic):
 
         """
         super().lookup_in(key, spec, **kwargs)
+
+    def lookup_in_any_replica(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        *opts,  # type: LookupInAnyReplicaOptions
+        **kwargs,  # type: Any
+    ) -> Awaitable[LookupInReplicaResult]:
+        """Performs a lookup-in operation against a document, fetching individual fields or information
+        about specific fields inside the document value. It leverages both active and all available replicas
+        returning the first available
+
+        Args:
+            key (str): The key for the document look in.
+            spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
+                from the document.
+            opts (:class:`~couchbase.options.LookupInAnyReplicaOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.LookupInAnyReplicaOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.LookupInReplicaResult`]: A future that contains an instance
+            of :class:`~couchbase.result.LookupInReplicaResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentUnretrievableException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple lookup_in_any_replica operation::
+
+                import couchbase.subdocument as SD
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('hotel')
+
+                key = 'hotel_10025'
+                res = await collection.lookup_in_any_replica(key, (SD.get("geo"),))
+                print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+
+            Simple lookup_in_any_replica operation with options::
+
+                from datetime import timedelta
+
+                import couchbase.subdocument as SD
+                from couchbase.options import LookupInAnyReplicaOptions
+
+                # ... other code ...
+
+                key = 'hotel_10025'
+                res = await collection.lookup_in_any_replica(key,
+                                                             (SD.get("geo"),),
+                                                             LookupInAnyReplicaOptions(timeout=timedelta(seconds=2)))
+                print(f'Document is replica: {res.is_replica}')
+                print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+        """
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+        return self._lookup_in_any_replica_internal(key, spec, **final_args)
+
+    @AsyncWrapper.inject_callbacks_and_decode(LookupInReplicaResult)
+    def _lookup_in_any_replica_internal(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        **kwargs,  # type: Any
+    ) -> Awaitable[LookupInReplicaResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.lookup_in` instead.
+
+        """
+        super().lookup_in_any_replica(key, spec, **kwargs)
+
+    def lookup_in_all_replicas(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        *opts,  # type: LookupInAllReplicasOptions
+        **kwargs,  # type: Any
+    ) -> Awaitable[Iterable[LookupInReplicaResult]]:
+        """Performs a lookup-in operation against a document, fetching individual fields or information
+        about specific fields inside the document value, returning results from both active and all available replicas
+
+        Args:
+            key (str): The key for the document look in.
+            spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
+                from the document.
+            opts (:class:`~couchbase.options.LookupInAllReplicasOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.LookupInAllReplicasOptions`
+
+        Returns:
+            Iterable[:class:`~couchbase.result.LookupInReplicaResult`]: A stream of
+            :class:`~couchbase.result.LookupInReplicaResult` representing both active and replicas of the sub-document
+                retrieved.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple lookup_in_all_replicas operation::
+
+                import couchbase.subdocument as SD
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('hotel')
+
+                key = 'hotel_10025'
+                results = await collection.lookup_in_all_replicas(key, (SD.get("geo"),))
+                for res in results:
+                    print(f'Document is replica: {res.is_replica}')
+                    print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+
+            Simple lookup_in_all_replicas operation with options::
+
+                import couchbase.subdocument as SD
+                from datetime import timedelta
+                from couchbase.options import LookupInAllReplicasOptions
+
+                # ... other code ...
+
+                key = 'hotel_10025'
+                results = await collection.lookup_in_all_replicas(key,
+                                                                  (SD.get("geo"),),
+                                                                  LookupInAllReplicasOptions(timeout=timedelta(seconds=2)))
+
+                for res in results:
+                    print(f'Document is replica: {res.is_replica}')
+                    print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+            Stream lookup_in_all_replicas results::
+
+                from datetime import timedelta
+                from couchbase.options import GetAllReplicasOptions
+
+                # ... other code ...
+
+                key = 'hotel_10025'
+                results = await collection.lookup_in_all_replicas(key,
+                                                                  (SD.get("geo"),),
+                                                                  LookupInAllReplicasOptions(timeout=timedelta(seconds=2)))
+                while True:
+                    try:
+                        res = next(results)
+                        print(f'Document is replica: {res.is_replica}')
+                        print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+                    except StopIteration:
+                        print('Done streaming replicas.')
+                        break
+
+        """  # noqa: E501
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+        return self._lookup_in_all_replicas_internal(key, spec, **final_args)
+
+    @AsyncWrapper.inject_callbacks_and_decode(LookupInReplicaResult)
+    def _lookup_in_all_replicas_internal(
+        self,
+        key,  # type: str
+        spec,  # type: Iterable[Spec]
+        **kwargs,  # type: Any
+    ) -> Awaitable[Iterable[LookupInReplicaResult]]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.lookup_in_all_replicas` instead.
+
+        """
+        super().lookup_in_all_replicas(key, spec, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutateInResult)
     def mutate_in(
