@@ -346,7 +346,8 @@ class ClusterOptions(ClusterOptionsBase):
         compression (:class:`~.Compression`, optional): Set compression mode.  Defaults to None.
         compression_min_size (int, optional): Set compression min size.  Defaults to None.
         compression_min_ratio (float, optional): Set compression min size.  Defaults to None.
-        compression (:class:`~.LockMode`, optional): Set LockMode mode.  Defaults to None.
+        lockmode (:class:`~.LockMode`, optional): **DEPRECATED** This option will be removed in a future version of the SDK.
+            Set LockMode mode.  Defaults to None.
         tracer (:class:`~couchbase.tracing.CouchbaseTracer`, optional): Set an external tracer.  Defaults to None,
             enabling the `threshold_logging_tracer`. Note when this is set, all tracing_options
             (see :class:`~.ClusterTracingOptions`) and then `enable_tracing` option are ignored.

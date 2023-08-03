@@ -195,6 +195,12 @@ Couchbase Python SDK Options related Enumerations
 
 
 class LockMode(IntEnum):
+    """
+    **DEPRECATED** This Enum will be removed in a future version of the SDK.
+
+    Enum kept for API compatibility with the 2.x/3.x series of the SDK. LockMode
+    is not used or needed with the 4.x series of the SDK.
+    """
     WAIT = 0
     EXC = 1
     NONE = 2

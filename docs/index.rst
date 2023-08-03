@@ -51,9 +51,6 @@ Global API
 :doc:`couchbase_api/exceptions`
    API reference for Exceptions.
 
-:doc:`couchbase_api/exceptions`
-   API reference for Exceptions.
-
 :doc:`couchbase_api/management_options`
    API reference for mangement operation options.
 
@@ -65,6 +62,9 @@ Global API
 
 :doc:`couchbase_api/subdocument`
    API reference for subdocument operation Specs.
+
+:doc:`couchbase_api/parallelism`
+   API reference for using parallelism paradigms in Python.
 
 Asynchronous APIs
 -----------------
@@ -117,6 +117,7 @@ Indices and tables
    couchbase_api/options
    couchbase_api/results
    couchbase_api/subdocument
+   couchbase_api/parallelism
 
 
 .. toctree::
