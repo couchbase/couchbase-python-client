@@ -28,7 +28,11 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   PathMismatchException,
                                   PathNotFoundException)
-from couchbase.options import GetOptions, MutateInOptions
+from couchbase.options import (GetOptions,
+                               LookupInAllReplicasOptions,
+                               LookupInAnyReplicaOptions,
+                               LookupInOptions,
+                               MutateInOptions)
 from couchbase.result import (GetResult,
                               LookupInReplicaResult,
                               LookupInResult,
@@ -171,6 +175,17 @@ class SubDocumentTests:
         # reset to norm
         run_in_reactor_thread(cb.remove, key)
 
+    def test_lookup_in_simple_with_timeout(self, cb_env, default_kvp):
+        cb = cb_env.collection
+        key = default_kvp.key
+        value = default_kvp.value
+        result = run_in_reactor_thread(cb.lookup_in,
+                                       key,
+                                       (SD.get('geo'),),
+                                       LookupInOptions(timeout=timedelta(milliseconds=5000)))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[dict](0) == value['geo']
+
     @pytest.mark.usefixtures("check_xattr_supported")
     def test_lookup_in_multiple_specs(self, cb_env):
         cb = cb_env.collection
@@ -259,6 +274,16 @@ class SubDocumentTests:
         assert result.is_replica is not None
 
     @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_with_timeout(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        opts = LookupInAnyReplicaOptions(timeout=timedelta(milliseconds=5000))
+        result = run_in_reactor_thread(cb.lookup_in_any_replica, key, [SD.get('country')], opts)
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['country']
+        assert result.is_replica is not None
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
     def test_lookup_in_all_replicas_get(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_default_key_value()
@@ -339,6 +364,20 @@ class SubDocumentTests:
             assert isinstance(result, LookupInReplicaResult)
             assert result.content_as[str](0) == value['country']
             assert result.exists(1)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_with_timeout(self, cb_env):
+        cb = cb_env.collection
+        key, value = cb_env.get_default_key_value()
+        opts = LookupInAllReplicasOptions(timeout=timedelta(milliseconds=5000))
+        results = run_in_reactor_thread(cb.lookup_in_all_replicas, key, [SD.get('country')], opts)
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['country']
             assert result.is_replica is not None
             active_count += not result.is_replica
         assert active_count == 1

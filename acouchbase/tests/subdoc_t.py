@@ -27,7 +27,11 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   PathMismatchException,
                                   PathNotFoundException)
-from couchbase.options import GetOptions, MutateInOptions
+from couchbase.options import (GetOptions,
+                               LookupInAllReplicasOptions,
+                               LookupInAnyReplicaOptions,
+                               LookupInOptions,
+                               MutateInOptions)
 from couchbase.result import (GetResult,
                               LookupInReplicaResult,
                               LookupInResult,
@@ -60,6 +64,22 @@ class SubDocumentTestSuite:
         'test_increment',
         'test_increment_create_parents',
         'test_insert_create_parents',
+        'test_lookup_in_all_replicas_bad_key',
+        'test_lookup_in_all_replicas_exists',
+        'test_lookup_in_all_replicas_exists_bad_path',
+        'test_lookup_in_all_replicas_get',
+        'test_lookup_in_all_replicas_get_bad_path',
+        'test_lookup_in_all_replicas_get_full',
+        'test_lookup_in_all_replicas_multiple_specs',
+        'test_lookup_in_all_replicas_with_timeout',
+        'test_lookup_in_any_replica_bad_key',
+        'test_lookup_in_any_replica_exists',
+        'test_lookup_in_any_replica_exists_bad_path',
+        'test_lookup_in_any_replica_get',
+        'test_lookup_in_any_replica_get_bad_path',
+        'test_lookup_in_any_replica_get_full',
+        'test_lookup_in_any_replica_multiple_specs',
+        'test_lookup_in_any_replica_with_timeout',
         'test_lookup_in_multiple_specs',
         'test_lookup_in_one_path_not_found',
         'test_lookup_in_simple_exists',
@@ -68,21 +88,8 @@ class SubDocumentTestSuite:
         'test_lookup_in_simple_get_bad_path',
         'test_lookup_in_simple_get_spec_as_list',
         'test_lookup_in_simple_long_path',
+        'test_lookup_in_simple_with_timeout',
         'test_lookup_in_valid_path_null_content',
-        'test_lookup_in_any_replica_get',
-        'test_lookup_in_any_replica_get_full',
-        'test_lookup_in_any_replica_get_bad_path',
-        'test_lookup_in_any_replica_exists',
-        'test_lookup_in_any_replica_exists_bad_path',
-        'test_lookup_in_any_replica_bad_key',
-        'test_lookup_in_any_replica_multiple_specs',
-        'test_lookup_in_all_replicas_get',
-        'test_lookup_in_all_replicas_get_full',
-        'test_lookup_in_all_replicas_get_bad_path',
-        'test_lookup_in_all_replicas_exists',
-        'test_lookup_in_all_replicas_exists_bad_path',
-        'test_lookup_in_all_replicas_bad_key',
-        'test_lookup_in_all_replicas_multiple_specs',
         'test_mutate_in_expiry',
         'test_mutate_in_insert_semantics',
         'test_mutate_in_insert_semantics_fail',
@@ -348,6 +355,178 @@ class SubDocumentTestSuite:
         assert result.content_as[dict]['new']['path'] == 'parents created'
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_bad_key(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.lookup_in_all_replicas('asdfgh', [SD.exists('batch')])
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_exists(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.exists('batch')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.exists(0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_exists_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.exists('qzzxy')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert not result.exists(0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_get(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['batch']
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_get_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('qzzxy')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            with pytest.raises(PathNotFoundException):
+                result.content_as[str](0)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_get_full(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get_full()])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[dict](0) == value
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_multiple_specs(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch'), SD.exists('manufacturer.city')])
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['batch']
+            assert result.exists(1)
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_all_replicas_with_timeout(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        opts = LookupInAllReplicasOptions(timeout=timedelta(milliseconds=5000))
+        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')], opts)
+        active_count = 0
+        for result in results:
+            assert isinstance(result, LookupInReplicaResult)
+            assert result.content_as[str](0) == value['batch']
+            assert result.is_replica is not None
+            active_count += not result.is_replica
+        assert active_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_bad_key(self, cb_env):
+        with pytest.raises(DocumentUnretrievableException):
+            await cb_env.collection.lookup_in_any_replica('asdfgh', [SD.exists('batch')])
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_exists(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.exists('batch')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.exists(0)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_exists_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.exists('qzzxy')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert not result.exists(0)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_get(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('batch')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['batch']
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_get_bad_path(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('qzzxy')])
+        assert isinstance(result, LookupInReplicaResult)
+        with pytest.raises(PathNotFoundException):
+            result.content_as[str](0)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_get_full(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get_full()])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[dict](0) == value
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_multiple_specs(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('batch'), SD.exists('manufacturer.city')])
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['batch']
+        assert result.exists(1)
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    async def test_lookup_in_any_replica_with_timeout(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        opts = LookupInAnyReplicaOptions(timeout=timedelta(milliseconds=5000))
+        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('batch')], opts)
+        assert isinstance(result, LookupInReplicaResult)
+        assert result.content_as[str](0) == value['batch']
+        assert result.is_replica is not None
+
+    @pytest.mark.asyncio
     @pytest.mark.usefixtures("check_xattr_supported")
     async def test_lookup_in_multiple_specs(self, cb_env):
         key, value = cb_env.get_existing_doc_by_type('vehicle')
@@ -422,6 +601,15 @@ class SubDocumentTestSuite:
         assert result.content_as[str](0) == value['manufacturer']['geo']['location']['tz']
 
     @pytest.mark.asyncio
+    async def test_lookup_in_simple_with_timeout(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        result = await cb_env.collection.lookup_in(key,
+                                                   (SD.get('batch'),),
+                                                   LookupInOptions(timeout=timedelta(milliseconds=5000)))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[str](0) == value['batch']
+
+    @pytest.mark.asyncio
     async def test_lookup_in_valid_path_null_content(self, cb_env):
         key, value = cb_env.get_new_doc_by_type('vehicle')
         value['empty_field'] = None
@@ -431,154 +619,6 @@ class SubDocumentTestSuite:
         result = await cb_env.collection.lookup_in(key, (SD.get('empty_field'), SD.get('batch')))
         assert isinstance(result, LookupInResult)
         assert result.content_as[lambda x: x](0) is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_any_replica_get(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('batch')])
-        assert isinstance(result, LookupInReplicaResult)
-        assert result.content_as[str](0) == value['batch']
-        assert result.is_replica is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_any_replica_get_full(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get_full()])
-        assert isinstance(result, LookupInReplicaResult)
-        assert result.content_as[dict](0) == value
-        assert result.is_replica is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_any_replica_get_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('qzzxy')])
-        assert isinstance(result, LookupInReplicaResult)
-        with pytest.raises(PathNotFoundException):
-            result.content_as[str](0)
-        assert result.is_replica is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_any_replica_exists(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        result = await cb_env.collection.lookup_in_any_replica(key, [SD.exists('batch')])
-        assert isinstance(result, LookupInReplicaResult)
-        assert result.exists(0)
-        assert result.is_replica is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_any_replica_exists_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        result = await cb_env.collection.lookup_in_any_replica(key, [SD.exists('qzzxy')])
-        assert isinstance(result, LookupInReplicaResult)
-        assert not result.exists(0)
-        assert result.is_replica is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_any_replica_bad_key(self, cb_env):
-        with pytest.raises(DocumentUnretrievableException):
-            await cb_env.collection.lookup_in_any_replica('asdfgh', [SD.exists('batch')])
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_any_replica_multiple_specs(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        result = await cb_env.collection.lookup_in_any_replica(key, [SD.get('batch'), SD.exists('manufacturer.city')])
-        assert isinstance(result, LookupInReplicaResult)
-        assert result.content_as[str](0) == value['batch']
-        assert result.exists(1)
-        assert result.is_replica is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_all_replicas_get(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')])
-        active_count = 0
-        for result in results:
-            assert isinstance(result, LookupInReplicaResult)
-            assert result.content_as[str](0) == value['batch']
-            assert result.is_replica is not None
-            active_count += not result.is_replica
-        assert active_count == 1
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_all_replicas_get_full(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get_full()])
-        active_count = 0
-        for result in results:
-            assert isinstance(result, LookupInReplicaResult)
-            assert result.content_as[dict](0) == value
-            assert result.is_replica is not None
-            active_count += not result.is_replica
-        assert active_count == 1
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_all_replicas_get_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('qzzxy')])
-        active_count = 0
-        for result in results:
-            assert isinstance(result, LookupInReplicaResult)
-            with pytest.raises(PathNotFoundException):
-                result.content_as[str](0)
-            assert result.is_replica is not None
-            active_count += not result.is_replica
-        assert active_count == 1
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_all_replicas_exists(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.exists('batch')])
-        active_count = 0
-        for result in results:
-            assert isinstance(result, LookupInReplicaResult)
-            assert result.exists(0)
-            assert result.is_replica is not None
-            active_count += not result.is_replica
-        assert active_count == 1
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_all_replicas_exists_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.exists('qzzxy')])
-        active_count = 0
-        for result in results:
-            assert isinstance(result, LookupInReplicaResult)
-            assert not result.exists(0)
-            assert result.is_replica is not None
-            active_count += not result.is_replica
-        assert active_count == 1
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_all_replicas_bad_key(self, cb_env):
-        with pytest.raises(DocumentNotFoundException):
-            await cb_env.collection.lookup_in_all_replicas('asdfgh', [SD.exists('batch')])
-
-    @pytest.mark.asyncio
-    @pytest.mark.usefixtures('check_replica_read_supported')
-    async def test_lookup_in_all_replicas_multiple_specs(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        results = await cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch'), SD.exists('manufacturer.city')])
-        active_count = 0
-        for result in results:
-            assert isinstance(result, LookupInReplicaResult)
-            assert result.content_as[str](0) == value['batch']
-            assert result.exists(1)
-            assert result.is_replica is not None
-            active_count += not result.is_replica
-        assert active_count == 1
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("check_xattr_supported")

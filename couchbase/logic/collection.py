@@ -337,13 +337,12 @@ class CollectionLogic:
                   **kwargs,  # type: Any
                   ) -> Optional[LookupInResult]:
         op_type = operations.LOOKUP_IN.value
-        final_args = forward_args(kwargs)
         return subdoc_operation(
             **self._get_connection_args(),
             key=key,
             spec=spec,
             op_type=op_type,
-            op_args=final_args
+            op_args=kwargs
         )
 
     def lookup_in_all_replicas(self,
@@ -352,13 +351,12 @@ class CollectionLogic:
                                **kwargs,  # type: Any
                                ) -> Optional[Iterable[LookupInReplicaResult]]:
         op_type = operations.LOOKUP_IN_ALL_REPLICAS.value
-        final_args = forward_args(kwargs)
         return subdoc_operation(
             **self._get_connection_args(),
             key=key,
             spec=spec,
             op_type=op_type,
-            op_args=final_args
+            op_args=kwargs
         )
 
     def lookup_in_any_replica(self,
@@ -367,13 +365,12 @@ class CollectionLogic:
                               **kwargs,  # type: Any
                               ) -> Optional[LookupInReplicaResult]:
         op_type = operations.LOOKUP_IN_ANY_REPLICA.value
-        final_args = forward_args(kwargs)
         return subdoc_operation(
             **self._get_connection_args(),
             key=key,
             spec=spec,
             op_type=op_type,
-            op_args=final_args
+            op_args=kwargs
         )
 
     def mutate_in(   # noqa: C901
