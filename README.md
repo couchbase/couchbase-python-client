@@ -1,6 +1,6 @@
 # Couchbase Python Client
 Python client for [Couchbase](https://couchbase.com)
->**NOTE:** This is the documentation for the 4.x version of the client. This is mostly compatible with the older 3.x version. Please refer to the *3.2.7* tag for the older 3.x version.
+>**NOTE:** This is the documentation for the 4.x version of the client. This is mostly compatible with the older 3.x version. Please refer to the *release32* branch for the older 3.x version.
 
 
 # Contents<a id="contents"></a>

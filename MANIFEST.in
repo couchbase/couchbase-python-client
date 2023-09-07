@@ -1,65 +1,81 @@
-include *.txt LICENSE CONTRIBUTING.md CMakeLists.txt pyproject.toml couchbase_version.py
+include *.txt LICENSE CONTRIBUTING.md BUILDING.md CMakeLists.txt pyproject.toml couchbase_version.py pycbc_build_setup.py
+include couchbase-sdk-python-black-duck-manifest.yaml
 recursive-include couchbase *.py
 recursive-include acouchbase *.py
 recursive-include txcouchbase *.py
-recursive-include tests *.py
 recursive-include src *.[ch]xx
 include deps/couchbase-cxx-client/CMakeLists.txt
+include deps/couchbase-cxx-client/couchbase-sdk-cxx-black-duck-manifest.yaml
 include deps/couchbase-cxx-client/LICENSE.txt
+include deps/couchbase-cxx-client/bin/build_boringssl*
 include deps/couchbase-cxx-client/cmake/*
 graft deps/couchbase-cxx-client/core
 graft deps/couchbase-cxx-client/couchbase
-include deps/couchbase-cxx-client/third_party/asio/COPYING
-include deps/couchbase-cxx-client/third_party/asio/LICENSE*
-include deps/couchbase-cxx-client/third_party/asio/asio/include/*.hpp
-recursive-include deps/couchbase-cxx-client/third_party/asio/asio/include/asio *.[hi]pp
-include deps/couchbase-cxx-client/third_party/cxx_function/cxx_function.hpp
+include deps/couchbase-cxx-cache/cpm/*.cmake
+include deps/couchbase-cxx-cache/asio/*/asio/COPYING
+include deps/couchbase-cxx-cache/asio/*/asio/LICENSE*
+include deps/couchbase-cxx-cache/asio/*/asio/asio/include/*.hpp
+recursive-include deps/couchbase-cxx-cache/asio/*/asio/asio/include/asio *.[hi]pp
+recursive-include deps/couchbase-cxx-cache/boringssl/*/boringssl *.[hcS]
+recursive-include deps/couchbase-cxx-cache/boringssl/*/boringssl *.cc
+recursive-include deps/couchbase-cxx-cache/boringssl/*/boringssl *.asm
+recursive-include deps/couchbase-cxx-cache/boringssl/*/boringssl CMakeLists.txt
+exclude deps/couchbase-cxx-cache/boringssl/*/boringssl/crypto_test_data.cc
+include deps/couchbase-cxx-cache/boringssl/*/boringssl/LICENSE
+include deps/couchbase-cxx-cache/fmt/*/fmt/CMakeLists.txt
+include deps/couchbase-cxx-cache/fmt/*/fmt/ChangeLog.rst
+include deps/couchbase-cxx-cache/fmt/*/fmt/LICENSE.rst
+include deps/couchbase-cxx-cache/fmt/*/fmt/README.rst
+graft deps/couchbase-cxx-cache/fmt/*/fmt/include
+graft deps/couchbase-cxx-cache/fmt/*/fmt/src
+graft deps/couchbase-cxx-cache/fmt/*/fmt/support/cmake
+include deps/couchbase-cxx-cache/gsl/*/gsl/CMakeLists.txt
+include deps/couchbase-cxx-cache/gsl/*/gsl/GSL.natvis
+include deps/couchbase-cxx-cache/gsl/*/gsl/LICENSE*
+include deps/couchbase-cxx-cache/gsl/*/gsl/ThirdPartyNotices.txt
+include deps/couchbase-cxx-cache/gsl/*/gsl/cmake/*
+graft deps/couchbase-cxx-cache/gsl/*/gsl/include
+include deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/*.pc.in
+include deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/CMakeLists.txt
+include deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/COPYING.txt
+include deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/LICENSE.txt
+include deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/cmake/*
+include deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/config.cmake.in
+graft deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/include
+graft deps/couchbase-cxx-cache/hdr_histogram/*/hdr_histogram/src
+include deps/couchbase-cxx-cache/llhttp/*/llhttp/*.pc.in
+include deps/couchbase-cxx-cache/llhttp/*/llhttp/CMakeLists.txt
+include deps/couchbase-cxx-cache/llhttp/*/llhttp/LICENSE*
+include deps/couchbase-cxx-cache/llhttp/*/llhttp/include/*.h
+include deps/couchbase-cxx-cache/llhttp/*/llhttp/src/*.c
+include deps/couchbase-cxx-cache/snappy/*/snappy/CMakeLists.txt
+include deps/couchbase-cxx-cache/snappy/*/snappy/COPYING
+include deps/couchbase-cxx-cache/snappy/*/snappy/cmake/*
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-c.h
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-c.cc
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-internal.h
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-sinksource.h
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-sinksource.cc
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-stubs-internal.h
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-stubs-internal.cc
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy-stubs-public.h.in
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy.h
+include deps/couchbase-cxx-cache/snappy/*/snappy/snappy.cc
+include deps/couchbase-cxx-cache/spdlog/*/spdlog/CMakeLists.txt
+include deps/couchbase-cxx-cache/spdlog/*/spdlog/LICENSE
+include deps/couchbase-cxx-cache/spdlog/*/spdlog/cmake/*
+graft deps/couchbase-cxx-cache/spdlog/*/spdlog/include
+graft deps/couchbase-cxx-cache/spdlog/*/spdlog/src
+include deps/couchbase-cxx-cache/mozilla-ca-bundle.*
+include deps/couchbase-cxx-cache/json/*/json/CMakeLists.txt
+include deps/couchbase-cxx-cache/json/*/json/LICENSE*
+include deps/couchbase-cxx-cache/json/*/json/external/PEGTL/.cmake/*
+include deps/couchbase-cxx-cache/json/*/json/external/PEGTL/CMakeLists.txt
+include deps/couchbase-cxx-cache/json/*/json/external/PEGTL/LICENSE*
+graft deps/couchbase-cxx-cache/json/*/json/external/PEGTL/include
+graft deps/couchbase-cxx-cache/json/*/json/include
+include deps/couchbase-cxx-client/third_party/jsonsl/*
 include deps/couchbase-cxx-client/third_party/expected/COPYING
 graft deps/couchbase-cxx-client/third_party/expected/include
-include deps/couchbase-cxx-client/third_party/fmt/CMakeLists.txt
-include deps/couchbase-cxx-client/third_party/fmt/ChangeLog.rst
-include deps/couchbase-cxx-client/third_party/fmt/LICENSE.rst
-include deps/couchbase-cxx-client/third_party/fmt/README.rst
-graft deps/couchbase-cxx-client/third_party/fmt/include
-graft deps/couchbase-cxx-client/third_party/fmt/src
-graft deps/couchbase-cxx-client/third_party/fmt/support/cmake
-include deps/couchbase-cxx-client/third_party/gsl/CMakeLists.txt
-include deps/couchbase-cxx-client/third_party/gsl/LICENSE*
-include deps/couchbase-cxx-client/third_party/gsl/ThirdPartyNotices.txt
-include deps/couchbase-cxx-client/third_party/gsl/cmake/*
-graft deps/couchbase-cxx-client/third_party/gsl/include
-include deps/couchbase-cxx-client/third_party/hdr_histogram_c/CMakeLists.txt
-include deps/couchbase-cxx-client/third_party/hdr_histogram_c/COPYING.txt
-include deps/couchbase-cxx-client/third_party/hdr_histogram_c/LICENSE.txt
-include deps/couchbase-cxx-client/third_party/hdr_histogram_c/config.cmake.in
-graft deps/couchbase-cxx-client/third_party/hdr_histogram_c/src
-include deps/couchbase-cxx-client/third_party/http_parser/LICENSE*
-include deps/couchbase-cxx-client/third_party/http_parser/http_parser.[ch]
-include deps/couchbase-cxx-client/third_party/json/CMakeLists.txt
-include deps/couchbase-cxx-client/third_party/json/LICENSE*
-include deps/couchbase-cxx-client/third_party/json/external/PEGTL/.cmake/*
-include deps/couchbase-cxx-client/third_party/json/external/PEGTL/CMakeLists.txt
-include deps/couchbase-cxx-client/third_party/json/external/PEGTL/LICENSE*
-graft deps/couchbase-cxx-client/third_party/json/external/PEGTL/include
-graft deps/couchbase-cxx-client/third_party/json/include
-include deps/couchbase-cxx-client/third_party/jsonsl/*
-include deps/couchbase-cxx-client/third_party/snappy/CMakeLists.txt
-include deps/couchbase-cxx-client/third_party/snappy/COPYING
-include deps/couchbase-cxx-client/third_party/snappy/cmake/*
-include deps/couchbase-cxx-client/third_party/snappy/snappy-c.h
-include deps/couchbase-cxx-client/third_party/snappy/snappy-c.cc
-include deps/couchbase-cxx-client/third_party/snappy/snappy-internal.h
-include deps/couchbase-cxx-client/third_party/snappy/snappy-sinksource.h
-include deps/couchbase-cxx-client/third_party/snappy/snappy-sinksource.cc
-include deps/couchbase-cxx-client/third_party/snappy/snappy-stubs-internal.h
-include deps/couchbase-cxx-client/third_party/snappy/snappy-stubs-internal.cc
-include deps/couchbase-cxx-client/third_party/snappy/snappy-stubs-public.h.in
-include deps/couchbase-cxx-client/third_party/snappy/snappy.h
-include deps/couchbase-cxx-client/third_party/snappy/snappy.cc
-include deps/couchbase-cxx-client/third_party/spdlog/CMakeLists.txt
-include deps/couchbase-cxx-client/third_party/spdlog/LICENSE
-include deps/couchbase-cxx-client/third_party/spdlog/cmake/*
-graft deps/couchbase-cxx-client/third_party/spdlog/include
-graft deps/couchbase-cxx-client/third_party/spdlog/src
 global-exclude *.py[cod] *.DS_Store
 exclude .git .gitignore .gitmodules gocaves* *.jar .clang* .cmake* .pre* .flake* MANIFEST.in

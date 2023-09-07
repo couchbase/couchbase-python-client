@@ -13,6 +13,7 @@ couchbase/*.so
 couchbase/*.dylib*.*
 couchbase/*.dll
 couchbase/*.pyd
+deps/couchbase-cxx-cache/
 
 # Sphinx
 docs/_build/

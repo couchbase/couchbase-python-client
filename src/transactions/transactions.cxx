@@ -1112,7 +1112,6 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
         }
         default:
             // return error!
-            CB_LOG_DEBUG("unknown op {}", op_type);
             PyErr_SetString(PyExc_ValueError, "unknown txn operation");
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
