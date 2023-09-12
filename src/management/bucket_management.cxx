@@ -250,6 +250,32 @@ build_bucket_settings(couchbase::core::management::cluster::bucket_settings sett
     }
     Py_DECREF(pyObj_tmp);
 
+    if (settings.history_retention_collection_default.has_value()) {
+        pyObj_tmp = PyBool_FromLong(settings.history_retention_collection_default.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "historyRetentionCollectionDefault", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
+    pyObj_tmp = PyLong_FromUnsignedLong(settings.history_retention_bytes);
+    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "historyRetentionBytes", pyObj_tmp)) {
+        Py_DECREF(pyObj_bucket_settings);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(settings.history_retention_duration);
+    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "historyRetentionDuration", pyObj_tmp)) {
+        Py_DECREF(pyObj_bucket_settings);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
     return pyObj_bucket_settings;
 }
 
@@ -630,6 +656,26 @@ get_bucket_settings(PyObject* settings)
             bucket_settings.storage_backend = couchbase::core::management::cluster::bucket_storage_backend::magma;
         }
     }
+
+    PyObject* pyObj_history_retention_collection_default = PyDict_GetItemString(settings, "historyRetentionCollectionDefault");
+    if (pyObj_history_retention_collection_default != nullptr) {
+        if (pyObj_history_retention_collection_default == Py_True) {
+            bucket_settings.history_retention_collection_default = true;
+        } else {
+            bucket_settings.history_retention_collection_default = false;
+        }
+    }
+
+    PyObject* pyObj_history_retention_bytes = PyDict_GetItemString(settings, "historyRetentionBytes");
+    if (pyObj_history_retention_bytes != nullptr) {
+        bucket_settings.history_retention_bytes = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_history_retention_bytes));
+    }
+
+    PyObject* pyObj_history_retention_duration = PyDict_GetItemString(settings, "historyRetentionDuration");
+    if (pyObj_history_retention_duration != nullptr) {
+        bucket_settings.history_retention_duration = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_history_retention_duration));
+    }
+
     return bucket_settings;
 }
 

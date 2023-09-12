@@ -16,9 +16,11 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from enum import Enum
 from functools import wraps
 
+from couchbase._utils import Overload, OverloadType
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
@@ -88,7 +90,10 @@ def get_all_scopes(res, return_cls):
             scope = return_cls[0](s['name'], list())
             for c in s['collections']:
                 scope.collections.append(
-                    return_cls[1](c['name'], c['scope_name'], c['max_expiry']))
+                    return_cls[1](c['name'],
+                                  c['scope_name'],
+                                  timedelta(seconds=c['max_expiry']),
+                                  history=c.get('history')))
             scopes.append(scope)
 
     return scopes
@@ -431,15 +436,28 @@ def handle_eventing_function_mgmt_response(ret, fn_name, return_cls):
     return retval
 
 
+mgmt_overload_registry = {}
+
+
 class BlockingMgmtWrapper:
 
     @classmethod  # noqa: C901
-    def block(cls, return_cls, mgmt_type, error_map):  # noqa: C901
+    def block(cls, return_cls, mgmt_type, error_map, overload_type=None):  # noqa: C901
         def decorator(fn):
+            if overload_type is not None:
+                mgmt_overload = mgmt_overload_registry.get(fn.__qualname__)
+                if mgmt_overload is None:
+                    mgmt_overload = mgmt_overload_registry[fn.__qualname__] = Overload(fn.__qualname__)
+                if overload_type is OverloadType.DEFAULT:
+                    mgmt_overload.register_default(fn)
+                else:
+                    mgmt_overload.register(fn)
+
             @wraps(fn)
             def wrapped_fn(self, *args, **kwargs):
                 try:
-                    ret = fn(self, *args, **kwargs)
+                    func = mgmt_overload_registry.get(fn.__qualname__, fn)
+                    ret = func(self, *args, **kwargs)
                     if isinstance(ret, BaseCouchbaseException):
                         handle_mgmt_exception(ret, mgmt_type, error_map)
                     if return_cls is None:

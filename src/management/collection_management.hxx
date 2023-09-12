@@ -24,7 +24,7 @@
 class CollectionManagementOperations
 {
   public:
-    enum OperationType { UNKNOWN, CREATE_SCOPE, DROP_SCOPE, GET_ALL_SCOPES, CREATE_COLLECTION, DROP_COLLECTION };
+    enum OperationType { UNKNOWN, CREATE_SCOPE, DROP_SCOPE, GET_ALL_SCOPES, CREATE_COLLECTION, DROP_COLLECTION, UPDATE_COLLECTION };
 
     CollectionManagementOperations()
       : CollectionManagementOperations{ UNKNOWN }
@@ -56,7 +56,8 @@ class CollectionManagementOperations
                           "DROP_SCOPE "
                           "GET_ALL_SCOPES "
                           "CREATE_COLLECTION "
-                          "DROP_COLLECTION";
+                          "DROP_COLLECTION "
+                          "UPDATE_COLLECTION";
 
         return ops;
     }

@@ -407,6 +407,15 @@ class BucketSettings(dict):
                                ParamTransform("storageBackend",
                                               StrToEnum(StorageBackend)),
                                default=StorageBackend.COUCHSTORE),
+        BidirectionalTransform("history_retention_collection_default",
+                               ParamTransform("historyRetentionCollectionDefault", Identity(bool, optional=True)),
+                               ParamTransform("historyRetentionCollectionDefault", Identity(bool, optional=True))),
+        BidirectionalTransform("history_retention_bytes",
+                               ParamTransform("historyRetentionBytes", Identity(int)),
+                               ParamTransform("historyRetentionBytes", Identity(int))),
+        BidirectionalTransform("history_retention_duration",
+                               ParamTransform("historyRetentionDuration", TimeDeltaToSeconds(int)),
+                               ParamTransform("historyRetentionDuration", SecondsToTimeDelta(timedelta))),
     ])
 
     @overload
@@ -423,6 +432,9 @@ class BucketSettings(dict):
                  compression_mode=None,  # type: CompressionMode
                  minimum_durability_level=None,  # type: DurabilityLevel
                  storage_backend=None,  # type: StorageBackend
+                 history_retention_collection_default=None,  # type: Optional[bool]
+                 history_retention_bytes=None,  # type: int
+                 history_retention_duration=None  # type: timedelta
                  ):
         # type: (...) -> None
         """BucketSettings provides a means of mapping bucket settings into an object.
@@ -511,6 +523,28 @@ class BucketSettings(dict):
         """
         return self.get('storage_backend')
 
+    @property
+    def history_retention_collection_default(self) -> Optional[bool]:
+        """
+        Whether history retention on collections is enabled by default
+        """
+        return self.get('history_retention_collection_default')
+
+    @property
+    def history_retention_bytes(self) -> Optional[int]:
+        """
+        The maximum size, in bytes, of the change history that is written to disk for all collections in this bucket
+        """
+        return self.get('history_retention_bytes')
+
+    @property
+    def history_retention_duration(self) -> Optional[timedelta]:
+        """
+        The maximum duration to be covered by the change history that is written to disk for all collections in this
+        bucket
+        """
+        return self.get('history_retention_duration')
+
     def transform_to_dest(self) -> Dict[str, Any]:
         kwargs = {**self}
         # needed?
@@ -545,7 +579,10 @@ class CreateBucketSettings(BucketSettings):
                  conflict_resolution_type=None,  # type: ConflictResolutionType
                  bucket_password="",  # type: str
                  ejection_method=None,  # type: EjectionMethod
-                 storage_backend=None  # type: StorageBackend
+                 storage_backend=None,  # type: StorageBackend
+                 history_retention_collection_default=None,  # type: Optional[bool]
+                 history_retention_bytes=None,  # type: int
+                 history_retention_duration=None  # type: timedelta
                  ):
         """
         Bucket creation settings.
@@ -562,6 +599,16 @@ class CreateBucketSettings(BucketSettings):
         :param compression_mode: compression mode
         :param ejection_method: ejection method (deprecated, please use eviction_policy instead)
         :param storage_backend: **UNCOMMITTED** specifies the storage type to use for the bucket
+        :param history_retention_collection_default: **UNCOMMITTED** whether to enable history retention on collections
+            by default
+        :param history_retention_bytes: **UNCOMMITTED** the maximum size, in bytes, of the change history that is
+            written to disk for all collections in this bucket
+        :param history_retention_duration: **UNCOMMITTED** the maximum duration to be covered by the change history that
+            is written to disk for all collections in this bucket
+
+        .. note::
+           History retention settings are only supported for Magma buckets, the server will ignore retention settings
+           for other storage backends.
         """
 
     def __init__(self, **kwargs):

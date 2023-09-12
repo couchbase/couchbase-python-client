@@ -128,6 +128,9 @@ class ServerFeatures(Enum):
     TxnQueries = 'txn_queries'
     KvRangeScan = 'kv_range_scan'
     SubdocReplicaRead = 'subdoc_replica_read'
+    UpdateCollection = 'update_collection'
+    UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
+    NonDedupedHistory = 'non_deduped_history'
 
 
 # mock and real server (all versions) should have these features
@@ -187,8 +190,12 @@ AT_LEAST_V7_1_0_FEATURES = [ServerFeatures.RateLimiting,
                             ServerFeatures.EventingFunctionManagement,
                             ServerFeatures.PreserveExpiry]
 
+AT_LEAST_V7_2_0_FEATURES = [ServerFeatures.NonDedupedHistory,
+                            ServerFeatures.UpdateCollection]
+
 AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan,
-                            ServerFeatures.SubdocReplicaRead]
+                            ServerFeatures.SubdocReplicaRead,
+                            ServerFeatures.UpdateCollectionMaxExpiry]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {
@@ -460,6 +467,11 @@ class CouchbaseTestEnvironment():
                 return self.server_version_short >= 7.1
             return not self.is_mock_server
 
+        if feature in map(lambda f: f.value, AT_LEAST_V7_2_0_FEATURES):
+            if self.is_real_server:
+                return self.server_version_short >= 7.2
+            return not self.is_mock_server
+
         if feature in map(lambda f: f.value, AT_LEAST_V7_5_0_FEATURES):
             if self.is_real_server:
                 return self.server_version_short >= 7.5
@@ -518,6 +530,12 @@ class CouchbaseTestEnvironment():
         if feature in map(lambda f: f.value, AT_LEAST_V7_1_0_FEATURES):
             if self.is_real_server:
                 return (f'Feature: {feature} only supported on server versions >= 7.1. '
+                        f'Using server version: {self.server_version}.')
+            return f'Mock server does not support feature: {feature}'
+
+        if feature in map(lambda f: f.value, AT_LEAST_V7_2_0_FEATURES):
+            if self.is_real_server:
+                return (f'Feature: {feature} only supported on server versions >= 7.2. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 

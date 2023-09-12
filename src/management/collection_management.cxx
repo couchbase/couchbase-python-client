@@ -84,6 +84,19 @@ create_result_from_collection_mgmt_response<couchbase::core::operations::managem
             }
             Py_DECREF(pyObj_tmp);
 
+            if (collection.history.has_value()) {
+                pyObj_tmp = PyBool_FromLong(collection.history.value());
+                if (-1 == PyDict_SetItemString(pyObj_collection_spec, "history", pyObj_tmp)) {
+                    Py_XDECREF(pyObj_scopes);
+                    Py_XDECREF(pyObj_collections);
+                    Py_DECREF(pyObj_scope_spec);
+                    Py_DECREF(pyObj_collection_spec);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
+                Py_DECREF(pyObj_tmp);
+            }
+
             PyList_Append(pyObj_collections, pyObj_collection_spec);
             Py_DECREF(pyObj_collection_spec);
         }
@@ -242,6 +255,7 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
             auto collection_name = std::string(PyUnicode_AsUTF8(pyObj_collection_name));
             // optional
             PyObject* pyObj_max_expiry = PyDict_GetItemString(options->op_args, "max_expiry");
+            PyObject* pyObj_history = PyDict_GetItemString(options->op_args, "history");
 
             couchbase::core::operations::management::collection_create_request req{};
             req.bucket_name = bucket_name;
@@ -250,12 +264,49 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
             if (pyObj_max_expiry != nullptr) {
                 req.max_expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_max_expiry));
             }
+            if (pyObj_history != nullptr) {
+                if (pyObj_history == Py_True) {
+                    req.history = true;
+                } else {
+                    req.history = false;
+                }
+            }
             req.timeout = options->timeout_ms;
 
             res = do_collection_mgmt_op<couchbase::core::operations::management::collection_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
+        case CollectionManagementOperations::UPDATE_COLLECTION: {
+            PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
+            auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+            PyObject* pyObj_collection_name = PyDict_GetItemString(options->op_args, "collection_name");
+            auto collection_name = std::string(PyUnicode_AsUTF8(pyObj_collection_name));
+            // optional
+            PyObject* pyObj_max_expiry = PyDict_GetItemString(options->op_args, "max_expiry");
+            PyObject* pyObj_history = PyDict_GetItemString(options->op_args, "history");
+
+            couchbase::core::operations::management::collection_update_request req{};
+            req.bucket_name = bucket_name;
+            req.scope_name = scope_name;
+            req.collection_name = collection_name;
+            if (pyObj_max_expiry != nullptr) {
+                req.max_expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_max_expiry));
+            }
+            if (pyObj_history != nullptr) {
+                if (pyObj_history == Py_True) {
+                    req.history = true;
+                } else {
+                    req.history = false;
+                }
+            }
+            req.timeout = options->timeout_ms;
+
+            res = do_collection_mgmt_op<couchbase::core::operations::management::collection_update_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
+            break;
+        }
+
         case CollectionManagementOperations::DROP_COLLECTION: {
             PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
             auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));

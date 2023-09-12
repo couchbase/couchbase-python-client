@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -22,7 +22,8 @@ from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   BucketNotFlushableException,
-                                  FeatureUnavailableException)
+                                  FeatureUnavailableException,
+                                  InvalidArgumentException)
 from couchbase.management.buckets import (BucketSettings,
                                           BucketType,
                                           ConflictResolutionType,
@@ -45,6 +46,10 @@ class BucketManagementTestSuite:
         'test_bucket_create_replica_index_false',
         'test_bucket_create_replica_index_true',
         'test_bucket_custom_conflict_resolution',
+        'test_bucket_create_history_retention',
+        'test_bucket_create_history_retention_unsupported',
+        'test_bucket_update_history_retention',
+        'test_bucket_update_history_retention_unsupported',
         'test_bucket_drop_fail',
         'test_bucket_flush',
         'test_bucket_flush_fail',
@@ -74,6 +79,12 @@ class BucketManagementTestSuite:
     @pytest.fixture(scope='class')
     def check_custom_conflict_resolution_supported(self, cb_env):
         EnvironmentFeatures.check_if_feature_supported('custom_conflict_resolution',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type)
+
+    @pytest.fixture(scope="class")
+    def check_non_deduped_history_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('non_deduped_history',
                                                        cb_env.server_version_short,
                                                        cb_env.mock_server_type)
 
@@ -208,6 +219,108 @@ class BucketManagementTestSuite:
                         ram_quota_mb=100,
                         conflict_resolution_type=ConflictResolutionType.CUSTOM,
                         flush_enabled=False))
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    def test_bucket_create_history_retention(self, cb_env):
+        bucket_name = cb_env.get_bucket_name()
+        cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=bucket_name,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.MAGMA,
+                ram_quota_mb=1024,
+                history_retention_collection_default=True,
+                history_retention_bytes=2**31,
+                history_retention_duration=timedelta(days=1)
+            )
+        )
+        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        assert bucket.history_retention_collection_default
+        assert bucket.history_retention_bytes == 2**31
+        assert bucket.history_retention_duration == timedelta(days=1)
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    def test_bucket_create_history_retention_unsupported(self, cb_env):
+        bucket_name = cb_env.get_bucket_name()
+
+        # History retention not supported for CouchStore
+        with pytest.raises(InvalidArgumentException):
+            cb_env.bm.create_bucket(
+                CreateBucketSettings(
+                    name=bucket_name,
+                    bucket_type=BucketType.COUCHBASE,
+                    storage_backend=StorageBackend.COUCHSTORE,
+                    ram_quota_mb=1024,
+                    history_retention_collection_default=True,
+                    history_retention_bytes=2**31,
+                    history_retention_duration=timedelta(days=1)
+                )
+            )
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    def test_bucket_update_history_retention(self, cb_env):
+        bucket_name = cb_env.get_bucket_name()
+
+        cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=bucket_name,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.MAGMA,
+                ram_quota_mb=1024,
+            )
+        )
+        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        assert bucket is not None
+        assert bucket.history_retention_collection_default
+        assert bucket.history_retention_bytes == 0
+        assert bucket.history_retention_duration == timedelta(0)
+
+        cb_env.bm.update_bucket(
+            BucketSettings(
+                name=bucket_name,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.MAGMA,
+                ram_quota_mb=1024,
+                history_retention_collection_default=True,
+                history_retention_bytes=2**31,
+                history_retention_duration=timedelta(minutes=10)
+            )
+        )
+        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        assert bucket.history_retention_collection_default
+        assert bucket.history_retention_bytes == 2**31
+        assert bucket.history_retention_duration == timedelta(minutes=10)
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    def test_bucket_update_history_retention_unsupported(self, cb_env):
+        bucket_name = cb_env.get_bucket_name()
+
+        cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=bucket_name,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.COUCHSTORE,
+                ram_quota_mb=256,
+            )
+        )
+        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        assert bucket is not None
+        assert bucket.history_retention_collection_default is None
+        assert bucket.history_retention_bytes == 0
+        assert bucket.history_retention_duration == timedelta(0)
+
+        with pytest.raises(InvalidArgumentException):
+            cb_env.bm.update_bucket(
+                BucketSettings(
+                    name=bucket_name,
+                    bucket_type=BucketType.COUCHBASE,
+                    storage_backend=StorageBackend.COUCHSTORE,
+                    ram_quota_mb=256,
+                    history_retention_collection_default=True,
+                    history_retention_bytes=2**31,
+                    history_retention_duration=timedelta(minutes=10)
+                )
+            )
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     def test_bucket_drop_fail(self, cb_env):

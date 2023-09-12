@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import warnings
+from inspect import Signature
 from typing import Optional
 
 
@@ -84,6 +85,24 @@ class Supportability:
         """
         message = (f"Method parameter {param} is deprecated and will be removed in a future release. "
                    f"Use {use_instead} instead.")
+        warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
+
+    @staticmethod
+    def method_signature_deprecated(method_name,  # type: str
+                                    signature,  # type: Signature
+                                    use_instead,  # type: Signature
+                                    ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the method overload with the provided signature is
+        deprecated.
+
+        Args
+            method_name (str): The name of the method
+            signature (Signature): The signature of the deprecated overload
+            use_instead (Signature): The signature of the overload that should be used instead.
+
+        """
+        message = (f"Method {method_name} with signature {signature} is deprecated and will be removed in "
+                   f"a future release. Use {method_name} with signature {use_instead} instead.")
         warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
 
     @staticmethod

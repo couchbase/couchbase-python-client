@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -24,7 +24,8 @@ from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   BucketNotFlushableException,
-                                  FeatureUnavailableException)
+                                  FeatureUnavailableException,
+                                  InvalidArgumentException)
 from couchbase.management.buckets import (BucketSettings,
                                           BucketType,
                                           ConflictResolutionType,
@@ -72,6 +73,10 @@ class BucketManagementTests:
     @pytest.fixture(scope="class")
     def check_custom_conflict_resolution_supported(self, cb_env):
         cb_env.check_if_feature_supported('custom_conflict_resolution')
+
+    @pytest.fixture(scope="class")
+    def check_non_deduped_history_supported(self, cb_env):
+        cb_env.check_if_feature_supported('non_deduped_history')
 
     @pytest.fixture()
     def test_bucket(self, test_buckets):
@@ -270,7 +275,7 @@ class BucketManagementTests:
         await cb_env.bm.create_bucket(
             CreateBucketSettings(
                 name=test_bucket,
-                ram_quota_mb=256,
+                ram_quota_mb=1024,
                 flush_enabled=False,
                 storage_backend=StorageBackend.MAGMA))
         bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
@@ -312,3 +317,105 @@ class BucketManagementTests:
                         ram_quota_mb=100,
                         conflict_resolution_type=ConflictResolutionType.CUSTOM,
                         flush_enabled=False))
+
+    @pytest.mark.usefixtures("check_non_deduped_history_supported")
+    @pytest.mark.usefixtures("purge_buckets")
+    @pytest.mark.asyncio
+    async def test_bucket_create_history_retention(self, cb_env, test_bucket):
+        await cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=test_bucket,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.MAGMA,
+                ram_quota_mb=1024,
+                history_retention_collection_default=True,
+                history_retention_bytes=2**31,
+                history_retention_duration=timedelta(days=1)
+            )
+        )
+        bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
+        assert bucket.history_retention_collection_default
+        assert bucket.history_retention_bytes == 2**31
+        assert bucket.history_retention_duration == timedelta(days=1)
+
+    @pytest.mark.usefixtures("check_non_deduped_history_supported")
+    @pytest.mark.usefixtures("purge_buckets")
+    @pytest.mark.asyncio
+    async def test_bucket_create_history_retention_unsupported(self, cb_env, test_bucket):
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.bm.create_bucket(
+                CreateBucketSettings(
+                    name=test_bucket,
+                    bucket_type=BucketType.COUCHBASE,
+                    storage_backend=StorageBackend.COUCHSTORE,
+                    ram_quota_mb=1024,
+                    history_retention_collection_default=True,
+                    history_retention_bytes=2**31,
+                    history_retention_duration=timedelta(days=1)
+                )
+            )
+
+    @pytest.mark.usefixtures("check_non_deduped_history_supported")
+    @pytest.mark.usefixtures("purge_buckets")
+    @pytest.mark.asyncio
+    async def test_bucket_update_history_retention(self, cb_env, test_bucket):
+        await cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=test_bucket,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.MAGMA,
+                ram_quota_mb=1024,
+            )
+        )
+        bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
+        assert bucket is not None
+        assert bucket.history_retention_collection_default
+        assert bucket.history_retention_bytes == 0
+        assert bucket.history_retention_duration == timedelta(0)
+
+        await cb_env.bm.update_bucket(
+            BucketSettings(
+                name=test_bucket,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.MAGMA,
+                ram_quota_mb=1024,
+                history_retention_collection_default=True,
+                history_retention_bytes=2**31,
+                history_retention_duration=timedelta(minutes=10)
+            )
+        )
+        bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
+        assert bucket.history_retention_collection_default
+        assert bucket.history_retention_bytes == 2**31
+        assert bucket.history_retention_duration == timedelta(minutes=10)
+
+    @pytest.mark.usefixtures("check_non_deduped_history_supported")
+    @pytest.mark.usefixtures("purge_buckets")
+    @pytest.mark.asyncio
+    async def test_bucket_update_history_retention_unsupported(self, cb_env, test_bucket):
+        await cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=test_bucket,
+                bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.COUCHSTORE,
+                ram_quota_mb=1024,
+            )
+        )
+        bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
+        assert bucket is not None
+        assert bucket.history_retention_collection_default is None
+        assert bucket.history_retention_bytes == 0
+        assert bucket.history_retention_duration == timedelta(0)
+
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.bm.update_bucket(
+                BucketSettings(
+                    name=test_bucket,
+                    bucket_type=BucketType.COUCHBASE,
+                    storage_backend=StorageBackend.MAGMA,
+                    ram_quota_mb=1024,
+                    history_retention_collection_default=True,
+                    history_retention_bytes=2**31,
+                    history_retention_duration=timedelta(minutes=10)
+                )
+            )

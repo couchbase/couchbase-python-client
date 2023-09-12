@@ -40,7 +40,8 @@ if TYPE_CHECKING:
                                               CreateScopeOptions,
                                               DropCollectionOptions,
                                               DropScopeOptions,
-                                              GetAllScopesOptions)
+                                              GetAllScopesOptions,
+                                              UpdateCollectionOptions)
 
 
 class CollectionManagerLogic:
@@ -151,18 +152,23 @@ class CollectionManagerLogic:
         return management_operation(**mgmt_kwargs)
 
     def create_collection(self,
-                          collection,     # type: CollectionSpec
-                          *options,       # type: CreateCollectionOptions
-                          **kwargs        # type: Dict[str, Any]
+                          scope_name: str,
+                          collection_name: str,
+                          settings: Optional[CreateCollectionSettings] = None,
+                          *options: CreateCollectionOptions,
+                          **kwargs: Dict[str, Any]
                           ) -> None:
         op_args = {
             "bucket_name": self._bucket_name,
-            "scope_name": collection.scope_name,
-            "collection_name": collection.name
+            "scope_name": scope_name,
+            "collection_name": collection_name,
         }
 
-        if collection.max_ttl is not None:
-            op_args["max_expiry"] = int(collection.max_ttl.total_seconds())
+        if settings is not None:
+            if settings.max_expiry is not None:
+                op_args["max_expiry"] = int(settings.max_expiry.total_seconds())
+            if settings.history is not None:
+                op_args["history"] = settings.history
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -186,14 +192,15 @@ class CollectionManagerLogic:
         return management_operation(**mgmt_kwargs)
 
     def drop_collection(self,
-                        collection,     # type: CollectionSpec
-                        *options,       # type: DropCollectionOptions
-                        **kwargs        # type: Dict[str, Any]
+                        scope_name: str,
+                        collection_name: str,
+                        *options: DropCollectionOptions,
+                        **kwargs: Dict[str, Any]
                         ) -> None:
         op_args = {
             "bucket_name": self._bucket_name,
-            "scope_name": collection.scope_name,
-            "collection_name": collection.name
+            "scope_name": scope_name,
+            "collection_name": collection_name,
         }
 
         mgmt_kwargs = {
@@ -217,6 +224,93 @@ class CollectionManagerLogic:
 
         return management_operation(**mgmt_kwargs)
 
+    def update_collection(self,
+                          scope_name: str,
+                          collection_name: str,
+                          settings: UpdateCollectionSettings,
+                          *options: UpdateCollectionOptions,
+                          **kwargs: Dict[str, Any]
+                          ) -> None:
+        op_args = {
+            "bucket_name": self._bucket_name,
+            "scope_name": scope_name,
+            "collection_name": collection_name,
+        }
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.COLLECTION.value,
+            "op_type": collection_mgmt_operations.UPDATE_COLLECTION.value,
+            "op_args": op_args
+        }
+
+        if settings.max_expiry is not None:
+            op_args["max_expiry"] = int(settings.max_expiry.total_seconds())
+        if settings.history is not None:
+            op_args["history"] = settings.history
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        final_args = forward_args(kwargs, *options)
+        if final_args.get("timeout", None) is not None:
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+
+class CreateCollectionSettings:
+    def __init__(self,
+                 max_expiry=None,  # type: Optional[timedelta]
+                 history=None,     # type: Optional[bool]
+                 ):
+        self._max_expiry = max_expiry
+        self._history = history
+
+    @property
+    def max_expiry(self) -> Optional[timedelta]:
+        """
+            Optional[timedelta]: The expiry for documents in the collection.
+        """
+        return self._max_expiry
+
+    @property
+    def history(self) -> Optional[bool]:
+        """
+            Optional[bool]: Whether history retention override should be enabled in the collection. If not set, it will
+            default to the bucket-level setting
+        """
+        return self._history
+
+
+class UpdateCollectionSettings:
+    def __init__(self,
+                 max_expiry=None,  # type: Optional[timedelta]
+                 history=None,     # type: Optional[bool]
+                 ):
+        self._max_expiry = max_expiry
+        self._history = history
+
+    @property
+    def max_expiry(self) -> Optional[timedelta]:
+        """
+            Optional[timedelta]: The expiry for documents in the collection.
+        """
+        return self._max_expiry
+
+    @property
+    def history(self) -> Optional[bool]:
+        """
+            Optional[bool]: Whether history retention override should be enabled in the collection. If not set, it will
+            default to the bucket-level setting
+        """
+        return self._history
+
 
 class CollectionSpec(object):
     def __init__(self,
@@ -224,6 +318,7 @@ class CollectionSpec(object):
                  scope_name='_default',     # type: Optional[str]
                  max_expiry=None,           # type: Optional[timedelta]
                  max_ttl=None,              # type: Optional[timedelta]
+                 history=None               # type: Optional[bool]
                  ):
         self._name, self._scope_name = collection_name, scope_name
         # in the event users utilize kwargs, set max_expiry if not set and max_ttl is set
@@ -232,6 +327,7 @@ class CollectionSpec(object):
             if max_expiry is None:
                 max_expiry = max_ttl
         self._max_expiry = max_expiry
+        self._history = history
 
     @property
     def max_expiry(self) -> Optional[timedelta]:
@@ -248,6 +344,10 @@ class CollectionSpec(object):
         """
         Supportability.class_property_deprecated('max_ttl', 'max_expiry')
         return self._max_expiry
+
+    @property
+    def history(self) -> Optional[bool]:
+        return self._history
 
     @property
     def name(self) -> str:

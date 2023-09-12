@@ -170,7 +170,7 @@ class BucketDescribeOptions(dict):
 
 
 class GetAllScopesOptions(dict):
-    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s get all
+    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s get all
     scopes operation.
 
     .. note::
@@ -193,7 +193,7 @@ class GetAllScopesOptions(dict):
 
 
 class CreateCollectionOptions(dict):
-    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s create collection
+    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s create collection
     operation.
 
     .. note::
@@ -216,7 +216,7 @@ class CreateCollectionOptions(dict):
 
 
 class DropCollectionOptions(dict):
-    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s drop collection
+    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s drop collection
     operation.
 
     .. note::
@@ -239,7 +239,7 @@ class DropCollectionOptions(dict):
 
 
 class CreateScopeOptions(dict):
-    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s create scope
+    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s create scope
     operation.
 
     .. note::
@@ -262,7 +262,7 @@ class CreateScopeOptions(dict):
 
 
 class DropScopeOptions(dict):
-    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s drop scope
+    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s drop scope
     operation.
 
     .. note::
@@ -282,6 +282,30 @@ class DropScopeOptions(dict):
             kwargs["timeout"] = timeout
 
         super().__init__(**kwargs)
+
+
+class UpdateCollectionOptions(dict):
+    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s update collection
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
+    def __init__(
+        self,
+        timeout=None  # type: timedelta
+    ):
+        kwargs = {}
+        if timeout:
+            kwargs["timeout"] = timeout
+
+        super().__init__(**kwargs)
+
 
 # User Management API
 

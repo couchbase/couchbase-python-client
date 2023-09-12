@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2023. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -15,11 +15,15 @@
 
 from datetime import timedelta
 from enum import Enum
+from inspect import (Parameter,
+                     Signature,
+                     signature)
 from time import time
 from typing import (Any,
                     Callable,
                     Dict,
                     List,
+                    Optional,
                     Tuple,
                     Type,
                     TypeVar,
@@ -123,12 +127,17 @@ def validate_str(value  # type: str
 
 
 class Identity:
-    def __init__(self, type_  # type: Callable
+    def __init__(self,
+                 type_,  # type: Callable
+                 optional=False  # type: Optional[bool]
                  ):
         self._type = type_
+        self._optional = optional
 
     def __call__(self, x  # type: Any
                  ) -> Any:
+        if self._optional and x is None:
+            return x
         if not isinstance(x, self._type):
             exc = InvalidArgumentException.pycbc_create_exception(
                 exception(),
@@ -139,7 +148,7 @@ class Identity:
 
 
 class EnumToStr:
-    def __init__(self, type_,  # type: Enum
+    def __init__(self, type_,  # type: Type[Enum]
                  conversion_fn=None  # type: Callable
                  ):
         self._type = type_
@@ -164,7 +173,7 @@ class EnumToStr:
 
 
 class StrToEnum:
-    def __init__(self, type_,  # type: Enum
+    def __init__(self, type_,  # type: Type[Enum]
                  conversion_fn=None  # type: Callable
                  ):
         self._type = type_
@@ -182,7 +191,7 @@ NumberType = TypeVar('NumberType', bound=Union[float, int])
 
 
 class SecondsToTimeDelta:
-    def __init__(self, type_  # type: timedelta
+    def __init__(self, type_  # type: Type[timedelta]
                  ):
         self._type = type_
 
@@ -197,7 +206,7 @@ class SecondsToTimeDelta:
 
 
 class TimeDeltaToSeconds:
-    def __init__(self, type_  # type: Union[float,int]
+    def __init__(self, type_  # type: Union[Type[int], Type[float]]
                  ):
         self._type = type_
 
@@ -341,3 +350,43 @@ class BidirectionalMapping:
 
     def transform_from_dest(self, data):
         return self.convert_from_dest(self._mapping, data)
+
+
+class OverloadType(Enum):
+    DEFAULT = 0
+    SECONDARY = 1
+
+
+class Overload:
+    def __init__(self, name):
+        self._name = name
+        self._sig_map = {}
+        self._default_fn = None
+
+    def register(self, fn):
+        sig = signature(fn)
+        if sig in self._sig_map:
+            raise TypeError(f'Already registered {self._name} with signature {sig}')
+        self._sig_map[sig] = fn
+
+    def register_default(self, fn):
+        if self._default_fn is not None:
+            raise TypeError(f'Default function already registered for {self._name}')
+        self._default_fn = fn
+
+    def __call__(self, *args, **kwargs):
+        for sig, fn in self._sig_map.items():
+            params = sig.parameters
+            try:
+                bound_args = sig.bind(*args, **kwargs)
+            except TypeError:
+                continue
+            if all(params[arg_name].annotation is Signature.empty or isinstance(arg, params[arg_name].annotation)
+                   for arg_name, arg in bound_args.arguments.items()
+                   if params[arg_name].kind not in [Parameter.VAR_POSITIONAL, Parameter.VAR_KEYWORD]):
+                return fn(*args, **kwargs)
+
+        # None of the functions in the signature map can be called, call the default one if it exists
+        if self._default_fn is None:
+            raise TypeError(f'Unable to find appropriate registered overload for {self._name}')
+        return self._default_fn(*args, **kwargs)

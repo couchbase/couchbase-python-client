@@ -62,6 +62,9 @@ class ServerFeatures(Enum):
     TxnQueries = 'txn_queries'
     KeyValueRangeScan = 'kv_range_scan'
     SubdocReplicaRead = 'subdoc_replica_read'
+    UpdateCollection = 'update_collection'
+    UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
+    NonDedupedHistory = 'non_deduped_history'
 
 
 class EnvironmentFeatures:
@@ -88,7 +91,9 @@ class EnvironmentFeatures:
                             ServerFeatures.TxnQueries,
                             ServerFeatures.UserGroupManagement,
                             ServerFeatures.UserManagement,
-                            ServerFeatures.ViewIndexManagement]
+                            ServerFeatures.ViewIndexManagement,
+                            ServerFeatures.NonDedupedHistory,
+                            ServerFeatures.UpdateCollection]
 
     FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -123,8 +128,12 @@ class EnvironmentFeatures:
                                 ServerFeatures.PreserveExpiry,
                                 ServerFeatures.QueryUserDefinedFunctions]
 
+    AT_LEAST_V7_2_0_FEATURES = [ServerFeatures.NonDedupedHistory,
+                                ServerFeatures.UpdateCollection]
+
     AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KeyValueRangeScan,
-                                ServerFeatures.SubdocReplicaRead]
+                                ServerFeatures.SubdocReplicaRead,
+                                ServerFeatures.UpdateCollectionMaxExpiry]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str

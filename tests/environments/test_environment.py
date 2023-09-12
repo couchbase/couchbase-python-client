@@ -43,7 +43,9 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException,
                                   UnAmbiguousTimeoutException)
-from couchbase.management.buckets import BucketType, CreateBucketSettings
+from couchbase.management.buckets import (BucketType,
+                                          CreateBucketSettings,
+                                          StorageBackend)
 from couchbase.management.collections import CollectionSpec
 from couchbase.options import ClusterOptions, TransactionConfig
 from tests.data_provider import DataProvider
@@ -87,7 +89,7 @@ class TestEnvironment:
 
     @property
     def bm(self) -> Optional[Any]:
-        """Returns the default bucket's BucketManager"""
+        """Returns the cluster's BucketManager"""
         return self._bm if hasattr(self, '_bm') else None
 
     @property
@@ -204,13 +206,19 @@ class TestEnvironment:
         """Returns the default ViewIndexManager"""
         return self._vixm if hasattr(self, '_vixm') else None
 
-    def create_bucket(self, bucket_name):
+    def create_bucket(self, bucket_name, storage_backend=None):
         try:
-            self.bm.create_bucket(
-                CreateBucketSettings(
-                    name=bucket_name,
-                    bucket_type=BucketType.COUCHBASE,
-                    ram_quota_mb=100))
+            settings_kwargs = {
+                'name': bucket_name,
+                'bucket_type': BucketType.COUCHBASE,
+                'ram_quota_mb': 100,
+            }
+            if storage_backend is not None:
+                settings_kwargs['storage_backend'] = storage_backend
+                if storage_backend is StorageBackend.MAGMA:
+                    settings_kwargs['ram_quota_mb'] = 1024
+
+            self.bm.create_bucket(CreateBucketSettings(**settings_kwargs))
         except BucketAlreadyExistsException:
             pass
         TestEnvironment.try_n_times(10, 1, self.bm.get_bucket, bucket_name)
@@ -415,12 +423,14 @@ class TestEnvironment:
             bucket_names.append(self._test_bucket.name)
 
         bucket = bucket_name or self._test_bucket.name
-        if bucket not in bucket_names:
+        if bucket not in bucket_names + [bucket_name]:
             raise CouchbaseTestEnvironmentException(
                 f"{bucket} is an invalid bucket name.")
 
         scopes = []
-        if bucket == self.bucket.name:
+        if bucket_name is not None:
+            scopes = self.cluster.bucket(bucket_name).collections().get_all_scopes()
+        elif bucket == self.bucket.name:
             scopes = self.cm.get_all_scopes()
         else:
             scopes = self.test_bucket_cm.get_all_scopes()
