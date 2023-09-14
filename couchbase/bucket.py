@@ -190,13 +190,19 @@ class Bucket(BucketLogic):
                     print(f'Found row: {row}')
 
         """
-
+        # If the view_query was provided a timeout we will use that value for the streaming timeout
+        # when the streaming object is created in the bindings.  If the view_query does not specify a
+        # timeout, the streaming_timeout defaults to cluster's view_timeout (set here). If the cluster
+        # also does not specify a view_timeout we set the streaming_timeout to
+        # couchbase::core::timeout_defaults::view_timeout when the streaming object is created in the bindings.
+        streaming_timeout = self._cluster._cluster_opts.get('timeout_options', dict()).get('view_timeout', None)
         query = ViewQuery.create_view_query_object(
             self.name, design_doc, view_name, *view_options, **kwargs
         )
         return ViewResult(ViewRequest.generate_view_request(self.connection,
                                                             query.as_encodable(),
-                                                            default_serializer=self.default_serializer))
+                                                            default_serializer=self.default_serializer,
+                                                            streaming_timeout=streaming_timeout))
 
     def collections(self) -> CollectionManager:
         """

@@ -318,8 +318,6 @@ build_query_request(PyObject* pyObj_query_args)
     if (nullptr != pyObj_timeout) {
         // comes in as microseconds
         req.timeout = std::chrono::milliseconds(PyLong_AsUnsignedLongLong(pyObj_timeout) / 1000ULL);
-    } else {
-        req.timeout = couchbase::core::timeout_defaults::query_timeout;
     }
 
     PyObject* pyObj_profile_mode = PyDict_GetItemString(pyObj_query_args, "profile_mode");

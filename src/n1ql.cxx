@@ -329,13 +329,14 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     // need these for all operations
     PyObject* pyObj_conn = nullptr;
     PyObject* pyObj_query_args = nullptr;
+    std::uint64_t streaming_timeout_us = 0;
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
     PyObject* pyObj_row_callback = nullptr;
 
-    static const char* kw_list[] = { "conn", "query_args", "callback", "errback", "row_callback", nullptr };
+    static const char* kw_list[] = { "conn", "query_args", "streaming_timeout", "callback", "errback", "row_callback", nullptr };
 
-    const char* kw_format = "O!|OOOO";
+    const char* kw_format = "O!|OKOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -343,6 +344,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
                                           &PyCapsule_Type,
                                           &pyObj_conn,
                                           &pyObj_query_args,
+                                          &streaming_timeout_us,
                                           &pyObj_callback,
                                           &pyObj_errback,
                                           &pyObj_row_callback);
@@ -371,7 +373,11 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     Py_XINCREF(pyObj_callback);
 
     // timeout is always set either to default, or timeout provided in options
-    streamed_result* streamed_res = create_streamed_result_obj(req.timeout.value());
+    auto streaming_timeout = couchbase::core::timeout_defaults::query_timeout;
+    if (streaming_timeout_us > 0) {
+        streaming_timeout = std::chrono::milliseconds(streaming_timeout_us / 1000ULL);
+    }
+    streamed_result* streamed_res = create_streamed_result_obj(streaming_timeout);
 
     // TODO:  let the couchbase++ streaming stabilize a bit more...
     // req.row_callback = [rows = streamed_res->rows](std::string&& row) {

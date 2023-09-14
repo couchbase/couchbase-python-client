@@ -22,7 +22,9 @@ from couchbase.analytics import (AnalyticsMetaData,
                                  AnalyticsMetrics,
                                  AnalyticsStatus,
                                  AnalyticsWarning)
-from couchbase.exceptions import DatasetNotFoundException, DataverseNotFoundException
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  DatasetNotFoundException,
+                                  DataverseNotFoundException)
 from couchbase.options import AnalyticsOptions, UnsignedInt64
 from tests.environments import CollectionType
 from tests.environments.analytics_environment import AnalyticsTestEnvironment
@@ -191,6 +193,7 @@ class AnalyticsTestSuite:
         'test_query_positional_params_no_option',
         'test_query_positional_params_override',
         'test_query_raw_options',
+        'test_query_timeout',
         'test_simple_query',
     ]
 
@@ -304,6 +307,33 @@ class AnalyticsTestSuite:
         result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
                                                 AnalyticsOptions(raw={'args': ['vehicle']}))
         cb_env.assert_rows(result, 1)
+
+    # creating a new connection, allow retries
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_query_timeout(self, cb_env):
+        from couchbase.auth import PasswordAuthenticator
+        from couchbase.cluster import Cluster
+        from couchbase.options import ClusterOptions, ClusterTimeoutOptions
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        # Prior to PYCBC-1521, this test would fail as each request would override the cluster level analytics_timeout.
+        # If a timeout was not provided in the request, the default 75s timeout would be used.  PYCBC-1521 corrects
+        # this behavior so this test will pass as we are essentially forcing an AmbiguousTimeoutException because
+        # we are setting the cluster level analytics_timeout such a small value.
+        timeout_opts = ClusterTimeoutOptions(analytics_timeout=timedelta(milliseconds=1))
+        cluster = Cluster.connect(f'{conn_string}', ClusterOptions(auth, timeout_options=timeout_opts))
+        # don't need to do this except for older server versions
+        _ = cluster.bucket(f'{cb_env.bucket.name}')
+        q_str = f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 1;'
+        with pytest.raises(AmbiguousTimeoutException):
+            res = cluster.analytics_query(q_str)
+            [r for r in res.rows()]
+
+        # if we override the timeout w/in the request the query should succeed.
+        res = cluster.analytics_query(q_str, timeout=timedelta(seconds=10))
+        rows = [r for r in res.rows()]
+        assert len(rows) > 0
 
     def test_simple_query(self, cb_env):
         result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 1')

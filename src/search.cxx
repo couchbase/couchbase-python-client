@@ -789,15 +789,11 @@ get_search_request(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::search_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
-    if (pyObj_timeout != nullptr) {
-        auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
-        if (0 < timeout) {
-            timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
-        }
+    if (nullptr != pyObj_timeout) {
+        // comes in as microseconds
+        req.timeout = std::chrono::milliseconds(PyLong_AsUnsignedLongLong(pyObj_timeout) / 1000ULL);
     }
-    req.timeout = timeout_ms;
 
     return req;
 }
@@ -809,15 +805,15 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     PyObject* pyObj_conn = nullptr;
     // optional
     PyObject* pyObj_op_args = nullptr;
-    PyObject* pyObj_serializer = nullptr;
+    std::uint64_t streaming_timeout_us = 0;
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
     PyObject* pyObj_row_callback = nullptr;
     PyObject* pyObj_span = nullptr;
 
-    static const char* kw_list[] = { "conn", "op_args", "serializer", "callback", "errback", "row_callback", "span", nullptr };
+    static const char* kw_list[] = { "conn", "op_args", "streaming_timeout", "callback", "errback", "row_callback", "span", nullptr };
 
-    const char* kw_format = "O!|OOOOOO";
+    const char* kw_format = "O!|OKOOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -825,7 +821,7 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
                                           &PyCapsule_Type,
                                           &pyObj_conn,
                                           &pyObj_op_args,
-                                          &pyObj_serializer,
+                                          &streaming_timeout_us,
                                           &pyObj_callback,
                                           &pyObj_errback,
                                           &pyObj_row_callback,
@@ -855,7 +851,11 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     }
 
     // timeout is always set either to default, or timeout provided in options
-    streamed_result* streamed_res = create_streamed_result_obj(req.timeout.value());
+    auto streaming_timeout = couchbase::core::timeout_defaults::search_timeout;
+    if (streaming_timeout_us > 0) {
+        streaming_timeout = std::chrono::milliseconds(streaming_timeout_us / 1000ULL);
+    }
+    streamed_result* streamed_res = create_streamed_result_obj(streaming_timeout);
 
     // TODO:  let the couchbase++ streaming stabilize a bit more...
     // req.row_callback = [rows = streamed_res->rows](std::string&& row) {

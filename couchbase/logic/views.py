@@ -482,6 +482,7 @@ class ViewRequestLogic:
         self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None
         self._started_streaming = False
+        self._streaming_timeout = kwargs.pop('streaming_timeout', None)
         self._done_streaming = False
         self._metadata = None
 
@@ -531,6 +532,11 @@ class ViewRequestLogic:
         }
         if span:
             view_kwargs['span'] = span
+
+        streaming_timeout = self.encoded_query.get('timeout', self._streaming_timeout)
+        if streaming_timeout:
+            view_kwargs['streaming_timeout'] = streaming_timeout
+
         # this is for txcouchbase...
         callback = kwargs.pop('callback', None)
         if callback:

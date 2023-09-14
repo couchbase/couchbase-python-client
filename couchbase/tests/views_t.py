@@ -14,10 +14,11 @@
 #  limitations under the License.
 
 import threading
+from datetime import timedelta
 
 import pytest
 
-from couchbase.exceptions import DesignDocumentNotFoundException
+from couchbase.exceptions import AmbiguousTimeoutException, DesignDocumentNotFoundException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
 from couchbase.views import ViewMetaData, ViewOrdering
@@ -38,6 +39,7 @@ class ViewsTestSuite:
         'test_view_query_keys',
         'test_view_query_startkey',
         'test_view_query_startkey_docid',
+        'test_view_query_timeout',
     ]
 
     def test_bad_view_query(self, cb_env):
@@ -229,6 +231,39 @@ class ViewsTestSuite:
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
         assert metadata.total_rows() >= expected_count
+
+    # creating a new connection, allow retries
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_view_query_timeout(self, cb_env):
+        from couchbase.auth import PasswordAuthenticator
+        from couchbase.cluster import Cluster
+        from couchbase.options import ClusterOptions, ClusterTimeoutOptions
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        # Prior to PYCBC-1521, this test would fail as each request would override the cluster level views_timeout.
+        # If a timeout was not provided in the request, the default 75s timeout would be used.  PYCBC-1521 corrects
+        # this behavior so this test will pass as we are essentially forcing an AmbiguousTimeoutException because
+        # we are setting the cluster level views_timeout such a small value.
+        timeout_opts = ClusterTimeoutOptions(views_timeout=timedelta(milliseconds=1))
+        cluster = Cluster.connect(f'{conn_string}', ClusterOptions(auth, timeout_options=timeout_opts))
+        # don't need to do this except for older server versions
+        bucket = cluster.bucket(f'{cb_env.bucket.name}')
+        with pytest.raises(AmbiguousTimeoutException):
+            res = bucket.view_query(cb_env.DOCNAME,
+                                    cb_env.TEST_VIEW_NAME,
+                                    limit=10,
+                                    namespace=DesignDocumentNamespace.DEVELOPMENT)
+            [r for r in res.rows()]
+
+        # if we override the timeout w/in the request the query should succeed.
+        res = bucket.view_query(cb_env.DOCNAME,
+                                cb_env.TEST_VIEW_NAME,
+                                limit=10,
+                                namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                timeout=timedelta(seconds=10))
+        rows = [r for r in res.rows()]
+        assert len(rows) > 0
 
 
 class ClassicViewsTests(ViewsTestSuite):

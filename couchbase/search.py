@@ -87,6 +87,7 @@ class SearchRequest(SearchRequestLogic):
 
     def _get_metadata(self):
         try:
+            # @TODO:  PYCBC-1524
             search_response = next(self._streaming_result)
             self._set_metadata(search_response)
         except CouchbaseException as ex:
@@ -109,7 +110,12 @@ class SearchRequest(SearchRequestLogic):
         if self.done_streaming is True:
             return
 
-        row = next(self._streaming_result)
+        try:
+            row = next(self._streaming_result)
+        except StopIteration:
+            # @TODO:  PYCBC-1524
+            row = next(self._streaming_result)
+
         if isinstance(row, CouchbaseBaseException):
             raise ErrorMapper.build_exception(row)
         # should only be None one query request is complete and _no_ errors found

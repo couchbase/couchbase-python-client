@@ -355,7 +355,8 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     char* scope_qualifier = nullptr;
     char* client_context_id = nullptr;
 
-    uint64_t timeout = 0;
+    std::uint64_t timeout = 0;
+    std::uint64_t streaming_timeout_us = 0;
     // booleans, but use int to read from kwargs
     int metrics = 0;
     int readonly = 0;
@@ -378,6 +379,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
                                      "client_context_id",
                                      "scan_consistency",
                                      "timeout",
+                                     "streaming_timeout",
                                      "metrics",
                                      "readonly",
                                      "priority",
@@ -391,7 +393,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
                                      "span",
                                      nullptr };
 
-    const char* kw_format = "O!s|sssssLiiiOOOOOOOO";
+    const char* kw_format = "O!s|sssssKKiiiOOOOOOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -405,6 +407,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
                                           &client_context_id,
                                           &scan_consistency,
                                           &timeout,
+                                          &streaming_timeout_us,
                                           &metrics,
                                           &readonly,
                                           &priority,
@@ -422,7 +425,6 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::analytics_timeout;
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
@@ -430,10 +432,6 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
         return nullptr;
     }
     PyErr_Clear();
-
-    if (0 < timeout) {
-        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
-    }
 
     couchbase::core::operations::analytics_request req{ statement };
     // positional parameters
@@ -485,7 +483,10 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
         req.named_parameters = named_parameters;
     }
 
-    req.timeout = timeout_ms;
+    if (0 < timeout) {
+        req.timeout = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+    }
+
     // req.metrics = metrics == 1;
     req.readonly = readonly == 1;
     req.priority = priority == 1;
@@ -530,7 +531,11 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     Py_XINCREF(pyObj_callback);
 
     // timeout is always set either to default, or timeout provided in options
-    streamed_result* streamed_res = create_streamed_result_obj(req.timeout.value());
+    auto streaming_timeout = couchbase::core::timeout_defaults::analytics_timeout;
+    if (streaming_timeout_us > 0) {
+        streaming_timeout = std::chrono::milliseconds(streaming_timeout_us / 1000ULL);
+    }
+    streamed_result* streamed_res = create_streamed_result_obj(streaming_timeout);
 
     // TODO:  let the couchbase++ streaming stabilize a bit more...
     // req.row_callback = [rows = streamed_res->rows](std::string&& row) {
