@@ -52,14 +52,12 @@ class CollectionManager(CollectionManagerLogic):
 
         Args:
             scope_name (str): The name of the scope.
-            options (:class:`~couchbase.management.options.CreateScopeOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
+            options (:class:`~couchbase.management.options.CreateScopeOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.ScopeAlreadyExistsException`: If the scope already exists.
-        """
+        """  # noqa: E501
         return super().create_scope(scope_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
@@ -72,14 +70,12 @@ class CollectionManager(CollectionManagerLogic):
 
         Args:
             scope_name (str): The name of the scope.
-            options (:class:`~couchbase.management.options.DropScopeOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
+            options (:class:`~couchbase.management.options.DropScopeOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
-        """
+        """  # noqa: E501
         return super().drop_scope(scope_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block((ScopeSpec, CollectionSpec), ManagementType.CollectionMgmt,
@@ -92,14 +88,12 @@ class CollectionManager(CollectionManagerLogic):
 
         Args:
             scope_name (str): The name of the scope.
-            options (:class:`~couchbase.management.options.GetAllScopesOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
+            options (:class:`~couchbase.management.options.GetAllScopesOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Iterable[:class:`.ScopeSpec`]: A list of all configured scopes.
-        """
+        """  # noqa: E501
         return super().get_all_scopes(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(None,
@@ -111,19 +105,21 @@ class CollectionManager(CollectionManagerLogic):
                           *options: CreateCollectionOptions,
                           **kwargs: Dict[str, Any]
                           ) -> None:
-        """**DEPRECATED** Creates a new collection in a specified scope.
+        """
+        .. deprecated:: 4.1.9
+            Use ``create_collection(scope_name, collection_name, settings=None, *options, **kwargs)`` instead.
+
+        Creates a new collection in a specified scope.
 
         Args:
             collection (:class:`.CollectionSpec`): The collection details.
-            options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
+            options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
-        """
+        """  # noqa: E501
         Supportability.method_signature_deprecated(
             'create_collection',
             Signature(
@@ -169,10 +165,8 @@ class CollectionManager(CollectionManagerLogic):
             scope_name (str): The name of the scope the collection will be created in.
             collection_name (str): The name of the collection to be created
             settings (:class:`~couchbase.management.options.CreateCollectionSettings`, optional): Settings to apply for the collection
-            options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
+            options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
@@ -183,48 +177,26 @@ class CollectionManager(CollectionManagerLogic):
     @BlockingMgmtWrapper.block(None,
                                ManagementType.CollectionMgmt,
                                CollectionManagerLogic._ERROR_MAPPING,
-                               OverloadType.DEFAULT)
-    def drop_collection(self,
-                        scope_name: str,
-                        collection_name: str,
-                        *options: DropCollectionOptions,
-                        **kwargs: Dict[str, Any]) -> None:
-        """Drops a collection from a scope.
-
-        Args:
-            scope_name (str): The name of the scope the collection is in.
-            collection_name (str): The name of the collection to be dropped
-            options (:class:`~couchbase.management.options.DropCollectionOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
-
-        Raises:
-            :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
-        """
-        return super().drop_collection(scope_name, collection_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None,
-                               ManagementType.CollectionMgmt,
-                               CollectionManagerLogic._ERROR_MAPPING,
                                OverloadType.SECONDARY)
-    def drop_collection(self,  # noqa: F811
+    def drop_collection(self,
                         collection: CollectionSpec,
                         *options: DropCollectionOptions,
                         **kwargs: Dict[str, Any]
                         ) -> None:
-        """**DEPRECATED** Drops a collection from a scope.
+        """
+        .. deprecated:: 4.1.9
+            Use ``drop_collection(scope_name, collection_name, *options, **kwargs)`` instead.
+
+        Drops a collection from the specified scope.
 
         Args:
             collection (:class:`.CollectionSpec`): The collection details.
-            options (:class:`~couchbase.management.options.DropCollectionOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
+            options (:class:`~couchbase.management.options.DropCollectionOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
-        """
+        """  # noqa: E501
         Supportability.method_signature_deprecated(
             'drop_collection',
             Signature(
@@ -247,6 +219,28 @@ class CollectionManager(CollectionManagerLogic):
         )
         return super().drop_collection(collection.scope_name, collection.name, *options, **kwargs)
 
+    @BlockingMgmtWrapper.block(None,
+                               ManagementType.CollectionMgmt,
+                               CollectionManagerLogic._ERROR_MAPPING,
+                               OverloadType.DEFAULT)
+    def drop_collection(self,  # noqa: F811
+                        scope_name: str,
+                        collection_name: str,
+                        *options: DropCollectionOptions,
+                        **kwargs: Dict[str, Any]) -> None:
+        """Drops a collection from the specified scope.
+
+        Args:
+            scope_name (str): The name of the scope the collection is in.
+            collection_name (str): The name of the collection to be dropped
+            options (:class:`~couchbase.management.options.DropCollectionOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
+        """  # noqa: E501
+        return super().drop_collection(scope_name, collection_name, *options, **kwargs)
+
     @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def update_collection(self,
                           scope_name: str,
@@ -261,10 +255,8 @@ class CollectionManager(CollectionManagerLogic):
             scope_name (str): The name of the scope the collection is in.
             collection_name (str): The name of the collection that will be updated
             settings (:class:`~couchbase.management.options.UpdateCollectionSettings`, optional): Settings to apply for the collection
-            options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this
-                operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
+            options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.

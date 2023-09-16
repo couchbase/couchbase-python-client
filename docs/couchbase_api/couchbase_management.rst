@@ -28,8 +28,42 @@ Collection Management
 
 .. autoclass:: CollectionManager
 
+    .. py:method:: create_collection(collection: CollectionSpec, *options: CreateCollectionOptions, **kwargs: Dict[str, Any]) -> None
+        :noindex:
+
+        .. deprecated:: 4.1.9
+            Use ``create_collection(scope_name, collection_name, settings=None, *options, **kwargs)`` instead.
+
+        Creates a new collection in a specified scope.
+
+        :param collection: The collection details.
+        :type collection: :class:`.CollectionSpec`
+        :param \*options: Optional parameters for this operation.
+        :type \*options: :class:`~couchbase.management.options.CreateCollectionOptions`
+        :param \*\*kwargs: keyword arguments that can be used as optional parameters for this operation.
+        :type \*\*kwargs: Dict[str, Any]
+        :raises `~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
+        :raises `~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
+
     .. automethod:: create_collection
     .. automethod:: create_scope
+
+    .. py:method:: drop_collection(collection: CollectionSpec, *options: DropCollectionOptions, **kwargs: Dict[str, Any]) -> None
+        :noindex:
+
+        .. deprecated:: 4.1.9
+            Use ``drop_collection(scope_name, collection_name, *options, **kwargs)`` instead.
+
+        Drops a collection from a specified scope.
+
+        :param collection: The collection details.
+        :type collection: :class:`.CollectionSpec`
+        :param \*options: Optional parameters for this operation.
+        :type \*options: :class:`~couchbase.management.options.DropCollectionOptions`
+        :param \*\*kwargs: keyword arguments that can be used as optional parameters for this operation.
+        :type \*\*kwargs: Dict[str, Any]
+        :raises `~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
+
     .. automethod:: drop_collection
     .. automethod:: drop_scope
     .. automethod:: get_all_scopes
