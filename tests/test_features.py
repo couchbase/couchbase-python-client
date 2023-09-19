@@ -285,6 +285,16 @@ class EnvironmentFeatures:
 
             return None
 
+        if feature in map(lambda f: f.value, EnvironmentFeatures.AT_LEAST_V7_2_0_FEATURES):
+            if is_mock_server:
+                return f'Mock server does not support feature: {feature}'
+
+            if server_version < 7.2:
+                return (f'Feature: {feature} only supported on server versions >= 7.2. '
+                        f'Using server version: {server_version}.')
+
+            return None
+
         if feature in map(lambda f: f.value, EnvironmentFeatures.AT_LEAST_V7_5_0_FEATURES):
             if is_mock_server:
                 return f'Mock server does not support feature: {feature}'
