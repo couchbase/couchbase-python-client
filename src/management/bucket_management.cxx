@@ -71,21 +71,24 @@ build_bucket_settings(couchbase::core::management::cluster::bucket_settings sett
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromUnsignedLong(settings.max_expiry);
-    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "maxTTL", pyObj_tmp)) {
-        Py_DECREF(pyObj_bucket_settings);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
+    if (settings.max_expiry.has_value()) {
+        // TODO:  this is deprecated in the Python client, should remove at some point in the future
+        pyObj_tmp = PyLong_FromUnsignedLong(settings.max_expiry.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "maxTTL", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromUnsignedLong(settings.max_expiry);
-    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "maxExpiry", pyObj_tmp)) {
-        Py_DECREF(pyObj_bucket_settings);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+        pyObj_tmp = PyLong_FromUnsignedLong(settings.max_expiry.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "maxExpiry", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
 
     switch (settings.compression_mode) {
         case couchbase::core::management::cluster::bucket_compression::off: {
@@ -147,29 +150,35 @@ build_bucket_settings(couchbase::core::management::cluster::bucket_settings sett
         Py_DECREF(pyObj_tmp);
     }
 
-    pyObj_tmp = PyLong_FromUnsignedLong(settings.num_replicas);
-    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "numReplicas", pyObj_tmp)) {
-        Py_DECREF(pyObj_bucket_settings);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+    if (settings.num_replicas.has_value()) {
+        pyObj_tmp = PyLong_FromUnsignedLong(settings.num_replicas.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "numReplicas", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyBool_FromLong(settings.replica_indexes);
-    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "replicaIndex", pyObj_tmp)) {
-        Py_DECREF(pyObj_bucket_settings);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+    if (settings.replica_indexes.has_value()) {
+        pyObj_tmp = PyBool_FromLong(settings.replica_indexes.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "replicaIndex", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyBool_FromLong(settings.flush_enabled);
-    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "flushEnabled", pyObj_tmp)) {
-        Py_DECREF(pyObj_bucket_settings);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+    if (settings.flush_enabled.has_value()) {
+        pyObj_tmp = PyBool_FromLong(settings.flush_enabled.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "flushEnabled", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
 
     switch (settings.eviction_policy) {
         case couchbase::core::management::cluster::bucket_eviction_policy::full: {
@@ -260,21 +269,25 @@ build_bucket_settings(couchbase::core::management::cluster::bucket_settings sett
         Py_DECREF(pyObj_tmp);
     }
 
-    pyObj_tmp = PyLong_FromUnsignedLong(settings.history_retention_bytes);
-    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "historyRetentionBytes", pyObj_tmp)) {
-        Py_DECREF(pyObj_bucket_settings);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+    if (settings.history_retention_bytes.has_value()) {
+        pyObj_tmp = PyLong_FromUnsignedLong(settings.history_retention_bytes.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "historyRetentionBytes", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromUnsignedLong(settings.history_retention_duration);
-    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "historyRetentionDuration", pyObj_tmp)) {
-        Py_DECREF(pyObj_bucket_settings);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+    if (settings.history_retention_duration.has_value()) {
+        pyObj_tmp = PyLong_FromUnsignedLong(settings.history_retention_duration.value());
+        if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "historyRetentionDuration", pyObj_tmp)) {
+            Py_DECREF(pyObj_bucket_settings);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
 
     return pyObj_bucket_settings;
 }
