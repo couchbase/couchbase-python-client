@@ -113,7 +113,10 @@ class ViewsTestEnvironment(TestEnvironment):
             TestEnvironment.try_n_times(5, 3, self.load_data, num_docs=num_docs)
 
             for _ in range(5):
-                row_count_good = self._check_row_count(5)
+                try:
+                    row_count_good = self._check_row_count(num_docs)
+                except DesignDocumentNotFoundException:
+                    row_count_good = False
                 if row_count_good:
                     break
                 print('Waiting for view to load, sleeping a bit...')
@@ -135,7 +138,6 @@ class ViewsTestEnvironment(TestEnvironment):
     def _check_row_count(self,
                          min_count  # type: int
                          ) -> bool:
-
         view_result = self.bucket.view_query(self.DOCNAME,
                                              self.TEST_VIEW_NAME,
                                              limit=min_count,

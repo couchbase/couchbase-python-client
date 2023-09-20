@@ -658,8 +658,8 @@ class TestEnvironment:
         for _ in range(num_times):
             try:
                 return func(*args, **kwargs)
-            except Exception:
-                print(f'trying {func} failed, sleeping for {seconds_between} seconds...')
+            except Exception as e:
+                print(f'trying {func} failed with {type(e).__name__}, sleeping for {seconds_between} seconds...')
                 time.sleep(seconds_between)
 
     @staticmethod
