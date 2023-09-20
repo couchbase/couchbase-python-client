@@ -323,6 +323,14 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
 
         if not kwargs:
             kwargs = {}
+
+        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
+            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
+                                           'query index manager')
+        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
+            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
+                                           'collection-level query index manager')
+
         kwargs['scope_name'] = self._scope_name
         kwargs['collection_name'] = self._collection_name
         return super().create_index(self._bucket_name, index_name, fields, *options, **kwargs)
@@ -346,6 +354,14 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
 
         if not kwargs:
             kwargs = {}
+
+        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
+            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
+                                           'query index manager')
+        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
+            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
+                                           'collection-level query index manager')
+
         kwargs['scope_name'] = self._scope_name
         kwargs['collection_name'] = self._collection_name
         return super().create_primary_index(self._bucket_name, *options, **kwargs)
@@ -374,6 +390,14 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
 
         if not kwargs:
             kwargs = {}
+
+        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
+            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
+                                           'query index manager')
+        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
+            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
+                                           'collection-level query index manager')
+
         kwargs['scope_name'] = self._scope_name
         kwargs['collection_name'] = self._collection_name
         return super().drop_index(self._bucket_name, index_name, *options, **kwargs)
@@ -396,6 +420,14 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
         """
         if not kwargs:
             kwargs = {}
+
+        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
+            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
+                                           'query index manager')
+        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
+            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
+                                           'collection-level query index manager')
+
         kwargs['scope_name'] = self._scope_name
         kwargs['collection_name'] = self._collection_name
         return super().drop_primary_index(self._bucket_name, *options, **kwargs)
@@ -420,6 +452,14 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
 
         if not kwargs:
             kwargs = {}
+
+        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
+            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
+                                           'query index manager')
+        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
+            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
+                                           'collection-level query index manager')
+
         kwargs['scope_name'] = self._scope_name
         kwargs['collection_name'] = self._collection_name
         return super().get_all_indexes(self._bucket_name, *options, **kwargs)
@@ -441,6 +481,14 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
 
         if not kwargs:
             kwargs = {}
+
+        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
+            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
+                                           'query index manager')
+        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
+            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
+                                           'collection-level query index manager')
+
         kwargs['scope_name'] = self._scope_name
         kwargs['collection_name'] = self._collection_name
         return super().build_deferred_indexes(self._bucket_name, *options, **kwargs)
@@ -471,6 +519,13 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
         final_args = forward_args(kwargs, *options)
         if final_args.get('watch_primary', False):
             index_names.append('#primary')
+
+        if final_args.get('scope_name'):
+            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
+                                           'query index manager')
+        if final_args.get('collection_name'):
+            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
+                                           'collection-level query index manager')
 
         timeout = final_args.get('timeout', None)
         if not timeout:
