@@ -98,7 +98,7 @@ create_result_from_mgmt_response<couchbase::core::operations::management::cluste
         PyObject* pyObj_node_svcs = PyList_New(static_cast<Py_ssize_t>(0));
         for (auto const& svc : node.services) {
             PyObject* pyObj_node_svc = nullptr;
-            pyObj_node_svc = PyUnicode_FromString(node.version.c_str());
+            pyObj_node_svc = PyUnicode_FromString(svc.c_str());
             if (pyObj_node_svc) {
                 PyList_Append(pyObj_node_svcs, pyObj_node_svc);
                 Py_DECREF(pyObj_node_svc);
