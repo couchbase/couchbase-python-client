@@ -117,12 +117,12 @@ class QueryIndexManagementTestEnvironment(TestEnvironment):
     def _drop_index(self, index, scope_name, collection_name):
         if self._from_collection:
             if index.is_primary:
-                opts = DropPrimaryQueryIndexOptions(collection_name=collection_name)
+                opts = DropPrimaryQueryIndexOptions()
                 if index.name != '#primary':
                     opts['index_name'] = index.name
                 self.qixm.drop_primary_index(opts)
             else:
-                self.qixm.drop_index(index.name, DropQueryIndexOptions(collection_name=collection_name))
+                self.qixm.drop_index(index.name)
         else:
             if index.is_primary:
                 opts = DropPrimaryQueryIndexOptions(scope_name=scope_name, collection_name=collection_name)
@@ -139,8 +139,7 @@ class QueryIndexManagementTestEnvironment(TestEnvironment):
                          collection_name=None,  # type: Optional[str]
                          ) -> List[QueryIndex]:
         if self._from_collection:
-            return self.qixm.get_all_indexes(GetAllQueryIndexOptions(scope_name=scope_name,
-                                                                     collection_name=collection_name))
+            return self.qixm.get_all_indexes()
         else:
             return self.qixm.get_all_indexes(self.bucket.name,
                                              GetAllQueryIndexOptions(scope_name=scope_name,
