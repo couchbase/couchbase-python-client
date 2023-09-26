@@ -101,6 +101,7 @@ class SubDocumentTestSuite:
         'test_mutate_in_replace_semantics',
         'test_mutate_in_replace_semantics_fail',
         'test_mutate_in_replace_semantics_kwargs',
+        'test_mutate_in_replace_full_document',
         'test_mutate_in_simple',
         'test_mutate_in_simple_spec_as_list',
         'test_mutate_in_store_semantics_fail',
@@ -765,6 +766,16 @@ class SubDocumentTestSuite:
 
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict]['new_path'] == 'im new'
+
+    def test_mutate_in_replace_full_document(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+
+        cb_env.collection.mutate_in(key,
+                                    (SD.replace('', {'make': 'New Make', 'model': 'New Model'}),))
+
+        res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
+        assert res.content_as[dict]['make'] == 'New Make'
+        assert res.content_as[dict]['model'] == 'New Model'
 
     def test_mutate_in_simple(self, cb_env):
         key, value = cb_env.get_existing_doc_by_type('vehicle')

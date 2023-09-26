@@ -361,6 +361,8 @@ def replace(path,                     # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
+    if not path:
+        return Spec(SubDocOp.SET_DOC, '', False, xattr, False, value)
     return Spec(SubDocOp.REPLACE, path, False, xattr, False, value)
 
 

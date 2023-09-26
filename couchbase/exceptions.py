@@ -1880,6 +1880,7 @@ class ExceptionMap(Enum):
     DurabilitySyncWriteInProgressException = 110
     PathNotFoundException = 113
     PathMismatchException = 114
+    PathInvalidException = 115
     InvalidValueException = 119
     PathExistsException = 123
     MutationTokenOutdatedException = 133
