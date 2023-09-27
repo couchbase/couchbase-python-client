@@ -36,14 +36,14 @@ Installing the SDK
 
 
 .. note::
-    The 4.0.2 release provides wheels for Windows, MacOS and Linux platforms (via manylinux) for Python 3.7 - 3.10.
+    The Couchbase Python SDK provides wheels for Windows, MacOS and Linux platforms (via manylinux) for Python 3.8 - 3.11.
 
 Prereqs
 ++++++++++
 
 If not on platform that has a binary wheel availble, the following is needed:
 
-* Python version 3.7 - 3.10
+* Python version 3.8 - 3.11 (see `Python Version Compatibility <https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#python-version-compat>`_ for details)
 * A C++ compiler supporting C++ 17
 * CMake (version >= 3.18)
 * Git (if not on a platform that offers wheels)
@@ -53,6 +53,11 @@ If not on platform that has a binary wheel availble, the following is needed:
 .. warning::
     Some older linux platforms to not provide defaults (Python version, OpenSSL, C++ 17 support, etc.) that meet the Python SDK's minimum requirements.  Be sure to update to the minimum requirements prior to installing the SDK.
     See the `dockerfiles folder <https://github.com/couchbase/couchbase-python-client/tree/master/examples/dockerfiles>`_ in the Python SDK examples folder for references to working setups for various linux platforms.
+
+.. note::
+    Starting with Python 3.11.5, macOS installers and Windows builders from python.org now use `OpenSSL 3.0 <https://docs.python.org/3/whatsnew/3.11.html#notable-changes-in-3-11-5>`_.
+    A potential side-effect of this change is an ``ImportError: DLL load failed while importing pycbc_core`` error when using the Python SDK. As a work-around,
+    set the ``PYCBC_OPENSSL_DIR`` environment variable to the path where the OpenSSL 1.1 libraries can be found (``libssl-1_1.dll`` and ``libcrypto-1_1.dll`` for Windows; ``libssl.1.1.dylib`` and ``libcrypto.1.1.dylib`` for macOS).
 
 After the above have been installed, pip install ``setuptools`` and ``wheel`` (see command below).
 
