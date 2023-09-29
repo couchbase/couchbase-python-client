@@ -221,6 +221,7 @@ class BucketManagementTestSuite:
                         flush_enabled=False))
 
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('drop_bucket')
     def test_bucket_create_history_retention(self, cb_env):
         bucket_name = cb_env.get_bucket_name()
         cb_env.bm.create_bucket(
@@ -240,6 +241,7 @@ class BucketManagementTestSuite:
         assert bucket.history_retention_duration == timedelta(days=1)
 
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('drop_bucket')
     def test_bucket_create_history_retention_unsupported(self, cb_env):
         bucket_name = cb_env.get_bucket_name()
 
@@ -258,6 +260,7 @@ class BucketManagementTestSuite:
             )
 
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('drop_bucket')
     def test_bucket_update_history_retention(self, cb_env):
         bucket_name = cb_env.get_bucket_name()
 
@@ -292,6 +295,7 @@ class BucketManagementTestSuite:
         assert bucket.history_retention_duration == timedelta(minutes=10)
 
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('drop_bucket')
     def test_bucket_update_history_retention_unsupported(self, cb_env):
         bucket_name = cb_env.get_bucket_name()
 
@@ -306,8 +310,8 @@ class BucketManagementTestSuite:
         bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
         assert bucket is not None
         assert bucket.history_retention_collection_default is None
-        assert bucket.history_retention_bytes == 0
-        assert bucket.history_retention_duration == timedelta(0)
+        assert bucket.history_retention_bytes is None
+        assert bucket.history_retention_duration is None
 
         with pytest.raises(InvalidArgumentException):
             cb_env.bm.update_bucket(

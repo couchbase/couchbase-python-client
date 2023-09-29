@@ -404,8 +404,8 @@ class BucketManagementTests:
         bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
         assert bucket is not None
         assert bucket.history_retention_collection_default is None
-        assert bucket.history_retention_bytes == 0
-        assert bucket.history_retention_duration == timedelta(0)
+        assert bucket.history_retention_bytes is None
+        assert bucket.history_retention_duration is None
 
         with pytest.raises(InvalidArgumentException):
             await cb_env.bm.update_bucket(
