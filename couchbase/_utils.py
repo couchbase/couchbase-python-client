@@ -23,7 +23,6 @@ from typing import (Any,
                     Callable,
                     Dict,
                     List,
-                    Optional,
                     Tuple,
                     Type,
                     TypeVar,
@@ -129,7 +128,7 @@ def validate_str(value  # type: str
 class Identity:
     def __init__(self,
                  type_,  # type: Callable
-                 optional=False  # type: Optional[bool]
+                 optional=False  # type: bool
                  ):
         self._type = type_
         self._optional = optional
@@ -174,14 +173,18 @@ class EnumToStr:
 
 class StrToEnum:
     def __init__(self, type_,  # type: Type[Enum]
-                 conversion_fn=None  # type: Callable
+                 conversion_fn=None,  # type: Callable
+                 optional=False  # type: bool
                  ):
         self._type = type_
         self._conversion_fn = conversion_fn
+        self._optional = optional
 
     def __call__(self, value  # type: str
                  ) -> Enum:
 
+        if self._optional and value is None:
+            return value
         if self._conversion_fn:
             return self._conversion_fn(value)
         return self._type(value)

@@ -104,11 +104,13 @@ build_bucket_settings(couchbase::core::management::cluster::bucket_settings sett
             break;
         }
         case couchbase::core::management::cluster::bucket_compression::unknown: {
-            pyObj_tmp = PyUnicode_FromString("unknown");
+            Py_INCREF(Py_None);
+            pyObj_tmp = Py_None;
             break;
         }
         default: {
-            pyObj_tmp = PyUnicode_FromString("unknown");
+            Py_INCREF(Py_None);
+            pyObj_tmp = Py_None;
             break;
         }
     }

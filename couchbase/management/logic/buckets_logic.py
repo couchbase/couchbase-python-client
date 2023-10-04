@@ -380,7 +380,7 @@ class BucketSettings(dict):
         BidirectionalTransform("compression_mode",
                                ParamTransform("compressionMode",
                                               EnumToStr(CompressionMode)),
-                               ParamTransform("compressionMode", StrToEnum(CompressionMode))),
+                               ParamTransform("compressionMode", StrToEnum(CompressionMode, optional=True))),
         BidirectionalTransform("conflict_resolution_type",
                                ParamTransform("conflictResolutionType", EnumToStr(
                                    ConflictResolutionType)),
