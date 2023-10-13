@@ -1,10 +1,65 @@
-include *.txt LICENSE
-include couchbase_version.py
+include *.txt LICENSE CONTRIBUTING.md CMakeLists.txt pyproject.toml couchbase_version.py
 recursive-include couchbase *.py
 recursive-include acouchbase *.py
 recursive-include txcouchbase *.py
 recursive-include tests *.py
-recursive-include src *
-recursive-include deps *
-recursive-exclude deps/couchbase-transactions-cxx/deps/couchbase-cxx-client/ *
-exclude MANIFEST.in
+recursive-include src *.[ch]xx
+include deps/couchbase-cxx-client/CMakeLists.txt
+include deps/couchbase-cxx-client/LICENSE.txt
+include deps/couchbase-cxx-client/cmake/*
+graft deps/couchbase-cxx-client/core
+graft deps/couchbase-cxx-client/couchbase
+include deps/couchbase-cxx-client/third_party/asio/COPYING
+include deps/couchbase-cxx-client/third_party/asio/LICENSE*
+include deps/couchbase-cxx-client/third_party/asio/asio/include/*.hpp
+recursive-include deps/couchbase-cxx-client/third_party/asio/asio/include/asio *.[hi]pp
+include deps/couchbase-cxx-client/third_party/cxx_function/cxx_function.hpp
+include deps/couchbase-cxx-client/third_party/expected/COPYING
+graft deps/couchbase-cxx-client/third_party/expected/include
+include deps/couchbase-cxx-client/third_party/fmt/CMakeLists.txt
+include deps/couchbase-cxx-client/third_party/fmt/ChangeLog.rst
+include deps/couchbase-cxx-client/third_party/fmt/LICENSE.rst
+include deps/couchbase-cxx-client/third_party/fmt/README.rst
+graft deps/couchbase-cxx-client/third_party/fmt/include
+graft deps/couchbase-cxx-client/third_party/fmt/src
+graft deps/couchbase-cxx-client/third_party/fmt/support/cmake
+include deps/couchbase-cxx-client/third_party/gsl/CMakeLists.txt
+include deps/couchbase-cxx-client/third_party/gsl/LICENSE*
+include deps/couchbase-cxx-client/third_party/gsl/ThirdPartyNotices.txt
+include deps/couchbase-cxx-client/third_party/gsl/cmake/*
+graft deps/couchbase-cxx-client/third_party/gsl/include
+include deps/couchbase-cxx-client/third_party/hdr_histogram_c/CMakeLists.txt
+include deps/couchbase-cxx-client/third_party/hdr_histogram_c/COPYING.txt
+include deps/couchbase-cxx-client/third_party/hdr_histogram_c/LICENSE.txt
+include deps/couchbase-cxx-client/third_party/hdr_histogram_c/config.cmake.in
+graft deps/couchbase-cxx-client/third_party/hdr_histogram_c/src
+include deps/couchbase-cxx-client/third_party/http_parser/LICENSE*
+include deps/couchbase-cxx-client/third_party/http_parser/http_parser.[ch]
+include deps/couchbase-cxx-client/third_party/json/CMakeLists.txt
+include deps/couchbase-cxx-client/third_party/json/LICENSE*
+include deps/couchbase-cxx-client/third_party/json/external/PEGTL/.cmake/*
+include deps/couchbase-cxx-client/third_party/json/external/PEGTL/CMakeLists.txt
+include deps/couchbase-cxx-client/third_party/json/external/PEGTL/LICENSE*
+graft deps/couchbase-cxx-client/third_party/json/external/PEGTL/include
+graft deps/couchbase-cxx-client/third_party/json/include
+include deps/couchbase-cxx-client/third_party/jsonsl/*
+include deps/couchbase-cxx-client/third_party/snappy/CMakeLists.txt
+include deps/couchbase-cxx-client/third_party/snappy/COPYING
+include deps/couchbase-cxx-client/third_party/snappy/cmake/*
+include deps/couchbase-cxx-client/third_party/snappy/snappy-c.h
+include deps/couchbase-cxx-client/third_party/snappy/snappy-c.cc
+include deps/couchbase-cxx-client/third_party/snappy/snappy-internal.h
+include deps/couchbase-cxx-client/third_party/snappy/snappy-sinksource.h
+include deps/couchbase-cxx-client/third_party/snappy/snappy-sinksource.cc
+include deps/couchbase-cxx-client/third_party/snappy/snappy-stubs-internal.h
+include deps/couchbase-cxx-client/third_party/snappy/snappy-stubs-internal.cc
+include deps/couchbase-cxx-client/third_party/snappy/snappy-stubs-public.h.in
+include deps/couchbase-cxx-client/third_party/snappy/snappy.h
+include deps/couchbase-cxx-client/third_party/snappy/snappy.cc
+include deps/couchbase-cxx-client/third_party/spdlog/CMakeLists.txt
+include deps/couchbase-cxx-client/third_party/spdlog/LICENSE
+include deps/couchbase-cxx-client/third_party/spdlog/cmake/*
+graft deps/couchbase-cxx-client/third_party/spdlog/include
+graft deps/couchbase-cxx-client/third_party/spdlog/src
+global-exclude *.py[cod] *.DS_Store
+exclude .git .gitignore .gitmodules gocaves* *.jar .clang* .cmake* .pre* .flake* MANIFEST.in
