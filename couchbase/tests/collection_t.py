@@ -124,6 +124,11 @@ class CollectionTestSuite:
         if num_nodes == 1:
             pytest.skip("Test only for clusters with more than a single node.")
 
+    @pytest.fixture(scope="class")
+    def skip_if_go_caves(self, cb_env):
+        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
+            pytest.skip("GoCAVES does not like this operation.")
+
     @pytest.mark.usefixtures('check_xattr_supported')
     @pytest.mark.parametrize("expiry", [FIFTY_YEARS + 1,
                                         FIFTY_YEARS,
@@ -389,14 +394,21 @@ class CollectionTestSuite:
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.get(key, GetOptions(project='thiswontwork'))
 
+    @pytest.mark.usefixtures('skip_if_go_caves')
     def test_project_too_many_projections(self, cb_env):
-        key = cb_env.get_existing_doc(key_only=True)
-        project = []
-        for _ in range(17):
-            project.append('something')
+        key = cb_env.get_new_doc(key_only=True)
+        value = {f'f{i}': i for i in range(1, 21)}
+        cb_env.collection.upsert(key, value)
 
-        with pytest.raises(InvalidArgumentException):
-            cb_env.collection.get(key, GetOptions(project=project))
+        project = [f'f{i}' for i in range(1, 19)]
+        result = cb_env.collection.get(key, GetOptions(project=project))
+
+        assert result.cas is not None
+        res_dict = result.content_as[dict]
+        assert res_dict != {}
+        assert res_dict.get('f20') is None
+        for field in project:
+            assert res_dict.get(field) is not None
 
     def test_remove(self, cb_env):
         key = cb_env.get_existing_doc(key_only=True)

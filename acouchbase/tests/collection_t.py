@@ -39,6 +39,7 @@ from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
                               MutationResult)
+from tests.mock_server import MockServerType
 
 from ._test_utils import (CollectionType,
                           KVPair,
@@ -132,6 +133,11 @@ class CollectionTests:
     def check_multi_node(self, num_nodes):
         if num_nodes == 1:
             pytest.skip("Test only for clusters with more than a single node.")
+
+    @pytest.fixture(scope="class")
+    def skip_if_go_caves(self, cb_env):
+        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
+            pytest.skip("GoCAVES does not like this operation.")
 
     @pytest.mark.asyncio
     async def test_exists(self, cb_env, default_kvp):
@@ -240,16 +246,29 @@ class CollectionTests:
         with pytest.raises(InvalidArgumentException):
             await cb.get(key, GetOptions(project="thiswontwork"))
 
+    @pytest.mark.usefixtures('skip_if_go_caves')
     @pytest.mark.asyncio
     async def test_project_too_many_projections(self, cb_env, default_kvp):
         cb = cb_env.collection
         key = default_kvp.key
-        project = []
-        for _ in range(17):
-            project.append("something")
+        value = {f'f{i}': i for i in range(1, 21)}
+        result = await cb.upsert(key, value, UpsertOptions(expiry=timedelta(seconds=2)))
 
-        with pytest.raises(InvalidArgumentException):
-            await cb.get(key, GetOptions(project=project))
+        async def cas_matches(cb, new_cas):
+            r = await cb.get(key)
+            if new_cas != r.cas:
+                raise Exception(f"{new_cas} != {r.cas}")
+
+        await cb_env.try_n_times(10, 3, cas_matches, cb, result.cas)
+
+        project = [f'f{i}' for i in range(1, 19)]
+        result = await cb.get(key, GetOptions(project=project))
+        assert result.cas is not None
+        res_dict = result.content_as[dict]
+        assert res_dict != {}
+        assert res_dict.get('f20') is None
+        for field in project:
+            assert res_dict.get(field) is not None
 
     @pytest.mark.asyncio
     async def test_upsert(self, cb_env, default_kvp):

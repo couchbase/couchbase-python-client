@@ -135,15 +135,8 @@ class CollectionLogic:
                 overrride provided :class:`~.options.GetOptions`
 
         Raises:
-            :class:`~.exceptions.InvalidArgumentException`: When attempting a get projection
-                operation with more than 16 projections.
             :class:`~.exceptions.DocumentNotFoundException`: If the provided document key does not exist.
         """
-        projections = kwargs.get("project")
-        if isinstance(projections, list) and len(projections) > 16:
-            raise InvalidArgumentException(
-                f"Maximum of 16 projects allowed. Provided {len(projections)}"
-            )
         op_type = operations.GET.value
         return kv_operation(**self._get_connection_args(),
                             key=key,

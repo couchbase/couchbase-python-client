@@ -41,6 +41,7 @@ from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
                               MutationResult)
+from tests.mock_server import MockServerType
 
 from ._test_utils import (CollectionType,
                           KVPair,
@@ -112,6 +113,11 @@ class CollectionTests:
         kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
         if kv_endpoints is None or len(kv_endpoints) < (num_replicas + 1):
             pytest.skip("Not all replicas are online")
+
+    @pytest.fixture(scope="class")
+    def skip_if_go_caves(self, cb_env):
+        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
+            pytest.skip("GoCAVES does not like this operation.")
 
     @pytest.fixture(scope="class")
     def num_replicas(self, cb_env):
@@ -231,17 +237,33 @@ class CollectionTests:
                                   key,
                                   GetOptions(project="thiswontwork"))
 
+    @pytest.mark.usefixtures('skip_if_go_caves')
     def test_project_too_many_projections(self, cb_env, default_kvp):
         cb = cb_env.collection
         key = default_kvp.key
-        project = []
-        for _ in range(17):
-            project.append("something")
+        value = {f'f{i}': i for i in range(1, 21)}
+        result = run_in_reactor_thread(cb.upsert,
+                                       key,
+                                       value,
+                                       UpsertOptions(expiry=timedelta(seconds=2)))
 
-        with pytest.raises(InvalidArgumentException):
-            run_in_reactor_thread(cb.get,
-                                  key,
-                                  GetOptions(project=project))
+        def cas_matches(cb, new_cas):
+            r = run_in_reactor_thread(cb.get, key)
+            if new_cas != r.cas:
+                raise Exception(f"{new_cas} != {r.cas}")
+
+        print('waiting for cas matches')
+        cb_env.try_n_times(10, 3, cas_matches, cb, result.cas, is_deferred=False)
+
+        project = [f'f{i}' for i in range(1, 19)]
+        result = run_in_reactor_thread(cb.get, key, GetOptions(project=project))
+
+        assert result.cas is not None
+        res_dict = result.content_as[dict]
+        assert res_dict != {}
+        assert res_dict.get('f20') is None
+        for field in project:
+            assert res_dict.get(field) is not None
 
     def test_upsert(self, cb_env, default_kvp):
         cb = cb_env.collection
