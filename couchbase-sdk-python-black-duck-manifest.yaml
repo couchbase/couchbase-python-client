@@ -1,4 +1,2 @@
-components:
-  couchbase-sdk-cxx:
-    bd-id: bf1af6e7-d229-4615-a24b-e3f8152cee44
-    versions: [ 1.0.0-dp.10 ]
+include-projects:
+  couchbase-sdk-cxx

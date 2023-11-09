@@ -36,18 +36,24 @@ Installing the SDK
 
 
 .. note::
-    The Couchbase Python SDK provides wheels for Windows, MacOS and Linux platforms (via manylinux) for Python 3.8 - 3.11.
+    The Couchbase Python SDK provides wheels for Windows, MacOS and Linux platforms (via manylinux) for supported versions of Python.
+    See :python_sdk_version_compat:`Python Version Compatibility <>` docs for details.
 
 Prereqs
 ++++++++++
 
 If not on platform that has a binary wheel availble, the following is needed:
 
-* Python version 3.8 - 3.11 (see `Python Version Compatibility <https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#python-version-compat>`_ for details)
+* A supported Python version (see :python_sdk_version_compat:`Python Version Compatibility <>` for details)
 * A C++ compiler supporting C++ 17
 * CMake (version >= 3.18)
 * Git (if not on a platform that offers wheels)
-* OpenSSL 1.1.1
+* OpenSSL
+
+    * SDK versions >= 4.1.9 provide wheels that **do not** require OpenSSL.
+    * SDK versions < 4.1.9 provide wheels that *require* OpenSSL 1.1.1.
+    * SDK versions >= 4.1 can be built against a desired version of OpenSSL.
+
 * If using the Twisted Framework and the txcouchbase API, Twisted >= 21.7.0 is required.
 
 .. warning::
@@ -56,8 +62,9 @@ If not on platform that has a binary wheel availble, the following is needed:
 
 .. note::
     Starting with Python 3.11.5, macOS installers and Windows builders from python.org now use `OpenSSL 3.0 <https://docs.python.org/3/whatsnew/3.11.html#notable-changes-in-3-11-5>`_.
-    A potential side-effect of this change is an ``ImportError: DLL load failed while importing pycbc_core`` error when using the Python SDK. As a work-around,
+    A potential side-effect of this change is an ``ImportError: DLL load failed while importing pycbc_core`` error when a version of the Python SDK prior to 4.1.9. As a work-around,
     set the ``PYCBC_OPENSSL_DIR`` environment variable to the path where the OpenSSL 1.1 libraries can be found (``libssl-1_1.dll`` and ``libcrypto-1_1.dll`` for Windows; ``libssl.1.1.dylib`` and ``libcrypto.1.1.dylib`` for macOS).
+    Alternatively, the SDK can be built from source using a version of OpenSSL > 1.1.x.
 
 After the above have been installed, pip install ``setuptools`` and ``wheel`` (see command below).
 

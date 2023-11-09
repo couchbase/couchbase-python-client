@@ -115,4 +115,6 @@ extlinks = {
     'python_sdk_license': ('https://github.com/couchbase/couchbase-python-client/blob/master/LICENSE', None),
     'python_sdk_contribute':
         ('https://github.com/couchbase/couchbase-python-client/blob/master/CONTRIBUTING.md', None),
+    'python_sdk_version_compat':
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#python-version-compat', None),
 }
