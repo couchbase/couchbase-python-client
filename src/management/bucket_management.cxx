@@ -16,10 +16,13 @@
  */
 
 #include "bucket_management.hxx"
-#include "../exceptions.hxx"
+
 #include <core/management/bucket_settings.hxx>
 #include <core/operations/management/bucket.hxx>
 #include <core/operations/management/bucket_describe.hxx> // should be in the include above, but isn't
+
+#include "../exceptions.hxx"
+#include "../result.hxx"
 #include "../utils.hxx"
 
 PyObject*
@@ -748,7 +751,7 @@ do_bucket_mgmt_op(connection& conn,
                   std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
         create_result_from_bucket_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;

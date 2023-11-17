@@ -16,10 +16,14 @@
  */
 
 #include "analytics.hxx"
+
+#include <core/operations/document_analytics.hxx>
+#include <core/analytics_scan_consistency.hxx>
+
 #include "exceptions.hxx"
+#include "n1ql.hxx"
 #include "result.hxx"
 #include "tracing.hxx"
-#include <core/analytics_scan_consistency.hxx>
 
 couchbase::core::analytics_scan_consistency
 str_to_scan_consistency_type(std::string consistency)
@@ -547,12 +551,12 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     // };
 
     {
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
-          req,
-          [rows = streamed_res->rows, include_metrics = metrics, pyObj_callback, pyObj_errback](
-            couchbase::core::operations::analytics_response resp) {
-              create_analytics_result(resp, include_metrics, rows, pyObj_callback, pyObj_errback);
-          });
+        Py_BEGIN_ALLOW_THREADS conn->cluster_.execute(req,
+                                                      [rows = streamed_res->rows, include_metrics = metrics, pyObj_callback, pyObj_errback](
+                                                        couchbase::core::operations::analytics_response resp) {
+                                                          create_analytics_result(
+                                                            resp, include_metrics, rows, pyObj_callback, pyObj_errback);
+                                                      });
         Py_END_ALLOW_THREADS
     }
     return streamed_res;

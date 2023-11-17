@@ -199,7 +199,7 @@ do_binary_op(connection& conn,
              result* multi_result = nullptr)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(
       req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](response_type resp) {
           create_result_from_binary_op_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier, multi_result);
       });

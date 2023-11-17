@@ -21,6 +21,12 @@
 
 #include "client.hxx"
 #include <couchbase/manager_error_context.hxx>
+#include <core/error_context/analytics.hxx>
+#include <core/error_context/http.hxx>
+#include <core/error_context/key_value.hxx>
+#include <core/error_context/query.hxx>
+#include <core/error_context/search.hxx>
+#include <core/error_context/view.hxx>
 
 #define DISPATCHED_TO "last_dispatched_to"
 #define DISPATCHED_FROM "last_dispatched_from"

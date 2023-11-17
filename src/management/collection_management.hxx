@@ -19,8 +19,6 @@
 
 #include "../client.hxx"
 
-#include <core/operations/management/collections.hxx>
-
 class CollectionManagementOperations
 {
   public:

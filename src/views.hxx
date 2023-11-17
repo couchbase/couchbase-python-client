@@ -19,7 +19,6 @@
 
 #include "client.hxx"
 #include "result.hxx"
-#include <core/operations/document_view.hxx>
 
 streamed_result*
 handle_view_query(PyObject* self, PyObject* args, PyObject* kwargs);

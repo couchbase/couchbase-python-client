@@ -17,6 +17,8 @@
 
 #include "exceptions.hxx"
 
+#include "result.hxx"
+
 PyTypeObject exception_base_type = { PyObject_HEAD_INIT(NULL) 0 };
 
 static PyObject*

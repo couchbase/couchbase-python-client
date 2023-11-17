@@ -16,12 +16,16 @@
  */
 
 #include "analytics_management.hxx"
-#include "analytics_link.hxx"
-#include "../exceptions.hxx"
+
+#include <core/operations/management/analytics.hxx>
 #include <core/analytics_scan_consistency.hxx>
 #include <core/management/analytics_link.hxx>
 #include <core/management/analytics_index.hxx>
 #include <core/management/analytics_dataset.hxx>
+
+#include "analytics_link.hxx"
+#include "../exceptions.hxx"
+#include "../result.hxx"
 
 /* couchbase::core::operations::management::analytics_* request building methods */
 
@@ -576,7 +580,7 @@ do_analytics_mgmt_op(connection& conn,
                      std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
         create_result_from_analytics_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;

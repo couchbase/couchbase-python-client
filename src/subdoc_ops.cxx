@@ -16,11 +16,13 @@
  */
 
 #include "subdoc_ops.hxx"
+
+#include <couchbase/cas.hxx>
+
 #include "exceptions.hxx"
 #include "result.hxx"
-#include <couchbase/cas.hxx>
-#include "utils.hxx"
 #include "tracing.hxx"
+#include "utils.hxx"
 
 couchbase::core::impl::subdoc::opcode
 to_subdoc_opcode(std::uint8_t opcode)
@@ -657,7 +659,7 @@ do_subdoc_op(connection& conn,
              std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier](response_type resp) {
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier](response_type resp) {
         create_result_from_subdoc_op_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS

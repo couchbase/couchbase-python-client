@@ -82,6 +82,7 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      UpsertOptionsBase,
                                      ViewOptionsBase,
                                      WaitUntilReadyOptionsBase)
+from couchbase.logic.supportability import Supportability
 from couchbase.pycbc_core import (transaction_config,
                                   transaction_options,
                                   transaction_query_options)
@@ -1601,7 +1602,7 @@ class DeltaValue(DeltaValueBase):
 
 
 class TransactionConfig:
-    _TXN_ALLOWED_KEYS = {"durability", "cleanup_window", "kv_timeout",
+    _TXN_ALLOWED_KEYS = {"durability", "cleanup_window", "timeout",
                          "expiration_time", "cleanup_lost_attempts", "cleanup_client_attempts",
                          "metadata_collection", "scan_consistency"}
 
@@ -1623,30 +1624,42 @@ class TransactionConfig:
             durability (:class:`ServerDurability`, optional): Desired durability level for all transaction operations.
             cleanup_window (timedelta, optional): The query metadata is cleaned up over a the cleanup_window.
               Longer windows mean less background activity, shorter intervals will clean things faster.
-            kv_timeout: (timedelta, optional): KV operation timeout.
-            expiration_time: (timedelta, optional): Maximum amount of time a transaction can take before rolling back.
+            kv_timeout: (timedelta, optional): **DEPRECATED** Currently a no-op. KV operation timeout.
+            expiration_time: (timedelta, optional): **DEPRECATED** Use timeout instead. Maximum amount of time a transaction can take before rolling back.
             cleanup_lost_attempts: (bool, optional): If False, then we don't do any background cleanup.
             cleanup_client_attempts: (bool, optional): if False, we don't do any cleanup as a transaction finishes.
             metadata_collection: (:class:`couchbase.transactions.TransactionKeyspace, optional): All transaction
               metadata uses the specified bucket/scope/collection.
             scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency to use for all transactional
               queries.
-        """
-        pass
+            timeout: (timedelta, optional): Maximum amount of time a transaction can take before rolling back.
+        """  # noqa: E501
 
-    def __init__(self,
+    def __init__(self,   # noqa: C901
                  **kwargs  # type: dict[str, Any]
-                 ):
-
+                 ):   # noqa: C901
+        # CXXCBC-391: Adds support for ExtSDKIntegration which removes kv_timeout, the cluster kv_durable
+        # timeout is used internally
+        if 'kv_timeout' in kwargs:
+            kwargs.pop('kv_timeout')
+            Supportability.option_deprecated('kv_timeout')
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionConfig._TXN_ALLOWED_KEYS}
         # convert everything here...
         durability = kwargs.pop("durability", None)
         if durability:
             kwargs["durability_level"] = durability.level.value
-        for k in ["cleanup_window", "kv_timeout", "expiration_time"]:
-            if kwargs.get(k, None):
-                kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
+        if kwargs.get('cleanup_window', None):
+            kwargs['cleanup_window'] = int(kwargs['cleanup_window'].total_seconds() * 1000000)
         coll = kwargs.pop("metadata_collection", None)
+        # CXXCBC-391: Adds support for ExtSDKIntegration which changes expiration_time -> timeout
+        if 'expiration_time' in kwargs or 'timeout' in kwargs:
+            Supportability.option_deprecated('expiration_time', 'timeout')
+            timeout = kwargs.pop('expiration_time', None)
+            # if timeout is also in the options, override expiration_time
+            if 'timeout' in kwargs:
+                timeout = kwargs.get('timeout', None)
+            if timeout:
+                kwargs['timeout'] = int(timeout.total_seconds() * 1000000)
         if coll:
             kwargs["metadata_bucket"] = coll.bucket
             kwargs["metadata_scope"] = coll.scope
@@ -1662,7 +1675,7 @@ class TransactionConfig:
 
 
 class TransactionOptions:
-    _TXN_ALLOWED_KEYS = {"durability", "kv_timeout", "expiration_time", "scan_consistency", "metadata_collection"}
+    _TXN_ALLOWED_KEYS = {"durability", "timeout", "expiration_time", "scan_consistency", "metadata_collection"}
 
     @overload
     def __init__(self,
@@ -1670,33 +1683,45 @@ class TransactionOptions:
                  kv_timeout=None,  # type: Optional[timedelta]
                  expiration_time=None,  # type: Optional[timedelta]
                  scan_consistency=None,  # type: Optional[QueryScanConsistency]
-                 metadata_collection=None  # type: Optional[Collection]
+                 metadata_collection=None,  # type: Optional[Collection]
+                 timeout=None,  # type: Optional[timedelta]
                  ):
         """
         Overrides a subset of the ``TransactionConfig`` parameters for a single query.
         Args:
             durability (:class:`ServerDurability`, optional): Desired durability level for all operations
                 in this transaction.
-            kv_timeout: (timedelta, optional): KV timeout to use for this transaction.
-            expiration_time: (timedelta, optional): Expiry for this transaction.
+            kv_timeout: (timedelta, optional): **DEPRECATED** Currently a no-op.  KV timeout to use for this transaction.
+            expiration_time: (timedelta, optional): **DEPRECATED** Use timeout instead. Expiry for this transaction.
             scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency for queries in
               this transaction.
             metadata_collection: (:class: `couchbase.collection.Collection, optional): This transaction will
               put all metadata in the specified bucket/scope/collection.
-        """
-        pass
+            timeout: (timedelta, optional): Expiry for this transaction.
+        """  # noqa: E501
 
     def __init__(self,
                  **kwargs  # type: Dict[str, Any]
                  ):
+        # CXXCBC-391: Adds support for ExtSDKIntegration which removes kv_timeout, the cluster kv_durable
+        # timeout is used internally
+        if 'kv_timeout' in kwargs:
+            kwargs.pop('kv_timeout')
+            Supportability.option_deprecated('kv_timeout')
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionOptions._TXN_ALLOWED_KEYS}
         # convert everything here...
         durability = kwargs.pop("durability", None)
         if durability:
             kwargs["durability_level"] = durability.level.value
-        for k in ["kv_timeout", "expiration_time"]:
-            if kwargs.get(k, None):
-                kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
+        # CXXCBC-391: Adds support for ExtSDKIntegration which changes expiration_time -> timeout
+        if 'expiration_time' in kwargs or 'timeout' in kwargs:
+            Supportability.option_deprecated('expiration_time', 'timeout')
+            timeout = kwargs.pop('expiration_time', None)
+            # if timeout is also in the options, override expiration_time
+            if 'timeout' in kwargs:
+                timeout = kwargs.get('timeout', None)
+            if timeout:
+                kwargs['timeout'] = int(timeout.total_seconds() * 1000000)
         if kwargs.get('scan_consistency', None):
             kwargs['scan_consistency'] = kwargs['scan_consistency'].value
             if kwargs["scan_consistency"] == "at_plus":

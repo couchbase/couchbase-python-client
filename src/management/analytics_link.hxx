@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "analytics_management.hxx"
 #include <core/management/analytics_link_couchbase_remote.hxx>
+#include "analytics_management.hxx"
 
 PyObject*
 build_couchbase_remote_link_encryption_settings(couchbase::core::management::analytics::couchbase_link_encryption_settings settings)

@@ -15,13 +15,14 @@
  *   limitations under the License.
  */
 
-#include "search.hxx"
-#include "exceptions.hxx"
-#include "result.hxx"
-#include "tracing.hxx"
-#include "utils.hxx"
+#include <core/operations/document_search.hxx>
 #include <core/search_highlight_style.hxx>
 #include <core/search_scan_consistency.hxx>
+
+#include "search.hxx"
+#include "exceptions.hxx"
+#include "tracing.hxx"
+#include "utils.hxx"
 
 PyObject*
 get_result_row_fragments(std::map<std::string, std::vector<std::string>> fragments)
@@ -871,7 +872,7 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     Py_XINCREF(pyObj_errback);
     Py_XINCREF(pyObj_callback);
 
-    Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
+    Py_BEGIN_ALLOW_THREADS conn->cluster_.execute(
       req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback, include_metrics](couchbase::core::operations::search_response resp) {
           create_search_result(resp, rows, pyObj_callback, pyObj_errback, include_metrics);
       });

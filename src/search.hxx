@@ -19,7 +19,6 @@
 
 #include "client.hxx"
 #include "result.hxx"
-#include <core/operations/document_search.hxx>
 
 streamed_result*
 handle_search_query(PyObject* self, PyObject* args, PyObject* kwargs);

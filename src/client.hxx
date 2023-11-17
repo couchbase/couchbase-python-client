@@ -15,20 +15,19 @@
  *   limitations under the License.
  */
 
-#ifndef CLIENT_H_
-#define CLIENT_H_
+#pragma once
 
 // NOLINTNEXTLINE
 #include "Python.h" // NOLINT
 #include "structmember.h"
-#include <core/cluster.hxx>
-#include <core/logger/logger.hxx>
-#include <core/meta/version.hxx>
-#include <core/agent_group.hxx>
+
+#include <future>
 #include <list>
 #include <thread>
-#include "result.hxx"
-#include "exceptions.hxx"
+
+#include <core/cluster.hxx>
+#include <core/logger/logger.hxx>
+#include <core/operations.hxx>
 
 #define PY_SSIZE_T_CLEAN
 
@@ -247,12 +246,17 @@ struct callback_context {
 
 struct connection {
     asio::io_context io_;
-    std::shared_ptr<couchbase::core::cluster> cluster_;
+    couchbase::core::cluster cluster_;
     std::list<std::thread> io_threads_;
 
-    connection(int num_io_threads)
+    connection()
+      : connection{ 1 }
     {
-        cluster_ = couchbase::core::cluster::create(io_);
+    }
+
+    connection(int num_io_threads)
+      : cluster_(couchbase::core::cluster(io_))
+    {
         for (int i = 0; i < num_io_threads; i++) {
             // TODO: consider maybe catching exceptions and running run() again?  For now, lets
             // log the exception and rethrow (which will lead to a crash)
@@ -290,5 +294,3 @@ extern PyTypeObject exception_base_type;
 extern PyTypeObject scan_iterator_type;
 extern PyTypeObject streamed_result_type;
 extern PyTypeObject mutation_token_type;
-
-#endif

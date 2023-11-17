@@ -16,13 +16,15 @@
  */
 
 #include "views.hxx"
-#include "exceptions.hxx"
-#include "result.hxx"
-#include "tracing.hxx"
+
 #include <core/view_scan_consistency.hxx>
 #include <core/view_sort_order.hxx>
 #include <core/management/design_document.hxx>
 #include <core/design_document_namespace.hxx>
+#include <core/operations/document_view.hxx>
+
+#include "exceptions.hxx"
+#include "tracing.hxx"
 
 result*
 create_result_from_view_response(couchbase::core::operations::document_view_response resp)
@@ -461,7 +463,7 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     Py_XINCREF(pyObj_callback);
 
     {
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
+        Py_BEGIN_ALLOW_THREADS conn->cluster_.execute(
           req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback](couchbase::core::operations::document_view_response resp) {
               create_view_result(resp, rows, pyObj_callback, pyObj_errback);
           });

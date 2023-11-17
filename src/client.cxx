@@ -19,20 +19,32 @@
 #include <structmember.h>
 #include <cstdlib>
 
+#include <core/meta/version.hxx>
+
+#include "analytics.hxx"
+#include "binary_ops.hxx"
 #include "connection.hxx"
+#include "diagnostics.hxx"
 #include "exceptions.hxx"
 #include "kv_ops.hxx"
 #include "kv_range_scan.hxx"
-#include "subdoc_ops.hxx"
-#include "diagnostics.hxx"
-#include "binary_ops.hxx"
 #include "logger.hxx"
 #include "n1ql.hxx"
-#include "analytics.hxx"
-#include "search.hxx"
-#include "views.hxx"
-#include "management/management.hxx"
 #include "result.hxx"
+#include "search.hxx"
+#include "subdoc_ops.hxx"
+#include "views.hxx"
+
+#include "management/analytics_management.hxx"
+#include "management/bucket_management.hxx"
+#include "management/collection_management.hxx"
+#include "management/eventing_function_management.hxx"
+#include "management/management.hxx"
+#include "management/query_index_management.hxx"
+#include "management/search_index_management.hxx"
+#include "management/user_management.hxx"
+#include "management/view_index_management.hxx"
+
 #include "transactions/transactions.hxx"
 
 void

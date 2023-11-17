@@ -18,7 +18,6 @@
 #pragma once
 
 #include "../client.hxx"
-#include <core/operations/management/user.hxx>
 
 class UserManagementOperations
 {

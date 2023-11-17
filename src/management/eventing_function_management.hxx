@@ -19,17 +19,6 @@
 
 #include "../client.hxx"
 
-#include <core/operations/management/eventing.hxx>
-// #include <couchbase/operations/management/eventing_upsert_function.hxx>
-// #include <couchbase/operations/management/eventing_deploy_function.hxx>
-// #include <couchbase/operations/management/eventing_get_function.hxx>
-// #include <couchbase/operations/management/eventing_pause_function.hxx>
-// #include <couchbase/operations/management/eventing_resume_function.hxx>
-// #include <couchbase/operations/management/eventing_undeploy_function.hxx>
-// #include <couchbase/operations/management/eventing_drop_function.hxx>
-// #include <couchbase/operations/management/eventing_get_all_functions.hxx>
-// #include <couchbase/operations/management/eventing_get_status.hxx>
-
 class EventingFunctionManagementOperations
 {
   public:

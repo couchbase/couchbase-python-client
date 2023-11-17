@@ -17,6 +17,7 @@
  */
 
 #include "transactions.hxx"
+#include "../exceptions.hxx"
 #include "../n1ql.hxx"
 #include "../utils.hxx"
 #include <core/cluster.hxx>
@@ -83,10 +84,7 @@ pycbc_txns::transaction_config__to_dict__(PyObject* self)
     PyObject* retval = PyDict_New();
     add_to_dict(retval, "durability_level", static_cast<int64_t>(conf->cfg->durability_level()));
     add_to_dict(retval, "cleanup_window", static_cast<int64_t>(conf->cfg->cleanup_config().cleanup_window().count()));
-    if (conf->cfg->kv_timeout()) {
-        add_to_dict(retval, "kv_timeout", static_cast<int64_t>(conf->cfg->kv_timeout()->count()));
-    }
-    add_to_dict(retval, "expiration_time", static_cast<int64_t>(conf->cfg->expiration_time().count()));
+    add_to_dict(retval, "timeout", static_cast<int64_t>(conf->cfg->timeout().count()));
     add_to_dict(retval, "cleanup_lost_attempts", conf->cfg->cleanup_config().cleanup_lost_attempts());
     add_to_dict(retval, "cleanup_client_attempts", conf->cfg->cleanup_config().cleanup_client_attempts());
     add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(conf->cfg->query_config().scan_consistency()));
@@ -110,8 +108,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
 {
     PyObject* durability_level = nullptr;
     PyObject* cleanup_window = nullptr;
-    PyObject* kv_timeout = nullptr;
-    PyObject* expiration_time = nullptr;
+    PyObject* timeout = nullptr;
     char* scan_consistency = nullptr;
     PyObject* cleanup_lost_attempts = nullptr;
     PyObject* cleanup_client_attempts = nullptr;
@@ -121,8 +118,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
 
     const char* kw_list[] = { "durability_level",
                               "cleanup_window",
-                              "kv_timeout",
-                              "expiration_time",
+                              "timeout",
                               "cleanup_lost_attempts",
                               "cleanup_client_attempts",
                               "metadata_bucket",
@@ -130,7 +126,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
                               "metadata_collection",
                               "scan_consistency",
                               nullptr };
-    const char* kw_format = "|OOOOOOssss";
+    const char* kw_format = "|OOOOOssss";
     auto self = reinterpret_cast<pycbc_txns::transaction_config*>(type->tp_alloc(type, 0));
 
     self->cfg = new tx::transactions_config();
@@ -141,8 +137,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
                                      const_cast<char**>(kw_list),
                                      &durability_level,
                                      &cleanup_window,
-                                     &kv_timeout,
-                                     &expiration_time,
+                                     &timeout,
                                      &cleanup_lost_attempts,
                                      &cleanup_client_attempts,
                                      &metadata_bucket,
@@ -158,11 +153,8 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
     if (nullptr != cleanup_window) {
         self->cfg->cleanup_config().cleanup_window(std::chrono::microseconds(PyLong_AsUnsignedLongLong(cleanup_window)));
     }
-    if (nullptr != kv_timeout) {
-        self->cfg->kv_timeout(std::chrono::milliseconds(PyLong_AsUnsignedLongLong(kv_timeout) / 1000));
-    }
-    if (nullptr != expiration_time) {
-        self->cfg->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
+    if (nullptr != timeout) {
+        self->cfg->timeout(std::chrono::microseconds(PyLong_AsUnsignedLongLong(timeout)));
     }
     if (nullptr != cleanup_lost_attempts) {
         self->cfg->cleanup_config().cleanup_lost_attempts(!!PyObject_IsTrue(cleanup_lost_attempts));
@@ -211,11 +203,8 @@ pycbc_txns::transaction_options__to_dict__(PyObject* self)
 {
     auto opts = reinterpret_cast<pycbc_txns::transaction_options*>(self);
     PyObject* retval = PyDict_New();
-    if (opts->opts->kv_timeout()) {
-        add_to_dict(retval, "kv_timeout", static_cast<int64_t>(opts->opts->kv_timeout()->count()));
-    }
-    if (opts->opts->expiration_time()) {
-        add_to_dict(retval, "expiration_time", static_cast<int64_t>(opts->opts->expiration_time()->count()));
+    if (opts->opts->timeout()) {
+        add_to_dict(retval, "timeout", static_cast<int64_t>(opts->opts->timeout()->count()));
     }
     if (opts->opts->durability_level()) {
         add_to_dict(retval, "durability_level", static_cast<int64_t>(opts->opts->durability_level().value()));
@@ -243,11 +232,8 @@ pycbc_txns::transaction_options__str__(PyObject* self)
         if (opts->durability_level()) {
             stream << "durability: " << tx_core::durability_level_to_string(*opts->durability_level()) << ", ";
         }
-        if (opts->kv_timeout()) {
-            stream << "kv_timeout: " << opts->kv_timeout()->count() << "ms, ";
-        }
-        if (opts->expiration_time()) {
-            stream << "expiration_time: " << opts->expiration_time()->count() << "ns, ";
+        if (opts->timeout()) {
+            stream << "timeout: " << opts->timeout()->count() << "ns, ";
         }
         if (opts->scan_consistency()) {
             stream << "scan_consistency: " << scan_consistency_type_to_string(*opts->scan_consistency());
@@ -266,16 +252,15 @@ PyObject*
 pycbc_txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
     PyObject* durability_level = nullptr;
-    PyObject* kv_timeout = nullptr;
-    PyObject* expiration_time = nullptr;
+    PyObject* timeout = nullptr;
     char* scan_consistency = nullptr;
     char* metadata_bucket = nullptr;
     char* metadata_scope = nullptr;
     char* metadata_collection = nullptr;
 
-    const char* kw_list[] = { "durability_level", "kv_timeout",     "expiration_time",     "scan_consistency",
-                              "metadata_bucket",  "metadata_scope", "metadata_collection", nullptr };
-    const char* kw_format = "|OOOssss";
+    const char* kw_list[] = { "durability_level",    "timeout", "scan_consistency", "metadata_bucket", "metadata_scope",
+                              "metadata_collection", nullptr };
+    const char* kw_format = "|OOssss";
     auto self = reinterpret_cast<pycbc_txns::transaction_options*>(type->tp_alloc(type, 0));
 
     self->opts = new tx::transaction_options();
@@ -285,8 +270,7 @@ pycbc_txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyObj
                                      kw_format,
                                      const_cast<char**>(kw_list),
                                      &durability_level,
-                                     &kv_timeout,
-                                     &expiration_time,
+                                     &timeout,
                                      &scan_consistency,
                                      &metadata_bucket,
                                      &metadata_scope,
@@ -297,11 +281,8 @@ pycbc_txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyObj
     if (nullptr != durability_level) {
         self->opts->durability_level(static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
     }
-    if (nullptr != kv_timeout) {
-        self->opts->kv_timeout(std::chrono::milliseconds(PyLong_AsUnsignedLongLong(kv_timeout) / 1000));
-    }
-    if (nullptr != expiration_time) {
-        self->opts->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
+    if (nullptr != timeout) {
+        self->opts->timeout(std::chrono::microseconds(PyLong_AsUnsignedLongLong(timeout)));
     }
     if (nullptr != scan_consistency) {
         self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
@@ -1277,8 +1258,8 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     }
     else
     {
-        auto expiry = opts->expiration_time();
-        CB_LOG_DEBUG("calling transactions.run with expiry {}ns", expiry.has_value() ? expiry->count() : 0);
+        auto timeout = opts->timeout();
+        CB_LOG_DEBUG("calling transactions.run with timeout {}ns", timeout.has_value() ? timeout->count() : 0);
         // @TODO: PYCBC-1425, is this the right approach?
         txns->txns->run(*opts, logic, std::forward<pycbc_txns::pycbc_txn_complete_callback>(cb));
     }

@@ -551,7 +551,7 @@ class CollectionTestSuite:
         result = cb_env.collection.get_and_lock(key, timedelta(seconds=5))
         cas = result.cas
         # @TODO(jc): MOCK - TemporaryFailException
-        with pytest.raises((DocumentLockedException)):
+        with pytest.raises(CasMismatchException):
             cb_env.collection.unlock(key, 100)
 
         TestEnvironment.try_n_times_till_exception(10,

@@ -17,6 +17,9 @@
 
 #include "diagnostics.hxx"
 
+#include "result.hxx"
+#include "exceptions.hxx"
+
 template<typename T>
 void
 add_extras_to_service_endpoint([[maybe_unused]] const T& t, [[maybe_unused]] PyObject* dict)
@@ -330,7 +333,7 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+    std::optional<std::chrono::milliseconds> timeout_ms{};
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
@@ -370,15 +373,15 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
     auto f = barrier->get_future();
 
     if (op_type == Operations::DIAGNOSTICS) {
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->diagnostics(
+        Py_BEGIN_ALLOW_THREADS conn->cluster_.diagnostics(
           reportId, [pyObj_callback, pyObj_errback, barrier](couchbase::core::diag::diagnostics_result r) {
               create_diagnostics_op_response(r, pyObj_callback, pyObj_errback, barrier);
           });
         Py_END_ALLOW_THREADS
     } else {
         couchbase::core::diag::ping_result resp;
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->ping(
-          reportId, bucketName, services, [pyObj_callback, pyObj_errback, barrier](couchbase::core::diag::ping_result r) {
+        Py_BEGIN_ALLOW_THREADS conn->cluster_.ping(
+          reportId, bucketName, services, timeout_ms, [pyObj_callback, pyObj_errback, barrier](couchbase::core::diag::ping_result r) {
               create_diagnostics_op_response(r, pyObj_callback, pyObj_errback, barrier);
           });
         Py_END_ALLOW_THREADS

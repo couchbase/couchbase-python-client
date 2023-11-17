@@ -15,15 +15,13 @@
  *   limitations under the License.
  */
 
-#ifndef KV_OPS_H_
-#define KV_OPS_H_
+#pragma once
+
+#include <future>
 
 #include "client.hxx"
 #include <couchbase/cas.hxx>
-#include <couchbase/insert_options.hxx>
-#include <couchbase/remove_options.hxx>
-#include <couchbase/replace_options.hxx>
-#include <couchbase/upsert_options.hxx>
+#include <core/document_id.hxx>
 #include <couchbase/persist_to.hxx>
 #include <couchbase/replicate_to.hxx>
 
@@ -90,11 +88,3 @@ handle_kv_multi_op(PyObject* self, PyObject* args, PyObject* kwargs);
 
 PyObject*
 handle_kv_blocking_result(std::future<PyObject*>&& fut);
-
-// couchbase::core::query_profile_mode
-// str_to_profile_mode(std::string profile_mode);
-
-// std::string
-// profile_mode_to_str(couchbase::core::query_profile_mode profile_mode);
-
-#endif

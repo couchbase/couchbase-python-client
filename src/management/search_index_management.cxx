@@ -16,8 +16,12 @@
  */
 
 #include "search_index_management.hxx"
-#include "../exceptions.hxx"
+
+#include <core/operations/management/search.hxx>
 #include <core/management/search_index.hxx>
+
+#include "../exceptions.hxx"
+#include "../result.hxx"
 
 PyObject*
 build_search_index(couchbase::core::management::search::index index)
@@ -319,7 +323,7 @@ create_result_from_search_index_mgmt_response(const couchbase::core::operations:
 
 template<>
 result*
-create_result_from_search_index_mgmt_response(const couchbase::core::operations::management::search_index_stats_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::core::operations::management::search_get_stats_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -632,7 +636,7 @@ do_search_index_mgmt_op(connection& conn,
                         std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
         create_result_from_search_index_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;
@@ -696,10 +700,10 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             break;
         }
         case SearchIndexManagementOperations::GET_ALL_STATS: {
-            auto req = get_search_index_req<couchbase::core::operations::management::search_index_stats_request>(options->op_args);
+            auto req = get_search_index_req<couchbase::core::operations::management::search_get_stats_request>(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_stats_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_get_stats_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }

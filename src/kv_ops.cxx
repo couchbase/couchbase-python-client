@@ -16,6 +16,7 @@
  */
 
 #include "kv_ops.hxx"
+
 #include "exceptions.hxx"
 #include "result.hxx"
 #include "tracing.hxx"
@@ -427,7 +428,7 @@ do_get(connection& conn,
        result* multi_result = nullptr)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(
       req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](response_type resp) {
           create_result_from_get_operation_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier, multi_result);
       });
@@ -747,7 +748,7 @@ do_mutation(connection& conn,
             result* multi_result = nullptr)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(
       req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](response_type resp) {
           create_result_from_mutation_operation_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier, multi_result);
       });

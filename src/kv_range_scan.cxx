@@ -1,4 +1,25 @@
+/*
+ *   Copyright 2016-2022. Couchbase, Inc.
+ *   All Rights Reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+
 #include "kv_range_scan.hxx"
+
+#include <core/agent_group.hxx>
+
+#include "exceptions.hxx"
 #include "utils.hxx"
 
 std::optional<couchbase::core::scan_term>
@@ -168,13 +189,13 @@ handle_kv_range_scan_op([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
 
     auto barrier = std::make_shared<std::promise<tl::expected<couchbase::core::topology::configuration, std::error_code>>>();
     auto f = barrier->get_future();
-    conn->cluster_->with_bucket_configuration(
-      bucket_name, [barrier](std::error_code ec, const couchbase::core::topology::configuration& config) mutable {
-          if (ec) {
-              return barrier->set_value(tl::unexpected(ec));
-          }
-          barrier->set_value(config);
-      });
+    conn->cluster_.with_bucket_configuration(bucket_name,
+                                             [barrier](std::error_code ec, const couchbase::core::topology::configuration& config) mutable {
+                                                 if (ec) {
+                                                     return barrier->set_value(tl::unexpected(ec));
+                                                 }
+                                                 barrier->set_value(config);
+                                             });
     auto config = f.get();
     if (!config.has_value()) {
         pycbc_set_python_exception(PycbcError::UnsuccessfulOperation,

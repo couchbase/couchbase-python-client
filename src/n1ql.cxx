@@ -17,7 +17,6 @@
 
 #include "n1ql.hxx"
 #include "exceptions.hxx"
-#include "result.hxx"
 #include "utils.hxx"
 
 std::string
@@ -389,7 +388,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     // };
 
     {
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
+        Py_BEGIN_ALLOW_THREADS conn->cluster_.execute(
           req,
           [rows = streamed_res->rows, include_metrics = req.metrics, pyObj_callback, pyObj_errback](
             couchbase::core::operations::query_response resp) {

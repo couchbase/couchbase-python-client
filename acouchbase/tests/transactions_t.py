@@ -52,7 +52,6 @@ class TransactionTestSuite:
         'test_insert',
         'test_insert_lambda_raises_doc_exists',
         'test_insert_inner_exc_doc_exists',
-        'test_kv_timeout',
         'test_max_parallelism',
         'test_metadata_collection',
         'test_metrics',
@@ -75,6 +74,7 @@ class TransactionTestSuite:
         'test_rollback_eating_exceptions',
         'test_scan_consistency',
         'test_scope_qualifier',
+        'test_timeout',
         'test_transaction_config_durability',
         'test_transaction_result',
     ]
@@ -139,9 +139,11 @@ class TransactionTestSuite:
     @pytest.mark.parametrize('exp', [timedelta(seconds=30), timedelta(milliseconds=100)])
     def test_expiration_time(self, cls, exp):
         cfg = cls(expiration_time=exp)
-        cfg_expiry = cfg._base.to_dict().get('expiration_time', None)
-        assert cfg_expiry is not None
-        assert cfg_expiry == exp.total_seconds() * 1000*1000*1000  # nanoseconds - and can't use 'is' here
+        # CXXCBC-391, changes make expiration_time an invalid key
+        cfg_timeout = cfg._base.to_dict().get('expiration_time', None)
+        assert cfg_timeout is None
+        cfg_timeout = cfg._base.to_dict().get('timeout', None)
+        assert cfg_timeout == exp.total_seconds() * 1000*1000*1000  # nanoseconds - and can't use 'is' here
 
     @pytest.mark.asyncio
     async def test_get(self, cb_env):
@@ -256,14 +258,6 @@ class TransactionTestSuite:
 
         assert num_attempts == 1
 
-    @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
-    @pytest.mark.parametrize('kv_timeout', [timedelta(seconds=30), timedelta(milliseconds=2)])
-    def test_kv_timeout(self, cls, kv_timeout):
-        cfg = cls(kv_timeout=kv_timeout)
-        cfg_kv_timeout = cfg._base.to_dict().get('kv_timeout', None)
-        assert cfg_kv_timeout is not None
-        assert cfg_kv_timeout == kv_timeout.total_seconds() * 1000  # milliseconds
-
     def test_max_parallelism(self):
         max = 100
         cfg = TransactionQueryOptions(max_parallelism=max)
@@ -308,7 +302,7 @@ class TransactionTestSuite:
 
         with pytest.raises(TransactionExpired):
             await cb_env.cluster.transactions.run(txn_logic,
-                                                  TransactionOptions(expiration_time=timedelta(microseconds=1)))
+                                                  TransactionOptions(timeout=timedelta(microseconds=1)))
         res = await cb_env.collection.exists(key)
         assert res.exists is False
 
@@ -450,7 +444,7 @@ class TransactionTestSuite:
                 assert 'transaction expired' in ex.message or 'cas_mismatch' in ex.message
 
         try:
-            await cb_env.cluster.transactions.run(txn_logic, TransactionOptions(expiration_time=timedelta(seconds=2)))
+            await cb_env.cluster.transactions.run(txn_logic, TransactionOptions(timeout=timedelta(seconds=2)))
         except Exception as ex:
             assert isinstance(ex, TransactionExpired)
             assert 'transaction expired' in ex.message or 'expired in auto' in ex.message
@@ -497,7 +491,7 @@ class TransactionTestSuite:
                 assert 'transaction expired' in ex.message or 'cas_mismatch' in ex.message
 
         try:
-            await cb_env.cluster.transactions.run(txn_logic, TransactionOptions(expiration_time=timedelta(seconds=2)))
+            await cb_env.cluster.transactions.run(txn_logic, TransactionOptions(timeout=timedelta(seconds=2)))
         except Exception as ex:
             assert isinstance(ex, TransactionExpired)
             assert 'transaction expired' in ex.message or 'expired in auto' in ex.message
@@ -576,6 +570,14 @@ class TransactionTestSuite:
         bucket, scope = cfg.split_scope_qualifier()
         assert bucket == cb_env.collection._scope.bucket_name
         assert scope == cb_env.collection._scope.name
+
+    @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
+    @pytest.mark.parametrize('exp', [timedelta(seconds=30), timedelta(milliseconds=100)])
+    def test_timeout(self, cls, exp):
+        cfg = cls(timeout=exp)
+        cfg_timeout = cfg._base.to_dict().get('timeout', None)
+        assert cfg_timeout is not None
+        assert cfg_timeout == exp.total_seconds() * 1000*1000*1000  # nanoseconds - and can't use 'is' here
 
     @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
     @pytest.mark.parametrize('level', [DurabilityLevel.NONE,

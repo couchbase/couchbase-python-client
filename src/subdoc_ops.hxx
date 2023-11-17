@@ -15,12 +15,12 @@
  *   limitations under the License.
  */
 
-#ifndef SUBDOC_OPS_H_
-#define SUBDOC_OPS_H_
+#pragma once
 
 #include "client.hxx"
 #include <core/impl/subdoc/opcode.hxx>
 #include <core/impl/subdoc/path_flags.hxx>
+#include <couchbase/store_semantics.hxx>
 
 struct mutate_in_spec {
     uint8_t op;
@@ -98,5 +98,3 @@ struct mutate_in_options {
 
 PyObject*
 handle_subdoc_op(PyObject* self, PyObject* args, PyObject* kwargs);
-
-#endif

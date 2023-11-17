@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.19)
 # needed for CMAKE_MSVC_RUNTIME_LIBRARY
 cmake_policy(SET CMP0091 NEW)
 include(FetchContent)

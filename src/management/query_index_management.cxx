@@ -16,11 +16,15 @@
  */
 
 #include "query_index_management.hxx"
-#include "../exceptions.hxx"
+
+#include <core/operations/management/query.hxx>
 #include <couchbase/management/query_index.hxx>
 
+#include "../exceptions.hxx"
+#include "../result.hxx"
+
 PyObject*
-build_query_index(const couchbase::management::query::index& index)
+build_query_index(const couchbase::management::query_index& index)
 {
     PyObject* pyObj_index = PyDict_New();
     if (index.is_primary) {
@@ -469,7 +473,7 @@ do_query_index_mgmt_op(connection& conn,
                        std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
         create_result_from_query_index_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;

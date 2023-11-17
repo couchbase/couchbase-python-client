@@ -16,6 +16,7 @@
  */
 
 #include "client.hxx"
+#include "exceptions.hxx"
 #include "result.hxx"
 
 /* result type methods */

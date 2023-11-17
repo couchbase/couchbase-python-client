@@ -16,7 +16,11 @@
  */
 
 #include "collection_management.hxx"
+
+#include <core/operations/management/collections.hxx>
+
 #include "../exceptions.hxx"
+#include "../result.hxx"
 
 template<typename T>
 result*
@@ -199,7 +203,7 @@ do_collection_mgmt_op(connection& conn,
                       std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
+    Py_BEGIN_ALLOW_THREADS conn.cluster_.execute(req, [pyObj_callback, pyObj_errback, barrier](response_type resp) {
         create_result_from_collection_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;

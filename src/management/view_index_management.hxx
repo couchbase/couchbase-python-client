@@ -19,8 +19,6 @@
 
 #include "../client.hxx"
 
-#include <core/operations/management/view.hxx>
-
 class ViewIndexManagementOperations
 {
   public:

@@ -19,10 +19,8 @@
 
 #include "client.hxx"
 #include "tracing.hxx"
-#include <couchbase/append_options.hxx>
-#include <couchbase/decrement_options.hxx>
-#include <couchbase/increment_options.hxx>
-#include <couchbase/prepend_options.hxx>
+#include <couchbase/cas.hxx>
+#include <core/document_id.hxx>
 #include <couchbase/persist_to.hxx>
 #include <couchbase/replicate_to.hxx>
 

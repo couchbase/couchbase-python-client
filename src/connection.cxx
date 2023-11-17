@@ -16,10 +16,13 @@
  */
 
 #include "connection.hxx"
-#include "exceptions.hxx"
-#include "tracing.hxx"
-#include "metrics.hxx"
+
 #include <core/io/ip_protocol.hxx>
+#include <core/utils/connection_string.hxx>
+
+#include "exceptions.hxx"
+#include "metrics.hxx"
+#include "tracing.hxx"
 
 couchbase::core::io::ip_protocol
 pyObj_to_ip_protocol(std::string ip_protocol)
@@ -76,7 +79,7 @@ dealloc_conn(PyObject* obj)
     if (conn) {
         auto barrier = std::make_shared<std::promise<void>>();
         auto f = barrier->get_future();
-        conn->cluster_->close([barrier]() { barrier->set_value(); });
+        conn->cluster_.close([barrier]() { barrier->set_value(); });
         f.get();
         conn->io_.stop();
         for (auto& t : conn->io_threads_) {
@@ -816,7 +819,7 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
     auto f = barrier->get_future();
     {
         int callback_count = 0;
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->open(
+        Py_BEGIN_ALLOW_THREADS conn->cluster_.open(
           couchbase::core::origin(auth, connection_str),
           [pyObj_conn, pyObj_callback, pyObj_errback, callback_count, barrier](std::error_code ec) mutable {
               if (callback_count == 0) {
@@ -855,7 +858,7 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
         return nullptr;
     }
 
-    auto cluster_info = conn->cluster_->origin();
+    auto cluster_info = conn->cluster_.origin();
     if (cluster_info.first) {
         Py_RETURN_NONE;
     }
@@ -1211,7 +1214,7 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
     auto f = barrier->get_future();
     {
         int callback_count = 0;
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->close([pyObj_conn, pyObj_callback, pyObj_errback, callback_count, barrier]() mutable {
+        Py_BEGIN_ALLOW_THREADS conn->cluster_.close([pyObj_conn, pyObj_callback, pyObj_errback, callback_count, barrier]() mutable {
             if (callback_count == 0) {
                 close_connection_callback(pyObj_conn, pyObj_callback, pyObj_errback, barrier);
             } else {
@@ -1284,24 +1287,24 @@ handle_open_or_close_bucket([[maybe_unused]] PyObject* self, PyObject* args, PyO
         int callback_count = 0;
         Py_BEGIN_ALLOW_THREADS if (open)
         {
-            conn->cluster_->open_bucket(bucket_name,
+            conn->cluster_.open_bucket(bucket_name,
+                                       [pyObj_callback, pyObj_errback, callback_count, open, barrier](std::error_code ec) mutable {
+                                           // @TODO: should the c++ client execute this lambda more than once?
+                                           if (callback_count == 0) {
+                                               bucket_op_callback(ec, open, pyObj_callback, pyObj_errback, barrier);
+                                           }
+                                           callback_count++;
+                                       });
+        }
+        else
+        {
+            conn->cluster_.close_bucket(bucket_name,
                                         [pyObj_callback, pyObj_errback, callback_count, open, barrier](std::error_code ec) mutable {
-                                            // @TODO: should the c++ client execute this lambda more than once?
                                             if (callback_count == 0) {
                                                 bucket_op_callback(ec, open, pyObj_callback, pyObj_errback, barrier);
                                             }
                                             callback_count++;
                                         });
-        }
-        else
-        {
-            conn->cluster_->close_bucket(bucket_name,
-                                         [pyObj_callback, pyObj_errback, callback_count, open, barrier](std::error_code ec) mutable {
-                                             if (callback_count == 0) {
-                                                 bucket_op_callback(ec, open, pyObj_callback, pyObj_errback, barrier);
-                                             }
-                                             callback_count++;
-                                         });
         }
         Py_END_ALLOW_THREADS
     }
