@@ -83,13 +83,14 @@ class CollectionManagementTestSuite:
 
     def test_collection_goes_in_correct_bucket(self, cb_env):
         collection_name = cb_env.get_collection_name()
-        collection = CollectionSpec(collection_name)
-        cb_env.test_bucket_cm.create_collection(collection)
+        scope_name = '_default'
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
         # make sure it actually is in the other-bucket
-        assert cb_env.get_collection(collection.scope_name, collection.name) is not None
+        assert cb_env.get_collection(scope_name, collection_name) is not None
         # also be sure this isn't in the default bucket
-        assert cb_env.get_collection(collection.scope_name,
-                                     collection.name,
+        assert cb_env.get_collection(scope_name,
+                                     collection_name,
                                      bucket_name=cb_env.bucket.name) is None
 
     def test_create_collection(self, cb_env):
@@ -97,6 +98,7 @@ class CollectionManagementTestSuite:
         collection_name = cb_env.get_collection_name()
         scope_name = '_default'
         cb_env.cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
         coll = cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name)
         assert coll.scope_name == scope_name
         assert coll is not None
@@ -105,6 +107,7 @@ class CollectionManagementTestSuite:
         collection_name = cb_env.get_collection_name()
         scope_name = '_default'
         cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
         # verify the collection exists w/in other-bucket
         assert cb_env.get_collection(scope_name, collection_name) is not None
         # now, it will fail if we try to create it again...
@@ -126,6 +129,7 @@ class CollectionManagementTestSuite:
         settings = CreateCollectionSettings(max_expiry=timedelta(seconds=2))
 
         cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
         coll_spec = cb_env.get_collection(scope_name, collection_name)
         assert coll_spec is not None
         assert coll_spec.max_expiry == timedelta(seconds=2)
@@ -152,6 +156,7 @@ class CollectionManagementTestSuite:
         collection_name = cb_env.get_collection_name()
         scope_name = '_default'
         cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
 
         coll_spec = cb_env.get_collection(scope_name, collection_name)
         assert coll_spec is not None
@@ -180,11 +185,15 @@ class CollectionManagementTestSuite:
     def test_create_scope(self, cb_env):
         scope_name = cb_env.get_scope_name()
         cb_env.test_bucket_cm.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
+
         assert cb_env.get_scope(scope_name) is not None
 
     def test_create_scope_already_exists(self, cb_env):
         scope_name = cb_env.get_scope_name()
         cb_env.test_bucket_cm.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
+
         assert cb_env.get_scope(scope_name) is not None
         with pytest.raises(ScopeAlreadyExistsException):
             cb_env.test_bucket_cm.create_scope(scope_name)
@@ -193,19 +202,26 @@ class CollectionManagementTestSuite:
         scope_name = cb_env.get_scope_name()
         collection_name = cb_env.get_collection_name()
         cb_env.test_bucket_cm.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
+
         assert cb_env.get_scope(scope_name) is not None
+
         collection = CollectionSpec(collection_name, scope_name)
         cb_env.test_bucket_cm.create_collection(collection)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+
         assert cb_env.get_collection(collection.scope_name, collection.name) is not None
 
     def test_drop_collection(self, cb_env):
         collection_name = cb_env.get_collection_name()
         scope_name = '_default'
         cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
         # verify the collection exists w/in other-bucket
         assert cb_env.get_collection(scope_name, collection_name) is not None
         # attempt to drop it again will raise CollectionNotFoundException
         cb_env.test_bucket_cm.drop_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
         with pytest.raises(CollectionNotFoundException):
             cb_env.test_bucket_cm.drop_collection(scope_name, collection_name)
 

@@ -48,6 +48,7 @@ from couchbase.management.buckets import (BucketType,
                                           StorageBackend)
 from couchbase.management.collections import CollectionSpec
 from couchbase.options import ClusterOptions, TransactionConfig
+from tests.consistency import ConsistencyChecker
 from tests.data_provider import DataProvider
 from tests.environments import CollectionType, CouchbaseTestEnvironmentException
 from tests.test_features import EnvironmentFeatures
@@ -81,6 +82,7 @@ class TestEnvironment:
         self._used_docs = set()
         self._used_extras = set()
         self._doc_types = ['dealership', 'vehicle']
+        self._consistency = ConsistencyChecker.from_test_environment(self)
 
     @property
     def aixm(self) -> Optional[Any]:
@@ -99,6 +101,10 @@ class TestEnvironment:
     @property
     def config(self):
         return self._config
+
+    @property
+    def consistency(self):
+        return self._consistency
 
     @property
     def cluster(self):
@@ -526,11 +532,7 @@ class TestEnvironment:
             self.cm.drop_scope(self.TEST_SCOPE)
             self.cm.create_scope(self.TEST_SCOPE)
 
-        TestEnvironment.try_n_times_till_exception(5,
-                                                   1,
-                                                   self.cm.create_scope,
-                                                   self.TEST_SCOPE,
-                                                   expected_exceptions=(ScopeAlreadyExistsException,))
+        self.consistency.wait_until_scope_present(self.bucket.name, self.TEST_SCOPE)
 
         self._collection_spec = CollectionSpec(self.TEST_COLLECTION, self.TEST_SCOPE)
         try:
@@ -539,15 +541,11 @@ class TestEnvironment:
             self.cm.drop_collection(self._collection_spec)
             self.cm.create_collection(self._collection_spec)
 
-        TestEnvironment.try_n_times_till_exception(5,
-                                                   1,
-                                                   self.cm.create_collection,
-                                                   self._collection_spec,
-                                                   expected_exceptions=(CollectionAlreadyExistsException,))
+        self.consistency.wait_until_collection_present(self.bucket.name, self.TEST_SCOPE, self.TEST_COLLECTION)
 
         c = self.get_collection(self.TEST_SCOPE, self.TEST_COLLECTION, bucket_name=self.bucket.name)
         if c is None:
-            raise CouchbaseTestEnvironmentException("Unabled to create collection for name collection testing")
+            raise CouchbaseTestEnvironmentException("Unable to create collection for named collection testing")
 
         self._named_scope = self.bucket.scope(self.TEST_SCOPE)
         self._named_collection = self._named_scope.collection(self.TEST_COLLECTION)

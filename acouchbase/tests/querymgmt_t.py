@@ -84,6 +84,10 @@ class QueryIndexManagementTests:
     async def clear_all_indexes(self, cb_env):
         await self._clear_all_indexes(cb_env)
 
+    @staticmethod
+    def supports_query_without_index(cb_env):
+        return cb_env.is_feature_supported('query_without_index')
+
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio
@@ -99,9 +103,11 @@ class QueryIndexManagementTests:
         await cb_env.cluster.query(n1ql).execute()
         # Drop the primary index
         await ixm.drop_primary_index(bucket_name)
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            await cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                await cb_env.cluster.query(n1ql).execute()
 
     # @TODO: couchbase++ does not handle named primary
     # @pytest.mark.usefixtures("check_query_index_mgmt_supported")
@@ -222,9 +228,11 @@ class QueryIndexManagementTests:
 
         # Drop the index
         await ixm.drop_index(bucket_name, ixname)
-        # Issue the query again
-        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
-            await cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
+                await cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
@@ -470,6 +478,10 @@ class QueryIndexCollectionManagementTests:
     async def clear_all_indexes(self, cb_env):
         await self._clear_all_indexes(cb_env)
 
+    @staticmethod
+    def supports_query_without_index(cb_env):
+        return cb_env.is_feature_supported('query_without_index')
+
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio
@@ -489,9 +501,10 @@ class QueryIndexCollectionManagementTests:
         await ixm.drop_primary_index(bucket_name,
                                      DropPrimaryQueryIndexOptions(scope_name=self.TEST_SCOPE,
                                                                   collection_name=self.TEST_COLLECTION))
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            await cb_env.cluster.query(n1ql).execute()
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                await cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
@@ -642,9 +655,11 @@ class QueryIndexCollectionManagementTests:
                              ixname,
                              scope_name=self.TEST_SCOPE,
                              collection_name=self.TEST_COLLECTION)
-        # Issue the query again
-        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
-            await cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                await cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
@@ -967,6 +982,10 @@ class CollectionQueryIndexManagerTests:
     async def clear_all_indexes(self, cb_env):
         await self._clear_all_indexes(cb_env)
 
+    @staticmethod
+    def supports_query_without_index(cb_env):
+        return cb_env.is_feature_supported('query_without_index')
+
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio
@@ -979,9 +998,11 @@ class CollectionQueryIndexManagerTests:
         await cb_env.cluster.query(n1ql).execute()
         # Drop the primary index
         await cb_env.cixm.drop_primary_index()
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            await cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                await cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
@@ -1073,9 +1094,11 @@ class CollectionQueryIndexManagerTests:
 
         # Drop the index
         await cb_env.cixm.drop_index(ixname)
-        # Issue the query again
-        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
-            await cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
+                await cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")

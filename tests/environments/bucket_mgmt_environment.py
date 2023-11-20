@@ -29,11 +29,11 @@ class BucketManagementTestEnvironment(TestEnvironment):
         available_ids = self._used_ids.difference(self._dropped_ids)
         bucket_name = available_ids.pop()
         self._dropped_ids.add(bucket_name)
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   3,
-                                                   self.bm.drop_bucket,
-                                                   bucket_name,
-                                                   expected_exceptions=(BucketDoesNotExistException, ))
+        try:
+            self.bm.drop_bucket(bucket_name)
+        except BucketDoesNotExistException:
+            pass
+        self.consistency.wait_until_bucket_dropped(bucket_name)
 
     def get_bucket_name(self):
         all_ids = set(self._bucket_ids)

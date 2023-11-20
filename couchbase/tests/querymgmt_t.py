@@ -29,6 +29,7 @@ from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
 from tests.environments import CollectionType
 from tests.environments.query_index_mgmt_environment import QueryIndexManagementTestEnvironment
 from tests.environments.test_environment import TestEnvironment
+from tests.test_features import EnvironmentFeatures
 
 
 class CollectionQueryCIndexManagementTestSuite:
@@ -56,6 +57,12 @@ class CollectionQueryCIndexManagementTestSuite:
     def clear_all_indexes(self, cb_env):
         cb_env.clear_all_indexes()
 
+    @staticmethod
+    def supports_query_without_index(cb_env):
+        return EnvironmentFeatures.is_feature_supported('query_without_index',
+                                                        cb_env.server_version_short,
+                                                        cb_env.mock_server_type)
+
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_index_no_fields(self, cb_env):
         # raises a TypeError b/c not providing fields means
@@ -75,9 +82,11 @@ class CollectionQueryCIndexManagementTestSuite:
         cb_env.cluster.query(n1ql).execute()
         # Drop the primary index
         cb_env.qixm.drop_primary_index(DropPrimaryQueryIndexOptions(index_name=ixname))
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary(self, cb_env):
@@ -89,9 +98,11 @@ class CollectionQueryCIndexManagementTestSuite:
         cb_env.cluster.query(n1ql).execute()
         # Drop the primary index
         cb_env.qixm.drop_primary_index()
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists(self, cb_env):
@@ -313,6 +324,12 @@ class QueryIndexManagementCollectionTestSuite:
     def clear_all_indexes(self, cb_env):
         cb_env.clear_all_indexes(CollectionType.NAMED)
 
+    @staticmethod
+    def supports_query_without_index(cb_env):
+        return EnvironmentFeatures.is_feature_supported('query_without_index',
+                                                        cb_env.server_version_short,
+                                                        cb_env.mock_server_type)
+
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_index_no_fields(self, cb_env):
         # raises a TypeError b/c not providing fields means
@@ -341,9 +358,11 @@ class QueryIndexManagementCollectionTestSuite:
                                        DropPrimaryQueryIndexOptions(index_name=ixname,
                                                                     scope_name=cb_env.TEST_SCOPE,
                                                                     collection_name=cb_env.TEST_COLLECTION))
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary(self, cb_env):
@@ -360,9 +379,11 @@ class QueryIndexManagementCollectionTestSuite:
         cb_env.qixm.drop_primary_index(cb_env.bucket.name,
                                        DropPrimaryQueryIndexOptions(scope_name=cb_env.TEST_SCOPE,
                                                                     collection_name=cb_env.TEST_COLLECTION))
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists(self, cb_env):
@@ -747,6 +768,12 @@ class QueryIndexManagementTestSuite:
     def clear_all_indexes(self, cb_env):
         cb_env.clear_all_indexes()
 
+    @staticmethod
+    def supports_query_without_index(cb_env):
+        return EnvironmentFeatures.is_feature_supported('query_without_index',
+                                                        cb_env.server_version_short,
+                                                        cb_env.mock_server_type)
+
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_index_no_fields(self, cb_env):
         # raises a TypeError b/c not providing fields means
@@ -768,9 +795,11 @@ class QueryIndexManagementTestSuite:
         cb_env.cluster.query(n1ql).execute()
         # Drop the primary index
         cb_env.qixm.drop_primary_index(cb_env.bucket.name, DropPrimaryQueryIndexOptions(index_name=ixname))
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary(self, cb_env):
@@ -782,9 +811,11 @@ class QueryIndexManagementTestSuite:
         cb_env.cluster.query(n1ql).execute()
         # Drop the primary index
         cb_env.qixm.drop_primary_index(cb_env.bucket.name)
-        # Ensure we get an error when executing the query
-        with pytest.raises(QueryIndexNotFoundException):
-            cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists(self, cb_env):
@@ -906,9 +937,11 @@ class QueryIndexManagementTestSuite:
 
         # Drop the index
         cb_env.qixm.drop_index(cb_env.bucket.name, ixname)
-        # Issue the query again
-        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
-            cb_env.cluster.query(n1ql).execute()
+
+        if not self.supports_query_without_index(cb_env):
+            # Ensure we get an error when executing the query
+            with pytest.raises(QueryIndexNotFoundException):
+                cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env):

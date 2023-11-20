@@ -65,6 +65,7 @@ class ServerFeatures(Enum):
     UpdateCollection = 'update_collection'
     UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
     NonDedupedHistory = 'non_deduped_history'
+    QueryWithoutIndex = 'query_without_index'
 
 
 class EnvironmentFeatures:
@@ -133,7 +134,8 @@ class EnvironmentFeatures:
 
     AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KeyValueRangeScan,
                                 ServerFeatures.SubdocReplicaRead,
-                                ServerFeatures.UpdateCollectionMaxExpiry]
+                                ServerFeatures.UpdateCollectionMaxExpiry,
+                                ServerFeatures.QueryWithoutIndex]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str

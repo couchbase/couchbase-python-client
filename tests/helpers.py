@@ -131,6 +131,7 @@ class ServerFeatures(Enum):
     UpdateCollection = 'update_collection'
     UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
     NonDedupedHistory = 'non_deduped_history'
+    QueryWithoutIndex = 'query_without_index'
 
 
 # mock and real server (all versions) should have these features
@@ -195,7 +196,8 @@ AT_LEAST_V7_2_0_FEATURES = [ServerFeatures.NonDedupedHistory,
 
 AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan,
                             ServerFeatures.SubdocReplicaRead,
-                            ServerFeatures.UpdateCollectionMaxExpiry]
+                            ServerFeatures.UpdateCollectionMaxExpiry,
+                            ServerFeatures.QueryWithoutIndex]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {

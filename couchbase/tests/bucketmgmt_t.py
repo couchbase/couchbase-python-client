@@ -103,7 +103,8 @@ class BucketManagementTestSuite:
                 name=bucket_name,
                 ram_quota_mb=100,
                 flush_enabled=False))
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
@@ -117,7 +118,8 @@ class BucketManagementTestSuite:
                 ram_quota_mb=100,
                 bucket_type=BucketType.EPHEMERAL,
                 flush_enabled=False))
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.storage_backend == StorageBackend.UNDEFINED
 
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
@@ -131,7 +133,8 @@ class BucketManagementTestSuite:
                 ram_quota_mb=1024,
                 flush_enabled=False,
                 storage_backend=StorageBackend.MAGMA))
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.storage_backend == StorageBackend.MAGMA
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
@@ -143,7 +146,8 @@ class BucketManagementTestSuite:
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
                 ram_quota_mb=100))
-        bucket = TestEnvironment.try_n_times(10, 1, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         if cb_env.server_version_short >= 6.6:
             assert bucket['minimum_durability_level'] == DurabilityLevel.NONE
 
@@ -156,7 +160,8 @@ class BucketManagementTestSuite:
                                                      bucket_type=BucketType.COUCHBASE,
                                                      ram_quota_mb=100,
                                                      minimum_durability_level=min_durability))
-        bucket = TestEnvironment.try_n_times(10, 1, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket["minimum_durability_level"] == min_durability
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
@@ -168,6 +173,7 @@ class BucketManagementTestSuite:
             bucket_type=BucketType.COUCHBASE,
             ram_quota_mb=100)
         cb_env.bm.create_bucket(settings)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
         with pytest.raises(BucketAlreadyExistsException):
             cb_env.bm.create_bucket(settings)
 
@@ -181,7 +187,8 @@ class BucketManagementTestSuite:
                 bucket_type=BucketType.COUCHBASE,
                 ram_quota_mb=100,
                 replica_index=False))
-        bucket = TestEnvironment.try_n_times(10, 1, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.replica_index is False
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
@@ -194,7 +201,8 @@ class BucketManagementTestSuite:
                 bucket_type=BucketType.COUCHBASE,
                 ram_quota_mb=100,
                 replica_index=True))
-        bucket = TestEnvironment.try_n_times(10, 1, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.replica_index is True
 
     @pytest.mark.usefixtures('check_custom_conflict_resolution_supported')
@@ -209,7 +217,8 @@ class BucketManagementTestSuite:
                     ram_quota_mb=100,
                     conflict_resolution_type=ConflictResolutionType.CUSTOM,
                     flush_enabled=False))
-            bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+            cb_env.consistency.wait_until_bucket_present(bucket_name)
+            bucket = cb_env.bm.get_bucket(bucket_name)
             assert bucket.conflict_resolution_type == ConflictResolutionType.CUSTOM
         else:
             with pytest.raises(FeatureUnavailableException):
@@ -235,7 +244,8 @@ class BucketManagementTestSuite:
                 history_retention_duration=timedelta(days=1)
             )
         )
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.history_retention_collection_default
         assert bucket.history_retention_bytes == 2**31
         assert bucket.history_retention_duration == timedelta(days=1)
@@ -272,7 +282,8 @@ class BucketManagementTestSuite:
                 ram_quota_mb=1024,
             )
         )
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket is not None
         assert bucket.history_retention_collection_default
         assert bucket.history_retention_bytes == 0
@@ -289,7 +300,7 @@ class BucketManagementTestSuite:
                 history_retention_duration=timedelta(minutes=10)
             )
         )
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.history_retention_collection_default
         assert bucket.history_retention_bytes == 2**31
         assert bucket.history_retention_duration == timedelta(minutes=10)
@@ -307,7 +318,8 @@ class BucketManagementTestSuite:
                 ram_quota_mb=256,
             )
         )
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket is not None
         assert bucket.history_retention_collection_default is None
         assert bucket.history_retention_bytes is None
@@ -334,7 +346,9 @@ class BucketManagementTestSuite:
             bucket_type=BucketType.COUCHBASE,
             ram_quota_mb=100)
         cb_env.bm.create_bucket(settings)
-        TestEnvironment.try_n_times(10, 1, cb_env.bm.drop_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        cb_env.bm.drop_bucket(bucket_name)
+        cb_env.consistency.wait_until_bucket_dropped(bucket_name)
         with pytest.raises(BucketDoesNotExistException):
             cb_env.bm.drop_bucket(bucket_name)
 
@@ -348,7 +362,8 @@ class BucketManagementTestSuite:
                 name=bucket_name,
                 ram_quota_mb=100,
                 flush_enabled=True))
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.flush_enabled is True
         # flush the bucket
         TestEnvironment.try_n_times(10, 3, cb_env.bm.flush_bucket, bucket.name)
@@ -363,7 +378,8 @@ class BucketManagementTestSuite:
                 name=bucket_name,
                 ram_quota_mb=100,
                 flush_enabled=False))
-        bucket = TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.flush_enabled is False
 
         with pytest.raises(BucketNotFlushableException):
@@ -378,7 +394,7 @@ class BucketManagementTestSuite:
                 CreateBucketSettings(
                     name=bucket_name,
                     ram_quota_mb=100))
-            TestEnvironment.try_n_times(10, 1, cb_env.bm.get_bucket, bucket_name)
+            cb_env.consistency.wait_until_bucket_present(bucket_name)
 
         buckets = cb_env.bm.get_all_buckets()
         assert set() == set(bucket_names).difference(set(map(lambda b: b.name, buckets)))
@@ -392,7 +408,7 @@ class BucketManagementTestSuite:
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100))
-        TestEnvironment.try_n_times(10, 3, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
 
         # change bucket TTL
         TestEnvironment.try_n_times(10, 3, cb_env.bm.update_bucket, BucketSettings(
@@ -416,7 +432,7 @@ class BucketManagementTestSuite:
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100))
-        TestEnvironment.try_n_times(10, 1, cb_env.bm.get_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
         # cluster should be able to return it (though, not right away)
         b = TestEnvironment.try_n_times(10, 2, cb_env.cluster.bucket, bucket_name)
         assert b is not None

@@ -83,7 +83,8 @@ class UserManagementTestSuite:
 
         cb_env.um.upsert_user(User(username=username, password=password, roles=roles))
 
-        user_metadata = TestEnvironment.try_n_times(5, 1, cb_env.um.get_user, username)
+        cb_env.consistency.wait_until_user_present(username)
+        user_metadata = cb_env.um.get_user(username)
         assert user_metadata is not None
 
         # handle 7.0 roles w/ scopes/collections
@@ -163,13 +164,10 @@ class UserManagementTestSuite:
         initial_user = User(username=username, roles=roles)
         # create user
         cb_env.um.upsert_user(initial_user, UpsertUserOptions(domain_name='external'))
+        cb_env.consistency.wait_until_user_present(username, 'external')
 
         # get user
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    username,
-                                                    GetUserOptions(domain_name='external'))
+        user_metadata = cb_env.um.get_user(username, GetUserOptions(domain_name='external'))
 
         # handle 7.0 roles w/ scopes/collections
         test_roles = roles
@@ -208,11 +206,9 @@ class UserManagementTestSuite:
 
         # remove user
         cb_env.um.drop_user(username, DropUserOptions(domain_name='external'))
-        TestEnvironment.try_n_times_till_exception(5,
-                                                   1,
-                                                   cb_env.um.get_user,
-                                                   username, domain_name='external',
-                                                   expected_exceptions=UserNotFoundException)
+        cb_env.consistency.wait_until_user_dropped(username, 'external')
+        with pytest.raises(UserNotFoundException):
+            cb_env.um.get_user(username, GetUserOptions(domain_name='external'))
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.usefixtures('check_user_groups_supported')
@@ -225,8 +221,10 @@ class UserManagementTestSuite:
                             roles=roles,
                             description='test group description')
         cb_env.um.upsert_group(fresh_group)
+        cb_env.consistency.wait_until_group_present(fresh_group.name)
         admin_group = Group('admin-test-group', roles=[Role(name='admin')])
         cb_env.um.upsert_group(admin_group)
+        cb_env.consistency.wait_until_group_present(admin_group.name)
         all_groups = cb_env.um.get_all_groups()
         # NOTE: we could well have other groups on this server, apart from the one we added, so
         # lets be ok with there being more of them.  However, the one we added
@@ -274,18 +272,17 @@ class UserManagementTestSuite:
                            description='test group description')
         # add group
         cb_env.um.upsert_group(test_group)
+        cb_env.consistency.wait_until_group_present(test_group.name)
 
         # get group
-        result = TestEnvironment.try_n_times(5, 1, cb_env.um.get_group, test_group.name)
+        result = cb_env.um.get_group(test_group.name)
         cb_env.validate_group(result, test_group.roles)
 
         # remove group
         cb_env.um.drop_group(test_group.name)
-        TestEnvironment.try_n_times_till_exception(5,
-                                                   1,
-                                                   cb_env.um.get_group,
-                                                   test_group.name,
-                                                   expected_exceptions=GroupNotFoundException)
+        cb_env.consistency.wait_until_group_dropped(test_group.name)
+        with pytest.raises(GroupNotFoundException):
+            cb_env.um.get_group(test_group.name)
 
     def test_group_feature_not_found(self, cb_env):
         groups_supported = EnvironmentFeatures.is_feature_supported('user_group_mgmt',
@@ -327,13 +324,10 @@ class UserManagementTestSuite:
         # create user
         cb_env.um.upsert_user(User(username=username, roles=roles, password=password),
                               UpsertUserOptions(domain_name='local'))
+        cb_env.consistency.wait_until_user_present(username)
 
         # get user
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    username,
-                                                    GetUserOptions(domain_name='local'))
+        user_metadata = cb_env.um.get_user(username, GetUserOptions(domain_name='local'))
 
         # handle 7.0 roles w/ scopes/collections
         test_roles = roles
@@ -373,12 +367,9 @@ class UserManagementTestSuite:
 
         # remove user
         cb_env.um.drop_user(username, DropUserOptions(domain_name='local'))
-        TestEnvironment.try_n_times_till_exception(5,
-                                                   1,
-                                                   cb_env.um.get_user,
-                                                   username,
-                                                   domain_name='local',
-                                                   expected_exceptions=(UserNotFoundException,))
+        cb_env.consistency.wait_until_user_dropped(username)
+        with pytest.raises((UserNotFoundException)):
+            cb_env.um.get_user(username, GetUserOptions(domain_name='local'))
 
     def test_internal_user_fail(self, cb_env):
         """
@@ -418,13 +409,10 @@ class UserManagementTestSuite:
 
         # create user
         cb_env.um.upsert_user(initial_user, domain_name='local')
+        cb_env.consistency.wait_until_user_present(username)
 
         # get single user
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    username,
-                                                    domain_name='local')
+        user_metadata = cb_env.um.get_user(username, domain_name='local')
 
         # handle 7.0 roles w/ scopes/collections
         test_roles = roles
@@ -464,12 +452,9 @@ class UserManagementTestSuite:
 
         # remove user
         cb_env.um.drop_user(username, domain_name='local')
-        TestEnvironment.try_n_times_till_exception(5,
-                                                   1,
-                                                   cb_env.um.get_user,
-                                                   username,
-                                                   domain_name='local',
-                                                   expected_exceptions=UserNotFoundException)
+        cb_env.consistency.wait_until_user_dropped(username)
+        with pytest.raises(UserNotFoundException):
+            cb_env.um.get_user(username, domain_name='local')
 
     def test_invalid_domain_raises_argument_error(self, cb_env):
 
@@ -527,7 +512,7 @@ class UserManagementTestSuite:
         # add groups
         for group in groups:
             cb_env.um.upsert_group(group)
-            TestEnvironment.try_n_times(5, 1, cb_env.um.get_group, group.name)
+            cb_env.consistency.wait_until_group_present(group.name)
         user_groups = list(map(lambda g: g.name, groups))
 
         # add user
@@ -536,13 +521,10 @@ class UserManagementTestSuite:
                          groups=user_groups,
                          password='s3cr3t')
         cb_env.um.upsert_user(test_user, domain_name='local')
+        cb_env.consistency.wait_until_user_present(test_user.username)
 
         # get user
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    test_user.username,
-                                                    domain_name='local')
+        user_metadata = cb_env.um.get_user(test_user.username, domain_name='local')
 
         # handle 7.0 roles w/ scopes/collections
         test_roles = user_roles
@@ -566,18 +548,12 @@ class UserManagementTestSuite:
         # remove group
         remove_group = groups.pop()
         cb_env.um.drop_group(remove_group.name)
-        TestEnvironment.try_n_times_till_exception(5,
-                                                   1,
-                                                   cb_env.um.get_group,
-                                                   remove_group.name,
-                                                   expected_exceptions=GroupNotFoundException)
+        cb_env.consistency.wait_until_group_dropped(remove_group.name)
+        with pytest.raises(GroupNotFoundException):
+            cb_env.um.get_group(remove_group.name)
 
         # get user to verify roles from removed group are removed
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    test_user.username,
-                                                    domain_name='local')
+        user_metadata = cb_env.um.get_user(test_user.username, domain_name='local')
 
         # handle 7.0 roles w/ scopes/collections
         if collections_supported:
@@ -611,6 +587,7 @@ class UserManagementTestSuite:
                                     password=original_password)
         # Upsert user
         cb_env.um.upsert_user(change_password_user, UpsertUserOptions(domain_name="local"))
+        cb_env.consistency.wait_until_user_present(username)
 
         # Authenticate as change-password-user.
         # Done in a while loop to emulate retry
@@ -655,13 +632,10 @@ class UserManagementTestSuite:
 
         # create user
         cb_env.um.upsert_user(user, UpsertUserOptions(domain_name='local'))
+        cb_env.consistency.wait_until_user_present(user.username)
 
         # get user
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    user.username,
-                                                    GetUserOptions(domain_name='local'))
+        user_metadata = cb_env.um.get_user(user.username, GetUserOptions(domain_name='local'))
 
         assert user_metadata.user.display_name == user.display_name
 
@@ -672,26 +646,18 @@ class UserManagementTestSuite:
 
         if cb_env.cm is None:
             cm = cb_env.bucket.collections()
+        else:
+            cm = cb_env.cm
 
-        cm.create_scope('um-test-scope')
-        for _ in range(3):
-            scopes = cm.get_all_scopes()
-            scope = next((s for s in scopes if s.name == 'um-test-scope'), None)
-            if scope:
-                break
-            TestEnvironment.sleep(1)
+        scope_name = 'um-test-scope'
+        collection_name = 'test-collection'
 
-        collection = CollectionSpec('test-collection', scope_name='um-test-scope')
+        cm.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.bucket.name, scope_name)
+
+        collection = CollectionSpec(collection_name, scope_name=scope_name)
         cm.create_collection(collection)
-        for _ in range(3):
-            scopes = cm.get_all_scopes()
-            scope = next((s for s in scopes if s.name == 'um-test-scope'), None)
-            if scope:
-                coll = next((c for c in scope.collections
-                             if c.name == 'test-collection'), None)
-                if coll:
-                    break
-            TestEnvironment.sleep(1)
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
 
         username = 'custom-user'
         password = 's3cr3t'
@@ -706,13 +672,10 @@ class UserManagementTestSuite:
 
         # create user
         cb_env.um.upsert_user(initial_user, domain_name='local')
+        cb_env.consistency.wait_until_user_present(username)
 
         # get single user
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    username,
-                                                    domain_name='local')
+        user_metadata = cb_env.um.get_user(username, domain_name='local')
 
         test_roles = []
         for r in roles:
