@@ -66,6 +66,7 @@ class ServerFeatures(Enum):
     UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
     NonDedupedHistory = 'non_deduped_history'
     QueryWithoutIndex = 'query_without_index'
+    NotLockedKVStatus = 'kv_not_locked'
 
 
 class EnvironmentFeatures:
@@ -136,6 +137,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.SubdocReplicaRead,
                                 ServerFeatures.UpdateCollectionMaxExpiry,
                                 ServerFeatures.QueryWithoutIndex]
+
+    AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str
@@ -303,6 +306,16 @@ class EnvironmentFeatures:
 
             if server_version < 7.5:
                 return (f'Feature: {feature} only supported on server versions >= 7.5. '
+                        f'Using server version: {server_version}.')
+
+            return None
+
+        if feature in map(lambda f: f.value, EnvironmentFeatures.AT_LEAST_V7_6_0_FEATURES):
+            if is_mock_server:
+                return f'Mock server does not support feature: {feature}'
+
+            if server_version < 7.6:
+                return (f'Feature: {feature} only supported on server versions >= 7.6. '
                         f'Using server version: {server_version}.')
 
             return None

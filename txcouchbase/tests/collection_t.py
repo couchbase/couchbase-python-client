@@ -27,6 +27,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentExistsException,
                                   DocumentLockedException,
                                   DocumentNotFoundException,
+                                  DocumentNotLockedException,
                                   DocumentUnretrievableException,
                                   DurabilityImpossibleException,
                                   InvalidArgumentException,
@@ -81,6 +82,10 @@ class CollectionTests:
     @pytest.fixture(scope="class")
     def check_xattr_supported(self, cb_env):
         cb_env.check_if_feature_supported('xattr')
+
+    @pytest.fixture(scope="class")
+    def check_not_locked_supported(self, cb_env):
+        cb_env.check_if_feature_supported('kv_not_locked')
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:
@@ -558,12 +563,10 @@ class CollectionTests:
         assert orig.cas != result.cas
 
         # @TODO(jc):  cxx client raises ambiguous timeout w/ retry reason: kv_temporary_failure
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb.unlock,
-                                          key,
-                                          orig.cas,
-                                          expected_exceptions=(TemporaryFailException,))
+        cb_env.try_n_times_till_exception(10, 1,
+                                          cb.unlock, key, orig.cas,
+                                          expected_exceptions=(TemporaryFailException,
+                                                               DocumentNotLockedException))
 
     def test_get_and_lock_replace_with_cas(self, cb_env, default_kvp_and_reset):
         cb = cb_env.collection
@@ -579,12 +582,10 @@ class CollectionTests:
 
         run_in_reactor_thread(cb.replace, key, value, ReplaceOptions(cas=cas))
         # @TODO(jc):  cxx client raises ambiguous timeout w/ retry reason: kv_temporary_failure
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb.unlock,
-                                          key,
-                                          cas,
-                                          expected_exceptions=(TemporaryFailException,))
+        cb_env.try_n_times_till_exception(10, 1,
+                                          cb.unlock, key, cas,
+                                          expected_exceptions=(TemporaryFailException,
+                                                               DocumentNotLockedException))
 
     def test_unlock(self, cb_env, default_kvp_and_reset):
         cb = cb_env.collection
@@ -601,15 +602,22 @@ class CollectionTests:
         result = run_in_reactor_thread(cb.get_and_lock, key, timedelta(seconds=5))
         cas = result.cas
         # @TODO(jc): MOCK - TemporaryFailException
-        with pytest.raises((DocumentLockedException)):
+        with pytest.raises(CasMismatchException):
             run_in_reactor_thread(cb.unlock, key, 100)
 
-        cb_env.try_n_times_till_exception(10,
-                                          1,
-                                          cb.unlock,
-                                          key,
-                                          cas,
-                                          expected_exceptions=(TemporaryFailException,))
+        cb_env.try_n_times_till_exception(10, 1,
+                                          cb.unlock, key, cas,
+                                          expected_exceptions=(TemporaryFailException, DocumentNotLockedException))
+
+    @pytest.mark.usefixtures("check_not_locked_supported")
+    def test_unlock_not_locked(self, cb_env, default_kvp_and_reset):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        result = run_in_reactor_thread(cb.get_and_lock, key, timedelta(seconds=5))
+        cas = result.cas
+        run_in_reactor_thread(cb.unlock, key, cas)
+        with pytest.raises(DocumentNotLockedException):
+            run_in_reactor_thread(cb.unlock, key, cas)
 
     @pytest.mark.usefixtures("check_replicas")
     def test_get_any_replica(self, cb_env, default_kvp):

@@ -27,6 +27,7 @@ from couchbase.exceptions import (CasMismatchException,
                                   DocumentExistsException,
                                   DocumentLockedException,
                                   DocumentNotFoundException,
+                                  DocumentNotLockedException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException,
                                   PathNotFoundException,
@@ -88,6 +89,10 @@ class CollectionTests:
     @pytest.fixture(scope="class")
     def check_xattr_supported(self, cb_env):
         cb_env.check_if_feature_supported('xattr')
+
+    @pytest.fixture(scope="class")
+    def check_not_locked_supported(self, cb_env):
+        cb_env.check_if_feature_supported('kv_not_locked')
 
     @pytest_asyncio.fixture(name="new_kvp")
     async def new_key_and_value_with_reset(self, cb_env) -> KVPair:
@@ -548,12 +553,10 @@ class CollectionTests:
         assert orig.cas != result.cas
 
         # @TODO(jc):  cxx client raises ambiguous timeout w/ retry reason: kv_temporary_failure
-        await cb_env.try_n_times_till_exception(10,
-                                                1,
-                                                cb.unlock,
-                                                key,
-                                                orig.cas,
-                                                expected_exceptions=(TemporaryFailException,))
+        await cb_env.try_n_times_till_exception(10, 1,
+                                                cb.unlock, key, orig.cas,
+                                                expected_exceptions=(TemporaryFailException,
+                                                                     DocumentNotLockedException))
 
     @pytest.mark.asyncio
     async def test_get_and_lock_replace_with_cas(self, cb_env, default_kvp_and_reset):
@@ -568,12 +571,10 @@ class CollectionTests:
 
         await cb.replace(key, value, ReplaceOptions(cas=cas))
         # @TODO(jc):  cxx client raises ambiguous timeout w/ retry reason: kv_temporary_failure
-        await cb_env.try_n_times_till_exception(10,
-                                                1,
-                                                cb.unlock,
-                                                key,
-                                                cas,
-                                                expected_exceptions=(TemporaryFailException,))
+        await cb_env.try_n_times_till_exception(10, 1,
+                                                cb.unlock, key, cas,
+                                                expected_exceptions=(TemporaryFailException,
+                                                                     DocumentNotLockedException))
 
     @pytest.mark.asyncio
     async def test_unlock(self, cb_env, default_kvp_and_reset):
@@ -592,15 +593,24 @@ class CollectionTests:
         result = await cb.get_and_lock(key, timedelta(seconds=5))
         cas = result.cas
         # @TODO(jc): MOCK - TemporaryFailException
-        with pytest.raises((DocumentLockedException)):
+        with pytest.raises(CasMismatchException):
             await cb.unlock(key, 100)
 
-        await cb_env.try_n_times_till_exception(10,
-                                                1,
-                                                cb.unlock,
-                                                key,
-                                                cas,
-                                                expected_exceptions=(TemporaryFailException,))
+        await cb_env.try_n_times_till_exception(10, 1,
+                                                cb.unlock, key, cas,
+                                                expected_exceptions=(TemporaryFailException,
+                                                                     DocumentNotLockedException))
+
+    @pytest.mark.usefixtures("check_not_locked_supported")
+    @pytest.mark.asyncio
+    async def test_unlock_not_locked(self, cb_env, default_kvp_and_reset):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        result = await cb.get_and_lock(key, timedelta(seconds=5))
+        cas = result.cas
+        await cb.unlock(key, cas)
+        with pytest.raises(DocumentNotLockedException):
+            await cb.unlock(key, cas)
 
     @pytest.mark.usefixtures("check_replicas")
     @pytest.mark.asyncio

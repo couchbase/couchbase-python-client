@@ -721,6 +721,22 @@ class DocumentLockedException(CouchbaseException):
         return self.__repr__()
 
 
+class DocumentNotLockedException(CouchbaseException):
+    """Indicates that the referenced document is not locked, generally raised when an
+    unlock operation is being performed."""
+
+    def __init__(self, message=None, **kwargs):
+        if message and isinstance(message, str) and 'message' not in kwargs:
+            kwargs['message'] = message
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
+
+
 class DocumentNotFoundException(CouchbaseException):
     """Indicates that the referenced document does not exist."""
 
@@ -1883,6 +1899,7 @@ class ExceptionMap(Enum):
     PathInvalidException = 115
     InvalidValueException = 119
     PathExistsException = 123
+    DocumentNotLockedException = 131
     MutationTokenOutdatedException = 133
     RangeScanCompletedException = 134
     DatasetNotFoundException = 303

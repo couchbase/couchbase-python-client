@@ -25,6 +25,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentExistsException,
                                   DocumentLockedException,
                                   DocumentNotFoundException,
+                                  DocumentNotLockedException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException,
                                   TemporaryFailException)
@@ -83,6 +84,7 @@ class CollectionTestSuite:
         'test_touch_no_expire',
         'test_unlock',
         'test_unlock_wrong_cas',
+        'test_unlock_not_locked',
         'test_upsert',
         'test_upsert_preserve_expiry',
         'test_upsert_preserve_expiry_not_used',
@@ -97,6 +99,12 @@ class CollectionTestSuite:
     @pytest.fixture(scope='class')
     def check_xattr_supported(self, cb_env):
         EnvironmentFeatures.check_if_feature_supported('xattr',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type)
+
+    @pytest.fixture(scope='class')
+    def check_not_locked_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('kv_not_locked',
                                                        cb_env.server_version_short,
                                                        cb_env.mock_server_type)
 
@@ -198,12 +206,10 @@ class CollectionTestSuite:
         assert orig.cas != result.cas
 
         # @TODO(jc):  cxx client raises ambiguous timeout w/ retry reason: kv_temporary_failure
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   1,
-                                                   cb_env.collection.unlock,
-                                                   key,
-                                                   orig.cas,
-                                                   expected_exceptions=(TemporaryFailException,))
+        TestEnvironment.try_n_times_till_exception(10, 1,
+                                                   cb_env.collection.unlock, key, orig.cas,
+                                                   expected_exceptions=(TemporaryFailException,
+                                                                        DocumentNotLockedException))
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.usefixtures("check_multi_node")
@@ -268,12 +274,10 @@ class CollectionTestSuite:
             cb_env.collection.upsert(key, value)
 
         cb_env.collection.replace(key, value, ReplaceOptions(cas=cas))
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   1,
-                                                   cb_env.collection.unlock,
-                                                   key,
-                                                   cas,
-                                                   expected_exceptions=(TemporaryFailException,))
+        TestEnvironment.try_n_times_till_exception(10, 1,
+                                                   cb_env.collection.unlock, key, cas,
+                                                   expected_exceptions=(TemporaryFailException,
+                                                                        DocumentNotLockedException))
 
     def test_get_and_touch(self, cb_env):
         key, value = cb_env.get_new_doc()
@@ -554,12 +558,19 @@ class CollectionTestSuite:
         with pytest.raises(CasMismatchException):
             cb_env.collection.unlock(key, 100)
 
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   1,
-                                                   cb_env.collection.unlock,
-                                                   key,
-                                                   cas,
-                                                   expected_exceptions=(TemporaryFailException,))
+        TestEnvironment.try_n_times_till_exception(10, 1,
+                                                   cb_env.collection.unlock, key, cas,
+                                                   expected_exceptions=(TemporaryFailException,
+                                                                        DocumentNotLockedException))
+
+    @pytest.mark.usefixtures("check_not_locked_supported")
+    def test_unlock_not_locked(self, cb_env):
+        key = cb_env.get_existing_doc(key_only=True)
+        result = cb_env.collection.get_and_lock(key, timedelta(seconds=5))
+        cas = result.cas
+        cb_env.collection.unlock(key, cas)
+        with pytest.raises(DocumentNotLockedException):
+            cb_env.collection.unlock(key, cas)
 
     def test_upsert(self, cb_env):
         key, value = cb_env.get_existing_doc()

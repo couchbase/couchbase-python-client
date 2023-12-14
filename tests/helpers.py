@@ -132,6 +132,7 @@ class ServerFeatures(Enum):
     UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
     NonDedupedHistory = 'non_deduped_history'
     QueryWithoutIndex = 'query_without_index'
+    NotLockedKVStatus = 'kv_not_locked'
 
 
 # mock and real server (all versions) should have these features
@@ -198,6 +199,8 @@ AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan,
                             ServerFeatures.SubdocReplicaRead,
                             ServerFeatures.UpdateCollectionMaxExpiry,
                             ServerFeatures.QueryWithoutIndex]
+
+AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {
@@ -479,6 +482,11 @@ class CouchbaseTestEnvironment():
                 return self.server_version_short >= 7.5
             return not self.is_mock_server
 
+        if feature in map(lambda f: f.value, AT_LEAST_V7_6_0_FEATURES):
+            if self.is_real_server:
+                return self.server_version_short >= 7.6
+            return not self.is_mock_server
+
         raise CouchbaseTestEnvironmentException(f"Unable to determine if server has provided feature: {feature}")
 
     def feature_not_supported_text(self, feature  # type: str  # noqa: C901
@@ -544,6 +552,12 @@ class CouchbaseTestEnvironment():
         if feature in map(lambda f: f.value, AT_LEAST_V7_5_0_FEATURES):
             if self.is_real_server:
                 return (f'Feature: {feature} only supported on server versions >= 7.5. '
+                        f'Using server version: {self.server_version}.')
+            return f'Mock server does not support feature: {feature}'
+
+        if feature in map(lambda f: f.value, AT_LEAST_V7_6_0_FEATURES):
+            if self.is_real_server:
+                return (f'Feature: {feature} only supported on server versions >= 7.6. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 
