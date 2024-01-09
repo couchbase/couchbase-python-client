@@ -1897,7 +1897,13 @@ class ExceptionMap(Enum):
     PathNotFoundException = 113
     PathMismatchException = 114
     PathInvalidException = 115
+    PathTooBigException = 116
+    PathTooDeepException = 117
+    ValueTooDeepException = 118
     InvalidValueException = 119
+    DocumentNotJsonException = 120
+    NumberTooBigException = 121
+    DeltaInvalidException = 122
     PathExistsException = 123
     DocumentNotLockedException = 131
     MutationTokenOutdatedException = 133
