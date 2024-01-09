@@ -372,7 +372,10 @@ class CouchbaseException(Exception):
     @property
     def error_context(self) -> ErrorContextType:
         if not self._context:
-            base_ec = self._base.error_context() or dict()
+            if self._base:
+                base_ec = self._base.error_context() or dict()
+            else:
+                base_ec = dict()
             self._context = ErrorContext.from_dict(**base_ec)
         return self._context
 
