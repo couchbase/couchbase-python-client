@@ -77,7 +77,7 @@ create_result_from_collection_mgmt_response<couchbase::core::operations::managem
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyLong_FromUnsignedLong(collection.max_expiry);
+            pyObj_tmp = PyLong_FromLong(collection.max_expiry);
             if (-1 == PyDict_SetItemString(pyObj_collection_spec, "max_expiry", pyObj_tmp)) {
                 Py_XDECREF(pyObj_scopes);
                 Py_XDECREF(pyObj_collections);
@@ -266,7 +266,14 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
             req.scope_name = scope_name;
             req.collection_name = collection_name;
             if (pyObj_max_expiry != nullptr) {
-                req.max_expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_max_expiry));
+                req.max_expiry = static_cast<int32_t>(PyLong_AsLong(pyObj_max_expiry));
+                // PyLong_AsLong() returns -1 on error, need to use PyErr_Occurred() to disambiguate.
+                if (PyErr_Occurred() != nullptr) {
+                    pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unabled to parse max_expiry.");
+                    Py_XDECREF(pyObj_callback);
+                    Py_XDECREF(pyObj_errback);
+                    return res;
+                }
             }
             if (pyObj_history != nullptr) {
                 if (pyObj_history == Py_True) {
@@ -295,7 +302,14 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
             req.scope_name = scope_name;
             req.collection_name = collection_name;
             if (pyObj_max_expiry != nullptr) {
-                req.max_expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_max_expiry));
+                req.max_expiry = static_cast<int32_t>(PyLong_AsLong(pyObj_max_expiry));
+                // PyLong_AsLong() returns -1 on error, need to use PyErr_Occurred() to disambiguate.
+                if (PyErr_Occurred() != nullptr) {
+                    pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unabled to parse max_expiry.");
+                    Py_XDECREF(pyObj_callback);
+                    Py_XDECREF(pyObj_errback);
+                    return res;
+                }
             }
             if (pyObj_history != nullptr) {
                 if (pyObj_history == Py_True) {

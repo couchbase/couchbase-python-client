@@ -20,6 +20,7 @@ from functools import wraps
 from twisted.internet.defer import Deferred
 
 from acouchbase.logic import call_async_fn
+from couchbase._utils import Overload, OverloadType
 from couchbase.exceptions import ErrorMapper, MissingConnectionException
 from couchbase.management.logic import (ManagementType,
                                         handle_analytics_index_mgmt_response,
@@ -36,11 +37,23 @@ def build_mgmt_exception(exc, mgmt_type, error_map):
     return ErrorMapper.build_exception(exc, mapping=error_map)
 
 
+mgmt_overload_registry = {}
+
+
 class TxMgmtWrapper:
     @classmethod   # noqa: C901
-    def inject_callbacks(cls, return_cls, mgmt_type, error_map):   # noqa: C901
+    def inject_callbacks(cls, return_cls, mgmt_type, error_map, overload_type=None):   # noqa: C901
 
         def decorator(fn):
+            if overload_type is not None:
+                mgmt_overload = mgmt_overload_registry.get(fn.__qualname__)
+                if mgmt_overload is None:
+                    mgmt_overload = mgmt_overload_registry[fn.__qualname__] = Overload(fn.__qualname__)
+                if overload_type is OverloadType.DEFAULT:
+                    mgmt_overload.register_default(fn)
+                else:
+                    mgmt_overload.register(fn)
+
             @wraps(fn)
             def wrapped_fn(self, *args, **kwargs):
                 ft = self.loop.create_future()
@@ -83,7 +96,8 @@ class TxMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    call_async_fn(ft, self, fn, *args, **kwargs)
+                    func = mgmt_overload_registry.get(fn.__qualname__, fn)
+                    call_async_fn(ft, self, func, *args, **kwargs)
 
                 return Deferred.fromFuture(ft)
 

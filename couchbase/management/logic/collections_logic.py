@@ -187,7 +187,7 @@ class CollectionManagerLogic:
 
         final_args = forward_args(kwargs, *options)
         if final_args.get("timeout", None) is not None:
-            kwargs["timeout"] = final_args.get("timeout")
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
 
         return management_operation(**mgmt_kwargs)
 

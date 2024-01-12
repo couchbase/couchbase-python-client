@@ -33,7 +33,9 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException,
                                   UnAmbiguousTimeoutException)
-from couchbase.management.buckets import BucketType, CreateBucketSettings
+from couchbase.management.buckets import (BucketType,
+                                          CreateBucketSettings,
+                                          StorageBackend)
 from couchbase.management.collections import CollectionSpec
 from couchbase.options import ClusterOptions
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
@@ -232,13 +234,19 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
     # Bucket MGMT
 
-    def create_bucket(self, bucket_name):
+    def create_bucket(self, bucket_name, storage_backend=None):
         try:
+            settings_kwargs = {
+                'name': bucket_name,
+                'bucket_type': BucketType.COUCHBASE,
+                'ram_quota_mb': 100,
+            }
+            if storage_backend is not None:
+                settings_kwargs['storage_backend'] = storage_backend
+                if storage_backend is StorageBackend.MAGMA:
+                    settings_kwargs['ram_quota_mb'] = 1024
             run_in_reactor_thread(self.bm.create_bucket,
-                                  CreateBucketSettings(
-                                      name=bucket_name,
-                                      bucket_type=BucketType.COUCHBASE,
-                                      ram_quota_mb=100))
+                                  CreateBucketSettings(**settings_kwargs))
         except BucketAlreadyExistsException:
             pass
         self.try_n_times(10, 1, self.bm.get_bucket, bucket_name)
@@ -308,7 +316,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
             bucket_names.append(self._test_bucket.name)
 
         bucket = bucket_name or self._test_bucket.name
-        if bucket not in bucket_names:
+        if bucket not in bucket_names + [bucket_name]:
             raise CouchbaseTestEnvironmentException(
                 f"{bucket} is an invalid bucket name.")
 

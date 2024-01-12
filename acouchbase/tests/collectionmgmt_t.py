@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import asyncio
 from datetime import timedelta
 from uuid import uuid4
 
@@ -25,6 +26,7 @@ from couchbase.exceptions import (BucketDoesNotExistException,
                                   CollectionNotFoundException,
                                   DocumentNotFoundException,
                                   FeatureUnavailableException,
+                                  InvalidArgumentException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException)
 from couchbase.management.buckets import StorageBackend
@@ -58,6 +60,10 @@ class CollectionManagementTests:
     @pytest.fixture(scope="class")
     def check_update_collection_max_expiry_supported(self, cb_env):
         cb_env.check_if_feature_supported('update_collection_max_expiry')
+
+    @pytest.fixture(scope="class")
+    def check_negative_collection_max_expiry_supported(self, cb_env):
+        cb_env.check_if_feature_supported('negative_collection_max_expiry')
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
@@ -94,6 +100,16 @@ class CollectionManagementTests:
                                                 cb_env.test_bucket_cm.drop_collection,
                                                 CollectionSpec(self.TEST_COLLECTION),
                                                 expected_exceptions=(CollectionNotFoundException,))
+
+    # temporary until we consoldate w/ new test env setup
+    async def _get_collection(self, cm, scope_name, coll_name):
+        scopes = await cm.get_all_scopes()
+        scope = next((s for s in scopes if s.name == scope_name), None)
+        if scope:
+            return next(
+                (c for c in scope.collections if c.name == coll_name), None)
+
+        return None
 
     @pytest.mark.usefixtures("cleanup_scope")
     @pytest.mark.asyncio
@@ -189,6 +205,51 @@ class CollectionManagementTests:
         await cb_env.try_n_times(10, 1, coll.get, key)
         await cb_env.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
 
+    @pytest.mark.usefixtures('cleanup_collection')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    @pytest.mark.asyncio
+    async def test_create_collection_max_expiry_default(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = self.TEST_COLLECTION
+        scope_name = '_default'
+
+        await cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        # TODO: consistency
+        coll_spec = await cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=0)
+
+    @pytest.mark.usefixtures('cleanup_collection')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    @pytest.mark.asyncio
+    async def test_create_collection_max_expiry_invalid(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+        collection_name = self.TEST_COLLECTION
+        scope_name = '_default'
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-20))
+
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
+
+    @pytest.mark.usefixtures('cleanup_collection')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    @pytest.mark.asyncio
+    async def test_create_collection_max_expiry_no_expiry(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = self.TEST_COLLECTION
+        scope_name = '_default'
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-1))
+        await cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
+        # TODO: consistency
+        coll_spec = await cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=-1)
+
     @pytest.mark.usefixtures('check_update_collection_supported')
     @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
     @pytest.mark.usefixtures("cleanup_collection")
@@ -266,8 +327,9 @@ class CollectionManagementTests:
         with pytest.raises(ScopeNotFoundException):
             await cb_env.test_bucket_cm.drop_collection("fake-scope", "fake-collection")
 
-    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('cleanup_collection')
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.asyncio
     async def test_create_collection_history_retention(self, cb_env):
         bucket_name = 'test-magma-bucket'
         scope_name = '_default'
@@ -279,7 +341,12 @@ class CollectionManagementTests:
         cm = bucket.collections()
 
         await cm.create_collection(scope_name, collection_name, CreateCollectionSettings(history=True))
-        collection_spec = await cb_env.get_collection(scope_name, collection_name, bucket_name=bucket_name)
+        collection_spec = None
+        retry = 0
+        while retry < 5 and collection_spec is None:
+            collection_spec = await self._get_collection(cm, scope_name, collection_name)
+            await asyncio.sleep(1)
+            retry += 1
         assert collection_spec is not None
         assert collection_spec.history
 
@@ -289,7 +356,7 @@ class CollectionManagementTests:
                                                 bucket_name,
                                                 expected_exceptions=(BucketDoesNotExistException,))
 
-    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.usefixtures('cleanup_collection')
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.asyncio
     async def test_create_collection_history_retention_unsupported(self, cb_env):
@@ -305,6 +372,7 @@ class CollectionManagementTests:
             await cb_env.test_bucket_cm.create_collection(
                 scope_name, collection_name, CreateCollectionSettings(history=False))
 
+    @pytest.mark.usefixtures('cleanup_collection')
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('check_update_collection_supported')
     @pytest.mark.asyncio
@@ -319,12 +387,22 @@ class CollectionManagementTests:
         cm = bucket.collections()
 
         await cm.create_collection(scope_name, collection_name, CreateCollectionSettings(history=False))
-        collection_spec = await cb_env.get_collection(scope_name, collection_name, bucket_name=bucket_name)
+        collection_spec = None
+        retry = 0
+        while retry < 5 and collection_spec is None:
+            collection_spec = await self._get_collection(cm, scope_name, collection_name)
+            await asyncio.sleep(1)
+            retry += 1
         assert collection_spec is not None
         assert not collection_spec.history
 
         await cm.update_collection(scope_name, collection_name, UpdateCollectionSettings(history=True))
-        collection_spec = await cb_env.get_collection(scope_name, collection_name, bucket_name=bucket_name)
+        collection_spec = None
+        retry = 0
+        while retry < 5 and collection_spec is None:
+            collection_spec = await self._get_collection(cm, scope_name, collection_name)
+            await asyncio.sleep(1)
+            retry += 1
         assert collection_spec is not None
         assert collection_spec.history
 
@@ -356,6 +434,72 @@ class CollectionManagementTests:
         collection_spec = await cb_env.get_collection(scope_name, collection_name)
         assert collection_spec is not None
         assert collection_spec.history is False
+
+    @pytest.mark.usefixtures('cleanup_collection')
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    @pytest.mark.asyncio
+    async def test_update_collection_max_expiry_bucket_default(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = self.TEST_COLLECTION
+        scope_name = '_default'
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=5))
+
+        await cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
+        coll_spec = await cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=5)
+
+        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=0))
+        await cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+        coll_spec = await cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=0)
+
+    @pytest.mark.usefixtures('cleanup_collection')
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    @pytest.mark.asyncio
+    async def test_update_collection_max_expiry_invalid(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+        collection_name = self.TEST_COLLECTION
+        scope_name = '_default'
+
+        await cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        coll_spec = await cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=0)
+
+        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=-20))
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+
+    @pytest.mark.usefixtures('cleanup_collection')
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    @pytest.mark.asyncio
+    async def test_update_collection_max_expiry_no_expiry(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = self.TEST_COLLECTION
+        scope_name = '_default'
+        await cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        coll_spec = await cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=0)
+
+        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=-1))
+        await cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+        coll_spec = await cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=-1)
 
     @pytest.mark.usefixtures("cleanup_collection")
     @pytest.mark.asyncio

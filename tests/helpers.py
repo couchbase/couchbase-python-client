@@ -130,6 +130,7 @@ class ServerFeatures(Enum):
     SubdocReplicaRead = 'subdoc_replica_read'
     UpdateCollection = 'update_collection'
     UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
+    NegativeCollectionMaxExpiry = 'negative_collection_max_expiry'
     NonDedupedHistory = 'non_deduped_history'
     QueryWithoutIndex = 'query_without_index'
     NotLockedKVStatus = 'kv_not_locked'
@@ -200,7 +201,8 @@ AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan,
                             ServerFeatures.UpdateCollectionMaxExpiry,
                             ServerFeatures.QueryWithoutIndex]
 
-AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus]
+AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus,
+                            ServerFeatures.NegativeCollectionMaxExpiry]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {
@@ -329,7 +331,9 @@ class CouchbaseTestEnvironment():
 
     @property
     def mock_server_type(self) -> MockServerType:
-        return self._cluster_config.mock_server.mock_type
+        if self.is_mock_server:
+            return self._cluster_config.mock_server.mock_type
+        return None
 
     @property
     def is_real_server(self):

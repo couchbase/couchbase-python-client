@@ -22,6 +22,7 @@ from couchbase.exceptions import (BucketDoesNotExistException,
                                   CollectionNotFoundException,
                                   DocumentNotFoundException,
                                   FeatureUnavailableException,
+                                  InvalidArgumentException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException)
 from couchbase.management.buckets import StorageBackend
@@ -40,6 +41,9 @@ class CollectionManagementTestSuite:
         'test_create_collection_already_exists',
         'test_create_collection_bad_scope',
         'test_create_collection_max_expiry',
+        'test_create_collection_max_expiry_default',
+        'test_create_collection_max_expiry_invalid',
+        'test_create_collection_max_expiry_no_expiry',
         'test_create_scope',
         'test_create_scope_already_exists',
         'test_create_scope_and_collection',
@@ -53,6 +57,10 @@ class CollectionManagementTestSuite:
         'test_create_collection_history_retention_unsupported',
         'test_update_collection_history_retention',
         'test_update_collection_history_retention_unsupported',
+        'test_update_collection_max_expiry',
+        'test_update_collection_max_expiry_bucket_default',
+        'test_update_collection_max_expiry_invalid',
+        'test_update_collection_max_expiry_no_expiry',
         'test_deprecated_create_collection',
         'test_deprecated_create_collection_already_exists',
         'test_deprecated_create_collection_bad_scope',
@@ -78,6 +86,12 @@ class CollectionManagementTestSuite:
     @pytest.fixture(scope="class")
     def check_update_collection_max_expiry_supported(self, cb_env):
         EnvironmentFeatures.check_if_feature_supported('update_collection_max_expiry',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type)
+
+    @pytest.fixture(scope="class")
+    def check_negative_collection_max_expiry_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('negative_collection_max_expiry',
                                                        cb_env.server_version_short,
                                                        cb_env.mock_server_type)
 
@@ -147,40 +161,44 @@ class CollectionManagementTestSuite:
                                                    key,
                                                    expected_exceptions=(DocumentNotFoundException,))
 
-    @pytest.mark.usefixtures('check_update_collection_supported')
-    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
-    def test_update_collection_max_expiry(self, cb_env):
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_create_collection_max_expiry_default(self, cb_env):
         if cb_env.is_mock_server:
             pytest.skip("CAVES doesn't support collection expiry.")
 
         collection_name = cb_env.get_collection_name()
         scope_name = '_default'
+
         cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
         cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-
         coll_spec = cb_env.get_collection(scope_name, collection_name)
         assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(0)
+        assert coll_spec.max_expiry == timedelta(seconds=0)
 
-        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=2))
-        cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_create_collection_max_expiry_invalid(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-20))
 
+        with pytest.raises(InvalidArgumentException):
+            cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
+
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_create_collection_max_expiry_no_expiry(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-1))
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
         coll_spec = cb_env.get_collection(scope_name, collection_name)
         assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=2)
-
-        # pop a doc in with no ttl, verify it goes away...
-        coll = cb_env.test_bucket.collection(collection_name)
-        key = 'test-coll-key0'
-        # we _can_ get a temp fail here, as we just created the collection.  So we
-        # retry the upsert.
-        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
-        TestEnvironment.try_n_times(10, 1, coll.get, key)
-        TestEnvironment.try_n_times_till_exception(4,
-                                                   1,
-                                                   coll.get,
-                                                   key,
-                                                   expected_exceptions=(DocumentNotFoundException,))
+        assert coll_spec.max_expiry == timedelta(seconds=-1)
 
     def test_create_scope(self, cb_env):
         scope_name = cb_env.get_scope_name()
@@ -348,6 +366,105 @@ class CollectionManagementTestSuite:
         assert collection_spec is not None
         assert collection_spec.history is False
 
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    def test_update_collection_max_expiry(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+
+        coll_spec = cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(0)
+
+        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=2))
+        cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+
+        coll_spec = cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=2)
+
+        # pop a doc in with no ttl, verify it goes away...
+        coll = cb_env.test_bucket.collection(collection_name)
+        key = 'test-coll-key0'
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
+        TestEnvironment.try_n_times(10, 1, coll.get, key)
+        TestEnvironment.try_n_times_till_exception(4,
+                                                   1,
+                                                   coll.get,
+                                                   key,
+                                                   expected_exceptions=(DocumentNotFoundException,))
+
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_update_collection_max_expiry_bucket_default(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=5))
+
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+        coll_spec = cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=5)
+
+        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=0))
+        cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+
+        coll_spec = cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=0)
+
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_update_collection_max_expiry_invalid(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+        coll_spec = cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=0)
+
+        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=-20))
+        with pytest.raises(InvalidArgumentException):
+            cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_update_collection_max_expiry_no_expiry(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+        coll_spec = cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=0)
+
+        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=-1))
+        cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+        coll_spec = cb_env.get_collection(scope_name, collection_name)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=-1)
+
     def test_deprecated_create_collection(self, cb_env):
         # create a collection under default_ scope
         collection_name = cb_env.get_collection_name()
@@ -428,20 +545,18 @@ class CollectionManagementTestSuite:
 
 class ClassicCollectionManagementTests(CollectionManagementTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
+    @pytest.fixture(scope='class', autouse=True)
+    def validate_test_manifest(self):
         def valid_test_method(meth):
             attr = getattr(ClassicCollectionManagementTests, meth)
             return callable(attr) and not meth.startswith('__') and meth.startswith('test')
         method_list = [meth for meth in dir(ClassicCollectionManagementTests) if valid_test_method(meth)]
-        compare = set(CollectionManagementTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+        test_list = set(CollectionManagementTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
+        if test_list:
+            pytest.fail(f'Test manifest invalid.  Missing/extra tests: {test_list}.')
 
     @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
+    def couchbase_test_environment(self, cb_base_env):
         cb_env = CollectionManagementTestEnvironment.from_environment(cb_base_env)
         cb_env.enable_bucket_mgmt().enable_collection_mgmt()
         cb_env.setup()

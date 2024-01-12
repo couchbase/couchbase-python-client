@@ -64,6 +64,7 @@ class ServerFeatures(Enum):
     SubdocReplicaRead = 'subdoc_replica_read'
     UpdateCollection = 'update_collection'
     UpdateCollectionMaxExpiry = 'update_collection_max_expiry'
+    NegativeCollectionMaxExpiry = 'negative_collection_max_expiry'
     NonDedupedHistory = 'non_deduped_history'
     QueryWithoutIndex = 'query_without_index'
     NotLockedKVStatus = 'kv_not_locked'
@@ -138,7 +139,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.UpdateCollectionMaxExpiry,
                                 ServerFeatures.QueryWithoutIndex]
 
-    AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus]
+    AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus,
+                                ServerFeatures.NegativeCollectionMaxExpiry]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str

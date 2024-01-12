@@ -57,10 +57,10 @@ class CollectionManagementTestEnvironment(TestEnvironment):
         self._batch_id = str(uuid.uuid4())[:8]
         self._used_scope_ids = set()
         self._dropped_scope_ids = set()
-        self._scope_ids = [f'{self._batch_id}_scope_{i}' for i in range(20)]
+        self._scope_ids = [f'{self._batch_id}_scope_{i}' for i in range(50)]
         self._used_collection_ids = set()
         self._dropped_collection_ids = set()
-        self._collection_ids = [f'{self._batch_id}_collection_{i}' for i in range(20)]
+        self._collection_ids = [f'{self._batch_id}_collection_{i}' for i in range(50)]
 
     def teardown(self):
         for c in self._used_collection_ids:

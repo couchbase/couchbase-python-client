@@ -61,6 +61,7 @@ class BucketManagerLogic:
 
     _ERROR_MAPPING = {'Bucket with given name (already|still) exists': BucketAlreadyExistsException,
                       'Requested resource not found': BucketDoesNotExistException,
+                      r'.*non existent bucket.*': BucketDoesNotExistException,
                       r'.*Flush is disabled for the bucket.*': BucketNotFlushableException,
                       r'.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException,
                       r'.*is supported only with developer preview enabled.*': FeatureUnavailableException}
