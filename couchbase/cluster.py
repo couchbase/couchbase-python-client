@@ -43,7 +43,9 @@ from couchbase.result import (AnalyticsResult,
                               PingResult,
                               QueryResult,
                               SearchResult)
-from couchbase.search import SearchQueryBuilder, SearchRequest
+from couchbase.search import (FullTextSearchRequest,
+                              SearchQueryBuilder,
+                              SearchRequest)
 from couchbase.transactions import Transactions
 
 if TYPE_CHECKING:
@@ -309,12 +311,11 @@ class Cluster(ClusterLogic):
 
             time.sleep(interval_millis / 1000)
 
-    def query(
-        self,
-        statement,  # type: str
-        *options,  # type: QueryOptions
-        **kwargs  # type: Any
-    ) -> QueryResult:
+    def query(self,
+              statement,  # type: str
+              *options,  # type: QueryOptions
+              **kwargs  # type: Dict[str, Any]
+              ) -> QueryResult:
         """Executes a N1QL query against the cluster.
 
         .. note::
@@ -385,21 +386,18 @@ class Cluster(ClusterLogic):
         # timeout, the streaming_timeout defaults to cluster's query_timeout (set here). If the cluster
         # also does not specify a query_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::query_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_opts.get('timeout_options', dict()).get('query_timeout', None)
-        query = N1QLQuery.create_query_object(statement,
-                                              *options,
-                                              **kwargs)
+        streaming_timeout = self.streaming_timeouts.get('query_timeout', None)
+        query = N1QLQuery.create_query_object(statement, *options, **kwargs)
         return QueryResult(N1QLRequest.generate_n1ql_request(self.connection,
                                                              query.params,
                                                              default_serializer=self.default_serializer,
                                                              streaming_timeout=streaming_timeout))
 
-    def analytics_query(
-        self,  # type: Cluster
-        statement,  # type: str
-        *options,  # type: AnalyticsOptions
-        **kwargs
-    ) -> AnalyticsResult:
+    def analytics_query(self,  # type: Cluster
+                        statement,  # type: str
+                        *options,  # type: AnalyticsOptions
+                        **kwargs   # type: Dict[str, Any]
+                        ) -> AnalyticsResult:
         """Executes an analaytics query against the cluster.
 
         .. note::
@@ -474,23 +472,19 @@ class Cluster(ClusterLogic):
         # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
         # also does not specify an analytics_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_opts.get('timeout_options', dict()).get('analytics_timeout', None)
-        query = AnalyticsQuery.create_query_object(statement,
-                                                   *options,
-                                                   **kwargs)
-        return AnalyticsResult(AnalyticsRequest.generate_analytics_request(
-            self.connection,
-            query.params,
-            default_serializer=self.default_serializer,
-            streaming_timeout=streaming_timeout))
+        streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
+        query = AnalyticsQuery.create_query_object(statement, *options, **kwargs)
+        return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self.connection,
+                                                                           query.params,
+                                                                           default_serializer=self.default_serializer,
+                                                                           streaming_timeout=streaming_timeout))
 
-    def search_query(
-        self,
-        index,  # type: str
-        query,  # type: SearchQuery
-        *options,  # type: SearchOptions
-        **kwargs
-    ) -> SearchResult:
+    def search_query(self,
+                     index,  # type: str
+                     query,  # type: SearchQuery
+                     *options,  # type: SearchOptions
+                     **kwargs   # type: Dict[str, Any]
+                     ) -> SearchResult:
         """Executes an search query against the cluster.
 
         .. note::
@@ -583,14 +577,33 @@ class Cluster(ClusterLogic):
         # timeout, the streaming_timeout defaults to cluster's search_timeout (set here). If the cluster
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_opts.get('timeout_options', dict()).get('search_timeout', None)
-        query = SearchQueryBuilder.create_search_query_object(
-            index, query, *options, **kwargs
-        )
-        return SearchResult(SearchRequest.generate_search_request(self.connection,
-                                                                  query.as_encodable(),
-                                                                  default_serializer=self.default_serializer,
-                                                                  streaming_timeout=streaming_timeout))
+        streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
+        query = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
+        return SearchResult(FullTextSearchRequest.generate_search_request(self.connection,
+                                                                          query.as_encodable(),
+                                                                          default_serializer=self.default_serializer,
+                                                                          streaming_timeout=streaming_timeout))
+
+    def search(self,
+               index,  # type: str
+               request,  # type: SearchRequest
+               *options,  # type: SearchOptions
+               **kwargs,  # type: Dict[str, Any]
+               ) -> SearchResult:
+        """
+        **VOLATILE** This API is subject to change at any time.
+        """
+        # If the search_query was provided a timeout we will use that value for the streaming timeout
+        # when the streaming object is created in the bindings.  If the search_query does not specify a
+        # timeout, the streaming_timeout defaults to cluster's search_timeout (set here). If the cluster
+        # also does not specify a search_timeout we set the streaming_timeout to
+        # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
+        streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
+        query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+        return SearchResult(FullTextSearchRequest.generate_search_request(self.connection,
+                                                                          query.as_encodable(),
+                                                                          default_serializer=self.default_serializer,
+                                                                          streaming_timeout=streaming_timeout))
 
     def buckets(self) -> BucketManager:
         """

@@ -186,7 +186,7 @@ class AsyncBucket(BucketLogic):
                    design_doc,      # type: str
                    view_name,       # type: str
                    *view_options,   # type: ViewOptions
-                   **kwargs
+                   **kwargs         # type: Dict[str, Any]
                    ) -> ViewResult:
         """Executes a View query against the bucket.
 
@@ -225,14 +225,13 @@ class AsyncBucket(BucketLogic):
                     print(f'Found row: {row}')
 
         """
-        request_args = dict()
+        request_args = dict(default_serialize=self.default_serializer,
+                            streaming_timeout=self.streaming_timeouts.get('view_timeout', None))
         num_workers = kwargs.pop('num_workers', None)
         if num_workers:
             request_args['num_workers'] = num_workers
 
-        query = ViewQuery.create_view_query_object(
-            self.name, design_doc, view_name, *view_options, **kwargs
-        )
+        query = ViewQuery.create_view_query_object(self.name, design_doc, view_name, *view_options, **kwargs)
         return ViewResult(AsyncViewRequest.generate_view_request(self.connection,
                                                                  self.loop,
                                                                  query.as_encodable(),

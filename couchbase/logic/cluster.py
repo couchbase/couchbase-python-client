@@ -158,6 +158,12 @@ class ClusterLogic:
         cluster_opts['user_agent_extra'] = PYCBC_VERSION
 
         self._cluster_opts = cluster_opts
+        self._streaming_timeouts = dict(
+            analytics_timeout=timeout_opts.get('analytics_timeout', None),
+            query_timeout=timeout_opts.get('query_timeout', None),
+            search_timeout=timeout_opts.get('search_timeout', None),
+            view_timeout=timeout_opts.get('view_timeout', None),
+        )
         self._connection = None
         self._cluster_info = None
         self._server_version = None
@@ -234,6 +240,13 @@ class ClusterLogic:
         if self._cluster_info:
             return False
         return None
+
+    @property
+    def streaming_timeouts(self):
+        """
+        **INTERNAL**
+        """
+        return self._streaming_timeouts
 
     def _parse_connection_string(self, connection_str  # type: str
                                  ) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:

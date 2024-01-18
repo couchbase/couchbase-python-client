@@ -47,6 +47,13 @@ class BucketLogic:
         return self._connection
 
     @property
+    def streaming_timeouts(self):
+        """
+        **INTERNAL**
+        """
+        return self._cluster.streaming_timeouts
+
+    @property
     def default_transcoder(self) -> Optional[Transcoder]:
         return self._cluster.default_transcoder
 

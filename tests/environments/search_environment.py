@@ -101,6 +101,8 @@ class SearchTestEnvironment(TestEnvironment):
             encoded_q['facets'] = json.loads(encoded_q['facets'])
         if 'sort_specs' in encoded_q:
             encoded_q['sort'] = json.loads(encoded_q['sort_specs'])
+        if 'vector_search' in encoded_q:
+            encoded_q['vector_search'] = json.loads(encoded_q['vector_search'])
 
         return encoded_q
 
@@ -133,7 +135,7 @@ class SearchTestEnvironment(TestEnvironment):
               test_suite=None,  # type: Optional[str]
               ):
 
-        if test_suite == 'ClassicSearchParamTests':
+        if test_suite in ['ClassicSearchParamTests', 'ClassicVectorSearchParamTests']:
             return
 
         if collection_type == CollectionType.NAMED:
@@ -157,7 +159,7 @@ class SearchTestEnvironment(TestEnvironment):
                  collection_type,  # type: CollectionType
                  test_suite=None,  # type: Optional[str]
                  ):
-        if test_suite == 'ClassicSearchParamTests':
+        if test_suite in ['ClassicSearchParamTests', 'ClassicVectorSearchParamTests']:
             return
 
         TestEnvironment.try_n_times(5, 3, self.purge_data)

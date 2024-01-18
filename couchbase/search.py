@@ -42,7 +42,7 @@ from couchbase.logic.search import SortGeoDistance  # noqa: F401
 from couchbase.logic.search import SortID  # noqa: F401
 from couchbase.logic.search import SortScore  # noqa: F401
 from couchbase.logic.search import TermFacet  # noqa: F401
-from couchbase.logic.search import SearchRequestLogic
+from couchbase.logic.search import FullTextSearchRequestLogic
 from couchbase.logic.search_queries import BooleanFieldQuery  # noqa: F401
 from couchbase.logic.search_queries import BooleanQuery  # noqa: F401
 from couchbase.logic.search_queries import ConjunctionQuery  # noqa: F401
@@ -67,10 +67,11 @@ from couchbase.logic.search_queries import SearchQuery  # noqa: F401
 from couchbase.logic.search_queries import TermQuery  # noqa: F401
 from couchbase.logic.search_queries import TermRangeQuery  # noqa: F401
 from couchbase.logic.search_queries import WildcardQuery  # noqa: F401
+from couchbase.logic.search_request import SearchRequest  # noqa: F401
 from couchbase.logic.supportability import Supportability
 
 
-class SearchRequest(SearchRequestLogic):
+class FullTextSearchRequest(FullTextSearchRequestLogic):
     def __init__(self,
                  connection,
                  encoded_query,

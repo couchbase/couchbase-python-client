@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from couchbase.subdocument import StoreSemantics
     from couchbase.tracing import CouchbaseTracer
     from couchbase.transcoder import Transcoder
+    from couchbase.vector_search import VectorQueryCombination
     from couchbase.views import (ViewErrorMode,
                                  ViewOrdering,
                                  ViewScanConsistency)
@@ -1201,6 +1202,21 @@ class SearchOptionsBase(OptionsTimeoutBase):
                  include_locations=None,  # type: Optional[bool]
                  client_context_id=None,  # type: Optional[str]
                  serializer=None  # type: Optional[Serializer]
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
+class VectorSearchOptionsBase(dict):
+    """
+    **VOLATILE** This API is subject to change at any time.
+    """
+    @overload
+    def __init__(self,
+                 vector_query_combination=None,           # type: Optional[VectorQueryCombination]
                  ):
         pass
 

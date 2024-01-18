@@ -66,6 +66,7 @@ _STREAMING_TESTS = [
     "couchbase/tests/query_t.py::ClassicQueryTests",
     "couchbase/tests/query_t.py::ClassicQueryCollectionTests",
     "couchbase/tests/search_params_t.py::ClassicSearchParamTests",
+    "couchbase/tests/search_params_t.py::ClassicVectorSearchParamTests",
     "couchbase/tests/search_t.py::ClassicSearchTests",
     "couchbase/tests/search_t.py::ClassicSearchCollectionTests",
     "couchbase/tests/views_t.py::ClassicViewsTests",

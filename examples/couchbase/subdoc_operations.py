@@ -3,7 +3,7 @@ import couchbase.subdocument as SD
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 
-#import couchbase.subdocument as SD
+# import couchbase.subdocument as SD
 # **DEPRECATED**, use from couchbase.options import MutateInOptions
 from couchbase.collection import MutateInOptions
 from couchbase.durability import (ClientDurability,

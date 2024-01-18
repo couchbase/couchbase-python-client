@@ -24,10 +24,10 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap)
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.search import SearchQueryBuilder  # noqa: F401
-from couchbase.logic.search import SearchRequestLogic
+from couchbase.logic.search import FullTextSearchRequestLogic
 
 
-class AsyncSearchRequest(SearchRequestLogic):
+class AsyncFullTextSearchRequest(FullTextSearchRequestLogic):
     def __init__(self,
                  connection,
                  loop,

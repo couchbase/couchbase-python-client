@@ -25,7 +25,7 @@ from typing import (Any,
 
 from acouchbase.analytics import AsyncAnalyticsRequest
 from acouchbase.n1ql import AsyncN1QLRequest
-from acouchbase.search import AsyncSearchRequest
+from acouchbase.search import AsyncFullTextSearchRequest
 from acouchbase.views import AsyncViewRequest
 from couchbase.diagnostics import (ClusterState,
                                    EndpointDiagnosticsReport,
@@ -1164,7 +1164,7 @@ class SearchResult:
         Returns:
             Iterable: Either an iterable or async iterable.
         """
-        if isinstance(self._request, AsyncSearchRequest):
+        if isinstance(self._request, AsyncFullTextSearchRequest):
             return self.__aiter__()
         return self.__iter__()
 

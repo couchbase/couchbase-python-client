@@ -271,7 +271,7 @@ class CollectionManagementTestSuite:
     def test_get_all_scopes(self, cb_env):
         scope_names = cb_env.get_scope_names()
         scopes = cb_env.test_bucket_cm.get_all_scopes()
-        assert(sum(s.name[0] != '_' for s in scopes) == len(scope_names))
+        assert (sum(s.name[0] != '_' for s in scopes) == len(scope_names))
         # should have a _default scope
         assert any(map(lambda s: s.name == '_default', scopes))
         for scope_name in scope_names:

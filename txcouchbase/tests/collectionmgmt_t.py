@@ -131,7 +131,7 @@ class CollectionManagementTests:
                 run_in_reactor_thread(cb_env.test_bucket_cm.create_collection, name, str(uuid4())[:8])
         scopes = run_in_reactor_thread(cb_env.test_bucket_cm.get_all_scopes)
 
-        assert(sum(s.name[0] != '_' for s in scopes) == len(scope_names))
+        assert (sum(s.name[0] != '_' for s in scopes) == len(scope_names))
         # should have a _default scope
         assert any(map(lambda s: s.name == '_default', scopes))
         for scope_name in scope_names:

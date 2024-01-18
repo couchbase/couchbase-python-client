@@ -30,7 +30,7 @@ from couchbase.transcoder import Transcoder
 from txcouchbase.analytics import AnalyticsRequest
 from txcouchbase.collection import Collection
 from txcouchbase.n1ql import N1QLRequest
-from txcouchbase.search import SearchRequest
+from txcouchbase.search import FullTextSearchRequest
 
 if TYPE_CHECKING:
 
@@ -174,10 +174,10 @@ class Scope:
         query = SearchQueryBuilder.create_search_query_object(
             index, query, *options, **kwargs
         )
-        request = SearchRequest.generate_search_request(self.connection,
-                                                        self.loop,
-                                                        query.as_encodable(),
-                                                        default_serializer=self.default_serializer)
+        request = FullTextSearchRequest.generate_search_request(self.connection,
+                                                                self.loop,
+                                                                query.as_encodable(),
+                                                                default_serializer=self.default_serializer)
         d = Deferred()
 
         def _on_ok(_):

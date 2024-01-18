@@ -35,7 +35,7 @@ from acouchbase.management.queries import QueryIndexManager
 from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
 from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
-from acouchbase.search import AsyncSearchRequest, SearchQueryBuilder
+from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
 from acouchbase.transactions import Transactions
 from couchbase.diagnostics import ClusterState, ServiceType
 from couchbase.exceptions import UnAmbiguousTimeoutException
@@ -49,13 +49,13 @@ from couchbase.result import (AnalyticsResult,
                               SearchResult)
 
 if TYPE_CHECKING:
-    from acouchbase.search import SearchQuery
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    DiagnosticsOptions,
                                    QueryOptions,
                                    SearchOptions,
                                    WaitUntilReadyOptions)
+    from couchbase.search import SearchQuery, SearchRequest
 
 
 class AsyncCluster(ClusterLogic):
@@ -357,12 +357,11 @@ class AsyncCluster(ClusterLogic):
 
             await asyncio.sleep(interval_millis / 1000)
 
-    def query(
-        self,
-        statement,  # type: str
-        *options,  # type: QueryOptions
-        **kwargs  # type: Any
-    ) -> QueryResult:
+    def query(self,
+              statement,  # type: str
+              *options,  # type: QueryOptions
+              **kwargs  # type: Dict[str, Any]
+              ) -> QueryResult:
         """Executes a N1QL query against the cluster.
 
         .. note::
@@ -428,23 +427,22 @@ class AsyncCluster(ClusterLogic):
 
         """
 
-        request_args = dict()
+        request_args = dict(default_serialize=self.default_serializer,
+                            streaming_timeout=self.streaming_timeouts.get('query_timeout', None))
         num_workers = kwargs.pop('num_workers', None)
         if num_workers:
             request_args['num_workers'] = num_workers
-        query = N1QLQuery.create_query_object(
-            statement, *options, **kwargs)
+        query = N1QLQuery.create_query_object(statement, *options, **kwargs)
         return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self.connection,
                                                                   self.loop,
                                                                   query.params,
                                                                   **request_args))
 
-    def analytics_query(
-        self,  # type: Cluster
-        statement,  # type: str
-        *options,  # type: AnalyticsOptions
-        **kwargs
-    ) -> AnalyticsResult:
+    def analytics_query(self,  # type: Cluster
+                        statement,  # type: str
+                        *options,  # type: AnalyticsOptions
+                        **kwargs,  # type: Dict[str, Any]
+                        ) -> AnalyticsResult:
         """Executes an analaytics query against the cluster.
 
         .. note::
@@ -514,25 +512,23 @@ class AsyncCluster(ClusterLogic):
 
         """  # noqa: E501
 
-        request_args = dict()
+        request_args = dict(default_serialize=self.default_serializer,
+                            streaming_timeout=self.streaming_timeouts.get('analytics_timeout', None))
         num_workers = kwargs.pop('num_workers', None)
         if num_workers:
             request_args['num_workers'] = num_workers
-
-        query = AnalyticsQuery.create_query_object(
-            statement, *options, **kwargs)
+        query = AnalyticsQuery.create_query_object(statement, *options, **kwargs)
         return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
                                                                                 self.loop,
                                                                                 query.params,
                                                                                 **request_args))
 
-    def search_query(
-        self,
-        index,  # type: str
-        query,  # type: SearchQuery
-        *options,  # type: SearchOptions
-        **kwargs
-    ) -> SearchResult:
+    def search_query(self,
+                     index,  # type: str
+                     query,  # type: SearchQuery
+                     *options,  # type: SearchOptions
+                     **kwargs   # type: Dict[str, Any]
+                     ) -> SearchResult:
         """Executes an search query against the cluster.
 
         .. note::
@@ -620,17 +616,36 @@ class AsyncCluster(ClusterLogic):
                     print(f'Locations: {row.locations}')
 
         """
-        request_args = dict()
+        request_args = dict(default_serialize=self.default_serializer,
+                            streaming_timeout=self.streaming_timeouts.get('search_timeout', None))
         num_workers = kwargs.pop('num_workers', None)
         if num_workers:
             request_args['num_workers'] = num_workers
-        query = SearchQueryBuilder.create_search_query_object(
-            index, query, *options, **kwargs
-        )
-        return SearchResult(AsyncSearchRequest.generate_search_request(self.connection,
-                                                                       self.loop,
-                                                                       query.as_encodable(),
-                                                                       **request_args))
+        query = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
+        return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
+                                                                               self.loop,
+                                                                               query.as_encodable(),
+                                                                               **request_args))
+
+    def search(self,
+               index,  # type: str
+               request,  # type: SearchRequest
+               *options,  # type: SearchOptions
+               **kwargs,  # type: Dict[str, Any]
+               ) -> SearchResult:
+        """
+        **VOLATILE** This API is subject to change at any time.
+        """
+        request_args = dict(default_serialize=self.default_serializer,
+                            streaming_timeout=self.streaming_timeouts.get('search_timeout', None))
+        num_workers = kwargs.pop('num_workers', None)
+        if num_workers:
+            request_args['num_workers'] = num_workers
+        query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+        return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
+                                                                               self.loop,
+                                                                               query.as_encodable(),
+                                                                               **request_args))
 
     def buckets(self) -> BucketManager:
         """

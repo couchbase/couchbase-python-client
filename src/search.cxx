@@ -654,6 +654,28 @@ get_search_request(PyObject* op_args)
 
     couchbase::core::operations::search_request req{ index_name, couchbase::core::json_string{ std::move(query) } };
 
+    PyObject* pyObj_vector_search = PyDict_GetItemString(op_args, "vector_search");
+    if (pyObj_vector_search != nullptr) {
+        auto vector_search = std::string(PyUnicode_AsUTF8(pyObj_vector_search));
+        req.vector_search = couchbase::core::json_string{ std::move(vector_search) };
+    }
+
+    PyObject* pyObj_vector_combo = PyDict_GetItemString(op_args, "vector_query_combination");
+    if (pyObj_vector_combo != nullptr) {
+        auto vector_combo = std::string(PyUnicode_AsUTF8(pyObj_vector_combo));
+        if (vector_combo.compare("and") == 0) {
+            req.vector_query_combination = couchbase::core::vector_query_combination::combination_and;
+        }
+        if (vector_combo.compare("or") == 0) {
+            req.vector_query_combination = couchbase::core::vector_query_combination::combination_or;
+        }
+    }
+
+    PyObject* pyObj_show_request = PyDict_GetItemString(op_args, "show_request");
+    if (pyObj_show_request != nullptr) {
+        req.show_request = pyObj_show_request == Py_True ? true : false;
+    }
+
     PyObject* pyObj_limit = PyDict_GetItemString(op_args, "limit");
     if (pyObj_limit != nullptr) {
         auto limit = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_limit));

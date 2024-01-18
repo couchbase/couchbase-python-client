@@ -15,7 +15,7 @@ repos:
         files: src/.*\.(cxx|hxx)$
         exclude: ^deps/
   - repo: https://github.com/pre-commit/mirrors-autopep8
-    rev: v1.6.0
+    rev: v2.0.4
     hooks:
       - id: autopep8
         exclude: ^(deps/|src/)

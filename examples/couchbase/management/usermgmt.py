@@ -2,7 +2,7 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 
 # **DEPRECATED**, import ALL management options from `couchbase.management.options`
-#from couchbase.management.queries import CreatePrimaryQueryIndexOptions
+# from couchbase.management.queries import CreatePrimaryQueryIndexOptions
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
 from couchbase.management.users import Role, User
 

@@ -21,7 +21,7 @@ from typing import (TYPE_CHECKING,
 from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
 from acouchbase.collection import Collection
 from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
-from acouchbase.search import AsyncSearchRequest, SearchQueryBuilder
+from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions)
@@ -412,10 +412,10 @@ class AsyncScope:
         query = SearchQueryBuilder.create_search_query_object(
             index, query, *options, **kwargs
         )
-        return SearchResult(AsyncSearchRequest.generate_search_request(self.connection,
-                                                                       self.loop,
-                                                                       query.as_encodable(),
-                                                                       **request_args))
+        return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
+                                                                               self.loop,
+                                                                               query.as_encodable(),
+                                                                               **request_args))
 
     @staticmethod
     def default_name():

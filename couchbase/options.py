@@ -80,6 +80,7 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      UnsignedInt32Base,
                                      UnsignedInt64Base,
                                      UpsertOptionsBase,
+                                     VectorSearchOptionsBase,
                                      ViewOptionsBase,
                                      WaitUntilReadyOptionsBase)
 from couchbase.logic.supportability import Supportability
@@ -1531,6 +1532,17 @@ class SearchOptions(SearchOptionsBase):
     """
 
 
+class VectorSearchOptions(VectorSearchOptionsBase):
+    """**VOLATILE** This API is subject to change at any time.
+
+    Available options to for a FTS vector search.
+
+    Args:
+        vector_query_combination (:class:`~couchbase.vector_search.VectorQueryCombination`, optional): Specifies logical operation
+            to use with multiple vector queries.
+    """  # noqa: E501
+
+
 class ViewOptions(ViewOptionsBase):
     """Available options to for a view query.
 
@@ -1670,7 +1682,7 @@ class TransactionConfig:
             if kwargs["scan_consistency"] == "at_plus":
                 raise InvalidArgumentException("QueryScanConsistency.AT_PLUS not valid for transactions")
         for key in [k for k, v in kwargs.items() if v is None]:
-            del(kwargs[key])
+            del (kwargs[key])
         self._base = transaction_config(**kwargs)
 
 
@@ -1733,7 +1745,7 @@ class TransactionOptions:
             kwargs['metadata_collection'] = coll.collection
         # don't pass None
         for key in [k for k, v in kwargs.items() if v is None]:
-            del(kwargs[key])
+            del (kwargs[key])
         self._base = transaction_options(**kwargs)
 
     def __str__(self):

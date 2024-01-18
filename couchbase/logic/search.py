@@ -34,6 +34,7 @@ from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import SearchOptionsBase
 from couchbase.logic.supportability import Supportability
+from couchbase.logic.vector_search import VectorQueryCombination
 from couchbase.options import (SearchOptions,
                                UnsignedInt32,
                                UnsignedInt64)
@@ -42,6 +43,9 @@ from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.tracing import CouchbaseSpan
 
 if TYPE_CHECKING:
+    from couchbase.logic.search_queries import SearchQuery
+    from couchbase.logic.search_request import SearchRequest
+    from couchbase.logic.vector_search import VectorSearch
     from couchbase.mutation_state import MutationState  # noqa: F401
 
 """
@@ -310,9 +314,7 @@ class MatchOperator(Enum):
     """
     OR = "or"
     AND = "and"
-
-
-"""
+    """
 
 Search Metrics and Metadata per the RFC
 
@@ -912,14 +914,22 @@ class SearchQueryBuilder:
         "serializer": {"serializer": lambda x: x},
         "facets": {},
         "sort": {},
-        "span": {"span": lambda x: x}
+        "show_request": {"show_request": lambda x: x},
+        "span": {"span": lambda x: x},
+        "vector_query_combination": {"vector_query_combination": lambda x: x}
     }
 
-    def __init__(self, index_name, query, **kwargs):
+    def __init__(self,
+                 index_name,  # type: str
+                 query=None,  # type: Optional[SearchQuery]
+                 vector_search=None,  # type: Optional[VectorSearch]
+                 **kwargs  # type: Dict[str, Any]
+                 ):
 
         self._index_name = index_name
         self._params = {}
         self._query = query
+        self._vector_search = vector_search
         # self._facets = {}
         # facets = kwargs.pop('facets', {})
         # if facets:
@@ -941,12 +951,33 @@ class SearchQueryBuilder:
         """
         self._params[name] = value
 
+    def encode_vector_search(self) -> Optional[List[Dict[str, Any]]]:
+        if self._vector_search is None:
+            return None
+
+        encoded_queries = []
+        for query in self._vector_search.queries:
+            encoded_query = {
+                'field': query.field_name,
+                'vector': query.vector,
+                'k': query.num_candidates if query.num_candidates is not None else 3
+            }
+            if query.boost is not None:
+                encoded_query['boost'] = query.boost
+            encoded_queries.append(encoded_query)
+
+        return encoded_queries
+
     def as_encodable(self) -> Dict[str, Any]:
         params = {
             'index_name': self._index_name
         }
         query = json.dumps(self._query.encodable)
         params['query'] = query
+        vector_search = self.encode_vector_search()
+        if vector_search:
+            params['vector_search'] = json.dumps(vector_search)
+
         # deprecate the scope_name option, no need to pass it to the C++ client
         # as the search API will not use
         params.update({k: v for k, v in self._params.items() if k not in ['scope_name']})
@@ -1229,6 +1260,16 @@ class SearchQueryBuilder:
         self.set_option('serializer', value)
 
     @property
+    def show_request(self) -> bool:
+        return self._params.get('show_request', False)
+
+    @show_request.setter
+    def show_request(self,
+                     value  # type: bool
+                     ):
+        self.set_option('show_request', value)
+
+    @property
     def span(self) -> Optional[CouchbaseSpan]:
         return self._params.get('span', None)
 
@@ -1239,8 +1280,96 @@ class SearchQueryBuilder:
             raise InvalidArgumentException(message='Span should implement CouchbaseSpan interface')
         self.set_option('span', value)
 
+    @property
+    def vector_query_combination(self) -> Optional[VectorQueryCombination]:
+        """
+        **VOLATILE** This API is subject to change at any time.
+        """
+        value = self._params.get('highlight_style', None)
+        if isinstance(value, VectorQueryCombination):
+            return value
+        if isinstance(value, str):
+            return VectorQueryCombination.AND if value == 'and' else VectorQueryCombination.OR
+
+    @vector_query_combination.setter
+    def vector_query_combination(self,
+                                 value  # type: Union[VectorQueryCombination, str]
+                                 ) -> None:
+        if isinstance(value, VectorQueryCombination):
+            self.set_option('vector_query_combination', value.value)
+        elif isinstance(value, str):
+            if value.lower() in [VectorQueryCombination.AND.value, VectorQueryCombination.OR.value]:
+                self.set_option('vector_query_combination', value.lower())
+        else:
+            raise InvalidArgumentException(message=("Excepted vector_query_combination to be either of type "
+                                                    "VectorQueryCombination or str representation "
+                                                    "of VectorQueryCombination"))
+
     @classmethod
-    def create_search_query_object(cls, index_name, query, *options, **kwargs):
+    def create_search_query_object(cls,
+                                   index_name,  # type: str
+                                   search_query,  # type: SearchQuery
+                                   *options,  # type: Optional[SearchOptions]
+                                   **kwargs,  # type: Dict[str, Any]
+                                   ) -> SearchQueryBuilder:
+        args = SearchQueryBuilder.get_search_query_args(*options, **kwargs)
+
+        facets = args.pop('facets', {})
+        sort = args.pop('sort', None)
+
+        query = cls(index_name, query=search_query, facets=facets, sort=sort)
+
+        # metrics defaults to True
+        query.metrics = args.get("metrics", True)
+
+        for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):
+            for target, transform in cls._VALID_OPTS[k].items():
+                setattr(query, target, transform(v))
+        return query
+
+    @classmethod
+    def create_search_query_from_request(cls,
+                                         index_name,  # type: str
+                                         request,  # type: SearchRequest
+                                         *options,  # type: Optional[SearchOptions]
+                                         **kwargs,  # type: Dict[str, Any]
+                                         ) -> SearchQueryBuilder:
+        args = SearchQueryBuilder.get_search_query_args(*options, **kwargs)
+
+        facets = args.pop('facets', {})
+        sort = args.pop('sort', None)
+
+        # the search_query should default to MatchNoneQuery if SearchRequest only has vector_search
+        search_query = request.search_query
+        if search_query is None:
+            # avoid circular import
+            from couchbase.logic.search_queries import MatchNoneQuery
+            search_query = MatchNoneQuery()
+
+        # only set query vector_query_combination if applicable
+        if request.vector_search and request.vector_search.options:
+            combo = request.vector_search.options.get('vector_query_combination', None)
+            if combo:
+                args['vector_query_combination'] = combo
+
+        query = cls(index_name,
+                    query=search_query,
+                    vector_search=request.vector_search,
+                    facets=facets,
+                    sort=sort)
+
+        # metrics defaults to True
+        query.metrics = args.get("metrics", True)
+        # show_request defaults to False
+        query.show_request = args.get("show_request", False)
+
+        for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):
+            for target, transform in cls._VALID_OPTS[k].items():
+                setattr(query, target, transform(v))
+        return query
+
+    @staticmethod
+    def get_search_query_args(*options, **kwargs):
         # lets make a copy of the options, and update with kwargs...
         opt = SearchOptions()
         # TODO: is it possible that we could have [SearchOptions, SearchOptions, ...]??
@@ -1252,22 +1381,10 @@ class SearchQueryBuilder:
                 opts.remove(o)
         args = opt.copy()
         args.update(kwargs)
-
-        facets = args.pop('facets', {})
-        sort = args.pop('sort', None)
-
-        query = cls(index_name, query, facets=facets, sort=sort)
-
-        # default to True on metrics
-        query.metrics = args.get("metrics", True)
-
-        for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):
-            for target, transform in cls._VALID_OPTS[k].items():
-                setattr(query, target, transform(v))
-        return query
+        return args
 
 
-class SearchRequestLogic:
+class FullTextSearchRequestLogic:
     def __init__(self,
                  connection,
                  encoded_query,

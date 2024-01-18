@@ -21,10 +21,10 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap)
 from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.logic.search import SearchRequestLogic
+from couchbase.logic.search import FullTextSearchRequestLogic
 
 
-class SearchRequest(SearchRequestLogic):
+class FullTextSearchRequest(FullTextSearchRequestLogic):
     def __init__(self,
                  connection,
                  loop,

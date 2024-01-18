@@ -15,6 +15,7 @@
 
 from typing import (TYPE_CHECKING,
                     Any,
+                    Dict,
                     Optional)
 
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
@@ -26,7 +27,7 @@ from couchbase.options import (AnalyticsOptions,
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
-from couchbase.search import SearchQueryBuilder, SearchRequest
+from couchbase.search import FullTextSearchRequest, SearchQueryBuilder
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
@@ -44,6 +45,13 @@ class ScopeLogic:
         **INTERNAL**
         """
         return self._bucket.connection
+
+    @property
+    def streaming_timeouts(self):
+        """
+        **INTERNAL**
+        """
+        return self._bucket.streaming_timeouts
 
     @property
     def default_transcoder(self) -> Optional[Transcoder]:
@@ -75,12 +83,11 @@ class ScopeLogic:
         """
         return Collection(self, name)
 
-    def query(
-        self,
-        statement,  # type: str
-        *options,  # type: QueryOptions
-        **kwargs  # type: Any
-    ) -> QueryResult:
+    def query(self,
+              statement,  # type: str
+              *options,  # type: QueryOptions
+              **kwargs  # type: Dict[str, Any]
+              ) -> QueryResult:
         """Executes a N1QL query against the scope.
 
         .. note::
@@ -159,17 +166,18 @@ class ScopeLogic:
         if not ('query_context' in opt or 'query_context' in kwargs):
             kwargs['query_context'] = '`{}`.`{}`'.format(self.bucket_name, self.name)
 
-        query = N1QLQuery.create_query_object(
-            statement, opt, **kwargs)
+        query = N1QLQuery.create_query_object(statement, opt, **kwargs)
+        # See cluster.query() for note on streaming timeout
+        streaming_timeout = self.streaming_timeouts.get('query_timeout', None)
         return QueryResult(N1QLRequest.generate_n1ql_request(self.connection,
-                                                             query.params))
+                                                             query.params,
+                                                             streaming_timeout=streaming_timeout))
 
-    def analytics_query(
-        self,
-        statement,  # type: str
-        *options,  # type: AnalyticsOptions
-        **kwargs
-    ) -> AnalyticsResult:
+    def analytics_query(self,
+                        statement,  # type: str
+                        *options,  # type: AnalyticsOptions
+                        **kwargs   # type: Dict[str, Any]
+                        ) -> AnalyticsResult:
         """Executes an analaytics query against the scope.
 
         .. note::
@@ -248,18 +256,19 @@ class ScopeLogic:
         if not ('query_context' in opt or 'query_context' in kwargs):
             kwargs['query_context'] = 'default:`{}`.`{}`'.format(self.bucket_name, self.name)
 
-        query = AnalyticsQuery.create_query_object(
-            statement, *options, **kwargs)
+        query = AnalyticsQuery.create_query_object(statement, *options, **kwargs)
+        # See cluster.analytics_query() for note on streaming timeout
+        streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
         return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self.connection,
-                                                                           query.params))
+                                                                           query.params,
+                                                                           streaming_timeout=streaming_timeout))
 
-    def search_query(
-        self,
-        index,  # type: str
-        query,  # type: SearchQuery
-        *options,  # type: SearchOptions
-        **kwargs
-    ) -> SearchResult:
+    def search_query(self,
+                     index,  # type: str
+                     query,  # type: SearchQuery
+                     *options,  # type: SearchOptions
+                     **kwargs   # type: Dict[str, Any]
+                     ) -> SearchResult:
         """Executes an search query against the scope.
 
         .. note::
@@ -357,12 +366,12 @@ class ScopeLogic:
         # set the scope_name as this scope if not provided
         if not ('scope_name' in opt or 'scope_name' in kwargs):
             kwargs['scope_name'] = f'{self.name}'
-
-        query = SearchQueryBuilder.create_search_query_object(
-            index, query, *options, **kwargs
-        )
-        return SearchResult(SearchRequest.generate_search_request(self.connection,
-                                                                  query.as_encodable()))
+        # See cluster.search_query() for note on streaming timeout
+        streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
+        query = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
+        return SearchResult(FullTextSearchRequest.generate_search_request(self.connection,
+                                                                          query.as_encodable(),
+                                                                          streaming_timeout=streaming_timeout))
 
     @staticmethod
     def default_name():

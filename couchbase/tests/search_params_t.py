@@ -21,9 +21,14 @@ import pytest
 import couchbase.search as search
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.mutation_state import MutationState
-from couchbase.options import SearchOptions
+from couchbase.options import SearchOptions, VectorSearchOptions
 from couchbase.result import MutationToken
-from couchbase.search import HighlightStyle, MatchOperator
+from couchbase.search import (HighlightStyle,
+                              MatchOperator,
+                              SearchRequest)
+from couchbase.vector_search import (VectorQuery,
+                                     VectorQueryCombination,
+                                     VectorSearch)
 from tests.environments import CollectionType
 from tests.environments.search_environment import SearchTestEnvironment
 
@@ -832,21 +837,196 @@ class SearchParamTestSuite:
         assert exp_json == encoded_q
 
 
+class VectorSearchParamTestSuite:
+    TEST_VECTOR = [-0.014653487130999565,
+                   -0.008658270351588726,
+                   0.017129190266132355,
+                   -0.015563474968075752,
+                   -0.02059517428278923,
+                   0.019551364704966545]
+
+    TEST_MANIFEST = [
+        'test_search_request_invalid',
+        'test_vector_query_invalid_boost',
+        'test_vector_query_invalid_num_candidates',
+        'test_vector_query_invalid_vector',
+        'test_vector_search',
+        'test_vector_search_invalid',
+        'test_vector_search_multiple_queries'
+    ]
+
+    def test_search_request_invalid(self):
+        with pytest.raises(InvalidArgumentException):
+            SearchRequest(None)
+        with pytest.raises(InvalidArgumentException):
+            SearchRequest.create(None)
+
+        vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR))
+        search_query = search.MatchAllQuery()
+        with pytest.raises(InvalidArgumentException):
+            req = SearchRequest(vector_search)
+            req.with_search_query(vector_search)
+        with pytest.raises(InvalidArgumentException):
+            req = SearchRequest(vector_search)
+            req.with_vector_search(search_query)
+        with pytest.raises(InvalidArgumentException):
+            req = SearchRequest(vector_search)
+            req.with_vector_search(vector_search)
+
+        with pytest.raises(InvalidArgumentException):
+            req = SearchRequest(search_query)
+            req.with_vector_search(search_query)
+        with pytest.raises(InvalidArgumentException):
+            req = SearchRequest(search_query)
+            req.with_search_query(search_query)
+        with pytest.raises(InvalidArgumentException):
+            req = SearchRequest(search_query)
+            req.with_search_query(vector_search)
+
+    def test_vector_query_invalid_boost(self):
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', self.TEST_VECTOR, boost=1)
+
+    def test_vector_query_invalid_num_candidates(self):
+        # cannot be < 1
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', self.TEST_VECTOR, 0)
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', self.TEST_VECTOR, num_candidates=0)
+        # value should be int
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', self.TEST_VECTOR, 3.14159)
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', self.TEST_VECTOR, num_candidates=3.14159)
+
+    def test_vector_query_invalid_vector(self):
+        # cannot be None/empty
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', [])
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', None)
+        # values should all be floats
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', [1])
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', [1.111, 2, 3.14159])
+
+    def test_vector_search(self, cb_env):
+        exp_json = {
+            'query': {'match_none': None},
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+            'show_request': False,
+            'vector_search': [
+                {
+                    'field': 'vector_field',
+                    'vector': self.TEST_VECTOR,
+                    'k': 3
+                }
+            ]
+        }
+
+        vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR))
+        req = SearchRequest.create(vector_search)
+        search_query = search.SearchQueryBuilder.create_search_query_from_request(
+            cb_env.TEST_INDEX_NAME,
+            req
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+
+    def test_vector_search_invalid(self):
+        with pytest.raises(InvalidArgumentException):
+            VectorSearch([])
+        with pytest.raises(InvalidArgumentException):
+            VectorSearch(None)
+        with pytest.raises(InvalidArgumentException):
+            VectorSearch([1, VectorQuery('vector_field', self.TEST_VECTOR)])
+        with pytest.raises(InvalidArgumentException):
+            VectorSearch.from_vector_query(None)
+        with pytest.raises(InvalidArgumentException):
+            VectorSearch.from_vector_query(1)
+
+    def test_vector_search_multiple_queries(self, cb_env):
+        exp_json = {
+            'query': {'match_none': None},
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+            'show_request': False,
+            'vector_search': [
+                {
+                    'field': 'vector_field',
+                    'vector': self.TEST_VECTOR,
+                    'k': 3
+                },
+                {
+                    'field': 'vector_field',
+                    'vector': self.TEST_VECTOR,
+                    'k': 3
+                },
+            ],
+            'vector_query_combination': 'and'
+        }
+
+        vector_queries = [
+            VectorQuery('vector_field', self.TEST_VECTOR),
+            VectorQuery('vector_field', self.TEST_VECTOR)
+        ]
+        vector_search = VectorSearch(vector_queries,
+                                     VectorSearchOptions(vector_query_combination=VectorQueryCombination.AND))
+        req = SearchRequest.create(vector_search)
+        search_query = search.SearchQueryBuilder.create_search_query_from_request(
+            cb_env.TEST_INDEX_NAME,
+            req
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+
+        exp_json['vector_query_combination'] = 'or'
+
+        vector_search = VectorSearch(vector_queries,
+                                     VectorSearchOptions(vector_query_combination=VectorQueryCombination.OR))
+        req = SearchRequest.create(vector_search)
+        search_query = search.SearchQueryBuilder.create_search_query_from_request(
+            cb_env.TEST_INDEX_NAME,
+            req
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+
+
 class ClassicSearchParamTests(SearchParamTestSuite):
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
+    @pytest.fixture(scope='class', autouse=True)
+    def validate_test_manifest(self):
         def valid_test_method(meth):
             attr = getattr(ClassicSearchParamTests, meth)
             return callable(attr) and not meth.startswith('__') and meth.startswith('test')
         method_list = [meth for meth in dir(ClassicSearchParamTests) if valid_test_method(meth)]
-        compare = set(SearchParamTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+        manifest_invalid = set(SearchParamTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
+        if manifest_invalid:
+            pytest.fail(f'Test manifest not validated.  Missing/extra tests: {manifest_invalid}.')
 
     @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+    def couchbase_test_environment(self, cb_base_env, request):
+        cb_env = SearchTestEnvironment.from_environment(cb_base_env)
+        cb_env.setup(request.param, test_suite=self.__class__.__name__)
+        yield cb_env
+        cb_env.teardown(request.param, test_suite=self.__class__.__name__)
 
+
+class ClassicVectorSearchParamTests(VectorSearchParamTestSuite):
+    @pytest.fixture(scope='class', autouse=True)
+    def validate_test_manifest(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicVectorSearchParamTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicVectorSearchParamTests) if valid_test_method(meth)]
+        manifest_invalid = set(VectorSearchParamTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
+        if manifest_invalid:
+            pytest.fail(f'Test manifest not validated.  Missing/extra tests: {manifest_invalid}.')
+
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
+    def couchbase_test_environment(self, cb_base_env, request):
         cb_env = SearchTestEnvironment.from_environment(cb_base_env)
         cb_env.setup(request.param, test_suite=self.__class__.__name__)
         yield cb_env
