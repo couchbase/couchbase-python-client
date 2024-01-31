@@ -24,7 +24,8 @@ from typing import (TYPE_CHECKING,
                     Optional)
 
 from couchbase._utils import is_null_or_empty
-from couchbase.exceptions import (InvalidArgumentException,
+from couchbase.exceptions import (FeatureUnavailableException,
+                                  InvalidArgumentException,
                                   QuotaLimitedException,
                                   SearchIndexNotFoundException)
 from couchbase.options import forward_args
@@ -54,8 +55,14 @@ class SearchIndexManagerLogic:
     _ERROR_MAPPING = {r'.*[iI]ndex not found.*': SearchIndexNotFoundException,
                       r'.*[Cc]reate[Ii]ndex, [Pp]repare failed, err: [Ee]xceeds indexes limit': QuotaLimitedException}
 
-    def __init__(self, connection):
+    def __init__(self,
+                 connection,
+                 bucket_name=None,  # type: Optional[str]
+                 scope_name=None  # type: Optional[str]
+                 ):
         self._connection = connection
+        self._bucket_name = bucket_name
+        self._scope_name = scope_name
 
     def upsert_index(self,
                      index,     # type: SearchIndex
@@ -77,6 +84,12 @@ class SearchIndexManagerLogic:
 
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -114,6 +127,12 @@ class SearchIndexManagerLogic:
 
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -153,6 +172,12 @@ class SearchIndexManagerLogic:
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
 
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
             "conn": self._connection,
             "mgmt_op": mgmt_operations.SEARCH_INDEX.value,
@@ -183,6 +208,12 @@ class SearchIndexManagerLogic:
 
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -221,6 +252,12 @@ class SearchIndexManagerLogic:
 
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -261,6 +298,12 @@ class SearchIndexManagerLogic:
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
 
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
             "conn": self._connection,
             "mgmt_op": mgmt_operations.SEARCH_INDEX.value,
@@ -299,6 +342,12 @@ class SearchIndexManagerLogic:
 
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -339,6 +388,12 @@ class SearchIndexManagerLogic:
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
 
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
             "conn": self._connection,
             "mgmt_op": mgmt_operations.SEARCH_INDEX.value,
@@ -377,6 +432,12 @@ class SearchIndexManagerLogic:
 
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -417,6 +478,12 @@ class SearchIndexManagerLogic:
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
 
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
             "conn": self._connection,
             "mgmt_op": mgmt_operations.SEARCH_INDEX.value,
@@ -455,6 +522,12 @@ class SearchIndexManagerLogic:
 
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -503,6 +576,12 @@ class SearchIndexManagerLogic:
         if final_args.get("client_context_id", None) is not None:
             op_args["client_context_id"] = final_args.get("client_context_id")
 
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
             "conn": self._connection,
             "mgmt_op": mgmt_operations.SEARCH_INDEX.value,
@@ -531,6 +610,10 @@ class SearchIndexManagerLogic:
 
         if is_null_or_empty(index_name):
             raise InvalidArgumentException("expected an index_name")
+
+        if self._bucket_name is not None and self._scope_name is not None:
+            raise FeatureUnavailableException(('get_index_stats unavailable at scope level. '
+                                               'Use cluster.searchIndexes().get_index_stats(...) instead.'))
 
         final_args = forward_args(kwargs, *options)
         op_args = {
@@ -633,16 +716,15 @@ class SearchIndex:
     def from_server(cls,
                     json_data  # type: Dict[str, Any]
                     ):
-
-        params = None
+        params = {}
         if 'params_json' in json_data:
             params = json.loads(json_data.get('params_json'))
 
-        source_params = None
+        source_params = {}
         if 'source_params_json' in json_data:
             source_params = json.loads(json_data.get('source_params_json'))
 
-        plan_params = None
+        plan_params = {}
         if 'plan_params_json' in json_data:
             plan_params = json.loads(json_data.get('plan_params_json'))
 

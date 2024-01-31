@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import asyncio
 from typing import (Any,
                     Callable,
@@ -112,6 +114,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
         self._collection_spec = None
         self._scope = None
         self._named_collection = None
+        self._use_scope_search_mgmt = False
 
     @property
     def collection(self) -> Collection:
@@ -182,6 +185,10 @@ class TestEnvironment(CouchbaseTestEnvironment):
         """Returns the rate limit testing data"""
         return self._rate_limit_params if hasattr(self, '_rate_limit_params') else None
 
+    @property
+    def use_scope_search_mgmt(self) -> bool:
+        return self._use_scope_search_mgmt
+
     @classmethod  # noqa: C901
     async def get_environment(cls,  # noqa: C901
                               test_suite,
@@ -238,6 +245,33 @@ class TestEnvironment(CouchbaseTestEnvironment):
                          **kwargs)
 
         return cb_env
+
+    def disable_scope_search_mgmt(self) -> TestEnvironment:
+        self._use_scope_search_mgmt = False
+        return self
+
+    def disable_search_mgmt(self) -> TestEnvironment:
+        self.check_if_feature_supported('search_index_mgmt')
+        if not hasattr(self, '_sixm'):
+            del self._sixm
+
+        return self
+
+    def enable_scope_search_mgmt(self) -> TestEnvironment:
+        self._use_scope_search_mgmt = True
+        return self
+
+    def enable_search_mgmt(self) -> TestEnvironment:
+        self.check_if_feature_supported('search_index_mgmt')
+        if self.use_scope_search_mgmt:
+            if not hasattr(self.scope, 'search_indexes'):
+                pytest.skip('Search index management not available on scope.')
+            self._sixm = self.scope.search_indexes()
+        else:
+            if not hasattr(self.cluster, 'search_indexes'):
+                pytest.skip('Search index management not available on cluster.')
+            self._sixm = self.cluster.search_indexes()
+        return self
 
     async def get_new_key_value(self, reset=True):
         if reset is True:

@@ -818,6 +818,18 @@ get_search_request(PyObject* op_args)
         req.timeout = std::chrono::milliseconds(PyLong_AsUnsignedLongLong(pyObj_timeout) / 1000ULL);
     }
 
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
     return req;
 }
 

@@ -20,6 +20,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
 from couchbase.collection import Collection
+from couchbase.management.search import ScopeSearchIndexManager
 from couchbase.n1ql import N1QLQuery, N1QLRequest
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
@@ -27,7 +28,10 @@ from couchbase.options import (AnalyticsOptions,
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
-from couchbase.search import FullTextSearchRequest, SearchQueryBuilder
+from couchbase.search import (FullTextSearchRequest,
+                              SearchQueryBuilder,
+                              SearchRequest)
+from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
@@ -52,6 +56,10 @@ class ScopeLogic:
         **INTERNAL**
         """
         return self._bucket.streaming_timeouts
+
+    @property
+    def default_serializer(self) -> Optional[Serializer]:
+        return self._bucket.default_serializer
 
     @property
     def default_transcoder(self) -> Optional[Transcoder]:
@@ -372,6 +380,39 @@ class ScopeLogic:
         return SearchResult(FullTextSearchRequest.generate_search_request(self.connection,
                                                                           query.as_encodable(),
                                                                           streaming_timeout=streaming_timeout))
+
+    def search(self,
+               index,  # type: str
+               request,  # type: SearchRequest
+               *options,  # type: SearchOptions
+               **kwargs,  # type: Dict[str, Any]
+               ) -> SearchResult:
+        """
+        **VOLATILE** This API is subject to change at any time.
+        """
+        # See cluster.search() for note on streaming timeout
+        streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
+        query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+        return SearchResult(FullTextSearchRequest.generate_search_request(self.connection,
+                                                                          query.as_encodable(),
+                                                                          default_serializer=self.default_serializer,
+                                                                          streaming_timeout=streaming_timeout,
+                                                                          bucket_name=self.bucket_name,
+                                                                          scope_name=self.name))
+
+    def search_indexes(self) -> ScopeSearchIndexManager:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Get a :class:`~couchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
+        indexes of this cluster.
+
+        Returns:
+            :class:`~couchbase.management.search.ScopeSearchIndexManager`: A :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
+
+        """  # noqa: E501
+        # TODO:  AlreadyShutdownException?
+        return ScopeSearchIndexManager(self.connection, self.bucket_name, self.name)
 
     @staticmethod
     def default_name():

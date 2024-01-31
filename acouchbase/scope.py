@@ -16,10 +16,12 @@
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
+                    Dict,
                     Optional)
 
 from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
 from acouchbase.collection import Collection
+from acouchbase.management.search import ScopeSearchIndexManager
 from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
 from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
 from couchbase.options import (AnalyticsOptions,
@@ -28,10 +30,11 @@ from couchbase.options import (AnalyticsOptions,
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
+from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
-    from acouchbase.search import SearchQuery
+    from couchbase.search import SearchQuery, SearchRequest
 
 
 class AsyncScope:
@@ -64,6 +67,17 @@ class AsyncScope:
         **INTERNAL**
         """
         return self._bucket.loop
+
+    @property
+    def default_serializer(self) -> Optional[Serializer]:
+        return self._bucket.default_serializer
+
+    @property
+    def streaming_timeouts(self):
+        """
+        **INTERNAL**
+        """
+        return self._bucket.streaming_timeouts
 
     @property
     def default_transcoder(self) -> Optional[Transcoder]:
@@ -107,12 +121,11 @@ class AsyncScope:
         """
         self._connection = self._bucket.connection
 
-    def query(
-        self,
-        statement,  # type: str
-        *options,  # type: QueryOptions
-        **kwargs  # type: Any
-    ) -> QueryResult:
+    def query(self,
+              statement,  # type: str
+              *options,  # type: QueryOptions
+              **kwargs   # type: Dict[str, Any]
+              ) -> QueryResult:
         """Executes a N1QL query against the scope.
 
         .. note::
@@ -203,12 +216,11 @@ class AsyncScope:
                                                                   query.params,
                                                                   **request_args))
 
-    def analytics_query(
-        self,
-        statement,  # type: str
-        *options,  # type: AnalyticsOptions
-        **kwargs
-    ) -> AnalyticsResult:
+    def analytics_query(self,
+                        statement,  # type: str
+                        *options,  # type: AnalyticsOptions
+                        **kwargs   # type: Dict[str, Any]
+                        ) -> AnalyticsResult:
         """Executes an analaytics query against the scope.
 
         .. note::
@@ -299,13 +311,12 @@ class AsyncScope:
                                                                                 query.params,
                                                                                 **request_args))
 
-    def search_query(
-        self,
-        index,  # type: str
-        query,  # type: SearchQuery
-        *options,  # type: SearchOptions
-        **kwargs
-    ) -> SearchResult:
+    def search_query(self,
+                     index,  # type: str
+                     query,  # type: SearchQuery
+                     *options,  # type: SearchOptions
+                     **kwargs   # type: Dict[str, Any]
+                     ) -> SearchResult:
         """Executes an search query against the scope.
 
         .. note::
@@ -409,13 +420,46 @@ class AsyncScope:
         if not ('scope_name' in opt or 'scope_name' in kwargs):
             kwargs['scope_name'] = f'{self.name}'
 
-        query = SearchQueryBuilder.create_search_query_object(
-            index, query, *options, **kwargs
-        )
+        query = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
         return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
                                                                                self.loop,
                                                                                query.as_encodable(),
                                                                                **request_args))
+
+    def search(self,
+               index,  # type: str
+               request,  # type: SearchRequest
+               *options,  # type: SearchOptions
+               **kwargs,  # type: Dict[str, Any]
+               ) -> SearchResult:
+        """
+        **VOLATILE** This API is subject to change at any time.
+        """
+        # See couchbase.cluster.search() for note on streaming timeout
+        streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
+        query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+        req = AsyncFullTextSearchRequest.generate_search_request(self.connection,
+                                                                 self.loop,
+                                                                 query.as_encodable(),
+                                                                 default_serializer=self.default_serializer,
+                                                                 streaming_timeout=streaming_timeout,
+                                                                 bucket_name=self.bucket_name,
+                                                                 scope_name=self.name)
+        return SearchResult(req)
+
+    def search_indexes(self) -> ScopeSearchIndexManager:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Get a :class:`~acouchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
+        indexes of this scope.
+
+        Returns:
+            :class:`~acouchbase.management.search.ScopeSearchIndexManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
+
+        """  # noqa: E501
+        # TODO:  AlreadyShutdownException?
+        return ScopeSearchIndexManager(self.connection, self.loop, self.bucket_name, self.name)
 
     @staticmethod
     def default_name():

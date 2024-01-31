@@ -134,6 +134,8 @@ class ServerFeatures(Enum):
     NonDedupedHistory = 'non_deduped_history'
     QueryWithoutIndex = 'query_without_index'
     NotLockedKVStatus = 'kv_not_locked'
+    ScopeSearch = 'scope_search'
+    ScopeSearchIndexManagement = 'scope_search_index_mgmt'
 
 
 # mock and real server (all versions) should have these features
@@ -159,7 +161,9 @@ FEATURES_NOT_IN_MOCK = [ServerFeatures.Analytics,
                         ServerFeatures.UserGroupManagement,
                         ServerFeatures.UserManagement,
                         ServerFeatures.ViewIndexManagement,
-                        ServerFeatures.KvRangeScan]
+                        ServerFeatures.KvRangeScan,
+                        ServerFeatures.ScopeSearch,
+                        ServerFeatures.ScopeSearchIndexManagement]
 
 FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -202,7 +206,9 @@ AT_LEAST_V7_5_0_FEATURES = [ServerFeatures.KvRangeScan,
                             ServerFeatures.QueryWithoutIndex]
 
 AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus,
-                            ServerFeatures.NegativeCollectionMaxExpiry]
+                            ServerFeatures.NegativeCollectionMaxExpiry,
+                            ServerFeatures.ScopeSearch,
+                            ServerFeatures.ScopeSearchIndexManagement]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {

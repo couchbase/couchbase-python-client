@@ -495,6 +495,18 @@ get_search_index_control_ingest_req(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
     return req;
 }
 
@@ -520,6 +532,18 @@ get_search_index_control_freeze_req(PyObject* op_args)
     if (pyObj_client_context_id != nullptr) {
         auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
         req.client_context_id = client_context_id;
+    }
+
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
     }
 
     return req;
@@ -549,6 +573,18 @@ get_search_index_control_query_req(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
     return req;
 }
 
@@ -571,6 +607,18 @@ get_search_index_analyze_doc_req(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
     return req;
 }
 
@@ -590,6 +638,18 @@ get_search_index_with_name_req(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
     return req;
 }
 
@@ -605,6 +665,18 @@ get_search_index_req(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
     return req;
 }
 
@@ -617,6 +689,50 @@ get_search_index_upsert_req(PyObject* op_args)
     Py_INCREF(pyObj_index);
     req.index = get_search_index(pyObj_index);
     Py_DECREF(pyObj_index);
+
+    PyObject* pyObj_client_context_id = PyDict_GetItemString(op_args, "client_context_id");
+    if (pyObj_client_context_id != nullptr) {
+        auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
+        req.client_context_id = client_context_id;
+    }
+
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
+    return req;
+}
+
+couchbase::core::operations::management::search_index_get_stats_request
+get_search_index_stats_req(PyObject* op_args)
+{
+    couchbase::core::operations::management::search_index_get_stats_request req{};
+
+    PyObject* pyObj_index_name = PyDict_GetItemString(op_args, "index_name");
+    auto index_name = std::string(PyUnicode_AsUTF8(pyObj_index_name));
+    req.index_name = index_name;
+
+    PyObject* pyObj_client_context_id = PyDict_GetItemString(op_args, "client_context_id");
+    if (pyObj_client_context_id != nullptr) {
+        auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
+        req.client_context_id = client_context_id;
+    }
+
+    return req;
+}
+
+couchbase::core::operations::management::search_get_stats_request
+get_search_all_stats_req(PyObject* op_args)
+{
+    couchbase::core::operations::management::search_get_stats_request req{};
 
     PyObject* pyObj_client_context_id = PyDict_GetItemString(op_args, "client_context_id");
     if (pyObj_client_context_id != nullptr) {
@@ -691,8 +807,7 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             break;
         }
         case SearchIndexManagementOperations::GET_INDEX_STATS: {
-            auto req =
-              get_search_index_with_name_req<couchbase::core::operations::management::search_index_get_stats_request>(options->op_args);
+            auto req = get_search_index_stats_req(options->op_args);
             req.timeout = options->timeout_ms;
 
             res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_get_stats_request>(
@@ -700,7 +815,7 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             break;
         }
         case SearchIndexManagementOperations::GET_ALL_STATS: {
-            auto req = get_search_index_req<couchbase::core::operations::management::search_get_stats_request>(options->op_args);
+            auto req = get_search_all_stats_req(options->op_args);
             req.timeout = options->timeout_ms;
 
             res = do_search_index_mgmt_op<couchbase::core::operations::management::search_get_stats_request>(

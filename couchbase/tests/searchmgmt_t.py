@@ -13,17 +13,29 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
+import pathlib
+from os import path
+
 import pytest
 
-from couchbase.exceptions import (InvalidArgumentException,
+from couchbase.exceptions import (FeatureUnavailableException,
+                                  InvalidArgumentException,
                                   QueryIndexAlreadyExistsException,
                                   SearchIndexNotFoundException)
 from couchbase.management.search import SearchIndex
+from tests.environments import CollectionType
 from tests.environments.test_environment import TestEnvironment
 
 
 class SearchIndexManagementTestSuite:
     IDX_NAME = 'test-fts-index'
+
+    TEST_COLLECTION_INDEX_NAME = 'test-search-coll-index'
+    TEST_COLLECTION_INDEX_PATH = path.join(pathlib.Path(__file__).parent.parent.parent,
+                                           'tests',
+                                           'test_cases',
+                                           f'{TEST_COLLECTION_INDEX_NAME}-params-new.json')
 
     TEST_MANIFEST = [
         'test_analyze_doc',
@@ -48,6 +60,14 @@ class SearchIndexManagementTestSuite:
 
     @pytest.fixture()
     def create_test_index(self, cb_env, test_idx):
+        if cb_env.use_scope_search_mgmt:
+            with open(self.TEST_COLLECTION_INDEX_PATH) as params_file:
+                input = params_file.read()
+                params_json = json.loads(input)
+                mapping_types = params_json.get('mapping', {}).get('types', {})
+                if mapping_types and 'test-scope.other-collection' in mapping_types:
+                    del params_json['mapping']['types']['test-scope.other-collection']
+                test_idx.params = params_json
         TestEnvironment.try_n_times_till_exception(10,
                                                    3,
                                                    cb_env.sixm.upsert_index,
@@ -69,18 +89,21 @@ class SearchIndexManagementTestSuite:
         if cb_env.server_version_short < 6.5:
             pytest.skip((f'FTS analyzeDoc only supported on server versions >= 6.5. '
                         f'Using server version: {cb_env.server_version}.'))
-        # like getting the doc count, this can fail immediately after index
-        # creation
         doc = {"field": "I got text in here"}
-        analysis = TestEnvironment.try_n_times(5,
-                                               2,
-                                               cb_env.sixm.analyze_document,
-                                               test_idx.name,
-                                               doc)
+        if cb_env.use_scope_search_mgmt:
+            with pytest.raises(FeatureUnavailableException):
+                cb_env.sixm.get_index_stats(test_idx.name, doc)
+        else:
+            # like getting the doc count, this can fail immediately after index creation
+            analysis = TestEnvironment.try_n_times(5,
+                                                   2,
+                                                   cb_env.sixm.analyze_document,
+                                                   test_idx.name,
+                                                   doc)
 
-        assert analysis.get('analysis', None) is not None
-        assert isinstance(analysis.get('analysis'), (list, dict))
-        assert analysis.get('status', None) == 'ok'
+            assert analysis.get('analysis', None) is not None
+            assert isinstance(analysis.get('analysis'), (list, dict))
+            assert analysis.get('status', None) == 'ok'
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
@@ -158,12 +181,16 @@ class SearchIndexManagementTestSuite:
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
     def test_get_index_stats(self, cb_env, test_idx):
-        # like getting the doc count, this can fail immediately after index
-        # creation
-        stats = TestEnvironment.try_n_times(5, 2, cb_env.sixm.get_index_stats, test_idx.name)
+        if cb_env.use_scope_search_mgmt:
+            with pytest.raises(FeatureUnavailableException):
+                cb_env.sixm.get_index_stats(test_idx.name)
+        else:
+            # like getting the doc count, this can fail immediately after index
+            # creation
+            stats = TestEnvironment.try_n_times(5, 2, cb_env.sixm.get_index_stats, test_idx.name)
 
-        assert stats is not None
-        assert isinstance(stats, dict)
+            assert stats is not None
+            assert isinstance(stats, dict)
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
@@ -208,20 +235,39 @@ class SearchIndexManagementTestSuite:
 
 @pytest.mark.flaky(reruns=5, reruns_delay=1)
 class ClassicSearchIndexManagementTests(SearchIndexManagementTestSuite):
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
+    @pytest.fixture(scope='class', autouse=True)
+    def validate_test_manifest(self):
         def valid_test_method(meth):
             attr = getattr(ClassicSearchIndexManagementTests, meth)
             return callable(attr) and not meth.startswith('__') and meth.startswith('test')
         method_list = [meth for meth in dir(ClassicSearchIndexManagementTests) if valid_test_method(meth)]
-        compare = set(SearchIndexManagementTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+        test_list = set(ClassicSearchIndexManagementTests.TEST_MANIFEST).symmetric_difference(method_list)
+        if test_list:
+            pytest.fail(f'Test manifest invalid.  Missing/extra tests: {test_list}.')
 
     @pytest.fixture(scope='class', name='cb_env')
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
+    def couchbase_test_environment(self, cb_base_env):
         cb_base_env.enable_search_mgmt()
         yield cb_base_env
         cb_base_env.disable_search_mgmt()
+
+
+# @pytest.mark.flaky(reruns=5, reruns_delay=1)
+class ClassicScopeSearchIndexManagementTests(SearchIndexManagementTestSuite):
+    @pytest.fixture(scope='class', autouse=True)
+    def validate_test_manifest(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicScopeSearchIndexManagementTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicScopeSearchIndexManagementTests) if valid_test_method(meth)]
+        test_list = set(ClassicScopeSearchIndexManagementTests.TEST_MANIFEST).symmetric_difference(method_list)
+        if test_list:
+            pytest.fail(f'Test manifest invalid.  Missing/extra tests: {test_list}.')
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self, cb_base_env):
+        cb_base_env.setup(CollectionType.NAMED, num_docs=100)
+        cb_base_env.enable_scope_search_mgmt().enable_search_mgmt()
+        yield cb_base_env
+        cb_base_env.disable_search_mgmt().disable_scope_search_mgmt()
+        cb_base_env.teardown(CollectionType.NAMED)

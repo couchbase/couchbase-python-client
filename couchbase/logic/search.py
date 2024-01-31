@@ -1404,6 +1404,8 @@ class FullTextSearchRequestLogic:
         self._metadata = None
         self._result_rows = None
         self._result_facets = None
+        self._bucket_name = kwargs.pop('bucket_name', None)
+        self._scope_name = kwargs.pop('scope_name', None)
 
     @property
     def encoded_query(self) -> Dict[str, Any]:
@@ -1511,9 +1513,14 @@ class FullTextSearchRequestLogic:
 
         self._started_streaming = True
         span = self.encoded_query.pop('span', None)
+        op_args = self.encoded_query
+        if self._bucket_name is not None and self._scope_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+            op_args['scope_name'] = self._scope_name
+
         search_kwargs = {
             'conn': self._connection,
-            'op_args': self.encoded_query
+            'op_args': op_args
         }
         if span:
             search_kwargs['span'] = span

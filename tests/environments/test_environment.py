@@ -83,6 +83,7 @@ class TestEnvironment:
         self._used_extras = set()
         self._doc_types = ['dealership', 'vehicle']
         self._consistency = ConsistencyChecker.from_test_environment(self)
+        self._use_scope_search_mgmt = False
 
     @property
     def aixm(self) -> Optional[Any]:
@@ -208,6 +209,10 @@ class TestEnvironment:
         return self._um if hasattr(self, '_um') else None
 
     @property
+    def use_scope_search_mgmt(self) -> bool:
+        return self._use_scope_search_mgmt
+
+    @property
     def vixm(self) -> Optional[Any]:
         """Returns the default ViewIndexManager"""
         return self._vixm if hasattr(self, '_vixm') else None
@@ -265,8 +270,9 @@ class TestEnvironment:
 
         return self
 
-    def disable_named_collections(self) -> None:
+    def disable_named_collections(self) -> TestEnvironment:
         self._use_named_collections = False
+        return self
 
     def disable_query_mgmt(self) -> TestEnvironment:
         EnvironmentFeatures.check_if_feature_supported('query_index_mgmt',
@@ -275,6 +281,10 @@ class TestEnvironment:
         if not hasattr(self, '_qixm'):
             del self._qixm
 
+        return self
+
+    def disable_scope_search_mgmt(self) -> TestEnvironment:
+        self._use_scope_search_mgmt = False
         return self
 
     def disable_search_mgmt(self) -> TestEnvironment:
@@ -363,14 +373,22 @@ class TestEnvironment:
             self._qixm = self.cluster.query_indexes()
         return self
 
+    def enable_scope_search_mgmt(self) -> TestEnvironment:
+        self._use_scope_search_mgmt = True
+        return self
+
     def enable_search_mgmt(self) -> TestEnvironment:
         EnvironmentFeatures.check_if_feature_supported('search_index_mgmt',
                                                        self.server_version_short,
                                                        self.mock_server_type)
-        if not hasattr(self.cluster, 'search_indexes'):
-            pytest.skip('Search index management not available on cluster.')
-
-        self._sixm = self.cluster.search_indexes()
+        if self.use_scope_search_mgmt:
+            if not hasattr(self.scope, 'search_indexes'):
+                pytest.skip('Search index management not available on scope.')
+            self._sixm = self.scope.search_indexes()
+        else:
+            if not hasattr(self.cluster, 'search_indexes'):
+                pytest.skip('Search index management not available on cluster.')
+            self._sixm = self.cluster.search_indexes()
         return self
 
     def enable_views_mgmt(self) -> TestEnvironment:

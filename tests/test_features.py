@@ -68,6 +68,8 @@ class ServerFeatures(Enum):
     NonDedupedHistory = 'non_deduped_history'
     QueryWithoutIndex = 'query_without_index'
     NotLockedKVStatus = 'kv_not_locked'
+    ScopeSearch = 'scope_search'
+    ScopeSearchIndexManagement = 'scope_search_index_mgmt'
 
 
 class EnvironmentFeatures:
@@ -140,7 +142,9 @@ class EnvironmentFeatures:
                                 ServerFeatures.QueryWithoutIndex]
 
     AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus,
-                                ServerFeatures.NegativeCollectionMaxExpiry]
+                                ServerFeatures.NegativeCollectionMaxExpiry,
+                                ServerFeatures.ScopeSearch,
+                                ServerFeatures.ScopeSearchIndexManagement]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str

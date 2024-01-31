@@ -29,6 +29,7 @@ from couchbase.result import (AnalyticsResult,
 from couchbase.transcoder import Transcoder
 from txcouchbase.analytics import AnalyticsRequest
 from txcouchbase.collection import Collection
+from txcouchbase.management.search import ScopeSearchIndexManager
 from txcouchbase.n1ql import N1QLRequest
 from txcouchbase.search import FullTextSearchRequest
 
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from couchbase.options import (AnalyticsOptions,
                                    QueryOptions,
                                    SearchOptions)
-    from couchbase.search import SearchQuery
+    from couchbase.search import SearchQuery, SearchRequest
 
 
 class Scope:
@@ -190,6 +191,52 @@ class Scope:
         query_d.addCallback(_on_ok)
         query_d.addErrback(_on_err)
         return d
+
+    def search(self,
+               index,  # type: str
+               request,  # type: SearchRequest
+               *options,  # type: SearchOptions
+               **kwargs,  # type: Dict[str, Any]
+               ) -> Deferred[SearchResult]:
+        """
+        **VOLATILE** This API is subject to change at any time.
+        """
+        request_args = dict(default_serialize=self.default_serializer,
+                            streaming_timeout=self.streaming_timeouts.get('search_timeout', None),
+                            bucket_name=self.bucket_name,
+                            scope_name=self.name)
+        query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+        request = FullTextSearchRequest.generate_search_request(self.connection,
+                                                                self.loop,
+                                                                query.as_encodable(),
+                                                                **request_args)
+
+        d = Deferred()
+
+        def _on_ok(_):
+            d.callback(SearchResult(request))
+
+        def _on_err(exc):
+            d.errback(exc)
+
+        query_d = request.execute_search_query()
+        query_d.addCallback(_on_ok)
+        query_d.addErrback(_on_err)
+        return d
+
+    def search_indexes(self) -> ScopeSearchIndexManager:
+        """
+        **VOLATILE** This API is subject to change at any time.
+
+        Get a :class:`~txcouchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
+        indexes of this scope.
+
+        Returns:
+            :class:`~txcouchbase.management.search.ScopeSearchIndexManager`: A :class:`~txcouchbase.management.search.ScopeSearchIndexManager` instance.
+
+        """  # noqa: E501
+        # TODO:  AlreadyShutdownException?
+        return ScopeSearchIndexManager(self.connection, self.loop, self.bucket_name, self.name)
 
     def _connect_bucket(self):
         """
