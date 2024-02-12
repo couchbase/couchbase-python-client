@@ -14,12 +14,14 @@ Vector search Enums per the search RFC
 
 
 class VectorQueryCombination(Enum):
-    """
+    """ Specifies how multiple vector searches are combined.
+
     **VOLATILE** This API is subject to change at any time.
 
     This can be one of:
-        AND
-        OR
+        AND: Indicates that multiple vector queries should be combined with logical AND.
+
+        OR: Indicates that multiple vector queries should be combined with logical OR.
 
     """
     AND = 'and'
@@ -27,9 +29,23 @@ class VectorQueryCombination(Enum):
 
 
 class VectorQuery:
-    """
+    """ Represents a vector query.
+
     **VOLATILE** This API is subject to change at any time.
-    """
+
+    Args:
+        field_name (str): The name of the field in the search index that stores the vector.
+        vector (List[float]): The vector to use in the query.
+        num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or equal to 1.
+        boost (float, optional): Add boost to query.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If all values of the provided vector are not instances of float.
+
+    Returns:
+        :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
+    """  # noqa: E501
 
     def __init__(self,
                  field_name,  # type: str
@@ -50,9 +66,11 @@ class VectorQuery:
             self.boost = boost
 
     @property
-    def boost(self) -> float:
+    def boost(self) -> Optional[float]:
         """
         **VOLATILE** This API is subject to change at any time.
+
+        Optional[float]: Returns vector query's boost value, if it exists.
         """
         return self._boost
 
@@ -68,13 +86,17 @@ class VectorQuery:
     def field_name(self) -> str:
         """
         **VOLATILE** This API is subject to change at any time.
+
+        str: Returns vector query's field name
         """
         return self._field_name
 
     @property
-    def num_candidates(self) -> int:
+    def num_candidates(self) -> Optional[int]:
         """
         **VOLATILE** This API is subject to change at any time.
+
+        Optional[int]: Returns vector query's num candidates value, if it exists.
         """
         return self._num_candidates
 
@@ -92,6 +114,8 @@ class VectorQuery:
     def vector(self) -> List[float]:
         """
         **VOLATILE** This API is subject to change at any time.
+
+        List[float]: Returns the vector query's vector.
         """
         return self._vector
 
@@ -102,16 +126,43 @@ class VectorQuery:
                num_candidates=None,  # type: Optional[int]
                boost=None,  # type: Optional[float]
                ) -> VectorQuery:
-        """
+        """ Creates a :class:`~couchbase.vector_search.VectorQuery`.
+
         **VOLATILE** This API is subject to change at any time.
-        """
+
+        Args:
+            field_name (str): The name of the field in the search index that stores the vector.
+            vector (List[float]): The vector to use in the query.
+            num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or equal to 1.
+            boost (float, optional): Add boost to query.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If all values of the provided vector are not instances of float.
+
+        Returns:
+            :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
+        """  # noqa: E501
         return cls(field_name, vector, num_candidates=num_candidates, boost=boost)
 
 
 class VectorSearch:
-    """
+    """ Represents a vector search.
+
     **VOLATILE** This API is subject to change at any time.
-    """
+
+    Args:
+        queries (List[:class:`~couchbase.vector_search.VectorQuery`]):
+            The list of :class:`~couchbase.vector_search.VectorQuery`'s to use for the vector search.
+        options (:class:`~couchbase.options.VectorSearchOptions`, optional): Options to set for the vector search.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If a list of :class:`~couchbase.vector_search.VectorQuery` is not provided.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If all values of the provided queries are not instances of :class:`~couchbase.vector_search.VectorQuery`.
+
+    Returns:
+        :class:`~couchbase.vector_search.VectorSearch`: The created vector search.
+    """  # noqa: E501
 
     def __init__(self,
                  queries,  # type: List[VectorQuery]
@@ -127,17 +178,34 @@ class VectorSearch:
 
     @property
     def queries(self) -> List[VectorQuery]:
+        """
+            **INTERNAL**
+        """
         return self._queries
 
     @property
     def options(self) -> Optional[VectorSearchOptions]:
+        """
+            **INTERNAL**
+        """
         return self._options
 
     @classmethod
     def from_vector_query(cls,
                           query  # type: VectorQuery
                           ) -> VectorSearch:
-        """
+        """ Creates a :class:`~couchbase.vector_search.VectorSearch` from a single :class:`~couchbase.vector_search.VectorQuery`.
+
         **VOLATILE** This API is subject to change at any time.
-        """
+
+        Args:
+            query (:class:`~couchbase.vector_search.VectorQuery`):
+                A :class:`~couchbase.vector_search.VectorQuery`'s to use for the vector search.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided query is not an instance of :class:`~couchbase.vector_search.VectorQuery`.
+
+        Returns:
+            :class:`~couchbase.vector_search.VectorSearch`: The created vector search.
+        """  # noqa: E501
         return cls([query])

@@ -87,34 +87,36 @@ html_theme_options = {
 # html_static_path = ['_static']
 html_static_path = []
 
+# The docs are unclear, but adding the `%s` to the end of the URL prevents:
+#   TypeError: not all arguments converted during string formatting
 extlinks = {
-    'analytics_intro': ('https://docs.couchbase.com/server/current/analytics/introduction.html', None),
-    'search_create_idx': ('https://docs.couchbase.com/server/current/fts/fts-creating-indexes.html', None),
-    'couchbase_dev_portal': ('https://developer.couchbase.com/', None),
-    'couchbase_discord': ('https://discord.com/invite/sQ5qbPZuTh', None),
-    'python_sdk_github': ('https://github.com/couchbase/couchbase-python-client', None),
+    'analytics_intro': ('https://docs.couchbase.com/server/current/analytics/introduction.html%s', None),
+    'search_create_idx': ('https://docs.couchbase.com/server/current/fts/fts-creating-indexes.html%s', None),
+    'couchbase_dev_portal': ('https://developer.couchbase.com/%s', None),
+    'couchbase_discord': ('https://discord.com/invite/sQ5qbPZuTh%s', None),
+    'python_sdk_github': ('https://github.com/couchbase/couchbase-python-client%s', None),
     'acouchbase_examples':
-        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/acouchbase', None),
+        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/acouchbase%s', None),
     'couchbase_examples':
-        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/couchbase', None),
+        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/couchbase%s', None),
     'txcouchbase_examples':
-        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/txcouchbase', None),
+        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/txcouchbase%s', None),
     'txns_examples':
-        ('https://docs.couchbase.com/python-sdk/current/howtos/distributed-acid-transactions-from-the-sdk.html', None),
-    'python_sdk_jira': ('https://issues.couchbase.com/projects/PYCBC/issues/', None),
-    'python_sdk_docs': ('https://docs.couchbase.com/python-sdk/current/hello-world/overview.html', None),
+        ('https://docs.couchbase.com/python-sdk/current/howtos/distributed-acid-transactions-from-the-sdk.html%s', None),  # noqa: E501
+    'python_sdk_jira': ('https://issues.couchbase.com/projects/PYCBC/issues/%s', None),
+    'python_sdk_docs': ('https://docs.couchbase.com/python-sdk/current/hello-world/overview.html%s', None),
     'python_sdk_release_notes':
-        ('https://docs.couchbase.com/python-sdk/current/project-docs/sdk-release-notes.html', None),
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/sdk-release-notes.html%s', None),
     'python_sdk_compatibility':
-        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html', None),
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html%s', None),
     'python_sdk_3x_migration':
-        ('https://docs.couchbase.com/python-sdk/current/project-docs/migrating-sdk-code-to-3.n.html', None),
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/migrating-sdk-code-to-3.n.html%s', None),
     'python_sdk_api_version':
-        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#api-version', None),
-    'python_sdk_forums': ('https://forums.couchbase.com/c/python-sdk/10', None),
-    'python_sdk_license': ('https://github.com/couchbase/couchbase-python-client/blob/master/LICENSE', None),
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#api-version%s', None),
+    'python_sdk_forums': ('https://forums.couchbase.com/c/python-sdk/10%s', None),
+    'python_sdk_license': ('https://github.com/couchbase/couchbase-python-client/blob/master/LICENSE%s', None),
     'python_sdk_contribute':
-        ('https://github.com/couchbase/couchbase-python-client/blob/master/CONTRIBUTING.md', None),
+        ('https://github.com/couchbase/couchbase-python-client/blob/master/CONTRIBUTING.md%s', None),
     'python_sdk_version_compat':
-        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#python-version-compat', None),
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html#python-version-compat%s', None),
 }

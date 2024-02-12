@@ -20,6 +20,7 @@ Cluster
     .. automethod:: wait_until_ready
     .. automethod:: query
     .. automethod:: search_query
+    .. automethod:: search
     .. automethod:: analytics_query
     .. autoproperty:: transactions
     .. automethod:: buckets
@@ -61,7 +62,9 @@ Scope
     .. autoproperty:: bucket_name
     .. automethod:: query
     .. automethod:: search_query
+    .. automethod:: search
     .. automethod:: analytics_query
+    .. automethod:: search_indexes
 
 Collection
 ==============

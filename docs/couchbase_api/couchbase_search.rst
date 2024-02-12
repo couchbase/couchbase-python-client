@@ -3,7 +3,7 @@ Full Text Search
 =================
 
 .. note::
-    Further updates to the search docs will come with future 4.0.x releases.
+    Further updates to the search docs will come with future 4.x releases.
 
 .. contents::
     :local:
@@ -23,23 +23,35 @@ Options
 .. autoclass:: SearchOptions
     :noindex:
 
+SearchRequest
+===============
+
+.. module:: couchbase.search
+    :noindex:
+.. autoclass:: SearchRequest
+    :members:
+
 Results
 ===============
+
 .. module:: couchbase.search
     :noindex:
 
 SearchMetaData
 +++++++++++++++++++
+
 .. autoclass:: SearchMetaData
     :members:
 
 SearchMetrics
 +++++++++++++++++++
+
 .. autoclass:: SearchMetrics
     :members:
 
 SearchResult
 +++++++++++++++++++
+
 .. module:: couchbase.result
     :noindex:
 
@@ -50,3 +62,29 @@ SearchResult
         :noindex:
     .. automethod:: metadata
         :noindex:
+
+Vector Search
+===============
+
+.. module:: couchbase.vector_search
+    :noindex:
+
+.. autoclass:: VectorQuery
+    :members:
+
+.. autoclass:: VectorSearch
+    :members:
+
+Enumerations
++++++++++++++++++++
+
+.. module:: couchbase.vector_search
+    :noindex:
+.. autoenum:: VectorQueryCombination
+
+Options
++++++++++++++++++++
+
+.. module:: couchbase.options
+    :noindex:
+.. autoclass:: VectorSearchOptions

@@ -8,9 +8,20 @@ from couchbase.logic.vector_search import VectorSearch
 
 
 class SearchRequest:
-    """
+    """ Represents a search query and/or vector search to execute via the Couchbase Full Text Search (FTS) service.
+
     **VOLATILE** This API is subject to change at any time.
-    """
+
+    Args:
+        query (Union[:class:`~couchbase.search.SearchQuery`, :class:`~couchbase.vector_search.VectorSearch`]): A :class:`~couchbase.search.SearchQuery` or
+            :class:`~couchbase.vector_search.VectorSearch` to initialize the search request.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If neither a :class:`~couchbase.search.SearchQuery` or :class:`~couchbase.vector_search.VectorSearch` is provided.
+
+    Returns:
+        :class:`~couchbase.search.SearchRequest`: The created search request.
+    """  # noqa: E501
 
     def __init__(self,
                  query  # type: Union[SearchQuery, VectorSearch]
@@ -29,22 +40,37 @@ class SearchRequest:
     def search_query(self) -> Optional[SearchQuery]:
         """
         **VOLATILE** This API is subject to change at any time.
-        """
+
+        Optional[:class:`~couchbase.search.SearchQuery`]: Returns the search request's :class:`~couchbase.search.SearchQuery`, if it exists.
+        """  # noqa: E501
         return self._search_query
 
     @property
     def vector_search(self) -> Optional[VectorSearch]:
         """
         **VOLATILE** This API is subject to change at any time.
-        """
+
+        Optional[:class:`~couchbase.vector_search.VectorSearch`]: Returns the search request's :class:`~couchbase.vector_search.VectorSearch`, if it exists.
+        """  # noqa: E501
         return self._vector_search
 
     def with_search_query(self,
                           query  # type: SearchQuery
                           ) -> SearchRequest:
-        """
+        """ Add a :class:`~couchbase.search.SearchQuery` to the search request.
+
         **VOLATILE** This API is subject to change at any time.
-        """
+
+        Args:
+            query (:class:`~couchbase.search.SearchQuery`): The :class:`~couchbase.search.SearchQuery` to add to the search request.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the search request already contains a :class:`~couchbase.search.SearchQuery`.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided query is not an instance of a :class:`~couchbase.search.SearchQuery`.
+
+        Returns:
+            :class:`~couchbase.search.SearchRequest`: The search request in order to allow method chaining.
+        """  # noqa: E501
         is_search_query = isinstance(query, SearchQuery)
         if not is_search_query:
             raise InvalidArgumentException('Must provide a SearchQuery.')
@@ -57,9 +83,20 @@ class SearchRequest:
     def with_vector_search(self,
                            vector_search  # type: VectorSearch
                            ) -> SearchRequest:
-        """
+        """ Add a :class:`~couchbase.vector_search.VectorSearch` to the search request.
+
         **VOLATILE** This API is subject to change at any time.
-        """
+
+        Args:
+            vector_search (:class:`~couchbase.vector_search.VectorSearch`): The :class:`~couchbase.vector_search.VectorSearch` to add to the search request.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the search request already contains a :class:`~couchbase.vector_search.VectorSearch`.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided query is not an instance of a :class:`~couchbase.vector_search.VectorSearch`.
+
+        Returns:
+            :class:`~couchbase.search.SearchRequest`: The search request in order to allow method chaining.
+        """  # noqa: E501
         is_vector_search = isinstance(vector_search, VectorSearch)
         if not is_vector_search:
             raise InvalidArgumentException('Must provide a VectorSearch.')
@@ -73,7 +110,18 @@ class SearchRequest:
     def create(cls,
                query  # type: Union[SearchQuery, VectorSearch]
                ) -> SearchRequest:
-        """
+        """ Creates a :class:`~couchbase.search.SearchRequest`.
+
         **VOLATILE** This API is subject to change at any time.
-        """
+
+        Args:
+            query (Union[:class:`~couchbase.search.SearchQuery`, :class:`~couchbase.vector_search.VectorSearch`]): A :class:`~couchbase.search.SearchQuery` or
+                :class:`~couchbase.vector_search.VectorSearch` to initialize the search request.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If neither a :class:`~couchbase.search.SearchQuery` or :class:`~couchbase.vector_search.VectorSearch` is provided.
+
+        Returns:
+            :class:`~couchbase.search.SearchRequest`: The created search request.
+        """  # noqa: E501
         return cls(query)
