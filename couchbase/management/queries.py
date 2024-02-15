@@ -45,7 +45,7 @@ class QueryIndexManager(QueryIndexManagerLogic):
     def create_index(self,
                      bucket_name,   # type: str
                      index_name,    # type: str
-                     fields,        # type: Iterable[str]
+                     keys,        # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
                      **kwargs       # type: Dict[str, Any]
                      ) -> None:
@@ -54,14 +54,14 @@ class QueryIndexManager(QueryIndexManagerLogic):
         Args:
             bucket_name (str): The name of the bucket this index is for.
             index_name (str): The name of the index.
-            fields (Iterable[str]): The fields which this index should cover.
+            keys (Iterable[str]): The keys which this index should cover.
             options (:class:`~couchbase.management.options.CreateQueryIndexOptions`): Optional parameters for this
                 operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name, index_name or fields
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name, index_name or keys
                 are invalid types.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
@@ -70,10 +70,10 @@ class QueryIndexManager(QueryIndexManagerLogic):
             raise InvalidArgumentException('The bucket_name must be provided when creating a secondary index.')
         if not isinstance(index_name, str):
             raise InvalidArgumentException('The index_name must be provided when creating a secondary index.')
-        if not isinstance(fields, (list, tuple)):
-            raise InvalidArgumentException('Index fields must be provided when creating a secondary index.')
+        if not isinstance(keys, (list, tuple)):
+            raise InvalidArgumentException('Index keys must be provided when creating a secondary index.')
 
-        return super().create_index(bucket_name, index_name, fields, *options, **kwargs)
+        return super().create_index(bucket_name, index_name, keys, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_primary_index(self,
@@ -297,7 +297,7 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
     @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_index(self,
                      index_name,    # type: str
-                     fields,        # type: Iterable[str]
+                     keys,        # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
                      **kwargs       # type: Dict[str, Any]
                      ) -> None:
@@ -305,21 +305,21 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
 
         Args:
             index_name (str): The name of the index.
-            fields (Iterable[str]): The fields which this index should cover.
+            keys (Iterable[str]): The keys which this index should cover.
             options (:class:`~couchbase.management.options.CreateQueryIndexOptions`): Optional parameters for this
                 operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or fields are invalid types.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or keys are invalid types.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
 
         if not isinstance(index_name, str):
             raise InvalidArgumentException('The index_name must be provided when creating a secondary index.')
-        if not isinstance(fields, (list, tuple)):
-            raise InvalidArgumentException('Index fields must be provided when creating a secondary index.')
+        if not isinstance(keys, (list, tuple)):
+            raise InvalidArgumentException('Index keys must be provided when creating a secondary index.')
 
         if not kwargs:
             kwargs = {}
@@ -333,7 +333,7 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
 
         kwargs['scope_name'] = self._scope_name
         kwargs['collection_name'] = self._collection_name
-        return super().create_index(self._bucket_name, index_name, fields, *options, **kwargs)
+        return super().create_index(self._bucket_name, index_name, keys, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_primary_index(self,

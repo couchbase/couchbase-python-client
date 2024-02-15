@@ -47,13 +47,13 @@ class QueryIndexManagerLogic:
 
     def _create_index(self,
                       bucket_name,  # type: str
-                      fields,  # type: Iterable[str]
+                      keys,  # type: Iterable[str]
                       index_name=None,  # type: Optional[str]
                       **kwargs  # type: Dict[str, Any]
                       ) -> None:
 
         op_args = self._parse_create_index_args(bucket_name,
-                                                fields,
+                                                keys,
                                                 index_name=index_name,
                                                 **kwargs)
 
@@ -79,7 +79,7 @@ class QueryIndexManagerLogic:
 
     def _parse_create_index_args(self,   # noqa: C901
                                  bucket_name,  # type: str
-                                 fields,  # type: Iterable[str]
+                                 keys,  # type: Iterable[str]
                                  index_name=None,  # type: Optional[str]
                                  **kwargs  # type: Dict[str, Any]
                                  ) -> Dict[str, Any]:
@@ -89,10 +89,10 @@ class QueryIndexManagerLogic:
         primary = kwargs.get('primary', False)
         condition = kwargs.get('condition', None)
 
-        if primary and fields:
-            raise TypeError('Cannot create primary index with explicit fields')
-        elif not primary and not fields:
-            raise ValueError('Fields required for non-primary index')
+        if primary and keys:
+            raise TypeError('Cannot create primary index with explicit keys')
+        elif not primary and not keys:
+            raise ValueError('Keys required for non-primary index')
 
         if condition and primary:
             raise ValueError('cannot specify condition for primary index')
@@ -106,11 +106,11 @@ class QueryIndexManagerLogic:
             op_args['is_primary'] = primary
         if condition:
             op_args['condition'] = condition
-        if fields and len(fields) > 0:
-            if isinstance(fields, list):
-                op_args['fields'] = fields
+        if keys and len(keys) > 0:
+            if isinstance(keys, list):
+                op_args['keys'] = keys
             else:
-                op_args['fields'] = list(fields)
+                op_args['keys'] = list(keys)
         if kwargs.get('ignore_if_exists', False) is True:
             op_args['ignore_if_exists'] = kwargs.get('ignore_if_exists')
         if kwargs.get('scope_name', None) is not None:
@@ -177,13 +177,13 @@ class QueryIndexManagerLogic:
     def create_index(self,
                      bucket_name,   # type: str
                      index_name,    # type: str
-                     fields,        # type: Iterable[str]
+                     keys,        # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
                      **kwargs       # type: Dict[str,Any]
                      ) -> None:
 
         final_args = forward_args(kwargs, *options)
-        return self._create_index(bucket_name, fields, index_name, **final_args)
+        return self._create_index(bucket_name, keys, index_name, **final_args)
 
     def create_primary_index(self,
                              bucket_name,  # type: str

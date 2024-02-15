@@ -88,6 +88,20 @@ class Supportability:
         warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
 
     @staticmethod
+    def method_kwarg_deprecated(kwarg,  # type: str
+                                use_instead  # type: str
+                                ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the provided param is deprecated.
+
+        Args:
+            kwarg (str): The name of the deprecated key-word argument.
+            use_instead (str): The name of the param to use instead of the deprecated param.
+        """
+        message = (f"Method key-word (kwarg) parameter {kwarg} is deprecated and will be removed in a future release. "
+                   f"Use {use_instead} instead.")
+        warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
+
+    @staticmethod
     def method_signature_deprecated(method_name,  # type: str
                                     signature,  # type: Signature
                                     use_instead,  # type: Signature

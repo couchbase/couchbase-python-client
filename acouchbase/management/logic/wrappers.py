@@ -20,6 +20,7 @@ from functools import wraps
 from acouchbase.logic import call_async_fn
 from couchbase._utils import Overload, OverloadType
 from couchbase.exceptions import ErrorMapper, MissingConnectionException
+from couchbase.logic.supportability import Supportability
 from couchbase.management.logic import (ManagementType,
                                         handle_analytics_index_mgmt_response,
                                         handle_bucket_mgmt_response,
@@ -98,6 +99,14 @@ class AsyncMgmtWrapper:
                     ft.set_exception(exc)
                 else:
                     func = mgmt_overload_registry.get(fn.__qualname__, fn)
+                    # work-around for PYCBC-1375, I doubt users are calling the index mgmt method
+                    # using fields=[...], but in the event they do (as we do in the tests) this corrects
+                    # the kwarg name.
+                    if ('QueryIndexManager' in fn.__qualname__
+                        and fn.__qualname__.endswith('create_index')
+                            and 'fields' in kwargs):
+                        kwargs['keys'] = kwargs.pop('fields')
+                        Supportability.method_kwarg_deprecated('fields', 'keys')
                     call_async_fn(ft, self, func, *args, **kwargs)
 
                 return ft

@@ -403,18 +403,18 @@ get_create_query_index_req(PyObject* op_args)
         req.num_replicas = num_replicas;
     }
 
-    PyObject* pyObj_fields = PyDict_GetItemString(op_args, "fields");
-    if (pyObj_fields != nullptr) {
-        size_t nfields = static_cast<size_t>(PyList_GET_SIZE(pyObj_fields));
-        std::vector<std::string> fields{};
+    PyObject* pyObj_keys = PyDict_GetItemString(op_args, "keys");
+    if (pyObj_keys != nullptr) {
+        size_t nkeys = static_cast<size_t>(PyList_GET_SIZE(pyObj_keys));
+        std::vector<std::string> keys{};
         size_t ii;
-        for (ii = 0; ii < nfields; ++ii) {
-            PyObject* pyObj_field = PyList_GetItem(pyObj_fields, ii);
-            auto field = std::string(PyUnicode_AsUTF8(pyObj_field));
-            fields.push_back(field);
+        for (ii = 0; ii < nkeys; ++ii) {
+            PyObject* pyObj_key = PyList_GetItem(pyObj_keys, ii);
+            auto key = std::string(PyUnicode_AsUTF8(pyObj_key));
+            keys.push_back(key);
         }
 
-        req.fields = fields;
+        req.keys = keys;
     }
 
     return req;

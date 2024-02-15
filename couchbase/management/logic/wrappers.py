@@ -27,6 +27,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap,
                                   HTTPException)
 from couchbase.exceptions import exception as BaseCouchbaseException
+from couchbase.logic.supportability import Supportability
 
 
 class ManagementType(Enum):
@@ -457,6 +458,14 @@ class BlockingMgmtWrapper:
             def wrapped_fn(self, *args, **kwargs):
                 try:
                     func = mgmt_overload_registry.get(fn.__qualname__, fn)
+                    # work-around for PYCBC-1375, I doubt users are calling the index mgmt method
+                    # using fields=[...], but in the event they do (as we do in the tests) this corrects
+                    # the kwarg name.
+                    if ('QueryIndexManager' in fn.__qualname__
+                        and fn.__qualname__.endswith('create_index')
+                            and 'fields' in kwargs):
+                        kwargs['keys'] = kwargs.pop('fields')
+                        Supportability.method_kwarg_deprecated('fields', 'keys')
                     ret = func(self, *args, **kwargs)
                     if isinstance(ret, BaseCouchbaseException):
                         handle_mgmt_exception(ret, mgmt_type, error_map)

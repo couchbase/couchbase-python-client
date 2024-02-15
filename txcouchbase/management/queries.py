@@ -52,7 +52,7 @@ class QueryIndexManager(QueryIndexManagerLogic):
     def create_index(self,
                      bucket_name,   # type: str
                      index_name,    # type: str
-                     fields,        # type: Iterable[str]
+                     keys,        # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
                      **kwargs
                      ) -> Deferred[None]:
@@ -61,10 +61,10 @@ class QueryIndexManager(QueryIndexManagerLogic):
             raise ValueError("bucket_name must be provided when creating a secondary index.")
         if not isinstance(index_name, str):
             raise ValueError("index_name must be provided when creating a secondary index.")
-        if not isinstance(fields, (list, tuple)):
-            raise ValueError("fields must be provided when creating a secondary index.")
+        if not isinstance(keys, (list, tuple)):
+            raise ValueError("keys must be provided when creating a secondary index.")
 
-        return Deferred.fromFuture(super().create_index(bucket_name, index_name, fields, *options, **kwargs))
+        return Deferred.fromFuture(super().create_index(bucket_name, index_name, keys, *options, **kwargs))
 
     def create_primary_index(self,
                              bucket_name,   # type: str

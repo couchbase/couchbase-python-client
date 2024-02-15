@@ -32,7 +32,7 @@ from tests.environments.test_environment import TestEnvironment
 from tests.test_features import EnvironmentFeatures
 
 
-class CollectionQueryCIndexManagementTestSuite:
+class CollectionQueryIndexManagementTestSuite:
     TEST_MANIFEST = [
         'test_create_index_no_fields',
         'test_create_named_primary',
@@ -42,6 +42,7 @@ class CollectionQueryCIndexManagementTestSuite:
         'test_create_secondary_index_default_coll',
         'test_create_secondary_indexes',
         'test_create_secondary_indexes_condition',
+        'test_create_secondary_indexes_fields_kwarg',
         'test_create_secondary_indexes_ignore_if_exists',
         'test_deferred',
         'test_drop_primary',
@@ -123,9 +124,9 @@ class CollectionQueryCIndexManagementTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_index_default_coll(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
         cb_env.qixm.create_index(ixname,
-                                 fields=fields,
+                                 keys,
                                  timeout=timedelta(seconds=120),
                                  ignore_if_exists=True)
 
@@ -140,17 +141,17 @@ class CollectionQueryCIndexManagementTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
         cb_env.qixm.create_index(ixname,
-                                 fields=fields,
+                                 keys=keys,
                                  timeout=timedelta(seconds=120))
-        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *fields)
+        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
         cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
 
         TestEnvironment.try_n_times_till_exception(10,
                                                    5,
@@ -159,7 +160,7 @@ class CollectionQueryCIndexManagementTestSuite:
                                                    expected_exceptions=(QueryIndexNotFoundException,))
         condition = '((`fld1` = 1) and (`fld2` = 2))'
         cb_env.qixm.create_index(ixname,
-                                 fields,
+                                 keys,
                                  CreateQueryIndexOptions(timeout=timedelta(days=1),
                                                          condition=condition))
 
@@ -172,13 +173,23 @@ class CollectionQueryCIndexManagementTestSuite:
         assert result.condition == condition
 
     @pytest.mark.usefixtures('clear_all_indexes')
+    def test_create_secondary_indexes_fields_kwarg(self, cb_env):
+        ixname = 'ix2'
+        keys = ('fld1', 'fld2')
+        cb_env.qixm.create_index(ixname,
+                                 fields=keys,
+                                 timeout=timedelta(seconds=120))
+        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
+        cb_env.cluster.query(n1ql).execute()
+
+    @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_ignore_if_exists(self, cb_env):
         ixname = 'ix2'
-        cb_env.qixm.create_index(ixname, fields=['hello'])
-        cb_env.qixm.create_index(ixname, fields=['hello'], ignore_if_exists=True)
+        cb_env.qixm.create_index(ixname, ['hello'])
+        cb_env.qixm.create_index(ixname, ['hello'], ignore_if_exists=True)
         cb_env.qixm.create_index(ixname, ['hello'], CreateQueryIndexOptions(ignore_if_exists=True))
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_index(ixname, fields=['hello'])
+            cb_env.qixm.create_index(ixname, ['hello'])
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
@@ -226,10 +237,10 @@ class CollectionQueryCIndexManagementTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_drop_secondary_indexes(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
-        cb_env.qixm.create_index(ixname, fields=fields, timeout=timedelta(seconds=120))
+        keys = ('fld1', 'fld2')
+        cb_env.qixm.create_index(ixname, keys, timeout=timedelta(seconds=120))
 
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *fields)
+        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
 
         # Drop the index
         cb_env.qixm.drop_index(ixname)
@@ -288,7 +299,7 @@ class CollectionQueryCIndexManagementTestSuite:
             defer = False
             if n % 2 == 0:
                 defer = True
-            cb_env.qixm.create_index(f'ix{n}', fields=[f'fld{n}'], deferred=defer)
+            cb_env.qixm.create_index(f'ix{n}', [f'fld{n}'], deferred=defer)
 
         ixs = cb_env.qixm.get_all_indexes()
         assert len(ixs) == 6
@@ -308,6 +319,7 @@ class QueryIndexManagementCollectionTestSuite:
         'test_create_secondary_index_default_coll',
         'test_create_secondary_indexes',
         'test_create_secondary_indexes_condition',
+        'test_create_secondary_indexes_fields_kwarg',
         'test_create_secondary_indexes_ignore_if_exists',
         'test_deferred',
         'test_drop_primary',
@@ -418,10 +430,10 @@ class QueryIndexManagementCollectionTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_index_default_coll(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
         cb_env.qixm.create_index(cb_env.bucket.name,
                                  ixname,
-                                 fields=fields,
+                                 keys=keys,
                                  timeout=timedelta(seconds=120),
                                  ignore_if_exists=True)
 
@@ -436,20 +448,20 @@ class QueryIndexManagementCollectionTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
         cb_env.qixm.create_index(cb_env.bucket.name,
                                  ixname,
-                                 fields=fields,
+                                 keys=keys,
                                  timeout=timedelta(seconds=120),
                                  scope_name=cb_env.TEST_SCOPE,
                                  collection_name=cb_env.TEST_COLLECTION)
-        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *fields)
+        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
         cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
 
         TestEnvironment.try_n_times_till_exception(10,
                                                    5,
@@ -462,7 +474,7 @@ class QueryIndexManagementCollectionTestSuite:
         condition = '((`fld1` = 1) and (`fld2` = 2))'
         cb_env.qixm.create_index(cb_env.bucket.name,
                                  ixname,
-                                 fields,
+                                 keys,
                                  CreateQueryIndexOptions(timeout=timedelta(days=1),
                                                          condition=condition,
                                                          scope_name=cb_env.TEST_SCOPE,
@@ -479,16 +491,29 @@ class QueryIndexManagementCollectionTestSuite:
         assert result.condition == condition
 
     @pytest.mark.usefixtures('clear_all_indexes')
+    def test_create_secondary_indexes_fields_kwarg(self, cb_env):
+        ixname = 'ix2'
+        keys = ('fld1', 'fld2')
+        cb_env.qixm.create_index(cb_env.bucket.name,
+                                 ixname,
+                                 fields=keys,
+                                 timeout=timedelta(seconds=120),
+                                 scope_name=cb_env.TEST_SCOPE,
+                                 collection_name=cb_env.TEST_COLLECTION)
+        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
+        cb_env.cluster.query(n1ql).execute()
+
+    @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_ignore_if_exists(self, cb_env):
         ixname = 'ix2'
         cb_env.qixm.create_index(cb_env.bucket.name,
                                  ixname,
-                                 fields=['hello'],
+                                 ['hello'],
                                  scope_name=cb_env.TEST_SCOPE,
                                  collection_name=cb_env.TEST_COLLECTION)
         cb_env.qixm.create_index(cb_env.bucket.name,
                                  ixname,
-                                 fields=['hello'],
+                                 ['hello'],
                                  ignore_if_exists=True,
                                  scope_name=cb_env.TEST_SCOPE,
                                  collection_name=cb_env.TEST_COLLECTION)
@@ -501,7 +526,7 @@ class QueryIndexManagementCollectionTestSuite:
         with pytest.raises(QueryIndexAlreadyExistsException):
             cb_env.qixm.create_index(cb_env.bucket.name,
                                      ixname,
-                                     fields=['hello'],
+                                     ['hello'],
                                      scope_name=cb_env.TEST_SCOPE,
                                      collection_name=cb_env.TEST_COLLECTION)
 
@@ -592,15 +617,15 @@ class QueryIndexManagementCollectionTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_drop_secondary_indexes(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
         cb_env.qixm.create_index(cb_env.bucket.name,
                                  ixname,
-                                 fields=fields,
+                                 keys,
                                  timeout=timedelta(seconds=120),
                                  scope_name=cb_env.TEST_SCOPE,
                                  collection_name=cb_env.TEST_COLLECTION)
 
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *fields)
+        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
 
         # Drop the index
         cb_env.qixm.drop_index(cb_env.bucket.name,
@@ -726,7 +751,7 @@ class QueryIndexManagementCollectionTestSuite:
                 defer = True
             cb_env.qixm.create_index(cb_env.bucket.name,
                                      'ix{0}'.format(n),
-                                     fields=['fld{0}'.format(n)],
+                                     ['fld{0}'.format(n)],
                                      deferred=defer,
                                      scope_name=cb_env.TEST_SCOPE,
                                      collection_name=cb_env.TEST_COLLECTION)
@@ -753,6 +778,7 @@ class QueryIndexManagementTestSuite:
         'test_create_primary_ignore_if_exists_kwargs',
         'test_create_secondary_indexes',
         'test_create_secondary_indexes_condition',
+        'test_create_secondary_indexes_fields_kwarg',
         'test_create_secondary_indexes_ignore_if_exists',
         'test_deferred',
         'test_drop_primary',
@@ -837,15 +863,15 @@ class QueryIndexManagementTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, fields=fields, timeout=timedelta(seconds=120))
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *fields)
+        keys = ('fld1', 'fld2')
+        cb_env.qixm.create_index(cb_env.bucket.name, ixname, keys=keys, timeout=timedelta(seconds=120))
+        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *keys)
         cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
+        keys = ('fld1', 'fld2')
 
         TestEnvironment.try_n_times_till_exception(10,
                                                    5,
@@ -856,7 +882,7 @@ class QueryIndexManagementTestSuite:
         condition = '((`fld1` = 1) and (`fld2` = 2))'
         cb_env.qixm.create_index(cb_env.bucket.name,
                                  ixname,
-                                 fields,
+                                 keys,
                                  CreateQueryIndexOptions(timeout=timedelta(days=1), condition=condition))
 
         def check_index():
@@ -868,13 +894,21 @@ class QueryIndexManagementTestSuite:
         assert result.condition == condition
 
     @pytest.mark.usefixtures('clear_all_indexes')
+    def test_create_secondary_indexes_fields_kwarg(self, cb_env):
+        ixname = 'ix2'
+        keys = ('fld1', 'fld2')
+        cb_env.qixm.create_index(cb_env.bucket.name, ixname, fields=keys, timeout=timedelta(seconds=120))
+        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *keys)
+        cb_env.cluster.query(n1ql).execute()
+
+    @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_ignore_if_exists(self, cb_env):
         ixname = 'ix2'
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, fields=['hello'])
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, fields=['hello'], ignore_if_exists=True)
+        cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'])
+        cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'], ignore_if_exists=True)
         cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'], CreateQueryIndexOptions(ignore_if_exists=True))
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_index(cb_env.bucket.name, ixname, fields=['hello'])
+            cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'])
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
@@ -930,10 +964,10 @@ class QueryIndexManagementTestSuite:
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_drop_secondary_indexes(self, cb_env):
         ixname = 'ix2'
-        fields = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, fields=fields, timeout=timedelta(seconds=120))
+        keys = ('fld1', 'fld2')
+        cb_env.qixm.create_index(cb_env.bucket.name, ixname, keys, timeout=timedelta(seconds=120))
 
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *fields)
+        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *keys)
 
         # Drop the index
         cb_env.qixm.drop_index(cb_env.bucket.name, ixname)
@@ -996,7 +1030,7 @@ class QueryIndexManagementTestSuite:
                 defer = True
             cb_env.qixm.create_index(cb_env.bucket.name,
                                      'ix{0}'.format(n),
-                                     fields=['fld{0}'.format(n)],
+                                     ['fld{0}'.format(n)],
                                      deferred=defer)
 
         ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
@@ -1046,14 +1080,14 @@ class ClassicQueryIndexManagementTests(QueryIndexManagementTestSuite):
         cb_env.teardown(request.param)
 
 
-class ClassicCollectionQueryIndexManagementTests(CollectionQueryCIndexManagementTestSuite):
+class ClassicCollectionQueryIndexManagementTests(CollectionQueryIndexManagementTestSuite):
     @pytest.fixture(scope='class', autouse=True)
     def manifest_validated(self):
         def valid_test_method(meth):
             attr = getattr(ClassicCollectionQueryIndexManagementTests, meth)
             return callable(attr) and not meth.startswith('__') and meth.startswith('test')
         method_list = [meth for meth in dir(ClassicCollectionQueryIndexManagementTests) if valid_test_method(meth)]
-        test_list = set(CollectionQueryCIndexManagementTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
+        test_list = set(CollectionQueryIndexManagementTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
         if test_list:
             pytest.fail(f'Test manifest invalid.  Missing/extra test(s): {test_list}.')
 
