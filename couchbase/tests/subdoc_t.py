@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import types
 from datetime import datetime, timedelta
 
 import pytest
@@ -48,15 +49,19 @@ class SubDocumentTestSuite:
         'test_array_add_unique',
         'test_array_add_unique_create_parents',
         'test_array_add_unique_fail',
+        'test_array_add_unique_mutate_in_macros',
         'test_array_append',
         'test_array_append_create_parents',
         'test_array_append_multi_insert',
+        'test_array_add_append_mutate_in_macros',
         'test_array_as_document',
         'test_array_insert',
         'test_array_insert_multi_insert',
+        'test_array_insert_mutate_in_macros',
         'test_array_prepend',
         'test_array_prepend_create_parents',
         'test_array_prepend_multi_insert',
+        'test_array_add_prepend_mutate_in_macros',
         'test_count',
         'test_decrement',
         'test_decrement_create_parents',
@@ -79,6 +84,7 @@ class SubDocumentTestSuite:
         'test_lookup_in_any_replica_get_full',
         'test_lookup_in_any_replica_multiple_specs',
         'test_lookup_in_any_replica_with_timeout',
+        'test_lookup_in_macros',
         'test_lookup_in_multiple_specs',
         'test_lookup_in_one_path_not_found',
         'test_lookup_in_simple_exists',
@@ -93,6 +99,8 @@ class SubDocumentTestSuite:
         'test_mutate_in_insert_semantics',
         'test_mutate_in_insert_semantics_fail',
         'test_mutate_in_insert_semantics_kwargs',
+        'test_mutate_in_macros_insert',
+        'test_mutate_in_macros_replace_upsert',
         'test_mutate_in_preserve_expiry',
         'test_mutate_in_preserve_expiry_fails',
         'test_mutate_in_preserve_expiry_not_used',
@@ -185,6 +193,22 @@ class SubDocumentTestSuite:
         with pytest.raises(PathMismatchException):
             cb_env.collection.mutate_in(key, (SD.array_addunique("c", 2),))
 
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('check_xattr_supported')
+    def test_array_add_unique_mutate_in_macros(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        xattr_array = 'xattr_array'
+        specs = [
+            SD.upsert(xattr_array, [], xattr=True),
+            SD.array_addunique(xattr_array, SD.MutationMacro.cas()),
+            SD.array_addunique(xattr_array, SD.MutationMacro.seq_no()),
+            SD.array_addunique(xattr_array, SD.MutationMacro.value_crc32c()),
+        ]
+        # TODO: PYCBC-1557: Server raises invalid argument when using mutate-in macro w/ arrayaddunique.
+        # Update test if associated MB is addressed in the future.
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.mutate_in(key, specs)
+
     def test_array_append(self, cb_env):
         key = cb_env.get_existing_doc_by_type('array', key_only=True)
         result = cb_env.collection.mutate_in(
@@ -217,6 +241,36 @@ class SubDocumentTestSuite:
         app_res = val['array'][5:]
         assert len(app_res) == 3
         assert app_res == [8, 9, 10]
+
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('check_xattr_supported')
+    def test_array_add_append_mutate_in_macros(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        xattr_array = 'xattr_array'
+        specs = [
+            SD.array_append(xattr_array, SD.MutationMacro.cas(), create_parents=True),
+            SD.array_append(xattr_array, SD.MutationMacro.seq_no()),
+            SD.array_append(xattr_array, SD.MutationMacro.value_crc32c()),
+        ]
+        result = cb_env.collection.mutate_in(key, specs)
+        assert isinstance(result, MutateInResult)
+        res = TestEnvironment.try_n_times(10,
+                                          3,
+                                          cb_env.collection.lookup_in,
+                                          key,
+                                          (SD.get(xattr_array, xattr=True),))
+
+        res_array = res.content_as[list](0)
+        assert len(res_array) == 3
+        assert all(map(lambda x: isinstance(x, str), res_array)) is True
+        res_cas = res_array[0]
+        res_seqno = res_array[1]
+        res_value = res_array[2]
+
+        assert res_cas.startswith('0x') is True
+        assert res.cas == SD.convert_macro_cas_to_cas(res_cas)
+        assert res_seqno.startswith('0x') is True
+        assert res_value.startswith('0x') is True
 
     def test_array_as_document(self, cb_env):
         key = cb_env.get_existing_doc_by_type('array_only', key_only=True)
@@ -255,6 +309,38 @@ class SubDocumentTestSuite:
         assert len(ins_res) == 3
         assert ins_res == [6, 7, 8]
 
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('check_xattr_supported')
+    def test_array_insert_mutate_in_macros(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        xattr_array = 'xattr_array'
+        specs = [
+            SD.upsert(xattr_array, [], xattr=True),
+            SD.array_insert(f'{xattr_array}.[0]', SD.MutationMacro.cas()),
+            SD.array_insert(f'{xattr_array}.[0]', SD.MutationMacro.seq_no()),
+            SD.array_insert(f'{xattr_array}.[0]', SD.MutationMacro.value_crc32c()),
+        ]
+        result = cb_env.collection.mutate_in(key, specs)
+        assert isinstance(result, MutateInResult)
+        res = TestEnvironment.try_n_times(10,
+                                          3,
+                                          cb_env.collection.lookup_in,
+                                          key,
+                                          (SD.get(xattr_array, xattr=True),))
+
+        res_array = res.content_as[list](0)
+        assert len(res_array) == 3
+        assert all(map(lambda x: isinstance(x, str), res_array)) is True
+        # prepending -- order is reversed
+        res_cas = res_array[2]
+        res_seqno = res_array[1]
+        res_value = res_array[0]
+
+        assert res_cas.startswith('0x') is True
+        assert res.cas == SD.convert_macro_cas_to_cas(res_cas)
+        assert res_seqno.startswith('0x') is True
+        assert res_value.startswith('0x') is True
+
     def test_array_prepend(self, cb_env):
         key = cb_env.get_existing_doc_by_type('array', key_only=True)
         result = cb_env.collection.mutate_in(
@@ -287,6 +373,37 @@ class SubDocumentTestSuite:
         pre_res = val['array'][:3]
         assert len(pre_res) == 3
         assert pre_res == [-2, -1, 0]
+
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('check_xattr_supported')
+    def test_array_add_prepend_mutate_in_macros(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+        xattr_array = 'xattr_array'
+        specs = [
+            SD.array_prepend(xattr_array, SD.MutationMacro.cas(), create_parents=True),
+            SD.array_prepend(xattr_array, SD.MutationMacro.seq_no()),
+            SD.array_prepend(xattr_array, SD.MutationMacro.value_crc32c()),
+        ]
+        result = cb_env.collection.mutate_in(key, specs)
+        assert isinstance(result, MutateInResult)
+        res = TestEnvironment.try_n_times(10,
+                                          3,
+                                          cb_env.collection.lookup_in,
+                                          key,
+                                          (SD.get(xattr_array, xattr=True),))
+
+        res_array = res.content_as[list](0)
+        assert len(res_array) == 3
+        assert all(map(lambda x: isinstance(x, str), res_array)) is True
+        # prepending -- order is reversed
+        res_cas = res_array[2]
+        res_seqno = res_array[1]
+        res_value = res_array[0]
+
+        assert res_cas.startswith('0x') is True
+        assert res.cas == SD.convert_macro_cas_to_cas(res_cas)
+        assert res_seqno.startswith('0x') is True
+        assert res_value.startswith('0x') is True
 
     def test_count(self, cb_env):
         key = cb_env.get_existing_doc_by_type('array', key_only=True)
@@ -492,6 +609,28 @@ class SubDocumentTestSuite:
         assert result.content_as[str](0) == value['batch']
         assert result.is_replica is not None
 
+    @pytest.mark.usefixtures('check_xattr_supported')
+    @pytest.mark.parametrize('macro',
+                             [getattr(SD.LookupInMacro, m)() for m in SD.LookupInMacro.__dict__.keys() if isinstance(getattr(SD.LookupInMacro, m),  # noqa: E501
+                                                                                                                     types.FunctionType)])  # noqa: E501
+    def test_lookup_in_macros(self, cb_env, macro):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        macro_res = cb_env.collection.lookup_in(key, (SD.get(macro, xattr=True),))
+        macro_res_value = macro_res.content_as[lambda x: x](0)
+        document_res = cb_env.collection.lookup_in(key, (SD.get(SD.LookupInMacro.document(), xattr=True),))
+        macro_key = macro.replace('$document.', '')
+        document_value = document_res.content_as[dict](0)
+
+        assert isinstance(macro_res, LookupInResult)
+
+        if macro_key == '$document':
+            assert document_value == macro_res_value
+        else:
+            assert document_value[macro_key] == macro_res_value
+            # we expect these to be hex values
+            if macro_key in ['CAS', 'seqno', 'vbucket_uuid', 'value_crc32c']:
+                assert str(macro_res_value).startswith('0x')
+
     @pytest.mark.usefixtures("check_xattr_supported")
     def test_lookup_in_multiple_specs(self, cb_env):
         key, value = cb_env.get_existing_doc_by_type('vehicle')
@@ -632,6 +771,59 @@ class SubDocumentTestSuite:
             cb_env.collection.mutate_in(key,
                                         (SD.insert('new_path', 'im new'),),
                                         insert_doc=True)
+
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('check_xattr_supported')
+    @pytest.mark.parametrize('macro', [SD.MutationMacro.cas(),
+                                       SD.MutationMacro.seq_no(),
+                                       SD.MutationMacro.value_crc32c()])
+    def test_mutate_in_macros_insert(self, cb_env, macro):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        xattr_key = 'xattr_key'
+        cb_env.collection.mutate_in(key, (SD.insert(xattr_key, macro),))
+        res = TestEnvironment.try_n_times(10,
+                                          3,
+                                          cb_env.collection.lookup_in,
+                                          key,
+                                          (SD.get(xattr_key, xattr=True),))
+        macro_res = res.content_as[str](0)
+        assert macro_res.startswith('0x') is True
+        if 'CAS' in macro.value:
+            assert res.cas == SD.convert_macro_cas_to_cas(macro_res)
+
+    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('check_xattr_supported')
+    @pytest.mark.parametrize('macro', [SD.MutationMacro.cas(),
+                                       SD.MutationMacro.seq_no(),
+                                       SD.MutationMacro.value_crc32c()])
+    def test_mutate_in_macros_replace_upsert(self, cb_env, macro):
+        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+        xattr_key = 'xattr_key'
+        cb_env.collection.mutate_in(key, (SD.upsert(xattr_key, macro),))
+        res = TestEnvironment.try_n_times(10,
+                                          3,
+                                          cb_env.collection.lookup_in,
+                                          key,
+                                          (SD.get(xattr_key, xattr=True),))
+        upsert_macro_res = res.content_as[str](0)
+        assert upsert_macro_res.startswith('0x') is True
+        if 'CAS' in macro.value:
+            assert res.cas == SD.convert_macro_cas_to_cas(upsert_macro_res)
+
+        cb_env.collection.mutate_in(key, (SD.replace(xattr_key, macro),))
+        res = TestEnvironment.try_n_times(10,
+                                          3,
+                                          cb_env.collection.lookup_in,
+                                          key,
+                                          (SD.get(xattr_key, xattr=True),))
+        replace_macro_res = res.content_as[str](0)
+        assert replace_macro_res.startswith('0x') is True
+        if 'CAS' in macro.value:
+            assert res.cas == SD.convert_macro_cas_to_cas(replace_macro_res)
+        if 'value_crc32c' in macro.value:
+            assert replace_macro_res == upsert_macro_res
+        else:
+            assert replace_macro_res != upsert_macro_res
 
     @pytest.mark.usefixtures('check_preserve_expiry_supported')
     def test_mutate_in_preserve_expiry(self, cb_env):

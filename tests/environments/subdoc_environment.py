@@ -66,7 +66,7 @@ class SubdocTestEnvironment(TestEnvironment):
         return doc['id'], doc
 
     def load_data(self):  # noqa: C901
-        for v in self.data_provider.get_array_docs(15):
+        for v in self.data_provider.get_array_docs(25):
             for _ in range(3):
                 try:
                     key = f'{v["id"]}'
@@ -80,7 +80,7 @@ class SubdocTestEnvironment(TestEnvironment):
                     print(ex)
                     raise
 
-        for k, v in self.data_provider.get_array_only_docs(5).items():
+        for k, v in self.data_provider.get_array_only_docs(15).items():
             for _ in range(3):
                 try:
                     _ = self.collection.upsert(k, v)

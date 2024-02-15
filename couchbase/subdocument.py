@@ -13,13 +13,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from enum import IntEnum
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     Iterable,
                     List,
-                    Optional)
+                    Optional,
+                    Union)
 
 from couchbase.exceptions import (CouchbaseException,
                                   DeltaInvalidException,
@@ -138,6 +141,62 @@ class StoreSemantics(IntEnum):
     INSERT = 2
 
 
+class LookupInMacro():
+
+    @staticmethod
+    def document() -> str:
+        return '$document'
+
+    @staticmethod
+    def expiry_time() -> str:
+        return '$document.exptime'
+
+    @staticmethod
+    def cas() -> str:
+        return '$document.CAS'
+
+    @staticmethod
+    def seq_no() -> str:
+        return '$document.seqno'
+
+    @staticmethod
+    def last_modified() -> str:
+        return '$document.last_modified'
+
+    @staticmethod
+    def is_deleted() -> str:
+        return '$document.deleted'
+
+    @staticmethod
+    def value_size_bytes() -> str:
+        return '$document.value_bytes'
+
+    @staticmethod
+    def rev_id() -> str:
+        return '$document.revid'
+
+
+class MutationMacro():
+    def __init__(self, value: str):
+        self._value = value
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @classmethod
+    def cas(cls) -> MutationMacro:
+        return cls("${Mutation.CAS}")
+
+    @classmethod
+    def seq_no(cls) -> MutationMacro:
+        return cls("${Mutation.seqno}")
+
+    @classmethod
+    def value_crc32c(cls) -> MutationMacro:
+        return cls("${Mutation.value_crc32c}")
+
+
 class Spec(tuple):
     """Represents a sub-operation to perform."""
 
@@ -230,10 +289,9 @@ def parse_subdocument_status(status, path, key):  # noqa: C901
     raise CouchbaseException(f"Unknown status. Status={status}, path={path}, key={key}")
 
 
-def exists(
-    path,  # type: str
-    xattr=False  # type: Optional[bool]
-) -> Spec:
+def exists(path,  # type: str
+           xattr=False  # type: Optional[bool]
+           ) -> Spec:
     """Creates a :class:`.Spec` that returns whether a specific field exists in the document.
 
     Args:
@@ -245,7 +303,6 @@ def exists(
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
-
     return Spec(SubDocOp.EXISTS, path, xattr)
 
 
@@ -284,7 +341,7 @@ def count(path,  # type: str
 
 
 def insert(path,                     # type: str
-           value,                    # type: JSONType
+           value,                    # type: Union[JSONType, MutationMacro]
            create_parents=False,     # type: Optional[bool]
            xattr=False,               # type: Optional[bool]
            **kwargs                 # type: Dict[str, Any]
@@ -294,7 +351,7 @@ def insert(path,                     # type: str
 
     Args:
         path (str): The path to the field.
-        value (JSONType): The value to insert.
+        value (Union[JSONType, MutationMacro]): The value to insert.
         create_parents (bool, optional): Whether or not the path to the field should be created
             if it does not already exist.
         xattr (bool, optional): Whether this operation should reference the document body or the
@@ -304,19 +361,16 @@ def insert(path,                     # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
-    return Spec(
-        SubDocOp.DICT_ADD,
-        path,
-        create_parents,
-        xattr,
-        kwargs.get(
-            "expand_macros",
-            False),
-        value)
+    expand_macros = kwargs.get('expand_macros', False)
+    if isinstance(value, MutationMacro):
+        value = value.value
+        xattr = True
+        expand_macros = True
+    return Spec(SubDocOp.DICT_ADD, path, create_parents, xattr, expand_macros, value)
 
 
 def upsert(path,                     # type: str
-           value,                    # type: JSONType
+           value,                    # type: Union[JSONType, MutationMacro]
            create_parents=False,     # type: Optional[bool]
            xattr=False               # type: Optional[bool]
            ) -> Spec:
@@ -325,7 +379,7 @@ def upsert(path,                     # type: str
 
     Args:
         path (str): The path to the field.
-        value (JSONType): The value to upsert.
+        value (Union[JSONType, MutationMacro]): The value to upsert.
         create_parents (bool, optional): Whether or not the path to the field should be created
             if it does not already exist.
         xattr (bool, optional): Whether this operation should reference the document body or the
@@ -335,17 +389,16 @@ def upsert(path,                     # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
-    return Spec(
-        SubDocOp.DICT_UPSERT,
-        path,
-        create_parents,
-        xattr,
-        False,
-        value)
+    expand_macros = False
+    if isinstance(value, MutationMacro):
+        value = value.value
+        xattr = True
+        expand_macros = True
+    return Spec(SubDocOp.DICT_UPSERT, path, create_parents, xattr, expand_macros, value)
 
 
 def replace(path,                     # type: str
-            value,                    # type: JSONType
+            value,                    # type: Union[JSONType, MutationMacro]
             xattr=False,              # type: Optional[bool]
             ) -> Spec:
     """Creates a :class:`.Spec` for replacing a field into the document. Failing if the field already
@@ -353,7 +406,7 @@ def replace(path,                     # type: str
 
     Args:
         path (str): The path to the field.
-        value (JSONType): The value to write.
+        value (Union[JSONType, MutationMacro]): The value to write.
         xattr (bool, optional): Whether this operation should reference the document body or the
             extended attributes data for the document.
 
@@ -361,9 +414,14 @@ def replace(path,                     # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
+    expand_macros = False
+    if isinstance(value, MutationMacro):
+        value = value.value
+        xattr = True
+        expand_macros = True
     if not path:
-        return Spec(SubDocOp.SET_DOC, '', False, xattr, False, value)
-    return Spec(SubDocOp.REPLACE, path, False, xattr, False, value)
+        return Spec(SubDocOp.SET_DOC, '', False, xattr, expand_macros, value)
+    return Spec(SubDocOp.REPLACE, path, False, xattr, expand_macros, value)
 
 
 def remove(path,                     # type: str
@@ -404,14 +462,12 @@ def array_append(path,              # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
-    return Spec(
-        SubDocOp.ARRAY_PUSH_LAST,
-        path,
-        create_parents,
-        xattr,
-        False,
-        ArrayValues(
-            *values))
+    expand_macros = False
+    if any(map(lambda m: isinstance(m, MutationMacro), values)):
+        values = [v.value if isinstance(v, MutationMacro) else v for v in values]
+        xattr = True
+        expand_macros = True
+    return Spec(SubDocOp.ARRAY_PUSH_LAST, path, create_parents, xattr, expand_macros, ArrayValues(*values))
 
 
 def array_prepend(path,              # type: str
@@ -433,15 +489,12 @@ def array_prepend(path,              # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
-
-    return Spec(
-        SubDocOp.ARRAY_PUSH_FIRST,
-        path,
-        create_parents,
-        xattr,
-        False,
-        ArrayValues(
-            *values))
+    expand_macros = False
+    if any(map(lambda m: isinstance(m, MutationMacro), values)):
+        values = [v.value if isinstance(v, MutationMacro) else v for v in values]
+        xattr = True
+        expand_macros = True
+    return Spec(SubDocOp.ARRAY_PUSH_FIRST, path, create_parents, xattr, expand_macros, ArrayValues(*values))
 
 
 def array_insert(path,              # type: str
@@ -464,14 +517,12 @@ def array_insert(path,              # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
-    return Spec(
-        SubDocOp.ARRAY_INSERT,
-        path,
-        create_parents,
-        xattr,
-        False,
-        ArrayValues(
-            *values))
+    expand_macros = False
+    if any(map(lambda m: isinstance(m, MutationMacro), values)):
+        values = [v.value if isinstance(v, MutationMacro) else v for v in values]
+        xattr = True
+        expand_macros = True
+    return Spec(SubDocOp.ARRAY_INSERT, path, create_parents, xattr, expand_macros, ArrayValues(*values))
 
 
 def array_addunique(path,              # type: str
@@ -494,14 +545,12 @@ def array_addunique(path,              # type: str
         :class:`.Spec`: An instance of :class:`.Spec`.
 
     """
-    return Spec(
-        SubDocOp.ARRAY_ADD_UNIQUE,
-        path,
-        create_parents,
-        xattr,
-        False,
-        ArrayValues(
-            *values))
+    expand_macros = False
+    if any(map(lambda m: isinstance(m, MutationMacro), values)):
+        values = [v.value if isinstance(v, MutationMacro) else v for v in values]
+        xattr = True
+        expand_macros = True
+    return Spec(SubDocOp.ARRAY_ADD_UNIQUE, path, create_parents, xattr, expand_macros, ArrayValues(*values))
 
 
 def counter(path,                   # type: str
@@ -594,8 +643,7 @@ def decrement(path,                   # type: str
         raise InvalidArgumentException(
             "Delta must be integer greater than or equal to 0")
 
-    return Spec(SubDocOp.COUNTER, path, create_parents,
-                xattr, False, -1 * delta)
+    return Spec(SubDocOp.COUNTER, path, create_parents, xattr, False, -1 * delta)
 
 
 def get_full() -> Spec:
@@ -613,7 +661,18 @@ def with_expiry() -> Spec:
 
     :return: Spec
     """
-    return Spec(SubDocOp.GET, '$document.exptime', True)
+    return Spec(SubDocOp.GET, LookupInMacro.expiry_time(), True)
+
+
+def convert_macro_cas_to_cas(cas  # type: str
+                             ) -> int:
+    """
+    Utility method to help encode CAS coming from MutationMacro.cas() stored in the xattr.
+    Due to a server bug, CAS is encoded backwards, but b/c of legacy users we cannot make a change.
+    """
+    reversed_bytes = bytearray.fromhex(cas[2:] if cas.startswith('0x') else cas)
+    reversed_bytes.reverse()
+    return int(reversed_bytes.hex(), base=16)
 
 
 """
