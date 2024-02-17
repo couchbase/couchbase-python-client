@@ -391,6 +391,48 @@ get_view_request(PyObject* op_args)
         req.timeout = std::chrono::milliseconds(PyLong_AsUnsignedLongLong(pyObj_timeout) / 1000ULL);
     }
 
+    PyObject* pyObj_full_set = PyDict_GetItemString(op_args, "full_set");
+    if (pyObj_full_set != nullptr) {
+        req.full_set = pyObj_debug == Py_True ? true : false;
+    }
+
+    PyObject* pyObj_raw = PyDict_GetItemString(op_args, "raw");
+    if (pyObj_raw != nullptr && PyDict_Check(pyObj_raw)) {
+        std::map<std::string, std::string> raw_options{};
+        PyObject *pyObj_key, *pyObj_value;
+        Py_ssize_t pos = 0;
+
+        // PyObj_key and pyObj_value are borrowed references
+        while (PyDict_Next(pyObj_raw, &pos, &pyObj_key, &pyObj_value)) {
+            std::string key;
+            std::string val;
+            if (PyUnicode_Check(pyObj_key)) {
+                key = std::string(PyUnicode_AsUTF8(pyObj_key));
+            } else {
+                PyErr_SetString(PyExc_ValueError, "Raw parameter key is not a string.  Raw option should be a dict[str, str].");
+                return {};
+            }
+            if (key.empty()) {
+                PyErr_SetString(PyExc_ValueError, "Raw parameter key is empty. Raw option should be a dict[str, str].");
+                return {};
+            }
+            if (PyUnicode_Check(pyObj_value)) {
+                val = std::string(PyUnicode_AsUTF8(pyObj_value));
+            } else {
+                PyErr_SetString(PyExc_ValueError, "Raw parameter value is not a string.  Raw option should be a dict[str, str].");
+                return {};
+            }
+            if (val.empty()) {
+                PyErr_SetString(PyExc_ValueError, "Raw parameter value is empty. Raw option should be a dict[str, str].");
+                return {};
+            }
+            raw_options.emplace(key, val);
+        }
+        if (raw_options.size() > 0) {
+            req.raw = raw_options;
+        }
+    }
+
     return req;
 }
 

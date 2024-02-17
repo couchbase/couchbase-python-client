@@ -25,7 +25,6 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     List,
                     Optional,
-                    Tuple,
                     Union,
                     overload)
 
@@ -1252,10 +1251,11 @@ class ViewOptionsBase(OptionsTimeoutBase):
                  reduce=None,                # type: Optional[bool]
                  on_error=None,              # type: Optional[ViewErrorMode]
                  debug=None,                 # type: Optional[bool]
-                 raw=None,                   # type: Optional[Tuple(str,Any)]
                  namespace=None,             # type: Optional[DesignDocumentNamespace]
                  query_string=None,          # type: Optional[List[str]]
-                 client_context_id=None      # type: Optional[str]
+                 client_context_id=None,     # type: Optional[str]
+                 raw=None,                   # type: Optional[Dict[str, str]]
+                 full_set=None,              # type: Optional[bool]
                  ):
         pass
 

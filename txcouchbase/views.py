@@ -91,6 +91,8 @@ class ViewRequest(ViewRequestLogic):
         # deserialized_row = self.serializer.deserialize(row)
         deserialized_row = row
         if issubclass(self.row_factory, ViewRow):
+            if hasattr(self.row_factory, 'from_json'):
+                return self.row_factory.from_json(deserialized_row)
             return self.row_factory(**deserialized_row)
         else:
             return deserialized_row

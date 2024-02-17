@@ -19,7 +19,8 @@ from __future__ import annotations
 import pathlib
 import time
 from os import path
-from typing import Optional
+from textwrap import wrap
+from typing import List, Optional
 
 from couchbase.exceptions import DesignDocumentNotFoundException
 from couchbase.management.views import (DesignDocument,
@@ -42,6 +43,10 @@ class ViewsTestEnvironment(TestEnvironment):
     @property
     def test_ddoc(self):
         return self._test_ddoc
+
+    @property
+    def num_docs(self) -> int:
+        return self._num_docs
 
     def add_test_ddoc(self):
         TestEnvironment.try_n_times(3,
@@ -95,12 +100,28 @@ class ViewsTestEnvironment(TestEnvironment):
         self._batch_id = doc['batch']
         return self._batch_id
 
+    def get_keys(self) -> List[str]:
+        return wrap(self._batch_id, 2)
+
+    def get_docids_by_key(self, key: str) -> List[str]:
+        keys = self.get_keys()
+        key_idx = keys.index(key)
+        if key_idx == 0:
+            return [f'{self._batch_id}::{i}' for i in range(10)]
+        elif key_idx == 1:
+            return [f'{self._batch_id}::{i}' for i in range(10, 20)]
+        elif key_idx == 2:
+            return [f'{self._batch_id}::{i}' for i in range(20, 30)]
+        else:
+            return [f'{self._batch_id}::{i}' for i in range(30, self.num_docs)]
+
     def setup(self,
               collection_type,  # type: CollectionType
               test_suite=None,  # type: Optional[str]
               num_docs=50,  # type: Optional[int]
               ):
 
+        self._num_docs = num_docs
         if test_suite == 'ClassicViewsParamTests':
             return
         elif test_suite == 'ClassicViewIndexManagementTests':
@@ -177,6 +198,10 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
     def test_ddoc(self):
         return self._test_ddoc
 
+    @property
+    def num_docs(self) -> int:
+        return self._num_docs
+
     async def add_test_ddoc(self):
         await AsyncTestEnvironment.try_n_times(3,
                                                5,
@@ -229,12 +254,27 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
         self._batch_id = doc['batch']
         return self._batch_id
 
+    def get_keys(self) -> List[str]:
+        return wrap(self._batch_id, 2)
+
+    def get_docids_by_key(self, key: str) -> List[str]:
+        keys = self.get_keys()
+        key_idx = keys.index(key)
+        if key_idx == 0:
+            return [f'{self._batch_id}::{i}' for i in range(10)]
+        elif key_idx == 1:
+            return [f'{self._batch_id}::{i}' for i in range(10, 20)]
+        elif key_idx == 2:
+            return [f'{self._batch_id}::{i}' for i in range(20, 30)]
+        else:
+            return [f'{self._batch_id}::{i}' for i in range(30, self.num_docs)]
+
     async def setup(self,
                     collection_type,  # type: CollectionType
                     test_suite=None,  # type: Optional[str]
                     num_docs=50,  # type: Optional[int]
                     ):
-
+        self._num_docs = num_docs
         if test_suite == 'ClassicViewsParamTests':
             return
         elif test_suite == 'ClassicViewIndexManagementTests':

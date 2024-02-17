@@ -24,7 +24,6 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     List,
                     Optional,
-                    Tuple,
                     Union)
 
 from couchbase._utils import to_microseconds
@@ -82,6 +81,15 @@ class ViewRow(object):
     value: object = None
     document: object = None
 
+    @classmethod
+    def from_json(cls, json_data: Dict[str, Any]) -> ViewRow:
+        output = cls(id=json_data.get('id', None))
+        if 'key' in json_data:
+            output.key = json.loads(json_data['key'])
+        if 'value' in json_data:
+            output.value = json.loads(json_data['value'])
+        return output
+
 
 class ViewQuery:
 
@@ -110,7 +118,8 @@ class ViewQuery:
         "raw": {"raw": lambda x: x},
         "query_string": {"query_string": lambda x: x},
         "serializer": {"serializer": lambda x: x},
-        "span": {"span": lambda x: x}
+        "span": {"span": lambda x: x},
+        "full_set": {"full_set": lambda x: x}
     }
 
     def __init__(self,
@@ -388,11 +397,11 @@ class ViewQuery:
         self.set_option('debug', value)
 
     @property
-    def raw(self) -> Optional[Tuple[str, Any]]:
+    def raw(self) -> Optional[Dict[str, str]]:
         return self._params.get('raw', None)
 
     @raw.setter
-    def raw(self, value  # type: Tuple[str, Any]
+    def raw(self, value  # type: Dict[str, str]
             ) -> None:
         self.set_option('raw', value)
 
@@ -437,6 +446,15 @@ class ViewQuery:
         if not issubclass(value.__class__, CouchbaseSpan):
             raise InvalidArgumentException(message='Span should implement CouchbaseSpan interface')
         self.set_option('span', value)
+
+    @property
+    def full_set(self) -> Optional[bool]:
+        return self._params.get('full_set', None)
+
+    @full_set.setter
+    def full_set(self, value  # type: bool
+                 ) -> None:
+        self.set_option('full_set', value)
 
     @classmethod
     def create_view_query_object(cls,

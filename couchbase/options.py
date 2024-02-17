@@ -1583,6 +1583,10 @@ class ViewOptions(ViewOptionsBase):
         namespace(:class:`~couchbase.management.views.DesignDocumentNamespace`, optional): Specifies the namespace
             for the design document.  Defaults to ``Development``.
         client_context_id (str, optional): The returned client context id for this view query. Defaults to None.
+        raw (Dict[str, str], optional): Specifies any additional parameters which should be passed to the view engine
+            when executing the view query. Defaults to None.
+        full_set (bool, optional): Specifies whether the query should force the entire set of document in the index
+            to be included in the result.  Defaults to None.
     """
 
 

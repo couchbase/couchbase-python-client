@@ -13,15 +13,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
 import threading
 from datetime import timedelta
 
 import pytest
 
-from couchbase.exceptions import AmbiguousTimeoutException, DesignDocumentNotFoundException
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  DesignDocumentNotFoundException,
+                                  InvalidArgumentException)
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
-from couchbase.views import ViewMetaData, ViewOrdering
+from couchbase.views import (ViewMetaData,
+                             ViewOrdering,
+                             ViewRow)
 from tests.environments import CollectionType
 from tests.environments.views_environment import ViewsTestEnvironment
 
@@ -32,12 +37,12 @@ class ViewsTestSuite:
         'test_view_query',
         'test_view_query_ascending',
         'test_view_query_descending',
-        'test_view_query_endkey',
         'test_view_query_endkey_docid',
         'test_view_query_in_thread',
         'test_view_query_key',
         'test_view_query_keys',
-        'test_view_query_startkey',
+        'test_view_query_raw',
+        'test_view_query_raw_fail',
         'test_view_query_startkey_docid',
         'test_view_query_timeout',
     ]
@@ -52,11 +57,10 @@ class ViewsTestSuite:
             [r for r in view_result]
 
     def test_view_query(self, cb_env):
-
         expected_count = 10
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
-                                               limit=expected_count,
+                                               full_set=True,
                                                namespace=DesignDocumentNamespace.DEVELOPMENT)
 
         cb_env.assert_rows(view_result, expected_count)
@@ -66,67 +70,65 @@ class ViewsTestSuite:
         assert metadata.total_rows() >= expected_count
 
     def test_view_query_ascending(self, cb_env):
-
-        expected_count = 10
+        # set the batch id
+        cb_env.get_batch_id()
+        keys = cb_env.get_keys()
+        expected_docids = [i for k in sorted(keys)
+                           for i in sorted(cb_env.get_docids_by_key(k))]
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
-                                               limit=expected_count,
                                                namespace=DesignDocumentNamespace.DEVELOPMENT,
                                                order=ViewOrdering.ASCENDING)
 
-        rows = cb_env.assert_rows(view_result, expected_count, return_rows=True)
-        results = list(map(lambda r: r.key, rows))
-        sorted_results = sorted(results, key=lambda x: x[0], reverse=True)
-        assert results == sorted_results
+        rows = cb_env.assert_rows(view_result, cb_env.num_docs, return_rows=True)
+        row_ids = list(map(lambda r: r.id, rows))
+        assert row_ids == expected_docids
 
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
+        assert metadata.total_rows() >= cb_env.num_docs
 
     def test_view_query_descending(self, cb_env):
-        expected_count = 10
+        # set the batch id
+        cb_env.get_batch_id()
+        keys = cb_env.get_keys()
+        expected_docids = [i for k in sorted(keys, reverse=True)
+                           for i in sorted(cb_env.get_docids_by_key(k), reverse=True)]
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
-                                               limit=expected_count,
                                                namespace=DesignDocumentNamespace.DEVELOPMENT,
                                                order=ViewOrdering.DESCENDING)
 
-        rows = cb_env.assert_rows(view_result, expected_count, return_rows=True)
-        results = list(map(lambda r: r.key, rows))
-        sorted_results = sorted(results, key=lambda x: x[0])
-        assert results == sorted_results
+        rows = cb_env.assert_rows(view_result, cb_env.num_docs, return_rows=True)
+        row_ids = list(map(lambda r: r.id, rows))
+        assert row_ids == expected_docids
 
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    def test_view_query_endkey(self, cb_env):
-        batch_id = cb_env.get_batch_id()
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           endkey=[f'{batch_id}::10', f'{batch_id}::20'])
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
-
-        cb_env.assert_rows(view_result, expected_count)
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
+        assert metadata.total_rows() >= cb_env.num_docs
 
     def test_view_query_endkey_docid(self, cb_env):
-        batch_id = cb_env.get_batch_id()
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           endkey_docid=f'{batch_id}::15')
+        # set the batch id
+        cb_env.get_batch_id()
+        keys = cb_env.get_keys()
+        # take the 2nd-smallest key so that we can purposefully select results of previous key group
+        key_idx = keys.index(sorted(keys)[1])
+        key = keys[key_idx]
+        key_docids = cb_env.get_docids_by_key(key)
+        # purposefully select a docid in the middle of key group
+        endkey_docid = key_docids[4]
+        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           endkey=key,
+                           endkey_docid=endkey_docid)
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
                                                opts)
-
-        cb_env.assert_rows(view_result, expected_count)
+        # all docs w/in first key (10 docs) + half of docs w/in next key (5 docs)
+        expected_count = 15
+        rows = cb_env.assert_rows(view_result, expected_count, True)
+        # last doc in results should be the endkey and endkey_docid
+        assert rows[-1].key == key
+        assert rows[-1].id == endkey_docid
 
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
@@ -165,68 +167,128 @@ class ViewsTestSuite:
 
     def test_view_query_key(self, cb_env):
         batch_id = cb_env.get_batch_id()
-        expected_count = 1
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           key=[f'{batch_id}', f'{batch_id}::10'])
+        expected_count = 10
+        keys = cb_env.get_keys()
+        key = keys[0]
+        docids = cb_env.get_docids_by_key(key)
+        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           key=key)
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
                                                opts)
 
-        cb_env.assert_rows(view_result, expected_count)
-
+        rows = cb_env.assert_rows(view_result, expected_count, True)
+        for row in rows:
+            assert isinstance(row, ViewRow)
+            assert isinstance(row.id, str)
+            assert isinstance(row.key, str)
+            assert isinstance(row.value, dict)
+            assert row.key == key
+            assert row.value['batch'] == batch_id
+            assert row.value['id'] in docids
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
         assert metadata.total_rows() >= expected_count
 
     def test_view_query_keys(self, cb_env):
-        batch_id = cb_env.get_batch_id()
-        expected_count = 5
-        keys = [[f'{batch_id}', f'{batch_id}::0'],
-                [f'{batch_id}', f'{batch_id}::1'],
-                [f'{batch_id}', f'{batch_id}::2'],
-                [f'{batch_id}', f'{batch_id}::3'],
-                [f'{batch_id}', f'{batch_id}::4']]
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           keys=keys)
+        keys = cb_env.get_keys()
+        expected_keys = keys[:2]
+        expected_count = 20
+        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           keys=expected_keys)
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
                                                opts)
 
-        cb_env.assert_rows(view_result, expected_count)
+        rows = cb_env.assert_rows(view_result, expected_count, True)
+        assert all(map(lambda r: r.key in expected_keys, rows)) is True
 
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
         assert metadata.total_rows() >= expected_count
 
-    def test_view_query_startkey(self, cb_env):
-        batch_id = cb_env.get_batch_id()
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           startkey=[f'{batch_id}', f'{batch_id}::0'])
+    def test_view_query_raw(self, cb_env):
+        # set the batch id
+        cb_env.get_batch_id()
+        keys = cb_env.get_keys()
+        # take the largest key so that we can purposefully narrow the result to 1 record
+        key_idx = keys.index(max(keys))
+        key = keys[key_idx]
+        key_docids = cb_env.get_docids_by_key(key)
+        # purposefully use the last doc w/in the key
+        startkey_docid = key_docids[-1]
+        # execute a query so we can have pagination
+        opts = ViewOptions(limit=5,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT)
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
                                                opts)
-
-        cb_env.assert_rows(view_result, expected_count)
+        # need to iterate over the result to execute the query
+        [r for r in view_result]
+        raw = {
+            'limit': '5',
+            'startkey': json.dumps(key),
+            'startkey_docid': startkey_docid,
+            'full_set': 'true'
+        }
+        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT, raw=raw)
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+        # expect only a single record to be returned
+        expected_count = 1
+        rows = cb_env.assert_rows(view_result, expected_count, True)
+        assert rows[0].key == key
+        assert rows[0].id == startkey_docid
 
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
         assert metadata.total_rows() >= expected_count
+
+    def test_view_query_raw_fail(self, cb_env):
+        raw = {
+            'limit': '5',
+            # this will fail as it is not encoded JSON
+            'startkey': 'view-key',
+            'startkey_docid': 'fake-doc-id'
+        }
+        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT, raw=raw)
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+        with pytest.raises(InvalidArgumentException):
+            [r for r in view_result]
 
     def test_view_query_startkey_docid(self, cb_env):
-        batch_id = cb_env.get_batch_id()
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           startkey_docid=f'{batch_id}::0')
+        # set the batch id
+        cb_env.get_batch_id()
+        keys = cb_env.get_keys()
+        # take the largest key so that we can purposefully narrow the result to 1 record
+        key_idx = keys.index(max(keys))
+        key = keys[key_idx]
+        key_docids = cb_env.get_docids_by_key(key)
+        # purposefully use the last doc w/in the key
+        startkey_docid = key_docids[-1]
+        # execute a query so we can have pagination
+        opts = ViewOptions(limit=5,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT)
         view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
                                                cb_env.TEST_VIEW_NAME,
                                                opts)
-
-        cb_env.assert_rows(view_result, expected_count)
+        # need to iterate over the result to execute the query
+        [r for r in view_result]
+        opts = ViewOptions(limit=5,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           startkey=key,
+                           startkey_docid=startkey_docid)
+        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
+                                               cb_env.TEST_VIEW_NAME,
+                                               opts)
+        # expect only a single record to be returned
+        expected_count = 1
+        rows = cb_env.assert_rows(view_result, expected_count, True)
+        assert rows[0].key == key
+        assert rows[0].id == startkey_docid
 
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)

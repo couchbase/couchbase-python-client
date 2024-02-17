@@ -7,7 +7,25 @@ function(doc, meta) {
       break;
     case "vehicle":
       if (doc.batch) {
-        emit([doc.batch, meta.id]);
+        const newDoc = {
+          batch: doc.batch,
+          id: doc.id,
+          type: doc.type
+        };
+        const batches = doc.id.split('::')
+        if (parseInt(batches[1]) < 10) {
+          const key = batches[0].slice(0, 2)
+          emit(key, newDoc)
+        } else if (parseInt(batches[1]) >= 10 && parseInt(batches[1]) < 20) {
+          const key = batches[0].slice(2, 4)
+          emit(key, newDoc);
+        } else if (parseInt(batches[1]) >= 20 && parseInt(batches[1]) < 30) {
+          const key = batches[0].slice(4, 6)
+          emit(key, newDoc);
+        } else {
+          const key = batches[0].slice(-2)
+          emit(key, newDoc);
+        }
       }
       break;
   }
