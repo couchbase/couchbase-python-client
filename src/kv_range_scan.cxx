@@ -204,7 +204,7 @@ handle_kv_range_scan_op([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
                                    "Cannot perform kv range scan operation.  Unable to get bucket configuration.");
         return nullptr;
     }
-    if (!config->supports_range_scan()) {
+    if (!config->capabilities.supports_range_scan()) {
         pycbc_set_python_exception(
           PycbcError::FeatureUnavailable, __FILE__, __LINE__, "The server does not support key-value scan operations.");
         return nullptr;

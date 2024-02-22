@@ -29,13 +29,16 @@ build_design_doc(couchbase::core::management::views::design_document dd)
 {
     PyObject* pyObj_dd = PyDict_New();
 
-    PyObject* pyObj_tmp = PyUnicode_FromString(dd.rev.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_dd, "rev", pyObj_tmp)) {
-        Py_XDECREF(pyObj_dd);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+    PyObject* pyObj_tmp = nullptr;
+    if (dd.rev.has_value()) {
+        pyObj_tmp = PyUnicode_FromString(dd.rev.value().c_str());
+        if (-1 == PyDict_SetItemString(pyObj_dd, "rev", pyObj_tmp)) {
+            Py_XDECREF(pyObj_dd);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
 
     pyObj_tmp = PyUnicode_FromString(dd.name.c_str());
     if (-1 == PyDict_SetItemString(pyObj_dd, "name", pyObj_tmp)) {
