@@ -102,7 +102,7 @@ class RangeScanTestSuite:
             except DocumentNotFoundException:
                 pass
 
-    async def _validate_result(self, result, expected_count=0, ids_only=False, return_rows=False):
+    async def _validate_result(self, result, expected_count=0, ids_only=False, return_rows=False, from_sample=False):
         assert isinstance(result, ScanResultIterable)
         rows = []
         async for r in result:
@@ -122,7 +122,10 @@ class RangeScanTestSuite:
                 assert content == {'id': r.id}
             rows.append(r)
 
-        assert len(rows) >= expected_count
+        if from_sample is True:
+            assert len(rows) <= expected_count
+        else:
+            assert len(rows) >= expected_count
 
         if return_rows:
             return rows
@@ -171,7 +174,7 @@ class RangeScanTestSuite:
         res = cb_env.collection.scan(scan_type, ScanOptions(timeout=timedelta(seconds=10),
                                                             ids_only=False,
                                                             consistent_with=test_mutation_state))
-        await self._validate_result(res, limit, ids_only=False, return_rows=False)
+        await self._validate_result(res, limit, ids_only=False, return_rows=False, from_sample=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_range_scan_supported')
@@ -181,7 +184,7 @@ class RangeScanTestSuite:
         res = cb_env.collection.scan(scan_type, ScanOptions(timeout=timedelta(seconds=10),
                                                             ids_only=True,
                                                             consistent_with=test_mutation_state))
-        rows = await self._validate_result(res, limit, ids_only=True, return_rows=True)
+        rows = await self._validate_result(res, limit, ids_only=True, return_rows=True, from_sample=True)
         result_ids = []
         for r in rows:
             result_ids.append(r.id)
@@ -190,7 +193,7 @@ class RangeScanTestSuite:
         res = cb_env.collection.scan(scan_type, ScanOptions(timeout=timedelta(seconds=10),
                                                             ids_only=True,
                                                             consistent_with=test_mutation_state))
-        rows = await self._validate_result(res, limit, ids_only=True, return_rows=True)
+        rows = await self._validate_result(res, limit, ids_only=True, return_rows=True, from_sample=True)
         compare_ids = list(map(lambda r: r.id, rows))
         assert result_ids == compare_ids
 
@@ -227,7 +230,6 @@ class RangeScanTestSuite:
                                                  consistent_with=test_mutation_state))
         await self._validate_result(res, 12)
 
-    @pytest.mark.skip('skipped until CXXCBC-345 is resolved')
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_range_scan_supported')
     @pytest.mark.parametrize('concurrency', [1, 2, 4, 16, 64, 128])
@@ -261,7 +263,6 @@ class RangeScanTestSuite:
                                                  consistent_with=test_mutation_state))
         await self._validate_result(res, 100)
 
-    @pytest.mark.skip('skipped until CXXCBC-345 is resolved')
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_range_scan_supported')
     @pytest.mark.parametrize('concurrency', [1, 2, 4, 16, 64, 128])
@@ -282,7 +283,7 @@ class RangeScanTestSuite:
                                      ScanOptions(timeout=timedelta(seconds=10),
                                                  batch_byte_limit=batch_byte_limit,
                                                  consistent_with=test_mutation_state))
-        await self._validate_result(res, 50)
+        await self._validate_result(res, 50, from_sample=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_range_scan_supported')
@@ -293,9 +294,8 @@ class RangeScanTestSuite:
                                      ScanOptions(timeout=timedelta(seconds=10),
                                                  batch_item_limit=batch_item_limit,
                                                  consistent_with=test_mutation_state))
-        await self._validate_result(res, 50)
+        await self._validate_result(res, 50, from_sample=True)
 
-    @pytest.mark.skip('skipped until CXXCBC-345 is resolved')
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_range_scan_supported')
     @pytest.mark.parametrize('concurrency', [1, 2, 4, 16, 64, 128])
@@ -305,7 +305,7 @@ class RangeScanTestSuite:
                                      ScanOptions(timeout=timedelta(seconds=10),
                                                  concurrency=concurrency,
                                                  consistent_with=test_mutation_state))
-        await self._validate_result(res, 50)
+        await self._validate_result(res, 50, from_sample=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_range_scan_supported')
