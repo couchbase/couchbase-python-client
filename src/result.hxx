@@ -76,11 +76,7 @@ private:
 
 struct result {
   PyObject_HEAD PyObject* dict;
-  std::error_code ec;
 };
-
-int
-pycbc_result_type_init(PyObject** ptr);
 
 PyObject*
 create_result_obj();
@@ -88,9 +84,6 @@ create_result_obj();
 struct mutation_token {
   PyObject_HEAD couchbase::mutation_token* token;
 };
-
-int
-pycbc_mutation_token_type_init(PyObject** ptr);
 
 PyObject*
 create_mutation_token_obj(struct couchbase::mutation_token mt);
@@ -101,9 +94,6 @@ struct streamed_result {
   std::chrono::milliseconds timeout_ms{};
 };
 
-int
-pycbc_streamed_result_type_init(PyObject** ptr);
-
 streamed_result*
 create_streamed_result_obj(std::chrono::milliseconds timeout_ms);
 
@@ -111,8 +101,8 @@ struct scan_iterator {
   PyObject_HEAD std::shared_ptr<couchbase::core::scan_result> scan_result;
 };
 
-int
-pycbc_scan_iterator_type_init(PyObject** ptr);
-
 scan_iterator*
 create_scan_iterator_obj(couchbase::core::scan_result result);
+
+PyObject*
+add_result_objects(PyObject* pyObj_module);

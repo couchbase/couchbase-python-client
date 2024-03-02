@@ -19,8 +19,6 @@
 
 #include "exceptions.hxx"
 
-PyTypeObject pycbc_logger_type = { PyObject_HEAD_INIT(NULL) 0 };
-
 static void
 pycbc_logger_dealloc(pycbc_logger* self)
 {
@@ -165,26 +163,22 @@ pycbc_logger_new(PyTypeObject* type, PyObject*, PyObject*)
   return reinterpret_cast<PyObject*>(self);
 }
 
-int
-pycbc_logger_type_init(PyObject** ptr)
+static PyTypeObject
+init_pycbc_logger_type()
 {
-  PyTypeObject* p = &pycbc_logger_type;
-
-  *ptr = (PyObject*)p;
-  if (p->tp_name) {
-    return 0;
-  }
-
-  p->tp_name = "pycbc_core.pycbc_logger";
-  p->tp_doc = "Python SDK Logger";
-  p->tp_basicsize = sizeof(pycbc_logger);
-  p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  p->tp_new = pycbc_logger_new;
-  p->tp_dealloc = (destructor)pycbc_logger_dealloc;
-  p->tp_methods = pycbc_logger_methods;
-
-  return PyType_Ready(p);
+  PyTypeObject obj = {};
+  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.pycbc_logger";
+  obj.tp_doc = PyDoc_STR("Python SDK Logger");
+  obj.tp_basicsize = sizeof(pycbc_logger);
+  obj.tp_itemsize = 0;
+  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  obj.tp_new = pycbc_logger_new;
+  obj.tp_dealloc = (destructor)pycbc_logger_dealloc;
+  obj.tp_methods = pycbc_logger_methods;
+  return obj;
 }
+
+static PyTypeObject pycbc_logger_type = init_pycbc_logger_type();
 
 size_t
 convert_spdlog_level(spdlog::level::level_enum lvl)
@@ -232,4 +226,19 @@ convert_python_log_level(PyObject* level)
     default:
       return couchbase::core::logger::level::off;
   }
+}
+
+PyObject*
+add_logger_objects(PyObject* pyObj_module)
+{
+  if (PyType_Ready(&pycbc_logger_type) < 0) {
+    return nullptr;
+  }
+  Py_INCREF(&pycbc_logger_type);
+  if (PyModule_AddObject(
+        pyObj_module, "pycbc_logger", reinterpret_cast<PyObject*>(&pycbc_logger_type)) < 0) {
+    Py_DECREF(&pycbc_logger_type);
+    return nullptr;
+  }
+  return pyObj_module;
 }

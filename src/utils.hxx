@@ -86,3 +86,9 @@ build_query_request(PyObject* pyObj_query_args);
 
 std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state);
+
+std::string
+service_type_to_str(couchbase::core::service_type t);
+
+couchbase::core::service_type
+str_to_service_type(std::string svc);

@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from enum import Enum
 from typing import (TYPE_CHECKING,
@@ -225,6 +226,12 @@ class QueryMetaData:
                  ) -> None:
         if raw is not None:
             self._raw = raw.get('metadata', None)
+            sig = self._raw.get('signature', None)
+            if sig is not None:
+                self._raw['signature'] = json.loads(sig)
+            prof = self._raw.get('profile', None)
+            if prof is not None:
+                self._raw['profile'] = json.loads(prof)
         else:
             self._raw = None
 

@@ -122,237 +122,6 @@ add_constants(PyObject* module)
   }
 }
 
-std::string
-service_type_to_str(couchbase::core::service_type t)
-{
-  switch (t) {
-    case couchbase::core::service_type::key_value: {
-      return "kv";
-    }
-    case couchbase::core::service_type::query: {
-      return "query";
-    }
-    case couchbase::core::service_type::analytics: {
-      return "analytics";
-    }
-    case couchbase::core::service_type::search: {
-      return "search";
-    }
-    case couchbase::core::service_type::management: {
-      return "mgmt";
-    }
-    case couchbase::core::service_type::view: {
-      return "views";
-    }
-    case couchbase::core::service_type::eventing: {
-      return "eventing";
-    }
-    default: {
-      // TODO: better exception
-      PyErr_SetString(PyExc_ValueError, "Invalid service type.");
-      return {};
-    }
-  }
-}
-
-couchbase::core::service_type
-str_to_service_type(std::string svc)
-{
-  if (svc.compare("kv") == 0) {
-    return couchbase::core::service_type::key_value;
-  }
-  if (svc.compare("query") == 0) {
-    return couchbase::core::service_type::query;
-  }
-  if (svc.compare("analytics") == 0) {
-    return couchbase::core::service_type::analytics;
-  }
-  if (svc.compare("search") == 0) {
-    return couchbase::core::service_type::search;
-  }
-  if (svc.compare("mgmt") == 0) {
-    return couchbase::core::service_type::management;
-  }
-  if (svc.compare("views") == 0) {
-    return couchbase::core::service_type::view;
-  }
-
-  // TODO: better exception
-  PyErr_SetString(PyExc_ValueError, "Invalid service type.");
-  return {};
-}
-
-static PyObject* json_module = nullptr;
-static PyObject* json_dumps = nullptr;
-static PyObject* json_loads = nullptr;
-
-// json encode an object using python's json module
-std::string
-json_encode(PyObject* obj)
-{
-  // let's import json, we will use it as the default transcoder
-  if (nullptr == json_dumps || nullptr == json_module) {
-    json_module = PyImport_ImportModule("json");
-    if (nullptr != json_module) {
-      json_dumps = PyObject_GetAttrString(json_module, "dumps");
-    } else {
-      PyErr_PrintEx(1);
-      return {};
-    }
-  }
-  // call json.dumps(obj)
-  PyObject* args = PyTuple_Pack(1, obj);
-  PyObject* encoded = PyObject_CallObject(json_dumps, args);
-  Py_XDECREF(args);
-  std::string res = std::string();
-  if (PyUnicode_Check(encoded)) {
-    res = std::string(PyUnicode_AsUTF8(encoded));
-  }
-  Py_XDECREF(encoded);
-  // CB_LOG_DEBUG("encoded document: {}", res);
-  return res;
-}
-
-std::tuple<std::string, uint32_t>
-encode_value(PyObject* transcoder, PyObject* value)
-{
-  PyObject* meth = nullptr;
-  PyObject* args = nullptr;
-  PyObject* result_tuple = nullptr;
-  PyObject* new_value = nullptr;
-  PyObject* flags_obj = nullptr;
-
-  args = PyTuple_Pack(1, value);
-  meth = PyObject_GetAttrString(transcoder, TRANSCODER_ENCODE);
-  if (!meth) {
-    // TODO:  better exception here
-    PyErr_SetString(PyExc_Exception, "Transcoder did not provide encode_value method.");
-    Py_XDECREF(args);
-    return {};
-  }
-
-  result_tuple = PyObject_Call(meth, args, nullptr);
-  // TODO: check if error flag is set
-  Py_XDECREF(args);
-  Py_XDECREF(meth);
-
-  if (!PyTuple_Check(result_tuple) || PyTuple_GET_SIZE(result_tuple) != 2) {
-    PyErr_SetString(PyExc_Exception, "Expected return value of (bytes, flags).");
-    Py_XDECREF(result_tuple);
-    return {};
-  }
-
-  new_value = PyTuple_GET_ITEM(result_tuple, 0);
-  flags_obj = PyTuple_GET_ITEM(result_tuple, 1);
-
-  if (new_value == nullptr || !PyBytes_Check(new_value)) {
-    PyErr_SetString(PyExc_Exception, "Expected bytes object for value to encode.");
-    Py_XDECREF(result_tuple);
-    return {};
-  }
-
-  if (flags_obj == nullptr || !PyLong_Check(flags_obj)) {
-    PyErr_SetString(PyExc_Exception, "Expected int object for flags.");
-    Py_XDECREF(result_tuple);
-    return {};
-  }
-
-  std::string res = std::string();
-  if (PyUnicode_Check(new_value)) {
-    res = std::string(PyUnicode_AsUTF8(new_value));
-  } else {
-    PyObject* unicode = PyUnicode_FromEncodedObject(new_value, "utf-8", "strict");
-    res = std::string(PyUnicode_AsUTF8(unicode));
-    Py_XDECREF(unicode);
-  }
-
-  auto result =
-    std::tuple<std::string, uint32_t>{ res, static_cast<uint32_t>(PyLong_AsLong(flags_obj)) };
-  // new_value and flags_obj are borrowed references
-  // only decref the tuple
-  Py_XDECREF(result_tuple);
-
-  return result;
-}
-
-PyObject*
-decode_value(const PyObject* transcoder,
-             const char* value,
-             size_t nvalue,
-             uint32_t flags,
-             bool deserialize)
-{
-  PyObject* pyObj_meth = nullptr;
-  PyObject* pyObj_args = nullptr;
-
-  if (deserialize) {
-    // transcoder is actually a serializer
-    pyObj_meth = PyObject_GetAttrString(const_cast<PyObject*>(transcoder), DESERIALIZE);
-  } else {
-    pyObj_meth = PyObject_GetAttrString(const_cast<PyObject*>(transcoder), TRANSCODER_DECODE);
-  }
-
-  if (!pyObj_meth) {
-    // TODO:  better exception here
-    PyErr_SetString(PyExc_Exception, "Transcoder did not provide decode_value method.");
-    Py_XDECREF(pyObj_args);
-    return {};
-  }
-
-  PyObject* pyObj_value = nullptr;
-  PyObject* pyObj_result = nullptr;
-
-  // TODO: verify if PyUnicode_DecodeUTF8(value, nvalue, "strict") might be needed?
-  pyObj_value = PyBytes_FromStringAndSize(value, nvalue);
-  if (deserialize) {
-    pyObj_args = PyTuple_Pack(1, pyObj_value);
-  } else {
-    PyObject* pyObj_flags = nullptr;
-    pyObj_flags = PyLong_FromUnsignedLong(flags);
-    pyObj_args = PyTuple_Pack(2, pyObj_value, pyObj_flags);
-    Py_XDECREF(pyObj_flags);
-  }
-  Py_XDECREF(pyObj_value);
-
-  pyObj_result = PyObject_Call(pyObj_meth, pyObj_args, nullptr);
-  // TODO: check if error flag is set
-  Py_XDECREF(pyObj_args);
-  Py_XDECREF(pyObj_meth);
-
-  return pyObj_result;
-}
-
-PyObject*
-json_decode(const char* value, size_t nvalue)
-{
-  if (nullptr == json_loads || nullptr == json_module) {
-    json_module = PyImport_ImportModule("json");
-    if (nullptr != json_module) {
-      json_loads = PyObject_GetAttrString(json_module, "loads");
-    } else {
-      PyErr_PrintEx(1);
-      return nullptr;
-    }
-  }
-
-  PyObject* unicode = nullptr;
-
-  // PyUnicode_FromString
-  unicode = PyUnicode_DecodeUTF8(value, nvalue, "strict");
-
-  if (!unicode) {
-    // TODO:  raise an exception here
-    PyErr_PrintEx(1);
-    return nullptr;
-  }
-
-  PyObject* args = PyTuple_Pack(1, unicode);
-  PyObject* decoded = PyObject_CallObject(json_loads, args);
-
-  Py_XDECREF(args);
-  return decoded;
-}
-
 static PyObject*
 binary_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
@@ -652,95 +421,40 @@ static struct PyMethodDef methods[] = {
   { nullptr, nullptr, 0, nullptr }
 };
 
-static struct PyModuleDef pycbc_core_module = { { PyObject_HEAD_INIT(NULL) nullptr, 0, nullptr },
-                                                "pycbc_core",
-                                                "Python interface to couchbase-client-cxx",
-                                                -1,
-                                                methods,
-                                                nullptr,
-                                                nullptr,
-                                                nullptr,
-                                                nullptr };
+static PyModuleDef
+init_pycbc_core_module()
+{
+  PyModuleDef mod = {};
+  mod.m_base = PyModuleDef_HEAD_INIT;
+  mod.m_name = "pycbc_core";
+  mod.m_doc = "Python interface to couchbase-client-cxx";
+  mod.m_size = -1;
+  mod.m_methods = methods;
+  return mod;
+}
+
+static PyModuleDef pycbc_core_module = init_pycbc_core_module();
 
 PyMODINIT_FUNC
 PyInit_pycbc_core(void)
 {
   Py_Initialize();
-  PyObject* m = nullptr;
-
-  PyObject* result_type;
-  if (pycbc_result_type_init(&result_type) < 0) {
-    return nullptr;
-  }
-
-  PyObject* exception_base_type;
-  if (pycbc_exception_base_type_init(&exception_base_type) < 0) {
-    return nullptr;
-  }
-
-  PyObject* scan_iterator_type;
-  if (pycbc_scan_iterator_type_init(&scan_iterator_type) < 0) {
-    return nullptr;
-  }
-
-  PyObject* streamed_result_type;
-  if (pycbc_streamed_result_type_init(&streamed_result_type) < 0) {
-    return nullptr;
-  }
-
-  PyObject* mutation_token_type;
-  if (pycbc_mutation_token_type_init(&mutation_token_type) < 0) {
-    return nullptr;
-  }
-
-  PyObject* pycbc_logger_type;
-  if (pycbc_logger_type_init(&pycbc_logger_type) < 0) {
-    return nullptr;
-  }
-
-  m = PyModule_Create(&pycbc_core_module);
+  PyObject* m = PyModule_Create(&pycbc_core_module);
   if (m == nullptr) {
     return nullptr;
   }
 
-  Py_INCREF(result_type);
-  if (PyModule_AddObject(m, "result", result_type) < 0) {
-    Py_DECREF(result_type);
+  if (add_result_objects(m) == nullptr) {
     Py_DECREF(m);
     return nullptr;
   }
 
-  Py_INCREF(exception_base_type);
-  if (PyModule_AddObject(m, "exception", exception_base_type) < 0) {
-    Py_DECREF(exception_base_type);
+  if (add_exception_objects(m) == nullptr) {
     Py_DECREF(m);
     return nullptr;
   }
 
-  Py_INCREF(scan_iterator_type);
-  if (PyModule_AddObject(m, "scan_iterator", scan_iterator_type) < 0) {
-    Py_DECREF(scan_iterator_type);
-    Py_DECREF(m);
-    return nullptr;
-  }
-
-  Py_INCREF(streamed_result_type);
-  if (PyModule_AddObject(m, "streamed_result", streamed_result_type) < 0) {
-    Py_DECREF(streamed_result_type);
-    Py_DECREF(m);
-    return nullptr;
-  }
-
-  Py_INCREF(mutation_token_type);
-  if (PyModule_AddObject(m, "mutation_token", mutation_token_type) < 0) {
-    Py_DECREF(mutation_token_type);
-    Py_DECREF(m);
-    return nullptr;
-  }
-
-  Py_INCREF(pycbc_logger_type);
-  if (PyModule_AddObject(m, "pycbc_logger", pycbc_logger_type) < 0) {
-    Py_DECREF(pycbc_logger_type);
+  if (add_logger_objects(m) == nullptr) {
     Py_DECREF(m);
     return nullptr;
   }

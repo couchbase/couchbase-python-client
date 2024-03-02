@@ -40,19 +40,17 @@ add_flags_and_value_to_result(const T& resp, result* res)
   }
   Py_XDECREF(pyObj_tmp);
 
-  if (!res->ec) {
-    try {
-      pyObj_tmp = binary_to_PyObject(resp.value);
-    } catch (const std::exception& e) {
-      PyErr_SetString(PyExc_TypeError, e.what());
-      return nullptr;
-    }
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_tmp)) {
-      Py_XDECREF(pyObj_tmp);
-      return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
+  try {
+    pyObj_tmp = binary_to_PyObject(resp.value);
+  } catch (const std::exception& e) {
+    PyErr_SetString(PyExc_TypeError, e.what());
+    return nullptr;
   }
+  if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_tmp)) {
+    Py_XDECREF(pyObj_tmp);
+    return nullptr;
+  }
+  Py_DECREF(pyObj_tmp);
   return res;
 }
 
@@ -147,7 +145,6 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
 {
   PyObject* pyObj_result = create_result_obj();
   result* res = reinterpret_cast<result*>(pyObj_result);
-  res->ec = resp.ctx.ec();
 
   PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
   if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
@@ -701,7 +698,6 @@ create_result_from_mutation_operation_response(const char* key,
   } else {
     auto res = create_base_result_from_mutation_operation_response(key, resp);
     if (res != nullptr) {
-      res->ec = resp.ctx.ec();
       res = add_extras_to_result(resp, res);
     }
 

@@ -746,3 +746,6 @@ pycbc_build_exception(std::error_code ec, const char* file, int line, std::strin
 
 void
 pycbc_add_exception_info(PyObject* pyObj_exc_base, const char* key, PyObject* pyObj_value);
+
+PyObject*
+add_exception_objects(PyObject* pyObj_module);

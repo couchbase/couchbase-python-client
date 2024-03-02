@@ -19,8 +19,6 @@
 
 #include "result.hxx"
 
-PyTypeObject exception_base_type = { PyObject_HEAD_INIT(NULL) 0 };
-
 static PyObject*
 exception_base__category__(exception_base* self, [[maybe_unused]] PyObject* args)
 {
@@ -83,19 +81,8 @@ exception_base_dealloc(exception_base* self)
 static PyObject*
 exception_base__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
-  // lets just initialize from a result object.
-  const char* kw[] = { "result", nullptr };
-  PyObject* result_obj = nullptr;
   auto self = reinterpret_cast<exception_base*>(type->tp_alloc(type, 0));
-  PyArg_ParseTupleAndKeywords(args, kwargs, "|iO", const_cast<char**>(kw), &result_obj);
-  if (nullptr != result_obj) {
-    if (PyObject_IsInstance(result_obj, reinterpret_cast<PyObject*>(&result_type))) {
-      self->ec = reinterpret_cast<result*>(result_obj)->ec;
-    }
-    Py_DECREF(result_obj);
-  } else {
-    self->ec = std::error_code();
-  }
+  self->ec = std::error_code();
   return reinterpret_cast<PyObject*>(self);
 }
 
@@ -117,27 +104,47 @@ static PyMethodDef exception_base_methods[] = {
   { nullptr, nullptr, 0, nullptr }
 };
 
-int
-pycbc_exception_base_type_init(PyObject** ptr)
+/*
+Initializing the PyTypeObject w/ the C99-style designated initializers fails to compile when using
+Python 3.12 on alpine3.18 (error below). The container I tested was using gcc 12.2 (don't know how
+other versions might behave).
+
+Error:
+/tmp/couchbase-python-client/src/exceptions.cxx:130:1: error: designator order for field
+'_typeobject::tp_basicsize' does not match declaration order in 'PyTypeObject' {aka '_typeobject'}
+130 | };
+
+This is what the docs show, so odd there is an issue...
+https://docs.python.org/3.12/extending/newtypes_tutorial.html#the-basics
+*/
+// static PyTypeObject exception_base_type = {
+//     .ob_base = PyVarObject_HEAD_INIT(NULL, 0)
+//     .tp_name = "pycbc_core.exception",
+//     .tp_doc = PyDoc_STR("Base class for exceptions coming from pycbc_core"),
+//     .tp_basicsize = sizeof(exception_base),
+//     .tp_itemsize = 0,
+//     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+//     .tp_new = exception_base__new__,
+//     .tp_dealloc = (destructor)exception_base_dealloc,
+//     .tp_methods = exception_base_methods,
+// };
+
+static PyTypeObject
+init_exception_base_type()
 {
-  PyTypeObject* p = &exception_base_type;
-
-  *ptr = (PyObject*)p;
-  if (p->tp_name) {
-    return 0;
-  }
-
-  p->tp_name = "pycbc_core.exception";
-  p->tp_doc = "Base class for exceptions coming from pycbc_core";
-  p->tp_basicsize = sizeof(exception_base);
-  p->tp_itemsize = 0;
-  p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  p->tp_new = exception_base__new__;
-  p->tp_dealloc = (destructor)exception_base_dealloc;
-  p->tp_methods = exception_base_methods;
-
-  return PyType_Ready(p);
+  PyTypeObject obj = {};
+  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.exception";
+  obj.tp_doc = PyDoc_STR("Base class for exceptions coming from pycbc_core");
+  obj.tp_basicsize = sizeof(exception_base);
+  obj.tp_itemsize = 0;
+  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  obj.tp_new = exception_base__new__;
+  obj.tp_dealloc = (destructor)exception_base_dealloc;
+  obj.tp_methods = exception_base_methods;
+  return obj;
 }
+
+static PyTypeObject exception_base_type = init_exception_base_type();
 
 exception_base*
 create_exception_base_obj()
@@ -568,4 +575,19 @@ pycbc_add_exception_info(PyObject* pyObj_exc_base, const char* key, PyObject* py
     exc->exc_info = pyObj_exc_info;
     Py_INCREF(exc->exc_info);
   }
+}
+
+PyObject*
+add_exception_objects(PyObject* pyObj_module)
+{
+  if (PyType_Ready(&exception_base_type) < 0) {
+    return nullptr;
+  }
+  Py_INCREF(&exception_base_type);
+  if (PyModule_AddObject(
+        pyObj_module, "exception", reinterpret_cast<PyObject*>(&exception_base_type)) < 0) {
+    Py_DECREF(&exception_base_type);
+    return nullptr;
+  }
+  return pyObj_module;
 }

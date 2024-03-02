@@ -34,33 +34,6 @@ result_dealloc([[maybe_unused]] result* self)
 }
 
 static PyObject*
-result__strerror__(result* self, [[maybe_unused]] PyObject* args)
-{
-  if (self->ec) {
-    return PyUnicode_FromString(self->ec.message().c_str());
-  }
-  Py_RETURN_NONE;
-}
-
-static PyObject*
-result__err__(result* self, [[maybe_unused]] PyObject* args)
-{
-  if (self->ec) {
-    return PyLong_FromLong(self->ec.value());
-  }
-  Py_RETURN_NONE;
-}
-
-static PyObject*
-result__category__(result* self, [[maybe_unused]] PyObject* args)
-{
-  if (self->ec) {
-    return PyUnicode_FromString(self->ec.category().name());
-  }
-  Py_RETURN_NONE;
-}
-
-static PyObject*
 result__get__(result* self, PyObject* args)
 {
   const char* field_name = nullptr;
@@ -91,21 +64,11 @@ result__get__(result* self, PyObject* args)
 static PyObject*
 result__str__(result* self)
 {
-  const char* format_string = "result:{err=%i, err_string=%s, value=%S}";
-  return PyUnicode_FromFormat(
-    format_string, self->ec.value(), self->ec.message().c_str(), self->dict);
+  const char* format_string = "result:{value=%S}";
+  return PyUnicode_FromFormat(format_string, self->dict);
 }
 
 static PyMethodDef result_methods[] = {
-  { "strerror",
-    (PyCFunction)result__strerror__,
-    METH_NOARGS,
-    PyDoc_STR("String description of error") },
-  { "err", (PyCFunction)result__err__, METH_NOARGS, PyDoc_STR("Integer error code") },
-  { "err_category",
-    (PyCFunction)result__category__,
-    METH_NOARGS,
-    PyDoc_STR("error category, expressed as a string") },
   { "get", (PyCFunction)result__get__, METH_VARARGS, PyDoc_STR("get field in result object") },
   { NULL, NULL, 0, NULL }
 };
@@ -118,44 +81,37 @@ static struct PyMemberDef result_members[] = { { "raw_result",
                                                { NULL } };
 
 static PyObject*
-result_new(PyTypeObject* type, PyObject*, PyObject*)
+result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
   result* self = reinterpret_cast<result*>(type->tp_alloc(type, 0));
   self->dict = PyDict_New();
-  self->ec = std::error_code();
   return reinterpret_cast<PyObject*>(self);
 }
 
-int
-pycbc_result_type_init(PyObject** ptr)
+static PyTypeObject
+init_result_type()
 {
-  PyTypeObject* p = &result_type;
-
-  *ptr = (PyObject*)p;
-  if (p->tp_name) {
-    return 0;
-  }
-
-  p->tp_name = "pycbc_core.result";
-  p->tp_doc = "Result of operation on client";
-  p->tp_basicsize = sizeof(result);
-  p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  p->tp_new = result_new;
-  p->tp_dealloc = (destructor)result_dealloc;
-  p->tp_methods = result_methods;
-  p->tp_members = result_members;
-  p->tp_repr = (reprfunc)result__str__;
-
-  return PyType_Ready(p);
+  PyTypeObject obj = {};
+  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.result";
+  obj.tp_doc = PyDoc_STR("Result of operation on client");
+  obj.tp_basicsize = sizeof(result);
+  obj.tp_itemsize = 0;
+  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  obj.tp_new = result__new__;
+  obj.tp_dealloc = (destructor)result_dealloc;
+  obj.tp_methods = result_methods;
+  obj.tp_members = result_members;
+  obj.tp_repr = (reprfunc)result__str__;
+  return obj;
 }
+
+static PyTypeObject result_type = init_result_type();
 
 PyObject*
 create_result_obj()
 {
   return PyObject_CallObject(reinterpret_cast<PyObject*>(&result_type), nullptr);
 }
-
-PyTypeObject result_type = { PyObject_HEAD_INIT(NULL) 0 };
 
 /* mutation_token type methods */
 
@@ -210,33 +166,29 @@ static PyMethodDef mutation_token_methods[] = { { "get",
                                                 { NULL } };
 
 static PyObject*
-mutation_token_new(PyTypeObject* type, PyObject*, PyObject*)
+mutation_token__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
   mutation_token* self = reinterpret_cast<mutation_token*>(type->tp_alloc(type, 0));
   self->token = new couchbase::mutation_token();
   return reinterpret_cast<PyObject*>(self);
 }
 
-int
-pycbc_mutation_token_type_init(PyObject** ptr)
+static PyTypeObject
+init_mutation_token_type()
 {
-  PyTypeObject* p = &mutation_token_type;
-
-  *ptr = (PyObject*)p;
-  if (p->tp_name) {
-    return 0;
-  }
-
-  p->tp_name = "pycbc_core.mutation_token";
-  p->tp_doc = "Object for c++ client mutation token";
-  p->tp_basicsize = sizeof(mutation_token);
-  p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  p->tp_new = mutation_token_new;
-  p->tp_dealloc = (destructor)mutation_token_dealloc;
-  p->tp_methods = mutation_token_methods;
-
-  return PyType_Ready(p);
+  PyTypeObject obj = {};
+  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.mutation_token";
+  obj.tp_doc = PyDoc_STR("Object for c++ client mutation token");
+  obj.tp_basicsize = sizeof(mutation_token);
+  obj.tp_itemsize = 0;
+  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  obj.tp_new = mutation_token__new__;
+  obj.tp_dealloc = (destructor)mutation_token_dealloc;
+  obj.tp_methods = mutation_token_methods;
+  return obj;
 }
+
+static PyTypeObject mutation_token_type = init_mutation_token_type();
 
 PyObject*
 create_mutation_token_obj(couchbase::mutation_token mt)
@@ -250,8 +202,6 @@ create_mutation_token_obj(couchbase::mutation_token mt)
   *mut_token->token = token;
   return reinterpret_cast<PyObject*>(mut_token);
 }
-
-PyTypeObject mutation_token_type = { PyObject_HEAD_INIT(NULL) 0 };
 
 /* streamed_result type methods */
 
@@ -290,7 +240,7 @@ streamed_result_iternext(PyObject* self)
 }
 
 static PyObject*
-streamed_result_new(PyTypeObject* type, PyObject*, PyObject*)
+streamed_result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
   streamed_result* self = reinterpret_cast<streamed_result*>(type->tp_alloc(type, 0));
   self->ec = std::error_code();
@@ -298,28 +248,24 @@ streamed_result_new(PyTypeObject* type, PyObject*, PyObject*)
   return reinterpret_cast<PyObject*>(self);
 }
 
-int
-pycbc_streamed_result_type_init(PyObject** ptr)
+static PyTypeObject
+init_streamed_result_type()
 {
-  PyTypeObject* p = &streamed_result_type;
-
-  *ptr = (PyObject*)p;
-  if (p->tp_name) {
-    return 0;
-  }
-
-  p->tp_name = "pycbc_core.streamed_result";
-  p->tp_doc = "Result of streaming operation on client";
-  p->tp_basicsize = sizeof(streamed_result);
-  p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  p->tp_new = streamed_result_new;
-  p->tp_dealloc = (destructor)streamed_result_dealloc;
-  p->tp_methods = streamed_result_TABLE_methods;
-  p->tp_iter = streamed_result_iter;
-  p->tp_iternext = streamed_result_iternext;
-
-  return PyType_Ready(p);
+  PyTypeObject obj = {};
+  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.streamed_result";
+  obj.tp_doc = PyDoc_STR("Result of streaming operation on client");
+  obj.tp_basicsize = sizeof(streamed_result);
+  obj.tp_itemsize = 0;
+  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  obj.tp_new = streamed_result__new__;
+  obj.tp_dealloc = (destructor)streamed_result_dealloc;
+  obj.tp_methods = streamed_result_TABLE_methods;
+  obj.tp_iter = streamed_result_iter;
+  obj.tp_iternext = streamed_result_iternext;
+  return obj;
 }
+
+static PyTypeObject streamed_result_type = init_streamed_result_type();
 
 streamed_result*
 create_streamed_result_obj(std::chrono::milliseconds timeout_ms)
@@ -330,8 +276,6 @@ create_streamed_result_obj(std::chrono::milliseconds timeout_ms)
   streamed_res->timeout_ms = timeout_ms;
   return streamed_res;
 }
-
-PyTypeObject streamed_result_type = { PyObject_HEAD_INIT(NULL) 0 };
 
 /* scan_iterator type methods */
 
@@ -503,34 +447,30 @@ scan_iterator_iternext(PyObject* self)
 }
 
 static PyObject*
-scan_iterator_new(PyTypeObject* type, PyObject*, PyObject*)
+scan_iterator__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
   scan_iterator* self = reinterpret_cast<scan_iterator*>(type->tp_alloc(type, 0));
   return reinterpret_cast<PyObject*>(self);
 }
 
-int
-pycbc_scan_iterator_type_init(PyObject** ptr)
+static PyTypeObject
+init_scan_iterator_type()
 {
-  PyTypeObject* p = &scan_iterator_type;
-
-  *ptr = (PyObject*)p;
-  if (p->tp_name) {
-    return 0;
-  }
-
-  p->tp_name = "pycbc_core.scan_iterator";
-  p->tp_doc = "Result of range scan operation on client";
-  p->tp_basicsize = sizeof(scan_iterator);
-  p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  p->tp_new = scan_iterator_new;
-  p->tp_dealloc = (destructor)scan_iterator_dealloc;
-  p->tp_methods = scan_iterator_TABLE_methods;
-  p->tp_iter = scan_iterator_iter;
-  p->tp_iternext = scan_iterator_iternext;
-
-  return PyType_Ready(p);
+  PyTypeObject obj = {};
+  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.scan_iterator";
+  obj.tp_doc = PyDoc_STR("Result of range scan operation on client");
+  obj.tp_basicsize = sizeof(scan_iterator);
+  obj.tp_itemsize = 0;
+  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  obj.tp_new = scan_iterator__new__;
+  obj.tp_dealloc = (destructor)scan_iterator_dealloc;
+  obj.tp_methods = scan_iterator_TABLE_methods;
+  obj.tp_iter = scan_iterator_iter;
+  obj.tp_iternext = scan_iterator_iternext;
+  return obj;
 }
+
+static PyTypeObject scan_iterator_type = init_scan_iterator_type();
 
 scan_iterator*
 create_scan_iterator_obj(couchbase::core::scan_result result)
@@ -542,4 +482,63 @@ create_scan_iterator_obj(couchbase::core::scan_result result)
   return scan_iter;
 }
 
-PyTypeObject scan_iterator_type = { PyObject_HEAD_INIT(NULL) 0 };
+PyObject*
+add_result_objects(PyObject* pyObj_module)
+{
+  // mutation_token_type
+  if (PyType_Ready(&mutation_token_type) < 0) {
+    return nullptr;
+  }
+  Py_INCREF(&mutation_token_type);
+  if (PyModule_AddObject(
+        pyObj_module, "mutation_token", reinterpret_cast<PyObject*>(&mutation_token_type)) < 0) {
+    Py_DECREF(&mutation_token_type);
+    return nullptr;
+  }
+
+  // result_type, need to DECREF previous types on failure
+  if (PyType_Ready(&result_type) < 0) {
+    Py_DECREF(&mutation_token_type);
+    return nullptr;
+  }
+  Py_INCREF(&result_type);
+  if (PyModule_AddObject(pyObj_module, "result", reinterpret_cast<PyObject*>(&result_type)) < 0) {
+    Py_DECREF(&mutation_token_type);
+    Py_DECREF(&result_type);
+    return nullptr;
+  }
+
+  // scan_iterator_type, need to DECREF previous types on failure
+  if (PyType_Ready(&scan_iterator_type) < 0) {
+    Py_DECREF(&mutation_token_type);
+    Py_DECREF(&result_type);
+    return nullptr;
+  }
+  Py_INCREF(&scan_iterator_type);
+  if (PyModule_AddObject(
+        pyObj_module, "scan_iterator", reinterpret_cast<PyObject*>(&scan_iterator_type)) < 0) {
+    Py_DECREF(&mutation_token_type);
+    Py_DECREF(&result_type);
+    Py_DECREF(&scan_iterator_type);
+    return nullptr;
+  }
+
+  // streamed_result_type, need to DECREF previous types on failure
+  if (PyType_Ready(&streamed_result_type) < 0) {
+    Py_DECREF(&mutation_token_type);
+    Py_DECREF(&result_type);
+    Py_DECREF(&scan_iterator_type);
+    return nullptr;
+  }
+  Py_INCREF(&streamed_result_type);
+  if (PyModule_AddObject(
+        pyObj_module, "streamed_result", reinterpret_cast<PyObject*>(&streamed_result_type)) < 0) {
+    Py_DECREF(&mutation_token_type);
+    Py_DECREF(&result_type);
+    Py_DECREF(&scan_iterator_type);
+    Py_DECREF(&streamed_result_type);
+    return nullptr;
+  }
+
+  return pyObj_module;
+}

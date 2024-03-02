@@ -75,7 +75,7 @@ class ConsistencyChecker:
 
         path = f'pools/default/buckets/{bucket_name}/scopes'
         error_msg = f'Collection {collection_name} in scope {scope_name}, bucket {bucket_name} is not present in all ' \
-                    f'nodes'
+            f'nodes'
         self._wait_until_resource_satisfies_predicate(path, predicate, error_msg, timeout)
 
     def wait_until_collection_dropped(self, bucket_name, scope_name, collection_name, timeout=DEFAULT_TIMEOUT):
@@ -87,7 +87,7 @@ class ConsistencyChecker:
 
         path = f'pools/default/buckets/{bucket_name}/scopes'
         error_msg = f'Collection {collection_name} in scope {scope_name}, bucket {bucket_name} has not been dropped ' \
-                    f'in all nodes'
+            f'in all nodes'
         self._wait_until_resource_satisfies_predicate(path, predicate, error_msg, timeout)
 
     def wait_until_collection_has_settings(self, bucket_name, scope_name, collection_name, settings,
@@ -104,7 +104,7 @@ class ConsistencyChecker:
 
         path = f'pools/default/buckets/{bucket_name}/scopes'
         error_msg = f'Collection {collection_name} in scope {scope_name}, bucket {bucket_name} does not have the' \
-                    f'expected settings in all nodes ({settings})'
+            f'expected settings in all nodes ({settings})'
         self._wait_until_resource_satisfies_predicate(path, predicate, error_msg, timeout)
 
     def _wait_until_resource_present(self, path, error_msg, timeout=DEFAULT_TIMEOUT):

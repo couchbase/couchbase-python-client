@@ -478,3 +478,63 @@ build_query_request(PyObject* pyObj_query_args)
 
   return req;
 }
+
+std::string
+service_type_to_str(couchbase::core::service_type t)
+{
+  switch (t) {
+    case couchbase::core::service_type::key_value: {
+      return "kv";
+    }
+    case couchbase::core::service_type::query: {
+      return "query";
+    }
+    case couchbase::core::service_type::analytics: {
+      return "analytics";
+    }
+    case couchbase::core::service_type::search: {
+      return "search";
+    }
+    case couchbase::core::service_type::management: {
+      return "mgmt";
+    }
+    case couchbase::core::service_type::view: {
+      return "views";
+    }
+    case couchbase::core::service_type::eventing: {
+      return "eventing";
+    }
+    default: {
+      // TODO: better exception
+      PyErr_SetString(PyExc_ValueError, "Invalid service type.");
+      return {};
+    }
+  }
+}
+
+couchbase::core::service_type
+str_to_service_type(std::string svc)
+{
+  if (svc.compare("kv") == 0) {
+    return couchbase::core::service_type::key_value;
+  }
+  if (svc.compare("query") == 0) {
+    return couchbase::core::service_type::query;
+  }
+  if (svc.compare("analytics") == 0) {
+    return couchbase::core::service_type::analytics;
+  }
+  if (svc.compare("search") == 0) {
+    return couchbase::core::service_type::search;
+  }
+  if (svc.compare("mgmt") == 0) {
+    return couchbase::core::service_type::management;
+  }
+  if (svc.compare("views") == 0) {
+    return couchbase::core::service_type::view;
+  }
+
+  // TODO: better exception
+  PyErr_SetString(PyExc_ValueError, "Invalid service type.");
+  return {};
+}

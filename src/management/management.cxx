@@ -32,6 +32,7 @@
 
 #include "../exceptions.hxx"
 #include "../result.hxx"
+#include "../utils.hxx"
 
 template<typename T>
 result*

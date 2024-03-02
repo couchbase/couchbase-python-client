@@ -123,6 +123,9 @@ class AnalyticsMetaData:
                  ) -> None:
         if raw is not None:
             self._raw = raw.get('metadata', None)
+            sig = self._raw.get('signature', None)
+            if sig is not None:
+                self._raw['signature'] = json.loads(sig)
         else:
             self._raw = None
 

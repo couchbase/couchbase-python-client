@@ -138,8 +138,7 @@ get_result_metadata(couchbase::core::operations::query_response::query_meta_data
   Py_XDECREF(pyObj_tmp);
 
   if (metadata.signature.has_value()) {
-    pyObj_tmp =
-      json_decode(metadata.signature.value().c_str(), metadata.signature.value().length());
+    pyObj_tmp = PyUnicode_FromString(metadata.signature.value().c_str());
     if (-1 == PyDict_SetItemString(pyObj_metadata, "signature", pyObj_tmp)) {
       PyErr_Print();
       PyErr_Clear();
@@ -148,7 +147,7 @@ get_result_metadata(couchbase::core::operations::query_response::query_meta_data
   }
 
   if (metadata.profile.has_value()) {
-    pyObj_tmp = json_decode(metadata.profile.value().c_str(), metadata.profile.value().length());
+    pyObj_tmp = PyUnicode_FromString(metadata.profile.value().c_str());
     if (-1 == PyDict_SetItemString(pyObj_metadata, "profile", pyObj_tmp)) {
       PyErr_Print();
       PyErr_Clear();
@@ -241,7 +240,6 @@ create_result_from_query_response(couchbase::core::operations::query_response re
 {
   PyObject* pyObj_result = create_result_obj();
   result* res = reinterpret_cast<result*>(pyObj_result);
-  res->ec = resp.ctx.ec;
 
   PyObject* pyObj_payload = PyDict_New();
 

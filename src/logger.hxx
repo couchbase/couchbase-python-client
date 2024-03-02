@@ -227,5 +227,5 @@ struct pycbc_logger {
   bool is_console_logger{ false };
 };
 
-int
-pycbc_logger_type_init(PyObject** ptr);
+PyObject*
+add_logger_objects(PyObject* pyObj_module);

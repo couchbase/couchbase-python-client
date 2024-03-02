@@ -31,7 +31,6 @@ create_result_from_view_response(couchbase::core::operations::document_view_resp
 {
   PyObject* pyObj_result = create_result_obj();
   result* res = reinterpret_cast<result*>(pyObj_result);
-  res->ec = resp.ctx.ec;
 
   PyObject* pyObj_tmp = nullptr;
   PyObject* pyObj_payload = PyDict_New();

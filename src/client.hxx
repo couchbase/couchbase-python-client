@@ -242,10 +242,6 @@ public:
 #define RESULT_KEY "key"
 #define RESULT_MUTATION_TOKEN "mutation_token"
 #define RESULT_EXISTS "exists"
-#define TRANSCODER_ENCODE "encode_value"
-#define SERIALIZE "serialize"
-#define TRANSCODER_DECODE "decode_value"
-#define DESERIALIZE "deserialize"
 
 struct connection {
   asio::io_context io_;
@@ -283,31 +279,3 @@ add_ops_enum(PyObject* module);
 
 void
 add_constants(PyObject* module);
-
-std::string
-json_encode(PyObject* obj);
-
-std::tuple<std::string, uint32_t>
-encode_value(PyObject* transcoder, PyObject* value);
-
-PyObject*
-decode_value(const PyObject* transcoder,
-             const char* value,
-             size_t nvalue,
-             uint32_t flags,
-             bool deserialize = false);
-
-PyObject*
-json_decode(const char* value, size_t nvalue);
-
-std::string
-service_type_to_str(couchbase::core::service_type t);
-
-couchbase::core::service_type
-str_to_service_type(std::string svc);
-
-extern PyTypeObject result_type;
-extern PyTypeObject exception_base_type;
-extern PyTypeObject scan_iterator_type;
-extern PyTypeObject streamed_result_type;
-extern PyTypeObject mutation_token_type;

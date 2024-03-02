@@ -125,7 +125,6 @@ create_result_from_binary_op_response(const char* key,
   } else {
     auto res = create_base_result_from_binary_op_response(key, resp);
     if (res != nullptr) {
-      res->ec = resp.ctx.ec();
       res = add_extras_to_result(resp, res);
     }
 

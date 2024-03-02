@@ -77,92 +77,90 @@ add_extras_to_result<couchbase::core::operations::lookup_in_any_replica_response
   const couchbase::core::operations::lookup_in_any_replica_response& resp,
   result* res)
 {
-  if (!res->ec) {
-    PyObject* pyObj_tmp = PyBool_FromLong(static_cast<long>(resp.is_replica));
-    if (-1 == PyDict_SetItemString(res->dict, "is_replica", pyObj_tmp)) {
+  PyObject* pyObj_tmp = PyBool_FromLong(static_cast<long>(resp.is_replica));
+  if (-1 == PyDict_SetItemString(res->dict, "is_replica", pyObj_tmp)) {
+    Py_XDECREF(pyObj_tmp);
+    return nullptr;
+  }
+  Py_DECREF(pyObj_tmp);
+
+  PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
+  for (auto f : resp.fields) {
+    PyObject* pyObj_field = PyDict_New();
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
+    if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
       Py_XDECREF(pyObj_tmp);
       return nullptr;
     }
     Py_DECREF(pyObj_tmp);
 
-    PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
-    for (auto f : resp.fields) {
-      PyObject* pyObj_field = PyDict_New();
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
-      if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
-      if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
-      if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
-      if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
-      if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      if (f.value.size() > 0) {
-        try {
-          pyObj_tmp = binary_to_PyObject(f.value);
-        } catch (const std::exception& e) {
-          PyErr_SetString(PyExc_TypeError, e.what());
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-      }
-
-      PyList_Append(pyObj_fields, pyObj_field);
-      Py_DECREF(pyObj_field);
-    }
-
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+    pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
+    if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
       Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
       return nullptr;
     }
-    Py_DECREF(pyObj_fields);
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
+    if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
+    if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
+    if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (f.value.size() > 0) {
+      try {
+        pyObj_tmp = binary_to_PyObject(f.value);
+      } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      Py_DECREF(pyObj_tmp);
+    }
+
+    PyList_Append(pyObj_fields, pyObj_field);
+    Py_DECREF(pyObj_field);
   }
+
+  if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+    Py_XDECREF(pyObj_fields);
+    return nullptr;
+  }
+  Py_DECREF(pyObj_fields);
   return res;
 }
 
@@ -172,92 +170,90 @@ add_extras_to_result<couchbase::core::operations::lookup_in_all_replicas_respons
   const couchbase::core::operations::lookup_in_all_replicas_response::entry& resp,
   result* res)
 {
-  if (!res->ec) {
-    PyObject* pyObj_tmp = PyBool_FromLong(static_cast<long>(resp.is_replica));
-    if (-1 == PyDict_SetItemString(res->dict, "is_replica", pyObj_tmp)) {
+  PyObject* pyObj_tmp = PyBool_FromLong(static_cast<long>(resp.is_replica));
+  if (-1 == PyDict_SetItemString(res->dict, "is_replica", pyObj_tmp)) {
+    Py_XDECREF(pyObj_tmp);
+    return nullptr;
+  }
+  Py_DECREF(pyObj_tmp);
+
+  PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
+  for (auto f : resp.fields) {
+    PyObject* pyObj_field = PyDict_New();
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
+    if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
       Py_XDECREF(pyObj_tmp);
       return nullptr;
     }
     Py_DECREF(pyObj_tmp);
 
-    PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
-    for (auto f : resp.fields) {
-      PyObject* pyObj_field = PyDict_New();
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
-      if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
-      if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
-      if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
-      if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
-      if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      if (f.value.size() > 0) {
-        try {
-          pyObj_tmp = binary_to_PyObject(f.value);
-        } catch (const std::exception& e) {
-          PyErr_SetString(PyExc_TypeError, e.what());
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-      }
-
-      PyList_Append(pyObj_fields, pyObj_field);
-      Py_DECREF(pyObj_field);
-    }
-
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+    pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
+    if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
       Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
       return nullptr;
     }
-    Py_DECREF(pyObj_fields);
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
+    if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
+    if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
+    if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (f.value.size() > 0) {
+      try {
+        pyObj_tmp = binary_to_PyObject(f.value);
+      } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      Py_DECREF(pyObj_tmp);
+    }
+
+    PyList_Append(pyObj_fields, pyObj_field);
+    Py_DECREF(pyObj_field);
   }
+
+  if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+    Py_XDECREF(pyObj_fields);
+    return nullptr;
+  }
+  Py_DECREF(pyObj_fields);
   return res;
 }
 
@@ -267,85 +263,83 @@ add_extras_to_result<couchbase::core::operations::lookup_in_response>(
   const couchbase::core::operations::lookup_in_response& resp,
   result* res)
 {
-  if (!res->ec) {
-    PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
-    for (auto f : resp.fields) {
-      PyObject* pyObj_field = PyDict_New();
+  PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
+  for (auto f : resp.fields) {
+    PyObject* pyObj_field = PyDict_New();
 
-      PyObject* pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
-      if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
-      if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
-      if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
-      if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
-      if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      if (f.value.size() > 0) {
-        try {
-          pyObj_tmp = binary_to_PyObject(f.value);
-        } catch (const std::exception& e) {
-          PyErr_SetString(PyExc_TypeError, e.what());
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-      }
-
-      PyList_Append(pyObj_fields, pyObj_field);
-      Py_DECREF(pyObj_field);
-    }
-
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
+    if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
       Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
       return nullptr;
     }
-    Py_DECREF(pyObj_fields);
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyBool_FromLong(static_cast<long>(f.exists));
+    if (-1 == PyDict_SetItemString(pyObj_field, "exists", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
+    if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
+    if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
+    if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (f.value.size() > 0) {
+      try {
+        pyObj_tmp = binary_to_PyObject(f.value);
+      } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      Py_DECREF(pyObj_tmp);
+    }
+
+    PyList_Append(pyObj_fields, pyObj_field);
+    Py_DECREF(pyObj_field);
   }
+
+  if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+    Py_XDECREF(pyObj_fields);
+    return nullptr;
+  }
+  Py_DECREF(pyObj_fields);
   return res;
 }
 
@@ -362,77 +356,74 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(
   }
   Py_DECREF(pyObj_mutation_token);
 
-  if (!res->ec) {
-    PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
-    for (int i = 0; i < resp.fields.size(); i++) {
-      PyObject* pyObj_field = PyDict_New();
-      PyObject* pyObj_tmp =
-        PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].opcode));
-      if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].status));
-      if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp =
-        PyUnicode_DecodeUTF8(resp.fields[i].path.c_str(), resp.fields[i].path.length(), "strict");
-      if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      pyObj_tmp =
-        PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].original_index));
-      if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
-        Py_XDECREF(pyObj_fields);
-        Py_XDECREF(pyObj_field);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-      }
-      Py_DECREF(pyObj_tmp);
-
-      if (resp.fields[i].value.size()) {
-        try {
-          pyObj_tmp = binary_to_PyObject(resp.fields[i].value);
-        } catch (const std::exception& e) {
-          PyErr_SetString(PyExc_TypeError, e.what());
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
-          Py_XDECREF(pyObj_fields);
-          Py_XDECREF(pyObj_field);
-          Py_XDECREF(pyObj_tmp);
-          return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-      }
-      PyList_Append(pyObj_fields, pyObj_field);
-      Py_DECREF(pyObj_field);
-    }
-
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+  PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
+  for (int i = 0; i < resp.fields.size(); i++) {
+    PyObject* pyObj_field = PyDict_New();
+    PyObject* pyObj_tmp =
+      PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].opcode));
+    if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
       Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
       return nullptr;
     }
-    Py_DECREF(pyObj_fields);
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].status));
+    if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp =
+      PyUnicode_DecodeUTF8(resp.fields[i].path.c_str(), resp.fields[i].path.length(), "strict");
+    if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].original_index));
+    if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
+      Py_XDECREF(pyObj_fields);
+      Py_XDECREF(pyObj_field);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (resp.fields[i].value.size()) {
+      try {
+        pyObj_tmp = binary_to_PyObject(resp.fields[i].value);
+      } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
+        Py_XDECREF(pyObj_fields);
+        Py_XDECREF(pyObj_field);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+      }
+      Py_DECREF(pyObj_tmp);
+    }
+    PyList_Append(pyObj_fields, pyObj_field);
+    Py_DECREF(pyObj_field);
   }
+
+  if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_fields)) {
+    Py_XDECREF(pyObj_fields);
+    return nullptr;
+  }
+  Py_DECREF(pyObj_fields);
   return res;
 }
 
@@ -442,7 +433,6 @@ create_base_result_from_subdoc_op_response(const char* key, const T& resp)
 {
   PyObject* pyObj_result = create_result_obj();
   result* res = reinterpret_cast<result*>(pyObj_result);
-  res->ec = resp.ctx.ec();
   PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
   if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
     Py_XDECREF(pyObj_result);

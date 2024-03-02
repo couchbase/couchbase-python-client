@@ -32,12 +32,9 @@ from couchbase.diagnostics import (ClusterState,
                                    EndpointPingReport,
                                    EndpointState,
                                    ServiceType)
-from couchbase.exceptions import (CLIENT_ERROR_MAP,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  InvalidArgumentException)
+from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.pycbc_core import exception, result
+from couchbase.pycbc_core import result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
 
 
@@ -45,12 +42,7 @@ class Result:
     def __init__(
         self,
         orig,  # type: result
-        should_raise=True,  # type: bool
     ):
-        if should_raise and orig.err():
-            base = exception(orig)
-            klass = CLIENT_ERROR_MAP.get(orig.err(), CouchbaseException)
-            raise klass(base)
 
         self._orig = orig
 

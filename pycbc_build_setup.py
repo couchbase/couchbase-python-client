@@ -13,16 +13,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import os
 import platform
 import shutil
 import subprocess  # nosec
 import sys
+from dataclasses import dataclass, field
 from sysconfig import get_config_var
+from typing import (Dict,
+                    List,
+                    Optional)
 
-from setuptools import Extension
+from setuptools import Command, Extension
+
+# need at least setuptools v62.3.0
 from setuptools.command.build import build
 from setuptools.command.build_ext import build_ext
+from setuptools.errors import OptionError, SetupError
 
 CMAKE_EXE = os.environ.get('CMAKE_EXE', shutil.which('cmake'))
 PYCBC_ROOT = os.path.dirname(__file__)
@@ -98,11 +107,144 @@ def process_build_env_vars():  # noqa: C901
     os.environ['CMAKE_COMMON_VARIABLES'] = ' '.join(cmake_extra_args)
 
 
+@dataclass
+class CMakeConfig:
+    build_type: str
+    num_threads: int
+    set_cpm_cache: bool
+    env: Dict[str, str] = field(default_factory=dict)
+    config_args: List[str] = field(default_factory=list)
+
+    @classmethod
+    def create_cmake_config(cls,  # noqa: C901
+                            output_dir: str,
+                            source_dir: str,
+                            set_cpm_cache: Optional[bool] = None
+                            ) -> CMakeConfig:
+        env = os.environ.copy()
+        num_threads = env.pop('PYCBC_CMAKE_PARALLEL_THREADS', '4')
+        build_type = env.pop('PYCBC_BUILD_TYPE')
+        cmake_generator = env.pop('PYCBC_CMAKE_SET_GENERATOR', None)
+        cmake_arch = env.pop('PYCBC_CMAKE_SET_ARCH', None)
+        cmake_config_args = [CMAKE_EXE,
+                             source_dir,
+                             f'-DCMAKE_BUILD_TYPE={build_type}',
+                             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}',
+                             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
+
+        cmake_config_args.extend(
+            [x for x in
+                os.environ.get('CMAKE_COMMON_VARIABLES', '').split(' ')
+                if x])
+
+        python3_executable = env.pop('PYCBC_PYTHON3_EXECUTABLE', None)
+        if python3_executable:
+            cmake_config_args += [f'-DPython3_EXECUTABLE={python3_executable}']
+
+        python3_include = env.pop('PYCBC_PYTHON3_INCLUDE_DIR', None)
+        if python3_include:
+            cmake_config_args += [f'-DPython3_INCLUDE_DIR={python3_include}']
+
+        if set_cpm_cache is None:
+            set_cpm_cache = env.pop('PYCBC_SET_CPM_CACHE', 'false').lower() in ENV_TRUE
+        use_cpm_cache = env.pop('PYCBC_USE_CPM_CACHE', 'true').lower() in ENV_TRUE
+
+        if set_cpm_cache is True:
+            # if we are setting the cache, we don't want to attempt a build (it will fail).
+            use_cpm_cache = False
+            if os.path.exists(CXXCBC_CACHE_DIR):
+                shutil.rmtree(CXXCBC_CACHE_DIR)
+            cmake_config_args += [f'-DCOUCHBASE_CXX_CPM_CACHE_DIR={CXXCBC_CACHE_DIR}',
+                                  '-DCPM_DOWNLOAD_ALL=ON',
+                                  '-DCPM_USE_NAMED_CACHE_DIRECTORIES=ON',
+                                  '-DCPM_USE_LOCAL_PACKAGES=OFF']
+
+        if use_cpm_cache is True:
+            if not os.path.exists(CXXCBC_CACHE_DIR):
+                raise OptionError(f'Cannot use cached dependencies, path={CXXCBC_CACHE_DIR} does not exist.')
+            cmake_config_args += ['-DCPM_DOWNLOAD_ALL=OFF',
+                                  '-DCPM_USE_NAMED_CACHE_DIRECTORIES=ON',
+                                  '-DCPM_USE_LOCAL_PACKAGES=OFF',
+                                  f'-DCPM_SOURCE_CACHE={CXXCBC_CACHE_DIR}',
+                                  f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}"']
+
+        if platform.system() == "Windows":
+            cmake_config_args += [f'-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
+
+            if cmake_generator:
+                if cmake_generator.upper() == 'TRUE':
+                    cmake_config_args += ['-G', 'Visual Studio 16 2019']
+                else:
+                    cmake_config_args += ['-G', f'{cmake_generator}']
+
+            if cmake_arch:
+                if cmake_arch.upper() == 'TRUE':
+                    if sys.maxsize > 2 ** 32:
+                        cmake_config_args += ['-A', 'x64']
+                else:
+                    cmake_config_args += ['-A', f'{cmake_arch}']
+            # maybe??
+            # '-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE',
+
+        return CMakeConfig(build_type,
+                           num_threads,
+                           set_cpm_cache,
+                           env,
+                           cmake_config_args)
+
+
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
         check_for_cmake()
         Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
+
+
+class CMakeConfigureExt(Command):
+    description = 'Configure Python Operational SDK C Extension'
+    user_options = []
+
+    def initialize_options(self) -> None:
+        return
+
+    def finalize_options(self) -> None:
+        return
+
+    def run(self) -> None:
+        check_for_cmake()
+        process_build_env_vars()
+        build_ext = self.get_finalized_command('build_ext')
+        if len(self.distribution.ext_modules) != 1:
+            raise SetupError('Should have only the Python SDK extension module.')
+        ext = self.distribution.ext_modules[0]
+        output_dir = os.path.abspath(os.path.dirname(build_ext.get_ext_fullpath(ext.name)))
+        set_cpm_cache = os.environ.get('PYCBC_SET_CPM_CACHE', 'true').lower() in ENV_TRUE
+        cmake_config = CMakeConfig.create_cmake_config(output_dir, ext.sourcedir, set_cpm_cache=set_cpm_cache)
+        if not os.path.exists(build_ext.build_temp):
+            os.makedirs(build_ext.build_temp)
+        print(f'cmake config args: {cmake_config.config_args}')
+        # configure (i.e. cmake ..)
+        subprocess.check_call(cmake_config.config_args,  # nosec
+                              cwd=build_ext.build_temp,
+                              env=cmake_config.env)
+
+        self._clean_cache_cpm_dependencies()
+
+    def _clean_cache_cpm_dependencies(self):
+        import re
+        from fileinput import FileInput
+        from pathlib import Path
+
+        cxx_cache_path = Path(CXXCBC_CACHE_DIR)
+        cmake_cpm = next((p for p in cxx_cache_path.glob('cpm/*') if f'{p}'.endswith('.cmake')), None)
+        if cmake_cpm is not None:
+            with FileInput(files=[cmake_cpm], inplace=True) as cpm_cmake:
+                for line in cpm_cmake:
+                    # used so that we don't have a dependency on git w/in environment
+                    if 'find_package(Git REQUIRED)' in line:
+                        line = re.sub(r'Git REQUIRED', 'Git', line)
+                    # remove ending whitespace to avoid double spaced output
+                    print(line.rstrip())
 
 
 class CMakeBuildExt(build_ext):
@@ -117,100 +259,29 @@ class CMakeBuildExt(build_ext):
         check_for_cmake()
         process_build_env_vars()
         if isinstance(ext, CMakeExtension):
-            env = os.environ.copy()
-            output_dir = os.path.abspath(
-                os.path.dirname(self.get_ext_fullpath(ext.name)))
-
-            num_threads = env.pop('PYCBC_CMAKE_PARALLEL_THREADS', '4')
-            build_type = env.pop('PYCBC_BUILD_TYPE')
-            cmake_generator = env.pop('PYCBC_CMAKE_SET_GENERATOR', None)
-            cmake_arch = env.pop('PYCBC_CMAKE_SET_ARCH', None)
-
-            cmake_config_args = [CMAKE_EXE,
-                                 ext.sourcedir,
-                                 f'-DCMAKE_BUILD_TYPE={build_type}',
-                                 f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}',
-                                 f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
-
-            cmake_config_args.extend(
-                [x for x in
-                    os.environ.get('CMAKE_COMMON_VARIABLES', '').split(' ')
-                    if x])
-
-            python3_executable = env.pop('PYCBC_PYTHON3_EXECUTABLE', None)
-            if python3_executable:
-                cmake_config_args += [f'-DPython3_EXECUTABLE={python3_executable}']
-
-            python3_include = env.pop('PYCBC_PYTHON3_INCLUDE_DIR', None)
-            if python3_include:
-                cmake_config_args += [f'-DPython3_INCLUDE_DIR={python3_include}']
-
-            set_cpm_cache = env.pop('PYCBC_SET_CPM_CACHE', 'false').lower() in ENV_TRUE
-            use_cpm_cache = env.pop('PYCBC_USE_CPM_CACHE', 'true').lower() in ENV_TRUE
-
-            if set_cpm_cache is True:
-                # if we are setting the cache, we don't want to attempt a build (it will fail).
-                use_cpm_cache = False
-                if os.path.exists(CXXCBC_CACHE_DIR):
-                    shutil.rmtree(CXXCBC_CACHE_DIR)
-                cmake_config_args += [f'-DCOUCHBASE_CXX_CPM_CACHE_DIR={CXXCBC_CACHE_DIR}',
-                                      '-DCPM_DOWNLOAD_ALL=ON',
-                                      '-DCPM_USE_NAMED_CACHE_DIRECTORIES=ON',
-                                      '-DCPM_USE_LOCAL_PACKAGES=OFF']
-
-            if use_cpm_cache is True:
-                if not os.path.exists(CXXCBC_CACHE_DIR):
-                    raise Exception(f'Cannot use cached dependencies, path={CXXCBC_CACHE_DIR} does not exist.')
-                cmake_config_args += ['-DCPM_DOWNLOAD_ALL=OFF',
-                                      '-DCPM_USE_NAMED_CACHE_DIRECTORIES=ON',
-                                      '-DCPM_USE_LOCAL_PACKAGES=OFF',
-                                      f'-DCPM_SOURCE_CACHE={CXXCBC_CACHE_DIR}',
-                                      f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}"']
-
-            if platform.system() == "Windows":
-                cmake_config_args += [f'-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
-
-                if cmake_generator:
-                    if cmake_generator.upper() == 'TRUE':
-                        cmake_config_args += ['-G', 'Visual Studio 16 2019']
-                    else:
-                        cmake_config_args += ['-G', f'{cmake_generator}']
-
-                if cmake_arch:
-                    if cmake_arch.upper() == 'TRUE':
-                        if sys.maxsize > 2 ** 32:
-                            cmake_config_args += ['-A', 'x64']
-                    else:
-                        cmake_config_args += ['-A', f'{cmake_arch}']
-                # maybe??
-                # '-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE',
+            output_dir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
+            cmake_config = CMakeConfig.create_cmake_config(output_dir, ext.sourcedir)
 
             cmake_build_args = [CMAKE_EXE,
                                 '--build',
                                 '.',
                                 '--config',
-                                f'{build_type}',
+                                f'{cmake_config.build_type}',
                                 '--parallel',
-                                f'{num_threads}']
+                                f'{cmake_config.num_threads}']
 
             if not os.path.exists(self.build_temp):
                 os.makedirs(self.build_temp)
-            print(f'cmake config args: {cmake_config_args}')
+            print(f'cmake config args: {cmake_config.config_args}')
             # configure (i.e. cmake ..)
-            subprocess.check_call(cmake_config_args,  # nosec
+            subprocess.check_call(cmake_config.config_args,  # nosec
                                   cwd=self.build_temp,
-                                  env=env)
-
-            if set_cpm_cache is True:
-                self._clean_cache_cpm_dependencies()
-                # NOTE: since we are not building, this will create an error.  Okay, as attempting the
-                # build will fail anyway and we really just want to update the CXX cache.
-            else:
-                print(f'cmake build args: {cmake_build_args}')
-                # build (i.e. cmake --build .)
-                subprocess.check_call(cmake_build_args,  # nosec
-                                      cwd=self.build_temp,
-                                      env=env)
+                                  env=cmake_config.env)
+            print(f'cmake build args: {cmake_build_args}')
+            # build (i.e. cmake --build .)
+            subprocess.check_call(cmake_build_args,  # nosec
+                                  cwd=self.build_temp,
+                                  env=cmake_config.env)
 
         else:
             super().build_extension(ext)

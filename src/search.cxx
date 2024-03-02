@@ -490,7 +490,6 @@ create_result_from_search_response(couchbase::core::operations::search_response 
 {
   PyObject* pyObj_result = create_result_obj();
   result* res = reinterpret_cast<result*>(pyObj_result);
-  res->ec = resp.ctx.ec;
 
   PyObject* pyObj_payload = PyDict_New();
 

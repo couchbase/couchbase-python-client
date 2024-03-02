@@ -23,6 +23,7 @@ sys.path.append('.')
 import couchbase_version  # nopep8 # isort:skip # noqa: E402
 from pycbc_build_setup import (BuildCommand,  # nopep8 # isort:skip # noqa: E402
                                CMakeBuildExt,
+                               CMakeConfigureExt,
                                CMakeExtension)
 
 try:
@@ -44,7 +45,9 @@ print(f'Python SDK version: {PYCBC_VERSION}')
 setup(name='couchbase',
       version=PYCBC_VERSION,
       ext_modules=[CMakeExtension('couchbase.pycbc_core')],
-      cmdclass={'build': BuildCommand, 'build_ext': CMakeBuildExt},
+      cmdclass={'build': BuildCommand,
+                'build_ext': CMakeBuildExt,
+                'configure_ext': CMakeConfigureExt},
       python_requires='>=3.7',
       packages=find_packages(
           include=['acouchbase', 'couchbase', 'txcouchbase', 'couchbase.*', 'acouchbase.*', 'txcouchbase.*'],

@@ -78,6 +78,7 @@ _MGMT_TESTS = [
     "acouchbase/tests/bucketmgmt_t.py::BucketManagementTests",
     "acouchbase/tests/collectionmgmt_t.py::CollectionManagementTests",
     "acouchbase/tests/eventingmgmt_t.py::EventingManagementTests",
+    "acouchbase/tests/eventingmgmt_t.py::ScopeEventingManagementTests",
     "acouchbase/tests/querymgmt_t.py::QueryIndexManagementTests",
     "acouchbase/tests/querymgmt_t.py::QueryIndexCollectionManagementTests",
     "acouchbase/tests/searchmgmt_t.py::SearchIndexManagementTests",
@@ -88,6 +89,7 @@ _MGMT_TESTS = [
     "couchbase/tests/bucketmgmt_t.py::ClassicBucketManagementTests",
     "couchbase/tests/collectionmgmt_t.py::ClassicCollectionManagementTests",
     "couchbase/tests/eventingmgmt_t.py::ClassicEventingManagementTests",
+    "couchbase/tests/eventingmgmt_t.py::ClassicScopeEventingManagementTests",
     "couchbase/tests/querymgmt_t.py::ClassicQueryIndexManagementTests",
     "couchbase/tests/querymgmt_t.py::ClassicQueryIndexCollectionManagementTests",
     "couchbase/tests/searchmgmt_t.py::ClassicSearchIndexManagementTests",
@@ -97,7 +99,9 @@ _MGMT_TESTS = [
 
 _SLOW_MGMT_TESTS = [
     "acouchbase/tests/eventingmgmt_t.py::EventingManagementTests",
+    "acouchbase/tests/eventingmgmt_t.py::ScopeEventingManagementTests",
     "couchbase/tests/eventingmgmt_t.py::ClassicEventingManagementTests",
+    "couchbase/tests/eventingmgmt_t.py::ClassicScopeEventingManagementTests",
 ]
 
 _MISC_TESTS = [
