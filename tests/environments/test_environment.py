@@ -374,6 +374,10 @@ class TestEnvironment:
         return self
 
     def enable_scope_search_mgmt(self) -> TestEnvironment:
+        EnvironmentFeatures.check_if_feature_supported('scope_search_index_mgmt',
+                                                       self.server_version_short,
+                                                       self.mock_server_type)
+
         self._use_scope_search_mgmt = True
         return self
 

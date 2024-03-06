@@ -258,6 +258,8 @@ class TestEnvironment(CouchbaseTestEnvironment):
         return self
 
     def enable_scope_search_mgmt(self) -> TestEnvironment:
+        self.check_if_feature_supported('scope_search_index_mgmt')
+
         self._use_scope_search_mgmt = True
         return self
 
