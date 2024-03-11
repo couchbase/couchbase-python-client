@@ -55,7 +55,7 @@ pycbc_txns::dealloc_transactions(PyObject* obj)
 {
     auto txns = reinterpret_cast<pycbc_txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
     txns->txns->close();
-    delete txns->txns;
+    txns->txns.reset();
     CB_LOG_DEBUG("dealloc transactions");
 }
 
@@ -644,10 +644,19 @@ pycbc_txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args,
         Py_RETURN_NONE;
     }
 
-    pycbc_txns::transactions* txns;
-    Py_BEGIN_ALLOW_THREADS txns =
-      new pycbc_txns::transactions(pyObj_conn, *reinterpret_cast<pycbc_txns::transaction_config*>(pyObj_config)->cfg);
-    Py_END_ALLOW_THREADS PyObject* pyObj_txns = PyCapsule_New(txns, "txns_", dealloc_transactions);
+    std::pair<std::error_code, std::shared_ptr<tx_core::transactions>> res;
+    Py_BEGIN_ALLOW_THREADS auto conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
+    auto txn_config = reinterpret_cast<pycbc_txns::transaction_config*>(pyObj_config)->cfg;
+    std::future<std::pair<std::error_code, std::shared_ptr<tx_core::transactions>>> fut =
+      tx_core::transactions::create(conn->cluster_, *txn_config);
+    res = fut.get();
+    Py_END_ALLOW_THREADS if (res.first.value())
+    {
+        pycbc_set_python_exception(res.first, __FILE__, __LINE__, res.first.message().c_str());
+        return nullptr;
+    }
+    pycbc_txns::transactions* txns = new pycbc_txns::transactions(res.second);
+    PyObject* pyObj_txns = PyCapsule_New(txns, "txns_", dealloc_transactions);
     return pyObj_txns;
 }
 

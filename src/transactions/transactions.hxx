@@ -18,6 +18,7 @@
 #pragma once
 
 #include "../client.hxx"
+#include "../exceptions.hxx"
 #include <core/transactions.hxx>
 #include <core/operations/document_query.hxx>
 
@@ -100,13 +101,11 @@ static PyObject*
 transaction_options__str__(PyObject*);
 
 struct transactions {
-    tx_core::transactions* txns;
+    std::shared_ptr<tx_core::transactions> txns;
 
-    explicit transactions(PyObject* pyObj_conn, const tx::transactions_config& cfg)
-      : txns(nullptr)
+    explicit transactions(std::shared_ptr<tx_core::transactions> transactions)
+      : txns(std::move(transactions))
     {
-        connection* c = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
-        txns = new tx_core::transactions(c->cluster_, cfg);
     }
 };
 

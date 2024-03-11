@@ -534,11 +534,15 @@ class TestEnvironment:
             TestEnvironment.try_n_times(5, 3, self.setup_named_collections)
 
         if test_suite:
+            suite_name = test_suite.split('.')[-1]
             TestEnvironment.try_n_times(5,
                                         3,
                                         self.load_data,
                                         num_docs=num_docs,
-                                        test_suite=test_suite.split('.')[-1])
+                                        test_suite=suite_name)
+            if suite_name == 'transactions_t':
+                self.setup_transactions_query()
+
         else:
             TestEnvironment.try_n_times(5, 3, self.load_data, num_docs=num_docs)
 
@@ -572,14 +576,53 @@ class TestEnvironment:
         self._named_scope = self.bucket.scope(self.TEST_SCOPE)
         self._named_collection = self._named_scope.collection(self.TEST_COLLECTION)
 
+    # TODO:  move to a new evironment??
+    def setup_transactions_query(self):
+        def _check_row_count(query_namespace,  # type: str
+                             min_count  # type: int
+                             ) -> bool:
+            result = self.cluster.query(f"SELECT id FROM {query_namespace};")
+            count = 0
+            for _ in result.rows():
+                count += 1
+            return count >= min_count
+
+        self.enable_query_mgmt()
+        fqdn = self.bucket.name
+        if self._use_named_collections:
+            self.qixm.create_primary_index(self.bucket.name,
+                                           scope_name=self.TEST_SCOPE,
+                                           collection_name=self.TEST_COLLECTION)
+            fqdn = f'`{fqdn}`.`{self.TEST_SCOPE}`.`{self.TEST_COLLECTION}`'
+        else:
+            self.qixm.create_primary_index(self.bucket.name)
+
+        for _ in range(5):
+            row_count_good = _check_row_count(fqdn, 20)
+
+            if row_count_good:
+                break
+            print('Waiting for index to load, sleeping a bit...')
+            TestEnvironment.sleep(5)
+
     def teardown(self,
                  collection_type=None,  # type: Optional[CollectionType]
+                 test_suite=None,  # type: Optional[str]
                  ):
 
         if collection_type is None:
             collection_type = CollectionType.DEFAULT
 
         TestEnvironment.try_n_times(5, 3, self.purge_data)
+
+        if test_suite and test_suite.split('.')[-1] == 'transactions_t':
+            if self._use_named_collections:
+                self.qixm.drop_primary_index(self.bucket.name,
+                                             scope_name=self.TEST_SCOPE,
+                                             collection_name=self.TEST_COLLECTION)
+            else:
+                self.qixm.drop_primary_index(self.bucket.name)
+            self.disable_query_mgmt()
 
         if collection_type == CollectionType.NAMED:
             TestEnvironment.try_n_times(5, 3, self.teardown_named_collections)
@@ -801,11 +844,14 @@ class AsyncTestEnvironment(TestEnvironment):
             await AsyncTestEnvironment.try_n_times(5, 3, self.setup_named_collections)
 
         if test_suite:
+            suite_name = test_suite.split('.')[-1]
             await AsyncTestEnvironment.try_n_times(5,
                                                    3,
                                                    self.load_data,
                                                    num_docs=num_docs,
-                                                   test_suite=test_suite.split('.')[-1])
+                                                   test_suite=suite_name)
+            if suite_name == 'transactions_t':
+                await self.setup_transactions_query()
         else:
             await AsyncTestEnvironment.try_n_times(5, 3, self.load_data, num_docs=num_docs)
 
@@ -847,14 +893,53 @@ class AsyncTestEnvironment(TestEnvironment):
         self._named_scope = self.bucket.scope(self.TEST_SCOPE)
         self._named_collection = self._named_scope.collection(self.TEST_COLLECTION)
 
+    # TODO:  move to a new evironment??
+    async def setup_transactions_query(self):
+        async def _check_row_count(query_namespace,  # type: str
+                                   min_count  # type: int
+                                   ) -> bool:
+            result = self.cluster.query(f"SELECT id FROM {query_namespace};")
+            count = 0
+            async for _ in result.rows():
+                count += 1
+            return count >= min_count
+
+        self.enable_query_mgmt()
+        fqdn = self.bucket.name
+        if self._use_named_collections:
+            await self.qixm.create_primary_index(self.bucket.name,
+                                                 scope_name=self.TEST_SCOPE,
+                                                 collection_name=self.TEST_COLLECTION)
+            fqdn = f'`{fqdn}`.`{self.TEST_SCOPE}`.`{self.TEST_COLLECTION}`'
+        else:
+            await self.qixm.create_primary_index(self.bucket.name)
+
+        for _ in range(5):
+            row_count_good = await _check_row_count(fqdn, 20)
+
+            if row_count_good:
+                break
+            print('Waiting for index to load, sleeping a bit...')
+            await TestEnvironment.sleep(5)
+
     async def teardown(self,
                        collection_type=None,  # type: Optional[CollectionType]
+                       test_suite=None,  # type: Optional[str]
                        ):
 
         if collection_type is None:
             collection_type = CollectionType.DEFAULT
 
         await AsyncTestEnvironment.try_n_times(5, 3, self.purge_data)
+
+        if test_suite and test_suite.split('.')[-1] == 'transactions_t':
+            if self._use_named_collections:
+                await self.qixm.drop_primary_index(self.bucket.name,
+                                                   scope_name=self.TEST_SCOPE,
+                                                   collection_name=self.TEST_COLLECTION)
+            else:
+                await self.qixm.drop_primary_index(self.bucket.name)
+            self.disable_query_mgmt()
 
         if collection_type == CollectionType.NAMED:
             await AsyncTestEnvironment.try_n_times(5, 3, self.teardown_named_collections)

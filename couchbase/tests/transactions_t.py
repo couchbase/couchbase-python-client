@@ -19,7 +19,8 @@ from datetime import timedelta
 import pytest
 
 from couchbase.durability import DurabilityLevel, ServerDurability
-from couchbase.exceptions import (DocumentExistsException,
+from couchbase.exceptions import (BucketNotFoundException,
+                                  DocumentExistsException,
                                   DocumentNotFoundException,
                                   ParsingFailedException,
                                   TransactionExpired,
@@ -52,6 +53,7 @@ class TransactionTestSuite:
         'test_insert_inner_exc_doc_exists',
         'test_max_parallelism',
         'test_metadata_collection',
+        'test_metadata_collection_not_found',
         'test_metrics',
         'test_named_params',
         'test_per_txn_config',
@@ -62,6 +64,8 @@ class TransactionTestSuite:
         'test_query',
         'test_query_lambda_raises_parsing_failure',
         'test_query_inner_exc_parsing_failure',
+        'test_query_mode_insert',
+        'test_query_mode_remove',
         'test_raw',
         'test_read_only',
         'test_remove',
@@ -264,6 +268,29 @@ class TransactionTestSuite:
         assert cfg_coll is not None
         assert cfg_coll == f'{coll._scope.bucket_name}.{coll._scope.name}.{coll.name}'
 
+    # creating a new connection, allow retries
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_metadata_collection_not_found(self, cb_env):
+        from couchbase.auth import PasswordAuthenticator
+        from couchbase.cluster import Cluster
+        from couchbase.options import ClusterOptions
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        metadata = TransactionKeyspace(bucket='no-bucket', scope='_default', collection='_default')
+        cluster = Cluster.connect(f'{conn_string}',
+                                  ClusterOptions(auth,
+                                                 transaction_config=TransactionConfig(metadata_collection=metadata)))
+        collection = cluster.bucket(cb_env.bucket.name).default_collection()
+
+        def txn_logic(ctx):
+            # key should not matter as we should fail when creating the
+            # transactions object and not actually get to this point
+            ctx.get(collection, 'test-key')
+
+        with pytest.raises(BucketNotFoundException):
+            cluster.transactions.run(txn_logic)
+
     @pytest.mark.parametrize('metrics', [True, False])
     def test_metrics(self, metrics):
         cfg = TransactionQueryOptions(metrics=metrics)
@@ -383,6 +410,46 @@ class TransactionTestSuite:
             pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
 
         assert num_attempts == 1
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_mode_insert(self, cb_env):
+        coll = cb_env.collection
+        key, value = cb_env.get_new_doc()
+        key1, value1 = cb_env.get_new_doc()
+        coll.insert(key, value)
+
+        def txn_logic(ctx):
+            fdqn = f"`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
+            statement = f'SELECT * FROM {fdqn} WHERE META().id IN $1 ORDER BY META().id ASC'
+            res = ctx.query(statement, TransactionQueryOptions(positional_parameters=[[key]]))
+            assert len(res.rows()) == 1
+            assert res.rows()[0].get(f'{coll.name}', {}).get('id') == value.get('id')
+            ctx.insert(coll, key1, value1)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        get_res = coll.get(key1)
+        assert get_res is not None
+        assert get_res.content_as[dict] == value1
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_mode_remove(self, cb_env):
+        coll = cb_env.collection
+        key, value = cb_env.get_new_doc()
+        key1, value1 = cb_env.get_new_doc()
+        coll.insert(key, value)
+
+        def txn_logic(ctx):
+            ctx.insert(coll, key1, value1)
+            fdqn = f"`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
+            statement = f'SELECT * FROM {fdqn} WHERE META().id IN $1 ORDER BY META().id ASC'
+            res = ctx.query(statement, TransactionQueryOptions(positional_parameters=[[key, key1]]))
+            assert len(res.rows()) == 2
+            getRes = ctx.get(coll, key)
+            ctx.remove(getRes)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        with pytest.raises(DocumentNotFoundException):
+            coll.get(key)
 
     @pytest.mark.parametrize('raw', [{'key1': 'yo'}, {'key1': 5, 'key2': 'foo'}, {'key': [1, 2, 3]}])
     def test_raw(self, raw):
@@ -604,6 +671,6 @@ class ClassicTransactionTests(TransactionTestSuite):
                                                        cb_base_txn_env.server_version_short,
                                                        cb_base_txn_env.mock_server_type)
 
-        cb_base_txn_env.setup(request.param)
+        cb_base_txn_env.setup(request.param, __name__)
         yield cb_base_txn_env
-        cb_base_txn_env.teardown(request.param)
+        cb_base_txn_env.teardown(request.param, __name__)

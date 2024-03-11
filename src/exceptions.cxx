@@ -332,6 +332,8 @@ PycbcErrorCategory::message(int ec) const
     switch (static_cast<PycbcError>(ec)) {
         case PycbcError::InvalidArgument:
             return "Invalid argument";
+        case PycbcError::BucketNotFound:
+            return "Bucket not found";
         case PycbcError::HTTPError:
             return "HTTP Error";
         case PycbcError::UnsuccessfulOperation:
@@ -361,6 +363,8 @@ get_pycbc_exception_class(PyObject* pyObj_exc_module, std::error_code ec)
     switch (static_cast<PycbcError>(ec.value())) {
         case PycbcError::InvalidArgument:
             return PyObject_GetAttrString(pyObj_exc_module, "InvalidArgumentException");
+        case PycbcError::BucketNotFound:
+            return PyObject_GetAttrString(pyObj_exc_module, "BucketNotFoundException");
         case PycbcError::HTTPError:
             return PyObject_GetAttrString(pyObj_exc_module, "HTTPException");
         case PycbcError::UnsuccessfulOperation:
