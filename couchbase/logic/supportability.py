@@ -74,6 +74,20 @@ class Supportability:
         warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
 
     @staticmethod
+    def method_deprecated(method,  # type: str
+                          use_instead  # type: str
+                          ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the provided method is deprecated.
+
+        Args:
+            method (str): The name of the deprecated method
+            use_instead (str): The name of the method to use instead of the deprecated method.
+        """
+        message = (f"Method {method} is deprecated and will be removed in a future release. "
+                   f"Use {use_instead} instead.")
+        warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
+
+    @staticmethod
     def method_param_deprecated(param,  # type: str
                                 use_instead  # type: str
                                 ) -> None:

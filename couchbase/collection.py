@@ -47,6 +47,7 @@ from couchbase.options import (AppendMultiOptions,
                                DecrementMultiOptions,
                                ExistsMultiOptions,
                                GetAllReplicasMultiOptions,
+                               GetAndLockMultiOptions,
                                GetAnyReplicaMultiOptions,
                                GetMultiOptions,
                                IncrementMultiOptions,
@@ -1175,7 +1176,9 @@ class Collection(CollectionLogic):
              ) -> ScanResultIterable:
         """Execute a key-value range scan operation from the collection.
 
-        **VOLATILE** This API is subject to change at any time.
+        .. note::
+            Use this API for low concurrency batch queries where latency is not a critical as the system may have to scan a lot of documents to find the matching documents.
+            For low latency range queries, it is recommended that you use SQL++ with the necessary indexes.
 
         Args:
             scan_type (:class:`~couchbase.kv_range_scan.ScanType`): Either a :class:`~couchbase.kv_range_scan.RangeScan`,
@@ -1934,12 +1937,11 @@ class Collection(CollectionLogic):
         return_exceptions = final_args.pop('return_exceptions', True)
         return op_args, return_exceptions, key_transcoders
 
-    def get_multi(
-        self,
-        keys,  # type: List[str]
-        *opts,  # type: GetMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiGetResult:
+    def get_multi(self,
+                  keys,  # type: List[str]
+                  *opts,  # type: GetMultiOptions
+                  **kwargs,  # type: Dict[str, Any]
+                  ) -> MultiGetResult:
         """For each key in the provided list, retrieve the document associated with the key.
 
         .. note::
@@ -2024,12 +2026,11 @@ class Collection(CollectionLogic):
 
         return MultiGetResult(res, return_exceptions)
 
-    def get_any_replica_multi(
-        self,
-        keys,  # type: List[str]
-        *opts,  # type: GetAnyReplicaMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiGetReplicaResult:
+    def get_any_replica_multi(self,
+                              keys,  # type: List[str]
+                              *opts,  # type: GetAnyReplicaMultiOptions
+                              **kwargs,  # type: Dict[str, Any]
+                              ) -> MultiGetReplicaResult:
         """For each key in the provided list, retrieve the document associated with the key from the collection
         leveraging both active and all available replicas returning the first available.
 
@@ -2123,12 +2124,11 @@ class Collection(CollectionLogic):
 
         return MultiGetReplicaResult(res, return_exceptions)
 
-    def get_all_replicas_multi(
-        self,
-        keys,  # type: List[str]
-        *opts,  # type: GetAllReplicasMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiGetReplicaResult:
+    def get_all_replicas_multi(self,
+                               keys,  # type: List[str]
+                               *opts,  # type: GetAllReplicasMultiOptions
+                               **kwargs,  # type: Dict[str, Any]
+                               ) -> MultiGetReplicaResult:
         """For each key in the provided list, retrieve the document from the collection returning both
         active and all available replicas.
 
@@ -2230,13 +2230,26 @@ class Collection(CollectionLogic):
 
         return MultiGetReplicaResult(res, return_exceptions)
 
-    def lock_multi(
-        self,
-        keys,  # type: List[str]
-        lock_time,  # type: timedelta
-        *opts,  # type: LockMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiGetResult:
+    def lock_multi(self,
+                   keys,  # type: List[str]
+                   lock_time,  # type: timedelta
+                   *opts,  # type: LockMultiOptions
+                   **kwargs,  # type: Dict[str, Any]
+                   ) -> MultiGetResult:
+        """
+        .. warning::
+            This method is deprecated and will be deprecated in a future release.
+            Use :meth:`~couchbase.collection.Collection.get_and_lock_multi` instead.
+        """
+        Supportability.method_deprecated('lock_multi', 'get_and_lock_multi')
+        return self.get_and_lock_multi(keys, lock_time, *opts, **kwargs)
+
+    def get_and_lock_multi(self,
+                           keys,  # type; List[str]
+                           lock_time,  # type: timedelta
+                           *opts,  # type: GetAndLockMultiOptions
+                           **kwargs,  # type: Dict[str, Any]
+                           ) -> MultiGetResult:
         """For each key in the provided list, lock the document associated with the key.
 
         .. note::
@@ -2246,9 +2259,9 @@ class Collection(CollectionLogic):
         Args:
             keys (List[str]): The keys to use for the multiple lock operations.
             lock_time (timedelta):  The amount of time to lock the documents.
-            opts (:class:`~couchbase.options.LockMultiOptions`): Optional parameters for this operation.
+            opts (:class:`~couchbase.options.GetAndLockMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.LockMultiOptions`
+                override provided :class:`~couchbase.options.GetAndLockMultiOptions`
 
         Returns:
             :class:`~couchbase.result.MultiGetResult`: An instance of
@@ -2258,6 +2271,47 @@ class Collection(CollectionLogic):
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
                 server and the return_exceptions options is False.  Otherwise the exception is returned as a
                 match to the key, but is not raised.
+
+        Examples:
+
+            Simple get_and_lock_multi operation::
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_and_lock_multi(keys, timedelta(seconds=20))
+                for k, v in res.results.items():
+                    print(f'Locked document: key={k}, content={v.content_as[str]}')
+
+            Simple get_and_lock_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import GetAndLockMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_and_lock_multi(keys,
+                                                     timedelta(seconds=20),
+                                                     GetAndLockMultiOptions(return_exceptions=False))
+                for k, v in res.results.items():
+                    print(f'Locked document: key={k}, content={v.content_as[str]}')
+
+            Simple get_and_lock_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import GetAndLockMultiOptions, GetAndLockOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                per_key_opts = {'doc1': GetAndLockOptions(timeout=timedelta(seconds=10))}
+                res = collection.get_and_lock_multi(keys,
+                                                     timedelta(seconds=20),
+                                                     GetAndLockMultiOptions(per_key_options=per_key_opts))
+                for k, v in res.results.items():
+                    print(f'Locked document: key={k}, content={v.content_as[str]}')
 
         """
         kwargs["lock_time"] = lock_time
@@ -2283,12 +2337,11 @@ class Collection(CollectionLogic):
 
         return MultiGetResult(res, return_exceptions)
 
-    def exists_multi(
-        self,
-        keys,  # type: List[str]
-        *opts,  # type: ExistsMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiExistsResult:
+    def exists_multi(self,
+                     keys,  # type: List[str]
+                     *opts,  # type: ExistsMultiOptions
+                     **kwargs,  # type: Dict[str, Any]
+                     ) -> MultiExistsResult:
         """For each key in the provided list, check if the document associated with the key exists.
 
         .. note::
@@ -2297,16 +2350,52 @@ class Collection(CollectionLogic):
 
         Args:
             keys (List[str]): The keys to use for the multiple exists operations.
-            lock_time (timedelta):  The amount of time to lock the documents.
             opts (:class:`~couchbase.options.ExistsMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiExistsResult`: An instance of
-            :class:`~couchbase.result.MultiExistsResult`.
+            :class:`~couchbase.result.MultiExistsResult`: An instance of :class:`~couchbase.result.MultiExistsResult`.
 
-        """
+        Examples:
+
+            Simple exists_multi operation::
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.exists_multi(keys)
+                for k, v in res.results.items():
+                    print(f'Doc with key={k} {"exists" if v.exists else "does not exist"}')
+
+            Simple exists_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import ExistsMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.exists_multi(keys,
+                                              ExistsMultiOptions(return_exceptions=False))
+                for k, v in res.results.items():
+                    print(f'Doc with key={k} {"exists" if v.exists else "does not exist"}')
+
+            Simple exists_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import ExistsMultiOptions, ExistsOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                per_key_opts = {'doc1': ExistsOptions(timeout=timedelta(seconds=10))}
+                res = collection.exists_multi(keys,
+                                              ExistsMultiOptions(per_key_options=per_key_opts))
+                for k, v in res.results.items():
+                    print(f'Doc with key={k} {"exists" if v.exists else "does not exist"}')
+        """  # noqa: E501
         op_args, return_exceptions, _ = self._get_multi_op_args(keys,
                                                                 *opts,
                                                                 opts_type=ExistsMultiOptions,
@@ -2319,12 +2408,11 @@ class Collection(CollectionLogic):
         )
         return MultiExistsResult(res, return_exceptions)
 
-    def insert_multi(
-        self,
-        keys_and_docs,  # type: Dict[str, JSONType]
-        *opts,  # type: InsertMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiMutationResult:
+    def insert_multi(self,
+                     keys_and_docs,  # type: Dict[str, JSONType]
+                     *opts,  # type: InsertMultiOptions
+                     **kwargs,  # type: Dict[str, Any]
+                     ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, inserts a new document to the collection,
         failing if the document already exists.
 
@@ -2339,15 +2427,68 @@ class Collection(CollectionLogic):
                 override provided :class:`~couchbase.options.InsertMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of
-            :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentExistsException`: If the key provided already exists on the
                 server and the return_exceptions options is False.  Otherwise the exception is returned as a
                 match to the key, but is not raised.
 
-        """
+        Examples:
+
+            Simple insert_multi operation::
+
+                collection = bucket.default_collection()
+                keys_and_docs = {
+                    'doc1': {'foo': 'bar', 'id': 'doc1'},
+                    'doc2': {'bar': 'baz', 'id': 'doc2'},
+                    'doc3': {'baz': 'qux', 'id': 'doc3'},
+                    'doc4': {'qux': 'quux', 'id': 'doc4'}
+                }
+                res = collection.insert_multi(keys_and_docs)
+                for k, v in res.results.items():
+                    print(f'Doc inserted: key={k}, cas={v.cas}')
+
+            Simple insert_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import InsertMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys_and_docs = {
+                    'doc1': {'foo': 'bar', 'id': 'doc1'},
+                    'doc2': {'bar': 'baz', 'id': 'doc2'},
+                    'doc3': {'baz': 'qux', 'id': 'doc3'},
+                    'doc4': {'qux': 'quux', 'id': 'doc4'}
+                }
+                res = collection.insert_multi(keys_and_docs,
+                                              InsertMultiOptions(return_exceptions=False))
+                for k, v in res.results.items():
+                    print(f'Doc inserted: key={k}, cas={v.cas}')
+
+            Simple insert_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import InsertMultiOptions, InsertOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys_and_docs = {
+                    'doc1': {'foo': 'bar', 'id': 'doc1'},
+                    'doc2': {'bar': 'baz', 'id': 'doc2'},
+                    'doc3': {'baz': 'qux', 'id': 'doc3'},
+                    'doc4': {'qux': 'quux', 'id': 'doc4'}
+                }
+                per_key_opts = {'doc1': InsertOptions(timeout=timedelta(seconds=10))}
+                res = collection.insert_multi(keys_and_docs,
+                                              InsertMultiOptions(per_key_options=per_key_opts))
+                for k, v in res.results.items():
+                    print(f'Doc inserted: key={k}, cas={v.cas}')
+
+        """  # noqa: E501
         op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
                                                                                  *opts,
                                                                                  opts_type=InsertMultiOptions,
@@ -2360,12 +2501,11 @@ class Collection(CollectionLogic):
         )
         return MultiMutationResult(res, return_exceptions)
 
-    def upsert_multi(
-        self,
-        keys_and_docs,  # type: Dict[str, JSONType]
-        *opts,  # type: UpsertMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiMutationResult:
+    def upsert_multi(self,
+                     keys_and_docs,  # type: Dict[str, JSONType]
+                     *opts,  # type: UpsertMultiOptions
+                     **kwargs,  # type: Dict[str, Any]
+                     ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, upserts a document to the collection. This operation
         succeeds whether or not the document already exists.
 
@@ -2380,10 +2520,63 @@ class Collection(CollectionLogic):
                 override provided :class:`~couchbase.options.UpsertMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of
-            :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
 
-        """
+        Examples:
+
+            Simple upsert_multi operation::
+
+                collection = bucket.default_collection()
+                keys_and_docs = {
+                    'doc1': {'foo': 'bar', 'id': 'doc1'},
+                    'doc2': {'bar': 'baz', 'id': 'doc2'},
+                    'doc3': {'baz': 'qux', 'id': 'doc3'},
+                    'doc4': {'qux': 'quux', 'id': 'doc4'}
+                }
+                res = collection.upsert_multi(keys_and_docs)
+                for k, v in res.results.items():
+                    print(f'Doc upserted: key={k}, cas={v.cas}')
+
+            Simple upsert_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import UpsertMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys_and_docs = {
+                    'doc1': {'foo': 'bar', 'id': 'doc1'},
+                    'doc2': {'bar': 'baz', 'id': 'doc2'},
+                    'doc3': {'baz': 'qux', 'id': 'doc3'},
+                    'doc4': {'qux': 'quux', 'id': 'doc4'}
+                }
+                res = collection.upsert_multi(keys_and_docs,
+                                              UpsertMultiOptions(return_exceptions=False))
+                for k, v in res.results.items():
+                    print(f'Doc upserted: key={k}, cas={v.cas}')
+
+            Simple upsert_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import UpsertMultiOptions, UpsertOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys_and_docs = {
+                    'doc1': {'foo': 'bar', 'id': 'doc1'},
+                    'doc2': {'bar': 'baz', 'id': 'doc2'},
+                    'doc3': {'baz': 'qux', 'id': 'doc3'},
+                    'doc4': {'qux': 'quux', 'id': 'doc4'}
+                }
+                per_key_opts = {'doc1': UpsertOptions(timeout=timedelta(seconds=10))}
+                res = collection.upsert_multi(keys_and_docs,
+                                              UpsertMultiOptions(per_key_options=per_key_opts))
+                for k, v in res.results.items():
+                    print(f'Doc upserted: key={k}, cas={v.cas}')
+
+        """  # noqa: E501
         op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
                                                                                  *opts,
                                                                                  opts_type=UpsertMultiOptions,
@@ -2396,12 +2589,11 @@ class Collection(CollectionLogic):
         )
         return MultiMutationResult(res, return_exceptions)
 
-    def replace_multi(
-        self,
-        keys_and_docs,  # type: Dict[str, JSONType]
-        *opts,  # type: ReplaceMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiMutationResult:
+    def replace_multi(self,
+                      keys_and_docs,  # type: Dict[str, JSONType]
+                      *opts,  # type: ReplaceMultiOptions
+                      **kwargs,  # type: Dict[str, Any]
+                      ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, replaces the value of a document in the collection.
         This operation fails if the document does not exist.
 
@@ -2416,15 +2608,74 @@ class Collection(CollectionLogic):
                 override provided :class:`~couchbase.options.ReplaceMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of
-            :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
                 server and the return_exceptions options is False.  Otherwise the exception is returned as a
                 match to the key, but is not raised.
 
-        """
+        Examples:
+
+            Simple replace_multi operation::
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_multi(keys)
+                keys_and_docs = {}
+                for k, v in res.results.items():
+                    # assuming document is JSON
+                    content = v.content_as[dict]
+                    content['foo'] = 'bar'
+                    keys_and_docs[k] = content
+                res = collection.replace_multi(keys_and_docs)
+                for k, v in res.results.items():
+                    print(f'Doc replaced: key={k}, cas={v.cas}')
+
+            Simple replace_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import ReplaceMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_multi(keys)
+                keys_and_docs = {}
+                for k, v in res.results.items():
+                    # assuming document is JSON
+                    content = v.content_as[dict]
+                    content['foo'] = 'bar'
+                    keys_and_docs[k] = content
+                res = collection.replace_multi(keys_and_docs,
+                                               ReplaceMultiOptions(return_exceptions=False))
+                for k, v in res.results.items():
+                    print(f'Doc replaced: key={k}, cas={v.cas}')
+
+            Simple replace_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import ReplaceMultiOptions, ReplaceOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_multi(keys)
+                keys_and_docs = {}
+                for k, v in res.results.items():
+                    # assuming document is JSON
+                    content = v.content_as[dict]
+                    content['foo'] = 'bar'
+                    keys_and_docs[k] = content
+                per_key_opts = {'doc1': ReplaceOptions(timeout=timedelta(seconds=10))}
+                res = collection.replace_multi(keys_and_docs,
+                                               ReplaceMultiOptions(per_key_options=per_key_opts))
+                for k, v in res.results.items():
+                    print(f'Doc replaced: key={k}, cas={v.cas}')
+
+        """  # noqa: E501
         op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
                                                                                  *opts,
                                                                                  opts_type=ReplaceMultiOptions,
@@ -2437,12 +2688,11 @@ class Collection(CollectionLogic):
         )
         return MultiMutationResult(res, return_exceptions)
 
-    def remove_multi(
-        self,
-        keys,  # type: List[str]
-        *opts,  # type: RemoveMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiMutationResult:
+    def remove_multi(self,
+                     keys,  # type: List[str]
+                     *opts,  # type: RemoveMultiOptions
+                     **kwargs,  # type: Dict[str, Any]
+                     ) -> MultiMutationResult:
         """For each key in the provided list, remove the existing document.  This operation fails
         if the document does not exist.
 
@@ -2457,15 +2707,47 @@ class Collection(CollectionLogic):
                 override provided :class:`~couchbase.options.RemoveMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of
-            :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
                 server and the return_exceptions options is False.  Otherwise the exception is returned as a
                 match to the key, but is not raised.
 
-        """
+        Examples:
+
+            Simple remove_multi operation::
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.remove_multi(keys)
+
+            Simple remove_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import RemoveMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.remove_multi(keys,
+                                              RemoveMultiOptions(return_exceptions=False))
+
+            Simple remove_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import RemoveMultiOptions, RemoveOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                per_key_opts = {'doc1': RemoveOptions(timeout=timedelta(seconds=10))}
+                res = collection.remove_multi(keys,
+                                              RemoveMultiOptions(per_key_options=per_key_opts))
+
+        """  # noqa: E501
         op_args, return_exceptions, _ = self._get_multi_op_args(keys,
                                                                 *opts,
                                                                 opts_type=RemoveMultiOptions,
@@ -2478,13 +2760,12 @@ class Collection(CollectionLogic):
         )
         return MultiMutationResult(res, return_exceptions)
 
-    def touch_multi(
-        self,
-        keys,  # type: List[str]
-        expiry,  # type: timedelta
-        *opts,  # type: TouchMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiMutationResult:
+    def touch_multi(self,
+                    keys,  # type: List[str]
+                    expiry,  # type: timedelta
+                    *opts,  # type: TouchMultiOptions
+                    **kwargs,  # type: Dict[str, Any]
+                    ) -> MultiMutationResult:
         """For each key in the provided list, update the expiry on an existing document. This operation fails
         if the document does not exist.
 
@@ -2522,12 +2803,11 @@ class Collection(CollectionLogic):
         )
         return MultiMutationResult(res, return_exceptions)
 
-    def unlock_multi(  # noqa: C901
-        self,
-        keys,  # type: Union[MultiResultType, Dict[str, int]]
-        *opts,  # type: UnlockMultiOptions
-        **kwargs,  # type: Any
-    ) -> Dict[str, Union[None, CouchbaseBaseException]]:
+    def unlock_multi(self,  # noqa: C901
+                     keys,  # type: Union[MultiResultType, Dict[str, int]]
+                     *opts,  # type: UnlockMultiOptions
+                     **kwargs,  # type: Dict[str, Any]
+                     ) -> Dict[str, Union[None, CouchbaseBaseException]]:
         """For each result in the provided :class:`~couchbase.result.MultiResultType` in the provided list,
         unlocks a previously locked document. This operation fails if the document does not exist.
 

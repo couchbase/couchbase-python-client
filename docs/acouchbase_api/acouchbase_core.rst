@@ -97,6 +97,7 @@ Collection
     .. automethod:: touch
     .. automethod:: unlock
     .. automethod:: upsert
+    .. automethod:: scan
     .. automethod:: binary
     .. automethod:: couchbase_list
     .. automethod:: couchbase_map

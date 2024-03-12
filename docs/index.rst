@@ -31,6 +31,9 @@ Synchronous API
 :doc:`couchbase_api/couchbase_transactions`
    API reference for Distributed ACID transactions with the Python SDK.
 
+:doc:`couchbase_api/couchbase_rangescan`
+   API reference for range scan operations.
+
 :doc:`couchbase_api/couchbase_diagnostics`
    API reference for diagnostic operations.
 
@@ -103,6 +106,7 @@ Indices and tables
    couchbase_api/couchbase_n1ql
    couchbase_api/couchbase_management
    couchbase_api/couchbase_search
+   couchbase_api/couchbase_rangescan
    couchbase_api/couchbase_transactions
    couchbase_api/couchbase_views
 

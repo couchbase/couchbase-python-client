@@ -657,8 +657,6 @@ class UpsertOptions(UpsertOptionsBase):
 class ScanOptions(ScanOptionsBase):
     """Available options to for a key-value scan operation.
 
-    **VOLATILE** This API is subject to change at any time.
-
     .. warning::
         Importing options from ``couchbase.collection`` is deprecated.
         All options should be imported from ``couchbase.options``.
@@ -1159,7 +1157,7 @@ class TouchMultiOptions(dict):
         return ['timeout', 'expiry', 'per_key_options', 'return_exceptions']
 
 
-class LockMultiOptions(dict):
+class GetAndLockMultiOptions(dict):
     """Available options to for a key-value multi-lock operation.
 
     Options can be set at a global level (i.e. for all lock operations handled with this multi-lock operation).
@@ -1190,6 +1188,9 @@ class LockMultiOptions(dict):
     @classmethod
     def get_valid_keys(cls):
         return ['timeout', 'transcoder', 'per_key_options', 'return_exceptions']
+
+
+LockMultiOptions = GetAndLockMultiOptions
 
 
 class UnlockMultiOptions(dict):

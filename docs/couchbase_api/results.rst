@@ -157,3 +157,22 @@ ViewResult
 
     .. automethod:: rows
     .. automethod:: metadata
+
+ScanResult
+=================
+
+.. class:: ScanResult
+
+    .. autoproperty:: id
+    .. autoproperty:: ids_only
+    .. autoproperty:: cas
+    .. autoproperty:: content_as
+    .. autoproperty:: expiry_time
+
+ScanResultIterable
+===================
+
+.. class:: ScanResultIterable
+
+    .. automethod:: rows
+    .. automethod:: cancel_scan

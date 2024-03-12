@@ -31,8 +31,6 @@ if TYPE_CHECKING:
 
 class ScanTerm:
     """Represents a search term for a RangeScan
-
-    **VOLATILE** This API is subject to change at any time.
     """
 
     def __init__(self, term,  # type: str
@@ -62,8 +60,6 @@ class ScanType(ABC):
 
 class RangeScan(ScanType):
     """A RangeScan performs a scan on a range of keys with the range specified through a start and end ScanTerm.
-
-    **VOLATILE** This API is subject to change at any time.
     """
 
     def __init__(self,
@@ -84,8 +80,6 @@ class RangeScan(ScanType):
 
 class PrefixScan(ScanType):
     """A PrefixScan performs a scan on a given prefix
-
-    **VOLATILE** This API is subject to change at any time.
     """
 
     def __init__(self,
@@ -100,8 +94,6 @@ class PrefixScan(ScanType):
 
 class SamplingScan(ScanType):
     """A SamplingScan performs a scan on a random sampling of keys with the sampling bounded by a limit.
-
-    **VOLATILE** This API is subject to change at any time.
     """
 
     def __init__(self, limit,  # type: int

@@ -1151,7 +1151,9 @@ class AsyncCollection(CollectionLogic):
              ) -> ScanResultIterable:
         """Execute a key-value range scan operation from the collection.
 
-        **VOLATILE** This API is subject to change at any time.
+        .. note::
+            Use this API for low concurrency batch queries where latency is not a critical as the system may have to scan a lot of documents to find the matching documents.
+            For low latency range queries, it is recommended that you use SQL++ with the necessary indexes.
 
         Args:
             scan_type (:class:`~couchbase.kv_range_scan.ScanType`): Either a :class:`~couchbase.kv_range_scan.RangeScan`,

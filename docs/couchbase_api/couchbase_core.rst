@@ -89,6 +89,7 @@ Collection
     .. automethod:: touch
     .. automethod:: unlock
     .. automethod:: upsert
+    .. automethod:: scan
     .. automethod:: binary
     .. automethod:: couchbase_list
     .. automethod:: list_append
@@ -112,11 +113,14 @@ Collection
     .. automethod:: queue_pop
     .. automethod:: queue_size
     .. automethod:: get_multi
-    .. automethod:: lock_multi
+    .. automethod:: get_and_lock_multi
+    .. automethod:: get_all_replicas_multi
+    .. automethod:: get_any_replica_multi
     .. automethod:: exists_multi
     .. automethod:: insert_multi
-    .. automethod:: upsert_multi
-    .. automethod:: replace_multi
+    .. automethod:: lock_multi
     .. automethod:: remove_multi
+    .. automethod:: replace_multi
     .. automethod:: touch_multi
     .. automethod:: unlock_multi
+    .. automethod:: upsert_multi

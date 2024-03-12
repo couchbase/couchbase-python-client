@@ -145,6 +145,11 @@ UpsertOptions
 
 .. autoclass:: UpsertOptions
 
+ScanOptions
+++++++++++++++++++++++
+
+.. autoclass:: ScanOptions
+
 Key-Value Multi
 =================
 
@@ -224,3 +229,8 @@ MutateInOptions
 
 Views
 =================
+
+ViewOptions
+++++++++++++++++++++++
+
+.. autoclass:: ViewOptions

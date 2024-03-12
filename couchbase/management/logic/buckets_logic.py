@@ -326,8 +326,7 @@ class ConflictResolutionType(Enum):
     Members:
     TIMESTAMP: specifies to use timestamp conflict resolution
     SEQUENCE_NUMBER: specifies to use sequence number conflict resolution
-    CUSTOM: **VOLATILE** This API is subject to change at any time. In Couchbase Server 7.1,
-    this feature is only available in "developer-preview" mode. See the UI XDCR settings.
+    CUSTOM: specifies to use a custom conflict resolution
 
     """
     TIMESTAMP = "lww"
@@ -337,10 +336,6 @@ class ConflictResolutionType(Enum):
 
 class StorageBackend(Enum):
     """
-    **UNCOMMITTED**
-    StorageBackend is part of an uncommitted API that is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
-
     Specifies the storage type to use for the bucket.
     """
     UNDEFINED = "undefined"
@@ -599,12 +594,12 @@ class CreateBucketSettings(BucketSettings):
         :param max_expiry: max expiry time for bucket
         :param compression_mode: compression mode
         :param ejection_method: ejection method (deprecated, please use eviction_policy instead)
-        :param storage_backend: **UNCOMMITTED** specifies the storage type to use for the bucket
-        :param history_retention_collection_default: **UNCOMMITTED** whether to enable history retention on collections
+        :param storage_backend: specifies the storage type to use for the bucket
+        :param history_retention_collection_default: specifies whether to enable history retention on collections
             by default
-        :param history_retention_bytes: **UNCOMMITTED** the maximum size, in bytes, of the change history that is
+        :param history_retention_bytes: specifies the maximum size, in bytes, of the change history that is
             written to disk for all collections in this bucket
-        :param history_retention_duration: **UNCOMMITTED** the maximum duration to be covered by the change history that
+        :param history_retention_duration: specifies the maximum duration to be covered by the change history that
             is written to disk for all collections in this bucket
 
         .. note::
