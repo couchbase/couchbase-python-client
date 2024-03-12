@@ -830,6 +830,16 @@ get_search_request(PyObject* op_args)
         req.scope_name = scope_name;
     }
 
+    PyObject* pyObj_log_request = PyDict_GetItemString(op_args, "log_request");
+    if (pyObj_log_request != nullptr) {
+        req.log_request = pyObj_log_request == Py_True ? true : false;
+    }
+
+    PyObject* pyObj_log_response = PyDict_GetItemString(op_args, "log_response");
+    if (pyObj_log_response != nullptr) {
+        req.log_response = pyObj_log_response == Py_True ? true : false;
+    }
+
     return req;
 }
 

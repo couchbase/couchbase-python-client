@@ -198,9 +198,6 @@ class Scope:
                *options,  # type: SearchOptions
                **kwargs,  # type: Dict[str, Any]
                ) -> Deferred[SearchResult]:
-        """
-        **VOLATILE** This API is subject to change at any time.
-        """
         request_args = dict(default_serialize=self.default_serializer,
                             streaming_timeout=self.streaming_timeouts.get('search_timeout', None),
                             bucket_name=self.bucket_name,
@@ -226,8 +223,6 @@ class Scope:
 
     def search_indexes(self) -> ScopeSearchIndexManager:
         """
-        **VOLATILE** This API is subject to change at any time.
-
         Get a :class:`~txcouchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
         indexes of this scope.
 

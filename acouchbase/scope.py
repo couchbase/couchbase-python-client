@@ -319,13 +319,13 @@ class AsyncScope:
                      ) -> SearchResult:
         """Executes an search query against the scope.
 
+        .. warning::
+            This method is **DEPRECATED** and will be removed in a future release.
+            Use :meth:`~acouchbase.scope.AsyncScope.search`: instead.
+
         .. note::
             The search query is executed lazily in that it is executed once iteration over the
             :class:`~couchbase.result.SearchResult` begins.
-
-        .. seealso::
-            * :class:`~acouchbase.management.search.SearchIndexManager`: for how to manage search indexes.
-            * :meth:`~acouchbase.cluster.AsyncCluster.search_query`: for how to execute cluster-level search queries
 
         Args:
             index (str): Name of the search query to use.
@@ -432,9 +432,83 @@ class AsyncScope:
                *options,  # type: SearchOptions
                **kwargs,  # type: Dict[str, Any]
                ) -> SearchResult:
-        """
-        **VOLATILE** This API is subject to change at any time.
-        """
+        """Executes an search against the scope.
+
+        .. note::
+            The search is executed lazily in that it is executed once iteration over the
+            :class:`~couchbase.result.SearchResult` begins.
+
+        .. seealso::
+            * :class:`~couchbase.management.search.ScopeSearchIndexManager`: for how to manage search indexes.
+            * :meth:`acouchbase.cluster.AsyncCluster.search`: for how to execute cluster-level search
+
+        Args:
+            index (str): Name of the search index to use.
+            request (:class:`~couchbase.search.SearchRequest`): Type of search request to perform.
+            options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.SearchOptions`
+
+        Returns:
+            :class:`~couchbase.result.SearchResult`: An instance of a
+            :class:`~couchbase.result.SearchResult` which provides access to iterate over the search
+            query results and access metadata and metrics about the search query.
+
+        Examples:
+
+            .. note::
+                Be sure to create a search index prior to executing a search.  Also, if an application
+                desires to utilize search row locations, highlighting, etc. make sure the search index is
+                setup appropriately.  See :search_create_idx:`Creating Indexes <>` in Couchbase Server docs.
+
+            Simple search::
+
+                import couchbase.search as search
+                from couchbase.options import SearchOptions
+
+                # ... other code ...
+
+                request = search.SearchRequest.create(search.TermQuery('home'))
+                q_res = scope.search('travel-sample-index', request, SearchOptions(limit=10))
+
+                async for row in q_res.rows():
+                    print(f'Found row: {row}')
+
+            Simple vector search::
+
+                import couchbase.search as search
+                from couchbase.options import SearchOptions
+                from couchbase.vector_search import VectorQuery, VectorSearch
+
+                # ... other code ...
+
+                # NOTE:  the vector is expected to be type List[float], set the vector to the appropriate value, this is an example.
+                vector = [-0.014653487130999565, -0.008658270351588726, 0.017129190266132355, -0.015563474968075752]
+                request = search.SearchRequest.create(VectorSearch.from_vector_query(VectorQuery('vector_field', vector)))
+                q_res = scope.search('travel-sample-vector-index', request, SearchOptions(limit=10))
+
+                async for row in q_res.rows():
+                    print(f'Found row: {row}')
+
+            Combine search and vector search::
+
+                import couchbase.search as search
+                from couchbase.options import SearchOptions
+                from couchbase.vector_search import VectorQuery, VectorSearch
+
+                # ... other code ...
+
+                # NOTE:  the vector is expected to be type List[float], set the vector to the appropriate value, this is an example.
+                vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', [-0.014653487130999565,
+                                                                                            -0.008658270351588726,
+                                                                                            0.017129190266132355,
+                                                                                            -0.015563474968075752]))
+                request = search.SearchRequest.create(search.MatchAllQuery()).with_vector_search(vector_search)
+                q_res = scope.search('travel-sample-vector-index', request, SearchOptions(limit=10))
+
+                async for row in q_res.rows():
+                    print(f'Found row: {row}')
+        """  # noqa: E501
         # See couchbase.cluster.search() for note on streaming timeout
         streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
         query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
@@ -449,8 +523,6 @@ class AsyncScope:
 
     def search_indexes(self) -> ScopeSearchIndexManager:
         """
-        **VOLATILE** This API is subject to change at any time.
-
         Get a :class:`~acouchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
         indexes of this scope.
 

@@ -10,8 +10,6 @@ from couchbase.logic.vector_search import VectorSearch
 class SearchRequest:
     """ Represents a search query and/or vector search to execute via the Couchbase Full Text Search (FTS) service.
 
-    **VOLATILE** This API is subject to change at any time.
-
     Args:
         query (Union[:class:`~couchbase.search.SearchQuery`, :class:`~couchbase.vector_search.VectorSearch`]): A :class:`~couchbase.search.SearchQuery` or
             :class:`~couchbase.vector_search.VectorSearch` to initialize the search request.
@@ -39,8 +37,6 @@ class SearchRequest:
     @property
     def search_query(self) -> Optional[SearchQuery]:
         """
-        **VOLATILE** This API is subject to change at any time.
-
         Optional[:class:`~couchbase.search.SearchQuery`]: Returns the search request's :class:`~couchbase.search.SearchQuery`, if it exists.
         """  # noqa: E501
         return self._search_query
@@ -48,7 +44,8 @@ class SearchRequest:
     @property
     def vector_search(self) -> Optional[VectorSearch]:
         """
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         Optional[:class:`~couchbase.vector_search.VectorSearch`]: Returns the search request's :class:`~couchbase.vector_search.VectorSearch`, if it exists.
         """  # noqa: E501
@@ -58,8 +55,6 @@ class SearchRequest:
                           query  # type: SearchQuery
                           ) -> SearchRequest:
         """ Add a :class:`~couchbase.search.SearchQuery` to the search request.
-
-        **VOLATILE** This API is subject to change at any time.
 
         Args:
             query (:class:`~couchbase.search.SearchQuery`): The :class:`~couchbase.search.SearchQuery` to add to the search request.
@@ -85,7 +80,8 @@ class SearchRequest:
                            ) -> SearchRequest:
         """ Add a :class:`~couchbase.vector_search.VectorSearch` to the search request.
 
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             vector_search (:class:`~couchbase.vector_search.VectorSearch`): The :class:`~couchbase.vector_search.VectorSearch` to add to the search request.
@@ -111,8 +107,6 @@ class SearchRequest:
                query  # type: Union[SearchQuery, VectorSearch]
                ) -> SearchRequest:
         """ Creates a :class:`~couchbase.search.SearchRequest`.
-
-        **VOLATILE** This API is subject to change at any time.
 
         Args:
             query (Union[:class:`~couchbase.search.SearchQuery`, :class:`~couchbase.vector_search.VectorSearch`]): A :class:`~couchbase.search.SearchQuery` or

@@ -260,7 +260,17 @@ struct connection {
         for (int i = 0; i < num_io_threads; i++) {
             // TODO: consider maybe catching exceptions and running run() again?  For now, lets
             // log the exception and rethrow (which will lead to a crash)
-            io_threads_.emplace_back([&] { io_.run(); });
+            io_threads_.emplace_back([&] {
+                try {
+                    io_.run();
+                } catch (const std::exception& e) {
+                    CB_LOG_ERROR(e.what());
+                    throw;
+                } catch (...) {
+                    CB_LOG_ERROR("Unknown exception");
+                    throw;
+                }
+            });
         }
     }
 };

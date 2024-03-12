@@ -16,7 +16,8 @@ Vector search Enums per the search RFC
 class VectorQueryCombination(Enum):
     """ Specifies how multiple vector searches are combined.
 
-    **VOLATILE** This API is subject to change at any time.
+    **UNCOMMITTED** This API is unlikely to change,
+    but may still change as final consensus on its behavior has not yet been reached.
 
     This can be one of:
         AND: Indicates that multiple vector queries should be combined with logical AND.
@@ -31,7 +32,8 @@ class VectorQueryCombination(Enum):
 class VectorQuery:
     """ Represents a vector query.
 
-    **VOLATILE** This API is subject to change at any time.
+    **UNCOMMITTED** This API is unlikely to change,
+    but may still change as final consensus on its behavior has not yet been reached.
 
     Args:
         field_name (str): The name of the field in the search index that stores the vector.
@@ -68,7 +70,8 @@ class VectorQuery:
     @property
     def boost(self) -> Optional[float]:
         """
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         Optional[float]: Returns vector query's boost value, if it exists.
         """
@@ -85,7 +88,8 @@ class VectorQuery:
     @property
     def field_name(self) -> str:
         """
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         str: Returns vector query's field name
         """
@@ -94,7 +98,8 @@ class VectorQuery:
     @property
     def num_candidates(self) -> Optional[int]:
         """
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         Optional[int]: Returns vector query's num candidates value, if it exists.
         """
@@ -113,7 +118,8 @@ class VectorQuery:
     @property
     def vector(self) -> List[float]:
         """
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         List[float]: Returns the vector query's vector.
         """
@@ -128,7 +134,8 @@ class VectorQuery:
                ) -> VectorQuery:
         """ Creates a :class:`~couchbase.vector_search.VectorQuery`.
 
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             field_name (str): The name of the field in the search index that stores the vector.
@@ -149,7 +156,8 @@ class VectorQuery:
 class VectorSearch:
     """ Represents a vector search.
 
-    **VOLATILE** This API is subject to change at any time.
+    **UNCOMMITTED** This API is unlikely to change,
+    but may still change as final consensus on its behavior has not yet been reached.
 
     Args:
         queries (List[:class:`~couchbase.vector_search.VectorQuery`]):
@@ -196,7 +204,8 @@ class VectorSearch:
                           ) -> VectorSearch:
         """ Creates a :class:`~couchbase.vector_search.VectorSearch` from a single :class:`~couchbase.vector_search.VectorQuery`.
 
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             query (:class:`~couchbase.vector_search.VectorQuery`):

@@ -58,9 +58,11 @@ class SearchParamTestSuite:
         'test_params_highlight_style_fields',
         'test_params_include_locations',
         'test_params_limit',
+        'test_params_logging',
         'test_params_scan_consistency',
         'test_params_scope_collections',
         'test_params_serializer',
+        'test_params_show_request',
         'test_params_skip',
         'test_params_sort',
         'test_params_timeout',
@@ -571,6 +573,17 @@ class SearchParamTestSuite:
         exp_opts['limit'] = 10
         assert search_query.params == exp_opts
 
+    def test_params_logging(self, cb_env, base_query_opts):
+        q, base_opts = base_query_opts
+        opts = SearchOptions(log_request=True, log_response=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts = base_opts.copy()
+        exp_opts['log_request'] = True
+        exp_opts['log_response'] = True
+        assert search_query.params == exp_opts
+
     def test_params_scan_consistency(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
         opts = SearchOptions(scan_consistency=search.SearchScanConsistency.REQUEST_PLUS)
@@ -615,6 +628,16 @@ class SearchParamTestSuite:
 
         exp_opts = base_opts.copy()
         exp_opts['serializer'] = serializer
+        assert search_query.params == exp_opts
+
+    def test_params_show_request(self, cb_env, base_query_opts):
+        q, base_opts = base_query_opts
+        opts = SearchOptions(show_request=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts = base_opts.copy()
+        exp_opts['show_request'] = True
         assert search_query.params == exp_opts
 
     def test_params_skip(self, cb_env, base_query_opts):

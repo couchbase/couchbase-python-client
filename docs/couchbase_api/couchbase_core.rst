@@ -56,6 +56,7 @@ Scope
 ==============
 
 .. module:: couchbase.scope
+
 .. autoclass:: Scope
 
     .. autoproperty:: name

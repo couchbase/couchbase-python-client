@@ -1529,11 +1529,15 @@ class SearchOptions(SearchOptionsBase):
             :class:`~couchbase.serializer.DefaultJsonSerializer`.
         raw (Dict[str, Any], optional): Specifies any additional parameters which should be passed to the search query
             engine when executing the search query. Defaults to None.
-    """
+        show_request (bool, optional): Specifies if the search response should contain the request for the search query. Defaults to False.
+        log_request (bool, optional): **UNCOMMITTED** Specifies if search request body should appear the log. Defaults to False.
+        log_response (bool, optional): **UNCOMMITTED** Specifies if search response should appear in the log. Defaults to False.
+    """  # noqa: E501
 
 
 class VectorSearchOptions(VectorSearchOptionsBase):
-    """**VOLATILE** This API is subject to change at any time.
+    """**UNCOMMITTED** This API is unlikely to change,
+    but may still change as final consensus on its behavior has not yet been reached.
 
     Available options to for a FTS vector search.
 

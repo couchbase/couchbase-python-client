@@ -204,6 +204,11 @@ QueryOptions
 Search
 =================
 
+SearchOptions
+++++++++++++++++++++++
+
+.. autoclass:: SearchOptions
+
 Subdocument
 =================
 

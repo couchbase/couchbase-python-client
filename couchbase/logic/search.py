@@ -916,7 +916,9 @@ class SearchQueryBuilder:
         "sort": {},
         "show_request": {"show_request": lambda x: x},
         "span": {"span": lambda x: x},
-        "vector_query_combination": {"vector_query_combination": lambda x: x}
+        "vector_query_combination": {"vector_query_combination": lambda x: x},
+        "log_request": {"log_request": lambda x: x},
+        "log_response": {"log_response": lambda x: x}
     }
 
     def __init__(self,
@@ -1283,7 +1285,8 @@ class SearchQueryBuilder:
     @property
     def vector_query_combination(self) -> Optional[VectorQueryCombination]:
         """
-        **VOLATILE** This API is subject to change at any time.
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
         """
         value = self._params.get('highlight_style', None)
         if isinstance(value, VectorQueryCombination):
@@ -1304,6 +1307,24 @@ class SearchQueryBuilder:
             raise InvalidArgumentException(message=("Excepted vector_query_combination to be either of type "
                                                     "VectorQueryCombination or str representation "
                                                     "of VectorQueryCombination"))
+
+    @property
+    def log_request(self) -> bool:
+        return self._params.get('log_request', False)
+
+    @log_request.setter
+    def log_request(self, value  # type: bool
+                    ) -> None:
+        self.set_option('log_request', value)
+
+    @property
+    def log_response(self) -> bool:
+        return self._params.get('log_response', False)
+
+    @log_response.setter
+    def log_response(self, value  # type: bool
+                     ) -> None:
+        self.set_option('log_response', value)
 
     @classmethod
     def create_search_query_object(cls,

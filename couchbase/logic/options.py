@@ -1200,7 +1200,10 @@ class SearchOptionsBase(OptionsTimeoutBase):
                  collections=None,       # type: Optional[List[str]]
                  include_locations=None,  # type: Optional[bool]
                  client_context_id=None,  # type: Optional[str]
-                 serializer=None  # type: Optional[Serializer]
+                 serializer=None,  # type: Optional[Serializer]
+                 show_request=None,      # type: Optional[bool]
+                 log_request=None,      # type: Optional[bool]
+                 log_response=None,      # type: Optional[bool]
                  ):
         pass
 
@@ -1211,7 +1214,8 @@ class SearchOptionsBase(OptionsTimeoutBase):
 
 class VectorSearchOptionsBase(dict):
     """
-    **VOLATILE** This API is subject to change at any time.
+    **UNCOMMITTED** This API is unlikely to change,
+    but may still change as final consensus on its behavior has not yet been reached.
     """
     @overload
     def __init__(self,

@@ -159,9 +159,6 @@ class SearchIndexManager(SearchIndexManagerLogic):
 
 
 class ScopeSearchIndexManager(SearchIndexManagerLogic):
-    """
-    **VOLATILE** This API is subject to change at any time.
-    """
 
     def __init__(self,
                  connection,

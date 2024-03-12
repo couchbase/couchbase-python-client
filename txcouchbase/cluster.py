@@ -312,9 +312,6 @@ class Cluster(ClusterLogic):
                *options,  # type: SearchOptions
                **kwargs,  # type: Dict[str, Any]
                ) -> Deferred[SearchResult]:
-        """
-        **VOLATILE** This API is subject to change at any time.
-        """
         request_args = dict(default_serialize=self.default_serializer,
                             streaming_timeout=self.streaming_timeouts.get('search_timeout', None))
         query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)

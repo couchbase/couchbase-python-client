@@ -493,7 +493,6 @@ class Cluster(ClusterLogic):
 
         .. seealso::
             * :class:`~couchbase.management.search.SearchIndexManager`: for how to manage search indexes.
-            * :meth:`couchbase.Scope.search_query`: for how to execute scope-level search queries
 
         Args:
             index (str): Name of the search query to use.
@@ -592,15 +591,13 @@ class Cluster(ClusterLogic):
                ) -> SearchResult:
         """Executes an search against the cluster.
 
-        **VOLATILE** This API is subject to change at any time.
-
         .. note::
             The search is executed lazily in that it is executed once iteration over the
             :class:`~couchbase.result.SearchResult` begins.
 
         .. seealso::
             * :class:`~couchbase.management.search.SearchIndexManager`: for how to manage search indexes.
-            * :meth:`couchbase.Scope.search`: for how to execute scope-level search
+            * :meth:`~couchbase.scope.Scope.search`: for how to execute scope-level search
 
         Args:
             index (str): Name of the search index to use.

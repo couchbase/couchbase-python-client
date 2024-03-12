@@ -279,13 +279,13 @@ class ScopeLogic:
                      ) -> SearchResult:
         """Executes an search query against the scope.
 
+        .. warning::
+            This method is **DEPRECATED** and will be removed in a future release.
+            Use :meth:`~couchbase.scope.Scope.search` instead.
+
         .. note::
             The search query is executed lazily in that it is executed once iteration over the
             :class:`~couchbase.result.SearchResult` begins.
-
-        .. seealso::
-            * :class:`~couchbase.management.search.SearchIndexManager`: for how to manage search indexes.
-            * :meth:`~couchbase.cluster.Cluster.search_query`: for how to execute cluster-level search queries
 
         Args:
             index (str): Name of the search query to use.
@@ -389,15 +389,13 @@ class ScopeLogic:
                ) -> SearchResult:
         """Executes an search against the scope.
 
-        **VOLATILE** This API is subject to change at any time.
-
         .. note::
             The search is executed lazily in that it is executed once iteration over the
             :class:`~couchbase.result.SearchResult` begins.
 
         .. seealso::
             * :class:`~couchbase.management.search.ScopeSearchIndexManager`: for how to manage search indexes.
-            * :meth:`couchbase.Cluster.search`: for how to execute cluster-level search
+            * :meth:`~couchbase.cluster.Cluster.search`: for how to execute cluster-level search
 
         Args:
             index (str): Name of the search index to use.
@@ -478,8 +476,6 @@ class ScopeLogic:
 
     def search_indexes(self) -> ScopeSearchIndexManager:
         """
-        **VOLATILE** This API is subject to change at any time.
-
         Get a :class:`~couchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
         indexes of this cluster.
 

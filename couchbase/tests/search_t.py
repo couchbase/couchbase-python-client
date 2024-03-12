@@ -208,7 +208,17 @@ class SearchTestSuite:
 
     def test_cluster_search(self, cb_env):
         q = search.TermQuery('auto')
-        res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME, q, SearchOptions(limit=10))
+        # PYCBC-1572, add show_request, log_request and log_response to options.
+        # to validate run at the commandline:
+        # PYCBC_LOG_LEVEL=info python \
+        # -m pytest couchbase/tests/search_t.py::ClassicSearchTests::test_cluster_search \
+        # -p no:asyncio -p no:warnings -vv -rA --capture=tee-sys
+        # output should have lines that contain w/ SEARCH: and SEARCH RESPONSE: and the JSON
+        # in the SEARCH RESPONSE line should have the request JSON
+        res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME, q, SearchOptions(limit=10,
+                                                                                   show_request=True,
+                                                                                   log_request=True,
+                                                                                   log_response=True))
         cb_env.assert_rows(res, 2)
 
     def test_cluster_search_date_facets(self, cb_env):
