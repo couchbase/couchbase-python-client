@@ -136,6 +136,7 @@ class ServerFeatures(Enum):
     NotLockedKVStatus = 'kv_not_locked'
     ScopeSearch = 'scope_search'
     ScopeSearchIndexManagement = 'scope_search_index_mgmt'
+    ScopeEventingFunctionManagement = 'scope_eventing_function_mgmt'
 
 
 # mock and real server (all versions) should have these features
@@ -163,7 +164,8 @@ FEATURES_NOT_IN_MOCK = [ServerFeatures.Analytics,
                         ServerFeatures.ViewIndexManagement,
                         ServerFeatures.KvRangeScan,
                         ServerFeatures.ScopeSearch,
-                        ServerFeatures.ScopeSearchIndexManagement]
+                        ServerFeatures.ScopeSearchIndexManagement,
+                        ServerFeatures.ScopeEventingFunctionManagement]
 
 FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -195,7 +197,8 @@ AT_LEAST_V7_1_0_FEATURES = [ServerFeatures.RateLimiting,
                             ServerFeatures.BucketStorageBackend,
                             ServerFeatures.CustomConflictResolution,
                             ServerFeatures.EventingFunctionManagement,
-                            ServerFeatures.PreserveExpiry]
+                            ServerFeatures.PreserveExpiry,
+                            ServerFeatures.ScopeEventingFunctionManagement]
 
 AT_LEAST_V7_2_0_FEATURES = [ServerFeatures.NonDedupedHistory,
                             ServerFeatures.UpdateCollection]
@@ -253,7 +256,7 @@ class FakeTestObj:
     PROP1 = 12345
 
 
-class CouchbaseTestEnvironment():
+class CouchbaseTestEnvironment:
     KEY = "airport_3830"
     CONTENT = {
         "airportname": "Chicago Ohare Intl",

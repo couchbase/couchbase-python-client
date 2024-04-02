@@ -70,6 +70,7 @@ class ServerFeatures(Enum):
     NotLockedKVStatus = 'kv_not_locked'
     ScopeSearch = 'scope_search'
     ScopeSearchIndexManagement = 'scope_search_index_mgmt'
+    ScopeEventingFunctionManagement = 'scope_eventing_function_mgmt'
 
 
 class EnvironmentFeatures:
@@ -98,7 +99,8 @@ class EnvironmentFeatures:
                             ServerFeatures.UserManagement,
                             ServerFeatures.ViewIndexManagement,
                             ServerFeatures.NonDedupedHistory,
-                            ServerFeatures.UpdateCollection]
+                            ServerFeatures.UpdateCollection,
+                            ServerFeatures.ScopeEventingFunctionManagement]
 
     FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -131,7 +133,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.CustomConflictResolution,
                                 ServerFeatures.EventingFunctionManagement,
                                 ServerFeatures.PreserveExpiry,
-                                ServerFeatures.QueryUserDefinedFunctions]
+                                ServerFeatures.QueryUserDefinedFunctions,
+                                ServerFeatures.ScopeEventingFunctionManagement]
 
     AT_LEAST_V7_2_0_FEATURES = [ServerFeatures.NonDedupedHistory,
                                 ServerFeatures.UpdateCollection]

@@ -150,3 +150,106 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
             return next((f for f in statuses.functions if f.name == name), None)
 
         return None
+
+
+class ScopeEventingFunctionManager(EventingFunctionManagerLogic):
+    def __init__(self,
+                 connection,
+                 bucket_name,  # type: str
+                 scope_name,  # type: str
+                 ):
+        super().__init__(connection, bucket_name=bucket_name, scope_name=scope_name)
+
+    @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
+    def upsert_function(
+        self,
+        function,  # type: EventingFunction
+        *options,  # type: UpsertFunctionOptions
+        **kwargs  # type: Dict[str, Any]
+    ) -> None:
+        return super().upsert_function(function, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
+    def drop_function(
+        self,
+        name,  # type: str
+        *options,  # type: DropFunctionOptions
+        **kwargs  # type: Any
+    ) -> None:
+        return super().drop_function(name, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
+    def deploy_function(
+        self,
+        name,  # type: str
+        *options,  # type: DeployFunctionOptions
+        **kwargs  # type: Any
+    ) -> None:
+        return super().deploy_function(name, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(EventingFunction, ManagementType.EventingFunctionMgmt,
+                               EventingFunctionManagerLogic._ERROR_MAPPING)
+    def get_all_functions(
+        self,
+        *options,  # type: GetAllFunctionOptions
+        **kwargs  # type: Any
+    ) -> List[EventingFunction]:
+        return super().get_all_functions(*options, **kwargs)
+
+    @BlockingMgmtWrapper.block(EventingFunction, ManagementType.EventingFunctionMgmt,
+                               EventingFunctionManagerLogic._ERROR_MAPPING)
+    def get_function(
+        self,
+        name,  # type: str
+        *options,  # type: GetFunctionOptions
+        **kwargs  # type: Any
+    ) -> EventingFunction:
+        return super().get_function(name, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
+    def pause_function(
+        self,
+        name,  # type: str
+        *options,  # type: PauseFunctionOptions
+        **kwargs  # type: Any
+    ) -> None:
+        return super().pause_function(name, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
+    def resume_function(
+        self,
+        name,  # type: str
+        *options,  # type: ResumeFunctionOptions
+        **kwargs  # type: Any
+    ) -> None:
+        return super().resume_function(name, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
+    def undeploy_function(
+        self,
+        name,  # type: str
+        *options,  # type: UndeployFunctionOptions
+        **kwargs  # type: Any
+    ) -> None:
+        return super().undeploy_function(name, *options, **kwargs)
+
+    @BlockingMgmtWrapper.block(EventingFunctionsStatus, ManagementType.EventingFunctionMgmt,
+                               EventingFunctionManagerLogic._ERROR_MAPPING)
+    def functions_status(
+        self,
+        *options,  # type: FunctionsStatusOptions
+        **kwargs  # type: Any
+    ) -> EventingFunctionsStatus:
+        return super().functions_status(*options, **kwargs)
+
+    def _get_status(
+        self,
+        name,  # type: str
+    ) -> EventingFunctionStatus:
+
+        statuses = self.functions_status()
+
+        if statuses.functions:
+            return next((f for f in statuses.functions if f.name == name), None)
+
+        return None

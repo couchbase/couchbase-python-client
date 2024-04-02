@@ -1679,6 +1679,18 @@ get_eventing_function_mgmt_req(PyObject* op_args)
     auto name = std::string(PyUnicode_AsUTF8(pyObj_name));
     req.name = name;
 
+    PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
+    if (pyObj_bucket_name != nullptr) {
+        auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+        req.bucket_name = bucket_name;
+    }
+
+    PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+        req.scope_name = scope_name;
+    }
+
     PyObject* pyObj_client_context_id = PyDict_GetItemString(op_args, "client_context_id");
     if (pyObj_client_context_id != nullptr) {
         auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
@@ -1716,11 +1728,25 @@ handle_eventing_function_mgmt_op(connection* conn,
         switch (options->op_type) {
             case EventingFunctionManagementOperations::UPSERT_FUNCTION: {
                 couchbase::core::operations::management::eventing_upsert_function_request req{};
+
+                PyObject* pyObj_bucket_name = PyDict_GetItemString(options->op_args, "bucket_name");
+                if (pyObj_bucket_name != nullptr) {
+                    auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+                    req.bucket_name = bucket_name;
+                }
+
+                PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
+                if (pyObj_scope_name != nullptr) {
+                    auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+                    req.scope_name = scope_name;
+                }
+
                 PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
                 if (pyObj_client_context_id != nullptr) {
                     auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
                     req.client_context_id = client_context_id;
                 }
+
                 PyObject* pyObj_eventing_function = PyDict_GetItemString(options->op_args, "eventing_function");
                 req.function = get_eventing_function(pyObj_eventing_function);
                 req.timeout = options->timeout_ms;
@@ -1785,11 +1811,25 @@ handle_eventing_function_mgmt_op(connection* conn,
             }
             case EventingFunctionManagementOperations::GET_ALL_FUNCTIONS: {
                 couchbase::core::operations::management::eventing_get_all_functions_request req{};
+
+                PyObject* pyObj_bucket_name = PyDict_GetItemString(options->op_args, "bucket_name");
+                if (pyObj_bucket_name != nullptr) {
+                    auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+                    req.bucket_name = bucket_name;
+                }
+
+                PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
+                if (pyObj_scope_name != nullptr) {
+                    auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+                    req.scope_name = scope_name;
+                }
+
                 PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
                 if (pyObj_client_context_id != nullptr) {
                     auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
                     req.client_context_id = client_context_id;
                 }
+
                 req.timeout = options->timeout_ms;
 
                 res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_get_all_functions_request>(
@@ -1798,11 +1838,25 @@ handle_eventing_function_mgmt_op(connection* conn,
             }
             case EventingFunctionManagementOperations::GET_STATUS: {
                 couchbase::core::operations::management::eventing_get_status_request req{};
+
+                PyObject* pyObj_bucket_name = PyDict_GetItemString(options->op_args, "bucket_name");
+                if (pyObj_bucket_name != nullptr) {
+                    auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+                    req.bucket_name = bucket_name;
+                }
+
+                PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
+                if (pyObj_scope_name != nullptr) {
+                    auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+                    req.scope_name = scope_name;
+                }
+
                 PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
                 if (pyObj_client_context_id != nullptr) {
                     auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
                     req.client_context_id = client_context_id;
                 }
+
                 req.timeout = options->timeout_ms;
 
                 res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_get_status_request>(

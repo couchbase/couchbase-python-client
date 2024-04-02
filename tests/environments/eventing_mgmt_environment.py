@@ -39,6 +39,7 @@ from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionUrlBinding,
                                            EventingFunctionUrlNoAuth)
 from couchbase.management.logic.eventing_logic import QueryScanConsistency
+from tests.environments import CollectionType
 from tests.environments.test_environment import TestEnvironment
 from tests.test_features import EnvironmentFeatures
 
@@ -77,7 +78,13 @@ class EventingManagementTestEnvironment(TestEnvironment):
     def evt_version(self):
         return self._version
 
-    def setup(self):
+    def setup(self,
+              collection_type=None,  # type: Optional[CollectionType]
+              test_suite=None,  # type: Optional[str]
+              num_docs=50,  # type: Optional[int]
+              ):
+        super().setup(collection_type=collection_type, test_suite=test_suite, num_docs=num_docs)
+
         self._version = 'evt-{}'.format(
             self.server_version_full.replace('enterprise', 'ee').replace('community', 'ce')
         )
@@ -86,7 +93,12 @@ class EventingManagementTestEnvironment(TestEnvironment):
             self.enable_collection_mgmt()
             TestEnvironment.try_n_times(5, 3, self.setup_named_collections)
 
-    def teardown(self):
+    def teardown(self,
+                 collection_type=None,  # type: Optional[CollectionType]
+                 test_suite=None,  # type: Optional[str]
+                 ):
+        super().teardown(collection_type=collection_type, test_suite=test_suite)
+
         self.disable_eventing_mgmt()
         if EnvironmentFeatures.is_feature_supported('collections', self.server_version_short):
             TestEnvironment.try_n_times_till_exception(5,

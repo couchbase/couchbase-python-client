@@ -20,6 +20,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
 from couchbase.collection import Collection
+from couchbase.management.eventing import ScopeEventingFunctionManager
 from couchbase.management.search import ScopeSearchIndexManager
 from couchbase.n1ql import N1QLQuery, N1QLRequest
 from couchbase.options import (AnalyticsOptions,
@@ -477,7 +478,7 @@ class ScopeLogic:
     def search_indexes(self) -> ScopeSearchIndexManager:
         """
         Get a :class:`~couchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
-        indexes of this cluster.
+        indexes of this scope.
 
         Returns:
             :class:`~couchbase.management.search.ScopeSearchIndexManager`: A :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
@@ -485,6 +486,17 @@ class ScopeLogic:
         """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return ScopeSearchIndexManager(self.connection, self.bucket_name, self.name)
+
+    def eventing_functions(self) -> ScopeEventingFunctionManager:
+        """
+        Get a :class:`~couchbase.management.search.ScopeEventingFunctionManager` which can be used to manage the eventing
+        functions of this scope.
+
+        Returns:
+            :class:`~couchbase.management.search.ScopeEventingFunctionManager`: A :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
+
+        """  # noqa: E501
+        return ScopeEventingFunctionManager(self.connection, self.bucket_name, self.name)
 
     @staticmethod
     def default_name():

@@ -63,8 +63,14 @@ class EventingFunctionManagerLogic:
                       r'.*ERR_APP_ALREADY_DEPLOYED': EventingFunctionAlreadyDeployedException,
                       r'.*ERR_SRC_MB_SAME': EventingFunctionIdenticalKeyspaceException}
 
-    def __init__(self, connection):
+    def __init__(self,
+                 connection,
+                 bucket_name=None,  # type: Optional[str]
+                 scope_name=None  # type: Optional[str]
+                 ):
         self._connection = connection
+        self._bucket_name = bucket_name
+        self._scope_name = scope_name
 
     def upsert_function(
         self,
@@ -88,10 +94,23 @@ class EventingFunctionManagerLogic:
         :raises: InvalidArgumentException
         Any exceptions raised by the underlying platform
         """
+        eventing_function = function.as_dict()
+
+        op_args = {
+            'eventing_function': eventing_function,
+        }
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.UPSERT_FUNCTION.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.UPSERT_FUNCTION.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -102,15 +121,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        eventing_function = function.as_dict()
-
-        mgmt_kwargs["op_args"] = {
-            "eventing_function": eventing_function
-        }
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -135,10 +148,21 @@ class EventingFunctionManagerLogic:
         :raises: EventingFunctionNotUndeployedException
         Any exceptions raised by the underlying platform
         """
+        op_args = {
+            'name': name,
+        }
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.DROP_FUNCTION.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.DROP_FUNCTION.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -149,13 +173,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {
-            "name": name
-        }
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -180,10 +200,21 @@ class EventingFunctionManagerLogic:
         :raises: EventingFunctionAlreadyDeployedException
         Any exceptions raised by the underlying platform
         """
+        op_args = {
+            'name': name,
+        }
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.DEPLOY_FUNCTION.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.DEPLOY_FUNCTION.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -194,13 +225,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {
-            "name": name
-        }
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -225,10 +252,19 @@ class EventingFunctionManagerLogic:
         :return: A list :class:`EventingFunction` objects
         :rtype: list
         """
+        op_args = {}
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.GET_ALL_FUNCTIONS.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.GET_ALL_FUNCTIONS.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -239,11 +275,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {}
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -270,10 +304,21 @@ class EventingFunctionManagerLogic:
         :return: class:`EventingFunction` object
         :rtype: class:`EventingFunction`
         """
+        op_args = {
+            'name': name,
+        }
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.GET_FUNCTION.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.GET_FUNCTION.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -284,13 +329,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {
-            "name": name
-        }
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -315,10 +356,21 @@ class EventingFunctionManagerLogic:
         :raises: EventingFunctionNotBootstrappedException
         Any exceptions raised by the underlying platform
         """
+        op_args = {
+            'name': name,
+        }
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.PAUSE_FUNCTION.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.PAUSE_FUNCTION.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -329,13 +381,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {
-            "name": name
-        }
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -360,10 +408,21 @@ class EventingFunctionManagerLogic:
         :raises: EventingFunctionNotDeployedException
         Any exceptions raised by the underlying platform
         """
+        op_args = {
+            'name': name,
+        }
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.RESUME_FUNCTION.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.RESUME_FUNCTION.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -374,13 +433,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {
-            "name": name
-        }
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -404,10 +459,21 @@ class EventingFunctionManagerLogic:
         :raises: EventingFunctionNotDeployedException
         Any exceptions raised by the underlying platform
         """
+        op_args = {
+            'name': name,
+        }
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.UNDEPLOY_FUNCTION.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.UNDEPLOY_FUNCTION.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -418,13 +484,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {
-            "name": name
-        }
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 
@@ -449,10 +511,19 @@ class EventingFunctionManagerLogic:
         :return: class:`EventingFunctionsStatus` object
         :rtype: class:`EventingFunctionsStatus`
         """
+        op_args = {}
+
+        if self._bucket_name is not None:
+            op_args['bucket_name'] = self._bucket_name
+
+        if self._scope_name is not None:
+            op_args['scope_name'] = self._scope_name
+
         mgmt_kwargs = {
-            "conn": self._connection,
-            "mgmt_op": mgmt_operations.EVENTING_FUNCTION.value,
-            "op_type": eventing_function_mgmt_operations.GET_STATUS.value
+            'conn': self._connection,
+            'mgmt_op': mgmt_operations.EVENTING_FUNCTION.value,
+            'op_type': eventing_function_mgmt_operations.GET_STATUS.value,
+            'op_args': op_args,
         }
 
         callback = kwargs.pop('callback', None)
@@ -463,11 +534,9 @@ class EventingFunctionManagerLogic:
         if errback:
             mgmt_kwargs['errback'] = errback
 
-        mgmt_kwargs["op_args"] = {}
-
         final_args = forward_args(kwargs, *options)
-        if final_args.get("timeout", None) is not None:
-            mgmt_kwargs["timeout"] = final_args.get("timeout")
+        if final_args.get('timeout', None) is not None:
+            mgmt_kwargs['timeout'] = final_args.get('timeout')
 
         return management_operation(**mgmt_kwargs)
 

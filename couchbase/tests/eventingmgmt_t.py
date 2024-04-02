@@ -44,6 +44,7 @@ from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionUrlBinding,
                                            EventingFunctionUrlNoAuth)
 from couchbase.management.options import GetFunctionOptions, UpsertFunctionOptions
+from tests.environments import CollectionType
 from tests.environments.eventing_mgmt_environment import EventingManagementTestEnvironment
 from tests.environments.test_environment import TestEnvironment
 from tests.test_features import EnvironmentFeatures
@@ -560,3 +561,26 @@ class ClassicEventingManagementTests(EventingManagementTestSuite):
         cb_env.setup()
         yield cb_env
         cb_env.teardown()
+
+
+@pytest.mark.flaky(reruns=5, reruns_delay=1)
+class ClassicScopeEventingManagementTests(EventingManagementTestSuite):
+
+    @pytest.fixture(scope='class')
+    def test_manifest_validated(self):
+        def valid_test_method(meth):
+            attr = getattr(ClassicEventingManagementTests, meth)
+            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
+        method_list = [meth for meth in dir(ClassicEventingManagementTests) if valid_test_method(meth)]
+        compare = set(EventingManagementTestSuite.TEST_MANIFEST).difference(method_list)
+        return compare
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self, cb_base_env, test_manifest_validated):
+        if test_manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+
+        cb_env = EventingManagementTestEnvironment.from_environment(cb_base_env).enable_scope_eventing_mgmt()
+        cb_env.setup(collection_type=CollectionType.NAMED)
+        yield cb_env
+        cb_env.disable_scope_eventing_mgmt().teardown(collection_type=CollectionType.NAMED)

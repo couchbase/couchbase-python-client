@@ -23,9 +23,9 @@ recursive-include deps/couchbase-cxx-cache/boringssl/*/boringssl CMakeLists.txt
 exclude deps/couchbase-cxx-cache/boringssl/*/boringssl/crypto_test_data.cc
 include deps/couchbase-cxx-cache/boringssl/*/boringssl/LICENSE
 include deps/couchbase-cxx-cache/fmt/*/fmt/CMakeLists.txt
-include deps/couchbase-cxx-cache/fmt/*/fmt/ChangeLog.rst
-include deps/couchbase-cxx-cache/fmt/*/fmt/LICENSE.rst
-include deps/couchbase-cxx-cache/fmt/*/fmt/README.rst
+include deps/couchbase-cxx-cache/fmt/*/fmt/ChangeLog.md
+include deps/couchbase-cxx-cache/fmt/*/fmt/LICENSE
+include deps/couchbase-cxx-cache/fmt/*/fmt/README.md
 graft deps/couchbase-cxx-cache/fmt/*/fmt/include
 graft deps/couchbase-cxx-cache/fmt/*/fmt/src
 graft deps/couchbase-cxx-cache/fmt/*/fmt/support/cmake

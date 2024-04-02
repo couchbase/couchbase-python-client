@@ -115,6 +115,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
         self._scope = None
         self._named_collection = None
         self._use_scope_search_mgmt = False
+        self._use_scope_eventing_mgmt = False
 
     @property
     def collection(self) -> Collection:
@@ -189,6 +190,10 @@ class TestEnvironment(CouchbaseTestEnvironment):
     def use_scope_search_mgmt(self) -> bool:
         return self._use_scope_search_mgmt
 
+    @property
+    def use_scope_eventing_mgmt(self) -> bool:
+        return self._use_scope_eventing_mgmt
+
     @classmethod  # noqa: C901
     async def get_environment(cls,  # noqa: C901
                               test_suite,
@@ -252,8 +257,19 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
     def disable_search_mgmt(self) -> TestEnvironment:
         self.check_if_feature_supported('search_index_mgmt')
-        if not hasattr(self, '_sixm'):
+        if hasattr(self, '_sixm'):
             del self._sixm
+
+        return self
+
+    def disable_scope_eventing_mgmt(self) -> TestEnvironment:
+        self._use_scope_eventing_mgmt = False
+        return self
+
+    def disable_eventing_mgmt(self) -> TestEnvironment:
+        self.check_if_feature_supported('eventing_function_mgmt')
+        if hasattr(self, '_efm'):
+            del self._efm
 
         return self
 
@@ -273,6 +289,23 @@ class TestEnvironment(CouchbaseTestEnvironment):
             if not hasattr(self.cluster, 'search_indexes'):
                 pytest.skip('Search index management not available on cluster.')
             self._sixm = self.cluster.search_indexes()
+        return self
+
+    def enable_scope_eventing_mgmt(self) -> TestEnvironment:
+        self.check_if_feature_supported('scope_eventing_function_mgmt')
+        self._use_scope_eventing_mgmt = True
+        return self
+
+    def enable_eventing_mgmt(self) -> TestEnvironment:
+        self.check_if_feature_supported('eventing_function_mgmt')
+        if self.use_scope_eventing_mgmt:
+            if not hasattr(self.scope, 'eventing_functions'):
+                pytest.skip('Eventing function management not available on scope.')
+            self._efm = self.scope.eventing_functions()
+        else:
+            if not hasattr(self.cluster, 'eventing_functions'):
+                pytest.skip('Eventing function management not available on cluster.')
+            self._efm = self.cluster.eventing_functions()
         return self
 
     async def get_new_key_value(self, reset=True):

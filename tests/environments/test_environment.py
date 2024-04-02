@@ -84,6 +84,7 @@ class TestEnvironment:
         self._doc_types = ['dealership', 'vehicle']
         self._consistency = ConsistencyChecker.from_test_environment(self)
         self._use_scope_search_mgmt = False
+        self._use_scope_eventing_mgmt = False
 
     @property
     def aixm(self) -> Optional[Any]:
@@ -213,6 +214,10 @@ class TestEnvironment:
         return self._use_scope_search_mgmt
 
     @property
+    def use_scope_eventing_mgmt(self) -> bool:
+        return self._use_scope_eventing_mgmt
+
+    @property
     def vixm(self) -> Optional[Any]:
         """Returns the default ViewIndexManager"""
         return self._vixm if hasattr(self, '_vixm') else None
@@ -259,6 +264,10 @@ class TestEnvironment:
         if not hasattr(self, '_cm'):
             del self._cm
 
+        return self
+
+    def disable_scope_eventing_mgmt(self) -> TestEnvironment:
+        self._use_scope_eventing_mgmt = False
         return self
 
     def disable_eventing_mgmt(self) -> TestEnvironment:
@@ -347,14 +356,28 @@ class TestEnvironment:
         self._cm = self.bucket.collections()
         return self
 
+    def enable_scope_eventing_mgmt(self) -> TestEnvironment:
+        EnvironmentFeatures.check_if_feature_supported('scope_eventing_function_mgmt',
+                                                       self.server_version_short,
+                                                       self.mock_server_type)
+
+        self._use_scope_eventing_mgmt = True
+        return self
+
     def enable_eventing_mgmt(self) -> TestEnvironment:
         EnvironmentFeatures.check_if_feature_supported('eventing_function_mgmt',
                                                        self.server_version_short,
                                                        self.mock_server_type)
-        if not hasattr(self.cluster, 'eventing_functions'):
-            pytest.skip('Eventing functions management not available on cluster.')
 
-        self._efm = self.cluster.eventing_functions()
+        if self._use_scope_eventing_mgmt:
+            if not hasattr(self.scope, 'eventing_functions'):
+                pytest.skip('Eventing functions management not available on scope.')
+            self._efm = self.scope.eventing_functions()
+        else:
+            if not hasattr(self.cluster, 'eventing_functions'):
+                pytest.skip('Eventing functions management not available on cluster.')
+            self._efm = self.cluster.eventing_functions()
+
         return self
 
     def enable_query_mgmt(self, from_collection=False) -> TestEnvironment:

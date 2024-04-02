@@ -21,6 +21,7 @@ from typing import (TYPE_CHECKING,
 
 from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
 from acouchbase.collection import Collection
+from acouchbase.management.eventing import ScopeEventingFunctionManager
 from acouchbase.management.search import ScopeSearchIndexManager
 from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
 from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
@@ -532,6 +533,17 @@ class AsyncScope:
         """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return ScopeSearchIndexManager(self.connection, self.loop, self.bucket_name, self.name)
+
+    def eventing_functions(self) -> ScopeEventingFunctionManager:
+        """
+        Get a :class:`~acouchbase.management.search.ScopeEventingFunctionManager` which can be used to manage the eventing
+        functions of this scope.
+
+        Returns:
+            :class:`~acouchbase.management.search.ScopeEventingFunctionManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
+
+        """  # noqa: E501
+        return ScopeEventingFunctionManager(self.connection, self.loop, self.bucket_name, self.name)
 
     @staticmethod
     def default_name():
