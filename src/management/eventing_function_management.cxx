@@ -346,6 +346,10 @@ build_eventing_function_settings(const couchbase::core::management::eventing::fu
                 pyObj_tmp = PyUnicode_FromString("version_6_6_2");
                 break;
             }
+            case couchbase::core::management::eventing::function_language_compatibility::version_7_2_0: {
+                pyObj_tmp = PyUnicode_FromString("version_7_2_0");
+                break;
+            }
             default: {
                 pyObj_tmp = PyUnicode_FromString("version_6_6_2");
                 break;
@@ -1269,6 +1273,8 @@ get_event_function_settings(PyObject* pyObj_settings)
             settings.language_compatibility = couchbase::core::management::eventing::function_language_compatibility::version_6_5_0;
         } else if (language_compatibility.compare("version_6_6_2") == 0) {
             settings.language_compatibility = couchbase::core::management::eventing::function_language_compatibility::version_6_6_2;
+        } else if (language_compatibility.compare("version_7_2_0") == 0) {
+            settings.language_compatibility = couchbase::core::management::eventing::function_language_compatibility::version_7_2_0;
         }
     }
 

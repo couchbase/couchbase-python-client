@@ -707,12 +707,14 @@ class EventingFunctionLanguageCompatibility(Enum):
 
     Version_6_0_0
     Version_6_5_0
-    Version_6_6_2 (default)
+    Version_6_6_2
+    Version_7_2_0
     """
 
     Version_6_0_0 = "6.0.0"
     Version_6_5_0 = "6.5.0"
     Version_6_6_2 = "6.6.2"
+    Version_7_2_0 = "7.2.0"
 
     def to_str(self):
         if self.value == '6.0.0':
@@ -721,6 +723,8 @@ class EventingFunctionLanguageCompatibility(Enum):
             return 'version_6_5_0'
         if self.value == '6.6.2':
             return 'version_6_6_2'
+        if self.value == '7.2.0':
+            return 'version_7_2_0'
 
     @classmethod
     def from_server(cls, value):
@@ -730,6 +734,8 @@ class EventingFunctionLanguageCompatibility(Enum):
             return cls.Version_6_5_0
         elif value == "version_6_6_2":
             return cls.Version_6_6_2
+        elif value == "version_7_2_0":
+            return cls.Version_7_2_0
         else:
             raise InvalidArgumentException(
                 "Invalid value for language compatibility: {}".format(value)

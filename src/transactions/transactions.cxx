@@ -354,7 +354,9 @@ pycbc_txns::transaction_query_options__to_dict__(PyObject* self)
     if (query_opts.scan_consistency.has_value()) {
         add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(query_opts.scan_consistency.value()));
     }
-    add_to_dict(retval, "profile", profile_mode_to_str(query_opts.profile));
+    if (query_opts.profile.has_value()) {
+        add_to_dict(retval, "profile", profile_mode_to_str(query_opts.profile.value()));
+    }
 
     if (!query_opts.raw.empty()) {
         PyObject* raw = PyDict_New();
@@ -440,7 +442,9 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     if (req.scan_consistency.has_value()) {
         self->opts->scan_consistency(req.scan_consistency.value());
     }
-    self->opts->profile(req.profile);
+    if (req.profile.has_value()) {
+        self->opts->profile(req.profile.value());
+    }
     if (req.raw.size() > 0) {
         std::map<std::string, std::vector<std::byte>, std::less<>> raw_options{};
         for (auto& [name, option] : req.raw) {
