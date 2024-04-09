@@ -63,7 +63,7 @@ except Exception:  # nosec
 import json  # nopep8 # isort:skip # noqa: E402
 import logging  # nopep8 # isort:skip # noqa: E402
 
-from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger  # nopep8 # isort:skip # noqa: E402
+from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger, shutdown_logger  # nopep8 # isort:skip # noqa: E402
 
 _PYCBC_LOGGER = pycbc_logger()
 _CXXCBC_METADATA_JSON = json.loads(CXXCBC_METADATA)
@@ -84,8 +84,10 @@ import atexit  # nopep8 # isort:skip # noqa: E402
 def _pycbc_teardown(**kwargs):
     """**INTERNAL**"""
     global _PYCBC_LOGGER
-    if _PYCBC_LOGGER:
-        # TODO:  see about synchronizing the logger's shutdown here
+    # if using a console logger we let the nature course of shutdown happening, if using Python logging
+    # we need a cleaner mechanism to shutdown the C++ logger prior to the Python interpreter starting to finalize
+    if _PYCBC_LOGGER and isinstance(_PYCBC_LOGGER, pycbc_logger) and not _PYCBC_LOGGER.is_console_logger():
+        shutdown_logger()
         _PYCBC_LOGGER = None
 
 

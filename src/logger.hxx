@@ -135,7 +135,11 @@ class pycbc_logger_sink : public spdlog::sinks::sink
             }
             PyGILState_Release(state);
         } catch (...) {
-            PyGILState_Release(state);
+            // There is still a possibility we hit this after the interpret has started to finalize
+            if (0 == _Py_IsFinalizing()) {
+                PyGILState_Release(state);
+            }
+            throw;
         }
     }
 
@@ -218,6 +222,7 @@ class pycbc_logger_sink : public spdlog::sinks::sink
 
 struct pycbc_logger {
     PyObject_HEAD std::shared_ptr<pycbc_logger_sink> logger_sink_;
+    bool is_console_logger{ false };
 };
 
 int

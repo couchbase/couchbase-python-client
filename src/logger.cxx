@@ -92,7 +92,7 @@ pycbc_logger__create_console_logger__(PyObject* self, PyObject* args, PyObject* 
     couchbase::core::logger::create_console_logger();
     auto level = couchbase::core::logger::level_from_str(log_level);
     couchbase::core::logger::set_log_levels(level);
-
+    logger->is_console_logger = true;
     Py_RETURN_NONE;
 }
 
@@ -113,6 +113,19 @@ pycbc_logger__enable_protocol_logger__(PyObject* self, PyObject* args, PyObject*
     Py_RETURN_NONE;
 }
 
+PyObject*
+pycbc_logger__is_console_logger__(PyObject* self, PyObject* Py_UNUSED(ignored))
+{
+    auto logger = reinterpret_cast<pycbc_logger*>(self);
+    if (logger->is_console_logger) {
+        Py_INCREF(Py_True);
+        return Py_True;
+    } else {
+        Py_INCREF(Py_False);
+        return Py_False;
+    }
+}
+
 static PyMethodDef pycbc_logger_methods[] = { { "configure_logging_sink",
                                                 (PyCFunction)pycbc_logger__configure_logging_sink__,
                                                 METH_VARARGS | METH_KEYWORDS,
@@ -125,6 +138,10 @@ static PyMethodDef pycbc_logger_methods[] = { { "configure_logging_sink",
                                                 (PyCFunction)pycbc_logger__enable_protocol_logger__,
                                                 METH_VARARGS | METH_KEYWORDS,
                                                 PyDoc_STR("Enables the protocol logger") },
+                                              { "is_console_logger",
+                                                (PyCFunction)pycbc_logger__is_console_logger__,
+                                                METH_NOARGS,
+                                                PyDoc_STR("Check if logger is console logger or not") },
                                               { NULL } };
 
 static PyObject*

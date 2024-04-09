@@ -519,6 +519,13 @@ close_connection(PyObject* self, PyObject* args, PyObject* kwargs)
     return res;
 }
 
+static PyObject*
+shutdown_logger(PyObject* self, PyObject* Py_UNUSED(ignored))
+{
+    Py_BEGIN_ALLOW_THREADS couchbase::core::logger::shutdown();
+    Py_END_ALLOW_THREADS Py_RETURN_NONE;
+}
+
 static struct PyMethodDef methods[] = {
     { "create_connection", (PyCFunction)create_connection, METH_VARARGS | METH_KEYWORDS, "Create connection object" },
     { "get_connection_info", (PyCFunction)get_connection_information, METH_VARARGS | METH_KEYWORDS, "Get connection options" },
@@ -551,6 +558,7 @@ static struct PyMethodDef methods[] = {
       (PyCFunction)pycbc_txns::destroy_transactions,
       METH_VARARGS | METH_KEYWORDS,
       "shut down transactions object" },
+    { "shutdown_logger", (PyCFunction)shutdown_logger, METH_NOARGS, "shut down C++ logger" },
     { nullptr, nullptr, 0, nullptr }
 };
 
