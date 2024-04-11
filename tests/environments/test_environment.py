@@ -218,6 +218,10 @@ class TestEnvironment:
         return self._use_scope_eventing_mgmt
 
     @property
+    def use_named_collections(self) -> bool:
+        return self._use_named_collections
+
+    @property
     def vixm(self) -> Optional[Any]:
         """Returns the default ViewIndexManager"""
         return self._vixm if hasattr(self, '_vixm') else None

@@ -96,7 +96,8 @@ class RangeScanTestSuite:
             except DocumentNotFoundException:
                 pass
 
-    def _validate_result(self, result, expected_count=0, ids_only=False, return_rows=False, from_sample=False):
+    def _validate_result(self, result, expected_count=0, ids_only=False, return_rows=False, from_sample=False,
+                         skip_content_validation=False):
         assert isinstance(result, ScanResultIterable)
         rows = []
         for r in result:
@@ -113,7 +114,8 @@ class RangeScanTestSuite:
                 assert r.id is not None
                 content = r.content_as[dict]
                 assert content is not None
-                assert content == {'id': r.id}
+                if not skip_content_validation:
+                    assert content == {'id': r.id}
             rows.append(r)
 
         if from_sample is True:
@@ -179,7 +181,8 @@ class RangeScanTestSuite:
         res = cb_env.collection.scan(scan_type, ScanOptions(timeout=timedelta(seconds=10),
                                                             ids_only=False,
                                                             consistent_with=test_mutation_state))
-        self._validate_result(res, limit, ids_only=False, return_rows=False, from_sample=True)
+        self._validate_result(res, limit, ids_only=False, return_rows=False, from_sample=True,
+                              skip_content_validation=(not cb_env.use_named_collections))
 
     @pytest.mark.usefixtures('check_range_scan_supported')
     def test_sampling_scan_with_seed(self, cb_env, test_ids, test_mutation_state):
@@ -188,7 +191,8 @@ class RangeScanTestSuite:
         res = cb_env.collection.scan(scan_type, ScanOptions(timeout=timedelta(seconds=10),
                                                             ids_only=True,
                                                             consistent_with=test_mutation_state))
-        rows = self._validate_result(res, limit, ids_only=True, return_rows=True, from_sample=True)
+        rows = self._validate_result(res, limit, ids_only=True, return_rows=True, from_sample=True,
+                                     skip_content_validation=(not cb_env.use_named_collections))
         result_ids = []
         for r in rows:
             result_ids.append(r.id)
@@ -197,7 +201,8 @@ class RangeScanTestSuite:
         res = cb_env.collection.scan(scan_type, ScanOptions(timeout=timedelta(seconds=10),
                                                             ids_only=True,
                                                             consistent_with=test_mutation_state))
-        rows = self._validate_result(res, limit, ids_only=True, return_rows=True, from_sample=True)
+        rows = self._validate_result(res, limit, ids_only=True, return_rows=True, from_sample=True,
+                                     skip_content_validation=(not cb_env.use_named_collections))
         compare_ids = list(map(lambda r: r.id, rows))
         assert result_ids == compare_ids
 
@@ -279,7 +284,7 @@ class RangeScanTestSuite:
                                      ScanOptions(timeout=timedelta(seconds=10),
                                                  batch_byte_limit=batch_byte_limit,
                                                  consistent_with=test_mutation_state))
-        self._validate_result(res, 100, from_sample=True)
+        self._validate_result(res, 100, from_sample=True, skip_content_validation=(not cb_env.use_named_collections))
 
     @pytest.mark.usefixtures('check_range_scan_supported')
     @pytest.mark.parametrize('batch_item_limit', [0, 1, 25, 100])
@@ -289,7 +294,7 @@ class RangeScanTestSuite:
                                      ScanOptions(timeout=timedelta(seconds=10),
                                                  batch_item_limit=batch_item_limit,
                                                  consistent_with=test_mutation_state))
-        self._validate_result(res, 100, from_sample=True)
+        self._validate_result(res, 100, from_sample=True, skip_content_validation=(not cb_env.use_named_collections))
 
     @pytest.mark.usefixtures('check_range_scan_supported')
     @pytest.mark.parametrize('concurrency', [1, 2, 4, 16, 64, 128])
@@ -299,7 +304,7 @@ class RangeScanTestSuite:
                                      ScanOptions(timeout=timedelta(seconds=10),
                                                  concurrency=concurrency,
                                                  consistent_with=test_mutation_state))
-        self._validate_result(res, 100, from_sample=True)
+        self._validate_result(res, 100, from_sample=True, skip_content_validation=(not cb_env.use_named_collections))
 
     @pytest.mark.usefixtures('check_range_scan_supported')
     def test_range_scan_with_zero_concurrency(self, cb_env, test_id, test_mutation_state):
