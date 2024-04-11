@@ -149,6 +149,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.ScopeSearch,
                                 ServerFeatures.ScopeSearchIndexManagement]
 
+    AT_MOST_V7_2_0_FEATURES = [ServerFeatures.RateLimiting]
+
     @staticmethod
     def is_feature_supported(feature,  # type: str
                              server_version,  # type: float
@@ -234,6 +236,11 @@ class EnvironmentFeatures:
                 return None
 
             return f'LegacyMockServer does not support feature: {feature}'
+
+        if feature in map(lambda f: f.value, EnvironmentFeatures.AT_MOST_V7_2_0_FEATURES):
+            if server_version > 7.2:
+                return (f'Feature: {feature} not supported on server versions > 7.2. '
+                        f'Using server version: {server_version}.')
 
         if feature in map(lambda f: f.value, EnvironmentFeatures.AT_LEAST_V5_5_0_FEATURES):
             if is_mock_server:
