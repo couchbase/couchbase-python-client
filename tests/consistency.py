@@ -90,6 +90,23 @@ class ConsistencyChecker:
                     f'in all nodes'
         self._wait_until_resource_satisfies_predicate(path, predicate, error_msg, timeout)
 
+    def wait_until_collection_has_settings(self, bucket_name, scope_name, collection_name, settings,
+                                           timeout=DEFAULT_TIMEOUT):
+        def satisfies_settings(coll):
+            return all(coll[k] == v for k, v in settings.items())
+
+        def predicate(resp):
+            return any(
+                scope['name'] == scope_name
+                and any(coll['name'] == collection_name and satisfies_settings(coll) for coll in scope['collections'])
+                for scope in resp['scopes']
+            )
+
+        path = f'pools/default/buckets/{bucket_name}/scopes'
+        error_msg = f'Collection {collection_name} in scope {scope_name}, bucket {bucket_name} does not have the' \
+                    f'expected settings in all nodes ({settings})'
+        self._wait_until_resource_satisfies_predicate(path, predicate, error_msg, timeout)
+
     def _wait_until_resource_present(self, path, error_msg, timeout=DEFAULT_TIMEOUT):
         deadline = datetime.now() + timeout
         while datetime.now() < deadline:

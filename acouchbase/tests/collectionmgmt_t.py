@@ -24,6 +24,7 @@ from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import (BucketDoesNotExistException,
                                   CollectionAlreadyExistsException,
                                   CollectionNotFoundException,
+                                  DocumentNotFoundException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException,
                                   ScopeAlreadyExistsException,
@@ -195,15 +196,14 @@ class CollectionManagementTests:
         assert coll_spec is not None
         assert coll_spec.max_expiry == timedelta(seconds=2)
 
-        # @TODO(PYCBC-1566) - need to investigate why this can crash
         # pop a doc in with no ttl, verify it goes away...
-        # coll = cb_env.test_bucket.collection(self.TEST_COLLECTION)
-        # key = "test-coll-key0"
-        # # we _can_ get a temp fail here, as we just created the collection.  So we
-        # # retry the upsert.
-        # await cb_env.try_n_times(10, 1, coll.upsert, key, {"some": "thing"})
-        # await cb_env.try_n_times(10, 1, coll.get, key)
-        # await cb_env.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
+        coll = cb_env.test_bucket.collection(self.TEST_COLLECTION)
+        key = "test-coll-key0"
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        await cb_env.try_n_times(10, 1, coll.upsert, key, {"some": "thing"})
+        await cb_env.try_n_times(10, 1, coll.get, key)
+        await cb_env.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
 
     @pytest.mark.usefixtures('cleanup_collection')
     @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
@@ -271,15 +271,14 @@ class CollectionManagementTests:
         assert coll_spec is not None
         assert coll_spec.max_expiry == timedelta(seconds=2)
 
-        # @TODO(PYCBC-1566) - need to investigate why this can crash
         # pop a doc in with no ttl, verify it goes away...
-        # coll = cb_env.test_bucket.collection(self.TEST_COLLECTION)
-        # key = "test-coll-key0"
-        # # we _can_ get a temp fail here, as we just created the collection.  So we
-        # # retry the upsert.
-        # await cb_env.try_n_times(10, 1, coll.upsert, key, {"some": "thing"})
-        # await cb_env.try_n_times(10, 1, coll.get, key)
-        # await cb_env.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
+        coll = cb_env.test_bucket.collection(self.TEST_COLLECTION)
+        key = "test-coll-key0"
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        await cb_env.try_n_times(10, 1, coll.upsert, key, {"some": "thing"})
+        await cb_env.try_n_times(10, 1, coll.get, key)
+        await cb_env.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
 
     @pytest.mark.asyncio
     async def test_create_collection_bad_scope(self, cb_env):
@@ -529,15 +528,14 @@ class CollectionManagementTests:
         await cb_env.test_bucket_cm.create_collection(collection)
         assert await cb_env.get_collection(collection.scope_name, collection.name) is not None
 
-        # @TODO(PYCBC-1566) - need to investigate why this can crash
         # pop a doc in with no ttl, verify it goes away...
-        # coll = cb_env.test_bucket.collection(collection.name)
-        # key = "test-coll-key0"
-        # # we _can_ get a temp fail here, as we just created the collection.  So we
-        # # retry the upsert.
-        # await cb_env.try_n_times(10, 1, coll.upsert, key, {"some": "thing"})
-        # await cb_env.try_n_times(10, 1, coll.get, key)
-        # await cb_env.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
+        coll = cb_env.test_bucket.collection(collection.name)
+        key = "test-coll-key0"
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        await cb_env.try_n_times(10, 1, coll.upsert, key, {"some": "thing"})
+        await cb_env.try_n_times(10, 1, coll.get, key)
+        await cb_env.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
 
     @pytest.mark.asyncio
     async def test_deprecated_create_collection_bad_scope(self, cb_env):

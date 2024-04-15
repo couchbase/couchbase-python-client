@@ -20,6 +20,7 @@ import pytest
 from couchbase.exceptions import (BucketDoesNotExistException,
                                   CollectionAlreadyExistsException,
                                   CollectionNotFoundException,
+                                  DocumentNotFoundException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException,
                                   ScopeAlreadyExistsException,
@@ -147,19 +148,18 @@ class CollectionManagementTestSuite:
         assert coll_spec is not None
         assert coll_spec.max_expiry == timedelta(seconds=2)
 
-        # @TODO(PYCBC-1566) - need to investigate why this can crash
         # pop a doc in with no ttl, verify it goes away...
-        # coll = cb_env.test_bucket.collection(collection_name)
-        # key = 'test-coll-key0'
-        # # we _can_ get a temp fail here, as we just created the collection.  So we
-        # # retry the upsert.
-        # TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
-        # TestEnvironment.try_n_times(10, 1, coll.get, key)
-        # TestEnvironment.try_n_times_till_exception(4,
-        #                                            1,
-        #                                            coll.get,
-        #                                            key,
-        #                                            expected_exceptions=(DocumentNotFoundException,))
+        coll = cb_env.test_bucket.collection(collection_name)
+        key = 'test-coll-key0'
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
+        TestEnvironment.try_n_times(10, 1, coll.get, key)
+        TestEnvironment.try_n_times_till_exception(4,
+                                                   1,
+                                                   coll.get,
+                                                   key,
+                                                   expected_exceptions=(DocumentNotFoundException,))
 
     @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
     def test_create_collection_max_expiry_default(self, cb_env):
@@ -340,6 +340,8 @@ class CollectionManagementTestSuite:
         assert not collection_spec.history
 
         cm.update_collection(scope_name, collection_name, UpdateCollectionSettings(history=True))
+        cb_env.consistency.wait_until_collection_has_settings(
+            bucket.name, scope_name, collection_name, {'history': True})
         collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name=bucket_name)
         assert collection_spec is not None
         assert collection_spec.history
@@ -388,24 +390,25 @@ class CollectionManagementTestSuite:
 
         settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=2))
         cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+        cb_env.consistency.wait_until_collection_has_settings(
+            cb_env.test_bucket.name, scope_name, collection_name, {'maxTTL': 2})
 
         coll_spec = cb_env.get_collection(scope_name, collection_name)
         assert coll_spec is not None
         assert coll_spec.max_expiry == timedelta(seconds=2)
 
         # pop a doc in with no ttl, verify it goes away...
-        # @TODO(PYCBC-1566) - need to investigate why this can crash
-        # coll = cb_env.test_bucket.collection(collection_name)
-        # key = 'test-coll-key0'
-        # # we _can_ get a temp fail here, as we just created the collection.  So we
-        # # retry the upsert.
-        # TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
-        # TestEnvironment.try_n_times(10, 1, coll.get, key)
-        # TestEnvironment.try_n_times_till_exception(4,
-        #                                            1,
-        #                                            coll.get,
-        #                                            key,
-        #                                            expected_exceptions=(DocumentNotFoundException,))
+        coll = cb_env.test_bucket.collection(collection_name)
+        key = 'test-coll-key0'
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
+        TestEnvironment.try_n_times(10, 1, coll.get, key)
+        TestEnvironment.try_n_times_till_exception(4,
+                                                   1,
+                                                   coll.get,
+                                                   key,
+                                                   expected_exceptions=(DocumentNotFoundException,))
 
     @pytest.mark.usefixtures('check_update_collection_supported')
     @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
@@ -426,6 +429,8 @@ class CollectionManagementTestSuite:
 
         settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=0))
         cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+        cb_env.consistency.wait_until_collection_has_settings(
+            cb_env.test_bucket.name, scope_name, collection_name, {'maxTTL': 0})
 
         coll_spec = cb_env.get_collection(scope_name, collection_name)
         assert coll_spec is not None
@@ -467,6 +472,8 @@ class CollectionManagementTestSuite:
 
         settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=-1))
         cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
+        cb_env.consistency.wait_until_collection_has_settings(
+            cb_env.test_bucket.name, scope_name, collection_name, {'maxTTL': -1})
         coll_spec = cb_env.get_collection(scope_name, collection_name)
         assert coll_spec is not None
         assert coll_spec.max_expiry == timedelta(seconds=-1)
@@ -509,19 +516,18 @@ class CollectionManagementTestSuite:
         cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
         assert cb_env.get_collection(collection.scope_name, collection.name) is not None
 
-        # @TODO(PYCBC-1566) - need to investigate why this can crash
         # pop a doc in with no ttl, verify it goes away...
-        # coll = cb_env.test_bucket.collection(collection.name)
-        # key = 'test-coll-key0'
-        # # we _can_ get a temp fail here, as we just created the collection.  So we
-        # # retry the upsert.
-        # TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
-        # TestEnvironment.try_n_times(10, 1, coll.get, key)
-        # TestEnvironment.try_n_times_till_exception(4,
-        #                                            1,
-        #                                            coll.get,
-        #                                            key,
-        #                                            expected_exceptions=(DocumentNotFoundException,))
+        coll = cb_env.test_bucket.collection(collection.name)
+        key = 'test-coll-key0'
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
+        TestEnvironment.try_n_times(10, 1, coll.get, key)
+        TestEnvironment.try_n_times_till_exception(4,
+                                                   1,
+                                                   coll.get,
+                                                   key,
+                                                   expected_exceptions=(DocumentNotFoundException,))
 
     def test_deprecated_create_scope_and_collection(self, cb_env):
         scope_name = cb_env.get_scope_name()
