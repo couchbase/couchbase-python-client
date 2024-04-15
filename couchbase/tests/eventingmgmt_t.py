@@ -79,6 +79,11 @@ class EventingManagementTestSuite:
         cb_env.efm.upsert_function(cb_env.BASIC_FUNC)
         yield
         cb_env.efm.drop_function(cb_env.BASIC_FUNC.name)
+        TestEnvironment.try_n_times_till_exception(10,
+                                                   1,
+                                                   cb_env.efm.get_function,
+                                                   cb_env.BASIC_FUNC.name,
+                                                   EventingFunctionNotFoundException)
 
     @pytest.fixture()
     def create_eventing_function(self, cb_env):
@@ -88,6 +93,11 @@ class EventingManagementTestSuite:
     def drop_eventing_function(self, cb_env):
         yield
         cb_env.efm.drop_function(cb_env.TEST_EVT_NAME)
+        TestEnvironment.try_n_times_till_exception(10,
+                                                   1,
+                                                   cb_env.efm.get_function,
+                                                   cb_env.BASIC_FUNC.name,
+                                                   EventingFunctionNotFoundException)
 
     @pytest.fixture()
     def undeploy_and_drop_eventing_function(self, cb_env):
@@ -95,6 +105,11 @@ class EventingManagementTestSuite:
         cb_env.efm.undeploy_function(cb_env.TEST_EVT_NAME)
         cb_env.wait_until_status(15, 2, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
         cb_env.efm.drop_function(cb_env.TEST_EVT_NAME)
+        TestEnvironment.try_n_times_till_exception(10,
+                                                   1,
+                                                   cb_env.efm.get_function,
+                                                   cb_env.BASIC_FUNC.name,
+                                                   EventingFunctionNotFoundException)
 
     def test_constant_bindings(self, cb_env):
         # TODO:  look into why timeout occurs when providing > 1 constant
