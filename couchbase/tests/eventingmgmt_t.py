@@ -62,9 +62,8 @@ class EventingManagementTestSuite:
         'test_get_function',
         'test_get_function_fail',
         'test_options_simple',
-        'test_pause_function',
         'test_pause_function_fail',
-        'test_resume_function',
+        'test_pause_and_resume_function',
         'test_resume_function_fail',
         'test_undeploy_function',
         'test_undeploy_function_fail',
@@ -322,18 +321,6 @@ class EventingManagementTestSuite:
                                            GetFunctionOptions(timeout=timedelta(seconds=15)))
         cb_env.validate_eventing_function(func, shallow=True)
 
-    @pytest.mark.usefixtures('create_eventing_function')
-    @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
-    def test_pause_function(self, cb_env):
-        cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
-        cb_env.efm.deploy_function(cb_env.BASIC_FUNC.name)
-        cb_env.wait_until_status(20, 3, EventingFunctionState.Deployed, cb_env.BASIC_FUNC.name)
-        cb_env.efm.pause_function(cb_env.BASIC_FUNC.name)
-        func = TestEnvironment.try_n_times(5, 1, cb_env.efm.get_function, cb_env.BASIC_FUNC.name)
-        cb_env.validate_eventing_function(func, shallow=True)
-        # verify function processing status
-        assert func.settings.processing_status == EventingFunctionProcessingStatus.Paused
-
     @pytest.mark.usefixtures('create_and_drop_eventing_function')
     def test_pause_function_fail(self, cb_env):
         cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
@@ -346,13 +333,17 @@ class EventingManagementTestSuite:
 
     @pytest.mark.usefixtures('create_eventing_function')
     @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
-    def test_resume_function(self, cb_env):
+    def test_pause_and_resume_function(self, cb_env):
         # make sure function has been deployed
         cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
         cb_env.efm.deploy_function(cb_env.BASIC_FUNC.name)
         cb_env.wait_until_status(20, 3, EventingFunctionState.Deployed, cb_env.BASIC_FUNC.name)
         # pause function - verify status is paused
         cb_env.efm.pause_function(cb_env.BASIC_FUNC.name)
+        func = TestEnvironment.try_n_times(5, 1, cb_env.efm.get_function, cb_env.BASIC_FUNC.name)
+        cb_env.validate_eventing_function(func, shallow=True)
+        # verify function processing status
+        assert func.settings.processing_status == EventingFunctionProcessingStatus.Paused
         cb_env.wait_until_status(15, 2, EventingFunctionState.Paused, cb_env.BASIC_FUNC.name)
         # resume function
         cb_env.efm.resume_function(cb_env.BASIC_FUNC.name)
@@ -360,6 +351,8 @@ class EventingManagementTestSuite:
         cb_env.validate_eventing_function(func, shallow=True)
         # verify function processing status
         assert func.settings.processing_status == EventingFunctionProcessingStatus.Running
+        # verify function state
+        cb_env.wait_until_status(20, 3, EventingFunctionState.Deployed, cb_env.BASIC_FUNC.name)
 
     @pytest.mark.usefixtures('create_and_drop_eventing_function')
     def test_resume_function_fail(self, cb_env):
