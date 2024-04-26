@@ -90,6 +90,10 @@ def process_build_env_vars():  # noqa: C901
     if pycbc_cmake_system_version is not None:
         cmake_extra_args += [f'-DCMAKE_SYSTEM_VERSION={pycbc_cmake_system_version}']
 
+    pycbc_tls_key_log_file = os.getenv('PYCBC_TLS_KEY_LOG_FILE', None)
+    if pycbc_tls_key_log_file is not None:
+        cmake_extra_args += [f'-DCOUCHBASE_CXX_CLIENT_TLS_KEY_LOG_FILE={pycbc_tls_key_log_file}']
+
     # now pop these in CMAKE_COMMON_VARIABLES, and they will be used by cmake...
     os.environ['CMAKE_COMMON_VARIABLES'] = ' '.join(cmake_extra_args)
 
