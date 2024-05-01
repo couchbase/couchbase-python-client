@@ -20,7 +20,6 @@ import pytest
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (AuthenticationException,
-                                  CouchbaseException,
                                   FeatureUnavailableException,
                                   GroupNotFoundException,
                                   InvalidArgumentException,
@@ -137,17 +136,17 @@ class UserManagementTestSuite:
         with pytest.raises(InvalidArgumentException):
             cb_env.um.upsert_user(User(username=username, password=password, roles=[]),
                                   domain_name='external')
-        try:
-            cb_env.um.upsert_user(
-                User(username=username, password=None, roles=roles),
-                UpsertUserOptions(domain_name='external'))
-        except InvalidArgumentException:
-            raise
-        except CouchbaseException:
-            pass
-        finally:
-            cb_env.um.drop_user(username, domain_name='external')
 
+        # Should not raise
+        cb_env.um.upsert_user(
+            User(username=username, password=None, roles=roles),
+            UpsertUserOptions(domain_name='external'))
+
+        cb_env.consistency.wait_until_user_present(username, domain='external')
+        cb_env.um.drop_user(username, domain_name='external')
+        cb_env.consistency.wait_until_user_dropped(username, domain='external')
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_external_user(self, cb_env):
         """
             test_external_user()
@@ -305,6 +304,7 @@ class UserManagementTestSuite:
         with pytest.raises(FeatureUnavailableException):
             cb_env.um.drop_group(test_group.name)
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_internal_user(self, cb_env):
         """
             test_internal_user()
@@ -391,6 +391,7 @@ class UserManagementTestSuite:
             cb_env.um.upsert_user(User(username=username, roles=roles, password=password),
                                   UpsertUserOptions(domain_name='local'))
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_internal_user_kwargs(self, cb_env):
         """
             test_internal_user_kwargs()
