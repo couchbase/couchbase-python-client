@@ -43,16 +43,16 @@ class AnalyticsScanConsistency(Enum):
 
 
 class AnalyticsStatus(Enum):
-    RUNNING = ()
-    SUCCESS = ()
-    ERRORS = ()
-    COMPLETED = ()
-    STOPPED = ()
-    TIMEOUT = ()
-    CLOSED = ()
-    FATAL = ()
-    ABORTED = ()
-    UNKNOWN = ()
+    RUNNING = 1
+    SUCCESS = 2
+    ERRORS = 3
+    COMPLETED = 4
+    STOPPED = 5
+    TIMEOUT = 6
+    CLOSED = 7
+    FATAL = 8
+    ABORTED = 9
+    UNKNOWN = 10
 
 
 class AnalyticsProblem(object):
