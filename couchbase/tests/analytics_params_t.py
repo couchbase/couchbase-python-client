@@ -17,7 +17,9 @@ from datetime import timedelta
 
 import pytest
 
-from couchbase.analytics import AnalyticsQuery, AnalyticsScanConsistency
+from couchbase.analytics import (AnalyticsQuery,
+                                 AnalyticsScanConsistency,
+                                 AnalyticsStatus)
 from couchbase.options import AnalyticsOptions
 from tests.environments import CollectionType
 
@@ -32,6 +34,7 @@ class AnalyticsParamTestSuite:
         'test_params_read_only',
         'test_params_serializer',
         'test_params_timeout',
+        'test_status'
     ]
 
     @pytest.fixture(scope='class')
@@ -130,6 +133,12 @@ class AnalyticsParamTestSuite:
         exp_opts = base_opts.copy()
         exp_opts['timeout'] = 25500000
         assert query.params == exp_opts
+
+    @pytest.mark.parametrize('value, expected', [(k, v) for k, v in AnalyticsStatus.__members__.items()])
+    def test_status(self, value, expected):
+        a_status = AnalyticsStatus[value]
+        assert isinstance(a_status, AnalyticsStatus)
+        assert a_status == expected
 
 
 class ClassicAnalyticsParamTests(AnalyticsParamTestSuite):

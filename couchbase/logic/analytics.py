@@ -43,16 +43,19 @@ class AnalyticsScanConsistency(Enum):
 
 
 class AnalyticsStatus(Enum):
-    RUNNING = ()
-    SUCCESS = ()
-    ERRORS = ()
-    COMPLETED = ()
-    STOPPED = ()
-    TIMEOUT = ()
-    CLOSED = ()
-    FATAL = ()
-    ABORTED = ()
-    UNKNOWN = ()
+    """
+    Represents the status of an analytics query.
+    """
+    RUNNING = "running"
+    SUCCESS = "success"
+    ERRORS = "errors"
+    COMPLETED = "completed"
+    STOPPED = "stopped"
+    TIMEOUT = "timeout"
+    CLOSED = "closed"
+    FATAL = "fatal"
+    ABORTED = "aborted"
+    UNKNOWN = "unknown"
 
 
 class AnalyticsProblem(object):
