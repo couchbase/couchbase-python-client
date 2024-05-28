@@ -579,7 +579,7 @@ get_bucket_settings(PyObject* settings)
     PyObject* pyObj_bucket_type = PyDict_GetItemString(settings, "bucketType");
     if (pyObj_bucket_type) {
         auto b_type = std::string(PyUnicode_AsUTF8(pyObj_bucket_type));
-        if (b_type.compare("couchbase") == 0) {
+        if (b_type.compare("membase") == 0 || b_type.compare("couchbase") == 0) {
             bucket_settings.bucket_type = couchbase::core::management::cluster::bucket_type::couchbase;
         } else if (b_type.compare("memcached") == 0) {
             bucket_settings.bucket_type = couchbase::core::management::cluster::bucket_type::memcached;
