@@ -289,58 +289,6 @@ create_result_from_query_index_mgmt_op_response(const Response& resp,
     PyGILState_Release(state);
 }
 
-template<>
-void
-create_result_from_query_index_mgmt_op_response(const couchbase::manager_error_context& ctx,
-                                                PyObject* pyObj_callback,
-                                                PyObject* pyObj_errback,
-                                                std::shared_ptr<std::promise<PyObject*>> barrier)
-{
-    PyObject* pyObj_args = nullptr;
-    PyObject* pyObj_kwargs = nullptr;
-    PyObject* pyObj_func = nullptr;
-    PyObject* pyObj_exc = nullptr;
-    PyObject* pyObj_callback_res = nullptr;
-
-    PyGILState_STATE state = PyGILState_Ensure();
-    if (ctx.ec()) {
-        pyObj_exc = build_exception_from_context(ctx, __FILE__, __LINE__, "Error doing query index mgmt operation.", "QueryIndexMgmt");
-        if (pyObj_errback == nullptr) {
-            barrier->set_value(pyObj_exc);
-        } else {
-            pyObj_func = pyObj_errback;
-            pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-        }
-        // lets clear any errors
-        PyErr_Clear();
-    } else {
-        Py_INCREF(Py_None);
-        if (pyObj_callback == nullptr) {
-            barrier->set_value(Py_None);
-        } else {
-            pyObj_func = pyObj_callback;
-            pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-        }
-    }
-
-    if (pyObj_func != nullptr) {
-        pyObj_callback_res = PyObject_Call(pyObj_func, pyObj_args, pyObj_kwargs);
-        if (pyObj_callback_res) {
-            Py_DECREF(pyObj_callback_res);
-        } else {
-            PyErr_Print();
-            // @TODO:  how to handle this situation?
-        }
-        Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-    }
-    PyGILState_Release(state);
-}
-
 couchbase::core::operations::management::query_index_create_request
 get_create_query_index_req(PyObject* op_args)
 {

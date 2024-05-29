@@ -20,7 +20,6 @@
 #include <exception>
 
 #include "client.hxx"
-#include <couchbase/manager_error_context.hxx>
 #include <core/error_context/analytics.hxx>
 #include <core/error_context/http.hxx>
 #include <core/error_context/key_value.hxx>
@@ -308,89 +307,6 @@ build_exception_from_context(const couchbase::key_value_error_context& ctx,
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
-
-    exc->error_context = pyObj_error_context;
-
-    PyObject* pyObj_exc_info = PyDict_New();
-
-    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
-    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
-        PyErr_Print();
-        Py_XDECREF(pyObj_cinfo);
-    }
-    Py_DECREF(pyObj_cinfo);
-
-    if (!error_msg.empty()) {
-        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
-        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
-            PyErr_Print();
-            Py_XDECREF(pyObj_error_msg);
-        }
-        Py_DECREF(pyObj_error_msg);
-    }
-
-    exc->exc_info = pyObj_exc_info;
-
-    return reinterpret_cast<PyObject*>(exc);
-}
-
-template<>
-inline PyObject*
-build_exception_from_context(const couchbase::manager_error_context& ctx,
-                             const char* file,
-                             int line,
-                             std::string error_msg,
-                             std::string context_detail_type)
-{
-    exception_base* exc = create_exception_base_obj();
-    exc->ec = ctx.ec();
-    PyObject* pyObj_error_context = build_base_error_context_new(ctx);
-
-    PyObject* pyObj_tmp = nullptr;
-    pyObj_tmp = PyUnicode_FromString(ctx.client_context_id().c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, CLIENT_CONTEXT_ID, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(ctx.content().c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, MGMT_CONTENT, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(ctx.path().c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, MGMT_PATH, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyLong_FromLong(static_cast<uint32_t>(ctx.http_status()));
-    if (-1 == PyDict_SetItemString(pyObj_error_context, MGMT_STATUS, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    std::string context_type = "ManagementErrorContext";
-    pyObj_tmp = PyUnicode_FromString(context_type.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, CONTEXT_TYPE, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    if (!context_detail_type.empty()) {
-        pyObj_tmp = PyUnicode_FromString(context_detail_type.c_str());
-        if (-1 == PyDict_SetItemString(pyObj_error_context, CONTEXT_DETAIL_TYPE, pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-    }
 
     exc->error_context = pyObj_error_context;
 
