@@ -868,12 +868,15 @@ class VectorSearchParamTestSuite:
                    -0.02059517428278923,
                    0.019551364704966545]
 
+    TEST_VECTOR_BASE64 = 'SSdtIGp1c3QgYSB0ZXN0IHN0cmluZw=='
+
     TEST_MANIFEST = [
         'test_search_request_invalid',
         'test_vector_query_invalid_boost',
         'test_vector_query_invalid_num_candidates',
         'test_vector_query_invalid_vector',
         'test_vector_search',
+        'test_vector_search_base64',
         'test_vector_search_invalid',
         'test_vector_search_multiple_queries'
     ]
@@ -933,6 +936,9 @@ class VectorSearchParamTestSuite:
             VectorQuery('vector_field', [1])
         with pytest.raises(InvalidArgumentException):
             VectorQuery('vector_field', [1.111, 2, 3.14159])
+        # if not a list, should be a str
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('vector_field', {})
 
     def test_vector_search(self, cb_env):
         exp_json = {
@@ -950,6 +956,30 @@ class VectorSearchParamTestSuite:
         }
 
         vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR))
+        req = SearchRequest.create(vector_search)
+        search_query = search.SearchQueryBuilder.create_search_query_from_request(
+            cb_env.TEST_INDEX_NAME,
+            req
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+
+    def test_vector_search_base64(self, cb_env):
+        exp_json = {
+            'query': {'match_none': None},
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+            'show_request': False,
+            'vector_search': [
+                {
+                    'field': 'vector_field',
+                    'vector_base64': self.TEST_VECTOR_BASE64,
+                    'k': 3
+                }
+            ]
+        }
+
+        vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR_BASE64))
         req = SearchRequest.create(vector_search)
         search_query = search.SearchQueryBuilder.create_search_query_from_request(
             cb_env.TEST_INDEX_NAME,

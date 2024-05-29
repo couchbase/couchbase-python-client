@@ -961,9 +961,12 @@ class SearchQueryBuilder:
         for query in self._vector_search.queries:
             encoded_query = {
                 'field': query.field_name,
-                'vector': query.vector,
                 'k': query.num_candidates if query.num_candidates is not None else 3
             }
+            if query.vector is not None:
+                encoded_query['vector'] = query.vector
+            else:
+                encoded_query['vector_base64'] = query.vector_base64
             if query.boost is not None:
                 encoded_query['boost'] = query.boost
             encoded_queries.append(encoded_query)

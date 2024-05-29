@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional
+from typing import (List,
+                    Optional,
+                    Union)
 
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import VectorSearchOptions
@@ -37,13 +39,14 @@ class VectorQuery:
 
     Args:
         field_name (str): The name of the field in the search index that stores the vector.
-        vector (List[float]): The vector to use in the query.
+        vector (Union[List[float], str]): The vector to use in the query.
         num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or equal to 1.
         boost (float, optional): Add boost to query.
 
     Raises:
         :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If all values of the provided vector are not instances of float.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not a list or str.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If vector is a list and all values of the provided vector are not instances of float.
 
     Returns:
         :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
@@ -51,16 +54,14 @@ class VectorQuery:
 
     def __init__(self,
                  field_name,  # type: str
-                 vector,  # type: List[float]
+                 vector,  # type: Union[List[float], str]
                  num_candidates=None,  # type: Optional[int]
                  boost=None,  # type: Optional[float]
                  ):
         self._field_name = field_name
-        if vector is None or len(vector) == 0:
-            raise InvalidArgumentException('Provided vector cannot be empty.')
-        if not all(map(lambda q: isinstance(q, float), vector)):
-            raise InvalidArgumentException('All vector values must be a float.')
-        self._vector = vector
+        self._vector = None
+        self._vector_base64 = None
+        self._validate_and_set_vector(vector)
         self._num_candidates = self._boost = None
         if num_candidates is not None:
             self.num_candidates = num_candidates
@@ -116,19 +117,46 @@ class VectorQuery:
         self._num_candidates = value
 
     @property
-    def vector(self) -> List[float]:
+    def vector(self) -> Optional[List[float]]:
         """
         **UNCOMMITTED** This API is unlikely to change,
         but may still change as final consensus on its behavior has not yet been reached.
 
-        List[float]: Returns the vector query's vector.
+        Optional[List[float]]: Returns the vector query's vector.
         """
         return self._vector
+
+    @property
+    def vector_base64(self) -> Optional[str]:
+        """
+        **UNCOMMITTED** This API is unlikely to change,
+        but may still change as final consensus on its behavior has not yet been reached.
+
+        Optional[str]: Returns the vector query's base64 vector str.
+        """
+        return self._vector_base64
+
+    def _validate_and_set_vector(self,
+                                 vector,  # type: Union[List[float], str]
+                                 ) -> None:
+        if vector is None:
+            raise InvalidArgumentException('Provided vector cannot be empty.')
+        if isinstance(vector, list):
+            if len(vector) == 0:
+                raise InvalidArgumentException('Provided vector cannot be empty.')
+            if not all(map(lambda q: isinstance(q, float), vector)):
+                raise InvalidArgumentException('All vector values must be a float.')
+            self._vector = vector
+            return
+        elif not isinstance(vector, str):
+            raise InvalidArgumentException('Provided vector must be either a List[float] or base64 encoded str.')
+
+        self._vector_base64 = vector
 
     @classmethod
     def create(cls,
                field_name,  # type: str
-               vector,  # type: List[float]
+               vector,  # type: Union[List[float], str]
                num_candidates=None,  # type: Optional[int]
                boost=None,  # type: Optional[float]
                ) -> VectorQuery:
@@ -139,13 +167,14 @@ class VectorQuery:
 
         Args:
             field_name (str): The name of the field in the search index that stores the vector.
-            vector (List[float]): The vector to use in the query.
+            vector (Union[List[float], str]): The vector to use in the query.
             num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or equal to 1.
             boost (float, optional): Add boost to query.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If all values of the provided vector are not instances of float.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not a list or str.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If vector is a list and all values of the provided vector are not instances of float.
 
         Returns:
             :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
