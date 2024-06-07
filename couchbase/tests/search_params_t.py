@@ -939,6 +939,10 @@ class VectorSearchParamTestSuite:
         # if not a list, should be a str
         with pytest.raises(InvalidArgumentException):
             VectorQuery('vector_field', {})
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery(None, self.TEST_VECTOR)
+        with pytest.raises(InvalidArgumentException):
+            VectorQuery('', self.TEST_VECTOR)
 
     def test_vector_search(self, cb_env):
         exp_json = {

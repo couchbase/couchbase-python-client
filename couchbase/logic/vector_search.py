@@ -5,6 +5,7 @@ from typing import (List,
                     Optional,
                     Union)
 
+from couchbase._utils import is_null_or_empty
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import VectorSearchOptions
 
@@ -58,6 +59,8 @@ class VectorQuery:
                  num_candidates=None,  # type: Optional[int]
                  boost=None,  # type: Optional[float]
                  ):
+        if is_null_or_empty(field_name):
+            raise InvalidArgumentException('Must provide a field name.')
         self._field_name = field_name
         self._vector = None
         self._vector_base64 = None
