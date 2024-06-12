@@ -525,7 +525,7 @@ pycbc_txns::transaction_get_result__get__(pycbc_txns::transaction_get_result* re
     }
     if (VALUE == field_name) {
         try {
-            return binary_to_PyObject(result->res->content());
+            return binary_to_PyObject(result->res->content().data);
         } catch (const std::exception& e) {
             PyErr_SetString(PyExc_TypeError, e.what());
             Py_RETURN_NONE;

@@ -707,7 +707,7 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
         try {
             auto opcode = to_subdoc_opcode(new_spec.op);
             specs.emplace_back(couchbase::core::impl::subdoc::command{
-              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr) });
+              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr, false) });
         } catch (const std::exception& e) {
             PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
             if (barrier) {
@@ -772,7 +772,7 @@ prepare_and_execute_lookup_in_any_replica_op(struct lookup_in_replica_options* o
         try {
             auto opcode = to_subdoc_opcode(new_spec.op);
             specs.emplace_back(couchbase::core::impl::subdoc::command{
-              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr) });
+              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr, false) });
         } catch (const std::exception& e) {
             PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
             if (barrier) {
@@ -836,7 +836,7 @@ prepare_and_execute_lookup_in_all_replicas_op(struct lookup_in_replica_options* 
         try {
             auto opcode = to_subdoc_opcode(new_spec.op);
             specs.emplace_back(couchbase::core::impl::subdoc::command{
-              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr) });
+              opcode, new_spec.path, {}, couchbase::core::impl::subdoc::build_lookup_in_path_flags(new_spec.xattr, false) });
         } catch (const std::exception& e) {
             PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
             if (barrier) {
@@ -920,11 +920,12 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
 
         try {
             auto opcode = to_subdoc_opcode(new_spec.op);
-            specs.emplace_back(couchbase::core::impl::subdoc::command{
-              opcode,
-              new_spec.path,
-              new_spec.value,
-              couchbase::core::impl::subdoc::build_mutate_in_path_flags(new_spec.xattr, new_spec.create_parents, new_spec.expand_macros) });
+            specs.emplace_back(
+              couchbase::core::impl::subdoc::command{ opcode,
+                                                      new_spec.path,
+                                                      new_spec.value,
+                                                      couchbase::core::impl::subdoc::build_mutate_in_path_flags(
+                                                        new_spec.xattr, new_spec.create_parents, new_spec.expand_macros, false) });
         } catch (const std::exception& e) {
             PyErr_SetString(PyExc_ValueError, fmt::format("Invalid subdocument opcode {}", new_spec.op).c_str());
             if (barrier) {
