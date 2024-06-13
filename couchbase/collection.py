@@ -232,7 +232,7 @@ class Collection(CollectionLogic):
                 print(f'Document is replica: {res.is_replica}')
                 print(f'Document value: {res.content_as[dict]}')
 
-        """
+        """  # noqa: E501
 
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)

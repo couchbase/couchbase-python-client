@@ -21,91 +21,106 @@
 
 class ManagementOperations
 {
-  public:
-    enum OperationType { UNKNOWN, CLUSTER, BUCKET, COLLECTION, QUERY_INDEX, SEARCH_INDEX, USER, ANALYTICS, VIEW_INDEX, EVENTING_FUNCTION };
+public:
+  enum OperationType {
+    UNKNOWN,
+    CLUSTER,
+    BUCKET,
+    COLLECTION,
+    QUERY_INDEX,
+    SEARCH_INDEX,
+    USER,
+    ANALYTICS,
+    VIEW_INDEX,
+    EVENTING_FUNCTION
+  };
 
-    ManagementOperations()
-      : ManagementOperations{ UNKNOWN }
-    {
-    }
-    constexpr ManagementOperations(OperationType op)
-      : operation{ op }
-    {
-    }
+  ManagementOperations()
+    : ManagementOperations{ UNKNOWN }
+  {
+  }
+  constexpr ManagementOperations(OperationType op)
+    : operation{ op }
+  {
+  }
 
-    operator OperationType() const
-    {
-        return operation;
-    }
-    // lets prevent the implicit promotion of bool to int
-    explicit operator bool() = delete;
-    constexpr bool operator==(ManagementOperations op) const
-    {
-        return operation == op.operation;
-    }
-    constexpr bool operator!=(ManagementOperations op) const
-    {
-        return operation != op.operation;
-    }
+  operator OperationType() const
+  {
+    return operation;
+  }
+  // lets prevent the implicit promotion of bool to int
+  explicit operator bool() = delete;
+  constexpr bool operator==(ManagementOperations op) const
+  {
+    return operation == op.operation;
+  }
+  constexpr bool operator!=(ManagementOperations op) const
+  {
+    return operation != op.operation;
+  }
 
-    static const char* ALL_OPERATIONS(void)
-    {
-        const char* ops = "CLUSTER "
-                          "BUCKET "
-                          "COLLECTION "
-                          "QUERY_INDEX "
-                          "SEARCH_INDEX "
-                          "USER "
-                          "ANALYTICS "
-                          "VIEW_INDEX "
-                          "EVENTING_FUNCTION";
+  static const char* ALL_OPERATIONS(void)
+  {
+    const char* ops = "CLUSTER "
+                      "BUCKET "
+                      "COLLECTION "
+                      "QUERY_INDEX "
+                      "SEARCH_INDEX "
+                      "USER "
+                      "ANALYTICS "
+                      "VIEW_INDEX "
+                      "EVENTING_FUNCTION";
 
-        return ops;
-    }
+    return ops;
+  }
 
-  private:
-    OperationType operation;
+private:
+  OperationType operation;
 };
 
 class ClusterManagementOperations
 {
-  public:
-    enum OperationType { UNKNOWN, GET_CLUSTER_INFO, ENABLE_DP };
+public:
+  enum OperationType {
+    UNKNOWN,
+    GET_CLUSTER_INFO,
+    ENABLE_DP
+  };
 
-    ClusterManagementOperations()
-      : ClusterManagementOperations{ UNKNOWN }
-    {
-    }
-    constexpr ClusterManagementOperations(OperationType op)
-      : operation{ op }
-    {
-    }
+  ClusterManagementOperations()
+    : ClusterManagementOperations{ UNKNOWN }
+  {
+  }
+  constexpr ClusterManagementOperations(OperationType op)
+    : operation{ op }
+  {
+  }
 
-    operator OperationType() const
-    {
-        return operation;
-    }
-    // lets prevent the implicit promotion of bool to int
-    explicit operator bool() = delete;
-    constexpr bool operator==(ClusterManagementOperations op) const
-    {
-        return operation == op.operation;
-    }
-    constexpr bool operator!=(ClusterManagementOperations op) const
-    {
-        return operation != op.operation;
-    }
+  operator OperationType() const
+  {
+    return operation;
+  }
+  // lets prevent the implicit promotion of bool to int
+  explicit operator bool() = delete;
+  constexpr bool operator==(ClusterManagementOperations op) const
+  {
+    return operation == op.operation;
+  }
+  constexpr bool operator!=(ClusterManagementOperations op) const
+  {
+    return operation != op.operation;
+  }
 
-    static const char* ALL_OPERATIONS(void)
-    {
-        const char* ops = "GET_CLUSTER_INFO "
-                          "ENABLE_DP";
+  static const char* ALL_OPERATIONS(void)
+  {
+    const char* ops = "GET_CLUSTER_INFO "
+                      "ENABLE_DP";
 
-        return ops;
-    }
+    return ops;
+  }
 
-  private:
-    OperationType operation;
+private:
+  OperationType operation;
 };
 
 PyObject*

@@ -19,8 +19,8 @@
 
 #include "../client.hxx"
 #include "../exceptions.hxx"
-#include <core/transactions.hxx>
 #include <core/operations/document_query.hxx>
+#include <core/transactions.hxx>
 
 namespace tx = couchbase::transactions;
 namespace tx_core = couchbase::core::transactions;
@@ -30,58 +30,66 @@ namespace pycbc_txns
 
 // @TODO: PYCBC-1425, is this the right approach?
 using pycbc_txn_complete_callback =
-  std::function<void(std::optional<tx_core::transaction_exception>, std::optional<tx::transaction_result>)>;
+  std::function<void(std::optional<tx_core::transaction_exception>,
+                     std::optional<tx::transaction_result>)>;
 
 class TxOperations
 {
-  public:
-    enum TxOperationType { UNKNOWN, GET, REPLACE, INSERT, REMOVE, QUERY };
+public:
+  enum TxOperationType {
+    UNKNOWN,
+    GET,
+    REPLACE,
+    INSERT,
+    REMOVE,
+    QUERY
+  };
 
-    TxOperations()
-      : TxOperations{ UNKNOWN }
-    {
-    }
-    constexpr TxOperations(TxOperationType op)
-      : operation_{ op }
-    {
-    }
+  TxOperations()
+    : TxOperations{ UNKNOWN }
+  {
+  }
+  constexpr TxOperations(TxOperationType op)
+    : operation_{ op }
+  {
+  }
 
-    operator TxOperationType() const
-    {
-        return operation_;
-    }
-    // lets prevent the implicit promotion of bool to int
-    explicit operator bool() = delete;
-    constexpr bool operator==(TxOperations op) const
-    {
-        return operation_ == op.operation_;
-    }
-    constexpr bool operator!=(TxOperations op) const
-    {
-        return operation_ != op.operation_;
-    }
+  operator TxOperationType() const
+  {
+    return operation_;
+  }
+  // lets prevent the implicit promotion of bool to int
+  explicit operator bool() = delete;
+  constexpr bool operator==(TxOperations op) const
+  {
+    return operation_ == op.operation_;
+  }
+  constexpr bool operator!=(TxOperations op) const
+  {
+    return operation_ != op.operation_;
+  }
 
-    static const char* ALL_OPERATIONS(void)
-    {
-        const char* ops = "GET "
-                          "REPLACE "
-                          "INSERT "
-                          "REMOVE "
-                          "QUERY";
+  static const char* ALL_OPERATIONS(void)
+  {
+    const char* ops = "GET "
+                      "REPLACE "
+                      "INSERT "
+                      "REMOVE "
+                      "QUERY";
 
-        return ops;
-    }
+    return ops;
+  }
 
-  private:
-    TxOperationType operation_;
+private:
+  TxOperationType operation_;
 };
 
 struct transaction_config {
-    PyObject_HEAD tx::transactions_config* cfg;
+  PyObject_HEAD tx::transactions_config* cfg;
 };
 
 struct transaction_options {
-    PyObject_HEAD tx::transaction_options* opts;
+  PyObject_HEAD tx::transaction_options* opts;
 };
 
 static PyObject*
@@ -101,29 +109,29 @@ static PyObject*
 transaction_options__str__(PyObject*);
 
 struct transactions {
-    std::shared_ptr<tx_core::transactions> txns;
+  std::shared_ptr<tx_core::transactions> txns;
 
-    explicit transactions(std::shared_ptr<tx_core::transactions> transactions)
-      : txns(std::move(transactions))
-    {
-    }
+  explicit transactions(std::shared_ptr<tx_core::transactions> transactions)
+    : txns(std::move(transactions))
+  {
+  }
 };
 
 struct attempt_context {
-    tx_core::async_attempt_context& ctx;
+  tx_core::async_attempt_context& ctx;
 
-    explicit attempt_context(tx_core::async_attempt_context& ctx)
-      : ctx(ctx)
-    {
-    }
+  explicit attempt_context(tx_core::async_attempt_context& ctx)
+    : ctx(ctx)
+  {
+  }
 };
 
 struct transaction_get_result {
-    PyObject_HEAD tx_core::transaction_get_result* res;
+  PyObject_HEAD tx_core::transaction_get_result* res;
 };
 
 struct transaction_query_options {
-    PyObject_HEAD tx::transaction_query_options* opts;
+  PyObject_HEAD tx::transaction_query_options* opts;
 };
 
 static PyObject*

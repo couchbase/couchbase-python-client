@@ -23,77 +23,77 @@
 #include <couchbase/store_semantics.hxx>
 
 struct mutate_in_spec {
-    uint8_t op;
-    uint8_t flags;
-    char* path;
-    std::vector<std::byte> value;
+  uint8_t op;
+  uint8_t flags;
+  char* path;
+  std::vector<std::byte> value;
 
-    PyObject* pyObj_value;
-    bool create_parents;
-    bool xattr;
-    bool expand_macros;
+  PyObject* pyObj_value;
+  bool create_parents;
+  bool xattr;
+  bool expand_macros;
 };
 
 struct lookup_in_spec {
-    uint8_t op;
-    uint8_t flags;
-    char* path;
-    bool xattr;
+  uint8_t op;
+  uint8_t flags;
+  char* path;
+  bool xattr;
 };
 
 struct lookup_in_options {
-    // required
-    connection* conn;
-    couchbase::core::document_id id;
-    Operations::OperationType op_type{ Operations::LOOKUP_IN };
+  // required
+  connection* conn;
+  couchbase::core::document_id id;
+  Operations::OperationType op_type{ Operations::LOOKUP_IN };
 
-    // optional
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    bool access_deleted{ false };
-    PyObject* span{ nullptr };
-    PyObject* specs{ nullptr };
+  // optional
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  bool access_deleted{ false };
+  PyObject* span{ nullptr };
+  PyObject* specs{ nullptr };
 
-    // TODO:
-    // retries?
-    // partition?
+  // TODO:
+  // retries?
+  // partition?
 };
 
 struct lookup_in_replica_options {
-    // required
-    connection* conn;
-    couchbase::core::document_id id;
-    Operations::OperationType op_type;
+  // required
+  connection* conn;
+  couchbase::core::document_id id;
+  Operations::OperationType op_type;
 
-    // optional
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    PyObject* span{ nullptr };
-    PyObject* specs{ nullptr };
+  // optional
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  PyObject* span{ nullptr };
+  PyObject* specs{ nullptr };
 };
 
 struct mutate_in_options {
-    // required
-    connection* conn;
-    couchbase::core::document_id id;
-    Operations::OperationType op_type{ Operations::MUTATE_IN };
+  // required
+  connection* conn;
+  couchbase::core::document_id id;
+  Operations::OperationType op_type{ Operations::MUTATE_IN };
 
-    // optional
-    couchbase::durability_level durability_level{ couchbase::durability_level::none };
-    bool use_legacy_durability{ false };
-    couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
-    couchbase::persist_to persist_to{ couchbase::persist_to::none };
-    couchbase::store_semantics store_semantics{ couchbase::store_semantics::replace };
-    uint32_t expiry{ 0 };
-    couchbase::cas cas;
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    bool preserve_expiry{ false };
-    bool access_deleted{ false };
-    bool create_as_deleted{ false };
-    PyObject* span{ nullptr };
-    PyObject* specs{ nullptr };
+  // optional
+  couchbase::durability_level durability_level{ couchbase::durability_level::none };
+  bool use_legacy_durability{ false };
+  couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
+  couchbase::persist_to persist_to{ couchbase::persist_to::none };
+  couchbase::store_semantics store_semantics{ couchbase::store_semantics::replace };
+  uint32_t expiry{ 0 };
+  couchbase::cas cas;
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  bool preserve_expiry{ false };
+  bool access_deleted{ false };
+  bool create_as_deleted{ false };
+  PyObject* span{ nullptr };
+  PyObject* specs{ nullptr };
 
-    // TODO:
-    // retries?
-    // partition?
+  // TODO:
+  // retries?
+  // partition?
 };
 
 PyObject*

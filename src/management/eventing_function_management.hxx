@@ -21,67 +21,69 @@
 
 class EventingFunctionManagementOperations
 {
-  public:
-    enum OperationType {
-        UNKNOWN,
-        UPSERT_FUNCTION,
-        DEPLOY_FUNCTION,
-        GET_FUNCTION,
-        PAUSE_FUNCTION,
-        RESUME_FUNCTION,
-        UNDEPLOY_FUNCTION,
-        DROP_FUNCTION,
-        GET_ALL_FUNCTIONS,
-        GET_STATUS
-    };
+public:
+  enum OperationType {
+    UNKNOWN,
+    UPSERT_FUNCTION,
+    DEPLOY_FUNCTION,
+    GET_FUNCTION,
+    PAUSE_FUNCTION,
+    RESUME_FUNCTION,
+    UNDEPLOY_FUNCTION,
+    DROP_FUNCTION,
+    GET_ALL_FUNCTIONS,
+    GET_STATUS
+  };
 
-    EventingFunctionManagementOperations()
-      : EventingFunctionManagementOperations{ UNKNOWN }
-    {
-    }
-    constexpr EventingFunctionManagementOperations(EventingFunctionManagementOperations::OperationType op)
-      : operation{ op }
-    {
-    }
+  EventingFunctionManagementOperations()
+    : EventingFunctionManagementOperations{ UNKNOWN }
+  {
+  }
+  constexpr EventingFunctionManagementOperations(
+    EventingFunctionManagementOperations::OperationType op)
+    : operation{ op }
+  {
+  }
 
-    operator OperationType() const
-    {
-        return operation;
-    }
-    // lets prevent the implicit promotion of bool to int
-    explicit operator bool() = delete;
-    constexpr bool operator==(EventingFunctionManagementOperations op) const
-    {
-        return operation == op.operation;
-    }
-    constexpr bool operator!=(EventingFunctionManagementOperations op) const
-    {
-        return operation != op.operation;
-    }
+  operator OperationType() const
+  {
+    return operation;
+  }
+  // lets prevent the implicit promotion of bool to int
+  explicit operator bool() = delete;
+  constexpr bool operator==(EventingFunctionManagementOperations op) const
+  {
+    return operation == op.operation;
+  }
+  constexpr bool operator!=(EventingFunctionManagementOperations op) const
+  {
+    return operation != op.operation;
+  }
 
-    static const char* ALL_OPERATIONS(void)
-    {
-        const char* ops = "UPSERT_FUNCTION "
-                          "DEPLOY_FUNCTION "
-                          "GET_FUNCTION "
-                          "PAUSE_FUNCTION "
-                          "RESUME_FUNCTION "
-                          "UNDEPLOY_FUNCTION "
-                          "DROP_FUNCTION "
-                          "GET_ALL_FUNCTIONS "
-                          "GET_STATUS";
+  static const char* ALL_OPERATIONS(void)
+  {
+    const char* ops = "UPSERT_FUNCTION "
+                      "DEPLOY_FUNCTION "
+                      "GET_FUNCTION "
+                      "PAUSE_FUNCTION "
+                      "RESUME_FUNCTION "
+                      "UNDEPLOY_FUNCTION "
+                      "DROP_FUNCTION "
+                      "GET_ALL_FUNCTIONS "
+                      "GET_STATUS";
 
-        return ops;
-    }
+    return ops;
+  }
 
-  private:
-    OperationType operation;
+private:
+  OperationType operation;
 };
 
 struct eventing_function_mgmt_options {
-    PyObject* op_args;
-    EventingFunctionManagementOperations::OperationType op_type = EventingFunctionManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
+  PyObject* op_args;
+  EventingFunctionManagementOperations::OperationType op_type =
+    EventingFunctionManagementOperations::UNKNOWN;
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

@@ -19,44 +19,44 @@
 
 #include "client.hxx"
 #include "tracing.hxx"
-#include <couchbase/cas.hxx>
 #include <core/document_id.hxx>
+#include <couchbase/cas.hxx>
 #include <couchbase/persist_to.hxx>
 #include <couchbase/replicate_to.hxx>
 
 struct counter_options {
-    // required
-    connection* conn;
-    couchbase::core::document_id id;
-    Operations::OperationType op_type{ Operations::UNKNOWN };
-    uint64_t delta{ 1 };
+  // required
+  connection* conn;
+  couchbase::core::document_id id;
+  Operations::OperationType op_type{ Operations::UNKNOWN };
+  uint64_t delta{ 1 };
 
-    // optional
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    uint32_t expiry{ 0 };
-    couchbase::durability_level durability_level{ couchbase::durability_level::none };
-    bool use_legacy_durability{ false };
-    couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
-    couchbase::persist_to persist_to{ couchbase::persist_to::none };
-    std::optional<uint64_t> initial_value{};
-    PyObject* span = nullptr;
+  // optional
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  uint32_t expiry{ 0 };
+  couchbase::durability_level durability_level{ couchbase::durability_level::none };
+  bool use_legacy_durability{ false };
+  couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
+  couchbase::persist_to persist_to{ couchbase::persist_to::none };
+  std::optional<uint64_t> initial_value{};
+  PyObject* span = nullptr;
 };
 
 struct binary_mutation_options {
-    // required
-    connection* conn;
-    couchbase::core::document_id id;
-    Operations::OperationType op_type{ Operations::UNKNOWN };
-    PyObject* pyObj_value = nullptr;
+  // required
+  connection* conn;
+  couchbase::core::document_id id;
+  Operations::OperationType op_type{ Operations::UNKNOWN };
+  PyObject* pyObj_value = nullptr;
 
-    // optional
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    couchbase::durability_level durability_level{ couchbase::durability_level::none };
-    bool use_legacy_durability{ false };
-    couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
-    couchbase::persist_to persist_to{ couchbase::persist_to::none };
-    couchbase::cas cas;
-    PyObject* span = nullptr;
+  // optional
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  couchbase::durability_level durability_level{ couchbase::durability_level::none };
+  bool use_legacy_durability{ false };
+  couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
+  couchbase::persist_to persist_to{ couchbase::persist_to::none };
+  couchbase::cas cas;
+  PyObject* span = nullptr;
 };
 
 PyObject*

@@ -20,8 +20,8 @@
 #include <future>
 
 #include "client.hxx"
-#include <couchbase/cas.hxx>
 #include <core/document_id.hxx>
+#include <couchbase/cas.hxx>
 #include <couchbase/persist_to.hxx>
 #include <couchbase/replicate_to.hxx>
 
@@ -30,54 +30,54 @@
  * EXISTS, TOUCH, UNLOCK
  */
 struct read_options {
-    // common - required
-    connection* conn;
-    couchbase::core::document_id id;
-    Operations::OperationType op_type{ Operations::UNKNOWN };
+  // common - required
+  connection* conn;
+  couchbase::core::document_id id;
+  Operations::OperationType op_type{ Operations::UNKNOWN };
 
-    // common - options
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  // common - options
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
 
-    // optional
-    bool with_expiry{ false };
-    uint32_t expiry{};
-    uint32_t lock_time{};
-    couchbase::cas cas;
-    PyObject* span{ nullptr };
-    PyObject* project{ nullptr };
+  // optional
+  bool with_expiry{ false };
+  uint32_t expiry{};
+  uint32_t lock_time{};
+  couchbase::cas cas;
+  PyObject* span{ nullptr };
+  PyObject* project{ nullptr };
 
-    // TODO:
-    // retries?
-    // partition?
+  // TODO:
+  // retries?
+  // partition?
 };
 
 /**
  * INSERT, UPSERT, REPLACE, REMOVE
  */
 struct mutation_options {
-    // common - required
-    connection* conn;
-    couchbase::core::document_id id;
-    Operations::OperationType op_type{ Operations::UNKNOWN };
-    PyObject* value{ nullptr }; // not for REMOVE
+  // common - required
+  connection* conn;
+  couchbase::core::document_id id;
+  Operations::OperationType op_type{ Operations::UNKNOWN };
+  PyObject* value{ nullptr }; // not for REMOVE
 
-    // common - optional
-    couchbase::durability_level durability_level{ couchbase::durability_level::none };
-    bool use_legacy_durability{ false };
-    couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
-    couchbase::persist_to persist_to{ couchbase::persist_to::none };
-    uint32_t expiry{ 0 };
-    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    PyObject* span = nullptr;
+  // common - optional
+  couchbase::durability_level durability_level{ couchbase::durability_level::none };
+  bool use_legacy_durability{ false };
+  couchbase::replicate_to replicate_to{ couchbase::replicate_to::none };
+  couchbase::persist_to persist_to{ couchbase::persist_to::none };
+  uint32_t expiry{ 0 };
+  std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  PyObject* span = nullptr;
 
-    // optional: REPLACE
-    couchbase::cas cas;
-    bool preserve_expiry{ false };
+  // optional: REPLACE
+  couchbase::cas cas;
+  bool preserve_expiry{ false };
 
-    // TODO:
-    // retries?
-    // partition?
-    // durability_timeout
+  // TODO:
+  // retries?
+  // partition?
+  // durability_timeout
 };
 
 PyObject*

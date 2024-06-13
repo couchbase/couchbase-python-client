@@ -18,18 +18,18 @@
 #pragma once
 
 #include "Python.h" // NOLINT
+#include "tracing.hxx"
+#include <chrono>
+#include <core/operations/document_query.hxx>
 #include <core/utils/binary.hxx>
-#include <core/utils/json.hxx>
 #include <core/utils/join_strings.hxx>
-#include <couchbase/persist_to.hxx>
-#include <couchbase/replicate_to.hxx>
+#include <core/utils/json.hxx>
 #include <couchbase/durability_level.hxx>
 #include <couchbase/mutation_token.hxx>
-#include <core/operations/document_query.hxx>
-#include "tracing.hxx"
+#include <couchbase/persist_to.hxx>
+#include <couchbase/replicate_to.hxx>
 #include <stdexcept>
 #include <string>
-#include <chrono>
 
 constexpr std::chrono::seconds FIFTY_YEARS{ 50 * 365 * 24 * 60 * 60 };
 
@@ -66,16 +66,17 @@ template<typename scan_consistency_type>
 scan_consistency_type
 str_to_scan_consistency_type(std::string consistency)
 {
-    if (consistency.compare("not_bounded") == 0) {
-        return scan_consistency_type::not_bounded;
-    }
-    if (consistency.compare("request_plus") == 0) {
-        return scan_consistency_type::request_plus;
-    }
+  if (consistency.compare("not_bounded") == 0) {
+    return scan_consistency_type::not_bounded;
+  }
+  if (consistency.compare("request_plus") == 0) {
+    return scan_consistency_type::request_plus;
+  }
 
-    // TODO: better exception
-    PyErr_SetString(PyExc_ValueError, fmt::format("Invalid Scan Consistency type {}", consistency).c_str());
-    return {};
+  // TODO: better exception
+  PyErr_SetString(PyExc_ValueError,
+                  fmt::format("Invalid Scan Consistency type {}", consistency).c_str());
+  return {};
 }
 
 // TODO: consolidate these types of methods to another file that handles other requests as well
