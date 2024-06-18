@@ -1287,10 +1287,6 @@ class SearchQueryBuilder:
 
     @property
     def vector_query_combination(self) -> Optional[VectorQueryCombination]:
-        """
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-        """
         value = self._params.get('highlight_style', None)
         if isinstance(value, VectorQueryCombination):
             return value

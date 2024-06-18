@@ -44,9 +44,6 @@ class SearchRequest:
     @property
     def vector_search(self) -> Optional[VectorSearch]:
         """
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-
         Optional[:class:`~couchbase.vector_search.VectorSearch`]: Returns the search request's :class:`~couchbase.vector_search.VectorSearch`, if it exists.
         """  # noqa: E501
         return self._vector_search
@@ -79,9 +76,6 @@ class SearchRequest:
                            vector_search  # type: VectorSearch
                            ) -> SearchRequest:
         """ Add a :class:`~couchbase.vector_search.VectorSearch` to the search request.
-
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             vector_search (:class:`~couchbase.vector_search.VectorSearch`): The :class:`~couchbase.vector_search.VectorSearch` to add to the search request.

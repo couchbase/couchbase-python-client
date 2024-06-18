@@ -9,18 +9,9 @@ from couchbase._utils import is_null_or_empty
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import VectorSearchOptions
 
-"""
-
-Vector search Enums per the search RFC
-
-"""
-
 
 class VectorQueryCombination(Enum):
     """ Specifies how multiple vector searches are combined.
-
-    **UNCOMMITTED** This API is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
 
     This can be one of:
         AND: Indicates that multiple vector queries should be combined with logical AND.
@@ -34,9 +25,6 @@ class VectorQueryCombination(Enum):
 
 class VectorQuery:
     """ Represents a vector query.
-
-    **UNCOMMITTED** This API is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
 
     Args:
         field_name (str): The name of the field in the search index that stores the vector.
@@ -74,9 +62,6 @@ class VectorQuery:
     @property
     def boost(self) -> Optional[float]:
         """
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-
         Optional[float]: Returns vector query's boost value, if it exists.
         """
         return self._boost
@@ -92,9 +77,6 @@ class VectorQuery:
     @property
     def field_name(self) -> str:
         """
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-
         str: Returns vector query's field name
         """
         return self._field_name
@@ -102,9 +84,6 @@ class VectorQuery:
     @property
     def num_candidates(self) -> Optional[int]:
         """
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-
         Optional[int]: Returns vector query's num candidates value, if it exists.
         """
         return self._num_candidates
@@ -122,9 +101,6 @@ class VectorQuery:
     @property
     def vector(self) -> Optional[List[float]]:
         """
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-
         Optional[List[float]]: Returns the vector query's vector.
         """
         return self._vector
@@ -132,9 +108,6 @@ class VectorQuery:
     @property
     def vector_base64(self) -> Optional[str]:
         """
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-
         Optional[str]: Returns the vector query's base64 vector str.
         """
         return self._vector_base64
@@ -165,9 +138,6 @@ class VectorQuery:
                ) -> VectorQuery:
         """ Creates a :class:`~couchbase.vector_search.VectorQuery`.
 
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             field_name (str): The name of the field in the search index that stores the vector.
             vector (Union[List[float], str]): The vector to use in the query.
@@ -175,9 +145,9 @@ class VectorQuery:
             boost (float, optional): Add boost to query.
 
         Raises:
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not a list or str.
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If vector is a list and all values of the provided vector are not instances of float.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not a list or str.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If vector is a list and all values of the provided vector are not instances of float.
 
         Returns:
             :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
@@ -187,9 +157,6 @@ class VectorQuery:
 
 class VectorSearch:
     """ Represents a vector search.
-
-    **UNCOMMITTED** This API is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
 
     Args:
         queries (List[:class:`~couchbase.vector_search.VectorQuery`]):
@@ -235,9 +202,6 @@ class VectorSearch:
                           query  # type: VectorQuery
                           ) -> VectorSearch:
         """ Creates a :class:`~couchbase.vector_search.VectorSearch` from a single :class:`~couchbase.vector_search.VectorQuery`.
-
-        **UNCOMMITTED** This API is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             query (:class:`~couchbase.vector_search.VectorQuery`):

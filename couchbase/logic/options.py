@@ -1214,8 +1214,7 @@ class SearchOptionsBase(OptionsTimeoutBase):
 
 class VectorSearchOptionsBase(dict):
     """
-    **UNCOMMITTED** This API is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
+    **INTERNAL**
     """
     @overload
     def __init__(self,

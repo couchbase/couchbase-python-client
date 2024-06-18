@@ -1537,10 +1537,7 @@ class SearchOptions(SearchOptionsBase):
 
 
 class VectorSearchOptions(VectorSearchOptionsBase):
-    """**UNCOMMITTED** This API is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
-
-    Available options to for a FTS vector search.
+    """Available options to for a FTS vector search.
 
     Args:
         vector_query_combination (:class:`~couchbase.vector_search.VectorQueryCombination`, optional): Specifies logical operation
