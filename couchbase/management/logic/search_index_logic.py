@@ -21,7 +21,8 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     Iterable,
-                    Optional)
+                    Optional,
+                    Union)
 
 from couchbase._utils import is_null_or_empty
 from couchbase.exceptions import (FeatureUnavailableException,
@@ -738,3 +739,61 @@ class SearchIndex:
                    source_params,
                    plan_params
                    )
+
+    @classmethod
+    def from_json(cls,
+                  json_input  # type: Union[str, Dict[str, Any]]
+                  ) -> SearchIndex:
+        """ Creates a `.SearchIndex` from a provided JSON str or Python dict derived from JSON.
+
+        Args:
+            json_input (Union[str, Dict[str, Any]]): JSON representation of the search index.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided JSON is not str or dict.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided JSON does not include an index name.
+        """  # noqa: E501
+        json_data = json_input
+        if isinstance(json_input, str):
+            json_data = json.loads(json_input)
+
+        if not isinstance(json_data, dict):
+            msg = 'Provided JSON input is either not a Python dict or a JSON str that produces a Python dict.'
+            raise InvalidArgumentException(msg)
+
+        name = json_data.get('name', None)
+        if name is None:
+            raise InvalidArgumentException('Provided JSON input does not contain an index name.')
+        if not isinstance(name, str):
+            raise InvalidArgumentException('Index name must be a str.')
+
+        name_tokens = name.split('.')
+        if len(name_tokens) > 1:
+            name = name_tokens[len(name_tokens)-1]
+
+        source_type = json_data.get('sourceType', 'couchbase')
+        idx_type = json_data.get('type', 'fulltext-index')
+        source_name = json_data.get('sourceName', None)
+        # cannot pass in the UUID or sourceUUID
+        uuid = None
+        source_uuid = None
+        params = json_data.get('params', None)
+        if params is None:
+            params = {}
+
+        source_params = json_data.get('sourceParams', None)
+        if source_params is None:
+            source_params = {}
+        plan_params = json_data.get('planParams', None)
+        if plan_params is None:
+            plan_params = {}
+
+        return cls(name,
+                   source_type,
+                   idx_type,
+                   source_name,
+                   uuid,
+                   params,
+                   source_uuid,
+                   source_params,
+                   plan_params)

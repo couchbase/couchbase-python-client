@@ -1,0 +1,63 @@
+{
+    "type": "fulltext-index",
+    "name": "default.test-scope.test-scope-search-index-from-ui",
+    "uuid": "1b7227c4f8dc2592",
+    "sourceType": "gocbcore",
+    "sourceName": "default",
+    "sourceUUID": "08624d642386673b5baaf4b5d4b2fbee",
+    "planParams": {
+        "maxPartitionsPerPIndex": 1024,
+        "indexPartitions": 1
+    },
+    "params": {
+        "doc_config": {
+            "docid_prefix_delim": "",
+            "docid_regexp": "",
+            "mode": "scope.collection.type_field",
+            "type_field": "type"
+        },
+        "mapping": {
+            "analysis": {},
+            "default_analyzer": "standard",
+            "default_datetime_parser": "dateTimeOptional",
+            "default_field": "_all",
+            "default_mapping": {
+                "dynamic": true,
+                "enabled": false
+            },
+            "default_type": "_default",
+            "docvalues_dynamic": true,
+            "index_dynamic": false,
+            "store_dynamic": false,
+            "type_field": "_type",
+            "types": {
+                "test-scope.test-collection": {
+                    "dynamic": false,
+                    "enabled": true,
+                    "properties": {
+                        "make": {
+                            "enabled": true,
+                            "dynamic": false,
+                            "fields": [
+                                {
+                                    "docvalues": true,
+                                    "include_in_all": true,
+                                    "include_term_vectors": true,
+                                    "index": true,
+                                    "name": "make",
+                                    "store": true,
+                                    "type": "text"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "store": {
+            "indexType": "scorch",
+            "segmentVersion": 15
+        }
+    },
+    "sourceParams": null
+}

@@ -37,6 +37,18 @@ class SearchIndexManagementTestSuite:
                                            'test_cases',
                                            f'{TEST_COLLECTION_INDEX_NAME}-params-new.json')
 
+    TEST_UI_INDEX_NAME = 'test-search-index-full'
+    TEST_UI_INDEX_PATH = path.join(pathlib.Path(__file__).parent.parent.parent,
+                                   'tests',
+                                   'test_cases',
+                                   f'{TEST_UI_INDEX_NAME}.json')
+
+    TEST_UI_SCOPE_INDEX_NAME = 'test-scope-search-index-full'
+    TEST_UI_SCOPE_INDEX_PATH = path.join(pathlib.Path(__file__).parent.parent.parent,
+                                         'tests',
+                                         'test_cases',
+                                         f'{TEST_UI_SCOPE_INDEX_NAME}.json')
+
     TEST_MANIFEST = [
         'test_analyze_doc',
         'test_drop_index',
@@ -52,6 +64,7 @@ class SearchIndexManagementTestSuite:
         'test_plan_freeze_control',
         'test_query_control',
         'test_upsert_index',
+        'test_upsert_index_from_json'
     ]
 
     @pytest.fixture(scope='class', name='test_idx')
@@ -82,6 +95,32 @@ class SearchIndexManagementTestSuite:
                                                    cb_env.sixm.drop_index,
                                                    test_idx.name,
                                                    expected_exceptions=(SearchIndexNotFoundException, ))
+
+    @pytest.fixture()
+    def drop_test_index_from_json(self, cb_env):
+        yield
+        if cb_env.use_scope_search_mgmt:
+            idx_name = 'test-scope-search-index-from-ui'
+        else:
+            idx_name = 'test-search-index-from-ui'
+        TestEnvironment.try_n_times_till_exception(10,
+                                                   3,
+                                                   cb_env.sixm.drop_index,
+                                                   idx_name,
+                                                   expected_exceptions=(SearchIndexNotFoundException, ))
+
+    @pytest.fixture(scope='class', name='test_idx_json')
+    def load_index_json(self, cb_env):
+        if cb_env.use_scope_search_mgmt:
+            with open(self.TEST_UI_SCOPE_INDEX_PATH) as index_json:
+                json_obj = json.load(index_json)
+        else:
+            with open(self.TEST_UI_INDEX_PATH) as index_json:
+                json_obj = json.load(index_json)
+        # >= 7.0 sourceType = gocbcore
+        if cb_env.server_version_short <= 6.6:
+            json_obj['sourceType'] = 'couchbase'
+        return json_obj
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
@@ -231,6 +270,25 @@ class SearchIndexManagementTestSuite:
         assert res is None
         res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.get_index, test_idx.name)
         assert isinstance(res, SearchIndex)
+
+    @pytest.mark.usefixtures('drop_test_index_from_json')
+    @pytest.mark.parametrize("idx_json_type", [str, dict])
+    def test_upsert_index_from_json(self, cb_env, test_idx_json, idx_json_type):
+        if idx_json_type.__name__ == 'str':
+            search_idx = SearchIndex.from_json(json.dumps(test_idx_json))
+        else:
+            search_idx = SearchIndex.from_json(test_idx_json)
+        res = cb_env.sixm.upsert_index(search_idx)
+        assert res is None
+        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.get_index, search_idx.name)
+        assert isinstance(res, SearchIndex)
+        assert res.name == search_idx.name
+        assert res.source_type == search_idx.source_type
+        assert res.idx_type == search_idx.idx_type
+        assert res.source_name == search_idx.source_name
+        assert res.params == search_idx.params
+        assert res.plan_params == search_idx.plan_params
+        assert res.source_params == search_idx.source_params
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=1)

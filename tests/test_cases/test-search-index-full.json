@@ -1,0 +1,138 @@
+{
+    "type": "fulltext-index",
+    "name": "test-search-index-from-ui",
+    "uuid": "24b4a143417c7c22",
+    "sourceType": "gocbcore",
+    "sourceName": "default",
+    "sourceUUID": "367a3da917a4d29dfd28d75fe755c280",
+    "planParams": {
+      "maxPartitionsPerPIndex": 1024,
+      "indexPartitions": 1
+    },
+    "params": {
+      "doc_config": {
+        "docid_prefix_delim": "",
+        "docid_regexp": "",
+        "mode": "type_field",
+        "type_field": "type"
+      },
+      "mapping": {
+        "analysis": {},
+        "default_analyzer": "standard",
+        "default_datetime_parser": "dateTimeOptional",
+        "default_field": "_all",
+        "default_mapping": {
+          "dynamic": true,
+          "enabled": false
+        },
+        "default_type": "_default",
+        "docvalues_dynamic": true,
+        "index_dynamic": false,
+        "store_dynamic": false,
+        "type_field": "_type",
+        "types": {
+          "vehicle": {
+            "dynamic": false,
+            "enabled": true,
+            "properties": {
+              "description": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "docvalues": true,
+                    "include_in_all": true,
+                    "include_term_vectors": true,
+                    "index": true,
+                    "name": "description",
+                    "store": true,
+                    "type": "text"
+                  }
+                ]
+              },
+              "last_updated": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "docvalues": true,
+                    "include_in_all": true,
+                    "include_term_vectors": true,
+                    "index": true,
+                    "name": "last_updated",
+                    "store": true,
+                    "type": "datetime"
+                  }
+                ]
+              },
+              "make": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "docvalues": true,
+                    "include_in_all": true,
+                    "include_term_vectors": true,
+                    "index": true,
+                    "name": "make",
+                    "store": true,
+                    "type": "text"
+                  }
+                ]
+              },
+              "model": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "docvalues": true,
+                    "include_in_all": true,
+                    "include_term_vectors": true,
+                    "index": true,
+                    "name": "model",
+                    "store": true,
+                    "type": "text"
+                  }
+                ]
+              },
+              "rating": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "docvalues": true,
+                    "include_in_all": true,
+                    "include_term_vectors": true,
+                    "index": true,
+                    "name": "rating",
+                    "store": true,
+                    "type": "number"
+                  }
+                ]
+              },
+              "year": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "docvalues": true,
+                    "include_in_all": true,
+                    "include_term_vectors": true,
+                    "index": true,
+                    "name": "year",
+                    "store": true,
+                    "type": "number"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "store": {
+        "indexType": "scorch",
+        "segmentVersion": 15
+      }
+    },
+    "sourceParams": null
+  }
