@@ -112,10 +112,10 @@ make_error_code(PycbcError ec);
 // end - needed for Pycbc error code
 
 PyObject*
-build_kv_error_map_info(couchbase::key_value_error_map_info error_info);
+build_kv_error_map_info(couchbase::core::key_value_error_map_info error_info);
 
 void
-build_kv_error_context(const couchbase::key_value_error_context& ctx, PyObject* pyObj_ctx);
+build_kv_error_context(const couchbase::core::key_value_error_context& ctx, PyObject* pyObj_ctx);
 
 /*
 
@@ -288,7 +288,7 @@ build_exception_from_context(const T& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::key_value_error_context& ctx,
+build_exception_from_context(const couchbase::core::key_value_error_context& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,
@@ -335,7 +335,7 @@ build_exception_from_context(const couchbase::key_value_error_context& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::subdocument_error_context& ctx,
+build_exception_from_context(const couchbase::core::subdocument_error_context& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,

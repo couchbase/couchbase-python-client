@@ -118,10 +118,10 @@ struct transactions {
 };
 
 struct attempt_context {
-  tx_core::async_attempt_context& ctx;
+  std::shared_ptr<tx_core::async_attempt_context> ctx;
 
-  explicit attempt_context(tx_core::async_attempt_context& ctx)
-    : ctx(ctx)
+  explicit attempt_context(std::shared_ptr<tx_core::async_attempt_context> ctx)
+    : ctx(std::move(ctx))
   {
   }
 };

@@ -987,7 +987,7 @@ pycbc_txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* args
   Py_XINCREF(pyObj_options);
   auto barrier = std::make_shared<std::promise<PyObject*>>();
   auto f = barrier->get_future();
-  Py_BEGIN_ALLOW_THREADS ctx->ctx.query(
+  Py_BEGIN_ALLOW_THREADS ctx->ctx->query(
     statement,
     *opt->opts,
     [pyObj_options, pyObj_callback, pyObj_errback, barrier](
@@ -1115,7 +1115,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
         Py_RETURN_NONE;
       }
       couchbase::core::document_id id{ bucket, scope, collection, key };
-      Py_BEGIN_ALLOW_THREADS ctx->ctx.get_optional(
+      Py_BEGIN_ALLOW_THREADS ctx->ctx->get_optional(
         id,
         [barrier, pyObj_callback, pyObj_errback](
           std::exception_ptr err, std::optional<tx_core::transaction_get_result> res) {
@@ -1134,7 +1134,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
                         fmt::format("no value given for an insert of key {}", id.key()).c_str());
         Py_RETURN_NONE;
       }
-      Py_BEGIN_ALLOW_THREADS ctx->ctx.insert(
+      Py_BEGIN_ALLOW_THREADS ctx->ctx->insert(
         id,
         value,
         [barrier, pyObj_callback, pyObj_errback](
@@ -1155,7 +1155,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
       }
       auto tx_get_result =
         reinterpret_cast<pycbc_txns::transaction_get_result*>(pyObj_txn_get_result);
-      Py_BEGIN_ALLOW_THREADS ctx->ctx.replace(
+      Py_BEGIN_ALLOW_THREADS ctx->ctx->replace(
         *tx_get_result->res,
         value,
         [pyObj_callback, pyObj_errback, barrier](
@@ -1172,7 +1172,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
       }
       auto tx_get_result =
         reinterpret_cast<pycbc_txns::transaction_get_result*>(pyObj_txn_get_result);
-      Py_BEGIN_ALLOW_THREADS ctx->ctx.remove(
+      Py_BEGIN_ALLOW_THREADS ctx->ctx->remove(
         *tx_get_result->res, [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err) {
           handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
         });
@@ -1265,7 +1265,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
   Py_INCREF(pyObj_inner_exc);
   auto barrier = std::make_shared<std::promise<PyObject*>>();
   auto f = barrier->get_future();
-  auto logic = [pyObj_logic, pyObj_inner_exc](tx_core::async_attempt_context& ctx) {
+  auto logic = [pyObj_logic, pyObj_inner_exc](std::shared_ptr<tx_core::async_attempt_context> ctx) {
     auto state = PyGILState_Ensure();
     auto py_ctx = new pycbc_txns::attempt_context(ctx);
     PyObject* pyObj_ctx = PyCapsule_New(py_ctx, "ctx_", dealloc_attempt_context);

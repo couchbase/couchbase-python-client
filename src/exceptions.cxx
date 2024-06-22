@@ -198,7 +198,7 @@ retry_reason_to_string(couchbase::retry_reason reason)
 }
 
 PyObject*
-build_kv_error_map_info(couchbase::key_value_error_map_info error_info)
+build_kv_error_map_info(couchbase::core::key_value_error_map_info error_info)
 {
   PyObject* err_info = PyDict_New();
   PyObject* pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(error_info.code()));
@@ -244,7 +244,8 @@ build_kv_error_map_info(couchbase::key_value_error_map_info error_info)
 }
 
 void
-build_kv_error_context(const couchbase::key_value_error_context& ctx, PyObject* pyObj_error_ctx)
+build_kv_error_context(const couchbase::core::key_value_error_context& ctx,
+                       PyObject* pyObj_error_ctx)
 {
   PyObject* pyObj_tmp = nullptr;
   pyObj_tmp = PyUnicode_FromString(ctx.id().c_str());
