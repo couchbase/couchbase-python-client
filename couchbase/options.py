@@ -328,7 +328,9 @@ class ClusterOptions(ClusterOptionsBase):
             Defaults to True (enabled).
         enable_metrics (bool, optional): Set to False to disable metrics (enables no-op meter).
             Defaults to True (enabled).
-        network (str, optional): Set to False to disable compression. Defaults to True (enabled).
+        network (str, optional): Set network resolution method. Can be set to 'default' (if the client is running on the
+            same network as the server) or 'external' (if the client is running on a different network). Defaults to
+            'auto'.
         tls_verify (Union[str, :class:`.TLSVerifyMode`], optional): Set tls verify mode. Defaults to
             TLSVerifyMode.PEER.
         disable_mozilla_ca_certificates (bool, optional): Set to True to disable loading Mozilla's list of CA
