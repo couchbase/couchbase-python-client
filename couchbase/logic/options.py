@@ -33,6 +33,7 @@ from couchbase._utils import (timedelta_as_microseconds,
                               validate_bool,
                               validate_int,
                               validate_str)
+from couchbase.durability import DurabilityParser
 from couchbase.exceptions import InvalidArgumentException
 
 if TYPE_CHECKING:
@@ -112,7 +113,7 @@ VALID_MULTI_OPTS = {
     'preserve_expiry': validate_bool,
     'with_expiry': validate_bool,
     'cas': validate_int,
-    'durability': lambda x: x,
+    'durability': DurabilityParser.parse_durability,
     'transcoder': lambda x: x,
     'span': lambda x: x,
     'project': lambda x: x,
