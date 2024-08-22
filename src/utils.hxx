@@ -30,6 +30,7 @@
 #include <couchbase/replicate_to.hxx>
 #include <stdexcept>
 #include <string>
+#include <tao/json/value.hpp>
 
 constexpr std::chrono::seconds FIFTY_YEARS{ 50 * 365 * 24 * 60 * 60 };
 
