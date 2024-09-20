@@ -118,10 +118,22 @@ endif()
 set(COUCHBASE_CXX_CLIENT_PYTHON_WARNINGS
     ON
     CACHE INTERNAL "")
-set(COUCHBASE_CXX_CLIENT_BUILD_TESTS
+set(COUCHBASE_CXX_CLIENT_BUILD_STATIC
+    ON
+    CACHE BOOL "" FORCE)
+set(COUCHBASE_CXX_CLIENT_BUILD_SHARED
+    OFF
+    CACHE BOOL "" FORCE)
+set(COUCHBASE_CXX_CLIENT_BUILD_INSTALL
+    OFF
+    CACHE BOOL "" FORCE)
+set(COUCHBASE_CXX_CLIENT_BUILD_DOCS
     OFF
     CACHE BOOL "" FORCE)
 set(COUCHBASE_CXX_CLIENT_BUILD_EXAMPLES
+    OFF
+    CACHE BOOL "" FORCE)
+set(COUCHBASE_CXX_CLIENT_BUILD_TESTS
     OFF
     CACHE BOOL "" FORCE)
 set(COUCHBASE_CXX_CLIENT_BUILD_TOOLS
@@ -157,7 +169,9 @@ endif()
 add_subdirectory(deps/couchbase-cxx-client)
 
 set(COUCHBASE_CXX_BINARY_DIR "${CMAKE_BINARY_DIR}/deps/couchbase-cxx-client")
+set(COUCHBASE_CXX_SOURCE_DIR "${PROJECT_SOURCE_DIR}/deps/couchbase-cxx-client")
 message(STATUS "COUCHBASE_CXX_BINARY_DIR=${COUCHBASE_CXX_BINARY_DIR}")
+message(STATUS "COUCHBASE_CXX_SOURCE_DIR=${COUCHBASE_CXX_SOURCE_DIR}")
 if(DEFINED COUCHBASE_CXX_CPM_CACHE_DIR AND NOT COUCHBASE_CXX_CPM_CACHE_DIR STREQUAL "")
   file(COPY "${COUCHBASE_CXX_BINARY_DIR}/mozilla-ca-bundle.crt" "${COUCHBASE_CXX_BINARY_DIR}/mozilla-ca-bundle.sha256"
     DESTINATION "${COUCHBASE_CXX_CPM_CACHE_DIR}")
@@ -181,18 +195,33 @@ file(
   "src/transactions/*.cxx")
 add_library(pycbc_core SHARED ${SOURCE_FILES})
 
-target_include_directories(pycbc_core PRIVATE "${CB_CXX_DIR}/include" "${CB_CXX_DIR}/third_party/asio/asio/include")
+target_include_directories(
+  pycbc_core PRIVATE SYSTEM
+  "${COUCHBASE_CXX_SOURCE_DIR}"
+  "${COUCHBASE_CXX_SOURCE_DIR}/third_party/cxx_function"
+  "${COUCHBASE_CXX_SOURCE_DIR}/third_party/expected/include")
+
+set(COUCHBASE_CXX_CLIENT_TARGET couchbase_cxx_client::couchbase_cxx_client_static)
 
 if(WIN32)
   target_link_libraries(
-    pycbc_core
-    PRIVATE couchbase_cxx_client
-            ${Python3_LIBRARIES}
-            asio
-            Microsoft.GSL::GSL
-            taocpp::json)
+    pycbc_core PRIVATE
+    ${COUCHBASE_CXX_CLIENT_TARGET}
+    ${Python3_LIBRARIES}
+    asio
+    Microsoft.GSL::GSL
+    taocpp::json
+    fmt::fmt
+    spdlog::spdlog)
 else()
-  target_link_libraries(pycbc_core PRIVATE couchbase_cxx_client asio Microsoft.GSL::GSL taocpp::json)
+  target_link_libraries(
+    pycbc_core PRIVATE
+    ${COUCHBASE_CXX_CLIENT_TARGET}
+    asio
+    Microsoft.GSL::GSL
+    taocpp::json
+    fmt::fmt
+    spdlog::spdlog)
   if(APPLE)
     target_link_options(
       pycbc_core

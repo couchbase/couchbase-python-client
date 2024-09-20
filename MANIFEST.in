@@ -15,6 +15,8 @@ include deps/couchbase-cxx-cache/cpm/*.cmake
 include deps/couchbase-cxx-cache/asio/*/asio/COPYING
 include deps/couchbase-cxx-cache/asio/*/asio/LICENSE*
 include deps/couchbase-cxx-cache/asio/*/asio/asio/include/*.hpp
+include deps/couchbase-cxx-cache/asio/*/asio/asio/src/asio.cpp
+include deps/couchbase-cxx-cache/asio/*/asio/asio/src/asio_ssl.cpp
 recursive-include deps/couchbase-cxx-cache/asio/*/asio/asio/include/asio *.[hi]pp
 recursive-include deps/couchbase-cxx-cache/boringssl/*/boringssl *.[hcS]
 recursive-include deps/couchbase-cxx-cache/boringssl/*/boringssl *.cc
