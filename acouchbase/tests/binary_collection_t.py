@@ -289,6 +289,16 @@ class BinaryCollectionTests:
         assert result.content == value - 3
 
     @pytest.mark.asyncio
+    async def test_counter_increment_no_initial_value(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.binary().increment('non-existent-doc', IncrementOptions(initial=SignedInt64(-1)))
+
+    @pytest.mark.asyncio
+    async def test_counter_decrement_no_initial_value(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            await cb_env.collection.binary().decrement('non-existent-doc', DecrementOptions(initial=SignedInt64(-1)))
+
+    @pytest.mark.asyncio
     async def test_counter_bad_initial_value(self, cb_env, counter_empty_kvp):
         cb = cb_env.collection
         key = counter_empty_kvp.key

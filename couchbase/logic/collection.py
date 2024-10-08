@@ -483,6 +483,11 @@ class CollectionLogic:
         op_type = operations.INCREMENT.value
         final_args['initial'] = int(final_args['initial'])
         final_args['delta'] = int(final_args['delta'])
+
+        if final_args['initial'] < 0:
+            # Negative 'initial' means no initial value
+            del final_args['initial']
+
         return binary_operation(**self._get_connection_args(),
                                 key=key,
                                 op_type=op_type,
@@ -506,6 +511,11 @@ class CollectionLogic:
         op_type = operations.DECREMENT.value
         final_args['initial'] = int(final_args['initial'])
         final_args['delta'] = int(final_args['delta'])
+
+        if final_args['initial'] < 0:
+            # Negative 'initial' means no initial value
+            del final_args['initial']
+
         return binary_operation(**self._get_connection_args(),
                                 key=key,
                                 op_type=op_type,

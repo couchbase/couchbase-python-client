@@ -792,7 +792,8 @@ class IncrementOptions(IncrementOptionsBase):
             for this operation.
         delta (:class:`.DeltaValue`, optional): The amount to increment the key. Defaults to 1.
         initial (:class:`.SignedInt64`, optional): The initial value to use for the document if it does not already
-            exist. Defaults to 0.
+            exist. Setting it to a negative value means that the document will not be created if it does not exist.
+            Defaults to 0.
     """
 
 
@@ -810,7 +811,8 @@ class DecrementOptions(DecrementOptionsBase):
             for this operation.
         delta (:class:`.DeltaValue`, optional): The amount to increment the key. Defaults to 1.
         initial (:class:`.SignedInt64`, optional): The initial value to use for the document if it does not already
-            exist. Defaults to 0.
+            exist. Setting it to a negative value means that the document will not be created if it does not exist.
+            Defaults to 0.
     """
 
 

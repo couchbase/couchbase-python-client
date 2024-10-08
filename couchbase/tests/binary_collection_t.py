@@ -40,9 +40,11 @@ class BinaryCollectionTestSuite:
         'test_counter_decrement',
         'test_counter_decrement_initial_value',
         'test_counter_decrement_non_default',
+        'test_counter_decrement_no_initial_value',
         'test_counter_increment',
         'test_counter_increment_initial_value',
         'test_counter_increment_non_default',
+        'test_counter_increment_no_initial_value',
         'test_prepend_bytes',
         'test_prepend_bytes_not_empty',
         'test_prepend_string',
@@ -131,6 +133,10 @@ class BinaryCollectionTestSuite:
         assert result.cas is not None
         assert result.content == value - 3
 
+    def test_counter_decrement_no_initial_value(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.binary().decrement('non-existent-doc', DecrementOptions(initial=SignedInt64(-1)))
+
     def test_counter_increment(self, cb_env):
         key, value = cb_env.get_existing_doc_by_type('counter')
         result = cb_env.collection.binary().increment(key)
@@ -151,6 +157,10 @@ class BinaryCollectionTestSuite:
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == value + 3
+
+    def test_counter_increment_no_initial_value(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.binary().increment('non-existent-doc', IncrementOptions(initial=SignedInt64(-1)))
 
     def test_prepend_bytes(self, cb_env):
         key = cb_env.get_existing_doc_by_type('bytes_empty', key_only=True)
