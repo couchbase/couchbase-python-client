@@ -417,7 +417,6 @@ class CollectionLogic:
         final_spec = []
         allowed_multi_ops = [SubDocOp.ARRAY_PUSH_FIRST,
                              SubDocOp.ARRAY_PUSH_LAST,
-                             SubDocOp.ARRAY_ADD_UNIQUE,
                              SubDocOp.ARRAY_INSERT]
 
         for s in spec:

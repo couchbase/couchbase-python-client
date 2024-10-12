@@ -526,7 +526,7 @@ def array_insert(path,              # type: str
 
 
 def array_addunique(path,              # type: str
-                    *values,                 # type: Iterable[Any]
+                    value,                 # type: Union[str, int, float, bool, None]
                     create_parents=False,     # type: Optional[bool]
                     xattr=False               # type: Optional[bool]
                     ) -> Spec:
@@ -535,7 +535,7 @@ def array_addunique(path,              # type: str
 
     Args:
         path (str): The path to an element of an array.
-        *values (Iterable[Any]): The values to add.
+        value (Union[str, int, float, bool, None]): The value to add into the array.
         create_parents (bool, optional): Whether or not the path to the field should be created
             if it does not already exist.
         xattr (bool, optional): Whether this operation should reference the document body or the
@@ -546,11 +546,11 @@ def array_addunique(path,              # type: str
 
     """
     expand_macros = False
-    if any(map(lambda m: isinstance(m, MutationMacro), values)):
-        values = [v.value if isinstance(v, MutationMacro) else v for v in values]
+    if isinstance(value, MutationMacro):
+        value = value.value
         xattr = True
         expand_macros = True
-    return Spec(SubDocOp.ARRAY_ADD_UNIQUE, path, create_parents, xattr, expand_macros, ArrayValues(*values))
+    return Spec(SubDocOp.ARRAY_ADD_UNIQUE, path, create_parents, xattr, expand_macros, value)
 
 
 def counter(path,                   # type: str

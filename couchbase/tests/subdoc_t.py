@@ -142,16 +142,20 @@ class SubDocumentTestSuite:
                                                        cb_env.mock_server_type)
 
     @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_array_add_unique(self, cb_env):
+    @pytest.mark.parametrize('value', [True,
+                                       False,
+                                       3.14159,
+                                       13,
+                                       'foo',
+                                       None])
+    def test_array_add_unique(self, cb_env, value):
         key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.array_addunique('array', 6),))
+        result = cb_env.collection.mutate_in(key, (SD.array_addunique('array', value),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
         assert isinstance(val['array'], list)
-        assert len(val['array']) == 6
-        assert 6 in val['array']
+        assert value in val['array']
 
     @pytest.mark.usefixtures('skip_if_go_caves')
     def test_array_add_unique_create_parents(self, cb_env):
