@@ -197,6 +197,7 @@ add_library(pycbc_core SHARED ${SOURCE_FILES})
 
 target_include_directories(
   pycbc_core PRIVATE SYSTEM
+  "${COUCHBASE_CXX_BINARY_DIR}/generated"
   "${COUCHBASE_CXX_SOURCE_DIR}"
   "${COUCHBASE_CXX_SOURCE_DIR}/third_party/cxx_function"
   "${COUCHBASE_CXX_SOURCE_DIR}/third_party/expected/include")
