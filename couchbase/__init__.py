@@ -84,9 +84,11 @@ import atexit  # nopep8 # isort:skip # noqa: E402
 def _pycbc_teardown(**kwargs):
     """**INTERNAL**"""
     global _PYCBC_LOGGER
-    # if using a console logger we let the nature course of shutdown happening, if using Python logging
+    # if using a console logger we let the natural course of shutdown happen, if using Python logging
     # we need a cleaner mechanism to shutdown the C++ logger prior to the Python interpreter starting to finalize
-    if _PYCBC_LOGGER and isinstance(_PYCBC_LOGGER, pycbc_logger) and not _PYCBC_LOGGER.is_console_logger():
+    if (_PYCBC_LOGGER
+        and isinstance(_PYCBC_LOGGER, pycbc_logger)
+            and not (_PYCBC_LOGGER.is_console_logger() or _PYCBC_LOGGER.is_file_logger())):
         shutdown_logger()
         _PYCBC_LOGGER = None
 
@@ -143,7 +145,11 @@ def configure_console_logger():
     import os
     log_level = os.getenv('PYCBC_LOG_LEVEL', None)
     if log_level:
-        _PYCBC_LOGGER.create_console_logger(log_level.lower())
+        log_file = os.getenv('PYCBC_LOG_FILE', None)
+        if log_file:
+            _PYCBC_LOGGER.create_logger(level=log_level.lower(), filename=log_file)
+        else:
+            _PYCBC_LOGGER.create_logger(level=log_level.lower())
         logging.getLogger().debug(get_metadata(as_str=True))
 
 
@@ -151,6 +157,10 @@ def configure_logging(name, level=logging.INFO, parent_logger=None):
     if parent_logger:
         name = f'{parent_logger.name}.{name}'
     logger = logging.getLogger(name)
+    if _PYCBC_LOGGER.is_console_logger() or _PYCBC_LOGGER.is_file_logger():
+        raise RuntimeError(('Cannot create logger.  Another logger has already been '
+                            'initialized. Make sure the PYCBC_LOG_LEVEL and PYCBC_LOG_FILE env '
+                            'variable are not set if using configure_logging.'))
     _PYCBC_LOGGER.configure_logging_sink(logger, level)
     logger.debug(get_metadata(as_str=True))
 

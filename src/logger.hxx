@@ -225,6 +225,7 @@ private:
 struct pycbc_logger {
   PyObject_HEAD std::shared_ptr<pycbc_logger_sink> logger_sink_;
   bool is_console_logger{ false };
+  bool is_file_logger{ false };
 };
 
 PyObject*

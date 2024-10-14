@@ -66,18 +66,19 @@ pycbc_logger__configure_logging_sink__(PyObject* self, PyObject* args, PyObject*
 }
 
 PyObject*
-pycbc_logger__create_console_logger__(PyObject* self, PyObject* args, PyObject* kwargs)
+pycbc_logger__create_logger__(PyObject* self, PyObject* args, PyObject* kwargs)
 {
   auto logger = reinterpret_cast<pycbc_logger*>(self);
   char* log_level = nullptr;
-  const char* kw_list[] = { "level", nullptr };
-  const char* kw_format = "s";
+  char* log_filename = nullptr;
+  const char* kw_list[] = { "level", "filename", nullptr };
+  const char* kw_format = "s|s";
   if (!PyArg_ParseTupleAndKeywords(
-        args, kwargs, kw_format, const_cast<char**>(kw_list), &log_level)) {
+        args, kwargs, kw_format, const_cast<char**>(kw_list), &log_level, &log_filename)) {
     pycbc_set_python_exception(PycbcError::InvalidArgument,
                                __FILE__,
                                __LINE__,
-                               "Cannot set create console logger.  Unable to parse args/kwargs.");
+                               "Cannot create logger.  Unable to parse args/kwargs.");
     return nullptr;
   }
 
@@ -86,7 +87,7 @@ pycbc_logger__create_console_logger__(PyObject* self, PyObject* args, PyObject* 
       PycbcError::UnsuccessfulOperation,
       __FILE__,
       __LINE__,
-      "Cannot create console logger.  Another logger has already been initialized.");
+      "Cannot create logger.  Another logger has already been initialized.");
     return nullptr;
   }
 
@@ -94,13 +95,21 @@ pycbc_logger__create_console_logger__(PyObject* self, PyObject* args, PyObject* 
     pycbc_set_python_exception(PycbcError::InvalidArgument,
                                __FILE__,
                                __LINE__,
-                               "Cannot create console logger.  Unable to determine log level.");
+                               "Cannot create logger.  Unable to determine log level.");
     return nullptr;
   }
-  couchbase::core::logger::create_console_logger();
   auto level = couchbase::core::logger::level_from_str(log_level);
-  couchbase::core::logger::set_log_levels(level);
-  logger->is_console_logger = true;
+  if (log_filename != nullptr) {
+    couchbase::core::logger::configuration configuration{};
+    configuration.filename = std::string{ log_filename };
+    configuration.log_level = level;
+    couchbase::core::logger::create_file_logger(configuration);
+    logger->is_file_logger = true;
+  } else {
+    couchbase::core::logger::create_console_logger();
+    couchbase::core::logger::set_log_levels(level);
+    logger->is_console_logger = true;
+  }
   Py_RETURN_NONE;
 }
 
@@ -137,24 +146,42 @@ pycbc_logger__is_console_logger__(PyObject* self, PyObject* Py_UNUSED(ignored))
   }
 }
 
-static PyMethodDef pycbc_logger_methods[] = { { "configure_logging_sink",
-                                                (PyCFunction)pycbc_logger__configure_logging_sink__,
-                                                METH_VARARGS | METH_KEYWORDS,
-                                                PyDoc_STR("Configure logger's logging sink") },
-                                              { "create_console_logger",
-                                                (PyCFunction)pycbc_logger__create_console_logger__,
-                                                METH_VARARGS | METH_KEYWORDS,
-                                                PyDoc_STR("Create a console logger") },
-                                              { "enable_protocol_logger",
-                                                (PyCFunction)pycbc_logger__enable_protocol_logger__,
-                                                METH_VARARGS | METH_KEYWORDS,
-                                                PyDoc_STR("Enables the protocol logger") },
-                                              { "is_console_logger",
-                                                (PyCFunction)pycbc_logger__is_console_logger__,
-                                                METH_NOARGS,
-                                                PyDoc_STR(
-                                                  "Check if logger is console logger or not") },
-                                              { NULL } };
+PyObject*
+pycbc_logger__is_file_logger__(PyObject* self, PyObject* Py_UNUSED(ignored))
+{
+  auto logger = reinterpret_cast<pycbc_logger*>(self);
+  if (logger->is_file_logger) {
+    Py_INCREF(Py_True);
+    return Py_True;
+  } else {
+    Py_INCREF(Py_False);
+    return Py_False;
+  }
+}
+
+static PyMethodDef pycbc_logger_methods[] = {
+  { "configure_logging_sink",
+    (PyCFunction)pycbc_logger__configure_logging_sink__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Configure logger's logging sink") },
+  { "create_logger",
+    (PyCFunction)pycbc_logger__create_logger__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Create a C++ core logger") },
+  { "enable_protocol_logger",
+    (PyCFunction)pycbc_logger__enable_protocol_logger__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Enables the protocol logger") },
+  { "is_console_logger",
+    (PyCFunction)pycbc_logger__is_console_logger__,
+    METH_NOARGS,
+    PyDoc_STR("Check if logger is console logger or not") },
+  { "is_file_logger",
+    (PyCFunction)pycbc_logger__is_file_logger__,
+    METH_NOARGS,
+    PyDoc_STR("Check if logger is file logger or not") },
+  { NULL }
+};
 
 static PyObject*
 pycbc_logger_new(PyTypeObject* type, PyObject*, PyObject*)
