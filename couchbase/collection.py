@@ -1944,10 +1944,6 @@ class Collection(CollectionLogic):
                   ) -> MultiGetResult:
         """For each key in the provided list, retrieve the document associated with the key.
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys (List[str]): The keys to use for the multiple get operations.
             opts (:class:`~couchbase.options.GetMultiOptions`): Optional parameters for this operation.
@@ -2033,10 +2029,6 @@ class Collection(CollectionLogic):
                               ) -> MultiGetReplicaResult:
         """For each key in the provided list, retrieve the document associated with the key from the collection
         leveraging both active and all available replicas returning the first available.
-
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             keys (List[str]): The keys to use for the multiple get operations.
@@ -2131,10 +2123,6 @@ class Collection(CollectionLogic):
                                ) -> MultiGetReplicaResult:
         """For each key in the provided list, retrieve the document from the collection returning both
         active and all available replicas.
-
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             keys (List[str]): The keys to use for the multiple get operations.
@@ -2252,10 +2240,6 @@ class Collection(CollectionLogic):
                            ) -> MultiGetResult:
         """For each key in the provided list, lock the document associated with the key.
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys (List[str]): The keys to use for the multiple lock operations.
             lock_time (timedelta):  The amount of time to lock the documents.
@@ -2344,10 +2328,6 @@ class Collection(CollectionLogic):
                      ) -> MultiExistsResult:
         """For each key in the provided list, check if the document associated with the key exists.
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys (List[str]): The keys to use for the multiple exists operations.
             opts (:class:`~couchbase.options.ExistsMultiOptions`): Optional parameters for this operation.
@@ -2415,10 +2395,6 @@ class Collection(CollectionLogic):
                      ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, inserts a new document to the collection,
         failing if the document already exists.
-
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple insert operations.
@@ -2509,10 +2485,6 @@ class Collection(CollectionLogic):
         """For each key, value pair in the provided dict, upserts a document to the collection. This operation
         succeeds whether or not the document already exists.
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple upsert operations.
             opts (:class:`~couchbase.options.UpsertMultiOptions`): Optional parameters for this operation.
@@ -2596,10 +2568,6 @@ class Collection(CollectionLogic):
                       ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, replaces the value of a document in the collection.
         This operation fails if the document does not exist.
-
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple replace operations.
@@ -2696,10 +2664,6 @@ class Collection(CollectionLogic):
         """For each key in the provided list, remove the existing document.  This operation fails
         if the document does not exist.
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys (List[str]): The keys to use for the multiple remove operations.
             opts (:class:`~couchbase.options.RemoveMultiOptions`): Optional parameters for this operation.
@@ -2769,10 +2733,6 @@ class Collection(CollectionLogic):
         """For each key in the provided list, update the expiry on an existing document. This operation fails
         if the document does not exist.
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys (List[str]): The keys to use for the multiple touch operations.
             expiry (timedelta): The new expiry for the document.
@@ -2810,10 +2770,6 @@ class Collection(CollectionLogic):
                      ) -> Dict[str, Union[None, CouchbaseBaseException]]:
         """For each result in the provided :class:`~couchbase.result.MultiResultType` in the provided list,
         unlocks a previously locked document. This operation fails if the document does not exist.
-
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             keys (Union[MultiResultType, Dict[str, int]]): The result from a previous multi operation.

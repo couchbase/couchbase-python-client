@@ -120,7 +120,7 @@ class ClusterLogic:
 
         if len(auth_kwargs.keys()) > 0:
             raise InvalidArgumentException(
-                message="Authentication kwargs now allowed.  Only provide the Authenticator.")
+                message="Authentication kwargs not allowed.  Only provide the Authenticator.")
 
         self._auth = authenticator.as_dict()
         # add the cert_path to the authenticator if found

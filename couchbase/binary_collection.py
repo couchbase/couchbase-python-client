@@ -253,10 +253,6 @@ class BinaryCollection:
     ) -> MultiMutationResult:
         """For each key-value pair, appends the specified value to the end of the document specified by the key.
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys_and_values (Dict[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
                 append operations.  Each key should correspond to the document to append to and each value should
@@ -353,10 +349,6 @@ class BinaryCollection:
     ) -> MultiMutationResult:
         """For each key-value pair, prepends the specified value to the beginning of the document specified
         by the key.
-
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             keys_and_values (Dict[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
@@ -455,10 +447,6 @@ class BinaryCollection:
         """For each key in the provided list, increments the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
 
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
         Args:
             keys (List[str]): The keys to use for the multiple increment operations.  Each key should correspond
                 to the document to increment.
@@ -543,10 +531,6 @@ class BinaryCollection:
     ) -> MultiCounterResult:
         """For each key in the provided list, decrements the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
-
-        .. note::
-            This method is part of an **uncommitted** API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
 
         Args:
             keys (List[str]): The keys to use for the multiple decrement operations.  Each key should correspond
