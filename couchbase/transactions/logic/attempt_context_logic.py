@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
     from couchbase._utils import PyCapsuleType
-    from couchbase.serializer import Serializer
+    from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)
 
@@ -33,14 +33,16 @@ class AttemptContextLogic:
     def __init__(self,
                  ctx,    # type: PyCapsuleType
                  loop,    # type: Optional[AbstractEventLoop]
-                 serializer  # type: Serializer
+                 transcoder,  # type: Transcoder
                  ):
-        log.debug('creating new attempt context with context=%s, loop=%s, and serializer=%s', ctx, loop, serializer)
+        log.debug('creating new attempt context with context=%s, loop=%s, and transcoder=%s', ctx, loop, transcoder)
         self._ctx = ctx
         self._loop = loop
-        self._serializer = serializer
+        self._transcoder = transcoder
 
     def get(self, coll, key, **kwargs):
+        # make sure we don't pass the transcoder along
+        kwargs.pop('transcoder', None)
         kwargs.update(coll._get_connection_args())
         kwargs.pop("conn")
         kwargs["key"] = key
@@ -50,19 +52,26 @@ class AttemptContextLogic:
         return transaction_op(**kwargs)
 
     def insert(self, coll, key, value, **kwargs):
+        transcoder = kwargs.pop('transcoder', self._transcoder)
         kwargs.update(coll._get_connection_args())
         kwargs.pop("conn")
-        kwargs["key"] = key
-        kwargs["ctx"] = self._ctx
-        kwargs["op"] = transaction_operations.INSERT.value
-        kwargs["value"] = self._serializer.serialize(value)
+        kwargs.update({
+            'key': key,
+            'ctx': self._ctx,
+            'op': transaction_operations.INSERT.value,
+            'value': transcoder.encode_value(value)
+        })
         log.debug('insert calling transaction op with %s', kwargs)
         return transaction_op(**kwargs)
 
     def replace(self, txn_get_result, value, **kwargs):
-        kwargs.update({"ctx": self._ctx, "op": transaction_operations.REPLACE.value,
-                       "value": self._serializer.serialize(value),
-                       "txn_get_result": txn_get_result._res})
+        transcoder = kwargs.pop('transcoder', self._transcoder)
+        kwargs.update({
+            'ctx': self._ctx,
+            'op': transaction_operations.REPLACE.value,
+            'value': transcoder.encode_value(value),
+            'txn_get_result': txn_get_result._res
+        })
         log.debug('replace calling transaction op with %s', kwargs)
         return transaction_op(**kwargs)
 

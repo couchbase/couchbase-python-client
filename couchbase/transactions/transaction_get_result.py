@@ -17,7 +17,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from couchbase.result import ContentProxy
-from couchbase.serializer import Serializer
+from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from couchbase.pycbc_core import transaction_get_result
@@ -28,10 +28,10 @@ log = logging.getLogger(__name__)
 class TransactionGetResult:
     def __init__(self,
                  res,    # type: transaction_get_result
-                 serializer  # type: Serializer
+                 transcoder  # type: Transcoder
                  ):
         self._res = res
-        self._serializer = serializer
+        self._transcoder = transcoder
         self._decoded_value = None
 
     @property
@@ -45,9 +45,9 @@ class TransactionGetResult:
     @property
     def content_as(self):
         if not self._decoded_value:
-            val = self._res.get('value')
+            val, flags = self._res.get('value')
             if val:
-                self._decoded_value = self._serializer.deserialize(self._res.get("value"))
+                self._decoded_value = self._transcoder.decode_value(val, flags)
                 log.debug(f'Result has decoded value {self._decoded_value}')
                 return ContentProxy(self._decoded_value)
 

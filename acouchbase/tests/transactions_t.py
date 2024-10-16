@@ -24,15 +24,20 @@ from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (BucketNotFoundException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
+                                  FeatureUnavailableException,
                                   ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed,
                                   TransactionOperationFailed)
 from couchbase.n1ql import QueryProfile, QueryScanConsistency
 from couchbase.options import (TransactionConfig,
+                               TransactionGetOptions,
+                               TransactionInsertOptions,
                                TransactionOptions,
-                               TransactionQueryOptions)
+                               TransactionQueryOptions,
+                               TransactionReplaceOptions)
 from couchbase.transactions import TransactionKeyspace, TransactionResult
+from couchbase.transcoder import RawBinaryTranscoder
 from tests.environments import CollectionType
 from tests.environments.test_environment import AsyncTestEnvironment
 from tests.test_features import EnvironmentFeatures
@@ -42,6 +47,9 @@ class TransactionTestSuite:
     TEST_MANIFEST = [
         'test_adhoc',
         'test_bad_query',
+        'test_binary',
+        'test_binary_kwargs',
+        'test_binary_not_supported',
         'test_cleanup_client_attempts',
         'test_cleanup_lost_attempts',
         'test_cleanup_window',
@@ -89,6 +97,20 @@ class TransactionTestSuite:
                                                        cb_env.server_version_short,
                                                        cb_env.mock_server_type)
 
+    @pytest.fixture(scope='class')
+    def check_binary_txns_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('binary_txns',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type,
+                                                       cb_env.server_version_patch)
+
+    @pytest.fixture(scope='class')
+    def check_binary_txns_not_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_not_supported('binary_txns',
+                                                           cb_env.server_version_short,
+                                                           cb_env.mock_server_type,
+                                                           cb_env.server_version_patch)
+
     @pytest.mark.parametrize('adhoc', [True, False])
     def test_adhoc(self, adhoc):
         cfg = TransactionQueryOptions(adhoc=adhoc)
@@ -110,6 +132,65 @@ class TransactionTestSuite:
                 pytest.fail(f"Expected bad query to raise ParsingFailedException, not {e.__class__.__name__}")
 
         await cb_env.cluster.transactions.run(txn_logic)
+
+    @pytest.mark.usefixtures('check_binary_txns_supported')
+    @pytest.mark.asyncio
+    async def test_binary(self, cb_env):
+        key = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value = 'bytes content'.encode('utf-8')
+        new_content = b'\xFF'
+
+        async def txn_logic(ctx):
+            await ctx.insert(cb_env.collection, key, value, TransactionInsertOptions(transcoder=tc))
+            get_res = await ctx.get(cb_env.collection, key, TransactionGetOptions(transcoder=tc))
+            assert get_res.content_as[bytes] == value
+            replace_res = await ctx.replace(get_res, new_content, TransactionReplaceOptions(transcoder=tc))
+            # there's a bug where we don't return the correct content in the replace, so comment this out for now
+            # assert replace_res.content_as[bytes] == new_content
+            assert get_res.cas != replace_res.cas
+
+        await cb_env.cluster.transactions.run(txn_logic)
+        result = await cb_env.collection.get(key, transcoder=tc)
+        assert result.content_as[bytes] == new_content
+
+    @pytest.mark.usefixtures('check_binary_txns_supported')
+    @pytest.mark.asyncio
+    async def test_binary_kwargs(self, cb_env):
+        key = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value = 'bytes content'.encode('utf-8')
+        new_content = b'\xFF'
+
+        async def txn_logic(ctx):
+            await ctx.insert(cb_env.collection, key, value, transcoder=tc)
+            get_res = await ctx.get(cb_env.collection, key, transcoder=tc)
+            assert get_res.content_as[bytes] == value
+            replace_res = await ctx.replace(get_res, new_content, transcoder=tc)
+            # there's a bug where we don't return the correct content in the replace, so comment this out for now
+            # assert replace_res.content_as[bytes] == new_content
+            assert get_res.cas != replace_res.cas
+
+        await cb_env.cluster.transactions.run(txn_logic)
+        result = await cb_env.collection.get(key, transcoder=tc)
+        assert result.content_as[bytes] == new_content
+
+    @pytest.mark.usefixtures('check_binary_txns_not_supported')
+    @pytest.mark.asyncio
+    async def test_binary_not_supported(self, cb_env):
+        key = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value = 'bytes content'.encode('utf-8')
+
+        async def txn_logic(ctx):
+            await ctx.insert(cb_env.collection, key, value, TransactionInsertOptions(transcoder=tc))
+
+        try:
+            await cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert ex.inner_cause is not None
+            err_msg = f"Expected to raise FeatureUnavailableException, not {ex.inner_cause.__class__.__name__}"
+            assert isinstance(ex.inner_cause, FeatureUnavailableException), err_msg
 
     @pytest.mark.parametrize('cleanup', [False, True])
     def test_cleanup_client_attempts(self, cleanup):

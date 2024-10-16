@@ -1945,3 +1945,63 @@ class TransactionQueryOptions:
             return bucket_tokens[0], bucket_tokens[1]
 
         return None
+
+
+class TransactionGetOptions(dict):
+    """Available options to for transaction get operation.
+
+    Args:
+        transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+    """  # noqa: E501
+
+    @overload
+    def __init__(self,
+                 transcoder=None  # type: Optional[Transcoder]
+                 ):
+        ...
+
+    def __init__(self, **kwargs):
+
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
+class TransactionInsertOptions(dict):
+    """Available options to for transaction insert operation.
+
+    Args:
+        transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+    """  # noqa: E501
+
+    @overload
+    def __init__(self,
+                 transcoder=None  # type: Optional[Transcoder]
+                 ):
+        ...
+
+    def __init__(self, **kwargs):
+
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
+class TransactionReplaceOptions(dict):
+    """Available options to for transaction replace operation.
+
+    Args:
+        transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+    """  # noqa: E501
+
+    @overload
+    def __init__(self,
+                 transcoder=None  # type: Optional[Transcoder]
+                 ):
+        ...
+
+    def __init__(self, **kwargs):
+
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)

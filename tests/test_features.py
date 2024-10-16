@@ -71,6 +71,7 @@ class ServerFeatures(Enum):
     ScopeSearch = 'scope_search'
     ScopeSearchIndexManagement = 'scope_search_index_mgmt'
     ScopeEventingFunctionManagement = 'scope_eventing_function_mgmt'
+    BinaryTxns = 'binary_txns'
 
 
 class EnvironmentFeatures:
@@ -100,7 +101,8 @@ class EnvironmentFeatures:
                             ServerFeatures.ViewIndexManagement,
                             ServerFeatures.NonDedupedHistory,
                             ServerFeatures.UpdateCollection,
-                            ServerFeatures.ScopeEventingFunctionManagement]
+                            ServerFeatures.ScopeEventingFunctionManagement,
+                            ServerFeatures.BinaryTxns]
 
     FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -149,15 +151,21 @@ class EnvironmentFeatures:
                                 ServerFeatures.ScopeSearch,
                                 ServerFeatures.ScopeSearchIndexManagement]
 
+    AT_LEAST_V7_6_2_FEATURES = [ServerFeatures.BinaryTxns]
+
     AT_MOST_V7_2_0_FEATURES = [ServerFeatures.RateLimiting]
 
     @staticmethod
     def is_feature_supported(feature,  # type: str
                              server_version,  # type: float
-                             mock_server_type=None  # type: Optional[MockServerType]
+                             mock_server_type=None,  # type: Optional[MockServerType]
+                             server_version_patch=None  # type: Optional[int]
                              ) -> bool:
         try:
-            supported = EnvironmentFeatures.supports_feature(feature, server_version, mock_server_type)
+            supported = EnvironmentFeatures.supports_feature(feature,
+                                                             server_version,
+                                                             mock_server_type,
+                                                             server_version_patch)
             return supported is None
         except Exception:
             return False
@@ -165,7 +173,8 @@ class EnvironmentFeatures:
     @staticmethod
     def check_if_feature_supported(features,  # type: Union[str, List[str]]
                                    server_version,  # type: float
-                                   mock_server_type=None  # type: Optional[MockServerType]
+                                   mock_server_type=None,  # type: Optional[MockServerType]
+                                   server_version_patch=None,  # type: Optional[int]
                                    ) -> None:
 
         print(f"Server version = {server_version}")
@@ -177,7 +186,10 @@ class EnvironmentFeatures:
 
         for feature in features_list:
             try:
-                supported = EnvironmentFeatures.supports_feature(feature, server_version, mock_server_type)
+                supported = EnvironmentFeatures.supports_feature(feature,
+                                                                 server_version,
+                                                                 mock_server_type,
+                                                                 server_version_patch)
                 if supported is not None:
                     pytest.skip(supported)
             except TypeError:
@@ -188,7 +200,8 @@ class EnvironmentFeatures:
     @staticmethod
     def check_if_feature_not_supported(features,  # type: Union[str, List[str]]
                                        server_version,  # type: float
-                                       mock_server_type=None  # type: Optional[MockServerType]
+                                       mock_server_type=None,  # type: Optional[MockServerType]
+                                       server_version_patch=None  # type: Optional[int]
                                        ) -> None:
 
         features_list = []
@@ -199,9 +212,12 @@ class EnvironmentFeatures:
 
         for feature in features_list:
             try:
-                supported = EnvironmentFeatures.supports_feature(feature, server_version, mock_server_type)
+                supported = EnvironmentFeatures.supports_feature(feature,
+                                                                 server_version,
+                                                                 mock_server_type,
+                                                                 server_version_patch)
                 if supported is None:
-                    pytest.skip(supported)
+                    pytest.skip(f'Feature: {feature} is supported.')
             except TypeError:
                 pytest.skip("Unable to determine server version")
             except Exception:
@@ -210,7 +226,8 @@ class EnvironmentFeatures:
     @staticmethod
     def supports_feature(feature,  # type: str  # noqa: C901
                          server_version,  # type: float
-                         mock_server_type=None  # type: Optional[MockServerType]
+                         mock_server_type=None,  # type: Optional[MockServerType]
+                         server_version_patch=None,  # type: Optional[int]
                          ) -> Optional[str]:
 
         is_mock_server = mock_server_type is not None
@@ -333,5 +350,19 @@ class EnvironmentFeatures:
             if server_version < 7.6:
                 return (f'Feature: {feature} only supported on server versions >= 7.6. '
                         f'Using server version: {server_version}.')
+
+            return None
+
+        if feature in map(lambda f: f.value, EnvironmentFeatures.AT_LEAST_V7_6_2_FEATURES):
+            if is_mock_server:
+                return f'Mock server does not support feature: {feature}'
+
+            if server_version < 7.6:
+                return (f'Feature: {feature} only supported on server versions >= 7.6. '
+                        f'Using server version: {server_version}.')
+            patch = server_version_patch or -1
+            if server_version == 7.6 and patch < 2:
+                return (f'Feature: {feature} only supported on server versions >= 7.6.2. '
+                        f'Using server version: {server_version}.{patch}.')
 
             return None

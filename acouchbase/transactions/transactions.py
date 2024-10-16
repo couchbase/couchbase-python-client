@@ -26,7 +26,10 @@ from typing import (TYPE_CHECKING,
 from couchbase.exceptions import ErrorMapper
 from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.supportability import Supportability
-from couchbase.options import TransactionQueryOptions
+from couchbase.options import (TransactionGetOptions,
+                               TransactionInsertOptions,
+                               TransactionQueryOptions,
+                               TransactionReplaceOptions)
 from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryResults,
                                     TransactionResult)
@@ -39,7 +42,7 @@ if TYPE_CHECKING:
     from acouchbase.collection import AsyncCollection
     from couchbase._utils import JSONType, PyCapsuleType
     from couchbase.options import TransactionConfig, TransactionOptions
-    from couchbase.serializer import Serializer
+    from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +54,7 @@ class AsyncWrapper:
             @wraps(fn)
             def wrapped_fn(self, *args, **kwargs):
                 ftr = self._loop.create_future()
+                tc = kwargs.get('transcoder', self._transcoder)
 
                 def on_ok(res):
                     log.debug('%s completed, with %s', fn.__name__, res)
@@ -60,7 +64,7 @@ class AsyncWrapper:
                     else:
                         try:
                             if return_cls is TransactionGetResult:
-                                result = return_cls(res, self._serializer)
+                                result = return_cls(res, tc)
                             else:
                                 result = return_cls(res) if return_cls is not None else None
                             self._loop.call_soon_threadsafe(ftr.set_result, result)
@@ -111,7 +115,7 @@ class Transactions(TransactionsLogic):
             **kwargs) -> Awaitable[TransactionResult]:
         def wrapped_logic(c):
             try:
-                ctx = AttemptContext(c, self._loop, self._serializer)
+                ctx = AttemptContext(c, self._loop, self._transcoder)
                 asyncio.run_coroutine_threadsafe(txn_logic(ctx), self._loop).result()
                 log.debug('wrapped logic completed')
             except Exception as e:
@@ -145,15 +149,23 @@ class AttemptContext(AttemptContextLogic):
     def __init__(self,
                  ctx,    # type: PyCapsuleType
                  loop,    # type: AbstractEventLoop
-                 serializer  # type: Serializer
+                 transcoder  # type: Transcoder
                  ):
-        super().__init__(ctx, loop, serializer)
+        super().__init__(ctx, loop, transcoder)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
+    def _get(self,
+             coll,  # type: AsyncCollection
+             key,   # type: JSONType
+             **kwargs  # type: Dict[str, Any]
+             ) -> Awaitable[TransactionGetResult]:
+        return super().get(coll, key, **kwargs)
+
     def get(self,
             coll,  # type: AsyncCollection
             key,   # type: JSONType
-            **kwargs  # type: Dict[str, JSONType]
+            options=None,  # type: Optional[TransactionGetOptions]
+            **kwargs  # type: Dict[str, Any]
             ) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction.
@@ -161,7 +173,9 @@ class AttemptContext(AttemptContextLogic):
         Args:
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
-            **kwargs (Dict[str, JSONType]): currently unused.
+            options (:class:`~couchbase.options.TransactionGetOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionGetOptions`
 
         Returns:
             Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful
@@ -171,13 +185,24 @@ class AttemptContext(AttemptContextLogic):
             no need to handle the exception, as the transaction will rollback regardless.
 
         """
-        return super().get(coll, key, **kwargs)
+        if 'transcoder' not in kwargs and isinstance(options, TransactionGetOptions):
+            kwargs['transcoder'] = options.get('transcoder', None)
+        return self._get(coll, key, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
+    def _insert(self,
+                coll,    # type: AsyncCollection
+                key,     # type: str
+                value,   # type: JSONType
+                **kwargs  # type: Dict[str, Any]
+                ) -> Awaitable[TransactionGetResult]:
+        return super().insert(coll, key, value, **kwargs)
+
     def insert(self,
                coll,    # type: AsyncCollection
                key,     # type: str
                value,   # type: JSONType
+               options=None,  # type: Optional[TransactionInsertOptions]
                **kwargs  # type: Dict[str, Any]
                ) -> Awaitable[TransactionGetResult]:
         """
@@ -187,7 +212,9 @@ class AttemptContext(AttemptContextLogic):
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
             value (:class:`couchbase._utils.JSONType):  Contents of the document.
-            **kwargs (Dict[str, Any]): currently unused.
+            options (:class:`~couchbase.options.TransactionInsertOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionInsertOptions`
 
         Returns:
            Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form
@@ -197,12 +224,22 @@ class AttemptContext(AttemptContextLogic):
                 no need to handle the exception, as the transaction will rollback regardless.
 
         """
-        return super().insert(coll, key, value, **kwargs)
+        if 'transcoder' not in kwargs and isinstance(options, TransactionInsertOptions):
+            kwargs['transcoder'] = options.get('transcoder', None)
+        return self._insert(coll, key, value, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
+    def _replace(self,
+                 txn_get_result,  # type: TransactionGetResult
+                 value,  # type: JSONType
+                 **kwargs  # type: Dict[str, Any]
+                 ) -> Awaitable[TransactionGetResult]:
+        return super().replace(txn_get_result, value, **kwargs)
+
     def replace(self,
                 txn_get_result,  # type: TransactionGetResult
                 value,  # type: JSONType
+                options=None,  # type: Optional[TransactionReplaceOptions]
                 **kwargs  # type: Dict[str, Any]
                 ) -> Awaitable[TransactionGetResult]:
         """
@@ -212,7 +249,9 @@ class AttemptContext(AttemptContextLogic):
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to replace, gotten from a
               previous call to another transaction operation.
             value (:class:`couchbase._utils.JSONType):  The new contents of the document.
-            **kwargs (Dict[str, Any]): currently unused.
+            options (:class:`~couchbase.options.TransactionReplaceOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionReplaceOptions`
 
         Returns:
            Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful
@@ -221,7 +260,9 @@ class AttemptContext(AttemptContextLogic):
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """
-        return super().replace(txn_get_result, value, **kwargs)
+        if 'transcoder' not in kwargs and isinstance(options, TransactionReplaceOptions):
+            kwargs['transcoder'] = options.get('transcoder', None)
+        return self._replace(txn_get_result, value, **kwargs)
 
     @AsyncWrapper.inject_callbacks(None)
     def remove(self,

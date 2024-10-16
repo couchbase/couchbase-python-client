@@ -527,10 +527,19 @@ pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result
 PyObject*
 pycbc_txns::transaction_get_result__str__(pycbc_txns::transaction_get_result* result)
 {
-  const char* format_string = "transaction_get_result:{key=%s, cas=%llu, value=%s}";
-  auto value = couchbase::core::utils::json::generate(result->res->content<tao::json::value>());
-  return PyUnicode_FromFormat(
-    format_string, result->res->id().key().c_str(), result->res->cas(), value.c_str());
+  if (result->res->content().data.size() != 0) {
+    auto value = reinterpret_cast<const char*>(result->res->content().data.data());
+    auto flags = result->res->content().flags;
+    return PyUnicode_FromFormat("transaction_get_result:{key=%s, cas=%llu, value=%s, flags=%lu}",
+                                result->res->id().key().c_str(),
+                                result->res->cas(),
+                                value,
+                                flags);
+  } else {
+    return PyUnicode_FromFormat("transaction_get_result:{key=%s, cas=%llu}",
+                                result->res->id().key().c_str(),
+                                result->res->cas());
+  }
 }
 
 // TODO: a better way later, perhaps an exposed enum like operations
@@ -555,12 +564,18 @@ pycbc_txns::transaction_get_result__get__(pycbc_txns::transaction_get_result* re
     return PyLong_FromUnsignedLongLong(result->res->cas().value());
   }
   if (VALUE == field_name) {
+    PyObject* pyObj_value = nullptr;
+    PyObject* pyObj_flags = PyLong_FromUnsignedLong(result->res->content().flags);
     try {
-      return binary_to_PyObject(result->res->content().data);
+      pyObj_value = binary_to_PyObject(result->res->content().data);
     } catch (const std::exception& e) {
       PyErr_SetString(PyExc_TypeError, e.what());
       Py_RETURN_NONE;
     }
+    PyObject* pyObj_result = PyTuple_Pack(2, pyObj_value, pyObj_flags);
+    Py_DECREF(pyObj_value);
+    Py_DECREF(pyObj_flags);
+    return pyObj_result;
   }
   PyErr_SetString(PyExc_ValueError, fmt::format("unknown field_name {}", field_name).c_str());
   Py_RETURN_NONE;
@@ -786,6 +801,8 @@ convert_to_python_exc_type(std::exception_ptr err,
   static PyObject* pyObj_query_parsing_failure =
     init_transaction_exception_type("ParsingFailedException");
   static PyObject* pyObj_couchbase_error = init_transaction_exception_type("CouchbaseException");
+  static PyObject* pyObj_feature_not_available_error =
+    init_transaction_exception_type("FeatureUnavailableException");
   PyObject* pyObj_error_ctx = PyDict_New();
   PyObject* pyObj_exc_type = nullptr;
   PyObject* pyObj_final_error = nullptr;
@@ -811,8 +828,13 @@ convert_to_python_exc_type(std::exception_ptr err,
     }
     message = e.what();
   } catch (const tx_core::transaction_operation_failed& e) {
-    pyObj_exc_type = pyObj_txn_op_failed;
-    message = e.what();
+    if (e.cause() == tx_core::external_exception::FEATURE_NOT_AVAILABLE_EXCEPTION) {
+      pyObj_exc_type = pyObj_feature_not_available_error;
+      message = "Possibly attempting a binary transaction operation with a server version < 7.6.2";
+    } else {
+      pyObj_exc_type = pyObj_txn_op_failed;
+      message = e.what();
+    }
   } catch (const tx_core::query_parsing_failure& e) {
     pyObj_exc_type = pyObj_query_parsing_failure;
     message = e.what();
@@ -1053,11 +1075,11 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
   const char* scope = nullptr;
   const char* collection = nullptr;
   const char* key = nullptr;
-  tao::json::value value;
+  couchbase::codec::encoded_value value{};
   TxOperations::TxOperationType op_type = TxOperations::UNKNOWN;
   const char* kw_list[] = { "ctx",      "bucket",  "scope", "collection_name", "key",  "op",
                             "callback", "errback", "value", "txn_get_result",  nullptr };
-  const char* kw_format = "O!|ssssIOOSO";
+  const char* kw_format = "O!|ssssIOOOO";
 
   int ret = PyArg_ParseTupleAndKeywords(args,
                                         kwargs,
@@ -1079,18 +1101,15 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
     Py_RETURN_NONE;
   }
   if (nullptr != pyObj_value) {
-    char* buf;
-    Py_ssize_t nbuf;
-    if (PyBytes_AsStringAndSize(pyObj_value, &buf, &nbuf) == -1) {
-      pycbc_set_python_exception(PycbcError::InvalidArgument,
-                                 __FILE__,
-                                 __LINE__,
-                                 "Unable to determine bytes object from provided value.");
+    PyObject* pyObj_data = PyTuple_GET_ITEM(pyObj_value, 0);
+    PyObject* pyObj_flags = PyTuple_GET_ITEM(pyObj_value, 1);
+    value.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
+    try {
+      value.data = PyObject_to_binary(pyObj_data);
+    } catch (const std::exception& e) {
+      pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
       Py_RETURN_NONE;
     }
-    auto size = py_ssize_t_to_size_t(nbuf);
-    value = couchbase::core::utils::json::parse(reinterpret_cast<const char*>(buf), size);
-    CB_LOG_DEBUG("value is {}", buf);
   }
   if (nullptr == pyObj_ctx) {
     PyErr_SetString(PyExc_ValueError, "no attempt_context passed in");

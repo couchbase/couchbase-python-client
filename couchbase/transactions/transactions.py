@@ -26,7 +26,10 @@ from couchbase.exceptions import (CouchbaseException,
                                   TransactionsErrorContext)
 from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.supportability import Supportability
-from couchbase.options import TransactionQueryOptions
+from couchbase.options import (TransactionGetOptions,
+                               TransactionInsertOptions,
+                               TransactionQueryOptions,
+                               TransactionReplaceOptions)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
 
 from .transaction_get_result import TransactionGetResult
@@ -37,7 +40,7 @@ if TYPE_CHECKING:
     from couchbase._utils import JSONType, PyCapsuleType
     from couchbase.collection import Collection
     from couchbase.options import TransactionOptions
-    from couchbase.serializer import Serializer
+    from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +52,7 @@ class BlockingWrapper:
             @wraps(fn)
             def wrapped_fn(self, *args, **kwargs):
                 try:
+                    tc = kwargs.get('transcoder', self._transcoder)
                     ret = fn(self, *args, **kwargs)
                     log.debug('%s returned %s', fn.__name__, ret)
                     if isinstance(ret, Exception):
@@ -58,7 +62,7 @@ class BlockingWrapper:
                     if return_cls is None:
                         return None
                     if return_cls is TransactionGetResult:
-                        retval = return_cls(ret, self._serializer)
+                        retval = return_cls(ret, tc)
                     else:
                         retval = return_cls(ret)
                     return retval
@@ -114,7 +118,7 @@ class Transactions(TransactionsLogic):
 
         def wrapped_txn_logic(c):
             try:
-                ctx = AttemptContext(c, self._serializer)
+                ctx = AttemptContext(c, self._transcoder)
                 return txn_logic(ctx)
             except Exception as e:
                 log.debug('wrapped_txn_logic got %s:%s, re-raising it', e.__class__.__name__, e)
@@ -138,14 +142,22 @@ class AttemptContext(AttemptContextLogic):
 
     def __init__(self,
                  ctx,  # type: PyCapsuleType
-                 serializer  # type: Serializer
+                 transcoder  # type: Transcoder
                  ):
-        super().__init__(ctx, None, serializer)
+        super().__init__(ctx, None, transcoder)
 
     @BlockingWrapper.block(TransactionGetResult)
+    def _get(self,
+             coll,              # type: Collection
+             key,               # type: str
+             **kwargs  # type: Dict[str, Any]
+             ) -> TransactionGetResult:
+        return super().get(coll, key, **kwargs)
+
     def get(self,
             coll,   # type: Collection
             key,     # type: str
+            options=None,  # type: Optional[TransactionGetOptions]
             **kwargs  # type: Dict[str, Any]
             ) -> TransactionGetResult:
         """
@@ -154,7 +166,9 @@ class AttemptContext(AttemptContextLogic):
         Args:
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
-            **kwargs (Dict[str, Any]): currently unused.
+            options (:class:`~couchbase.options.TransactionGetOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionGetOptions`
 
         Returns:
             :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
@@ -163,13 +177,24 @@ class AttemptContext(AttemptContextLogic):
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """
-        return super().get(coll, key)
+        if 'transcoder' not in kwargs and isinstance(options, TransactionGetOptions):
+            kwargs['transcoder'] = options.get('transcoder', None)
+        return self._get(coll, key, **kwargs)
 
     @BlockingWrapper.block(TransactionGetResult)
+    def _insert(self,
+                coll,    # type: Collection
+                key,     # type: str
+                value,   # type: JSONType
+                **kwargs  # type: Dict[str, Any]
+                ) -> Optional[TransactionGetResult]:
+        return super().insert(coll, key, value, **kwargs)
+
     def insert(self,
                coll,    # type: Collection
                key,     # type: str
                value,   # type: JSONType
+               options=None,  # type: Optional[TransactionInsertOptions]
                **kwargs  # type: Dict[str, Any]
                ) -> Optional[TransactionGetResult]:
         """
@@ -179,7 +204,9 @@ class AttemptContext(AttemptContextLogic):
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
             value (:class:`couchbase._utils.JSONType):  Contents of the document.
-            **kwargs (Dict[str, Any]): currently unused.
+            options (:class:`~couchbase.options.TransactionInsertOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionInsertOptions`
 
         Returns:
            :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
@@ -188,12 +215,22 @@ class AttemptContext(AttemptContextLogic):
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """
-        return super().insert(coll, key, value, **kwargs)
+        if 'transcoder' not in kwargs and isinstance(options, TransactionInsertOptions):
+            kwargs['transcoder'] = options.get('transcoder', None)
+        return self._insert(coll, key, value, **kwargs)
 
     @BlockingWrapper.block(TransactionGetResult)
+    def _replace(self,
+                 txn_get_result,  # type: TransactionGetResult
+                 value,  # type: JSONType
+                 **kwargs,  # type: Dict[str, Any]
+                 ) -> TransactionGetResult:
+        return super().replace(txn_get_result, value, **kwargs)
+
     def replace(self,
                 txn_get_result,  # type: TransactionGetResult
                 value,  # type: JSONType
+                options=None,  # type: Optional[TransactionReplaceOptions]
                 **kwargs,  # type: Dict[str, Any]
                 ) -> TransactionGetResult:
         """
@@ -203,7 +240,9 @@ class AttemptContext(AttemptContextLogic):
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to replace, gotten from a
               previous call to another transaction operation.
             value (:class:`couchbase._utils.JSONType):  The new contents of the document.
-            **kwargs (Dict[str, Any]): currently unused.
+            options (:class:`~couchbase.options.TransactionReplaceOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionReplaceOptions`
 
         Returns:
            :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
@@ -213,7 +252,9 @@ class AttemptContext(AttemptContextLogic):
                 no need to handle the exception, as the transaction will rollback regardless.
 
         """
-        return super().replace(txn_get_result, value, **kwargs)
+        if 'transcoder' not in kwargs and isinstance(options, TransactionReplaceOptions):
+            kwargs['transcoder'] = options.get('transcoder', None)
+        return self._replace(txn_get_result, value, **kwargs)
 
     @BlockingWrapper.block(None)
     def remove(self,

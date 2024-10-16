@@ -24,6 +24,7 @@ from couchbase.logic.supportability import Supportability
 from couchbase.pycbc_core import (create_transactions,
                                   destroy_transactions,
                                   run_transaction)
+from couchbase.transcoder import JSONTranscoder
 
 if TYPE_CHECKING:
     from couchbase.logic.cluster import ClusterLogic
@@ -40,12 +41,12 @@ class TransactionsLogic:
                  ):
         self._config = config
         self._loop = None
-        # cluster always has a default (DefaultJSONSerializer)
-        self._serializer = cluster._default_serializer
+        # while the cluster has a default transcoder, it might not be a JSONTranscoder
+        self._transcoder = JSONTranscoder(cluster.default_serializer)
         if hasattr(cluster, "loop"):
             self._loop = cluster.loop
         self._txns = create_transactions(cluster.connection, self._config._base)
-        log.info('created transactions object using config=%s, serializer=%s', self._config, self._serializer)
+        log.info('created transactions object using config=%s, transcoder=%s', self._config, self._transcoder)
 
     def run(self,
             logic,                     # type: Callable[[AttemptContextLogic], None]

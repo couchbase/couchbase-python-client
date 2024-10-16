@@ -190,6 +190,15 @@ class TestEnvironment:
         return self._cluster.server_version_short
 
     @property
+    def server_version_patch(self) -> Optional[int]:
+        if self.server_version:
+            try:
+                return int(self.server_version.split('-')[0].split('.')[2])
+            except Exception:
+                return None
+        return None
+
+    @property
     def sixm(self) -> Optional[Any]:
         """Returns the default SearchIndexManager"""
         return self._sixm if hasattr(self, '_sixm') else None
@@ -619,10 +628,11 @@ class TestEnvironment:
         if self._use_named_collections:
             self.qixm.create_primary_index(self.bucket.name,
                                            scope_name=self.TEST_SCOPE,
-                                           collection_name=self.TEST_COLLECTION)
+                                           collection_name=self.TEST_COLLECTION,
+                                           ignore_if_exists=True)
             fqdn = f'`{fqdn}`.`{self.TEST_SCOPE}`.`{self.TEST_COLLECTION}`'
         else:
-            self.qixm.create_primary_index(self.bucket.name)
+            self.qixm.create_primary_index(self.bucket.name, ignore_if_exists=True)
 
         for _ in range(5):
             row_count_good = _check_row_count(fqdn, 20)
@@ -936,10 +946,11 @@ class AsyncTestEnvironment(TestEnvironment):
         if self._use_named_collections:
             await self.qixm.create_primary_index(self.bucket.name,
                                                  scope_name=self.TEST_SCOPE,
-                                                 collection_name=self.TEST_COLLECTION)
+                                                 collection_name=self.TEST_COLLECTION,
+                                                 ignore_if_exists=True)
             fqdn = f'`{fqdn}`.`{self.TEST_SCOPE}`.`{self.TEST_COLLECTION}`'
         else:
-            await self.qixm.create_primary_index(self.bucket.name)
+            await self.qixm.create_primary_index(self.bucket.name, ignore_if_exists=True)
 
         for _ in range(5):
             row_count_good = await _check_row_count(fqdn, 20)
