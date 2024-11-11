@@ -87,6 +87,15 @@ def process_build_env_vars():  # noqa: C901
     else:
         cmake_extra_args += ['-DUSE_STATIC_STDLIB:BOOL=OFF']
 
+    # v4.3.4: Allow user to specify if the C++ core will download Mozilla CA bundle during build.
+    #         Defaults to ON unless the CPM Cache is being used then we use the certs from the cache
+    download_mozilla_ca_bundle = os.getenv('PYCBC_DOWNLOAD_MOZILLA_CA_BUNDLE', None)
+    if download_mozilla_ca_bundle is not None:
+        if download_mozilla_ca_bundle.lower() in ENV_TRUE:
+            cmake_extra_args += ['-DDOWNLOAD_MOZILLA_CA_BUNDLE:BOOL=ON']
+        else:
+            cmake_extra_args += ['-DDOWNLOAD_MOZILLA_CA_BUNDLE:BOOL=OFF']
+
     sanitizers = os.getenv('PYCBC_SANITIZERS', None)
     if sanitizers:
         for x in sanitizers.split(','):
@@ -165,8 +174,17 @@ class CMakeConfig:
             cmake_config_args += ['-DCPM_DOWNLOAD_ALL=OFF',
                                   '-DCPM_USE_NAMED_CACHE_DIRECTORIES=ON',
                                   '-DCPM_USE_LOCAL_PACKAGES=OFF',
-                                  f'-DCPM_SOURCE_CACHE={CXXCBC_CACHE_DIR}',
-                                  f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}"']
+                                  f'-DCPM_SOURCE_CACHE={CXXCBC_CACHE_DIR}']
+            # v4.3.4: If the user has not specifically provided what they want for downloading the Mozilla CA bundle,
+            #         we turn this off to use the bundle from the CPM Cache.  If the user wants the bundle downloaded,
+            #         we make sure to not set the CA_BUNDLE_ROOT path.
+            user_defined_download_mozilla = next(
+                (arg for arg in cmake_config_args if '-DDOWNLOAD_MOZILLA_CA_BUNDLE' in arg), None)
+            if user_defined_download_mozilla is None:
+                cmake_config_args += [f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}',
+                                      '-DDOWNLOAD_MOZILLA_CA_BUNDLE:BOOL=OFF']
+            elif user_defined_download_mozilla == '-DDOWNLOAD_MOZILLA_CA_BUNDLE:BOOL=OFF':
+                cmake_config_args.append(f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}')
 
         if platform.system() == "Windows":
             cmake_config_args += [f'-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
