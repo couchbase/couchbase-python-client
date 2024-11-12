@@ -48,6 +48,17 @@ log = logging.getLogger(__name__)
 
 
 class AsyncWrapper:
+    @staticmethod
+    def call_async_fn(ftr, self, fn, *args, **kwargs):
+        try:
+            fn(self, *args, **kwargs)
+        except SystemError as e:
+            ftr.set_exception(e.__cause__)
+        except Exception as e:
+            ftr.set_exception(e)
+        finally:
+            return ftr
+
     @classmethod  # noqa: C901
     def inject_callbacks(cls, return_cls):  # noqa: C901
         def decorator(fn):
@@ -86,14 +97,7 @@ class AsyncWrapper:
 
                 kwargs["callback"] = on_ok
                 kwargs["errback"] = on_err
-                try:
-                    fn(self, *args, **kwargs)
-                except SystemError as e:
-                    ftr.set_exception(e.__cause__)
-                except Exception as e:
-                    ftr.set_exception(e)
-                finally:
-                    return ftr
+                return AsyncWrapper.call_async_fn(ftr, self, fn, *args, **kwargs)
 
             return wrapped_fn
 
