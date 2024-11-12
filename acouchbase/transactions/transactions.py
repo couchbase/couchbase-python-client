@@ -56,8 +56,6 @@ class AsyncWrapper:
             ftr.set_exception(e.__cause__)
         except Exception as e:
             ftr.set_exception(e)
-        finally:
-            return ftr
 
     @classmethod  # noqa: C901
     def inject_callbacks(cls, return_cls):  # noqa: C901
@@ -97,7 +95,8 @@ class AsyncWrapper:
 
                 kwargs["callback"] = on_ok
                 kwargs["errback"] = on_err
-                return AsyncWrapper.call_async_fn(ftr, self, fn, *args, **kwargs)
+                AsyncWrapper.call_async_fn(ftr, self, fn, *args, **kwargs)
+                return ftr
 
             return wrapped_fn
 

@@ -226,14 +226,11 @@ class AsyncUtilityTestSuite:
         class_name = expected_error.__class__.__name__
         if class_name == 'SystemError':
             raise_with_cause = True
-        elif class_name in ['BaseException', 'KeyboardInterrupt', 'SystemExit', 'CancelledError']:
-            pytest.skip('Skip until PYCBC-1636 addressed')
 
         if raise_with_cause is True:
-            # BUG(PYCBC-1636): acouchbase API does not properly handle BaseException
             # TypeError b/c cause is None where a cause is expected
-            # with pytest.raises(TypeError):
-            #     await tester.fn_failure(expected_error)
+            with pytest.raises(TypeError):
+                await tester.fn_failure(expected_error)
             cause = Exception('Fail!')
             with pytest.raises(type(cause)):
                 await tester.fn_failure(expected_error, cause=cause)
