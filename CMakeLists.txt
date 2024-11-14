@@ -47,6 +47,14 @@ else()
   set(PYCBC_C_MOD_SUFFIX ".so")
 endif()
 
+file(READ "${PROJECT_SOURCE_DIR}/couchbase/_version.py" PYCBC_VERSION_CONTENTS)
+string(REGEX MATCH "__version__.*([0-9]+\\.[0-9]+\\.[0-9]+)(\\.?[+a-z0-9]*)" PYCBC_FOUND_VERSION ${PYCBC_VERSION_CONTENTS})
+set(PYCBC_VERSION "${CMAKE_MATCH_1}")
+if(NOT CMAKE_MATCH_2 STREQUAL "")
+  set(PYCBC_VERSION "${PYCBC_VERSION}${CMAKE_MATCH_2}")
+endif()
+message(STATUS "PYCBC_VERSION=${PYCBC_VERSION}")
+
 option(USE_STATIC_BORINGSSL "Statically link BoringSSL instead of dynamically linking OpenSSL" FALSE)
 message(STATUS "USE_STATIC_BORINGSSL=${USE_STATIC_BORINGSSL}")
 if(NOT USE_STATIC_BORINGSSL)
@@ -115,6 +123,9 @@ else()
       CACHE BOOL "" FORCE)
 endif()
 
+set(COUCHBASE_CXX_CLIENT_WRAPPER_UNIFIED_ID
+    "python/${PYCBC_VERSION}"
+    CACHE STRING "" FORCE)
 set(COUCHBASE_CXX_CLIENT_PYTHON_WARNINGS
     ON
     CACHE INTERNAL "")

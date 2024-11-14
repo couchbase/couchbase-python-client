@@ -49,12 +49,11 @@ try:
 except ImportError:
     __version__ = '0.0.0-could-not-find-version'
 
-PYCBC_VERSION = f'pycbc/{__version__}'
+PYCBC_VERSION = f'python/{__version__}'
+USER_AGENT_EXTRA = ''
 
 try:
-    python_version_info = platform.sys.version.split(' ')
-    if len(python_version_info) > 0:
-        PYCBC_VERSION = f'{PYCBC_VERSION} (python/{python_version_info[0]})'
+    USER_AGENT_EXTRA = f'python/{platform.python_version()}'
 except Exception:  # nosec
     pass
 

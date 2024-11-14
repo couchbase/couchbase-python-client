@@ -26,7 +26,7 @@ from typing import (TYPE_CHECKING,
                     Union)
 from urllib.parse import parse_qs, urlparse
 
-from couchbase import PYCBC_VERSION
+from couchbase import USER_AGENT_EXTRA
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import InvalidArgumentException
@@ -155,7 +155,7 @@ class ClusterLogic:
         if not self._default_transcoder:
             self._default_transcoder = JSONTranscoder()
 
-        cluster_opts['user_agent_extra'] = PYCBC_VERSION
+        cluster_opts['user_agent_extra'] = USER_AGENT_EXTRA
 
         self._cluster_opts = cluster_opts
         self._streaming_timeouts = dict(

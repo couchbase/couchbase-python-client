@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import platform
 import warnings
 from copy import copy
 from datetime import timedelta
@@ -329,9 +330,7 @@ class ConnectionTestSuite:
         assert cluster_opts is not None
         assert isinstance(cluster_opts, dict)
         assert cluster_opts == expected_opts
-        assert user_agent is not None
-        assert 'pycbc/' in user_agent
-        assert 'python/' in user_agent
+        assert user_agent == f'python/{platform.python_version()}'
 
         # check via kwargs
         cluster_opts = ClusterOptions(auth)
@@ -341,9 +340,7 @@ class ConnectionTestSuite:
         assert cluster_opts is not None
         assert isinstance(cluster_opts, dict)
         assert cluster_opts == expected_opts
-        assert user_agent is not None
-        assert 'pycbc/' in user_agent
-        assert 'python/' in user_agent
+        assert user_agent == f'python/{platform.python_version()}'
 
     def test_cluster_pw_auth(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -895,9 +892,7 @@ class ConnectionTestSuite:
 
             user_agent = cl._cluster_opts.pop('user_agent_extra', None)
             assert expected_opts == cl._cluster_opts
-            assert user_agent is not None
-            assert 'pycbc/' in user_agent
-            assert 'python/' in user_agent
+            assert user_agent == f'python/{platform.python_version()}'
             expected_conn_str = conn_str.split('?')[0]
             assert expected_conn_str == cl._connstr
         except CouchbaseException:
@@ -919,9 +914,7 @@ class ConnectionTestSuite:
 
             user_agent = cl._cluster_opts.pop('user_agent_extra', None)
             assert expected_opts == cl._cluster_opts
-            assert user_agent is not None
-            assert 'pycbc/' in user_agent
-            assert 'python/' in user_agent
+            assert user_agent == f'python/{platform.python_version()}'
             expected_conn_str = conn_str.split('?')[0]
             assert expected_conn_str == cl._connstr
         except CouchbaseException:
