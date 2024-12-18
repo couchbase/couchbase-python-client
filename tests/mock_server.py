@@ -292,7 +292,10 @@ class CavesMockServer(MockServer):
             else:
                 self._caves_url = f"{url}/{self._caves_version}/gocaves-linux-amd64"
         elif sys.platform.startswith('darwin'):
-            self._caves_url = f"{url}/{self._caves_version}/gocaves-macos"
+            if platform.machine() == 'arm64':
+                self._caves_url = f"{url}/{self._caves_version}/gocaves-macos-arm64"
+            else:
+                self._caves_url = f"{url}/{self._caves_version}/gocaves-macos"
         elif sys.platform.startswith('win32'):
             self._caves_url = f"{url}/{self._caves_version}/gocaves-windows.exe"
         else:
@@ -303,7 +306,7 @@ class CavesMockServer(MockServer):
             if sys.platform.startswith('linux'):
                 caves_path = 'gocaves-linux-arm64' if platform.machine() == 'aarch64' else 'gocaves-linux-amd64'
             elif sys.platform.startswith('darwin'):
-                caves_path = 'gocaves-macos'
+                caves_path = 'gocaves-macos-arm64' if platform.machine() == 'arm64' else 'gocaves-macos'
             elif sys.platform.startswith('win32'):
                 caves_path = 'gocaves-windows.exe'
 

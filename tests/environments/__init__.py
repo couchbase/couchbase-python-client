@@ -25,13 +25,11 @@ class CollectionType(IntEnum):
 class CouchbaseTestEnvironmentException(Exception):
     """Raised when something with the test environment is incorrect."""
 
-    def __init__(self, message=None, **kwargs):
-        if message and 'message' not in kwargs:
-            kwargs['message'] = message
-        super().__init__(**kwargs)
+    def __init__(self, message=None):
+        super().__init__(message)
 
     def __repr__(self):
-        return f"{type(self).__name__}({super().__repr__()})"
+        return f"{type(self).__name__}({super().__str__()})"
 
     def __str__(self):
         return self.__repr__()
