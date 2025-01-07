@@ -21,6 +21,7 @@
 #include "../exceptions.hxx"
 #include <core/operations/document_query.hxx>
 #include <core/transactions.hxx>
+#include <core/transactions/internal/transaction_context.hxx>
 
 namespace tx = couchbase::transactions;
 namespace tx_core = couchbase::core::transactions;
@@ -84,6 +85,18 @@ private:
   TxOperationType operation_;
 };
 
+enum TxnExceptionType {
+  TRANSACTION_FAILED,
+  TRANSACTION_COMMIT_AMBIGUOUS,
+  TRANSACTION_EXPIRED,
+  TRANSACTION_OPERATION_FAILED,
+  FEATURE_NOT_AVAILABLE,
+  QUERY_PARSING_FAILURE,
+  DOCUMENT_EXISTS,
+  DOCUMENT_NOT_FOUND,
+  COUCHBASE_ERROR
+};
+
 struct transaction_config {
   PyObject_HEAD tx::transactions_config* cfg;
 };
@@ -117,10 +130,10 @@ struct transactions {
   }
 };
 
-struct attempt_context {
-  std::shared_ptr<tx_core::async_attempt_context> ctx;
+struct transaction_context {
+  std::shared_ptr<tx_core::transaction_context> ctx;
 
-  explicit attempt_context(std::shared_ptr<tx_core::async_attempt_context> ctx)
+  explicit transaction_context(std::shared_ptr<tx_core::transaction_context> ctx)
     : ctx(std::move(ctx))
   {
   }
@@ -156,16 +169,22 @@ add_transaction_objects(PyObject* module);
 static void
 dealloc_transactions(PyObject* txns);
 static void
-dealloc_attempt_context(PyObject* ctx);
+dealloc_transaction_context(PyObject* ctx);
 
 PyObject*
 create_transactions(PyObject*, PyObject*, PyObject*);
 PyObject*
-run_transactions(PyObject*, PyObject*, PyObject*);
+create_transaction_context(PyObject*, PyObject*, PyObject*);
+PyObject*
+create_new_attempt_context(PyObject*, PyObject*, PyObject*);
 PyObject*
 transaction_op(PyObject*, PyObject*, PyObject*);
 PyObject*
 transaction_query_op(PyObject*, PyObject*, PyObject*);
+PyObject*
+transaction_commit(PyObject*, PyObject*, PyObject*);
+PyObject*
+transaction_rollback(PyObject*, PyObject*, PyObject*);
 PyObject*
 destroy_transactions(PyObject*, PyObject*, PyObject*);
 void

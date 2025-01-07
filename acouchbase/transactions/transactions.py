@@ -13,13 +13,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
 import logging
 from functools import wraps
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
                     Callable,
+                    Coroutine,
                     Dict,
                     Optional)
 
@@ -111,28 +111,19 @@ class Transactions(TransactionsLogic):
                  ):
         super().__init__(cluster, config)
 
-    @AsyncWrapper.inject_callbacks(TransactionResult)
-    def run(self,
-            txn_logic,  # type:  Callable[[AttemptContextLogic], None]
-            transaction_options=None,  # type: Optional[TransactionOptions]
-            **kwargs) -> Awaitable[TransactionResult]:
-        def wrapped_logic(c):
-            try:
-                ctx = AttemptContext(c, self._loop, self._transcoder)
-                asyncio.run_coroutine_threadsafe(txn_logic(ctx), self._loop).result()
-                log.debug('wrapped logic completed')
-            except Exception as e:
-                log.debug('wrapped_logic raised %s', e)
-                raise e
-
+    async def run(self,
+                  txn_logic,  # type:  Callable[[AttemptContextLogic], Coroutine[Any, Any, None]]
+                  transaction_options=None,  # type: Optional[TransactionOptions]
+                  **kwargs) -> TransactionResult:
         opts = None
         if transaction_options:
-            opts = transaction_options
+            opts = transaction_options._base
         if 'per_txn_config' in kwargs:
             Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
             opts = kwargs.pop('per_txn_config', None)
 
-        return super().run(wrapped_logic, opts, **kwargs)
+        txn_result = await super().run_async(txn_logic, AttemptContext(self._txns, self._loop, self._transcoder, opts))
+        return TransactionResult(**txn_result)
 
     # TODO: make async?
     def close(self):
@@ -149,12 +140,32 @@ class Transactions(TransactionsLogic):
 
 
 class AttemptContext(AttemptContextLogic):
+
     def __init__(self,
                  ctx,    # type: PyCapsuleType
                  loop,    # type: AbstractEventLoop
-                 transcoder  # type: Transcoder
+                 transcoder,  # type: Transcoder
+                 opts    # type: Optional[PyCapsuleType]
                  ):
-        super().__init__(ctx, loop, transcoder)
+        super().__init__(ctx, transcoder, loop, opts)
+
+    @AsyncWrapper.inject_callbacks(None)
+    def _new_attempt(self,
+                     **kwargs  # type: Dict[str, Any]
+                     ) -> Awaitable[None]:
+        return super()._new_attempt_async(**kwargs)
+
+    @AsyncWrapper.inject_callbacks(None)
+    def _rollback(self,
+                  **kwargs  # type: Dict[str, Any]
+                  ) -> Awaitable[None]:
+        return super()._rollback_async(**kwargs)
+
+    @AsyncWrapper.inject_callbacks(TransactionResult)
+    def _commit(self,
+                **kwargs  # type: Dict[str, Any]
+                ) -> Awaitable[TransactionResult]:
+        return super()._commit_async(**kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
     def _get(self,

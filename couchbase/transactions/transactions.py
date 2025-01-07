@@ -116,22 +116,14 @@ class Transactions(TransactionsLogic):
 
         """  # noqa: E501
 
-        def wrapped_txn_logic(c):
-            try:
-                ctx = AttemptContext(c, self._transcoder)
-                return txn_logic(ctx)
-            except Exception as e:
-                log.debug('wrapped_txn_logic got %s:%s, re-raising it', e.__class__.__name__, e)
-                raise e
-
         opts = None
         if transaction_options:
-            opts = transaction_options
+            opts = transaction_options._base
         if 'per_txn_config' in kwargs:
             Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
             opts = kwargs.pop('per_txn_config', None)
 
-        return TransactionResult(**super().run(wrapped_txn_logic, opts))
+        return super().run(txn_logic, AttemptContext(self._txns, self._transcoder, opts))
 
     def close(self):
         super().close()
@@ -141,10 +133,11 @@ class Transactions(TransactionsLogic):
 class AttemptContext(AttemptContextLogic):
 
     def __init__(self,
-                 ctx,  # type: PyCapsuleType
-                 transcoder  # type: Transcoder
+                 txns,    # type: PyCapsuleType
+                 transcoder,  # type: Transcoder
+                 opts    # type: Optional[PyCapsuleType]
                  ):
-        super().__init__(ctx, None, transcoder)
+        super().__init__(txns, transcoder, None, opts)
 
     @BlockingWrapper.block(TransactionGetResult)
     def _get(self,
