@@ -804,6 +804,7 @@ prepare_and_execute_lookup_in_any_replica_op(struct lookup_in_replica_options* o
   couchbase::core::operations::lookup_in_any_replica_request req{ options->id };
   req.timeout = options->timeout_ms;
   req.specs = specs;
+  req.read_preference = options->read_preference;
   if (nullptr != options->span) {
     req.parent_span = std::make_shared<pycbc::request_span>(options->span);
   }
@@ -874,6 +875,7 @@ prepare_and_execute_lookup_in_all_replicas_op(struct lookup_in_replica_options* 
   couchbase::core::operations::lookup_in_all_replicas_request req{ options->id };
   req.timeout = options->timeout_ms;
   req.specs = specs;
+  req.read_preference = options->read_preference;
   if (nullptr != options->span) {
     req.parent_span = std::make_shared<pycbc::request_span>(options->span);
   }
@@ -1036,6 +1038,11 @@ get_lookup_in_replica_options(PyObject* op_args)
     if (0 < timeout) {
       opts.timeout_ms = timeout_ms;
     }
+  }
+
+  PyObject* pyObj_read_preference = PyDict_GetItemString(op_args, "read_preference");
+  if (pyObj_read_preference != nullptr) {
+    opts.read_preference = PyObject_to_read_preference(pyObj_read_preference);
   }
 
   return opts;

@@ -137,6 +137,7 @@ class ServerFeatures(Enum):
     ScopeSearch = 'scope_search'
     ScopeSearchIndexManagement = 'scope_search_index_mgmt'
     ScopeEventingFunctionManagement = 'scope_eventing_function_mgmt'
+    ServerGroups = 'server_groups'
 
 
 # mock and real server (all versions) should have these features
@@ -165,7 +166,8 @@ FEATURES_NOT_IN_MOCK = [ServerFeatures.Analytics,
                         ServerFeatures.KvRangeScan,
                         ServerFeatures.ScopeSearch,
                         ServerFeatures.ScopeSearchIndexManagement,
-                        ServerFeatures.ScopeEventingFunctionManagement]
+                        ServerFeatures.ScopeEventingFunctionManagement,
+                        ServerFeatures.ServerGroups]
 
 FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -212,6 +214,8 @@ AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus,
                             ServerFeatures.NegativeCollectionMaxExpiry,
                             ServerFeatures.ScopeSearch,
                             ServerFeatures.ScopeSearchIndexManagement]
+
+AT_LEAST_V7_6_2_FEATURES = [ServerFeatures.ServerGroups]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {
@@ -361,6 +365,15 @@ class CouchbaseTestEnvironment:
         return self._cluster.server_version_full
 
     @property
+    def server_version_patch(self) -> Optional[int]:
+        if self.server_version:
+            try:
+                return int(self.server_version.split('-')[0].split('.')[2])
+            except Exception:
+                return None
+        return None
+
+    @property
     def is_developer_preview(self) -> Optional[bool]:
         return self._cluster.is_developer_preview
 
@@ -498,6 +511,12 @@ class CouchbaseTestEnvironment:
         if feature in map(lambda f: f.value, AT_LEAST_V7_6_0_FEATURES):
             if self.is_real_server:
                 return self.server_version_short >= 7.6
+            return not self.is_mock_server
+
+        if feature in map(lambda f: f.value, AT_LEAST_V7_6_2_FEATURES):
+            if self.is_real_server:
+                return ((self.server_version_short >= 7.6 and self.server_version_patch >= 2)
+                        or self.server_version_short > 7.6)
             return not self.is_mock_server
 
         raise CouchbaseTestEnvironmentException(f"Unable to determine if server has provided feature: {feature}")

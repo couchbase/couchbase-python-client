@@ -18,8 +18,8 @@
 #pragma once
 
 #include "Python.h" // NOLINT
+
 #include "tracing.hxx"
-#include <chrono>
 #include <core/operations/document_query.hxx>
 #include <core/utils/binary.hxx>
 #include <core/utils/join_strings.hxx>
@@ -27,10 +27,14 @@
 #include <couchbase/durability_level.hxx>
 #include <couchbase/mutation_token.hxx>
 #include <couchbase/persist_to.hxx>
+#include <couchbase/read_preference.hxx>
 #include <couchbase/replicate_to.hxx>
+
+#include <tao/json/value.hpp>
+
+#include <chrono>
 #include <stdexcept>
 #include <string>
-#include <tao/json/value.hpp>
 
 constexpr std::chrono::seconds FIFTY_YEARS{ 50 * 365 * 24 * 60 * 60 };
 
@@ -56,6 +60,9 @@ std::pair<couchbase::persist_to, couchbase::replicate_to>
 PyObject_to_durability(PyObject*);
 couchbase::durability_level
 PyObject_to_durability_level(PyObject*);
+
+couchbase::read_preference
+PyObject_to_read_preference(PyObject*);
 
 std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state);

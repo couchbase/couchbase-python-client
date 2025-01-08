@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from couchbase.metrics import CouchbaseMeter
     from couchbase.mutation_state import MutationState
     from couchbase.n1ql import QueryProfile, QueryScanConsistency
+    from couchbase.replica_reads import ReadPreference
     from couchbase.search import (Facet,
                                   HighlightStyle,
                                   SearchScanConsistency,
@@ -119,6 +120,7 @@ VALID_MULTI_OPTS = {
     'project': lambda x: x,
     'delta': lambda x: x,
     'initial': lambda x: x,
+    'read_preference': lambda x: x.value,
     'per_key_options': lambda x: x,
     'return_exceptions': validate_bool
 }
@@ -556,6 +558,7 @@ class ClusterOptionsBase(dict):
         "dns_nameserver": {"dns_nameserver": validate_str},
         "dns_port": {"dns_port": validate_int},
         "dump_configuration": {"dump_configuration": validate_bool},
+        "preferred_server_group": {"preferred_server_group": validate_str},
     }
 
     @overload
@@ -596,7 +599,8 @@ class ClusterOptionsBase(dict):
         dns_nameserver=None,  # type: Optional[str]
         dns_port=None,  # type: Optional[int]
         disable_mozilla_ca_certificates=None,  # type: Optional[bool]
-        dump_configuration=None,  # type: Optional[bool]
+        dump_configuration=None,  # type: Optional[bool],
+        preferred_server_group=None,  # type: Optional[str]
     ):
         """ClusterOptions instance."""
 
@@ -913,7 +917,8 @@ class GetAllReplicasOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 transcoder=None  # type: Optional[Transcoder]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 read_preference=None,  # type: Optional[ReadPreference]
                  ):
         pass
 
@@ -952,7 +957,8 @@ class GetAnyReplicaOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 transcoder=None  # type: Optional[Transcoder]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 read_preference=None,  # type: Optional[ReadPreference]
                  ):
         pass
 
@@ -995,6 +1001,7 @@ class LookupInAllReplicasOptionsBase(OptionsTimeoutBase):
                  timeout=None,  # type: Optional[timedelta]
                  span=None,  # type: Optional[Any]
                  serializer=None,  # type: Optional[Serializer]
+                 read_preference=None,  # type: Optional[ReadPreference]
                  ) -> None:
         pass
 
@@ -1009,6 +1016,7 @@ class LookupInAnyReplicaOptionsBase(OptionsTimeoutBase):
                  timeout=None,  # type: Optional[timedelta]
                  span=None,  # type: Optional[Any]
                  serializer=None,  # type: Optional[Serializer]
+                 read_preference=None,  # type: Optional[ReadPreference]
                  ) -> None:
         pass
 

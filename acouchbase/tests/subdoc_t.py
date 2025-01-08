@@ -32,6 +32,7 @@ from couchbase.options import (GetOptions,
                                LookupInAnyReplicaOptions,
                                LookupInOptions,
                                MutateInOptions)
+from couchbase.replica_reads import ReadPreference
 from couchbase.result import (GetResult,
                               LookupInReplicaResult,
                               LookupInResult,
@@ -72,6 +73,7 @@ class SubDocumentTestSuite:
         'test_lookup_in_all_replicas_get_full',
         'test_lookup_in_all_replicas_multiple_specs',
         'test_lookup_in_all_replicas_with_timeout',
+        'test_lookup_in_all_replicas_read_preference',
         'test_lookup_in_any_replica_bad_key',
         'test_lookup_in_any_replica_exists',
         'test_lookup_in_any_replica_exists_bad_path',
@@ -80,6 +82,7 @@ class SubDocumentTestSuite:
         'test_lookup_in_any_replica_get_full',
         'test_lookup_in_any_replica_multiple_specs',
         'test_lookup_in_any_replica_with_timeout',
+        'test_lookup_in_any_replica_read_preference',
         'test_lookup_in_multiple_specs',
         'test_lookup_in_one_path_not_found',
         'test_lookup_in_simple_exists',
@@ -133,6 +136,13 @@ class SubDocumentTestSuite:
         EnvironmentFeatures.check_if_feature_supported('subdoc_replica_read',
                                                        cb_env.server_version_short,
                                                        cb_env.mock_server_type)
+
+    @pytest.fixture(scope='class')
+    def check_server_groups_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('server_groups',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type,
+                                                       cb_env.server_version_patch)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('skip_if_go_caves')
@@ -457,6 +467,19 @@ class SubDocumentTestSuite:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    async def test_lookup_in_all_replicas_read_preference(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        # No preferred server group was specified in the cluster options so this should raise
+        # DocumentUnretrievableException
+        with pytest.raises(DocumentUnretrievableException):
+            await cb_env.collection.lookup_in_all_replicas(
+                key,
+                [SD.get('batch')],
+                LookupInAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
     async def test_lookup_in_any_replica_bad_key(self, cb_env):
         with pytest.raises(DocumentUnretrievableException):
             await cb_env.collection.lookup_in_any_replica('asdfgh', [SD.exists('batch')])
@@ -526,6 +549,17 @@ class SubDocumentTestSuite:
         assert isinstance(result, LookupInReplicaResult)
         assert result.content_as[str](0) == value['batch']
         assert result.is_replica is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    async def test_lookup_in_any_replica_read_preference(self, cb_env):
+        key, value = cb_env.get_existing_doc_by_type('vehicle')
+        # No preferred server group was specified in the cluster options so this should raise
+        # DocumentUnretrievableException
+        with pytest.raises(DocumentUnretrievableException):
+            await cb_env.collection.lookup_in_any_replica(
+                key, [SD.get('batch')], LookupInAnyReplicaOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("check_xattr_supported")

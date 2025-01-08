@@ -32,10 +32,13 @@ from couchbase.exceptions import (CasMismatchException,
                                   InvalidArgumentException,
                                   PathNotFoundException,
                                   TemporaryFailException)
-from couchbase.options import (GetOptions,
+from couchbase.options import (GetAllReplicasOptions,
+                               GetAnyReplicaOptions,
+                               GetOptions,
                                InsertOptions,
                                ReplaceOptions,
                                UpsertOptions)
+from couchbase.replica_reads import ReadPreference
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
@@ -93,6 +96,10 @@ class CollectionTests:
     @pytest.fixture(scope="class")
     def check_not_locked_supported(self, cb_env):
         cb_env.check_if_feature_supported('kv_not_locked')
+
+    @pytest.fixture(scope='class')
+    def check_server_groups_supported(self, cb_env):
+        cb_env.check_if_feature_supported('server_groups')
 
     @pytest_asyncio.fixture(name="new_kvp")
     async def new_key_and_value_with_reset(self, cb_env) -> KVPair:
@@ -628,6 +635,17 @@ class CollectionTests:
 
     @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas")
+    @pytest.mark.usefixtures("check_server_groups_supported")
+    @pytest.mark.asyncio
+    async def test_get_any_replica_read_preference(self, cb_env, default_kvp):
+        # No preferred server group was specified in the cluster options so this should raise
+        # DocumentUnretrievableException
+        with pytest.raises(DocumentUnretrievableException):
+            await cb_env.collection.get_any_replica(
+                default_kvp.key, GetAnyReplicaOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
+
+    @pytest.mark.usefixtures("check_multi_node")
+    @pytest.mark.usefixtures("check_replicas")
     @pytest.mark.asyncio
     async def test_get_all_replicas(self, cb_env, default_kvp):
         result = await cb_env.try_n_times(10, 3, cb_env.collection.get_all_replicas, default_kvp.key)
@@ -666,6 +684,17 @@ class CollectionTests:
 
         assert active_cnt == 1
         assert replica_cnt >= active_cnt
+
+    @pytest.mark.usefixtures("check_multi_node")
+    @pytest.mark.usefixtures("check_replicas")
+    @pytest.mark.usefixtures("check_server_groups_supported")
+    @pytest.mark.asyncio
+    async def test_get_all_replicas_read_preference(self, cb_env, default_kvp):
+        # No preferred server group was specified in the cluster options so this should raise
+        # DocumentUnretrievableException
+        with pytest.raises(DocumentUnretrievableException):
+            await cb_env.collection.get_all_replicas(
+                default_kvp.key, GetAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
 
     # @TODO(jc): - should an expiry of -1 raise an InvalidArgumentException?
     @pytest.mark.usefixtures("check_xattr_supported")

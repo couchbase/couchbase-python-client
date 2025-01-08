@@ -29,10 +29,13 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException,
                                   TemporaryFailException)
-from couchbase.options import (GetOptions,
+from couchbase.options import (GetAllReplicasOptions,
+                               GetAnyReplicaOptions,
+                               GetOptions,
                                InsertOptions,
                                ReplaceOptions,
                                UpsertOptions)
+from couchbase.replica_reads import ReadPreference
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
@@ -57,12 +60,14 @@ class CollectionTestSuite:
         'test_get_all_replicas',
         'test_get_all_replicas_fail',
         'test_get_all_replicas_results',
+        'test_get_all_replicas_read_preference',
         'test_get_and_lock',
         'test_get_and_lock_replace_with_cas',
         'test_get_and_touch',
         'test_get_and_touch_no_expire',
         'test_get_any_replica',
         'test_get_any_replica_fail',
+        'test_get_any_replica_read_preference',
         'test_get_fails',
         'test_get_options',
         'test_get_with_expiry',
@@ -131,6 +136,13 @@ class CollectionTestSuite:
     def check_multi_node(self, num_nodes):
         if num_nodes == 1:
             pytest.skip("Test only for clusters with more than a single node.")
+
+    @pytest.fixture(scope='class')
+    def check_server_groups_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('server_groups',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type,
+                                                       cb_env.server_version_patch)
 
     @pytest.fixture(scope="class")
     def skip_if_go_caves(self, cb_env):
@@ -254,6 +266,17 @@ class CollectionTestSuite:
         if num_replicas > 0:
             assert replica_cnt >= active_cnt
 
+    @pytest.mark.usefixtures("check_multi_node")
+    @pytest.mark.usefixtures("check_replicas")
+    @pytest.mark.usefixtures("check_server_groups_supported")
+    def test_get_all_replicas_read_preference(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        # No preferred server group was specified in the cluster options so this should raise
+        # DocumentUnretrievableException
+        with pytest.raises(DocumentUnretrievableException):
+            cb_env.collection.get_all_replicas(
+                key, GetAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
+
     def test_get_and_lock(self, cb_env):
         key, value = cb_env.get_existing_doc()
         result = cb_env.collection.get_and_lock(key, timedelta(seconds=3))
@@ -318,6 +341,17 @@ class CollectionTestSuite:
     def test_get_any_replica_fail(self, cb_env):
         with pytest.raises(DocumentUnretrievableException):
             cb_env.collection.get_any_replica('not-a-key')
+
+    @pytest.mark.usefixtures("check_multi_node")
+    @pytest.mark.usefixtures("check_replicas")
+    @pytest.mark.usefixtures("check_server_groups_supported")
+    def test_get_any_replica_read_preference(self, cb_env):
+        key, value = cb_env.get_existing_doc()
+        # No preferred server group was specified in the cluster options so this should raise
+        # DocumentUnretrievableException
+        with pytest.raises(DocumentUnretrievableException):
+            cb_env.collection.get_any_replica(
+                key, GetAnyReplicaOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
 
     def test_get_options(self, cb_env):
         key, value = cb_env.get_existing_doc()

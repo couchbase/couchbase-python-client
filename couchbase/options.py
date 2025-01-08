@@ -96,6 +96,7 @@ if TYPE_CHECKING:
     from couchbase.collection import Collection
     from couchbase.durability import DurabilityType, ServerDurability
     from couchbase.n1ql import QueryScanConsistency
+    from couchbase.replica_reads import ReadPreference
     from couchbase.transactions import TransactionKeyspace
     from couchbase.transcoder import Transcoder
 
@@ -362,6 +363,7 @@ class ClusterOptions(ClusterOptionsBase):
         dns_nameserver (str, optional):  **VOLATILE** This API is subject to change at any time. Set to configure custom DNS nameserver. Defaults to None.
         dns_port (int, optional):  **VOLATILE** This API is subject to change at any time. Set to configure custom DNS port. Defaults to None.
         dump_configuration (bool, optional): Set to True to dump every new configuration when TRACE level logging. Defaults to False (disabled).
+        preferred_server_group (str, optional): Specifies the preferred server group to be used for replica reads with 'selected server group' read preference.
     """  # noqa: E501
 
     def apply_profile(self,
@@ -507,6 +509,8 @@ class GetAllReplicasOptions(GetAllReplicasOptionsBase):
             key-value operation timeout.
         transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+        read_preference(:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
+            will be selected. Defaults to no preference.
     """
 
 
@@ -552,6 +556,8 @@ class GetAnyReplicaOptions(GetAnyReplicaOptionsBase):
             key-value operation timeout.
         transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+        read_preference(:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
+            will be selected. Defaults to no preference.
     """
 
 
@@ -706,6 +712,8 @@ class LookupInAnyReplicaOptions(LookupInAnyReplicaOptionsBase):
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             subdocument operation timeout.
+        read_preference(:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
+            will be selected. Defaults to no preference.
     """
 
 
@@ -719,6 +727,8 @@ class LookupInAllReplicasOptions(LookupInAllReplicasOptionsBase):
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             subdocument operation timeout.
+        read_preference(:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
+            will be selected. Defaults to no preference.
     """
 
 
@@ -834,6 +844,8 @@ class GetAllReplicasMultiOptions(dict):
             key-value operation timeout.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+        read_preference(:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
+            will be selected. Defaults to no preference.
         per_key_options (Dict[str, :class:`.GetAllReplicasOptions`], optional): Specify
             :class:`.GetAllReplicasOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
@@ -842,9 +854,10 @@ class GetAllReplicasMultiOptions(dict):
     @overload
     def __init__(
         self,
-        transcoder=None,  # type: Transcoder
-        per_key_options=None,       # type: Dict[str, GetAllReplicasOptions]
-        return_exceptions=None      # type: Optional[bool]
+        transcoder=None,        # type: Optional[Transcoder]
+        read_preference=None,   # type: Optional[ReadPreference]
+        per_key_options=None,   # type: Dict[str, GetAllReplicasOptions]
+        return_exceptions=None  # type: Optional[bool]
     ):
         pass
 
@@ -854,7 +867,7 @@ class GetAllReplicasMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls):
-        return ['timeout', 'transcoder', 'per_key_options', 'return_exceptions']
+        return ['timeout', 'transcoder', 'read_preference', 'per_key_options', 'return_exceptions']
 
 
 class GetAnyReplicaMultiOptions(dict):
@@ -868,6 +881,8 @@ class GetAnyReplicaMultiOptions(dict):
             key-value operation timeout.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
             to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+        read_preference(:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
+            will be selected. Defaults to no preference.
         per_key_options (Dict[str, :class:`.GetAnyReplicaOptions`], optional): Specify
             :class:`.GetAnyReplicaOptions` per key.
         return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
@@ -876,9 +891,10 @@ class GetAnyReplicaMultiOptions(dict):
     @overload
     def __init__(
         self,
-        transcoder=None,  # type: Transcoder
-        per_key_options=None,       # type: Dict[str, GetAnyReplicaOptions]
-        return_exceptions=None      # type: Optional[bool]
+        transcoder=None,        # type: Optional[Transcoder]
+        read_preference=None,   # type: Optional[ReadPreference]
+        per_key_options=None,   # type: Dict[str, GetAnyReplicaOptions]
+        return_exceptions=None  # type: Optional[bool]
     ):
         pass
 
@@ -888,7 +904,7 @@ class GetAnyReplicaMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls):
-        return ['timeout', 'transcoder', 'per_key_options', 'return_exceptions']
+        return ['timeout', 'transcoder', 'read_preference', 'per_key_options', 'return_exceptions']
 
 
 class GetMultiOptions(dict):
@@ -1820,7 +1836,8 @@ class DefaultForwarder(Forwarder):
             "report_id": {"report_id": lambda x: str(x)},
             "batch_byte_limit": {"batch_byte_limit": validate_int},
             "batch_item_limit": {"batch_item_limit": validate_int},
-            "concurrency": {"concurrency": validate_int}
+            "concurrency": {"concurrency": validate_int},
+            "read_preference": {"read_preference": lambda r: r.value}
         }
 
 

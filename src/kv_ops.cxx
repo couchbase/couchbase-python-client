@@ -529,13 +529,17 @@ prepare_and_execute_read_op(struct read_options* options,
       break;
     }
     case Operations::GET_ANY_REPLICA: {
-      couchbase::core::operations::get_any_replica_request req{ options->id, options->timeout_ms };
+      couchbase::core::operations::get_any_replica_request req{ options->id,
+                                                                options->timeout_ms,
+                                                                options->read_preference };
       do_get<couchbase::core::operations::get_any_replica_request>(
         *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
       break;
     }
     case Operations::GET_ALL_REPLICAS: {
-      couchbase::core::operations::get_all_replicas_request req{ options->id, options->timeout_ms };
+      couchbase::core::operations::get_all_replicas_request req{ options->id,
+                                                                 options->timeout_ms,
+                                                                 options->read_preference };
       do_get<couchbase::core::operations::get_all_replicas_request>(
         *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
       break;
@@ -1018,6 +1022,11 @@ get_read_options(PyObject* op_args)
 
   PyObject* pyObj_with_expiry = PyDict_GetItemString(op_args, "with_expiry");
   opts.with_expiry = pyObj_with_expiry != nullptr && pyObj_with_expiry == Py_True ? true : false;
+
+  PyObject* pyObj_read_preference = PyDict_GetItemString(op_args, "read_preference");
+  if (pyObj_read_preference != nullptr) {
+    opts.read_preference = PyObject_to_read_preference(pyObj_read_preference);
+  }
 
   return opts;
 }

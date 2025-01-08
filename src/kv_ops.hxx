@@ -23,6 +23,7 @@
 #include <core/document_id.hxx>
 #include <couchbase/cas.hxx>
 #include <couchbase/persist_to.hxx>
+#include <couchbase/read_preference.hxx>
 #include <couchbase/replicate_to.hxx>
 
 /**
@@ -45,6 +46,9 @@ struct read_options {
   couchbase::cas cas;
   PyObject* span{ nullptr };
   PyObject* project{ nullptr };
+
+  // optional - replica reads
+  couchbase::read_preference read_preference{ couchbase::read_preference::no_preference };
 
   // TODO:
   // retries?

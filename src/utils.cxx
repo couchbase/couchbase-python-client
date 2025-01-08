@@ -158,6 +158,21 @@ PyObject_to_durability_level(PyObject* pyObj_durability_level)
   }
 }
 
+couchbase::read_preference
+PyObject_to_read_preference(PyObject* pyObj_read_preference)
+{
+  if (pyObj_read_preference == nullptr || pyObj_read_preference == Py_None) {
+    return couchbase::read_preference::no_preference;
+  }
+
+  auto preference = static_cast<std::uint8_t>(PyLong_AsLong(pyObj_read_preference));
+  if (preference == 1) {
+    return couchbase::read_preference::selected_server_group;
+  } else {
+    return couchbase::read_preference::no_preference;
+  }
+}
+
 std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state)
 {

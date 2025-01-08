@@ -72,6 +72,7 @@ class ServerFeatures(Enum):
     ScopeSearchIndexManagement = 'scope_search_index_mgmt'
     ScopeEventingFunctionManagement = 'scope_eventing_function_mgmt'
     BinaryTxns = 'binary_txns'
+    ServerGroups = 'server_groups'
 
 
 class EnvironmentFeatures:
@@ -102,7 +103,8 @@ class EnvironmentFeatures:
                             ServerFeatures.NonDedupedHistory,
                             ServerFeatures.UpdateCollection,
                             ServerFeatures.ScopeEventingFunctionManagement,
-                            ServerFeatures.BinaryTxns]
+                            ServerFeatures.BinaryTxns,
+                            ServerFeatures.ServerGroups]
 
     FEATURES_IN_MOCK = [ServerFeatures.Txns]
 
@@ -151,7 +153,8 @@ class EnvironmentFeatures:
                                 ServerFeatures.ScopeSearch,
                                 ServerFeatures.ScopeSearchIndexManagement]
 
-    AT_LEAST_V7_6_2_FEATURES = [ServerFeatures.BinaryTxns]
+    AT_LEAST_V7_6_2_FEATURES = [ServerFeatures.BinaryTxns,
+                                ServerFeatures.ServerGroups]
 
     AT_MOST_V7_2_0_FEATURES = [ServerFeatures.RateLimiting]
 

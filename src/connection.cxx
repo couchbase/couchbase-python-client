@@ -829,6 +829,12 @@ update_cluster_options(couchbase::core::cluster_options& options,
   if (pyObj_dump_configuration != nullptr && pyObj_dump_configuration == Py_True) {
     options.dump_configuration = true;
   }
+
+  PyObject* pyObj_preferred_server_group =
+    PyDict_GetItemString(pyObj_options, "preferred_server_group");
+  if (pyObj_preferred_server_group != nullptr) {
+    options.server_group = std::string(PyUnicode_AsUTF8(pyObj_preferred_server_group));
+  }
 }
 
 PyObject*

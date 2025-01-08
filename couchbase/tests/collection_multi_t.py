@@ -23,7 +23,8 @@ from couchbase.exceptions import (CouchbaseException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException)
-from couchbase.options import (GetAnyReplicaMultiOptions,
+from couchbase.options import (GetAllReplicasMultiOptions,
+                               GetAnyReplicaMultiOptions,
                                GetMultiOptions,
                                InsertMultiOptions,
                                InsertOptions,
@@ -31,6 +32,7 @@ from couchbase.options import (GetAnyReplicaMultiOptions,
                                TouchMultiOptions,
                                UpsertMultiOptions,
                                UpsertOptions)
+from couchbase.replica_reads import ReadPreference
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
@@ -43,6 +45,7 @@ from tests.environments import CollectionType
 from tests.environments.collection_multi_environment import CollectionMultiTestEnvironment
 from tests.environments.test_environment import TestEnvironment
 from tests.mock_server import MockServerType
+from tests.test_features import EnvironmentFeatures
 
 
 class CollectionMultiTestSuite:
@@ -54,9 +57,11 @@ class CollectionMultiTestSuite:
         'test_multi_get_all_replicas_fail',
         'test_multi_get_all_replicas_invalid_input',
         'test_multi_get_all_replicas_simple',
+        'test_multi_get_all_replicas_read_preference',
         'test_multi_get_any_replica_fail',
         'test_multi_get_any_replica_invalid_input',
         'test_multi_get_any_replica_simple',
+        'test_multi_get_any_replica_read_preference',
         'test_multi_get_fail',
         'test_multi_get_invalid_input',
         'test_multi_get_simple',
@@ -100,6 +105,13 @@ class CollectionMultiTestSuite:
         kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
         if kv_endpoints is None or len(kv_endpoints) < (num_replicas + 1):
             pytest.skip('Not all replicas are online')
+
+    @pytest.fixture(scope='class')
+    def check_server_groups_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('server_groups',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type,
+                                                       cb_env.server_version_patch)
 
     @pytest.fixture(scope='class')
     def num_nodes(self, cb_env):
@@ -189,6 +201,20 @@ class CollectionMultiTestSuite:
                 assert replica.content_as[dict] == keys_and_docs[k]
 
     @pytest.mark.usefixtures("check_replicas")
+    @pytest.mark.usefixtures("check_server_groups_supported")
+    def test_multi_get_all_replicas_read_preference(self, cb_env):
+        keys_and_docs = cb_env.get_docs(4)
+        keys = list(keys_and_docs.keys())
+        res = cb_env.collection.get_all_replicas_multi(
+            keys, GetAllReplicasMultiOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP,
+                                             return_exceptions=True))
+        assert isinstance(res, MultiGetReplicaResult)
+        assert res.all_ok is False
+        assert isinstance(res.results, dict)
+        assert all(map(lambda r: isinstance(r, DocumentUnretrievableException), res.exceptions.values())) is True
+        assert len(res.results) == 0
+
+    @pytest.mark.usefixtures("check_replicas")
     def test_multi_get_any_replica_fail(self, cb_env):
         keys_and_docs = cb_env.FAKE_DOCS
         keys = list(keys_and_docs.keys())
@@ -229,6 +255,20 @@ class CollectionMultiTestSuite:
         for k, v in res.results.items():
             assert isinstance(v.is_replica, bool)
             assert v.content_as[dict] == keys_and_docs[k]
+
+    @pytest.mark.usefixtures("check_replicas")
+    @pytest.mark.usefixtures("check_server_groups_supported")
+    def test_multi_get_any_replica_read_preference(self, cb_env):
+        keys_and_docs = cb_env.get_docs(4)
+        keys = list(keys_and_docs.keys())
+        res = cb_env.collection.get_any_replica_multi(
+            keys, GetAnyReplicaMultiOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP,
+                                            return_exceptions=True))
+        assert isinstance(res, MultiGetReplicaResult)
+        assert res.all_ok is False
+        assert isinstance(res.results, dict)
+        assert all(map(lambda r: isinstance(r, DocumentUnretrievableException), res.exceptions.values())) is True
+        assert len(res.results) == 0
 
     def test_multi_get_fail(self, cb_env):
         keys_and_docs = cb_env.FAKE_DOCS

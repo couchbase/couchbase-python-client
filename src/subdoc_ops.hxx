@@ -20,6 +20,7 @@
 #include "client.hxx"
 #include <core/impl/subdoc/opcode.hxx>
 #include <core/impl/subdoc/path_flags.hxx>
+#include <couchbase/read_preference.hxx>
 #include <couchbase/store_semantics.hxx>
 
 struct mutate_in_spec {
@@ -66,6 +67,7 @@ struct lookup_in_replica_options {
 
   // optional
   std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
+  couchbase::read_preference read_preference{ couchbase::read_preference::no_preference };
   PyObject* span{ nullptr };
   PyObject* specs{ nullptr };
 };
