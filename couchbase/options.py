@@ -1984,6 +1984,26 @@ class TransactionGetOptions(dict):
         super().__init__(**kwargs)
 
 
+class TransactionGetReplicaFromPreferredServerGroupOptions(dict):
+    """Available options to for transaction get_replica_from_preferred_server_group operation.
+
+    Args:
+        transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+    """
+
+    @overload
+    def __init__(self,
+                 transcoder=None  # type: Optional[Transcoder]
+                 ):
+        ...
+
+    def __init__(self, **kwargs):
+
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
 class TransactionInsertOptions(dict):
     """Available options to for transaction insert operation.
 

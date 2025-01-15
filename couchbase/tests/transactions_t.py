@@ -22,6 +22,7 @@ from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (BucketNotFoundException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
+                                  DocumentUnretrievableException,
                                   FeatureUnavailableException,
                                   ParsingFailedException,
                                   TransactionExpired,
@@ -56,6 +57,8 @@ class TransactionTestSuite:
         'test_get',
         'test_get_lambda_raises_doc_not_found',
         'test_get_inner_exc_doc_not_found',
+        'test_get_replica_from_preferred_server_group_unretrievable',
+        'test_get_replica_from_preferred_server_group_propagate_unretrievable_exc',
         'test_insert',
         'test_insert_lambda_raises_doc_exists',
         'test_insert_inner_exc_doc_exists',
@@ -108,6 +111,13 @@ class TransactionTestSuite:
                                                            cb_env.server_version_short,
                                                            cb_env.mock_server_type,
                                                            cb_env.server_version_patch)
+
+    @pytest.fixture(scope='class')
+    def check_server_groups_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('server_groups',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type,
+                                                       cb_env.server_version_patch)
 
     @pytest.mark.parametrize('adhoc', [True, False])
     def test_adhoc(self, adhoc):
@@ -273,6 +283,41 @@ class TransactionTestSuite:
         except TransactionFailed as ex:
             assert ex.inner_cause is not None
             assert isinstance(ex.inner_cause, DocumentNotFoundException)
+        except Exception as ex:
+            pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
+
+        assert num_attempts == 1
+
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_replica_from_preferred_server_group_unretrievable(self, cb_env):
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            with pytest.raises(DocumentUnretrievableException):
+                ctx.get_replica_from_preferred_server_group(cb_env.collection, key)
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        assert num_attempts == 1
+
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_replica_from_preferred_server_group_propagate_unretrievable_exc(self, cb_env):
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx):
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.get_replica_from_preferred_server_group(cb_env.collection, key)
+
+        try:
+            cb_env.cluster.transactions.run(txn_logic)
+        except TransactionFailed as ex:
+            assert ex.inner_cause is not None
+            assert isinstance(ex.inner_cause, DocumentUnretrievableException)
         except Exception as ex:
             pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
 

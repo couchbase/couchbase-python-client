@@ -99,6 +99,16 @@ class AttemptContextLogic:
         log.debug('get calling transaction op with %s', kwargs)
         return transaction_op(**kwargs)
 
+    def get_replica_from_preferred_server_group(self, coll, key, **kwargs):
+        kwargs.pop('transcoder', None)
+        kwargs.update(coll._get_connection_args())
+        kwargs.pop("conn")
+        kwargs["key"] = key
+        kwargs["ctx"] = self._ctx
+        kwargs["op"] = transaction_operations.GET_REPLICA_FROM_PREFERRED_SERVER_GROUP.value
+        log.debug('get_replica_from_preferred_server_group calling transaction op with %s', kwargs)
+        return transaction_op(**kwargs)
+
     def insert(self, coll, key, value, **kwargs):
         transcoder = kwargs.pop('transcoder', self._transcoder)
         kwargs.update(coll._get_connection_args())

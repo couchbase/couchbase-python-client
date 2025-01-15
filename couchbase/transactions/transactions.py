@@ -27,6 +27,7 @@ from couchbase.exceptions import (CouchbaseException,
 from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.supportability import Supportability
 from couchbase.options import (TransactionGetOptions,
+                               TransactionGetReplicaFromPreferredServerGroupOptions,
                                TransactionInsertOptions,
                                TransactionQueryOptions,
                                TransactionReplaceOptions)
@@ -173,6 +174,46 @@ class AttemptContext(AttemptContextLogic):
         if 'transcoder' not in kwargs and isinstance(options, TransactionGetOptions):
             kwargs['transcoder'] = options.get('transcoder', None)
         return self._get(coll, key, **kwargs)
+
+    @BlockingWrapper.block(TransactionGetResult)
+    def _get_replica_from_preferred_server_group(self,
+                                                 coll,     # type: Collection
+                                                 key,      # type: str
+                                                 **kwargs  # type: Dict[str, Any]
+                                                 ) -> TransactionGetResult:
+        return super().get_replica_from_preferred_server_group(coll, key, **kwargs)
+
+    def get_replica_from_preferred_server_group(self,
+                                                coll,          # type: Collection
+                                                key,           # type: str
+                                                options=None,  # type: Optional[TransactionGetReplicaFromPreferredServerGroupOptions]  # noqa: E501
+                                                **kwargs       # type: Dict[str, Any]
+                                                ) -> TransactionGetResult:
+        """
+        Get a document within this transaction from any replica in the preferred server group that has been specified in
+            the :class:`couchbase.options.ClusterOptions`.
+
+        Args:
+            coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
+            key (str): document key.
+            options (:class:`~couchbase.options.TransactionGetReplicaFromPreferredServerGroupOptions`): Optional
+                parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionGetReplicaFromPreferredServerGroupOptions`
+
+        Returns:
+            :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
+                to other transaction operations. Or `None` if the document was not found.
+        Raises:
+            :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+                no need to handle the exception, as the transaction will rollback regardless.
+            :class:`couchbase.exceptions.DocumentUnretrievableException`: If the document could not be retrieved from
+                any replica in the preferred server group. The transaction will not rollback if this exception is
+                caught.
+        """
+        if 'transcoder' not in kwargs and isinstance(options, TransactionGetReplicaFromPreferredServerGroupOptions):
+            kwargs['transcoder'] = options.get('transcoder', None)
+        return self._get_replica_from_preferred_server_group(coll, key, **kwargs)
 
     @BlockingWrapper.block(TransactionGetResult)
     def _insert(self,

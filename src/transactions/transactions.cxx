@@ -995,11 +995,13 @@ handle_returning_void(PyObject* pyObj_callback,
 }
 
 void
-handle_returning_transaction_get_result(PyObject* pyObj_callback,
-                                        PyObject* pyObj_errback,
-                                        std::shared_ptr<std::promise<PyObject*>> barrier,
-                                        std::exception_ptr err,
-                                        std::optional<tx_core::transaction_get_result> res)
+handle_returning_transaction_get_result(
+  PyObject* pyObj_callback,
+  PyObject* pyObj_errback,
+  std::shared_ptr<std::promise<PyObject*>> barrier,
+  std::exception_ptr err,
+  std::optional<couchbase::core::transactions::transaction_get_result> res,
+  bool is_replica_get = false)
 {
   // TODO: flesh out transaction_get_result and exceptions...
   auto state = PyGILState_Ensure();
@@ -1022,7 +1024,9 @@ handle_returning_transaction_get_result(PyObject* pyObj_callback,
     // operations once the underlying issue has been resolved.
     if (!res.has_value()) {
       pyObj_get_result = pycbc_build_exception(
-        couchbase::errc::make_error_code(couchbase::errc::key_value::document_not_found),
+        couchbase::errc::make_error_code((is_replica_get)
+                                           ? couchbase::errc::key_value::document_irretrievable
+                                           : couchbase::errc::key_value::document_not_found),
         __FILE__,
         __LINE__,
         "Txn get op: document not found.");
@@ -1228,6 +1232,22 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
         [barrier, pyObj_callback, pyObj_errback](
           std::exception_ptr err, std::optional<tx_core::transaction_get_result> res) {
           handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
+        });
+      Py_END_ALLOW_THREADS break;
+    }
+    case TxOperations::GET_REPLICA_FROM_PREFERRED_SERVER_GROUP: {
+      if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
+        PyErr_SetString(PyExc_ValueError,
+                        "couldn't create document id for get_replica_from_preferred_server_group");
+        Py_RETURN_NONE;
+      }
+      couchbase::core::document_id id{ bucket, scope, collection, key };
+      Py_BEGIN_ALLOW_THREADS ctx->ctx->get_replica_from_preferred_server_group(
+        id,
+        [barrier, pyObj_callback, pyObj_errback](
+          std::exception_ptr err, std::optional<tx_core::transaction_get_result> res) {
+          handle_returning_transaction_get_result(
+            pyObj_callback, pyObj_errback, barrier, err, res, true);
         });
       Py_END_ALLOW_THREADS break;
     }

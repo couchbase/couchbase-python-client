@@ -40,6 +40,7 @@ public:
   enum TxOperationType {
     UNKNOWN,
     GET,
+    GET_REPLICA_FROM_PREFERRED_SERVER_GROUP,
     REPLACE,
     INSERT,
     REMOVE,
@@ -73,6 +74,7 @@ public:
   static const char* ALL_OPERATIONS(void)
   {
     const char* ops = "GET "
+                      "GET_REPLICA_FROM_PREFERRED_SERVER_GROUP "
                       "REPLACE "
                       "INSERT "
                       "REMOVE "
