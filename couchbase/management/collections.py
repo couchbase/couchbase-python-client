@@ -164,7 +164,7 @@ class CollectionManager(CollectionManagerLogic):
         Args:
             scope_name (str): The name of the scope the collection will be created in.
             collection_name (str): The name of the collection to be created
-            settings (:class:`~couchbase.management.options.CreateCollectionSettings`, optional): Settings to apply for the collection
+            settings (:class:`~.CreateCollectionSettings`, optional): Settings to apply for the collection
             options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
@@ -254,7 +254,7 @@ class CollectionManager(CollectionManagerLogic):
         Args:
             scope_name (str): The name of the scope the collection is in.
             collection_name (str): The name of the collection that will be updated
-            settings (:class:`~couchbase.management.options.UpdateCollectionSettings`, optional): Settings to apply for the collection
+            settings (:class:`~.UpdateCollectionSettings`, optional): Settings to apply for the collection
             options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 

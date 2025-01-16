@@ -28,6 +28,8 @@ Collection Management
 
 .. autoclass:: CollectionManager
 
+    .. automethod:: create_collection
+
     .. py:method:: create_collection(collection: CollectionSpec, *options: CreateCollectionOptions, **kwargs: Dict[str, Any]) -> None
         :noindex:
 
@@ -45,8 +47,11 @@ Collection Management
         :raises `~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
         :raises `~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
 
-    .. automethod:: create_collection
     .. automethod:: create_scope
+
+    .. automethod:: update_collection
+
+    .. automethod:: drop_collection
 
     .. py:method:: drop_collection(collection: CollectionSpec, *options: DropCollectionOptions, **kwargs: Dict[str, Any]) -> None
         :noindex:
@@ -64,15 +69,26 @@ Collection Management
         :type \*\*kwargs: Dict[str, Any]
         :raises `~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
 
-    .. automethod:: drop_collection
     .. automethod:: drop_scope
     .. automethod:: get_all_scopes
+
+.. autoclass:: CreateCollectionSettings
+
+    .. autoproperty:: max_expiry
+    .. autoproperty:: history
+
+.. autoclass:: UpdateCollectionSettings
+
+    .. autoproperty:: max_expiry
+    .. autoproperty:: history
 
 .. autoclass:: CollectionSpec
 
     .. autoproperty:: name
     .. autoproperty:: scope_name
+    .. autoproperty:: max_expiry
     .. autoproperty:: max_ttl
+    .. autoproperty:: history
 
 .. autoclass:: ScopeSpec
 

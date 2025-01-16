@@ -48,6 +48,10 @@ CreateScopeOptions
 ++++++++++++++++++++++++
 .. autoclass:: CreateScopeOptions
 
+UpdateCollectionOptions
+++++++++++++++++++++++++
+.. autoclass:: UpdateCollectionOptions
+
 DropCollectionOptions
 ++++++++++++++++++++++++
 .. autoclass:: DropCollectionOptions

@@ -265,6 +265,10 @@ class CollectionManagerLogic:
 
 
 class CreateCollectionSettings:
+    """
+        Specifies settings for a collection that will be created.
+    """
+
     def __init__(self,
                  max_expiry=None,  # type: Optional[timedelta]
                  history=None,     # type: Optional[bool]
@@ -275,7 +279,7 @@ class CreateCollectionSettings:
     @property
     def max_expiry(self) -> Optional[timedelta]:
         """
-            Optional[timedelta]: The expiry for documents in the collection.
+            Optional[timedelta]: The maximum expiry for documents in the collection.
         """
         return self._max_expiry
 
@@ -289,6 +293,10 @@ class CreateCollectionSettings:
 
 
 class UpdateCollectionSettings:
+    """
+        Specifies settings for a collection that will be updated.
+    """
+
     def __init__(self,
                  max_expiry=None,  # type: Optional[timedelta]
                  history=None,     # type: Optional[bool]
@@ -299,7 +307,7 @@ class UpdateCollectionSettings:
     @property
     def max_expiry(self) -> Optional[timedelta]:
         """
-            Optional[timedelta]: The expiry for documents in the collection.
+            Optional[timedelta]: The maximum expiry for documents in the collection.
         """
         return self._max_expiry
 
@@ -339,14 +347,19 @@ class CollectionSpec(object):
     @property
     def max_ttl(self) -> Optional[timedelta]:
         """
-            **DEPRECATED**
             Optional[timedelta]: The expiry for documents in the collection.
+
+            **DEPRECATED** Use :attr:`max_expiry` instead.
         """
         Supportability.class_property_deprecated('max_ttl', 'max_expiry')
         return self._max_expiry
 
     @property
     def history(self) -> Optional[bool]:
+        """
+            Optional[bool]: Whether history retention is enabled in the collection. None represents the bucket-level
+            setting.
+        """
         return self._history
 
     @property
