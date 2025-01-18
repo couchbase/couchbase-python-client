@@ -519,7 +519,7 @@ static PyTypeObject transaction_query_options_type = init_transaction_query_opti
 void
 pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result)
 {
-  delete result->res;
+  result->res.reset();
   Py_TYPE(result)->tp_free((PyObject*)result);
   CB_LOG_DEBUG("dealloc transaction_get_result");
 }
@@ -593,7 +593,6 @@ PyObject*
 pycbc_txns::transaction_get_result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
   auto self = reinterpret_cast<pycbc_txns::transaction_get_result*>(type->tp_alloc(type, 0));
-  self->res = new tx_core::transaction_get_result();
   return reinterpret_cast<PyObject*>(self);
 }
 
@@ -996,12 +995,11 @@ handle_returning_void(PyObject* pyObj_callback,
 }
 
 void
-handle_returning_transaction_get_result(
-  PyObject* pyObj_callback,
-  PyObject* pyObj_errback,
-  std::shared_ptr<std::promise<PyObject*>> barrier,
-  std::exception_ptr err,
-  std::optional<couchbase::core::transactions::transaction_get_result> res)
+handle_returning_transaction_get_result(PyObject* pyObj_callback,
+                                        PyObject* pyObj_errback,
+                                        std::shared_ptr<std::promise<PyObject*>> barrier,
+                                        std::exception_ptr err,
+                                        std::optional<tx_core::transaction_get_result> res)
 {
   // TODO: flesh out transaction_get_result and exceptions...
   auto state = PyGILState_Ensure();
@@ -1032,9 +1030,7 @@ handle_returning_transaction_get_result(
       pyObj_get_result =
         PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_result_type), nullptr);
       auto result = reinterpret_cast<pycbc_txns::transaction_get_result*>(pyObj_get_result);
-      // now lets copy it in
-      // TODO: ideally we'd have a move constructor for transaction_get_result, but for now...
-      result->res = new tx_core::transaction_get_result(res.value());
+      result->res = std::make_unique<tx_core::transaction_get_result>(std::move(res.value()));
     }
 
     if (nullptr == pyObj_callback) {

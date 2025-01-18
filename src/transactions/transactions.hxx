@@ -140,7 +140,7 @@ struct transaction_context {
 };
 
 struct transaction_get_result {
-  PyObject_HEAD tx_core::transaction_get_result* res;
+  PyObject_HEAD std::unique_ptr<tx_core::transaction_get_result> res;
 };
 
 struct transaction_query_options {
