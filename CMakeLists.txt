@@ -20,6 +20,21 @@ include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 17)
 
+function(get_python_version)
+  if(DEFINED ENV{PYCBC_PYTHON3_EXECUTABLE})
+    message(STATUS "Using python3 executable from environment: $ENV{PYCBC_PYTHON3_EXECUTABLE}")
+    set(PYTHON3_EXE $ENV{PYCBC_PYTHON3_EXECUTABLE})
+  else()
+    message(STATUS "Using default python3 executable")
+    set(PYTHON3_EXE "python3")
+  endif()
+
+  execute_process(COMMAND ${PYTHON3_EXE} -c "import platform;print(platform.python_version())"
+                  OUTPUT_VARIABLE local_python_version)
+  string(STRIP "${local_python_version}" PYTHON_VERSION)
+  set(LOCAL_PYTHON_VERSION "${PYTHON_VERSION}" PARENT_SCOPE)
+endfunction()
+
 if(WIN32)
   # cmake-format: off
   # MultiThreaded$<$<CONFIG:Debug>:Debug>DLL for /MD compile flag
@@ -33,13 +48,17 @@ endif()
 project(couchbase_client)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(PYTHON_VERSION_EXACT)
-  set(Python_FIND_VIRTUALENV FIRST)
-  message("finding python version ${PYTHON_VERSION_EXACT}")
+get_python_version()
+message(STATUS "LOCAL_PYTHON_VERSION=${LOCAL_PYTHON_VERSION}")
+
+if(LOCAL_PYTHON_VERSION)
+  set(Python3_FIND_VIRTUALENV FIRST)
+  message("finding python version ${LOCAL_PYTHON_VERSION}")
+  find_package(Python3 ${LOCAL_PYTHON_VERSION} EXACT COMPONENTS Interpreter Development.Module)
 else()
-  set(PYTHON_VERSION_EXACT 3.6)
+  find_package(Python3 COMPONENTS Interpreter Development.Module)
 endif()
-find_package(Python3 ${PYTHON_VERSION_EXACT} COMPONENTS Interpreter Development.Module)
+
 
 if(WIN32)
   set(PYCBC_C_MOD_SUFFIX ".pyd")

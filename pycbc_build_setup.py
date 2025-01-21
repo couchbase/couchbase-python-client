@@ -146,11 +146,23 @@ class CMakeConfig:
                 os.environ.get('CMAKE_COMMON_VARIABLES', '').split(' ')
                 if x])
 
-        python3_executable = env.pop('PYCBC_PYTHON3_EXECUTABLE', None)
+        python3_find_strategy = env.get('PYCBC_PYTHON3_FIND_STRATEGY', 'LOCATION')
+        cmake_config_args += [f'-DPython3_FIND_STRATEGY={python3_find_strategy}']
+
+        python3_rootdir = env.get('PYCBC_PYTHON3_ROOT_DIR', None)
+        if python3_rootdir:
+            cmake_config_args += [f'-DPython3_ROOT_DIR={python3_rootdir}']
+
+        python3_executable = env.get('PYCBC_PYTHON3_EXECUTABLE', None)
+        if python3_executable is None and sys.executable:
+            # if sys.executable determines the path we want to use that to determine the
+            # Python version in our get_python_version CMake function.
+            python3_executable = sys.executable
+            env['PYCBC_PYTHON3_EXECUTABLE'] = python3_executable
         if python3_executable:
             cmake_config_args += [f'-DPython3_EXECUTABLE={python3_executable}']
 
-        python3_include = env.pop('PYCBC_PYTHON3_INCLUDE_DIR', None)
+        python3_include = env.get('PYCBC_PYTHON3_INCLUDE_DIR', None)
         if python3_include:
             cmake_config_args += [f'-DPython3_INCLUDE_DIR={python3_include}']
 
