@@ -213,7 +213,6 @@ class CMakeConfig:
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
-        check_for_cmake()
         Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 

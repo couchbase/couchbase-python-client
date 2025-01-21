@@ -24,7 +24,8 @@ import couchbase_version  # nopep8 # isort:skip # noqa: E402
 from pycbc_build_setup import (BuildCommand,  # nopep8 # isort:skip # noqa: E402
                                CMakeBuildExt,
                                CMakeConfigureExt,
-                               CMakeExtension)
+                               CMakeExtension,
+                               CMAKE_EXE)
 
 try:
     couchbase_version.gen_version()
@@ -40,6 +41,12 @@ package_data = {}
 if platform.system() == 'Windows':
     package_data = {'couchbase': ['pycbc_core.pyd']}
 
+# request installing cmake from PyPI if no CMake executable was found.
+# otherwise, we want to use the system executable.
+setup_requires = []
+if not CMAKE_EXE:
+    setup_requires += ["cmake"]
+
 print(f'Python SDK version: {PYCBC_VERSION}')
 
 setup(name='couchbase',
@@ -49,6 +56,7 @@ setup(name='couchbase',
                 'build_ext': CMakeBuildExt,
                 'configure_ext': CMakeConfigureExt},
       python_requires='>=3.7',
+      setup_requires=setup_requires,
       packages=find_packages(
           include=['acouchbase', 'couchbase', 'txcouchbase', 'couchbase.*', 'acouchbase.*', 'txcouchbase.*'],
           exclude=['acouchbase.tests', 'couchbase.tests', 'txcouchbase.tests']),
