@@ -254,7 +254,6 @@ if(WIN32)
     asio
     Microsoft.GSL::GSL
     taocpp::json
-    fmt::fmt
     spdlog::spdlog)
 else()
   target_link_libraries(
@@ -263,7 +262,6 @@ else()
     asio
     Microsoft.GSL::GSL
     taocpp::json
-    fmt::fmt
     spdlog::spdlog)
   if(APPLE)
     target_link_options(
