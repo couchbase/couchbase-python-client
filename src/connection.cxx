@@ -835,6 +835,49 @@ update_cluster_options(couchbase::core::cluster_options& options,
   if (pyObj_preferred_server_group != nullptr) {
     options.server_group = std::string(PyUnicode_AsUTF8(pyObj_preferred_server_group));
   }
+
+  PyObject* pyObj_enable_app_telemetry =
+    PyDict_GetItemString(pyObj_options, "enable_app_telemetry");
+  if (pyObj_enable_app_telemetry != nullptr && pyObj_enable_app_telemetry == Py_False) {
+    options.enable_app_telemetry = false;
+  }
+
+  PyObject* pyObj_app_telemetry_endpoint =
+    PyDict_GetItemString(pyObj_options, "app_telemetry_endpoint");
+  if (pyObj_app_telemetry_endpoint != nullptr) {
+    auto app_telemetry_endpoint = std::string(PyUnicode_AsUTF8(pyObj_app_telemetry_endpoint));
+    options.app_telemetry_endpoint = app_telemetry_endpoint;
+  }
+
+  PyObject* pyObj_app_telemetry_backoff =
+    PyDict_GetItemString(pyObj_options, "app_telemetry_backoff");
+  if (pyObj_app_telemetry_backoff != nullptr) {
+    auto app_telemetry_backoff =
+      static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_app_telemetry_backoff));
+    auto app_telemetry_backoff_ms =
+      std::chrono::milliseconds(std::max(0ULL, app_telemetry_backoff / 1000ULL));
+    options.app_telemetry_backoff_interval = app_telemetry_backoff_ms;
+  }
+
+  PyObject* pyObj_app_telemetry_ping_interval =
+    PyDict_GetItemString(pyObj_options, "app_telemetry_ping_interval");
+  if (pyObj_app_telemetry_ping_interval != nullptr) {
+    auto app_telemetry_ping_interval =
+      static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_app_telemetry_ping_interval));
+    auto app_telemetry_ping_interval_ms =
+      std::chrono::milliseconds(std::max(0ULL, app_telemetry_ping_interval / 1000ULL));
+    options.app_telemetry_ping_interval = app_telemetry_ping_interval_ms;
+  }
+
+  PyObject* pyObj_app_telemetry_ping_timeout =
+    PyDict_GetItemString(pyObj_options, "app_telemetry_ping_timeout");
+  if (pyObj_app_telemetry_ping_timeout != nullptr) {
+    auto app_telemetry_ping_timeout =
+      static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_app_telemetry_ping_timeout));
+    auto app_telemetry_ping_timeout_ms =
+      std::chrono::milliseconds(std::max(0ULL, app_telemetry_ping_timeout / 1000ULL));
+    options.app_telemetry_ping_timeout = app_telemetry_ping_timeout_ms;
+  }
 }
 
 PyObject*
@@ -1281,6 +1324,50 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     PyErr_Print();
     PyErr_Clear();
   }
+
+  pyObj_tmp = PyUnicode_FromString(opts.server_group.c_str());
+  if (-1 == PyDict_SetItemString(pyObj_opts, "preferred_server_group", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+  Py_XDECREF(pyObj_tmp);
+
+  if (-1 == PyDict_SetItemString(
+              pyObj_opts, "enable_app_telemetry", opts.enable_app_telemetry ? Py_True : Py_False)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+
+  pyObj_tmp = PyUnicode_FromString(opts.app_telemetry_endpoint.c_str());
+  if (-1 == PyDict_SetItemString(pyObj_opts, "app_telemetry_endpoint", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+  Py_XDECREF(pyObj_tmp);
+
+  int_msec = opts.app_telemetry_backoff_interval;
+  pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+  if (-1 == PyDict_SetItemString(pyObj_opts, "app_telemetry_backoff", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+  Py_XDECREF(pyObj_tmp);
+
+  int_msec = opts.app_telemetry_ping_interval;
+  pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+  if (-1 == PyDict_SetItemString(pyObj_opts, "app_telemetry_ping_interval", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+  Py_XDECREF(pyObj_tmp);
+
+  int_msec = opts.app_telemetry_ping_timeout;
+  pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+  if (-1 == PyDict_SetItemString(pyObj_opts, "app_telemetry_ping_timeout", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+  Py_XDECREF(pyObj_tmp);
 
   return pyObj_opts;
 }

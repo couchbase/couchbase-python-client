@@ -364,6 +364,11 @@ class ClusterOptions(ClusterOptionsBase):
         dns_port (int, optional):  **VOLATILE** This API is subject to change at any time. Set to configure custom DNS port. Defaults to None.
         dump_configuration (bool, optional): Set to True to dump every new configuration when TRACE level logging. Defaults to False (disabled).
         preferred_server_group (str, optional): Specifies the preferred server group to be used for replica reads with 'selected server group' read preference.
+        enable_app_telemetry (bool, optional): Specifies if application telemetry feature should be enabled.  Defaults to True (enabled).
+        app_telemetry_endpoint (str, optional): Specifies an endpoint to override the application metrics endpoint discovered during configuration. Defaults to None.
+        app_telemetry_backoff (timedelta, optional): Specifies the time to wait before attempting a websocket reconnection. Defaults to 5 seconds.
+        app_telemetry_ping_interval (timedelta, optional): Specifies the time to wait between sending consecutive websocket PING commands to the server. Defaults to 30 seconds.
+        app_telemetry_ping_timeout (timedelta, optional): Specifies the time allowed for the server to respond to websocket PING command. Defaults to 2 seconds.
     """  # noqa: E501
 
     def apply_profile(self,

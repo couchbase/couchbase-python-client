@@ -559,6 +559,11 @@ class ClusterOptionsBase(dict):
         "dns_port": {"dns_port": validate_int},
         "dump_configuration": {"dump_configuration": validate_bool},
         "preferred_server_group": {"preferred_server_group": validate_str},
+        "enable_app_telemetry": {"enable_app_telemetry": validate_bool},
+        "app_telemetry_endpoint": {"app_telemetry_endpoint": validate_str},
+        "app_telemetry_backoff": {"app_telemetry_backoff": timedelta_as_microseconds},
+        "app_telemetry_ping_interval": {"app_telemetry_ping_interval": timedelta_as_microseconds},
+        "app_telemetry_ping_timeout": {"app_telemetry_ping_timeout": timedelta_as_microseconds},
     }
 
     @overload
@@ -599,8 +604,13 @@ class ClusterOptionsBase(dict):
         dns_nameserver=None,  # type: Optional[str]
         dns_port=None,  # type: Optional[int]
         disable_mozilla_ca_certificates=None,  # type: Optional[bool]
-        dump_configuration=None,  # type: Optional[bool],
+        dump_configuration=None,  # type: Optional[bool]
         preferred_server_group=None,  # type: Optional[str]
+        enable_app_telemetry=None,  # type: Optional[bool]
+        app_telemetry_endpoint=None,  # type: Optional[str]
+        app_telemetry_backoff=None,  # type: Optional[timedelta]
+        app_telemetry_ping_interval=None,  # type: Optional[timedelta]
+        app_telemetry_ping_timeout=None,  # type: Optional[timedelta]
     ):
         """ClusterOptions instance."""
 

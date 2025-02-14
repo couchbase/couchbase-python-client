@@ -298,6 +298,11 @@ class ConnectionTestSuite:
             'num_io_threads': 1,
             'dump_configuration': True,
             'preferred_server_group': 'group1',
+            'enable_app_telemetry': True,
+            'app_telemetry_endpoint': 'ws://localhost:8093',
+            "app_telemetry_backoff": timedelta(seconds=10),
+            "app_telemetry_ping_interval": timedelta(seconds=60),
+            "app_telemetry_ping_timeout": timedelta(seconds=5),
         }
 
         expected_opts = copy(opts)
@@ -309,6 +314,9 @@ class ConnectionTestSuite:
         expected_opts['tcp_keep_alive_interval'] = 30000000
         expected_opts['config_poll_interval'] = 30000000
         expected_opts['config_poll_floor'] = 30000000
+        expected_opts['app_telemetry_backoff'] = 10000000
+        expected_opts['app_telemetry_ping_interval'] = 60000000
+        expected_opts['app_telemetry_ping_timeout'] = 5000000
         # IpProtocol is translated to string and has another name
         expected_opts.pop('ip_protocol')
         expected_opts['use_ip_protocol'] = 'any'
@@ -906,6 +914,8 @@ class ConnectionTestSuite:
                                {'num_io_threads': 1, 'dump_configuration': True}),
                               ('couchbase://10.0.0.1?max_http_connections=4&disable_mozilla_ca_certificates=False',
                                {'max_http_connections': 4, 'disable_mozilla_ca_certificates': False}),
+                              ('couchbase://localhost?enable_app_telemetry=true&app_telemetry_endpoint=ws://localhost:8091',  # noqa: E501
+                               {'enable_app_telemetry': True, 'app_telemetry_endpoint': 'ws://localhost:8091'}),
                               ('couchbase://10.0.0.1?an_invalid_option=10',
                                {}),
                               ])
