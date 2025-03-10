@@ -104,7 +104,7 @@ class AttemptContextLogic:
         kwargs.update(coll._get_connection_args())
         kwargs.pop("conn")
         kwargs["key"] = key
-        kwargs["ctx"] = self._ctx
+        kwargs["ctx"] = self._txnctx
         kwargs["op"] = transaction_operations.GET_REPLICA_FROM_PREFERRED_SERVER_GROUP.value
         log.debug('get_replica_from_preferred_server_group calling transaction op with %s', kwargs)
         return transaction_op(**kwargs)
