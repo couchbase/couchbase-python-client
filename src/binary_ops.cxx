@@ -331,8 +331,7 @@ prepare_and_execute_binary_mutation_op(struct binary_mutation_options* options,
   if (options->op_type == Operations::APPEND) {
     auto req = couchbase::core::operations::append_request{ options->id };
     req.timeout = options->timeout_ms;
-    // @TODO:  cxx client req doesn't have cas
-    // req.cas = options->cas;
+    req.cas = options->cas;
     req.value = value;
     if (nullptr != options->span) {
       req.parent_span = std::make_shared<pycbc::request_span>(options->span);
@@ -355,8 +354,7 @@ prepare_and_execute_binary_mutation_op(struct binary_mutation_options* options,
   } else {
     auto req = couchbase::core::operations::prepend_request{ options->id };
     req.timeout = options->timeout_ms;
-    // @TODO:  cxx client req doesn't have cas
-    // req.cas = options->cas;
+    req.cas = options->cas;
     req.value = value;
     if (nullptr != options->span) {
       req.parent_span = std::make_shared<pycbc::request_span>(options->span);
