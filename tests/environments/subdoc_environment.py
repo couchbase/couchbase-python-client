@@ -107,7 +107,7 @@ class SubdocTestEnvironment(TestEnvironment):
                     print(ex)
                     raise
 
-        for v in self.data_provider.get_vehicles()[:50]:
+        for v in self.data_provider.get_vehicles()[:100]:
             for _ in range(3):
                 try:
                     key = f'{v["id"]}'
