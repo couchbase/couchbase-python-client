@@ -127,6 +127,9 @@ class VectorQuery:
         elif not isinstance(vector, str):
             raise InvalidArgumentException('Provided vector must be either a List[float] or base64 encoded str.')
 
+        if len(vector) == 0:
+            raise InvalidArgumentException('Provided base64 encoded vector cannot be empty.')
+
         self._vector_base64 = vector
 
     @classmethod
