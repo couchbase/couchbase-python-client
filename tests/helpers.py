@@ -138,6 +138,7 @@ class ServerFeatures(Enum):
     ScopeSearchIndexManagement = 'scope_search_index_mgmt'
     ScopeEventingFunctionManagement = 'scope_eventing_function_mgmt'
     ServerGroups = 'server_groups'
+    Magma128Buckets = 'magma_128_buckets'
 
 
 # mock and real server (all versions) should have these features
@@ -216,6 +217,8 @@ AT_LEAST_V7_6_0_FEATURES = [ServerFeatures.NotLockedKVStatus,
                             ServerFeatures.ScopeSearchIndexManagement]
 
 AT_LEAST_V7_6_2_FEATURES = [ServerFeatures.ServerGroups]
+
+AT_LEAST_V8_0_0_FEATURES = [ServerFeatures.Magma128Buckets]
 
 # Only set the baseline needed
 TEST_SUITE_MAP = {
@@ -517,6 +520,11 @@ class CouchbaseTestEnvironment:
             if self.is_real_server:
                 return ((self.server_version_short >= 7.6 and self.server_version_patch >= 2)
                         or self.server_version_short > 7.6)
+            return not self.is_mock_server
+
+        if feature in map(lambda f: f.value, AT_LEAST_V8_0_0_FEATURES):
+            if self.is_real_server:
+                return self.server_version_short >= 8.0
             return not self.is_mock_server
 
         raise CouchbaseTestEnvironmentException(f"Unable to determine if server has provided feature: {feature}")

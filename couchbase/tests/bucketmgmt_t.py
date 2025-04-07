@@ -40,6 +40,7 @@ class BucketManagementTestSuite:
         'test_bucket_backend_default',
         'test_bucket_backend_ephemeral',
         'test_bucket_backend_magma',
+        'test_bucket_backend_couchstore',
         'test_bucket_create',
         'test_bucket_create_durability',
         'test_bucket_create_fail',
@@ -88,6 +89,11 @@ class BucketManagementTestSuite:
                                                        cb_env.server_version_short,
                                                        cb_env.mock_server_type)
 
+    def supports_magma_128_buckets(self, cb_env):
+        return EnvironmentFeatures.supports_feature('magma_128_buckets',
+                                                    cb_env.server_version_short,
+                                                    cb_env.mock_server_type) is None
+
     @pytest.fixture()
     def drop_bucket(self, cb_env):
         yield
@@ -105,7 +111,10 @@ class BucketManagementTestSuite:
                 flush_enabled=False))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
         bucket = cb_env.bm.get_bucket(bucket_name)
-        assert bucket.storage_backend == StorageBackend.COUCHSTORE
+        if self.supports_magma_128_buckets(cb_env):
+            assert bucket.storage_backend == StorageBackend.MAGMA
+        else:
+            assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
     @pytest.mark.usefixtures('drop_bucket')
@@ -136,6 +145,21 @@ class BucketManagementTestSuite:
         cb_env.consistency.wait_until_bucket_present(bucket_name)
         bucket = cb_env.bm.get_bucket(bucket_name)
         assert bucket.storage_backend == StorageBackend.MAGMA
+
+    @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
+    @pytest.mark.usefixtures('drop_bucket')
+    def test_bucket_backend_couchstore(self, cb_env):
+        bucket_name = cb_env.get_bucket_name()
+        # Create the bucket
+        cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=bucket_name,
+                ram_quota_mb=100,
+                flush_enabled=False,
+                storage_backend=StorageBackend.COUCHSTORE))
+        cb_env.consistency.wait_until_bucket_present(bucket_name)
+        bucket = cb_env.bm.get_bucket(bucket_name)
+        assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('drop_bucket')

@@ -265,7 +265,10 @@ class BucketManagementTests:
                 ram_quota_mb=100,
                 flush_enabled=False))
         bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
-        assert bucket.storage_backend == StorageBackend.COUCHSTORE
+        if cb_env.supports_feature('magma_128_buckets'):
+            assert bucket.storage_backend == StorageBackend.MAGMA
+        else:
+            assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
     @pytest.mark.usefixtures("check_bucket_storage_backend_supported")
     @pytest.mark.usefixtures("purge_buckets")
@@ -280,6 +283,20 @@ class BucketManagementTests:
                 storage_backend=StorageBackend.MAGMA))
         bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
         assert bucket.storage_backend == StorageBackend.MAGMA
+
+    @pytest.mark.usefixtures("check_bucket_storage_backend_supported")
+    @pytest.mark.usefixtures("purge_buckets")
+    @pytest.mark.asyncio
+    async def test_bucket_backend_couchstore(self, cb_env, test_bucket):
+        # Create the bucket
+        await cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=test_bucket,
+                ram_quota_mb=100,
+                flush_enabled=False,
+                storage_backend=StorageBackend.COUCHSTORE))
+        bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
+        assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
     @pytest.mark.usefixtures("check_bucket_storage_backend_supported")
     @pytest.mark.usefixtures("purge_buckets")
