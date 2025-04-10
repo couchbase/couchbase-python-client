@@ -295,6 +295,16 @@ build_bucket_settings(couchbase::core::management::cluster::bucket_settings sett
     Py_DECREF(pyObj_tmp);
   }
 
+  if (settings.num_vbuckets.has_value()) {
+    pyObj_tmp = PyLong_FromUnsignedLong(settings.num_vbuckets.value());
+    if (-1 == PyDict_SetItemString(pyObj_bucket_settings, "numVBuckets", pyObj_tmp)) {
+      Py_DECREF(pyObj_bucket_settings);
+      Py_XDECREF(pyObj_tmp);
+      return nullptr;
+    }
+    Py_DECREF(pyObj_tmp);
+  }
+
   return pyObj_bucket_settings;
 }
 
@@ -719,6 +729,11 @@ get_bucket_settings(PyObject* settings)
   if (pyObj_history_retention_duration != nullptr) {
     bucket_settings.history_retention_duration =
       static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_history_retention_duration));
+  }
+
+  PyObject* pyObj_num_vbuckets = PyDict_GetItemString(settings, "numVBuckets");
+  if (pyObj_num_vbuckets != nullptr) {
+    bucket_settings.num_vbuckets = static_cast<uint16_t>(PyLong_AsUnsignedLong(pyObj_num_vbuckets));
   }
 
   return bucket_settings;

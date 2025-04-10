@@ -411,6 +411,9 @@ class BucketSettings(dict):
         BidirectionalTransform("history_retention_duration",
                                ParamTransform("historyRetentionDuration", TimeDeltaToSeconds(int)),
                                ParamTransform("historyRetentionDuration", SecondsToTimeDelta(timedelta))),
+        BidirectionalTransform("num_vbuckets",
+                               ParamTransform("numVBuckets", Identity(int)),
+                               ParamTransform("numVBuckets", Identity(int))),
     ])
 
     @overload
@@ -429,7 +432,8 @@ class BucketSettings(dict):
                  storage_backend=None,  # type: StorageBackend
                  history_retention_collection_default=None,  # type: Optional[bool]
                  history_retention_bytes=None,  # type: int
-                 history_retention_duration=None  # type: timedelta
+                 history_retention_duration=None,  # type: timedelta
+                 num_vbuckets=None  # type: int
                  ):
         # type: (...) -> None
         """BucketSettings provides a means of mapping bucket settings into an object.
@@ -540,6 +544,13 @@ class BucketSettings(dict):
         """
         return self.get('history_retention_duration')
 
+    @property
+    def num_vbuckets(self) -> Optional[int]:
+        """
+        The number of vBuckets in this bucket
+        """
+        return self.get('num_vbuckets')
+
     def transform_to_dest(self) -> Dict[str, Any]:
         kwargs = {**self}
         # needed?
@@ -577,7 +588,8 @@ class CreateBucketSettings(BucketSettings):
                  storage_backend=None,  # type: StorageBackend
                  history_retention_collection_default=None,  # type: Optional[bool]
                  history_retention_bytes=None,  # type: int
-                 history_retention_duration=None  # type: timedelta
+                 history_retention_duration=None,  # type: timedelta
+                 num_vbuckets=None  # type: int
                  ):
         """
         Bucket creation settings.
@@ -600,6 +612,7 @@ class CreateBucketSettings(BucketSettings):
             written to disk for all collections in this bucket
         :param history_retention_duration: specifies the maximum duration to be covered by the change history that
             is written to disk for all collections in this bucket
+        :param num_vbuckets: specifies the number of vBuckets in the bucket.
 
         .. note::
            History retention settings are only supported for Magma buckets, the server will ignore retention settings
