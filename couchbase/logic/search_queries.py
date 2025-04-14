@@ -22,6 +22,7 @@ from typing import (Any,
 
 from couchbase.exceptions import InvalidArgumentException, NoChildrenException
 from couchbase.logic.search import MatchOperator, _QueryBuilder
+from couchbase.logic.supportability import Supportability
 
 # Query Types
 
@@ -355,7 +356,7 @@ class BooleanFieldQuery(SearchQuery):
 
 @_QueryBuilder._with_fields(fields=['field'])
 class GeoDistanceQuery(SearchQuery):
-    def __init__(self, distance,  # type: Union[int, float]
+    def __init__(self, distance,  # type: str
                  location,  # type: Tuple[float, float]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
@@ -467,7 +468,8 @@ class NumericRangeQuery(SearchQuery):
     At least one of `min` or `max` must be specified.
     """
 
-    def __init__(self, min=None,  # type: Optional[float]
+    def __init__(self,
+                 min=None,  # type: Optional[float]
                  max=None,  # type: Optional[float]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
@@ -486,7 +488,8 @@ class NumericRangeQuery(SearchQuery):
         return self._json_.get('min', None)
 
     @min.setter
-    def min(self, value  # type: float
+    def min(self,
+            value  # type: float
             ) -> None:
         self.set_prop('min', value)
 
@@ -495,16 +498,29 @@ class NumericRangeQuery(SearchQuery):
         return self._json_.get('min_inclusive', None)
 
     @min_inclusive.setter
-    def min_inclusive(self, value  # type: bool
+    def min_inclusive(self,
+                      value  # type: bool
                       ) -> None:
-        self.set_prop('min_inclusive', value)
+        Supportability.class_property_deprecated('min_inclusive', 'inclusive_min')
+        self.set_prop('inclusive_min', value)
+
+    @property
+    def inclusive_min(self) -> Optional[bool]:
+        return self._json_.get('inclusive_min', None)
+
+    @inclusive_min.setter
+    def inclusive_min(self,
+                      value  # type: bool
+                      ) -> None:
+        self.set_prop('inclusive_min', value)
 
     @property
     def max(self) -> Optional[float]:
         return self._json_.get('max', None)
 
     @max.setter
-    def max(self, value  # type: float
+    def max(self,
+            value  # type: float
             ) -> None:
         self.set_prop('max', value)
 
@@ -513,9 +529,21 @@ class NumericRangeQuery(SearchQuery):
         return self._json_.get('max_inclusive', None)
 
     @max_inclusive.setter
-    def max_inclusive(self, value  # type: bool
+    def max_inclusive(self,
+                      value  # type: bool
                       ) -> None:
-        self.set_prop('max_inclusive', value)
+        Supportability.class_property_deprecated('max_inclusive', 'inclusive_max')
+        self.set_prop('inclusive_max', value)
+
+    @property
+    def inclusive_max(self) -> Optional[bool]:
+        return self._json_.get('inclusive_max', None)
+
+    @inclusive_max.setter
+    def inclusive_max(self,
+                      value  # type: bool
+                      ) -> None:
+        self.set_prop('inclusive_max', value)
 
     # min = _genprop(
     #     float, 'min', doc='Lower bound of range. See :attr:`min_inclusive`')
@@ -570,7 +598,8 @@ class DateRangeQuery(SearchQuery):
         return self._json_.get('start', None)
 
     @start.setter
-    def start(self, value  # type: str
+    def start(self,
+              value  # type: str
               ) -> None:
         self.set_prop('start', value)
 
@@ -579,16 +608,29 @@ class DateRangeQuery(SearchQuery):
         return self._json_.get('start_inclusive', None)
 
     @start_inclusive.setter
-    def start_inclusive(self, value  # type: bool
+    def start_inclusive(self,
+                        value  # type: bool
                         ) -> None:
-        self.set_prop('start_inclusive', value)
+        Supportability.class_property_deprecated('start_inclusive', 'inclusive_start')
+        self.set_prop('inclusive_start', value)
+
+    @property
+    def inclusive_start(self) -> Optional[bool]:
+        return self._json_.get('inclusive_start', None)
+
+    @inclusive_start.setter
+    def inclusive_start(self,
+                        value  # type: bool
+                        ) -> None:
+        self.set_prop('inclusive_start', value)
 
     @property
     def end(self) -> Optional[str]:
         return self._json_.get('end', None)
 
     @end.setter
-    def end(self, value  # type: str
+    def end(self,
+            value  # type: str
             ) -> None:
         self.set_prop('end', value)
 
@@ -597,16 +639,29 @@ class DateRangeQuery(SearchQuery):
         return self._json_.get('end_inclusive', None)
 
     @end_inclusive.setter
-    def end_inclusive(self, value  # type: bool
+    def end_inclusive(self,
+                      value  # type: bool
                       ) -> None:
-        self.set_prop('end_inclusive', value)
+        Supportability.class_property_deprecated('end_inclusive', 'inclusive_end')
+        self.set_prop('inclusive_end', value)
+
+    @property
+    def inclusive_end(self) -> Optional[bool]:
+        return self._json_.get('inclusive_end', None)
+
+    @inclusive_end.setter
+    def inclusive_end(self,
+                      value  # type: bool
+                      ) -> None:
+        self.set_prop('inclusive_end', value)
 
     @property
     def datetime_parser(self) -> Optional[str]:
         return self._json_.get('datetime_parser', None)
 
     @datetime_parser.setter
-    def datetime_parser(self, value  # type: str
+    def datetime_parser(self,
+                        value  # type: str
                         ) -> None:
         self.set_prop('datetime_parser', value)
 
@@ -638,18 +693,31 @@ class TermRangeQuery(SearchQuery):
     lexical range.
     """
 
-    _MINMAX = 'start', 'end'
+    _MINMAX = 'min', 'max'
 
-    def __init__(self, start=None,  # type: Optional[str]
+    def __init__(self,
+                 start=None,  # type: Optional[str]
                  end=None,  # type: Optional[str]
+                 min=None,  # type: Optional[str]
+                 max=None,  # type: Optional[str]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
         """
-        :param str start: See :attr:`start`
-        :param str end: See :attr:`end`
+        Args:
+            start (str): **DEPRECATED** Use min.
+            end (str): **DEPRECATED** Use max.
+            min (str): The lower end of the range.
+            max (str): The higher end of the range.
         """
         super().__init__()
-        _QueryBuilder._validate_range_query(self, start, end, **kwargs)
+        if start is not None and min is None:
+            Supportability.class_property_deprecated('start', 'min')
+            min = start
+        if end is not None and max is None:
+            Supportability.class_property_deprecated('end', 'max')
+            max = end
+
+        _QueryBuilder._validate_range_query(self, min, max, **kwargs)
 
     @property
     def start(self) -> Optional[str]:
@@ -658,7 +726,17 @@ class TermRangeQuery(SearchQuery):
     @start.setter
     def start(self, value  # type: str
               ) -> None:
-        self.set_prop('start', value)
+        Supportability.class_property_deprecated('start', 'min')
+        self.set_prop('min', value)
+
+    @property
+    def min(self) -> Optional[str]:
+        return self._json_.get('min', None)
+
+    @min.setter
+    def min(self, value  # type: str
+            ) -> None:
+        self.set_prop('min', value)
 
     @property
     def start_inclusive(self) -> Optional[bool]:
@@ -667,7 +745,17 @@ class TermRangeQuery(SearchQuery):
     @start_inclusive.setter
     def start_inclusive(self, value  # type: bool
                         ) -> None:
-        self.set_prop('start_inclusive', value)
+        Supportability.class_property_deprecated('start_inclusive', 'inclusive_min')
+        self.set_prop('inclusive_min', value)
+
+    @property
+    def inclusive_min(self) -> Optional[bool]:
+        return self._json_.get('start_inclusive', None)
+
+    @inclusive_min.setter
+    def inclusive_min(self, value  # type: bool
+                      ) -> None:
+        self.set_prop('inclusive_min', value)
 
     @property
     def end(self) -> Optional[str]:
@@ -676,7 +764,17 @@ class TermRangeQuery(SearchQuery):
     @end.setter
     def end(self, value  # type: str
             ) -> None:
-        self.set_prop('end', value)
+        Supportability.class_property_deprecated('end', 'max')
+        self.set_prop('max', value)
+
+    @property
+    def max(self) -> Optional[str]:
+        return self._json_.get('max', None)
+
+    @max.setter
+    def max(self, value  # type: str
+            ) -> None:
+        self.set_prop('max', value)
 
     @property
     def end_inclusive(self) -> Optional[bool]:
@@ -685,7 +783,17 @@ class TermRangeQuery(SearchQuery):
     @end_inclusive.setter
     def end_inclusive(self, value  # type: bool
                       ) -> None:
-        self.set_prop('end_inclusive', value)
+        Supportability.class_property_deprecated('end_inclusive', 'inclusive_max')
+        self.set_prop('inclusive_max', value)
+
+    @property
+    def inclusive_max(self) -> Optional[bool]:
+        return self._json_.get('inclusive_max', None)
+
+    @inclusive_max.setter
+    def inclusive_max(self, value  # type: bool
+                      ) -> None:
+        self.set_prop('inclusive_max', value)
 
     # def __init__(self, start=None, end=None, **kwargs):
     #     super(TermRangeQuery, self).__init__(start=start, end=end, **kwargs)
@@ -799,7 +907,7 @@ class BooleanQuery(SearchQuery):
         self.must_not = must_not
 
     @property
-    def must(self) -> DisjunctionQuery:
+    def must(self) -> ConjunctionQuery:
         return self._subqueries.get('must')
 
     @must.setter
@@ -808,7 +916,7 @@ class BooleanQuery(SearchQuery):
         self._set_query('must', value, ConjunctionQuery)
 
     @property
-    def must_not(self) -> ConjunctionQuery:
+    def must_not(self) -> DisjunctionQuery:
         return self._subqueries.get('must_not')
 
     @must_not.setter
