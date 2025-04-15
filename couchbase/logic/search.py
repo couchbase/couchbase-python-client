@@ -969,6 +969,8 @@ class SearchQueryBuilder:
                 encoded_query['vector_base64'] = query.vector_base64
             if query.boost is not None:
                 encoded_query['boost'] = query.boost
+            if query.prefilter is not None:
+                encoded_query['filter'] = query.prefilter.encodable
             encoded_queries.append(encoded_query)
 
         return encoded_queries

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import (List,
+from typing import (TYPE_CHECKING,
+                    List,
                     Optional,
                     Union)
 
 from couchbase._utils import is_null_or_empty
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import VectorSearchOptions
+
+if TYPE_CHECKING:
+    from couchbase.logic.search_queries import SearchQuery
 
 
 class VectorQueryCombination(Enum):
@@ -31,6 +35,7 @@ class VectorQuery:
         vector (Union[List[float], str]): The vector to use in the query.
         num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or equal to 1.
         boost (float, optional): Add boost to query.
+        prefilter (`~couchbase.search.SearchQuery`, optional): Specifies a pre-filter to use for the vector query.
 
     Raises:
         :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
@@ -46,6 +51,7 @@ class VectorQuery:
                  vector,  # type: Union[List[float], str]
                  num_candidates=None,  # type: Optional[int]
                  boost=None,  # type: Optional[float]
+                 prefilter=None,  # type: Optional[SearchQuery]
                  ):
         if is_null_or_empty(field_name):
             raise InvalidArgumentException('Must provide a field name.')
@@ -53,11 +59,13 @@ class VectorQuery:
         self._vector = None
         self._vector_base64 = None
         self._validate_and_set_vector(vector)
-        self._num_candidates = self._boost = None
+        self._num_candidates = self._boost = self._prefilter = None
         if num_candidates is not None:
             self.num_candidates = num_candidates
         if boost is not None:
             self.boost = boost
+        if prefilter is not None:
+            self.prefilter = prefilter
 
     @property
     def boost(self) -> Optional[float]:
@@ -99,6 +107,23 @@ class VectorQuery:
         self._num_candidates = value
 
     @property
+    def prefilter(self) -> Optional[SearchQuery]:
+        """
+        Optional[SearchQuery]: Returns vector query's prefilter query, if it exists.
+        """
+        return self._prefilter
+
+    @prefilter.setter
+    def prefilter(self,
+                  value  # type: SearchQuery
+                  ):
+        # avoid circular import
+        from couchbase.logic.search_queries import SearchQuery
+        if not isinstance(value, SearchQuery):
+            raise InvalidArgumentException('prefilter must be a SearchQuery.')
+        self._prefilter = value
+
+    @property
     def vector(self) -> Optional[List[float]]:
         """
         Optional[List[float]]: Returns the vector query's vector.
@@ -138,6 +163,7 @@ class VectorQuery:
                vector,  # type: Union[List[float], str]
                num_candidates=None,  # type: Optional[int]
                boost=None,  # type: Optional[float]
+               prefilter=None,  # type: Optional[SearchQuery]
                ) -> VectorQuery:
         """ Creates a :class:`~couchbase.vector_search.VectorQuery`.
 
@@ -146,6 +172,7 @@ class VectorQuery:
             vector (Union[List[float], str]): The vector to use in the query.
             num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or equal to 1.
             boost (float, optional): Add boost to query.
+            prefilter (`~couchbase.search.SearchQuery`, optional): Specifies a pre-filter to use for the vector query.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
@@ -155,7 +182,7 @@ class VectorQuery:
         Returns:
             :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
         """  # noqa: E501
-        return cls(field_name, vector, num_candidates=num_candidates, boost=boost)
+        return cls(field_name, vector, num_candidates=num_candidates, boost=boost, prefilter=prefilter)
 
 
 class VectorSearch:

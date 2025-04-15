@@ -955,6 +955,7 @@ class VectorSearchParamTestSuite:
         'test_vector_query_invalid_num_candidates',
         'test_vector_query_invalid_vector',
         'test_vector_search',
+        'test_vector_search_with_prefilter',
         'test_vector_search_base64',
         'test_vector_search_invalid',
         'test_vector_search_multiple_queries'
@@ -1039,6 +1040,43 @@ class VectorSearchParamTestSuite:
         }
 
         vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR))
+        req = SearchRequest.create(vector_search)
+        search_query = search.SearchQueryBuilder.create_search_query_from_request(
+            cb_env.TEST_INDEX_NAME,
+            req
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+
+    def test_vector_search_with_prefilter(self, cb_env):
+        exp_json = {
+            'query': {'match_none': None},
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+            'show_request': False,
+            'vector_search': [
+                {
+                    'field': 'vector_field',
+                    'vector': self.TEST_VECTOR,
+                    'k': 3,
+                    'filter': {
+                        'match': 'salty beers',
+                        'analyzer': 'analyzer',
+                        'boost': 1.5,
+                        'field': 'field',
+                        'fuzziness': 1234,
+                        'prefix_length': 4,
+                        'operator': 'or'
+                    }
+                }
+            ]
+        }
+
+        q = search.MatchQuery('salty beers', boost=1.5, analyzer='analyzer',
+                              field='field', fuzziness=1234, prefix_length=4, match_operator=MatchOperator.OR)
+        vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field',
+                                                                   self.TEST_VECTOR,
+                                                                   prefilter=q))
         req = SearchRequest.create(vector_search)
         search_query = search.SearchQueryBuilder.create_search_query_from_request(
             cb_env.TEST_INDEX_NAME,
