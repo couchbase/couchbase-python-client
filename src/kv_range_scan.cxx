@@ -198,19 +198,15 @@ handle_kv_range_scan_op([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
     return nullptr;
   }
 
-  auto barrier = std::make_shared<
-    std::promise<tl::expected<couchbase::core::topology::configuration, std::error_code>>>();
+  auto barrier = std::make_shared<std::promise<
+    std::pair<std::error_code, std::shared_ptr<couchbase::core::topology::configuration>>>>();
   auto f = barrier->get_future();
-  conn->cluster_.with_bucket_configuration(
-    bucket_name,
-    [barrier](std::error_code ec, const couchbase::core::topology::configuration& config) mutable {
-      if (ec) {
-        return barrier->set_value(tl::unexpected(ec));
-      }
-      barrier->set_value(config);
-    });
-  auto config = f.get();
-  if (!config.has_value()) {
+  conn->cluster_.with_bucket_configuration(bucket_name,
+                                           [barrier](std::error_code ec, auto config) mutable {
+                                             barrier->set_value({ ec, std::move(config) });
+                                           });
+  auto [ec, config] = f.get();
+  if (ec) {
     pycbc_set_python_exception(
       PycbcError::UnsuccessfulOperation,
       __FILE__,
