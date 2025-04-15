@@ -71,10 +71,16 @@ pycbc_logger__create_logger__(PyObject* self, PyObject* args, PyObject* kwargs)
   auto logger = reinterpret_cast<pycbc_logger*>(self);
   char* log_level = nullptr;
   char* log_filename = nullptr;
-  const char* kw_list[] = { "level", "filename", nullptr };
-  const char* kw_format = "s|s";
-  if (!PyArg_ParseTupleAndKeywords(
-        args, kwargs, kw_format, const_cast<char**>(kw_list), &log_level, &log_filename)) {
+  int enable_console = 0;
+  const char* kw_list[] = { "level", "filename", "enable_console", nullptr };
+  const char* kw_format = "s|si";
+  if (!PyArg_ParseTupleAndKeywords(args,
+                                   kwargs,
+                                   kw_format,
+                                   const_cast<char**>(kw_list),
+                                   &log_level,
+                                   &log_filename,
+                                   &enable_console)) {
     pycbc_set_python_exception(PycbcError::InvalidArgument,
                                __FILE__,
                                __LINE__,
@@ -103,6 +109,7 @@ pycbc_logger__create_logger__(PyObject* self, PyObject* args, PyObject* kwargs)
     couchbase::core::logger::configuration configuration{};
     configuration.filename = std::string{ log_filename };
     configuration.log_level = level;
+    configuration.console = enable_console > 0;
     couchbase::core::logger::create_file_logger(configuration);
     logger->is_file_logger = true;
   } else {
