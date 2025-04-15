@@ -180,26 +180,26 @@ class SearchParamTestSuite:
         with pytest.raises(TypeError):
             q = search.DateRangeQuery()
 
-        q = search.DateRangeQuery(end='theEnd')
+        q = search.DateRangeQuery(end='2024-12-01')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'end': 'theEnd'}
+        assert encoded_q['query'] == {'end': '2024-12-01'}
 
-        q = search.DateRangeQuery(start='theStart')
+        q = search.DateRangeQuery(start='2024-01-01')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'theStart'}
+        assert encoded_q['query'] == {'start': '2024-01-01'}
 
-        q = search.DateRangeQuery(start='theStart', end='theEnd')
+        q = search.DateRangeQuery(start='2024-01-01', end='2024-12-01')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'theStart', 'end': 'theEnd'}
+        assert encoded_q['query'] == {'start': '2024-01-01', 'end': '2024-12-01'}
 
         q = search.DateRangeQuery('', '')  # Empty strings should be ok
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -207,6 +207,27 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'start': '', 'end': ''}
+
+        # deprecated start_inclusive & end_inclusive
+        q = search.DateRangeQuery('2024-01-01', '2024-12-01', start_inclusive=True, end_inclusive=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'start': '2024-01-01',
+                                      'end': '2024-12-01',
+                                      'inclusive_start': True,
+                                      'inclusive_end': True}
+
+        q = search.DateRangeQuery('2024-01-01', '2024-12-01', inclusive_start=True, inclusive_end=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'start': '2024-01-01',
+                                      'end': '2024-12-01',
+                                      'inclusive_start': True,
+                                      'inclusive_end': True}
 
     def test_disjunction_query(self, cb_env):
         q = search.DisjunctionQuery()
@@ -438,6 +459,27 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': 0.1}
+
+        # deprecated min_inclusive & max_inclusive
+        q = search.NumericRangeQuery(0.1, 0.9, min_inclusive=True, max_inclusive=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'min': 0.1,
+                                      'max': 0.9,
+                                      'inclusive_min': True,
+                                      'inclusive_max': True}
+
+        q = search.NumericRangeQuery(0.1, 0.9, inclusive_min=True, inclusive_max=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'min': 0.1,
+                                      'max': 0.9,
+                                      'inclusive_min': True,
+                                      'inclusive_max': True}
 
     def test_params_base(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
@@ -820,28 +862,65 @@ class SearchParamTestSuite:
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': '', 'end': ''}
+        assert encoded_q['query'] == {'min': '', 'max': ''}
 
         q = search.TermRangeQuery('startTerm', 'endTerm')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'startTerm', 'end': 'endTerm'}
+        assert encoded_q['query'] == {'min': 'startTerm', 'max': 'endTerm'}
 
+        # deprecated end
         q = search.TermRangeQuery(end='endTerm')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'end': 'endTerm'}
+        assert encoded_q['query'] == {'max': 'endTerm'}
 
+        q = search.TermRangeQuery(max='endTerm')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'max': 'endTerm'}
+
+        # deprecated start
         q = search.TermRangeQuery(start='startTerm')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'startTerm'}
+        assert encoded_q['query'] == {'min': 'startTerm'}
+
+        q = search.TermRangeQuery(min='startTerm')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'min': 'startTerm'}
+
+        # deprecated start_inclusive & end_inclusive
+        q = search.TermRangeQuery('startTerm', 'endTerm', start_inclusive=True, end_inclusive=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'min': 'startTerm',
+                                      'max': 'endTerm',
+                                      'inclusive_min': True,
+                                      'inclusive_max': True}
+
+        q = search.TermRangeQuery('startTerm', 'endTerm', inclusive_min=True, inclusive_max=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == {'min': 'startTerm',
+                                      'max': 'endTerm',
+                                      'inclusive_min': True,
+                                      'inclusive_max': True}
 
     def test_wildcard_query(self, cb_env):
         exp_json = {
