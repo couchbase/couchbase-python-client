@@ -146,7 +146,10 @@ def configure_console_logger():
     if log_level:
         log_file = os.getenv('PYCBC_LOG_FILE', None)
         if log_file:
-            _PYCBC_LOGGER.create_logger(level=log_level.lower(), filename=log_file)
+            enable_console_logging = 0 if os.getenv('PYCBC_ENABLE_CONSOLE', None) is None else 1
+            _PYCBC_LOGGER.create_logger(level=log_level.lower(),
+                                        filename=log_file,
+                                        enable_console=enable_console_logging)
         else:
             _PYCBC_LOGGER.create_logger(level=log_level.lower())
         logging.getLogger().debug(get_metadata(as_str=True))
