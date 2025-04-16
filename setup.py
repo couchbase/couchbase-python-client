@@ -45,7 +45,7 @@ if platform.system() == 'Windows':
 # otherwise, we want to use the system executable.
 setup_requires = []
 if not CMAKE_EXE:
-    setup_requires += ["cmake"]
+    setup_requires += ["cmake>=3.19.0,<4.0.0"]
 
 print(f'Python SDK version: {PYCBC_VERSION}')
 
