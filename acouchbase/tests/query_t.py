@@ -205,19 +205,6 @@ class QueryTestSuite:
         'test_simple_query_without_options_with_kwargs_positional_params',
     ]
 
-    @pytest_asyncio.fixture(name='setup_udf')
-    async def setup_teardown_udf(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('query_user_defined_functions',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-        await AsyncTestEnvironment.try_n_times(3,
-                                               1,
-                                               cb_env.load_udf)
-        yield
-        await AsyncTestEnvironment.try_n_times(3,
-                                               1,
-                                               cb_env.drop_udf)
-
     @pytest.fixture(scope='class')
     def check_preserve_expiry_supported(self, cb_env):
         EnvironmentFeatures.check_if_feature_supported('preserve_expiry',
@@ -243,11 +230,15 @@ class QueryTestSuite:
                                       QueryOptions(positional_parameters=['xgfflq']), f'{cb_env.get_batch_id()}')
         await cb_env.assert_rows(result, 1)
 
-    @pytest.mark.usefixtures('setup_udf')
     @pytest.mark.asyncio
     async def test_non_blocking(self, cb_env):
+
         async def run_query(cluster, idx):
-            result = cluster.query("EXECUTE FUNCTION loop(1000000000)")
+            slow_query = ['SELECT COUNT (1) AS c FROM',
+                          'ARRAY_RANGE(0,100) AS d1,'
+                          'ARRAY_RANGE(0,100) AS d2,'
+                          'ARRAY_RANGE(0,100) AS d3']
+            result = cluster.query(' '.join(slow_query))
             rows = []
             async for r in result:
                 rows.append(r)
@@ -363,6 +354,8 @@ class QueryTestSuite:
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.asyncio
     async def test_query_timeout(self, cb_env):
+        if cb_env.server_version_short < 7.1:
+            pytest.skip("Query used in test only available on server versions >= 7.1")
         from acouchbase.cluster import Cluster
         from couchbase.auth import PasswordAuthenticator
         from couchbase.options import ClusterOptions, ClusterTimeoutOptions
@@ -370,18 +363,20 @@ class QueryTestSuite:
         username, pw = cb_env.config.get_username_and_pw()
         auth = PasswordAuthenticator(username, pw)
         # Prior to PYCBC-1521, this test would fail as each request would override the cluster level query_timeout.
-        # If a timeout was not provided in the request, the default 75s timeout would be used.  PYCBC-1521 corrects
-        # this behavior so this test will pass as we are essentially forcing an AmbiguousTimeoutException because
-        # we are setting the cluster level query_timeout such a small value.
-        timeout_opts = ClusterTimeoutOptions(query_timeout=timedelta(milliseconds=1))
+        # If a timeout was not provided in the request, the default 75s timeout would be used.
+        timeout_opts = ClusterTimeoutOptions(query_timeout=timedelta(seconds=1.5))
         cluster = await Cluster.connect(f'{conn_string}', ClusterOptions(auth, timeout_options=timeout_opts))
         # don't need to do this except for older server versions
         _ = cluster.bucket(f'{cb_env.bucket.name}')
-        q_str = f'SELECT * FROM `{cb_env.bucket.name}` LIMIT 10;'
+        slow_query = ' '.join(['SELECT COUNT (1) AS c FROM',
+                               'ARRAY_RANGE(0,110) AS d1,'
+                               'ARRAY_RANGE(0,110) AS d2,'
+                               'ARRAY_RANGE(0,110) AS d3'])
         with pytest.raises(AmbiguousTimeoutException):
-            await cluster.query(q_str).execute()
+            await cluster.query(slow_query).execute()
         # If we override the timeout w/in the request the query should succeed.
-        rows = await cluster.query(q_str, timeout=timedelta(seconds=10)).execute()
+        # NOTE: a timeout of < 10s is most likely acceptable, but for the Jenkins environment we give plenty of room.
+        rows = await cluster.query(slow_query, timeout=timedelta(seconds=30)).execute()
         assert len(rows) > 0
 
     @pytest.mark.asyncio
