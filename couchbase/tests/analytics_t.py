@@ -186,6 +186,7 @@ class AnalyticsTestSuite:
         'test_analytics_metadata',
         'test_analytics_query_in_thread',
         'test_analytics_with_metrics',
+        'test_query_large_result_set',
         'test_query_named_parameters',
         'test_query_named_parameters_no_options',
         'test_query_named_parameters_override',
@@ -264,6 +265,20 @@ class AnalyticsTestSuite:
         assert isinstance(metrics.processed_objects(), UnsignedInt64)
         assert metrics.error_count() == UnsignedInt64(0)
 
+    def test_query_large_result_set(self, cb_env):
+        # Prior to PYCBC-1685, this would raise a StopIteration b/c the timeout was
+        # reached on the Python side prior to the C++ core returning the result set.
+        # It is difficult to determine the timeout value in the Jenkins environment,
+        # so allow an AmbiguousTimeoutException.
+        count = 100000
+        statement = f'SELECT {{"x1": 1, "x2": 2, "x3": 3}} FROM range(1, {count}) r;'
+        try:
+            result = cb_env.cluster.analytics_query(statement, timeout=timedelta(seconds=2))
+            row_count = [1 for _ in result.rows()]
+            assert len(row_count) == count
+        except AmbiguousTimeoutException:
+            pass
+
     def test_query_named_parameters(self, cb_env):
         result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
                                                 AnalyticsOptions(named_parameters={'atype': 'vehicle'}))
@@ -318,20 +333,18 @@ class AnalyticsTestSuite:
         username, pw = cb_env.config.get_username_and_pw()
         auth = PasswordAuthenticator(username, pw)
         # Prior to PYCBC-1521, this test would fail as each request would override the cluster level analytics_timeout.
-        # If a timeout was not provided in the request, the default 75s timeout would be used.  PYCBC-1521 corrects
-        # this behavior so this test will pass as we are essentially forcing an AmbiguousTimeoutException because
-        # we are setting the cluster level analytics_timeout such a small value.
-        timeout_opts = ClusterTimeoutOptions(analytics_timeout=timedelta(milliseconds=1))
+        # If a timeout was not provided in the request, the default 75s timeout would be used.
+        timeout_opts = ClusterTimeoutOptions(analytics_timeout=timedelta(seconds=1))
         cluster = Cluster.connect(f'{conn_string}', ClusterOptions(auth, timeout_options=timeout_opts))
         # don't need to do this except for older server versions
         _ = cluster.bucket(f'{cb_env.bucket.name}')
-        q_str = f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 1;'
+        q_str = 'SELECT sleep("some value", 1500) AS some_field;'
         with pytest.raises(AmbiguousTimeoutException):
             res = cluster.analytics_query(q_str)
             [r for r in res.rows()]
 
         # if we override the timeout w/in the request the query should succeed.
-        res = cluster.analytics_query(q_str, timeout=timedelta(seconds=10))
+        res = cluster.analytics_query(q_str, timeout=timedelta(seconds=2))
         rows = [r for r in res.rows()]
         assert len(rows) > 0
 

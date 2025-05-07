@@ -49,10 +49,21 @@ public:
     std::unique_lock<std::mutex> lock(mut_);
 
     while (rows_.empty()) {
-      auto now = std::chrono::system_clock::now();
-      if (cv_.wait_until(lock, now + timeout_ms) == std::cv_status::timeout) {
-        // this will cause iternext to return nullptr, which stops iteration
-        return nullptr;
+      if (cv_.wait_for(lock, timeout_ms) == std::cv_status::timeout) {
+        // This timeout (e.g. timeout_ms) is the same timeout we pass to the C++ core.
+        // If we timeout on the Python side this means:
+        //   - Edge case where the C++ core is about to timeout. We want to use the C++ core error
+        //   details,
+        //     so wait a little longer to get the C++ core timeout.
+        //   - The result set is large and since we don't have streaming support yet, we have to
+        //   wait for
+        //     the entire result set to be returned.  Again we should wait until we get the results.
+        // PYCBC-1685: Instead of trying to do some tricky error handling we instead wait for the
+        // C++ core results and log a message that can provide insight to users about the SDK
+        // behavior.
+        CB_LOG_DEBUG(
+          "PYCBC: No results received from C++ core after {}ms.  Continue to wait for results.",
+          timeout_ms.count());
       }
     }
 

@@ -230,13 +230,7 @@ streamed_result_iternext(PyObject* self)
     Py_BEGIN_ALLOW_THREADS row = s_res->rows->get(s_res->timeout_ms);
     Py_END_ALLOW_THREADS
   }
-
-  if (row != nullptr) {
-    return row;
-  } else {
-    PyErr_SetString(PyExc_StopIteration, "Timeout occurred waiting for next item in queue.");
-    return nullptr;
-  }
+  return row;
 }
 
 static PyObject*
