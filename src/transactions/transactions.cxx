@@ -514,7 +514,7 @@ init_transaction_query_options_type()
 
 static PyTypeObject transaction_query_options_type = init_transaction_query_options_type();
 
-/* pycbc_txns::transaction_query_options type methods */
+/* pycbc_txns::transaction_get_result type methods */
 
 void
 pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result)
@@ -613,6 +613,56 @@ init_transaction_get_result_type()
 
 static PyTypeObject transaction_get_result_type = init_transaction_get_result_type();
 
+/* pycbc_txns::transaction_get_multi_result type methods */
+
+void
+pycbc_txns::transaction_get_multi_result__dealloc__(
+  pycbc_txns::transaction_get_multi_result* result)
+{
+  if (result->content) {
+    PyList_SetSlice(result->content, 0, PY_SSIZE_T_MAX, NULL);
+    Py_DECREF(result->content);
+  }
+  Py_TYPE(result)->tp_free((PyObject*)result);
+  CB_LOG_DEBUG("dealloc transaction_get_multi_result");
+}
+
+static PyMethodDef transaction_get_multi_methods[] = { { NULL } };
+
+static PyMemberDef transaction_get_multi_members[] = {
+  { "content",
+    T_OBJECT_EX,
+    offsetof(pycbc_txns::transaction_get_multi_result, content),
+    0,
+    PyDoc_STR("Transaction get_multi content list.\n") },
+  { NULL }
+};
+
+PyObject*
+pycbc_txns::transaction_get_multi_result__new__(PyTypeObject* type, PyObject*, PyObject*)
+{
+  auto self = reinterpret_cast<pycbc_txns::transaction_get_multi_result*>(type->tp_alloc(type, 0));
+  self->content = PyList_New(static_cast<Py_ssize_t>(0));
+  return reinterpret_cast<PyObject*>(self);
+}
+
+static PyTypeObject
+init_transaction_get_multi_result_type()
+{
+  PyTypeObject r = {};
+  r.tp_name = "pycbc_core.transaction_get_multi_result";
+  r.tp_doc = "Result of transaction get_multi operation on client";
+  r.tp_basicsize = sizeof(pycbc_txns::transaction_get_multi_result);
+  r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  r.tp_new = pycbc_txns::transaction_get_multi_result__new__;
+  r.tp_dealloc = (destructor)pycbc_txns::transaction_get_multi_result__dealloc__;
+  r.tp_methods = transaction_get_multi_methods;
+  r.tp_members = transaction_get_multi_members;
+  return r;
+}
+
+static PyTypeObject transaction_get_multi_result_type = init_transaction_get_multi_result_type();
+
 PyObject*
 pycbc_txns::add_transaction_objects(PyObject* pyObj_module)
 {
@@ -640,6 +690,8 @@ pycbc_txns::add_transaction_objects(PyObject* pyObj_module)
   }
   Py_DECREF(pyObj_enum_class);
   Py_DECREF(pyObj_enum_module);
+
+  // TODO(PYCBC-1686): Fix deeply nested logic
   if (PyType_Ready(&transaction_get_result_type) == 0) {
     Py_INCREF(&transaction_get_result_type);
     if (PyModule_AddObject(pyObj_module,
@@ -662,7 +714,16 @@ pycbc_txns::add_transaction_objects(PyObject* pyObj_module)
                                        "transaction_options",
                                        reinterpret_cast<PyObject*>(&transaction_options_type)) ==
                     0) {
-                  return pyObj_module;
+                  if (PyType_Ready(&transaction_get_multi_result_type) == 0) {
+                    Py_INCREF(&transaction_get_multi_result_type);
+                    if (PyModule_AddObject(
+                          pyObj_module,
+                          "transaction_get_mulit_result",
+                          reinterpret_cast<PyObject*>(&transaction_get_multi_result_type)) == 0) {
+                      return pyObj_module;
+                    }
+                    Py_DECREF(&transaction_get_multi_result_type);
+                  }
                 }
                 Py_DECREF(&transaction_options_type);
               }
@@ -807,6 +868,8 @@ txn_external_exception_to_string(tx_core::external_exception ext_exception)
       return "transaction_already_aborted";
     case tx_core::external_exception::TRANSACTION_ALREADY_COMMITTED:
       return "transaction_already_committed";
+    case tx_core::external_exception::DOCUMENT_UNRETRIEVABLE_EXCEPTION:
+      return "document_unretrievable_exception";
   }
   return "unknown";
 }
@@ -831,6 +894,8 @@ create_python_exception(pycbc_txns::TxnExceptionType exc_type,
   static PyObject* pyObj_couchbase_error = init_transaction_exception_type("CouchbaseException");
   static PyObject* pyObj_feature_not_available_error =
     init_transaction_exception_type("FeatureUnavailableException");
+  static PyObject* pyObj_document_unretrievable_ex =
+    init_transaction_exception_type("DocumentUnretrievableException");
 
   PyObject* pyObj_final_error = nullptr;
   PyObject* pyObj_exc_type = nullptr;
@@ -867,6 +932,10 @@ create_python_exception(pycbc_txns::TxnExceptionType exc_type,
     }
     case pycbc_txns::TxnExceptionType::DOCUMENT_NOT_FOUND: {
       pyObj_exc_type = pyObj_document_not_found_ex;
+      break;
+    }
+    case pycbc_txns::TxnExceptionType::DOCUMENT_UNRETRIEVABLE: {
+      pyObj_exc_type = pyObj_document_unretrievable_ex;
       break;
     }
     case pycbc_txns::TxnExceptionType::COUCHBASE_ERROR:
@@ -924,6 +993,9 @@ convert_to_python_exc_type(std::exception_ptr err,
     if (e.cause() == tx_core::external_exception::FEATURE_NOT_AVAILABLE_EXCEPTION) {
       exc_type = pycbc_txns::TxnExceptionType::FEATURE_NOT_AVAILABLE;
       message = "Possibly attempting a binary transaction operation with a server version < 7.6.2";
+    } else if (e.cause() == tx_core::external_exception::DOCUMENT_UNRETRIEVABLE_EXCEPTION) {
+      exc_type = pycbc_txns::TxnExceptionType::DOCUMENT_UNRETRIEVABLE;
+      message = e.what();
     } else {
       // follow logic that was used in C++ core transactions::wrap_run() to call
       // transaction_context::handle_error() which boils down to (not exactly, should suffice
@@ -1042,6 +1114,74 @@ handle_returning_transaction_get_result(
     } else {
       pyObj_args = PyTuple_New(1);
       PyTuple_SetItem(pyObj_args, 0, pyObj_get_result);
+      pyObj_func = pyObj_callback;
+    }
+  }
+  if (nullptr != pyObj_func) {
+    PyObject_CallObject(pyObj_func, pyObj_args);
+    Py_DECREF(pyObj_errback);
+    Py_DECREF(pyObj_callback);
+    Py_DECREF(pyObj_args);
+  }
+  PyGILState_Release(state);
+}
+
+template<typename T>
+void
+handle_returning_transaction_get_multi_result(PyObject* pyObj_callback,
+                                              PyObject* pyObj_errback,
+                                              std::shared_ptr<std::promise<PyObject*>> barrier,
+                                              std::exception_ptr err,
+                                              T res,
+                                              bool is_replica_get = false)
+{
+  auto state = PyGILState_Ensure();
+  PyObject* pyObj_args = nullptr;
+  PyObject* pyObj_func = nullptr;
+  PyObject* pyObj_err = nullptr;
+  if (err) {
+    pyObj_err = convert_to_python_exc_type(err);
+    if (nullptr == pyObj_errback) {
+      barrier->set_value(pyObj_err);
+    } else {
+      pyObj_args = PyTuple_New(1);
+      PyTuple_SetItem(pyObj_args, 0, pyObj_err);
+      pyObj_func = pyObj_errback;
+    }
+  } else {
+    PyObject* pyObj_get_multi_result =
+      PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_multi_result_type), nullptr);
+    auto result =
+      reinterpret_cast<pycbc_txns::transaction_get_multi_result*>(pyObj_get_multi_result);
+    for (const auto& item : res->content()) {
+      if (!item.has_value()) {
+        Py_INCREF(Py_None);
+        PyList_Append(result->content, Py_None);
+        continue;
+      }
+      PyObject* pyObj_value = nullptr;
+      PyObject* pyObj_flags = nullptr;
+      try {
+        pyObj_value = binary_to_PyObject(item.value().data);
+        pyObj_flags = PyLong_FromUnsignedLong(item.value().flags);
+      } catch (const std::exception& e) {
+        Py_INCREF(Py_None);
+        PyList_Append(result->content, Py_None);
+        CB_LOG_ERROR("PYCBC: Failed to convert item to PyObject. Error: {}", e.what());
+        continue;
+      }
+      PyObject* pyObj_item = PyTuple_Pack(2, pyObj_value, pyObj_flags);
+      PyList_Append(result->content, pyObj_item);
+      Py_DECREF(pyObj_value);
+      Py_DECREF(pyObj_flags);
+      Py_DECREF(pyObj_item);
+    }
+
+    if (nullptr == pyObj_callback) {
+      barrier->set_value(pyObj_get_multi_result);
+    } else {
+      pyObj_args = PyTuple_New(1);
+      PyTuple_SetItem(pyObj_args, 0, pyObj_get_multi_result);
       pyObj_func = pyObj_callback;
     }
   }
@@ -1310,6 +1450,179 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
       // return error!
       PyErr_SetString(PyExc_ValueError, "unknown txn operation");
   }
+  if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+    PyObject* ret = nullptr;
+    Py_BEGIN_ALLOW_THREADS ret = fut.get();
+    Py_END_ALLOW_THREADS return ret;
+  }
+  Py_RETURN_NONE;
+}
+
+tx_core::transaction_get_multi_mode
+get_transaction_get_multi_mode(std::string mode)
+{
+  if (!mode.empty()) {
+    if (mode.compare("prioritise_latency") == 0) {
+      return tx_core::transaction_get_multi_mode::prioritise_latency;
+    } else if (mode.compare("disable_read_skew_detection") == 0) {
+      return tx_core::transaction_get_multi_mode::disable_read_skew_detection;
+    } else if (mode.compare("prioritise_read_skew_detection") == 0) {
+      return tx_core::transaction_get_multi_mode::prioritise_read_skew_detection;
+    }
+  }
+  return tx_core::transaction_get_multi_mode::prioritise_latency;
+}
+
+tx_core::transaction_get_multi_replicas_from_preferred_server_group_mode
+get_transaction_get_multi_replicas_from_preferred_server_group_mode(std::string mode)
+{
+  if (!mode.empty()) {
+    if (mode.compare("prioritise_latency") == 0) {
+      return tx_core::transaction_get_multi_replicas_from_preferred_server_group_mode::
+        prioritise_latency;
+    } else if (mode.compare("disable_read_skew_detection") == 0) {
+      return tx_core::transaction_get_multi_replicas_from_preferred_server_group_mode::
+        disable_read_skew_detection;
+    } else if (mode.compare("prioritise_read_skew_detection") == 0) {
+      return tx_core::transaction_get_multi_replicas_from_preferred_server_group_mode::
+        prioritise_read_skew_detection;
+    }
+  }
+  return tx_core::transaction_get_multi_replicas_from_preferred_server_group_mode::
+    prioritise_latency;
+}
+
+PyObject*
+pycbc_txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
+                                     PyObject* args,
+                                     PyObject* kwargs)
+{
+  PyObject* pyObj_ctx = nullptr;
+  PyObject* pyObj_callback = nullptr;
+  PyObject* pyObj_errback = nullptr;
+  PyObject* pyObj_specs = nullptr;
+  const char* mode = nullptr;
+  TxOperations::TxOperationType op_type = TxOperations::UNKNOWN;
+  const char* kw_list[] = { "ctx", "op", "specs", "mode", "callback", "errback", nullptr };
+  const char* kw_format = "O!IO|sOO";
+
+  int ret = PyArg_ParseTupleAndKeywords(args,
+                                        kwargs,
+                                        kw_format,
+                                        const_cast<char**>(kw_list),
+                                        &PyCapsule_Type,
+                                        &pyObj_ctx,
+                                        &op_type,
+                                        &pyObj_specs,
+                                        &mode,
+                                        &pyObj_callback,
+                                        &pyObj_errback);
+  if (!ret) {
+    PyErr_SetString(PyExc_ValueError, "couldn't parse args");
+    Py_RETURN_NONE;
+  }
+
+  if (nullptr == pyObj_ctx) {
+    PyErr_SetString(PyExc_ValueError, "no transaction_context passed in");
+    Py_RETURN_NONE;
+  }
+  auto ctx =
+    reinterpret_cast<pycbc_txns::transaction_context*>(PyCapsule_GetPointer(pyObj_ctx, "ctx_"));
+  if (nullptr == ctx) {
+    PyErr_SetString(PyExc_ValueError, "passed null transaction_context");
+    Py_RETURN_NONE;
+  }
+
+  if (!PyTuple_Check(pyObj_specs) && !PyList_Check(pyObj_specs)) {
+    pycbc_set_python_exception(
+      PycbcError::InvalidArgument,
+      __FILE__,
+      __LINE__,
+      "Cannot perform transaction get_multi operation.  Specs must be a tuple or list.");
+    Py_RETURN_NONE;
+  }
+
+  size_t nspecs;
+  if (PyTuple_Check(pyObj_specs)) {
+    nspecs = static_cast<size_t>(PyTuple_GET_SIZE(pyObj_specs));
+  } else {
+    nspecs = static_cast<size_t>(PyList_GET_SIZE(pyObj_specs));
+  }
+
+  if (nspecs == 0) {
+    pycbc_set_python_exception(
+      PycbcError::InvalidArgument,
+      __FILE__,
+      __LINE__,
+      "Cannot perform transaction get_multi operation.  Need at least one spec.");
+    Py_RETURN_NONE;
+  }
+
+  Py_XINCREF(pyObj_callback);
+  Py_XINCREF(pyObj_errback);
+
+  auto barrier = std::make_shared<std::promise<PyObject*>>();
+  auto fut = barrier->get_future();
+
+  size_t ii;
+  auto ids = std::vector<couchbase::core::document_id>{};
+  for (ii = 0; ii < nspecs; ++ii) {
+    PyObject* pyObj_spec = nullptr;
+    if (PyTuple_Check(pyObj_specs)) {
+      pyObj_spec = PyTuple_GetItem(pyObj_specs, ii);
+    } else {
+      pyObj_spec = PyList_GetItem(pyObj_specs, ii);
+    }
+    if (!pyObj_spec) {
+      pycbc_set_python_exception(
+        PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+      Py_XDECREF(pyObj_callback);
+      Py_XDECREF(pyObj_errback);
+      Py_RETURN_NONE;
+    }
+    char* bucket = nullptr;
+    char* scope = nullptr;
+    char* collection = nullptr;
+    char* id = nullptr;
+    if (!PyArg_ParseTuple(pyObj_spec, "ssss", &bucket, &scope, &collection, &id)) {
+      pycbc_set_python_exception(
+        PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
+      Py_XDECREF(pyObj_callback);
+      Py_XDECREF(pyObj_errback);
+      Py_RETURN_NONE;
+    }
+    ids.emplace_back(couchbase::core::document_id{ bucket, scope, collection, id });
+  }
+
+  if (op_type == TxOperations::GET_MULTI) {
+    auto get_multi_mode = get_transaction_get_multi_mode(mode);
+    Py_BEGIN_ALLOW_THREADS ctx->ctx->get_multi(
+      ids,
+      get_multi_mode,
+      [barrier, pyObj_callback, pyObj_errback](
+        std::exception_ptr err, std::optional<tx_core::transaction_get_multi_result> res) {
+        handle_returning_transaction_get_multi_result(
+          pyObj_callback, pyObj_errback, barrier, err, res);
+      });
+    Py_END_ALLOW_THREADS
+  } else if (op_type == TxOperations::GET_MULTI_REPLICAS_FROM_PREFERRED_SERVER_GROUP) {
+    auto get_multi_mode = get_transaction_get_multi_replicas_from_preferred_server_group_mode(mode);
+    Py_BEGIN_ALLOW_THREADS ctx->ctx->get_multi_replicas_from_preferred_server_group(
+      ids,
+      get_multi_mode,
+      [barrier, pyObj_callback, pyObj_errback](
+        std::exception_ptr err,
+        std::optional<tx_core::transaction_get_multi_replicas_from_preferred_server_group_result>
+          res) {
+        handle_returning_transaction_get_multi_result(
+          pyObj_callback, pyObj_errback, barrier, err, res);
+      });
+    Py_END_ALLOW_THREADS
+  } else {
+    PyErr_SetString(PyExc_ValueError, "Unknown transaction operation");
+    Py_RETURN_NONE;
+  }
+
   if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
     Py_BEGIN_ALLOW_THREADS ret = fut.get();

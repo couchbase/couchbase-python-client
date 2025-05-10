@@ -21,17 +21,26 @@ from typing import (TYPE_CHECKING,
                     Callable,
                     Coroutine,
                     Dict,
-                    Optional)
+                    List,
+                    Optional,
+                    Tuple,
+                    Union)
 
 from couchbase.exceptions import ErrorMapper
 from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.supportability import Supportability
-from couchbase.options import (TransactionGetOptions,
+from couchbase.options import (TransactionGetMultiOptions,
+                               TransactionGetMultiReplicasFromPreferredServerGroupOptions,
+                               TransactionGetOptions,
                                TransactionGetReplicaFromPreferredServerGroupOptions,
                                TransactionInsertOptions,
                                TransactionQueryOptions,
                                TransactionReplaceOptions)
-from couchbase.transactions import (TransactionGetResult,
+from couchbase.transactions import (TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                    TransactionGetMultiReplicasFromPreferredServerGroupSpec,
+                                    TransactionGetMultiResult,
+                                    TransactionGetMultiSpec,
+                                    TransactionGetResult,
                                     TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
@@ -75,6 +84,9 @@ class AsyncWrapper:
                         try:
                             if return_cls is TransactionGetResult:
                                 result = return_cls(res, tc)
+                            elif (return_cls is TransactionGetMultiResult
+                                  or return_cls is TransactionGetMultiReplicasFromPreferredServerGroupResult):
+                                result = return_cls(res, [spec.transcoder for spec in args[0]], tc)
                             else:
                                 result = return_cls(res) if return_cls is not None else None
                             self._loop.call_soon_threadsafe(ftr.set_result, result)
@@ -143,10 +155,10 @@ class Transactions(TransactionsLogic):
 class AttemptContext(AttemptContextLogic):
 
     def __init__(self,
-                 ctx,    # type: PyCapsuleType
-                 loop,    # type: AbstractEventLoop
+                 ctx,         # type: PyCapsuleType
+                 loop,        # type: AbstractEventLoop
                  transcoder,  # type: Transcoder
-                 opts    # type: Optional[PyCapsuleType]
+                 opts         # type: Optional[PyCapsuleType]
                  ):
         super().__init__(ctx, transcoder, loop, opts)
 
@@ -170,17 +182,17 @@ class AttemptContext(AttemptContextLogic):
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
     def _get(self,
-             coll,  # type: AsyncCollection
-             key,   # type: str
+             coll,     # type: AsyncCollection
+             key,      # type: str
              **kwargs  # type: Dict[str, Any]
              ) -> Awaitable[TransactionGetResult]:
         return super().get(coll, key, **kwargs)
 
     def get(self,
-            coll,  # type: AsyncCollection
-            key,   # type: str
+            coll,          # type: AsyncCollection
+            key,           # type: str
             options=None,  # type: Optional[TransactionGetOptions]
-            **kwargs  # type: Dict[str, Any]
+            **kwargs       # type: Dict[str, Any]
             ) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction.
@@ -209,7 +221,7 @@ class AttemptContext(AttemptContextLogic):
                                                  coll,     # type: AsyncCollection
                                                  key,      # type: str
                                                  **kwargs  # type: Dict[str, Any]
-                                                 ) -> TransactionGetResult:
+                                                 ) -> Awaitable[TransactionGetResult]:
         return super().get_replica_from_preferred_server_group(coll, key, **kwargs)
 
     def get_replica_from_preferred_server_group(self,
@@ -217,7 +229,7 @@ class AttemptContext(AttemptContextLogic):
                                                 key,           # type: str
                                                 options=None,  # type: Optional[TransactionGetReplicaFromPreferredServerGroupOptions]  # noqa: E501
                                                 **kwargs       # type: Dict[str, Any]
-                                                ) -> TransactionGetResult:
+                                                ) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction from any replica in the preferred server group that is specified in
             the :class:`couchbase.options.ClusterOptions`.
@@ -244,21 +256,86 @@ class AttemptContext(AttemptContextLogic):
             kwargs['transcoder'] = options.get('transcoder', None)
         return self._get_replica_from_preferred_server_group(coll, key, **kwargs)
 
+    @AsyncWrapper.inject_callbacks(TransactionGetMultiResult)
+    def _get_multi(self,
+                   specs,    # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec]]
+                   **kwargs  # type: Dict[str, Any]
+                   ) -> Awaitable[TransactionGetMultiResult]:
+        return super().get_multi(specs, **kwargs)
+
+    def get_multi(self,
+                  specs,         # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec]]
+                  options=None,  # type: Optional[TransactionGetMultiOptions]
+                  **kwargs       # type: Dict[str, Any]
+                  ) -> Awaitable[TransactionGetMultiResult]:
+        """
+        Get a document within this transaction.
+
+        Args:
+            specs (Union[List[:class:`~couchbase.transactions.TransactionGetMultiSpec`], Tuple[:class:`~couchbase.transactions.TransactionGetMultiSpec`]]):
+                The required information for the documents involved for this operation.
+            options (:class:`~couchbase.options.TransactionGetMultiOptions`, optional): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionGetMultiOptions`
+
+        Returns:
+            :class:`couchbase.transactions.TransactionGetMultiResult`: Document in collection, in a form useful for passing
+                to other transaction operations. Or `None` if the document was not found.
+        Raises:
+            :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+                no need to handle the exception, as the transaction will rollback regardless.
+        """  # noqa: E501
+        if 'mode' not in kwargs and isinstance(options, TransactionGetMultiOptions):
+            kwargs['mode'] = options.get('mode', None)
+        return self._get_multi(specs, **kwargs)
+
+    @AsyncWrapper.inject_callbacks(TransactionGetMultiReplicasFromPreferredServerGroupResult)
+    def _get_multi_replicas_from_preferred_server_group(self,
+                                                        specs,    # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec]]  # noqa: E501
+                                                        **kwargs  # type: Dict[str, Any]
+                                                        ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:  # noqa: E501
+        return super().get_multi_replicas_from_preferred_server_group(specs, **kwargs)
+
+    def get_multi_replicas_from_preferred_server_group(self,
+                                                       specs,         # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec]] # noqa: E501
+                                                       options=None,  # type: Optional[TransactionGetMultiReplicasFromPreferredServerGroupOptions]  # noqa: E501
+                                                       **kwargs       # type: Dict[str, Any]
+                                                       ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:  # noqa: E501
+        """
+        Get multiple documents within this transaction from any replica.
+
+        Args:
+            specs (Union[List[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`], Tuple[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`]]):
+                The required information for the documents involved for this operation.
+            options (:class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`, optional): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`
+
+        Returns:
+            :class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupResult`: Collection of results from the operation.
+        Raises:
+            :class:`~couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+                no need to handle the exception, as the transaction will rollback regardless.
+        """  # noqa: E501
+        if 'mode' not in kwargs and isinstance(options, TransactionGetMultiReplicasFromPreferredServerGroupOptions):
+            kwargs['mode'] = options.get('mode', None)
+        return self._get_multi_replicas_from_preferred_server_group(specs, **kwargs)
+
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
     def _insert(self,
-                coll,    # type: AsyncCollection
-                key,     # type: str
-                value,   # type: JSONType
+                coll,     # type: AsyncCollection
+                key,      # type: str
+                value,    # type: JSONType
                 **kwargs  # type: Dict[str, Any]
                 ) -> Awaitable[TransactionGetResult]:
         return super().insert(coll, key, value, **kwargs)
 
     def insert(self,
-               coll,    # type: AsyncCollection
-               key,     # type: str
-               value,   # type: JSONType
+               coll,          # type: AsyncCollection
+               key,           # type: str
+               value,         # type: JSONType
                options=None,  # type: Optional[TransactionInsertOptions]
-               **kwargs  # type: Dict[str, Any]
+               **kwargs       # type: Dict[str, Any]
                ) -> Awaitable[TransactionGetResult]:
         """
         Insert a new document within a transaction.
@@ -286,16 +363,16 @@ class AttemptContext(AttemptContextLogic):
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
     def _replace(self,
                  txn_get_result,  # type: TransactionGetResult
-                 value,  # type: JSONType
-                 **kwargs  # type: Dict[str, Any]
+                 value,           # type: JSONType
+                 **kwargs         # type: Dict[str, Any]
                  ) -> Awaitable[TransactionGetResult]:
         return super().replace(txn_get_result, value, **kwargs)
 
     def replace(self,
                 txn_get_result,  # type: TransactionGetResult
-                value,  # type: JSONType
-                options=None,  # type: Optional[TransactionReplaceOptions]
-                **kwargs  # type: Dict[str, Any]
+                value,           # type: JSONType
+                options=None,    # type: Optional[TransactionReplaceOptions]
+                **kwargs         # type: Dict[str, Any]
                 ) -> Awaitable[TransactionGetResult]:
         """
         Replace the contents of a document within a transaction.
@@ -321,9 +398,9 @@ class AttemptContext(AttemptContextLogic):
 
     @AsyncWrapper.inject_callbacks(None)
     def remove(self,
-               txn_get_result,
-               **kwargs
-               ):
+               txn_get_result,      # type: TransactionGetResult
+               **kwargs             # type: Dict[str, Any]
+               ) -> Awaitable[None]:
         """
         Remove a document in a transaction.
 
@@ -340,9 +417,10 @@ class AttemptContext(AttemptContextLogic):
 
     @AsyncWrapper.inject_callbacks(TransactionQueryResults)
     def query(self,
-              query,
-              options=TransactionQueryOptions(),
-              **kwargs) -> TransactionQueryResults:
+              query,         # type: str
+              options=None,  # type: Optional[TransactionQueryOptions]
+              **kwargs       # type: Dict[str, Any]
+              ) -> Awaitable[TransactionQueryResults]:
         """
         Perform a query within a transaction.
 
@@ -360,4 +438,6 @@ class AttemptContext(AttemptContextLogic):
                 necessarily be rolled back, a CouchbaseException other than TransactionOperationFailed will be raised.
                 If handled, the transaction will not rollback.
         """
+        if options is None:
+            options = TransactionQueryOptions()
         return super().query(query, options, **kwargs)

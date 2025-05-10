@@ -44,11 +44,13 @@ class TransactionGetResult:
 
     @property
     def content_as(self):
+        if self._decoded_value:
+            return ContentProxy(self._decoded_value)
+
         if not self._decoded_value:
             val, flags = self._res.get('value')
             if val:
                 self._decoded_value = self._transcoder.decode_value(val, flags)
-                log.debug(f'Result has decoded value {self._decoded_value}')
                 return ContentProxy(self._decoded_value)
 
         log.debug('Result is missing decoded value ')

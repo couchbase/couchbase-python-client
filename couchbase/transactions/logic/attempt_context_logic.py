@@ -25,6 +25,7 @@ from couchbase.options import TransactionOptions
 from couchbase.pycbc_core import (create_new_attempt_context,
                                   create_transaction_context,
                                   transaction_commit,
+                                  transaction_get_multi_op,
                                   transaction_op,
                                   transaction_operations,
                                   transaction_query_op,
@@ -108,6 +109,44 @@ class AttemptContextLogic:
         kwargs["op"] = transaction_operations.GET_REPLICA_FROM_PREFERRED_SERVER_GROUP.value
         log.debug('get_replica_from_preferred_server_group calling transaction op with %s', kwargs)
         return transaction_op(**kwargs)
+
+    def get_multi_replicas_from_preferred_server_group(self, specs, **kwargs):
+        mode = kwargs.pop('mode', '')
+        callback = kwargs.pop('callback', None)
+        errback = kwargs.pop('errback', None)
+        if mode:
+            mode = mode.value
+        op_args = {
+            'ctx': self._txnctx,
+            'op': transaction_operations.GET_MULTI_REPLICAS_FROM_PREFERRED_SERVER_GROUP.value,
+            'specs': [s._astuple() for s in specs],
+            'mode': mode
+        }
+        if callback:
+            op_args['callback'] = callback
+        if errback:
+            op_args['errback'] = errback
+        log.debug('get_multi calling transaction op with %s', op_args)
+        return transaction_get_multi_op(**op_args)
+
+    def get_multi(self, specs, **kwargs):
+        mode = kwargs.pop('mode', '')
+        callback = kwargs.pop('callback', None)
+        errback = kwargs.pop('errback', None)
+        if mode:
+            mode = mode.value
+        op_args = {
+            'ctx': self._txnctx,
+            'op': transaction_operations.GET_MULTI.value,
+            'specs': [s._astuple() for s in specs],
+            'mode': mode
+        }
+        if callback:
+            op_args['callback'] = callback
+        if errback:
+            op_args['errback'] = errback
+        log.debug('get_multi calling transaction op with %s', op_args)
+        return transaction_get_multi_op(**op_args)
 
     def insert(self, coll, key, value, **kwargs):
         transcoder = kwargs.pop('transcoder', self._transcoder)

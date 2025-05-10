@@ -19,3 +19,9 @@ from .transaction_query_results import TransactionQueryResults  # noqa: F401
 from .transaction_result import TransactionResult  # noqa: F401
 from .transactions import AttemptContext  # noqa: F401
 from .transactions import Transactions  # noqa: F401
+from .transactions_get_multi import TransactionGetMultiMode  # noqa: F401
+from .transactions_get_multi import TransactionGetMultiReplicasFromPreferredServerGroupMode  # noqa: F401
+from .transactions_get_multi import TransactionGetMultiReplicasFromPreferredServerGroupResult  # noqa: F401
+from .transactions_get_multi import TransactionGetMultiReplicasFromPreferredServerGroupSpec  # noqa: F401
+from .transactions_get_multi import TransactionGetMultiResult  # noqa: F401
+from .transactions_get_multi import TransactionGetMultiSpec  # noqa: F401

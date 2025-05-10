@@ -97,7 +97,9 @@ if TYPE_CHECKING:
     from couchbase.durability import DurabilityType, ServerDurability
     from couchbase.n1ql import QueryScanConsistency
     from couchbase.replica_reads import ReadPreference
-    from couchbase.transactions import TransactionKeyspace
+    from couchbase.transactions import (TransactionGetMultiMode,
+                                        TransactionGetMultiReplicasFromPreferredServerGroupMode,
+                                        TransactionKeyspace)
     from couchbase.transcoder import Transcoder
 
 
@@ -1984,7 +1986,25 @@ class TransactionGetOptions(dict):
         ...
 
     def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
 
+
+class TransactionGetMultiOptions(dict):
+    """Available options to for transaction get_multi operation.
+
+    Args:
+        mode (:class:`~.transactions.TransactionGetMultiMode`, optional): Specifies the mode
+            to use for this specific operation. Defaults to None.
+    """  # noqa: E501
+
+    @overload
+    def __init__(self,
+                 mode=None  # type: Optional[TransactionGetMultiMode]
+                 ):
+        ...
+
+    def __init__(self, **kwargs):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
 
@@ -2004,7 +2024,25 @@ class TransactionGetReplicaFromPreferredServerGroupOptions(dict):
         ...
 
     def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
 
+
+class TransactionGetMultiReplicasFromPreferredServerGroupOptions(dict):
+    """Available options to for transaction get_multi_replicas_from_preferred_server_group operation.
+
+    Args:
+        mode (:class:`~.transactions.TransactionGetMultiReplicasFromPreferredServerGroupMode`, optional): Specifies the mode
+            to use for this specific operation. Defaults to None.
+    """  # noqa: E501
+
+    @overload
+    def __init__(self,
+                 mode=None  # type: Optional[TransactionGetMultiReplicasFromPreferredServerGroupMode]
+                 ):
+        ...
+
+    def __init__(self, **kwargs):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
 
@@ -2024,7 +2062,6 @@ class TransactionInsertOptions(dict):
         ...
 
     def __init__(self, **kwargs):
-
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
 
@@ -2044,6 +2081,5 @@ class TransactionReplaceOptions(dict):
         ...
 
     def __init__(self, **kwargs):
-
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)

@@ -41,6 +41,8 @@ public:
     UNKNOWN,
     GET,
     GET_REPLICA_FROM_PREFERRED_SERVER_GROUP,
+    GET_MULTI,
+    GET_MULTI_REPLICAS_FROM_PREFERRED_SERVER_GROUP,
     REPLACE,
     INSERT,
     REMOVE,
@@ -75,6 +77,8 @@ public:
   {
     const char* ops = "GET "
                       "GET_REPLICA_FROM_PREFERRED_SERVER_GROUP "
+                      "GET_MULTI "
+                      "GET_MULTI_REPLICAS_FROM_PREFERRED_SERVER_GROUP "
                       "REPLACE "
                       "INSERT "
                       "REMOVE "
@@ -96,6 +100,7 @@ enum TxnExceptionType {
   QUERY_PARSING_FAILURE,
   DOCUMENT_EXISTS,
   DOCUMENT_NOT_FOUND,
+  DOCUMENT_UNRETRIEVABLE,
   COUCHBASE_ERROR
 };
 
@@ -145,6 +150,10 @@ struct transaction_get_result {
   PyObject_HEAD std::unique_ptr<tx_core::transaction_get_result> res;
 };
 
+struct transaction_get_multi_result {
+  PyObject_HEAD PyObject* content;
+};
+
 struct transaction_query_options {
   PyObject_HEAD tx::transaction_query_options* opts;
 };
@@ -165,6 +174,11 @@ transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result);
 static PyObject*
 transaction_get_result__get__(pycbc_txns::transaction_get_result* result, PyObject* args);
 
+static PyObject*
+transaction_get_multi_result__new__(PyTypeObject*, PyObject*, PyObject*);
+static void
+transaction_get_multi_result__dealloc__(pycbc_txns::transaction_get_multi_result* result);
+
 PyObject*
 add_transaction_objects(PyObject* module);
 
@@ -181,6 +195,8 @@ PyObject*
 create_new_attempt_context(PyObject*, PyObject*, PyObject*);
 PyObject*
 transaction_op(PyObject*, PyObject*, PyObject*);
+PyObject*
+transaction_get_multi_op(PyObject*, PyObject*, PyObject*);
 PyObject*
 transaction_query_op(PyObject*, PyObject*, PyObject*);
 PyObject*

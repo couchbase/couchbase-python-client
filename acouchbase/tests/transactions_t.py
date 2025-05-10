@@ -26,18 +26,28 @@ from couchbase.exceptions import (BucketNotFoundException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
                                   FeatureUnavailableException,
+                                  InvalidIndexException,
                                   ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed,
                                   TransactionOperationFailed)
 from couchbase.n1ql import QueryProfile, QueryScanConsistency
 from couchbase.options import (TransactionConfig,
+                               TransactionGetMultiOptions,
+                               TransactionGetMultiReplicasFromPreferredServerGroupOptions,
                                TransactionGetOptions,
                                TransactionInsertOptions,
                                TransactionOptions,
                                TransactionQueryOptions,
                                TransactionReplaceOptions)
-from couchbase.transactions import TransactionKeyspace, TransactionResult
+from couchbase.transactions import (TransactionGetMultiMode,
+                                    TransactionGetMultiReplicasFromPreferredServerGroupMode,
+                                    TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                    TransactionGetMultiReplicasFromPreferredServerGroupSpec,
+                                    TransactionGetMultiResult,
+                                    TransactionGetMultiSpec,
+                                    TransactionKeyspace,
+                                    TransactionResult)
 from couchbase.transcoder import RawBinaryTranscoder
 from tests.environments import CollectionType
 from tests.environments.test_environment import AsyncTestEnvironment
@@ -61,6 +71,16 @@ class TransactionTestSuite:
         'test_get_inner_exc_doc_not_found',
         'test_get_replica_from_preferred_server_group_unretrievable',
         'test_get_replica_from_preferred_server_group_propagate_unretrievable_exc',
+        'test_get_multi_binary',
+        'test_get_multi_not_exists',
+        'test_get_multi_invalid_index',
+        'test_get_multi_options',
+        'test_get_multi_simple',
+        'test_get_multi_replicas_from_preferred_server_group_binary',
+        'test_get_multi_replicas_from_preferred_server_group_not_exists',
+        'test_get_multi_replicas_from_preferred_server_group_invalid_index',
+        'test_get_multi_replicas_from_preferred_server_group_options',
+        'test_get_multi_replicas_from_preferred_server_group_simple',
         'test_insert',
         'test_insert_lambda_raises_doc_exists',
         'test_insert_inner_exc_doc_exists',
@@ -333,6 +353,268 @@ class TransactionTestSuite:
             pytest.fail(f"Expected to raise TransactionFailed, not {ex.__class__.__name__}")
 
         assert num_attempts == 1
+
+    @pytest.mark.asyncio
+    async def test_get_multi_binary(self, cb_env):
+        key1 = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value1 = 'bytes content'.encode('utf-8')
+        key2, value2 = cb_env.get_new_doc()
+
+        await cb_env.collection.insert(key1, value1, transcoder=tc)
+        await cb_env.collection.insert(key2, value2)
+
+        async def txn_logic(ctx):
+            specs = [
+                TransactionGetMultiSpec(cb_env.collection, key1, transcoder=tc),
+                TransactionGetMultiSpec(cb_env.collection, key2),
+            ]
+            res = await ctx.get_multi(specs)
+            assert isinstance(res, TransactionGetMultiResult)
+            assert res.content_as[bytes](0) == value1
+            assert res.content_as[dict](1) == value2
+
+        await cb_env.cluster.transactions.run(txn_logic)
+
+        for k in [key1, key2]:
+            try:
+                await cb_env.collection.remove(k)
+            except DocumentNotFoundException:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_not_exists(self, cb_env):
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        await cb_env.collection.insert(key1, value1)
+
+        async def txn_logic(ctx):
+            specs = (
+                TransactionGetMultiSpec(cb_env.collection, key1),
+                TransactionGetMultiSpec(cb_env.collection, key2)
+            )
+            res = await ctx.get_multi(specs)
+            assert isinstance(res, TransactionGetMultiResult)
+            assert res.exists(0) is True
+            assert res.exists(1) is False
+
+            with pytest.raises(DocumentNotFoundException):
+                res.content_as[dict](1)
+
+        await cb_env.cluster.transactions.run(txn_logic)
+        try:
+            await cb_env.collection.remove(key1)
+        except DocumentNotFoundException:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_invalid_index(self, cb_env):
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        await cb_env.collection.insert(key1, value1)
+
+        async def txn_logic(ctx):
+            specs = [
+                TransactionGetMultiSpec(cb_env.collection, key1),
+                TransactionGetMultiSpec(cb_env.collection, key2)
+            ]
+            res = await ctx.get_multi(specs)
+            assert isinstance(res, TransactionGetMultiResult)
+            assert res.exists(0) is True
+            assert res.exists(1) is False
+            with pytest.raises(InvalidIndexException):
+                res.content_as[dict](2)
+
+        await cb_env.cluster.transactions.run(txn_logic)
+        try:
+            await cb_env.collection.remove(key1)
+        except DocumentNotFoundException:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_options(self, cb_env):
+        key1, value1 = cb_env.get_new_doc()
+        key2, value2 = cb_env.get_new_doc()
+        await cb_env.collection.insert(key1, value1)
+        await cb_env.collection.insert(key2, value2)
+
+        async def txn_logic(ctx):
+            specs = (
+                TransactionGetMultiSpec(cb_env.collection, key1),
+                TransactionGetMultiSpec(cb_env.collection, key2)
+            )
+            opts = TransactionGetMultiOptions(mode=TransactionGetMultiMode.DISABLE_READ_SKEW_DETECTION)
+            res = await ctx.get_multi(specs, opts)
+            assert isinstance(res, TransactionGetMultiResult)
+            assert res.content_as[dict](0) == value1
+            assert res.content_as[dict](1) == value2
+
+        await cb_env.cluster.transactions.run(txn_logic)
+
+        for k in [key1, key2]:
+            try:
+                await cb_env.collection.remove(k)
+            except DocumentNotFoundException:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_simple(self, cb_env):
+        keys_and_docs = []
+        for _ in range(3):
+            key, value = cb_env.get_new_doc()
+            keys_and_docs.append((key, value))
+            await cb_env.collection.insert(key, value)
+
+        async def txn_logic(ctx):
+            specs = (
+                TransactionGetMultiSpec(cb_env.collection, keys_and_docs[0][0]),
+                TransactionGetMultiSpec(cb_env.collection, keys_and_docs[1][0]),
+                TransactionGetMultiSpec(cb_env.collection, keys_and_docs[2][0])
+            )
+            res = await ctx.get_multi(specs)
+            assert isinstance(res, TransactionGetMultiResult)
+            for idx in range(len(keys_and_docs)):
+                assert res.exists(idx) is True
+                assert res.content_as[dict](idx) == keys_and_docs[idx][1]
+
+        await cb_env.cluster.transactions.run(txn_logic)
+
+        for kd in keys_and_docs:
+            try:
+                await cb_env.collection.remove(kd[0])
+            except DocumentNotFoundException:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_replicas_from_preferred_server_group_binary(self, cb_env):
+        key1 = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value1 = 'bytes content'.encode('utf-8')
+        key2, value2 = cb_env.get_new_doc()
+
+        await cb_env.collection.insert(key1, value1, transcoder=tc)
+        await cb_env.collection.insert(key2, value2)
+
+        async def txn_logic(ctx):
+            specs = [
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1, transcoder=tc),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2),
+            ]
+            res = await ctx.get_multi_replicas_from_preferred_server_group(specs)
+            assert isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult)
+            assert res.content_as[bytes](0) == value1
+            assert res.content_as[dict](1) == value2
+
+        await cb_env.cluster.transactions.run(txn_logic)
+
+        for k in [key1, key2]:
+            try:
+                await cb_env.collection.remove(k)
+            except DocumentNotFoundException:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_replicas_from_preferred_server_group_not_exists(self, cb_env):
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        await cb_env.collection.insert(key1, value1)
+
+        async def txn_logic(ctx):
+            specs = (
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2)
+            )
+            res = await ctx.get_multi_replicas_from_preferred_server_group(specs)
+            assert isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult)
+            assert res.exists(0) is True
+            assert res.exists(1) is False
+
+            with pytest.raises(DocumentNotFoundException):
+                res.content_as[dict](1)
+
+        await cb_env.cluster.transactions.run(txn_logic)
+        try:
+            await cb_env.collection.remove(key1)
+        except DocumentNotFoundException:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_replicas_from_preferred_server_group_invalid_index(self, cb_env):
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        await cb_env.collection.insert(key1, value1)
+
+        async def txn_logic(ctx):
+            specs = [
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2)
+            ]
+            res = await ctx.get_multi_replicas_from_preferred_server_group(specs)
+            assert isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult)
+            assert res.exists(0) is True
+            assert res.exists(1) is False
+            with pytest.raises(InvalidIndexException):
+                res.content_as[dict](2)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        try:
+            await cb_env.collection.remove(key1)
+        except DocumentNotFoundException:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_replicas_from_preferred_server_group_options(self, cb_env):
+        key1, value1 = cb_env.get_new_doc()
+        key2, value2 = cb_env.get_new_doc()
+        await cb_env.collection.insert(key1, value1)
+        await cb_env.collection.insert(key2, value2)
+
+        async def txn_logic(ctx):
+            specs = (
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2)
+            )
+            opts = TransactionGetMultiReplicasFromPreferredServerGroupOptions(mode=TransactionGetMultiReplicasFromPreferredServerGroupMode.DISABLE_READ_SKEW_DETECTION)  # noqa: E501
+            res = await ctx.get_multi_replicas_from_preferred_server_group(specs, opts)
+            assert isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult)
+            assert res.content_as[dict](0) == value1
+            assert res.content_as[dict](1) == value2
+
+        await cb_env.cluster.transactions.run(txn_logic)
+
+        for k in [key1, key2]:
+            try:
+                await cb_env.collection.remove(k)
+            except DocumentNotFoundException:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_get_multi_replicas_from_preferred_server_group_simple(self, cb_env):
+        keys_and_docs = []
+        for _ in range(3):
+            key, value = cb_env.get_new_doc()
+            keys_and_docs.append((key, value))
+            await cb_env.collection.insert(key, value)
+
+        async def txn_logic(ctx):
+            specs = (
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, keys_and_docs[0][0]),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, keys_and_docs[1][0]),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, keys_and_docs[2][0])
+            )
+            res = await ctx.get_multi_replicas_from_preferred_server_group(specs)
+            assert isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult)
+            for idx in range(len(keys_and_docs)):
+                assert res.exists(idx) is True
+                assert res.content_as[dict](idx) == keys_and_docs[idx][1]
+
+        await cb_env.cluster.transactions.run(txn_logic)
+
+        for kd in keys_and_docs:
+            try:
+                await cb_env.collection.remove(kd[0])
+            except DocumentNotFoundException:
+                pass
 
     @pytest.mark.asyncio
     async def test_insert(self, cb_env):
