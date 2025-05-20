@@ -132,6 +132,12 @@ class TransactionTestSuite:
                                                            cb_env.mock_server_type,
                                                            cb_env.server_version_patch)
 
+    @pytest.fixture(scope="class")
+    def check_replica_read_supported(self, cb_env):
+        EnvironmentFeatures.check_if_feature_supported('subdoc_replica_read',
+                                                       cb_env.server_version_short,
+                                                       cb_env.mock_server_type)
+
     @pytest.fixture(scope='class')
     def check_server_groups_supported(self, cb_env):
         EnvironmentFeatures.check_if_feature_supported('server_groups',
@@ -343,6 +349,7 @@ class TransactionTestSuite:
 
         assert num_attempts == 1
 
+    @pytest.mark.usefixtures('check_binary_txns_supported')
     def test_get_multi_binary(self, cb_env):
         key1 = cb_env.get_new_doc(key_only=True)
         tc = RawBinaryTranscoder()
@@ -469,6 +476,9 @@ class TransactionTestSuite:
             except DocumentNotFoundException:
                 pass
 
+    @pytest.mark.usefixtures('check_binary_txns_supported')
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
     def test_get_multi_replicas_from_preferred_server_group_binary(self, cb_env):
         key1 = cb_env.get_new_doc(key_only=True)
         tc = RawBinaryTranscoder()
@@ -496,6 +506,8 @@ class TransactionTestSuite:
             except DocumentNotFoundException:
                 pass
 
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
     def test_get_multi_replicas_from_preferred_server_group_not_exists(self, cb_env):
         key1, value1 = cb_env.get_new_doc()
         key2 = cb_env.get_new_doc(key_only=True)
@@ -520,6 +532,8 @@ class TransactionTestSuite:
         except DocumentNotFoundException:
             pass
 
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
     def test_get_multi_replicas_from_preferred_server_group_invalid_index(self, cb_env):
         key1, value1 = cb_env.get_new_doc()
         key2 = cb_env.get_new_doc(key_only=True)
@@ -543,6 +557,8 @@ class TransactionTestSuite:
         except DocumentNotFoundException:
             pass
 
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
     def test_get_multi_replicas_from_preferred_server_group_options(self, cb_env):
         key1, value1 = cb_env.get_new_doc()
         key2, value2 = cb_env.get_new_doc()
@@ -568,6 +584,8 @@ class TransactionTestSuite:
             except DocumentNotFoundException:
                 pass
 
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
     def test_get_multi_replicas_from_preferred_server_group_simple(self, cb_env):
         keys_and_docs = []
         for _ in range(3):
