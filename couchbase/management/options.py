@@ -531,9 +531,9 @@ class GetAllQueryIndexOptions(dict):
         All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        collection_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the collection of the indexes.
-        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        scope_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the scope of the indexes.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
@@ -559,7 +559,7 @@ class CreateQueryIndexOptions(dict):
         All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        collection_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the collection of the index.
         condition (str, optional): Specifies the 'where' condition for partial index creation.
         deferred (bool, optional): Specifies whether this index creation should be deferred until
@@ -567,7 +567,7 @@ class CreateQueryIndexOptions(dict):
         ignore_if_exists (bool, optional): Whether or not the call should ignore the
             index already existing when determining whether the call was successful.
         num_replicas (int, optional): The number of replicas of this index that should be created.
-        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        scope_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
@@ -599,7 +599,7 @@ class CreatePrimaryQueryIndexOptions(dict):
         All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        collection_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the collection of the index.
         condition (str, optional): Specifies the 'where' condition for partial index creation.
         deferred (bool, optional): Specifies whether this index creation should be deferred until
@@ -608,7 +608,7 @@ class CreatePrimaryQueryIndexOptions(dict):
             index already existing when determining whether the call was successful.
         index_name (str, optional): Specifies the name of the primary index.
         num_replicas (int, optional): The number of replicas of this index that should be created.
-        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        scope_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
@@ -641,11 +641,11 @@ class DropQueryIndexOptions(dict):
         All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        collection_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the collection of the index.
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the
             index not existing when determining whether the call was successful.
-        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        scope_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
@@ -672,12 +672,12 @@ class DropPrimaryQueryIndexOptions(dict):
         All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional): ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        collection_name (str, optional): **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the collection of the index.
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the
             index not existing when determining whether the call was successful.
         index_name (str, optional): Specifies the name of the primary index.
-        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        scope_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
@@ -705,9 +705,9 @@ class WatchQueryIndexOptions(dict):
         All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        collection_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the collection of the index.
-        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        scope_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
@@ -736,9 +736,9 @@ class BuildDeferredQueryIndexOptions(dict):
         All management options should be imported from `couchbase.management.options`.
 
     Args:
-        collection_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        collection_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the collection of the index.
-        scope_name (str, optional):  ** DEPRECATED ** - use `~couchbase.management.queries.CollectionQueryIndexManager`.
+        scope_name (str, optional):  **DEPRECATED** - use :class:`~couchbase.management.queries.CollectionQueryIndexManager`.
             Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.

@@ -38,6 +38,12 @@ from couchbase.options import forward_args
 
 
 class QueryIndexManager(QueryIndexManagerLogic):
+    """
+    Performs management operations on query indexes.
+
+    For managing query indexes at the collection level, :class:`.CollectionQueryIndexManager` should be used.
+    """
+
     def __init__(self, connection):
         super().__init__(connection)
 
@@ -45,7 +51,7 @@ class QueryIndexManager(QueryIndexManagerLogic):
     def create_index(self,
                      bucket_name,   # type: str
                      index_name,    # type: str
-                     keys,        # type: Iterable[str]
+                     keys,          # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
                      **kwargs       # type: Dict[str, Any]
                      ) -> None:
@@ -288,6 +294,10 @@ class QueryIndexManager(QueryIndexManagerLogic):
 
 
 class CollectionQueryIndexManager(QueryIndexManagerLogic):
+    """
+    Performs management operations on query indexes at the collection level.
+    """
+
     def __init__(self, connection, bucket_name, scope_name, collection_name):
         self._bucket_name = bucket_name
         self._scope_name = scope_name

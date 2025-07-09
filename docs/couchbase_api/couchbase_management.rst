@@ -100,6 +100,16 @@ Query Index Management
 
 .. module:: couchbase.management.queries
 
+.. autoclass:: CollectionQueryIndexManager
+
+    .. automethod:: build_deferred_indexes
+    .. automethod:: create_index
+    .. automethod:: create_primary_index
+    .. automethod:: drop_index
+    .. automethod:: drop_primary_index
+    .. automethod:: get_all_indexes
+    .. automethod:: watch_indexes
+
 .. autoclass:: QueryIndexManager
 
     .. automethod:: build_deferred_indexes
