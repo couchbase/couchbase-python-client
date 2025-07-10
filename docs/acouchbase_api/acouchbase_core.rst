@@ -73,7 +73,10 @@ Scope
     .. autoproperty:: bucket_name
     .. automethod:: query
     .. automethod:: search_query
+    .. automethod:: search
     .. automethod:: analytics_query
+    .. automethod:: search_indexes
+    .. automethod:: eventing_functions
 
 Collection
 ==============
@@ -103,3 +106,4 @@ Collection
     .. automethod:: couchbase_map
     .. automethod:: couchbase_set
     .. automethod:: couchbase_queue
+    .. automethod:: query_indexes

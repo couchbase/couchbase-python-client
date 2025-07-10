@@ -38,6 +38,10 @@ from couchbase.management.options import (AllowQueryingSearchIndexOptions,
 
 
 class SearchIndexManager(SearchIndexManagerLogic):
+    """
+    Allows to manage search indexes in a Couchbase cluster.
+    """
+
     def __init__(self,
                  connection
                  ):
@@ -49,6 +53,17 @@ class SearchIndexManager(SearchIndexManagerLogic):
                      *options,  # type: UpsertSearchIndexOptions
                      **kwargs   # type: Dict[str, Any]
                      ) -> None:
+        """Creates or updates an index.
+
+        Args:
+            index (:class:`.SearchIndex`): The index definition.
+            options (:class:`~couchbase.management.options.UpsertSearchIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index definition is invalid.
+        """
 
         return super().upsert_index(index, *options, **kwargs)
 
@@ -58,6 +73,17 @@ class SearchIndexManager(SearchIndexManagerLogic):
                    *options,   # type: DropSearchIndexOptions
                    **kwargs    # type: Dict[str, Any]
                    ) -> None:
+        """Drops an index.
+
+        Args:
+            index_name (str): The name of the index.
+            options (:class:`~couchbase.management.options.DropSearchIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
 
         return super().drop_index(index_name, *options, **kwargs)
 
@@ -67,6 +93,20 @@ class SearchIndexManager(SearchIndexManagerLogic):
                   *options,   # type: GetSearchIndexOptions
                   **kwargs    # type: Dict[str, Any]
                   ) -> SearchIndex:
+        """Fetches an index from the server if it exists.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.GetSearchIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            :class:`.SearchIndex`: The index definition if it exists.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
 
         return super().get_index(index_name, *options, **kwargs)
 
@@ -75,6 +115,17 @@ class SearchIndexManager(SearchIndexManagerLogic):
                         *options,  # type: GetAllSearchIndexesOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Iterable[SearchIndex]:
+        """Fetches all indexes from the server.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllSearchIndexesOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Iterable[:class:`.SearchIndex`]: A list of all indexes.
+        """
+
         return super().get_all_indexes(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(int, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -83,6 +134,21 @@ class SearchIndexManager(SearchIndexManagerLogic):
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
                                     **kwargs    # type: Dict[str, Any]
                                     ) -> int:
+        """Retrieves the number of documents that have been indexed for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.GetSearchIndexedDocumentsCountOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            int: The number of documents indexed for the specified index.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().get_indexed_documents_count(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -91,6 +157,18 @@ class SearchIndexManager(SearchIndexManagerLogic):
                      *options,  # type: PauseIngestSearchIndexOptions
                      **kwargs  # type: Dict[str, Any]
                      ) -> None:
+        """Pauses updates and maintenance for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.PauseIngestSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().pause_ingest(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -99,6 +177,18 @@ class SearchIndexManager(SearchIndexManagerLogic):
                       *options,  # type: ResumeIngestSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> None:
+        """Resumes updates and maintenance for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.ResumeIngestSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().resume_ingest(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -107,6 +197,18 @@ class SearchIndexManager(SearchIndexManagerLogic):
                        *options,  # type: AllowQueryingSearchIndexOptions
                        **kwargs  # type: Dict[str, Any]
                        ) -> None:
+        """Allows querying against an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.AllowQueryingSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().allow_querying(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -115,6 +217,18 @@ class SearchIndexManager(SearchIndexManagerLogic):
                           *options,  # type: DisallowQueryingSearchIndexOptions
                           **kwargs  # type: Dict[str, Any]
                           ) -> None:
+        """Disallows querying against an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.DisallowQueryingSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().disallow_querying(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -123,6 +237,18 @@ class SearchIndexManager(SearchIndexManagerLogic):
                     *options,  # type: FreezePlanSearchIndexOptions
                     **kwargs  # type: Dict[str, Any]
                     ) -> None:
+        """Freezes the assignment of index partitions to nodes for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.FreezePlanSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().freeze_plan(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -131,6 +257,18 @@ class SearchIndexManager(SearchIndexManagerLogic):
                       *options,  # type: UnfreezePlanSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> None:
+        """Unfreezes the assignment of index partitions to nodes for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.UnfreezePlanSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().unfreeze_plan(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -140,6 +278,22 @@ class SearchIndexManager(SearchIndexManagerLogic):
                          *options,  # type: AnalyzeDocumentSearchIndexOptions
                          **kwargs  # type: Dict[str, Any]
                          ) -> Dict[str, Any]:
+        """Allows to see how a document is analyzed against a specific index.
+
+        Args:
+            index_name (str): The name of the search index.
+            document (Any): The document to analyze.
+            options (:class:`~couchbase.management.options.AnalyzeDocumentSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Dict[str, Any]: The analyzed sections for the document.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().analyze_document(index_name, document, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -148,6 +302,25 @@ class SearchIndexManager(SearchIndexManagerLogic):
                         *options,  # type: GetSearchIndexStatsOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Dict[str, Any]:
+        """Retrieves metrics, timings and counters for a given index.
+
+        **UNCOMMITTED**
+        This is an uncommitted API call that is unlikely to change, but may still change as
+        final consensus on its behavior has not yet been reached.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.GetSearchIndexStatsOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Dict[str, Any]: The stats for the index.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().get_index_stats(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -155,10 +328,29 @@ class SearchIndexManager(SearchIndexManagerLogic):
                             *options,  # type: GetAllSearchIndexStatsOptions
                             **kwargs  # type: Dict[str, Any]
                             ) -> Dict[str, Any]:
+        """Retrieves statistics on search service. Information is provided on documents, partition indexes, mutations,
+        compactions, queries, and more.
+
+        **UNCOMMITTED**
+        This is an uncommitted API call that is unlikely to change, but may still change as
+        final consensus on its behavior has not yet been reached.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllSearchIndexStatsOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Dict[str, Any]: The stats report.
+        """
+
         return super().get_all_index_stats(*options, **kwargs)
 
 
 class ScopeSearchIndexManager(SearchIndexManagerLogic):
+    """
+    Allows to manage scope-level search indexes in a Couchbase cluster.
+    """
 
     def __init__(self,
                  connection,
@@ -173,6 +365,17 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                      *options,  # type: UpsertSearchIndexOptions
                      **kwargs   # type: Dict[str, Any]
                      ) -> None:
+        """Creates or updates an index.
+
+        Args:
+            index (:class:`.SearchIndex`): The index definition.
+            options (:class:`~couchbase.management.options.UpsertSearchIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index definition is invalid.
+        """
 
         return super().upsert_index(index, *options, **kwargs)
 
@@ -182,6 +385,17 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                    *options,   # type: DropSearchIndexOptions
                    **kwargs    # type: Dict[str, Any]
                    ) -> None:
+        """Drops an index.
+
+        Args:
+            index_name (str): The name of the index.
+            options (:class:`~couchbase.management.options.DropSearchIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
 
         return super().drop_index(index_name, *options, **kwargs)
 
@@ -191,6 +405,20 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                   *options,   # type: GetSearchIndexOptions
                   **kwargs    # type: Dict[str, Any]
                   ) -> SearchIndex:
+        """Fetches an index from the server if it exists.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.GetSearchIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            :class:`.SearchIndex`: The index definition if it exists.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
 
         return super().get_index(index_name, *options, **kwargs)
 
@@ -199,6 +427,17 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                         *options,  # type: GetAllSearchIndexesOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Iterable[SearchIndex]:
+        """Fetches all indexes from the server.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllSearchIndexesOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Iterable[:class:`.SearchIndex`]: A list of all indexes.
+        """
+
         return super().get_all_indexes(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(int, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -207,6 +446,21 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
                                     **kwargs    # type: Dict[str, Any]
                                     ) -> int:
+        """Retrieves the number of documents that have been indexed for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.GetSearchIndexedDocumentsCountOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            int: The number of documents indexed for the specified index.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().get_indexed_documents_count(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -215,6 +469,18 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                      *options,  # type: PauseIngestSearchIndexOptions
                      **kwargs  # type: Dict[str, Any]
                      ) -> None:
+        """Pauses updates and maintenance for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.PauseIngestSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().pause_ingest(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -223,6 +489,18 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                       *options,  # type: ResumeIngestSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> None:
+        """Resumes updates and maintenance for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.ResumeIngestSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().resume_ingest(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -231,6 +509,18 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                        *options,  # type: AllowQueryingSearchIndexOptions
                        **kwargs  # type: Dict[str, Any]
                        ) -> None:
+        """Allows querying against an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.AllowQueryingSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().allow_querying(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -239,6 +529,18 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                           *options,  # type: DisallowQueryingSearchIndexOptions
                           **kwargs  # type: Dict[str, Any]
                           ) -> None:
+        """Disallows querying against an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.DisallowQueryingSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().disallow_querying(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -247,6 +549,18 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                     *options,  # type: FreezePlanSearchIndexOptions
                     **kwargs  # type: Dict[str, Any]
                     ) -> None:
+        """Freezes the assignment of index partitions to nodes for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.FreezePlanSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().freeze_plan(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -255,6 +569,18 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                       *options,  # type: UnfreezePlanSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> None:
+        """Unfreezes the assignment of index partitions to nodes for an index.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.UnfreezePlanSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().unfreeze_plan(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -264,6 +590,22 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                          *options,  # type: AnalyzeDocumentSearchIndexOptions
                          **kwargs  # type: Dict[str, Any]
                          ) -> Dict[str, Any]:
+        """Allows to see how a document is analyzed against a specific index.
+
+        Args:
+            index_name (str): The name of the search index.
+            document (Any): The document to analyze.
+            options (:class:`~couchbase.management.options.AnalyzeDocumentSearchIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Dict[str, Any]: The analyzed sections for the document.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().analyze_document(index_name, document, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -272,6 +614,26 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                         *options,  # type: GetSearchIndexStatsOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Dict[str, Any]:
+        """Retrieves metrics, timings and counters for a given index.
+
+        .. note::
+            **UNCOMMITTED:**
+            This is an uncommitted API call that is unlikely to change, but may still change as
+            final consensus on its behavior has not yet been reached.
+
+        Args:
+            index_name (str): The name of the search index.
+            options (:class:`~couchbase.management.options.GetSearchIndexStatsOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Dict[str, Any]: The stats for the index.
+
+        Raises:
+            :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
+        """
+
         return super().get_index_stats(index_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
@@ -279,4 +641,21 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
                             *options,  # type: GetAllSearchIndexStatsOptions
                             **kwargs  # type: Dict[str, Any]
                             ) -> Dict[str, Any]:
+        """Retrieves statistics on search service. Information is provided on documents, partition indexes, mutations,
+        compactions, queries, and more.
+
+        .. note::
+            **UNCOMMITTED:**
+            This is an uncommitted API call that is unlikely to change, but may still change as
+            final consensus on its behavior has not yet been reached.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllSearchIndexStatsOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Dict[str, Any]: The stats report.
+        """
+
         return super().get_all_index_stats(*options, **kwargs)

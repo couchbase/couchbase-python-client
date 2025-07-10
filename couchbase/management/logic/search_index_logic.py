@@ -678,6 +678,22 @@ class SearchIndexManagerLogic:
 
 @dataclass
 class SearchIndex:
+    """Object representation for a Couchbase search index.
+
+    Args:
+        name (str): Name of the index.
+        source_type (str, optional): Type of the data source.
+        idx_type (str, optional): Type of the index.
+        source_name (str): Name of the source of the data for the index (e.g. bucket name).
+        uuid (str, optional): UUID of the index. It must be specified for an update.
+        params (dict, optional): Index properties such as store type and mappings
+        source_uuid (str, optional): The UUID of the data source, this can be used to more tightly tie the index to a
+            source.
+        source_params (dict, optional): Extra parameters for the source. These can include advanced connection settings
+            and tuning.
+        plan_params (dict, optional): Plan properties such as number of replicas and number of partitions.
+    """
+
     name: str
     source_type: str = 'couchbase'
     idx_type: str = 'fulltext-index'
@@ -744,7 +760,7 @@ class SearchIndex:
     def from_json(cls,
                   json_input  # type: Union[str, Dict[str, Any]]
                   ) -> SearchIndex:
-        """ Creates a `.SearchIndex` from a provided JSON str or Python dict derived from JSON.
+        """ Creates a :class:`.SearchIndex` from a provided JSON str or Python dict derived from JSON.
 
         Args:
             json_input (Union[str, Dict[str, Any]]): JSON representation of the search index.

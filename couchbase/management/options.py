@@ -1033,9 +1033,20 @@ class GetLinksAnalyticsOptions(dict):
 
 
 class UpsertSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.upsert_index` or a
+    :meth:`.SearchIndexManager.upsert_index` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1045,9 +1056,20 @@ class UpsertSearchIndexOptions(dict):
 
 
 class DropSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.drop_index` or a
+    :meth:`.SearchIndexManager.drop_index` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1057,9 +1079,20 @@ class DropSearchIndexOptions(dict):
 
 
 class GetSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.get_index` or a
+    :meth:`.SearchIndexManager.get_index` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1069,9 +1102,20 @@ class GetSearchIndexOptions(dict):
 
 
 class GetAllSearchIndexesOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.get_all_indexes` or a
+    :meth:`.SearchIndexManager.get_all_indexes` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1081,9 +1125,20 @@ class GetAllSearchIndexesOptions(dict):
 
 
 class GetSearchIndexedDocumentsCountOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.get_indexed_documents_count` or a
+    :meth:`.SearchIndexManager.get_indexed_documents_count` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1093,9 +1148,20 @@ class GetSearchIndexedDocumentsCountOptions(dict):
 
 
 class PauseIngestSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.pause_ingest` or a
+    :meth:`.SearchIndexManager.pause_ingest` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1105,9 +1171,20 @@ class PauseIngestSearchIndexOptions(dict):
 
 
 class ResumeIngestSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.resume_ingest` or a
+    :meth:`.SearchIndexManager.resume_ingest` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1117,9 +1194,20 @@ class ResumeIngestSearchIndexOptions(dict):
 
 
 class AllowQueryingSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.allow_querying` or a
+    :meth:`.SearchIndexManager.allow_querying` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1129,9 +1217,20 @@ class AllowQueryingSearchIndexOptions(dict):
 
 
 class DisallowQueryingSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.disallow_querying` or a
+    :meth:`.SearchIndexManager.disallow_querying` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1141,9 +1240,20 @@ class DisallowQueryingSearchIndexOptions(dict):
 
 
 class FreezePlanSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.freeze_plan` or a
+    :meth:`.SearchIndexManager.freeze_plan` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1153,9 +1263,20 @@ class FreezePlanSearchIndexOptions(dict):
 
 
 class UnfreezePlanSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.unfreeze_plan` or a
+    :meth:`.SearchIndexManager.unfreeze_plan` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1165,9 +1286,20 @@ class UnfreezePlanSearchIndexOptions(dict):
 
 
 class AnalyzeDocumentSearchIndexOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.analyze_document` or a
+    :meth:`.SearchIndexManager.analyze_document` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1177,9 +1309,20 @@ class AnalyzeDocumentSearchIndexOptions(dict):
 
 
 class GetSearchIndexStatsOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.get_index_stats` or a
+    :meth:`.SearchIndexManager.get_index_stats` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 
@@ -1189,9 +1332,20 @@ class GetSearchIndexStatsOptions(dict):
 
 
 class GetAllSearchIndexStatsOptions(dict):
+    """Available options for a :meth:`.ScopeSearchIndexManager.get_all_index_stats` or a
+    :meth:`.SearchIndexManager.get_all_index_stats` operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     @overload
     def __init__(self,
-                 timeout=None           # type: Optional[timedelta]
+                 timeout=None  # type: Optional[timedelta]
                  ):
         pass
 

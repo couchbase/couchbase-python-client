@@ -66,6 +66,7 @@ Scope
     .. automethod:: search
     .. automethod:: analytics_query
     .. automethod:: search_indexes
+    .. automethod:: eventing_functions
 
 Collection
 ==============
@@ -124,3 +125,4 @@ Collection
     .. automethod:: touch_multi
     .. automethod:: unlock_multi
     .. automethod:: upsert_multi
+    .. automethod:: query_indexes

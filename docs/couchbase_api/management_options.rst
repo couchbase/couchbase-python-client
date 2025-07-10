@@ -133,3 +133,62 @@ UpsertGroupOptions
 UpsertUserOptions
 ++++++++++++++++++++++++
 .. autoclass:: UpsertUserOptions
+
+Search Index Management
+========================
+
+UpsertSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: UpsertSearchIndexOptions
+
+DropSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: DropSearchIndexOptions
+
+GetSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: GetSearchIndexOptions
+
+GetAllSearchIndexesOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: GetAllSearchIndexesOptions
+
+GetSearchIndexedDocumentsCountOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: GetSearchIndexedDocumentsCountOptions
+
+PauseIngestSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: PauseIngestSearchIndexOptions
+
+ResumeIngestSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: ResumeIngestSearchIndexOptions
+
+AllowQueryingSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: AllowQueryingSearchIndexOptions
+
+DisallowQueryingSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: DisallowQueryingSearchIndexOptions
+
+FreezePlanSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: FreezePlanSearchIndexOptions
+
+UnfreezePlanSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: UnfreezePlanSearchIndexOptions
+
+AnalyzeDocumentSearchIndexOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: AnalyzeDocumentSearchIndexOptions
+
+GetSearchIndexStatsOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: GetSearchIndexStatsOptions
+
+GetAllSearchIndexStatsOptions
++++++++++++++++++++++++++++++++++++++
+.. autoclass:: GetAllSearchIndexStatsOptions

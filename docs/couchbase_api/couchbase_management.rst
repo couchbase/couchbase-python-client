@@ -136,3 +136,46 @@ User Management
     .. automethod:: get_user
     .. automethod:: upsert_group
     .. automethod:: upsert_user
+
+Search Index Management
+=================================
+
+.. module:: couchbase.management.search
+
+.. autoclass:: ScopeSearchIndexManager
+
+    .. automethod:: upsert_index
+    .. automethod:: drop_index
+    .. automethod:: get_index
+    .. automethod:: get_all_indexes
+    .. automethod:: get_indexed_documents_count
+    .. automethod:: pause_ingest
+    .. automethod:: resume_ingest
+    .. automethod:: allow_querying
+    .. automethod:: disallow_querying
+    .. automethod:: freeze_plan
+    .. automethod:: unfreeze_plan
+    .. automethod:: analyze_document
+    .. automethod:: get_index_stats
+    .. automethod:: get_all_index_stats
+
+.. autoclass:: SearchIndexManager
+
+    .. automethod:: upsert_index
+    .. automethod:: drop_index
+    .. automethod:: get_index
+    .. automethod:: get_all_indexes
+    .. automethod:: get_indexed_documents_count
+    .. automethod:: pause_ingest
+    .. automethod:: resume_ingest
+    .. automethod:: allow_querying
+    .. automethod:: disallow_querying
+    .. automethod:: freeze_plan
+    .. automethod:: unfreeze_plan
+    .. automethod:: analyze_document
+    .. automethod:: get_index_stats
+    .. automethod:: get_all_index_stats
+
+.. autoclass:: SearchIndex
+
+    .. automethod:: from_json
