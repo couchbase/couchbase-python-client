@@ -250,7 +250,7 @@ class SearchParamTestSuite:
         assert encoded_q['query'] == disjuncts
 
         with pytest.raises(InvalidArgumentException):
-            q.min = 0
+            q.min = -1
 
         q.min = 2
         search_query = search.SearchQueryBuilder.create_search_query_object(

@@ -862,11 +862,11 @@ class DisjunctionQuery(SearchQuery):
         return self._json_.get('min', None)
 
     @min.setter
-    def min(self, value  # type: bool
+    def min(self, value  # type: int
             ) -> None:
         value = int(value)
-        if not value:
-            raise InvalidArgumentException(message='Must be > 0')
+        if value < 0:
+            raise InvalidArgumentException(message='Must be >= 0')
         self.set_prop('min', value)
 
     @property
