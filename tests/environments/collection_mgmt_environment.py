@@ -52,6 +52,23 @@ class CollectionManagementTestEnvironment(TestEnvironment):
         available_ids = self._used_scope_ids.difference(self._dropped_scope_ids)
         return list(available_ids)
 
+    def drop_bucket(self):
+        available_ids = self._used_bucket_ids.difference(self._dropped_bucket_ids)
+        bucket_name = available_ids.pop()
+        self._dropped_bucket_ids.add(bucket_name)
+        try:
+            self.bm.drop_bucket(bucket_name)
+        except BucketDoesNotExistException:
+            pass
+        self.consistency.wait_until_bucket_dropped(bucket_name)
+
+    def get_bucket_name(self):
+        all_ids = set(self._bucket_ids)
+        available_ids = all_ids.difference(self._used_bucket_ids)
+        bucket_id = random.choice(list(available_ids))
+        self._used_bucket_ids.add(bucket_id)
+        return bucket_id
+
     def setup(self):
         TestEnvironment.try_n_times(3, 5, self.setup_collection_mgmt, self.TEST_BUCKET)
         self._batch_id = str(uuid.uuid4())[:8]
@@ -61,6 +78,9 @@ class CollectionManagementTestEnvironment(TestEnvironment):
         self._used_collection_ids = set()
         self._dropped_collection_ids = set()
         self._collection_ids = [f'{self._batch_id}_collection_{i}' for i in range(50)]
+        self._bucket_ids = [f'{self._batch_id}_bucket_{i}' for i in range(10)]
+        self._used_bucket_ids = set()
+        self._dropped_bucket_ids = set()
 
     def teardown(self):
         for c in self._used_collection_ids:

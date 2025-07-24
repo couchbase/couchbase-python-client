@@ -209,6 +209,7 @@ class BucketManagementTestSuite:
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.COUCHSTORE,  # Views only supported on CouchStore
                 ram_quota_mb=100,
                 replica_index=False))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
@@ -223,6 +224,7 @@ class BucketManagementTestSuite:
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.COUCHSTORE,  # Views only supported on CouchStore
                 ram_quota_mb=100,
                 replica_index=True))
         cb_env.consistency.wait_until_bucket_present(bucket_name)

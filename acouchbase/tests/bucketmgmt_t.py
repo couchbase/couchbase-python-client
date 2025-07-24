@@ -117,6 +117,7 @@ class BucketManagementTests:
             CreateBucketSettings(
                 name=test_bucket,
                 bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.COUCHSTORE,
                 ram_quota_mb=100,
                 replica_index=True))
         bucket = await cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
@@ -130,6 +131,7 @@ class BucketManagementTests:
             CreateBucketSettings(
                 name=test_bucket,
                 bucket_type=BucketType.COUCHBASE,
+                storage_backend=StorageBackend.COUCHSTORE,
                 ram_quota_mb=100,
                 replica_index=False))
         bucket = await cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
