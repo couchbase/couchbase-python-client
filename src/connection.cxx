@@ -878,6 +878,12 @@ update_cluster_options(couchbase::core::cluster_options& options,
       std::chrono::milliseconds(std::max(0ULL, app_telemetry_ping_timeout / 1000ULL));
     options.app_telemetry_ping_timeout = app_telemetry_ping_timeout_ms;
   }
+
+  PyObject* pyObj_allow_enterprise_analytics =
+    PyDict_GetItemString(pyObj_options, "allow_enterprise_analytics");
+  if (pyObj_allow_enterprise_analytics != nullptr && pyObj_allow_enterprise_analytics == Py_True) {
+    options.allow_enterprise_analytics = true;
+  }
 }
 
 PyObject*
