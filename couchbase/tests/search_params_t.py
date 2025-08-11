@@ -43,9 +43,12 @@ class SearchParamTestSuite:
         'test_disjunction_query',
         'test_docid_query',
         'test_facets',
+        'test_geo_bounding_box_query',
+        'test_geo_distance_query',
+        'test_geo_polygon_query',
         'test_match_all_query',
         'test_match_none_query',
-        'test_match_phrase',
+        'test_match_phrase_query',
         'test_match_query',
         'test_numrange_query',
         'test_params_base',
@@ -68,10 +71,10 @@ class SearchParamTestSuite:
         'test_params_timeout',
         'test_phrase_query',
         'test_prefix_query',
+        'test_query_string_query',
         'test_raw_query',
         'test_regexp_query',
-        'test_string_query',
-        'test_term_search',
+        'test_term_query',
         'test_termrange_query',
         'test_wildcard_query',
     ]
@@ -101,6 +104,10 @@ class SearchParamTestSuite:
         assert encoded_q['query']['must_not'] == disjuncts
         assert encoded_q['query']['should'] == disjuncts
 
+        bool_q_repr = str(bool_q)
+        expected_repr = f'{search.BooleanQuery.__name__}(query={encoded_q["query"]})'
+        assert bool_q_repr == expected_repr
+
         # Test multiple criteria in must and must_not
         pq_1 = search.PrefixQuery('someterm', boost=2)
         pq_2 = search.PrefixQuery('otherterm')
@@ -116,6 +123,9 @@ class SearchParamTestSuite:
             ]
         }
         assert encoded_q['query']['must'] == conjuncts
+        bool_q_repr = str(bool_q)
+        expected_repr = f'{search.BooleanQuery.__name__}(query={encoded_q["query"]})'
+        assert bool_q_repr == expected_repr
 
     def test_booleanfield_query(self, cb_env):
         exp_json = {
@@ -131,6 +141,20 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.BooleanFieldQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.BooleanFieldQuery(bool=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.BooleanFieldQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_conjunction_query(self, cb_env):
         q = search.ConjunctionQuery()
@@ -141,14 +165,32 @@ class SearchParamTestSuite:
             _ = cb_env.get_encoded_query(search_query)
 
         conjuncts = {
-            'conjuncts': [{'prefix': 'somePrefix'}],
+            'conjuncts': [{'prefix': 'somePrefix'}, {'term': 'sand'}],
         }
-        q.conjuncts.append(search.PrefixQuery('somePrefix'))
+
+        # create by providing multiple queries
+        q = search.ConjunctionQuery(search.PrefixQuery('somePrefix'), search.TermQuery('sand'))
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == conjuncts
+
+        q_repr = str(q)
+        expected_repr = f'{search.ConjunctionQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # create by providing a list of queries
+        q = search.ConjunctionQuery([search.PrefixQuery('somePrefix'), search.TermQuery('sand')])
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == conjuncts
+
+        q_repr = str(q)
+        expected_repr = f'{search.ConjunctionQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_consistent_with(self, cb_env):
         q = search.TermQuery('someterm')
@@ -177,7 +219,7 @@ class SearchParamTestSuite:
         assert q_mt[0] == mt.as_dict()
 
     def test_daterange_query(self, cb_env):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             q = search.DateRangeQuery()
 
         q = search.DateRangeQuery(end='2024-12-01')
@@ -187,12 +229,19 @@ class SearchParamTestSuite:
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'end': '2024-12-01'}
 
+        q_repr = str(q)
+        expected_repr = f'{search.DateRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
         q = search.DateRangeQuery(start='2024-01-01')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'start': '2024-01-01'}
+        q_repr = str(q)
+        expected_repr = f'{search.DateRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.DateRangeQuery(start='2024-01-01', end='2024-12-01')
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -200,6 +249,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'start': '2024-01-01', 'end': '2024-12-01'}
+        q_repr = str(q)
+        expected_repr = f'{search.DateRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.DateRangeQuery('', '')  # Empty strings should be ok
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -207,6 +259,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'start': '', 'end': ''}
+        q_repr = str(q)
+        expected_repr = f'{search.DateRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         # deprecated start_inclusive & end_inclusive
         q = search.DateRangeQuery('2024-01-01', '2024-12-01', start_inclusive=True, end_inclusive=True)
@@ -218,6 +273,9 @@ class SearchParamTestSuite:
                                       'end': '2024-12-01',
                                       'inclusive_start': True,
                                       'inclusive_end': True}
+        q_repr = str(q)
+        expected_repr = f'{search.DateRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.DateRangeQuery('2024-01-01', '2024-12-01', inclusive_start=True, inclusive_end=True)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -228,6 +286,9 @@ class SearchParamTestSuite:
                                       'end': '2024-12-01',
                                       'inclusive_start': True,
                                       'inclusive_end': True}
+        q_repr = str(q)
+        expected_repr = f'{search.DateRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_disjunction_query(self, cb_env):
         q = search.DisjunctionQuery()
@@ -239,25 +300,41 @@ class SearchParamTestSuite:
             _ = cb_env.get_encoded_query(search_query)
 
         disjuncts = {
-            'disjuncts': [{'prefix': 'somePrefix'}],
+            'disjuncts': [{'prefix': 'somePrefix'}, {'term': 'sand'}],
             'min': 1
         }
-        q.disjuncts.append(search.PrefixQuery('somePrefix'))
+
+        # create by providing multiple queries
+        q = search.DisjunctionQuery(search.PrefixQuery('somePrefix'), search.TermQuery('sand'))
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == disjuncts
+        q_repr = str(q)
+        expected_repr = f'{search.DisjunctionQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         with pytest.raises(InvalidArgumentException):
             q.min = -1
 
-        q.min = 2
+        q.min = 3
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         with pytest.raises(InvalidArgumentException):
             _ = cb_env.get_encoded_query(search_query)
+
+        # create by providing list of queries
+        q = search.DisjunctionQuery([search.PrefixQuery('somePrefix'), search.TermQuery('sand')])
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert encoded_q['query'] == disjuncts
+        q_repr = str(q)
+        expected_repr = f'{search.DisjunctionQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_docid_query(self, cb_env):
         q = search.DocIdQuery([])
@@ -275,12 +352,181 @@ class SearchParamTestSuite:
             'metrics': True,
         }
 
-        q.ids = ['foo', 'bar', 'baz']
+        q = search.DocIdQuery(['foo', 'bar', 'baz'])
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.DocIdQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.DocIdQuery(ids=['foo', 'bar', 'baz'])
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.DocIdQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+    def test_geo_bounding_box_query(self, cb_env):
+        exp_json = {
+            'query': {
+                'top_left': [-0.489, 51.686],
+                'bottom_right': [0.236, 51.28],
+                'field': 'geo_location'
+            },
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+        }
+        # location as tuple
+        q = search.GeoBoundingBoxQuery((-0.489, 51.686), (0.236, 51.28), field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoBoundingBoxQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # location as list
+        q = search.GeoBoundingBoxQuery([-0.489, 51.686], [0.236, 51.28], field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoBoundingBoxQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # location as dict
+        q = search.GeoBoundingBoxQuery({'lon': -0.489, 'lat': 51.686},
+                                       {'lon': 0.236, 'lat': 51.28},
+                                       field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoBoundingBoxQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwargs
+        q = search.GeoBoundingBoxQuery(top_left=(-0.489, 51.686), bottom_right=(0.236, 51.28), field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoBoundingBoxQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+    def test_geo_distance_query(self, cb_env):
+        exp_json = {
+            'query': {
+                'distance': '130mi',
+                'location': [-115.1391, 36.1716],
+                'field': 'geo_location'
+            },
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+        }
+        # location as tuple
+        q = search.GeoDistanceQuery('130mi', (-115.1391, 36.1716), field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoDistanceQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # location as list
+        q = search.GeoDistanceQuery('130mi', [-115.1391, 36.1716], field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoDistanceQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # location as dict
+        q = search.GeoDistanceQuery('130mi', {'lon': -115.1391, 'lat': 36.1716}, field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoDistanceQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwargs
+        q = search.GeoDistanceQuery(distance='130mi', location=(-115.1391, 36.1716), field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoDistanceQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+    def test_geo_polygon_query(self, cb_env):
+        exp_json = {
+            'query': {
+                'polygon_points': [[37.79393211306212, -122.44234633404847],
+                                   [37.77995881733997, -122.43977141339417],
+                                   [37.788031092020155, -122.42925715405579],
+                                   [37.79026946582319, -122.41149020154114],
+                                   [37.79571192027403, -122.40735054016113],
+                                   [37.79393211306212, -122.44234633404847]],
+                'field': 'geo_location'
+            },
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+        }
+        q = search.GeoPolygonQuery([(37.79393211306212, -122.44234633404847),
+                                    (37.77995881733997, -122.43977141339417),
+                                    (37.788031092020155, -122.42925715405579),
+                                    (37.79026946582319, -122.41149020154114),
+                                    (37.79571192027403, -122.40735054016113),
+                                    (37.79393211306212, -122.44234633404847)], field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoPolygonQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.GeoPolygonQuery(polygon_points=[(37.79393211306212, -122.44234633404847),
+                                                   (37.77995881733997, -122.43977141339417),
+                                                   (37.788031092020155, -122.42925715405579),
+                                                   (37.79026946582319, -122.41149020154114),
+                                                   (37.79571192027403, -122.40735054016113),
+                                                   (37.79393211306212, -122.44234633404847)], field='geo_location')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.GeoPolygonQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_facets(self, cb_env):
         q = search.TermQuery('someterm')
@@ -349,6 +595,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.MatchAllQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_match_none_query(self, cb_env):
         exp_json = {
@@ -364,8 +613,11 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.MatchNoneQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
-    def test_match_phrase(self, cb_env):
+    def test_match_phrase_query(self, cb_env):
         exp_json = {
             'query': {
                 'match_phrase': 'salty beers',
@@ -381,14 +633,26 @@ class SearchParamTestSuite:
         q = search.MatchPhraseQuery('salty beers', boost=1.5, analyzer='analyzer',
                                     field='field')
         opts = search.SearchOptions(limit=10)
-
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q, opts
         )
-
         encoded_q = cb_env.get_encoded_query(search_query)
-
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.MatchPhraseQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.MatchPhraseQuery(match_phrase='salty beers', boost=1.5, analyzer='analyzer',
+                                    field='field')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.MatchPhraseQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_match_query(self, cb_env):
         exp_json = {
@@ -415,6 +679,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.MatchQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         exp_json["query"]["operator"] = "and"
 
@@ -427,9 +694,25 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.MatchQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.MatchQuery(match='salty beers', boost=1.5, analyzer='analyzer',
+                              field='field', fuzziness=1234, prefix_length=4, match_operator=MatchOperator.AND)
+
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.MatchQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_numrange_query(self, cb_env):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             q = search.NumericRangeQuery()
 
         q = search.NumericRangeQuery(0, 0)  # Should be OK
@@ -438,6 +721,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': 0, 'max': 0}
+        q_repr = str(q)
+        expected_repr = f'{search.NumericRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.NumericRangeQuery(0.1, 0.9)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -445,6 +731,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': 0.1, 'max': 0.9}
+        q_repr = str(q)
+        expected_repr = f'{search.NumericRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.NumericRangeQuery(max=0.9)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -452,6 +741,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'max': 0.9}
+        q_repr = str(q)
+        expected_repr = f'{search.NumericRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.NumericRangeQuery(min=0.1)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -459,6 +751,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': 0.1}
+        q_repr = str(q)
+        expected_repr = f'{search.NumericRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         # deprecated min_inclusive & max_inclusive
         q = search.NumericRangeQuery(0.1, 0.9, min_inclusive=True, max_inclusive=True)
@@ -470,6 +765,9 @@ class SearchParamTestSuite:
                                       'max': 0.9,
                                       'inclusive_min': True,
                                       'inclusive_max': True}
+        q_repr = str(q)
+        expected_repr = f'{search.NumericRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.NumericRangeQuery(0.1, 0.9, inclusive_min=True, inclusive_max=True)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -480,6 +778,9 @@ class SearchParamTestSuite:
                                       'max': 0.9,
                                       'inclusive_min': True,
                                       'inclusive_max': True}
+        q_repr = str(q)
+        expected_repr = f'{search.NumericRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_params_base(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
@@ -735,32 +1036,49 @@ class SearchParamTestSuite:
     def test_phrase_query(self, cb_env):
         exp_json = {
             'query': {
-                'terms': ['salty', 'beers']
+                'terms': ['salty']
             },
             'index_name': cb_env.TEST_INDEX_NAME,
             'metrics': True,
         }
-        q = search.PhraseQuery('salty', 'beers')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            cb_env.TEST_INDEX_NAME, q
-        )
-        encoded_q = cb_env.get_encoded_query(search_query)
-        assert exp_json == encoded_q
 
-        q = search.PhraseQuery()
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            cb_env.TEST_INDEX_NAME, q
-        )
-        with pytest.raises(search.NoChildrenException):
-            _ = cb_env.get_encoded_query(search_query)
+        # must provide terms
+        with pytest.raises(ValueError):
+            q = search.PhraseQuery()
 
-        q.terms.append('salty')
+        # single term
+        q = search.PhraseQuery('salty')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         exp_json['query']['terms'] = ['salty']
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.PhraseQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        exp_json['query']['terms'] = ['salty', 'beers']
+        q = search.PhraseQuery('salty', 'beers')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.PhraseQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.PhraseQuery(terms=['salty', 'beers'])
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.PhraseQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_prefix_query(self, cb_env):
         exp_json = {
@@ -777,6 +1095,54 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.PrefixQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.PrefixQuery(prefix='someterm', boost=1.5)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.PrefixQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+    def test_query_string_query(self, cb_env):
+        exp_json = {
+            'query': {
+                'query': 'q*ry',
+                'boost': 2.0,
+            },
+            'explain': True,
+            'limit': 10,
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+        }
+        q = search.QueryStringQuery('q*ry', boost=2.0)
+        opts = search.SearchOptions(limit=10, explain=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.QueryStringQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.QueryStringQuery(query='q*ry', boost=2.0)
+        opts = search.SearchOptions(limit=10, explain=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.QueryStringQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_raw_query(self, cb_env):
         exp_json = {
@@ -807,37 +1173,22 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.RegexQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
-    def test_string_query(self, cb_env):
-        exp_json = {
-            'query': {
-                'query': 'q*ry',
-                'boost': 2.0,
-            },
-            'explain': True,
-            'limit': 10,
-            'index_name': cb_env.TEST_INDEX_NAME,
-            'metrics': True,
-        }
-        q = search.QueryStringQuery('q*ry', boost=2.0)
-        opts = search.SearchOptions(limit=10, explain=True)
+        # as kwarg
+        q = search.RegexQuery(regexp='some?regex')
         search_query = search.SearchQueryBuilder.create_search_query_object(
-            cb_env.TEST_INDEX_NAME, q, opts
+            cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.RegexQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
-    def test_term_search(self, cb_env):
-        q = search.TermQuery('someterm', field='field', boost=1.5,
-                             prefix_length=23, fuzziness=12)
-        opts = search.SearchOptions(explain=True)
-
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            cb_env.TEST_INDEX_NAME, q, opts
-        )
-
-        encoded_q = cb_env.get_encoded_query(search_query)
-
+    def test_term_query(self, cb_env):
         exp_json = {
             'query': {
                 'term': 'someterm',
@@ -851,10 +1202,32 @@ class SearchParamTestSuite:
             'metrics': True,
         }
 
+        q = search.TermQuery('someterm', field='field', boost=1.5,
+                             prefix_length=23, fuzziness=12)
+        opts = search.SearchOptions(explain=True)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.TermQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.TermQuery(term='someterm', field='field', boost=1.5,
+                             prefix_length=23, fuzziness=12)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.TermQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_termrange_query(self, cb_env):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             q = search.TermRangeQuery()
 
         q = search.TermRangeQuery('', '')  # Should be OK
@@ -863,6 +1236,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': '', 'max': ''}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.TermRangeQuery('startTerm', 'endTerm')
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -870,6 +1246,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': 'startTerm', 'max': 'endTerm'}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         # deprecated end
         q = search.TermRangeQuery(end='endTerm')
@@ -878,6 +1257,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'max': 'endTerm'}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.TermRangeQuery(max='endTerm')
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -885,6 +1267,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'max': 'endTerm'}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         # deprecated start
         q = search.TermRangeQuery(start='startTerm')
@@ -893,6 +1278,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': 'startTerm'}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.TermRangeQuery(min='startTerm')
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -900,6 +1288,9 @@ class SearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert encoded_q['query'] == {'min': 'startTerm'}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         # deprecated start_inclusive & end_inclusive
         q = search.TermRangeQuery('startTerm', 'endTerm', start_inclusive=True, end_inclusive=True)
@@ -911,6 +1302,9 @@ class SearchParamTestSuite:
                                       'max': 'endTerm',
                                       'inclusive_min': True,
                                       'inclusive_max': True}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
         q = search.TermRangeQuery('startTerm', 'endTerm', inclusive_min=True, inclusive_max=True)
         search_query = search.SearchQueryBuilder.create_search_query_object(
@@ -921,6 +1315,9 @@ class SearchParamTestSuite:
                                       'max': 'endTerm',
                                       'inclusive_min': True,
                                       'inclusive_max': True}
+        q_repr = str(q)
+        expected_repr = f'{search.TermRangeQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
     def test_wildcard_query(self, cb_env):
         exp_json = {
@@ -931,12 +1328,27 @@ class SearchParamTestSuite:
             'index_name': cb_env.TEST_INDEX_NAME,
             'metrics': True,
         }
+
         q = search.WildcardQuery('f*o', field='wc')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             cb_env.TEST_INDEX_NAME, q
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.WildcardQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
+
+        # as kwarg
+        q = search.WildcardQuery(wildcard='f*o', field='wc')
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+        q_repr = str(q)
+        expected_repr = f'{search.WildcardQuery.__name__}(query={encoded_q["query"]})'
+        assert q_repr == expected_repr
 
 
 class VectorSearchParamTestSuite:

@@ -119,6 +119,10 @@ class _QueryBuilder:
 
     @staticmethod
     def _gen_location(value):
+        if isinstance(value, dict):
+            if 'lon' in value and 'lat' in value:
+                return [float(value['lon']), float(value['lat'])]
+            raise InvalidArgumentException(message='Requires a dict with keys: lon, lat')
         if len(value) != 2 or not all(map(lambda pt: isinstance(pt, (int, float)), value)):
             raise InvalidArgumentException(message='Requires a tuple: (lon, lat)')
         return [float(value[0]), float(value[1])]
@@ -174,8 +178,7 @@ class _QueryBuilder:
     def _validate_range_query(self, r1, r2, **kwargs):
         _QueryBuilder._assign_kwargs(self, kwargs)
         if r1 is None and r2 is None:
-            raise TypeError('At least one of {0} or {1} should be specified',
-                            *self._MINMAX)
+            raise ValueError(f'At least one of the following params should be specified: {", ".join(self._MINMAX)}')
         if r1 is not None:
             setattr(self, self._MINMAX[0], r1)
         if r2 is not None:
@@ -198,10 +201,12 @@ class _QueryBuilder:
                     field_prop = _COMMON_FIELDS[f]
                     setattr(cls, f, field_prop)
 
-            def new_init(self, term, *args, **kwargs):
+            def new_init(self, *args, **kwargs):
                 super(type(self), self).__init__()
                 if self._TERMPROP not in kwargs:
-                    kwargs[self._TERMPROP] = term
+                    if len(args) == 0:
+                        raise ValueError(f'{cls.__name__} missing required property: {self._TERMPROP}')
+                    kwargs[self._TERMPROP] = args[0]
                 _QueryBuilder._assign_kwargs(self, kwargs)
 
             cls.__init__ = new_init

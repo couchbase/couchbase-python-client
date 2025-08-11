@@ -31,6 +31,76 @@ SearchRequest
 .. autoclass:: SearchRequest
     :members:
 
+SearchQuery
+===============
+
+.. module:: couchbase.search
+    :noindex:
+
+QueryString Queries
+++++++++++++++++++++
+
+.. autoclass:: QueryStringQuery
+    :members:
+
+Analytic Queries
++++++++++++++++++++
+
+.. autoclass:: MatchQuery
+    :members:
+.. autoclass:: MatchPhraseQuery
+    :members:
+
+Non-Analytic Queries
++++++++++++++++++++++
+
+.. autoclass:: BooleanFieldQuery
+    :members:
+.. autoclass:: DocIdQuery
+    :members:
+.. autoclass:: PrefixQuery
+    :members:
+.. autoclass:: PhraseQuery
+    :members:
+.. autoclass:: RegexQuery
+    :members:
+.. autoclass:: TermQuery
+    :members:
+.. autoclass:: WildcardQuery
+    :members:
+
+Range Queries
++++++++++++++++++++
+
+.. autoclass:: DateRangeQuery
+    :members:
+.. autoclass:: NumericRangeQuery
+    :members:
+.. autoclass:: TermRangeQuery
+    :members:
+
+Compound Queries
++++++++++++++++++++
+
+.. autoclass:: BooleanQuery
+.. autoclass:: ConjunctionQuery
+.. autoclass:: DisjunctionQuery
+
+Geo Queries
++++++++++++++++++++
+
+.. autoclass:: GeoBoundingBoxQuery
+.. autoclass:: GeoDistanceQuery
+.. autoclass:: GeoPolygonQuery
+
+Special Queries
++++++++++++++++++++
+
+.. autoclass:: MatchAllQuery
+    :members:
+.. autoclass:: MatchNoneQuery
+    :members:
+
 Results
 ===============
 

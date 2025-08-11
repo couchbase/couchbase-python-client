@@ -45,13 +45,6 @@ class SearchQuery:
                  ) -> None:
         self._json_[key] = value
 
-    # boost = _genprop(
-    #     float, 'boost', doc="""
-    #     When specifying multiple queries, you can give this query a
-    #     higher or lower weight in order to prioritize it among sibling
-    #     queries. See :class:`ConjunctionQuery`
-    #     """)
-
     @property
     def boost(self) -> Optional[float]:
         return self._json_.get('boost', None)
@@ -79,20 +72,61 @@ class SearchQuery:
         """
         pass
 
+    def __repr__(self) -> str:
+        return f'query={str(self._json_)}'
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
 
 # Single Term Queries
 
 
 @_QueryBuilder._single_term_query(fields=['fuzziness', 'prefix_length', 'field'])
 class TermQuery(SearchQuery):
-    """
-    Searches for a given term in documents. Unlike :class:`MatchQuery`,
-    the term is not analyzed.
 
-    Example::
-
-        TermQuery('lcb_cntl_string')
     """
+    Query that specifies the Search Service should search for an exact match to the specified term.
+
+    Examples:
+        Basic search using TermQuery::
+
+            from couchbase.search import TermQuery, SearchRequest
+
+            # ... other code ...
+
+            query = TermQuery('park', field='description')
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using TermQuery with kwargs::
+
+            from couchbase.search import TermQuery, SearchRequest
+
+            # ... other code ...
+
+            query = TermQuery(term='park', field='description')
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using TermQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import TermQuery, SearchRequest
+
+            # ... other code ...
+
+            query = TermQuery('park', field='description')
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+    """
+
     _TERMPROP = 'term'
 
     @property
@@ -103,23 +137,57 @@ class TermQuery(SearchQuery):
     def term(self, value  # type: str
              ) -> None:
         self.set_prop('term', value)
-    # term = _QueryBuilder._genprop_str('term', doc='Exact term to search for')
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._single_term_query()
 class QueryStringQuery(SearchQuery):
     """
-    Query which allows users to describe a query in a query language.
-    The server will then execute the appropriate query based on the contents
-    of the query string:
+    Query that specifies the Search Service should search for a match to the specified query string.
 
     .. seealso::
 
         `Query Language <http://www.blevesearch.com/docs/Query-String-Query/>`_
 
-    Example::
+    Examples:
+        Basic search using QueryStringQuery::
 
-        QueryStringQuery('description:water and stuff')
+            from couchbase.search import QueryStringQuery, SearchRequest
+
+            # ... other code ...
+
+            query = QueryStringQuery('+description:sea -color_hex:fff5ee')
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using QueryStringQuery with kwargs::
+
+            from couchbase.search import QueryStringQuery, SearchRequest
+
+            # ... other code ...
+
+            query = QueryStringQuery(query='+description:sea -color_hex:fff5ee')
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using QueryStringQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import QueryStringQuery, SearchRequest
+
+            # ... other code ...
+
+            query = QueryStringQuery('+description:sea -color_hex:fff5ee')
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
 
     _TERMPROP = 'query'
@@ -133,14 +201,62 @@ class QueryStringQuery(SearchQuery):
               ) -> None:
         self.set_prop('query', value)
 
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
+
 
 @_QueryBuilder._single_term_query(fields=['field'])
 class WildcardQuery(SearchQuery):
+
     """
-    Query in which the characters `*` and `?` have special meaning, where
-    `?` matches 1 occurrence and `*` will match 0 or more occurrences of the
-    previous character
+    Query that specifies the Search Service should search for a match to the specified wildcard string.
+
+    Use `?` to allow a match to any single character.
+    Use `*` to allow a match to zero or many characters.
+
+
+    Examples:
+        Basic search using WildcardQuery::
+
+            from couchbase.search import WildcardQuery, SearchRequest
+
+            # ... other code ...
+
+            query = WildcardQuery('f0f???', field='color_hex')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using WildcardQuery with kwargs::
+
+            from couchbase.search import WildcardQuery, SearchRequest
+
+            # ... other code ...
+
+            query = WildcardQuery(wildcard='f0f???', field='color_hex')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using WildcardQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import WildcardQuery, SearchRequest
+
+            # ... other code ...
+
+            query = WildcardQuery('f0f???', field='color_hex')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _TERMPROP = 'wildcard'
 
     @property
@@ -151,16 +267,60 @@ class WildcardQuery(SearchQuery):
     def wildcard(self, value  # type: str
                  ) -> None:
         self.set_prop('wildcard', value)
-    # wildcard = _genprop_str(_TERMPROP, doc='Wildcard pattern to use')
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._single_term_query()
 class DocIdQuery(SearchQuery):
+
     """
-    Matches document IDs. This is must useful in a compound query
-    (for example, :class:`BooleanQuery`). When used as a criteria, only
-    documents with the specified IDs will be searched.
+    Query that specifies the Search Service should search matches to the specified
+    list of document ids.
+
+    Examples:
+        Basic search using DocIdQuery::
+
+            from couchbase.search import DocIdQuery, SearchRequest
+
+            # ... other code ...
+
+            query = DocIdQuery(['34','43','61'])
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using DocIdQuery with kwargs::
+
+            from couchbase.search import DocIdQuery, SearchRequest
+
+            # ... other code ...
+
+            query = DocIdQuery(ids=['34','43','61'])
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using DocIdQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import DocIdQuery, SearchRequest
+
+            # ... other code ...
+
+            query = DocIdQuery(['34','43','61','72])
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _TERMPROP = 'ids'
 
     @property
@@ -172,21 +332,63 @@ class DocIdQuery(SearchQuery):
             ) -> None:
         self.set_prop('ids', value)
 
-    # ids = _genprop(list, 'ids', doc="""
-    # List of document IDs to use
-    # """)
-
     def validate(self):
         super(DocIdQuery, self).validate()
         if not self.ids:
             raise NoChildrenException('`ids` must contain at least one ID')
 
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
+
 
 @_QueryBuilder._single_term_query(fields=['prefix_length', 'fuzziness', 'field', 'analyzer'])
 class MatchQuery(SearchQuery):
     """
-    Query which checks one or more fields for a match
+    Query that specifies the Search Service should search for an exact match to the specified
+    term inside the Search index’s default field.
+
+    Examples:
+        Basic search using MatchQuery::
+
+            from couchbase.search import MatchQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchQuery('secondary', field='color_wheel_pos')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using MatchQuery with kwargs::
+
+            from couchbase.search import MatchQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchQuery(match='secondary', field='color_wheel_pos')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using MatchQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import MatchQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchQuery('secondary', field='color_wheel_pos')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _TERMPROP = 'match'
 
     @property
@@ -218,25 +420,58 @@ class MatchQuery(SearchQuery):
                               "of MatchOperator"))
         self.set_prop('operator', match_op)
 
-    # match = _genprop_str(
-    #     'match', doc="""
-    #     String to search for
-    #     """)
-    # match_operator = _genprop(
-    #     _match_operator, 'operator', doc='**UNCOMMITTED** This API may change in the future.
-    #     Specifies how the individual match terms should be logically concatenated.')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._single_term_query(fields=['field', 'analyzer'])
 class MatchPhraseQuery(SearchQuery):
     """
-    Search documents which match a given phrase. The phrase is composed
-    of one or more terms.
+    Query that specifies the Search Service should search for exact matches to the specified
+    phrase. The phrase is composed of one or more terms.
 
-    Example::
+    Examples:
+        Basic search using MatchPhraseQuery::
 
-        MatchPhraseQuery("Hello world!")
+            from couchbase.search import MatchPhraseQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchPhraseQuery('white sands', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using MatchPhraseQuery with kwargs::
+
+            from couchbase.search import MatchPhraseQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchPhraseQuery(match_phrase='white sands', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using MatchPhraseQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import MatchPhraseQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchPhraseQuery('white sands', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _TERMPROP = 'match_phrase'
 
     @property
@@ -248,19 +483,75 @@ class MatchPhraseQuery(SearchQuery):
                      ) -> None:
         self.set_prop('match_phrase', value)
 
-    # match_phrase = _genprop_str(_TERMPROP, doc="Phrase to search for")
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._with_fields(fields=['field'])
 class PhraseQuery(SearchQuery):
+    """
+    Query that specifies the Search Service should search for terms provided in the specified
+    order. The `field` property must be provided.
+
+    Examples:
+        Basic search using PhraseQuery::
+
+            from couchbase.search import PhraseQuery, SearchRequest
+
+            # ... other code ...
+
+            query = PhraseQuery('white sand', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using PhraseQuery with kwargs::
+
+            from couchbase.search import PhraseQuery, SearchRequest
+
+            # ... other code ...
+
+            query = PhraseQuery(terms='white sand', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using PhraseQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import PhraseQuery, SearchRequest
+
+            # ... other code ...
+
+            query = PhraseQuery('white sand', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+    """
+
     _TERMPROP = 'terms'
 
-    def __init__(self, *phrases,  # type: str
+    def __init__(self,
+                 *phrases,  # type: str
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
         super().__init__()
-        if self._TERMPROP not in kwargs:
-            kwargs[self._TERMPROP] = phrases
+        if self._TERMPROP in kwargs:
+            if isinstance(kwargs[self._TERMPROP], str):
+                kwargs[self._TERMPROP] = kwargs[self._TERMPROP].split()
+        else:
+            if isinstance(phrases, str):
+                kwargs[self._TERMPROP] = phrases.split()
+            else:
+                kwargs[self._TERMPROP] = phrases
+        if self._TERMPROP not in kwargs or len(kwargs[self._TERMPROP]) == 0:
+            raise ValueError(f'{self.__class__.__name__} missing required property: {self._TERMPROP}')
         _QueryBuilder._assign_kwargs(self, kwargs)
 
     @property
@@ -268,7 +559,8 @@ class PhraseQuery(SearchQuery):
         return self._json_.get('terms', None)
 
     @terms.setter
-    def terms(self, value  # type: Union[List[str], Tuple[str]]
+    def terms(self,
+              value  # type: Union[List[str], Tuple[str]]
               ) -> None:
         if not (isinstance(value, (list, tuple)) and all(map(lambda f: isinstance(f, str), value))):
             raise InvalidArgumentException(message='Expected a list of strings')
@@ -282,15 +574,59 @@ class PhraseQuery(SearchQuery):
         if not self.terms:
             raise NoChildrenException('Missing terms')
 
-    # terms = _genprop(list, 'terms', doc='List of terms to search for')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._single_term_query(fields=['field'])
 class PrefixQuery(SearchQuery):
+
     """
-    Search documents for fields beginning with a certain prefix. This is
-    most useful for type-ahead or lookup queries.
+    Query that specifies the Search Service should search for matches to the specified
+    prefix.
+
+    Examples:
+        Basic search using PrefixQuery::
+
+            from couchbase.search import PrefixQuery, SearchRequest
+
+            # ... other code ...
+
+            query = PrefixQuery('yellow', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using PrefixQuery with kwargs::
+
+            from couchbase.search import PrefixQuery, SearchRequest
+
+            # ... other code ...
+
+            query = PrefixQuery(prefix='yellow', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using PrefixQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import PrefixQuery, SearchRequest
+
+            # ... other code ...
+
+            query = PrefixQuery('yellow', field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _TERMPROP = 'prefix'
 
     @property
@@ -302,14 +638,58 @@ class PrefixQuery(SearchQuery):
                ) -> None:
         self.set_prop('prefix', value)
 
-    # prefix = _genprop_str('prefix', doc='The prefix to match')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._single_term_query(fields=['field'])
 class RegexQuery(SearchQuery):
     """
-    Search documents for fields matching a given regular expression
+    Query that specifies the Search Service should search for matches to the specified
+    regular expression.
+
+    Examples:
+        Basic search using RegexQuery::
+
+            from couchbase.search import RegexQuery, SearchRequest
+
+            # ... other code ...
+
+            query = RegexQuery('f[58]f.*', field='color_hex')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using RegexQuery with kwargs::
+
+            from couchbase.search import RegexQuery, SearchRequest
+
+            # ... other code ...
+
+            query = RegexQuery(regexp='f[58]f.*', field='color_hex')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using RegexQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import RegexQuery, SearchRequest
+
+            # ... other code ...
+
+            query = RegexQuery('f[58]f.*', field='color_hex')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _TERMPROP = 'regexp'
 
     @property
@@ -330,7 +710,8 @@ class RegexQuery(SearchQuery):
                ) -> None:
         self.set_prop('regexp', value)
 
-    # regex = _genprop_str('regexp', doc="Regular expression to use")
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 RegexpQuery = RegexQuery
@@ -338,6 +719,52 @@ RegexpQuery = RegexQuery
 
 @_QueryBuilder._single_term_query(fields=['field'])
 class BooleanFieldQuery(SearchQuery):
+    """
+    Query that specifies the Search Service should search for to the specified
+    boolean value in the provided field.
+
+    Examples:
+        Basic search using BooleanFieldQuery::
+
+            from couchbase.search import BooleanFieldQuery, SearchRequest
+
+            # ... other code ...
+
+            query = BooleanFieldQuery(True, field='perfect_rating')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using BooleanFieldQuery with kwargs::
+
+            from couchbase.search import BooleanFieldQuery, SearchRequest
+
+            # ... other code ...
+
+            query = BooleanFieldQuery(bool=True, field='perfect_rating')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using BooleanFieldQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import BooleanFieldQuery, SearchRequest
+
+            # ... other code ...
+
+            query = BooleanFieldQuery(True, field='perfect_rating')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+    """
+
     _TERMPROP = 'bool'
 
     @property
@@ -348,7 +775,9 @@ class BooleanFieldQuery(SearchQuery):
     def bool(self, value  # type: bool
              ) -> None:
         self.set_prop('bool', value)
-    # bool = _genprop(bool, 'bool', doc='Boolean value to search for')
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 # Geo Queries
@@ -356,18 +785,89 @@ class BooleanFieldQuery(SearchQuery):
 
 @_QueryBuilder._with_fields(fields=['field'])
 class GeoDistanceQuery(SearchQuery):
-    def __init__(self, distance,  # type: str
-                 location,  # type: Tuple[float, float]
+    """
+    Query that specifies the Search Service should search for geo location values
+    in a set radius around a specified latitude and longitude.
+
+    If you use location as an array, your array must contain a longitude value followed by a latitude value.
+
+    The following distance units:
+      - mm: Millimeters
+      - cm: Centimeters
+      - in: Inches
+      - yd: Yards
+      - ft: Feet
+      - m: Meters
+      - km: Kilometers
+      - mi: Miles
+      - nm: Nautical miles
+
+
+    Examples:
+        Basic search using GeoDistanceQuery::
+
+            from couchbase.search import GeoDistanceQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoDistanceQuery('130mi', (-115.1391, 36.1716), field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoDistanceQuery with location as dict::
+
+            from couchbase.search import GeoDistanceQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoDistanceQuery('130mi', {'lon': -115.1391, 'lat': 36.1716}, field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoDistanceQuery with kwargs::
+
+            from couchbase.search import GeoDistanceQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoDistanceQuery(distance='130mi', location=(-115.1391, 36.1716), field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoDistanceQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import GeoDistanceQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoDistanceQuery('130mi', (-115.1391, 36.1716), field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+    """
+
+    def __init__(self,
+                 distance=None,  # type: str
+                 location=None,  # type: Union[List[float, float], Tuple[float, float], Dict[str, float]]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
-        """
-        Search for items within a given radius
-        :param distance: The distance string specifying the radius
-        :param location: A tuple of `(lon, lat)` indicating point of origin
-        """
         super(GeoDistanceQuery, self).__init__()
         kwargs['distance'] = distance
         kwargs['location'] = location
+        if kwargs['distance'] is None or kwargs['location'] is None:
+            raise ValueError(f'{self.__class__.__name__} requires both a distance and location to be specified.')
         _QueryBuilder._assign_kwargs(self, kwargs)
 
     @property
@@ -375,7 +875,8 @@ class GeoDistanceQuery(SearchQuery):
         return self._json_.get('location')
 
     @location.setter
-    def location(self, value  # type: Tuple[float, float]
+    def location(self,
+                 value  # type: Union[List[float, float], Tuple[float, float], Dict[str, float]]
                  ) -> None:
         location = _QueryBuilder._gen_location(value)
         self.set_prop('location', location)
@@ -385,23 +886,103 @@ class GeoDistanceQuery(SearchQuery):
         return self._json_.get('distance', None)
 
     @distance.setter
-    def distance(self, value  # type: str
+    def distance(self,
+                 value  # type: str
                  ) -> None:
         self.set_prop('distance', value)
 
-    # location = _genprop(_location_conv, 'location', doc='Location')
-    # distance = _genprop_str('distance')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._with_fields(fields=['field'])
 class GeoBoundingBoxQuery(SearchQuery):
-    def __init__(self, top_left,  # type: Tuple[float, float]
-                 bottom_right,  # type: Tuple[float, float]
+    """
+    Query that specifies the Search Service should search for geo location values
+    in a defined rectangle.
+
+    If you use location as an array, your array must contain a longitude value followed by a latitude value.
+
+    Examples:
+        Basic search using GeoBoundingBoxQuery::
+
+            from couchbase.search import GeoBoundingBoxQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoBoundingBoxQuery((-0.489, 51.686), (0.236, 51.28), field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoBoundingBoxQuery with bounding box points as list::
+
+            from couchbase.search import GeoBoundingBoxQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoBoundingBoxQuery([-0.489, 51.686], [0.236, 51.28], field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoBoundingBoxQuery with location as dict::
+
+            from couchbase.search import GeoBoundingBoxQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoBoundingBoxQuery({'lon': -0.489, 'lat': 51.686},
+                                        {'lon': 0.236, 'lat': 51.28},
+                                        field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoBoundingBoxQuery with kwargs::
+
+            from couchbase.search import GeoBoundingBoxQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoBoundingBoxQuery(top_left=(-0.489, 51.686), bottom_right=(0.236, 51.28), field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoDistanceQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import GeoBoundingBoxQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoBoundingBoxQuery((-0.489, 51.686), (0.236, 51.28), field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+    """
+
+    def __init__(self,
+                 top_left=None,  # type: Tuple[float, float]
+                 bottom_right=None,  # type: Tuple[float, float]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
         super(GeoBoundingBoxQuery, self).__init__()
         kwargs['top_left'] = top_left
         kwargs['bottom_right'] = bottom_right
+        if kwargs['top_left'] is None or kwargs['bottom_right'] is None:
+            raise ValueError(f'{self.__class__.__name__} requires both a top_left and bottom_right to be specified.')
         _QueryBuilder._assign_kwargs(self, kwargs)
 
     @property
@@ -424,21 +1005,88 @@ class GeoBoundingBoxQuery(SearchQuery):
         bottom_right = _QueryBuilder._gen_location(value)
         self.set_prop('bottom_right', bottom_right)
 
-    # top_left = _genprop(
-    #     _location_conv, 'top_left',
-    #     doc='Tuple of `(lon, lat)` for the top left corner of bounding box')
-    # bottom_right = _genprop(
-    #     _location_conv, 'bottom_right',
-    #     doc='Tuple of `(lon, lat`) for the bottom right corner of bounding box')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._with_fields(fields=['field'])
 class GeoPolygonQuery(SearchQuery):
-    def __init__(self, polygon_points,  # type: List[Tuple[float, float]]
+    """
+    Query that specifies the Search Service should search for geo location values
+    in a defined polygon.
+
+    The point tuple must contain a longitude value followed by a latitude value.
+
+    Examples:
+        Basic search using GeoPolygonQuery::
+
+            from couchbase.search import GeoPolygonQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoPolygonQuery([(37.79393211306212, -122.44234633404847),
+                                     (37.77995881733997, -122.43977141339417),
+                                     (37.788031092020155, -122.42925715405579),
+                                     (37.79026946582319, -122.41149020154114),
+                                     (37.79571192027403, -122.40735054016113),
+                                     (37.79393211306212, -122.44234633404847)],
+                                     field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+
+        Basic search using GeoPolygonQuery with kwargs::
+
+            from couchbase.search import GeoPolygonQuery, SearchRequest
+
+            # ... other code ...
+
+            pts = [(37.79393211306212, -122.44234633404847),
+                   (37.77995881733997, -122.43977141339417),
+                   (37.788031092020155, -122.42925715405579),
+                   (37.79026946582319, -122.41149020154114),
+                   (37.79571192027403, -122.40735054016113),
+                   (37.79393211306212, -122.44234633404847)]
+            query = GeoPolygonQuery(polygon_points=pts, field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using GeoPolygonQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import GeoPolygonQuery, SearchRequest
+
+            # ... other code ...
+
+            query = GeoPolygonQuery([(37.79393211306212, -122.44234633404847),
+                                     (37.77995881733997, -122.43977141339417),
+                                     (37.788031092020155, -122.42925715405579),
+                                     (37.79026946582319, -122.41149020154114),
+                                     (37.79571192027403, -122.40735054016113),
+                                     (37.79393211306212, -122.44234633404847)],
+                                     field='geo_location')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+    """
+
+    def __init__(self,
+                 polygon_points=None,  # type: List[Tuple[float, float]]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
         super(GeoPolygonQuery, self).__init__()
-        kwargs['polygon_points'] = polygon_points
+        pts = polygon_points or kwargs.pop('polygon_points', None)
+        if pts is None:
+            raise ValueError(f'{self.__class__.__name__} requires a list of tuples for polygon points.')
+        kwargs['polygon_points'] = pts
         _QueryBuilder._assign_kwargs(self, kwargs)
 
     @property
@@ -451,9 +1099,8 @@ class GeoPolygonQuery(SearchQuery):
         polygon_points = _QueryBuilder._gen_locations(value)
         self.set_prop('polygon_points', polygon_points)
 
-    # polygon_points = _genprop(
-    #     _locations_conv, 'polygon_points',
-    #     doc='List of tuples `(lon, lat)` for the points of a polygon')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 # Range Queries
@@ -462,10 +1109,64 @@ class GeoPolygonQuery(SearchQuery):
 @_QueryBuilder._with_fields(fields=['field'])
 class NumericRangeQuery(SearchQuery):
     """
-    Search documents for fields containing a value within a given numerical
-    range.
+    Query that specifies the Search Service should search for matches to the specified
+    numerical range.
 
-    At least one of `min` or `max` must be specified.
+    .. note::
+        At least one of `min` or `max` must be specified.
+
+    Examples:
+        Basic search using NumericRangeQuery::
+
+            from couchbase.search import NumericRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = NumericRangeQuery(3.0,
+                                      3.2,
+                                      inclusive_min=True,
+                                      inclusive_max=False,
+                                      field='rating')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using NumericRangeQuery with kwargs::
+
+            from couchbase.search import NumericRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = NumericRangeQuery(min=3.0,
+                                      max=3.2,
+                                      inclusive_min=True,
+                                      inclusive_max=False,
+                                      field='rating')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using NumericRangeQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import NumericRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = NumericRangeQuery(3.0,
+                                      3.2,
+                                      inclusive_min=True,
+                                      inclusive_max=False,
+                                      field='rating')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
 
     def __init__(self,
@@ -473,11 +1174,6 @@ class NumericRangeQuery(SearchQuery):
                  max=None,  # type: Optional[float]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
-        """
-        :param float min: See :attr:`min`
-        :param float max: See :attr:`max`
-        """
-        # super(NumericRangeQuery, self).__init__(min, max, **kwargs)
         super().__init__()
         _QueryBuilder._validate_range_query(self, min, max, **kwargs)
 
@@ -545,51 +1241,81 @@ class NumericRangeQuery(SearchQuery):
                       ) -> None:
         self.set_prop('inclusive_max', value)
 
-    # min = _genprop(
-    #     float, 'min', doc='Lower bound of range. See :attr:`min_inclusive`')
-
-    # min_inclusive = _genprop(
-    #     bool, 'inclusive_min',
-    #     doc='Whether matches are inclusive of lower bound')
-
-    # max = _genprop(
-    #     float, 'max',
-    #     doc='Upper bound of range. See :attr:`max_inclusive`')
-
-    # max_inclusive = _genprop(
-    #     bool, 'inclusive_max',
-    #     doc='Whether matches are inclusive of upper bound')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._with_fields(fields=['field'])
 class DateRangeQuery(SearchQuery):
+
     """
-    Search documents for fields containing a value within a given date
-    range.
+    Query that specifies the Search Service should search for matches to the specified
+    date range.
+
+    .. note::
+        At least one of `start` or `end` must be specified.
 
     The date ranges are parsed according to a given :attr:`datetime_parser`.
     If no parser is specified, the RFC 3339 parser is used. See
     `Generating an RFC 3339 Timestamp <http://goo.gl/LIkV7G>_`.
 
-    The :attr:`start` and :attr:`end` parameters should be specified in the
-    constructor. Note that either `start` or `end` (but not both!) may be
-    omitted.
+    Examples:
+        Basic search using DateRangeQuery::
 
-    .. code-block:: python
+            from couchbase.search import DateRangeQuery, SearchRequest
 
-        DateRangeQuery(start='2014-12-25', end='2016-01-01')
+            # ... other code ...
+
+            query = DateRangeQuery('2024-01-01',
+                                   '2024-01-05',
+                                   inclusive_start=True,
+                                   inclusive_end=True,
+                                   field='last_rated')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using DateRangeQuery with kwargs::
+
+            from couchbase.search import DateRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = DateRangeQuery(start='2024-01-01',
+                                   end='2024-01-05',
+                                   inclusive_start=True,
+                                   inclusive_end=True,
+                                   field='last_rated')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using DateRangeQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import DateRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = NumericRangeQuery(3.0,
+                                      3.2,
+                                      inclusive_min=True,
+                                      inclusive_max=False,
+                                      field='rating')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
 
     def __init__(self, start=None, end=None, **kwargs):
-        """
-        :param str start: Start of date range
-        :param str end: End of date range
-        :param kwargs: Additional options: :attr:`field`, :attr:`boost`
-        """
         super().__init__()
         _QueryBuilder._validate_range_query(self, start, end, **kwargs)
-
-    #     super(DateRangeQuery, self).__init__(start, end, **kwargs)
 
     _MINMAX = 'start', 'end'
 
@@ -665,32 +1391,72 @@ class DateRangeQuery(SearchQuery):
                         ) -> None:
         self.set_prop('datetime_parser', value)
 
-    # start = _genprop_str('start', doc='Lower bound datetime')
-    # end = _genprop_str('end', doc='Upper bound datetime')
-
-    # start_inclusive = _genprop(
-    #     bool, 'inclusive_start', doc='If :attr:`start` is inclusive')
-
-    # end_inclusive = _genprop(
-    #     bool, 'inclusive_end', doc='If :attr:`end` is inclusive')
-
-    # datetime_parser = _genprop_str(
-    #     'datetime_parser',
-    #     doc="""
-    #     Parser to use when analyzing the :attr:`start` and :attr:`end` fields
-    #     on the server.
-
-    #     If not specified, the RFC 3339 parser is used.
-    #     Ensure to specify :attr:`start` and :attr:`end` in a format suitable
-    #     for the given parser.
-    #     """)
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 @_QueryBuilder._with_fields(fields=['field'])
 class TermRangeQuery(SearchQuery):
+
     """
-    Search documents for fields containing a value within a given
-    lexical range.
+    Query that specifies the Search Service should search for matches to the specified
+    range of terms.
+
+    .. note::
+        At least one of `min` or `max` must be specified.
+
+    Examples:
+        Basic search using TermRangeQuery::
+
+            from couchbase.search import TermRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = TermRangeQuery('mist',
+                                   'misty',
+                                   inclusive_min=True,
+                                   inclusive_max=True,
+                                   field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using TermRangeQuery with kwargs::
+
+            from couchbase.search import TermRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = TermRangeQuery(min='mist',
+                                   max='misty',
+                                   inclusive_min=True,
+                                   inclusive_max=True,
+                                   field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using TermRangeQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import TermRangeQuery, SearchRequest
+
+            # ... other code ...
+
+            query = TermRangeQuery(min='mist',
+                                   max='misty',
+                                   inclusive_min=True,
+                                   inclusive_max=True,
+                                   field='description')
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
 
     _MINMAX = 'min', 'max'
@@ -702,13 +1468,6 @@ class TermRangeQuery(SearchQuery):
                  max=None,  # type: Optional[str]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
-        """
-        Args:
-            start (str): **DEPRECATED** Use min.
-            end (str): **DEPRECATED** Use max.
-            min (str): The lower end of the range.
-            max (str): The higher end of the range.
-        """
         super().__init__()
         if start is not None and min is None:
             Supportability.class_property_deprecated('start', 'min')
@@ -795,32 +1554,70 @@ class TermRangeQuery(SearchQuery):
                       ) -> None:
         self.set_prop('inclusive_max', value)
 
-    # def __init__(self, start=None, end=None, **kwargs):
-    #     super(TermRangeQuery, self).__init__(start=start, end=end, **kwargs)
-
-    # start = _genprop_str('start', doc='Lower range of term')
-
-    # end = _genprop_str('end', doc='Upper range of term')
-
-    # start_inclusive = _genprop(
-    #     bool, 'inclusive_start', doc='If :attr:`start` is inclusive')
-
-    # end_inclusive = _genprop(
-    #     bool, 'inclusive_end', doc='If :attr:`end` is inclusive')
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
 
 
 # Compound Queries
 
 class ConjunctionQuery(SearchQuery):
+
     """
-    Compound query in which all sub-queries passed must be satisfied
+    A compound query that specifies multiple child queries.
+
+    For a ConjunctionQuery, every query object in the array must have a match in a document
+    to include the document in search results.
+
+    Examples:
+        Basic search using ConjunctionQuery::
+
+            from couchbase.search import ConjunctionQuery, DateRangeQuery, TermQuery, SearchRequest
+
+            # ... other code ...
+
+            queries = [DateRangeQuery('2024-01-01',
+                                      '2024-02-15',
+                                      start_inclusive=False,
+                                      end_inclusive=False,
+                                      field='last_rated'),
+                        TermQuery('sand', field='description')]
+            query = ConjunctionQuery(*queries)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using ConjunctionQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import ConjunctionQuery, DateRangeQuery, TermQuery, SearchRequest
+
+            # ... other code ...
+
+            queries = [DateRangeQuery('2024-01-01',
+                                      '2024-02-15',
+                                      start_inclusive=False,
+                                      end_inclusive=False,
+                                      field='last_rated'),
+                        TermQuery('sand', field='description')]
+            query = ConjunctionQuery(*queries)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _COMPOUND_FIELDS = ('conjuncts', 'conjuncts'),
 
     def __init__(self, *queries, **kwargs):
         super().__init__()
         _QueryBuilder._assign_kwargs(self, kwargs)
-        self.conjuncts = list(queries)
+        if len(queries) == 1 and isinstance(queries[0], list):
+            self.conjuncts = queries[0]
+        else:
+            self.conjuncts = list(queries)
 
     @property
     def encodable(self):
@@ -842,18 +1639,74 @@ class ConjunctionQuery(SearchQuery):
         if not self.conjuncts:
             raise NoChildrenException('No sub-queries')
 
+    def __repr__(self) -> str:
+        query = self.encodable
+        return f'{type(self).__name__}(query={query})'
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
 
 class DisjunctionQuery(SearchQuery):
+
     """
-    Compound query in which at least :attr:`min` or more queries must be
-    satisfied
+    A compound query that specifies multiple child queries.
+
+    For a DisjunctionQuery, the :attr:`min` property sets the number of query objects
+    from the disjuncts array that must have a match in a document.
+    If a document does not match the min number of query objects, the Search Service
+    does not include the document in search results.
+
+    Examples:
+        Basic search using DisjunctionQuery::
+
+            from couchbase.search import DisjunctionQuery, NumericRangeQuery, TermQuery, SearchRequest
+
+            # ... other code ...
+
+            queries = [NumericRangeQuery(3.0,
+                                         3.1,
+                                         inclusive_min=True,
+                                         inclusive_max=True,
+                                         field='rating'),
+                        TermQuery('smoke', field='description')]
+            query = DisjunctionQuery(*queries)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using DisjunctionQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import DisjunctionQuery, NumericRangeQuery, TermQuery, SearchRequest
+
+            # ... other code ...
+
+            queries = [NumericRangeQuery(3.0,
+                                         3.1,
+                                         inclusive_min=True,
+                                         inclusive_max=True,
+                                         field='rating'),
+                        TermQuery('smoke', field='description')]
+            query = DisjunctionQuery(*queries)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
     """
+
     _COMPOUND_FIELDS = ('disjuncts', 'disjuncts'),
 
     def __init__(self, *queries, **kwargs):
         super().__init__()
         _QueryBuilder._assign_kwargs(self, kwargs)
-        self.disjuncts = list(queries)
+        if len(queries) == 1 and isinstance(queries[0], list):
+            self.disjuncts = queries[0]
+        else:
+            self.disjuncts = list(queries)
         if 'min' not in self._json_:
             self.min = 1
 
@@ -884,9 +1737,6 @@ class DisjunctionQuery(SearchQuery):
             js[tgt] = [q.encodable for q in objs]
         return js
 
-    # min = _genprop(
-    #     _convert_gt0, 'min', doc='Number of queries which must be satisfied')
-
     def validate(self):
         super(DisjunctionQuery, self).validate()
         if not self.disjuncts:
@@ -894,17 +1744,110 @@ class DisjunctionQuery(SearchQuery):
         if len(self.disjuncts) < self.min:
             raise InvalidArgumentException(message='Specified min is larger than number of queries.')
 
+    def __repr__(self) -> str:
+        query = self.encodable
+        return f'{type(self).__name__}(query={query})'
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
 
 CompoundQueryType = Union[SearchQuery, ConjunctionQuery, DisjunctionQuery, List[SearchQuery]]
 
 
 class BooleanQuery(SearchQuery):
+    """
+    A compound query that specifies multiple child queries.
+
+    For a BooleanQuery, a document must match the combination of queries to be included in the search results.
+
+    Examples:
+        Basic search using BooleanQuery::
+
+            from couchbase.search import (BooleanQuery,
+                                          DateRangeQuery,
+                                          TermQuery,
+                                          PrefixQuery,
+                                          WildcardQuery,
+                                          SearchRequest)
+
+            # ... other code ...
+
+            must = [DateRangeQuery('2024-10-01',
+                                   '2024-12-31',
+                                   inclusive_start=True,
+                                   inclusive_end=True,
+                                   field='last_rated'),
+                    WildcardQuery('ff????', field='color_hex')]
+            must_not = [TermQuery('smoke', field='description'),
+                        PrefixQuery('rain', field='description')]
+            query = BooleanQuery(must, None, must_not)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using BooleanQuery with kwargs::
+
+            from couchbase.search import (BooleanQuery,
+                                          DateRangeQuery,
+                                          TermQuery,
+                                          PrefixQuery,
+                                          WildcardQuery,
+                                          SearchRequest)
+
+            # ... other code ...
+
+            must = [DateRangeQuery('2024-10-01',
+                                   '2024-12-31',
+                                   inclusive_start=True,
+                                   inclusive_end=True,
+                                   field='last_rated'),
+                    WildcardQuery('ff????', field='color_hex')]
+            must_not = [TermQuery('smoke', field='description'),
+                        PrefixQuery('rain', field='description')]
+            query = BooleanQuery(must=must, must_not=must_not)
+            search_res = scope.search(scope_index_name, req)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
+        Basic search using BooleanQuery with SearchOptions::
+
+            from couchbase.options import SearchOptions
+            from couchbase.search import (BooleanQuery,
+                                          DateRangeQuery,
+                                          TermQuery,
+                                          PrefixQuery,
+                                          WildcardQuery,
+                                          SearchRequest)
+
+            # ... other code ...
+
+            must = [DateRangeQuery('2024-10-01',
+                                   '2024-12-31',
+                                   inclusive_start=True,
+                                   inclusive_end=True,
+                                   field='last_rated'),
+                    WildcardQuery('ff????', field='color_hex')]
+            must_not = [TermQuery('smoke', field='description'),
+                        PrefixQuery('rain', field='description')]
+            query = BooleanQuery(must, None, must_not)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+    """
+
     def __init__(self, must=None, should=None, must_not=None):
         super().__init__()
         self._subqueries = {}
         self.must = must
         self.should = should
         self.must_not = must_not
+        self.validate()
 
     @property
     def must(self) -> ConjunctionQuery:
@@ -947,7 +1890,7 @@ class BooleanQuery(SearchQuery):
     def validate(self) -> None:
         super(BooleanQuery, self).validate()
         if not self.must and not self.must_not and not self.should:
-            raise ValueError('No sub-queries specified', self)
+            raise ValueError('At least one of the following queries should be specified: must, should, must_not.')
 
     def _set_query(self, name,  # type: str
                    value,  # type: Optional[CompoundQueryType]
@@ -973,6 +1916,13 @@ class BooleanQuery(SearchQuery):
                 sub_query.append(query)
             self._subqueries[name] = reqtype(*sub_query)
 
+    def __repr__(self) -> str:
+        query = self.encodable
+        return f'{type(self).__name__}(query={query})'
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
 
 # Special Queries
 
@@ -989,8 +1939,24 @@ class RawQuery(SearchQuery):
 
 
 class MatchAllQuery(SearchQuery):
+
     """
     Special query which matches all documents
+
+    Examples:
+        Basic search using MatchAllQuery::
+
+            from couchbase.search import MatchAllQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchAllQuery()
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
     """
 
     def __init__(self, **kwargs):
@@ -998,13 +1964,35 @@ class MatchAllQuery(SearchQuery):
         self._json_['match_all'] = None
         _QueryBuilder._assign_kwargs(self, kwargs)
 
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
+
 
 class MatchNoneQuery(SearchQuery):
+
     """
     Special query which matches no documents
+
+    Examples:
+        Basic search using MatchNoneQuery::
+
+            from couchbase.search import MatchNoneQuery, SearchRequest
+
+            # ... other code ...
+
+            query = MatchNoneQuery()
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name)
+            for r in search_res.rows():
+                print(f'Found search result: {r}')
+            print(f'metadata={search_res.metadata()}')
+
     """
 
     def __init__(self, **kwargs):
         super(MatchNoneQuery, self).__init__()
         self._json_['match_none'] = None
         _QueryBuilder._assign_kwargs(self, kwargs)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({super().__repr__()})'
