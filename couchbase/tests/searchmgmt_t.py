@@ -286,6 +286,12 @@ class SearchIndexManagementTestSuite:
         assert res.source_type == search_idx.source_type
         assert res.idx_type == search_idx.idx_type
         assert res.source_name == search_idx.source_name
+        res_params_store = res.params.pop('store', {})
+        search_idx_params_store = search_idx.params.pop('store', {})
+        if search_idx_params_store is not None:
+            assert res_params_store is not None
+            assert res_params_store['indexType'] == search_idx_params_store['indexType']
+            assert res_params_store['segmentVersion'] == search_idx_params_store['segmentVersion']
         assert res.params == search_idx.params
         assert res.plan_params == search_idx.plan_params
         assert res.source_params == search_idx.source_params

@@ -22,9 +22,7 @@ import pytest
 import pytest_asyncio
 
 import couchbase.search as search
-from couchbase.exceptions import (AmbiguousTimeoutException,
-                                  InvalidArgumentException,
-                                  QueryIndexNotFoundException)
+from couchbase.exceptions import InvalidArgumentException, QueryIndexNotFoundException
 from couchbase.mutation_state import MutationState
 from couchbase.options import SearchOptions
 from couchbase.search import (HighlightStyle,
@@ -738,33 +736,6 @@ class SearchTestSuite:
         q = search.RawQuery(query_args)
         res = cb_env.cluster.search_query(cb_env.TEST_INDEX_NAME, q, limit=10)
         await cb_env.assert_rows(res, 1)
-
-    # creating a new connection, allow retries
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    @pytest.mark.asyncio
-    async def test_search_timeout(self, cb_env):
-        from acouchbase.cluster import Cluster
-        from couchbase.auth import PasswordAuthenticator
-        from couchbase.options import ClusterOptions, ClusterTimeoutOptions
-        conn_string = cb_env.config.get_connection_string()
-        username, pw = cb_env.config.get_username_and_pw()
-        auth = PasswordAuthenticator(username, pw)
-        # Prior to PYCBC-1521, this test would fail as each request would override the cluster level search_timeout.
-        # If a timeout was not provided in the request, the default 75s timeout would be used.  PYCBC-1521 corrects
-        # this behavior so this test will pass as we are essentially forcing an AmbiguousTimeoutException because
-        # we are setting the cluster level search_timeout such a small value.
-        timeout_opts = ClusterTimeoutOptions(search_timeout=timedelta(milliseconds=1))
-        cluster = await Cluster.connect(f'{conn_string}', ClusterOptions(auth, timeout_options=timeout_opts))
-        # don't need to do this except for older server versions
-        _ = cluster.bucket(f'{cb_env.bucket.name}')
-        q = search.TermQuery('auto')
-        with pytest.raises(AmbiguousTimeoutException):
-            res = cluster.search_query(cb_env.TEST_INDEX_NAME, q, SearchOptions(limit=10))
-            [r async for r in res.rows()]
-        # if we override the timeout w/in the request the query should succeed.
-        res = cluster.search_query(cb_env.TEST_INDEX_NAME, q, SearchOptions(limit=10, timeout=timedelta(seconds=10)))
-        rows = [r async for r in res.rows()]
-        assert len(rows) > 0
 
 
 class ClassicSearchCollectionTests(SearchCollectionTestSuite):

@@ -78,6 +78,14 @@ class EventingManagementTestEnvironment(TestEnvironment):
     def evt_version(self):
         return self._version
 
+    @property
+    def function_names(self) -> List[str]:
+        return self._function_names
+
+    @function_names.setter
+    def function_names(self, names: List[str]) -> None:
+        self._function_names = names
+
     def setup(self,
               collection_type=None,  # type: Optional[CollectionType]
               test_suite=None,  # type: Optional[str]
@@ -92,6 +100,8 @@ class EventingManagementTestEnvironment(TestEnvironment):
         if EnvironmentFeatures.is_feature_supported('collections', self.server_version_short):
             self.enable_collection_mgmt()
             TestEnvironment.try_n_times(5, 3, self.setup_named_collections)
+
+        self._function_names = []
 
     def teardown(self,
                  collection_type=None,  # type: Optional[CollectionType]

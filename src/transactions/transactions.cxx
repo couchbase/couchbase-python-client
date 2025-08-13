@@ -1018,6 +1018,9 @@ convert_to_python_exc_type(std::exception_ptr err,
   } catch (const tx_core::document_not_found& e) {
     exc_type = pycbc_txns::TxnExceptionType::DOCUMENT_NOT_FOUND;
     message = e.what();
+  } catch (const tx_core::document_unretrievable& e) {
+    exc_type = pycbc_txns::TxnExceptionType::DOCUMENT_UNRETRIEVABLE;
+    message = e.what();
   } catch (const tx_core::op_exception& e) {
     message = e.what();
   } catch (const std::exception& e) {
