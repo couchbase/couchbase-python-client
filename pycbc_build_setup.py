@@ -71,12 +71,20 @@ def process_build_env_vars():  # noqa: C901
 
     # We use OpenSSL by default if building the SDK; however, starting with v4.1.9 we build our wheels using BoringSSL.
     pycbc_use_openssl = os.getenv('PYCBC_USE_OPENSSL', 'true').lower() in ENV_TRUE
-    if pycbc_use_openssl is True:
+    pycbc_use_opensslv1_1 = os.getenv('PYCBC_USE_OPENSSLV1_1', 'false').lower() in ENV_TRUE
+    if pycbc_use_openssl is True or pycbc_use_opensslv1_1:
         cmake_extra_args += ['-DUSE_STATIC_BORINGSSL:BOOL=OFF']
         ssl_version = os.getenv('PYCBC_OPENSSL_VERSION', None)
-        if not ssl_version:
-            ssl_version = '1.1.1w'
+        if pycbc_use_opensslv1_1 is True:
+            cmake_extra_args += ['-DUSE_OPENSSLV1_1:BOOL=ON']
+            if not ssl_version:
+                # lastest 1.1 version: https://github.com/openssl/openssl/releases/tag/OpenSSL_1_1_1w
+                ssl_version = '1.1.1w'
+        elif not ssl_version:
+            # lastest 3.x version: https://github.com/openssl/openssl/releases/tag/openssl-3.5.2
+            ssl_version = '3.5.2'
         cmake_extra_args += [f'-DOPENSSL_VERSION={ssl_version}']
+
     else:
         cmake_extra_args += ['-DUSE_STATIC_BORINGSSL:BOOL=ON']
 
