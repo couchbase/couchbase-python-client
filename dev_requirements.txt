@@ -1,9 +1,9 @@
-autopep8~=1.6
-pre-commit~=2.17
-Faker~=16.6
+autopep8~=2.3
+pre-commit~=4.2.0
+Faker~=37.1
 faker-vehicle~=0.2
-pytest~=6.2,>=6.2.5
-pytest-asyncio~=0.17,>=0.17.2
-pytest-rerunfailures~=10.2
+pytest~=8.3.5
+pytest-asyncio~=1.1
+pytest-rerunfailures~=15.1
 requests~=2.26
-Twisted~=22.2,>=22.2.1
+Twisted~=24.7

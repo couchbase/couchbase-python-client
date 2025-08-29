@@ -6,7 +6,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
-minversion = "6.0"
+minversion = "8.0"
 #addopts = "-ra -q"
 testpaths = [
     "tests",
@@ -20,6 +20,8 @@ python_classes = [
 python_files = [
     "*_t.py"
 ]
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 markers = [
     "pycbc_couchbase: marks a test for the couchbase API (deselect with '-m \"not pycbc_couchbase\"')",
     "pycbc_acouchbase: marks a test for the acouchbase API (deselect with '-m \"not pycbc_acouchbase\"')",
