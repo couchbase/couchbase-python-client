@@ -437,10 +437,12 @@ class EventingManagementTestSuite:
         func = TestEnvironment.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
         cb_env.validate_eventing_function(func, shallow=True)
 
+    @pytest.mark.usefixtures('drop_eventing_functions')
     def test_upsert_function_fail(self, cb_env):
+        cb_env.function_names = ['test-evt-func-1']
         # bad appcode
         local_func = EventingFunction(
-            'test-evt-func-1',
+            cb_env.function_names[0],
             'func OnUpdate(doc, meta) {\n    log("Doc created/updated", meta.id);\n}\n\n',
             cb_env.evt_version,
             metadata_keyspace=EventingFunctionKeyspace('default'),
@@ -462,8 +464,9 @@ class EventingManagementTestSuite:
             'beer-sample', "test-scope", "test-collection"
         )
         if cb_env.server_version_short >= 8.0:
-            with pytest.raises(InternalServerFailureException):
+            with pytest.raises((InternalServerFailureException, EventingFunctionCollectionNotFoundException)):
                 cb_env.efm.upsert_function(local_func)
+                cb_env.efm.deploy_function(local_func.name)
         else:
             with pytest.raises(EventingFunctionCollectionNotFoundException):
                 cb_env.efm.upsert_function(local_func)

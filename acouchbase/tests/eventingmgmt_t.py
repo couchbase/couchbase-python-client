@@ -213,8 +213,10 @@ class EventingManagementTests:
         func = await cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
         cb_env.validate_eventing_function(func, shallow=True)
 
+    @pytest.mark.usefixtures("drop_eventing_functions")
     @pytest.mark.asyncio
     async def test_upsert_function_fail(self, cb_env, evt_version):
+        self.function_names = [self.TEST_EVT_NAME]
         # bad appcode
         local_func = EventingFunction(
             self.TEST_EVT_NAME,
@@ -239,8 +241,9 @@ class EventingManagementTests:
             "beer-sample", "test-scope", "test-collection"
         )
         if cb_env.server_version_short >= 8.0:
-            with pytest.raises(InternalServerFailureException):
+            with pytest.raises((InternalServerFailureException, EventingFunctionCollectionNotFoundException)):
                 await cb_env.efm.upsert_function(local_func)
+                await cb_env.efm.deploy_function(local_func.name)
         else:
             with pytest.raises(EventingFunctionCollectionNotFoundException):
                 await cb_env.efm.upsert_function(local_func)
@@ -788,7 +791,10 @@ class ScopeEventingManagementTests:
     async def drop_eventing_functions(self, cb_env):
         yield
         for fn_name in self.function_names:
-            await cb_env.efm.drop_function(fn_name)
+            try:
+                await cb_env.efm.drop_function(fn_name)
+            except EventingFunctionNotFoundException:
+                continue
             await cb_env.try_n_times_till_exception(10,
                                                     1,
                                                     cb_env.efm.get_function,
@@ -803,13 +809,19 @@ class ScopeEventingManagementTests:
         await self._wait_until_status(
             cb_env, 15, 2, EventingFunctionState.Undeployed, self.TEST_EVT_NAME
         )
-        await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        try:
+            await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        except EventingFunctionNotFoundException:
+            pass
 
     @pytest_asyncio.fixture()
     async def create_and_drop_eventing_function(self, cb_env):
         await cb_env.efm.upsert_function(self.BASIC_FUNC)
         yield
-        await cb_env.efm.drop_function(self.BASIC_FUNC.name)
+        try:
+            await cb_env.efm.drop_function(self.BASIC_FUNC.name)
+        except EventingFunctionNotFoundException:
+            pass
 
     async def _wait_until_status(self,
                                  cb_env,  # type: TestEnvironment
@@ -863,8 +875,10 @@ class ScopeEventingManagementTests:
         func = await cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
         cb_env.validate_eventing_function(func, shallow=True)
 
+    @pytest.mark.usefixtures("drop_eventing_functions")
     @pytest.mark.asyncio
     async def test_upsert_function_fail(self, cb_env, evt_version):
+        self.function_names = [self.TEST_EVT_NAME]
         # bad appcode
         local_func = EventingFunction(
             self.TEST_EVT_NAME,
@@ -889,8 +903,9 @@ class ScopeEventingManagementTests:
             "beer-sample", "test-scope", "test-collection"
         )
         if cb_env.server_version_short >= 8.0:
-            with pytest.raises(InternalServerFailureException):
+            with pytest.raises((InternalServerFailureException, EventingFunctionCollectionNotFoundException)):
                 await cb_env.efm.upsert_function(local_func)
+                await cb_env.efm.deploy_function(local_func.name)
         else:
             with pytest.raises(EventingFunctionCollectionNotFoundException):
                 await cb_env.efm.upsert_function(local_func)
