@@ -29,10 +29,16 @@ function(get_python_version)
     set(PYTHON3_EXE "python3")
   endif()
 
-  execute_process(COMMAND ${PYTHON3_EXE} -c "import platform;print(platform.python_version())"
-                  OUTPUT_VARIABLE local_python_version)
-  string(STRIP "${local_python_version}" PYTHON_VERSION)
-  set(LOCAL_PYTHON_VERSION "${PYTHON_VERSION}" PARENT_SCOPE)
+  # Be careful with whitespace
+  execute_process(COMMAND ${PYTHON3_EXE} -c
+                  "import platform
+import re
+version = platform.python_version()
+match = re.search(r'\\d+\\.\\d+\\.\\d+', version)
+print(match.group())"
+                  OUTPUT_VARIABLE local_python_version
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(LOCAL_PYTHON_VERSION "${local_python_version}" PARENT_SCOPE)
 endfunction()
 
 if(WIN32)
@@ -53,7 +59,7 @@ message(STATUS "LOCAL_PYTHON_VERSION=${LOCAL_PYTHON_VERSION}")
 
 if(LOCAL_PYTHON_VERSION)
   set(Python3_FIND_VIRTUALENV FIRST)
-  message("finding python version ${LOCAL_PYTHON_VERSION}")
+  message(STATUS "Attempting to find python version: ${LOCAL_PYTHON_VERSION}")
   find_package(Python3 ${LOCAL_PYTHON_VERSION} EXACT COMPONENTS Interpreter Development.Module)
 else()
   find_package(Python3 COMPONENTS Interpreter Development.Module)
@@ -99,7 +105,7 @@ if(NOT USE_STATIC_BORINGSSL)
       if(NOT OPENSSL_VERSION)
         message(STATUS "No OpenSSL version set...cannot attempt to download.")
       else()
-        # default version is currently 1.1.1g (see setup.py)
+        # see pycbc_build_setup.py for default OpenSSL versions
         FetchContent_Declare(openssl
                              URL https://github.com/python/cpython-bin-deps/archive/openssl-bin-${OPENSSL_VERSION}.zip)
         message(STATUS "fetching OpenSSL version: ${OPENSSL_VERSION}")
@@ -112,8 +118,15 @@ if(NOT USE_STATIC_BORINGSSL)
       find_program(BREW_COMMAND brew)
       if(BREW_COMMAND)
         message(STATUS "brew command: ${BREW_COMMAND}")
+        set(BREW_OPENSSL "openssl@3")
+        if(USE_OPENSSLV1_1)
+          set(BREW_OPENSSL "openssl@1.1")
+          message(STATUS "Using OpenSSL v1.1 from homebrew")
+        else()
+          message(STATUS "Using OpenSSL v3 from homebrew")
+        endif()
         execute_process(
-          COMMAND ${BREW_COMMAND} --prefix openssl@1.1
+          COMMAND ${BREW_COMMAND} --prefix ${BREW_OPENSSL}
           OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
           RESULT_VARIABLE BREW_RESULT
           OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -132,7 +145,7 @@ if(NOT USE_STATIC_BORINGSSL)
   endif()
 
   message(STATUS "Adding ${OPENSSL_INCLUDE_DIR} to include dirs...")
-  include_directories(${OPENSSL_INCLUDE_DIR})
+  include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
 else()
   set(COUCHBASE_CXX_CLIENT_POST_LINKED_OPENSSL
       OFF
