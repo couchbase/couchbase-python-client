@@ -127,13 +127,19 @@ class EventingManagementTests:
     @pytest_asyncio.fixture()
     async def drop_eventing_function(self, cb_env):
         yield
-        await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        try:
+            await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        except EventingFunctionNotFoundException:
+            pass
 
     @pytest_asyncio.fixture()
     async def drop_eventing_functions(self, cb_env):
         yield
         for fn_name in self.function_names:
-            await cb_env.efm.drop_function(fn_name)
+            try:
+                await cb_env.efm.drop_function(fn_name)
+            except EventingFunctionNotFoundException:
+                continue
             await cb_env.try_n_times_till_exception(10,
                                                     1,
                                                     cb_env.efm.get_function,
@@ -148,18 +154,25 @@ class EventingManagementTests:
         await self._wait_until_status(
             cb_env, 15, 2, EventingFunctionState.Undeployed, self.TEST_EVT_NAME
         )
-        await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        try:
+            await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        except EventingFunctionNotFoundException:
+            pass
 
     @pytest_asyncio.fixture()
     async def create_and_drop_eventing_function(self, cb_env):
         await cb_env.efm.upsert_function(self.BASIC_FUNC)
         yield
-        await cb_env.efm.drop_function(self.BASIC_FUNC.name)
-        await cb_env.try_n_times_till_exception(10,
-                                                1,
-                                                cb_env.efm.get_function,
-                                                self.BASIC_FUNC.name,
-                                                EventingFunctionNotFoundException)
+        try:
+            await cb_env.efm.drop_function(self.BASIC_FUNC.name)
+        except EventingFunctionNotFoundException:
+            pass
+        else:
+            await cb_env.try_n_times_till_exception(10,
+                                                    1,
+                                                    cb_env.efm.get_function,
+                                                    self.BASIC_FUNC.name,
+                                                    EventingFunctionNotFoundException)
 
     async def _wait_until_status(self,
                                  cb_env,  # type: TestEnvironment

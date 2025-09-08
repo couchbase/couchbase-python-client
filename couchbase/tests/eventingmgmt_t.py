@@ -77,12 +77,16 @@ class EventingManagementTestSuite:
     def create_and_drop_eventing_function(self, cb_env):
         cb_env.efm.upsert_function(cb_env.BASIC_FUNC)
         yield
-        cb_env.efm.drop_function(cb_env.BASIC_FUNC.name)
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   1,
-                                                   cb_env.efm.get_function,
-                                                   cb_env.BASIC_FUNC.name,
-                                                   EventingFunctionNotFoundException)
+        try:
+            cb_env.efm.drop_function(cb_env.BASIC_FUNC.name)
+        except EventingFunctionNotFoundException:
+            pass
+        else:
+            TestEnvironment.try_n_times_till_exception(10,
+                                                       1,
+                                                       cb_env.efm.get_function,
+                                                       cb_env.BASIC_FUNC.name,
+                                                       EventingFunctionNotFoundException)
 
     @pytest.fixture()
     def create_eventing_function(self, cb_env):
@@ -92,7 +96,10 @@ class EventingManagementTestSuite:
     def drop_eventing_functions(self, cb_env):
         yield
         for fn_name in cb_env.function_names:
-            cb_env.efm.drop_function(fn_name)
+            try:
+                cb_env.efm.drop_function(fn_name)
+            except EventingFunctionNotFoundException:
+                continue
             TestEnvironment.try_n_times_till_exception(10,
                                                        1,
                                                        cb_env.efm.get_function,
@@ -105,12 +112,16 @@ class EventingManagementTestSuite:
         yield
         cb_env.efm.undeploy_function(cb_env.TEST_EVT_NAME)
         cb_env.wait_until_status(15, 2, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
-        cb_env.efm.drop_function(cb_env.TEST_EVT_NAME)
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   1,
-                                                   cb_env.efm.get_function,
-                                                   cb_env.BASIC_FUNC.name,
-                                                   EventingFunctionNotFoundException)
+        try:
+            cb_env.efm.drop_function(cb_env.TEST_EVT_NAME)
+        except EventingFunctionNotFoundException:
+            pass
+        else:
+            TestEnvironment.try_n_times_till_exception(10,
+                                                       1,
+                                                       cb_env.efm.get_function,
+                                                       cb_env.BASIC_FUNC.name,
+                                                       EventingFunctionNotFoundException)
 
     @pytest.mark.usefixtures('drop_eventing_functions')
     def test_constant_bindings(self, cb_env):
