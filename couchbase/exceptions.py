@@ -16,9 +16,7 @@
 import json
 import re
 import sys
-from collections import defaultdict
 from enum import Enum
-from string import Template
 from typing import (Any,
                     Dict,
                     Optional,
@@ -400,6 +398,8 @@ class CouchbaseException(Exception):
         Returns:
             Optional[Exception]: Exception's inner cause, if it exists.
         """
+        if not self._exc_info:
+            return
         return self._exc_info.get('inner_cause', None)
 
     @classmethod
@@ -409,7 +409,7 @@ class CouchbaseException(Exception):
     def __repr__(self):
         from couchbase._utils import is_null_or_empty
         details = []
-        if self._base:
+        if hasattr(self, '_base') and self._base:
             details.append(
                 "ec={}, category={}".format(
                     self._base.err(),
@@ -1754,95 +1754,131 @@ class TransactionCommitAmbiguous(TransactionException):
 
 # Field Level Encryption Exceptions
 
-# @TODO:  Need to look at FLE library to make updates here
-
 
 class CryptoException(CouchbaseException):
-    def __init__(self, params=None,
-                 message="Generic Cryptography exception", **kwargs):
-        params = params or {}
-        param_dict = params.get("objextra") or defaultdict(lambda: "unknown")
-        params["message"] = Template(message).safe_substitute(**param_dict)
-        super(CryptoException, self).__init__(params=params, **kwargs)
+    def __init__(self,
+                 message: Optional[str] = 'Generic Cryptography exception',
+                 exc_info: Optional[Dict[str, Any]] = None
+                 ) -> None:
+        super().__init__(message=message, exc_info=exc_info)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class EncryptionFailureException(CryptoException):
-    def __init__(self, params=None,
-                 message="Generic encryption failure.", **kwargs):
-        super(EncryptionFailureException, self).__init__(
-            params=params, message=message, **kwargs
-        )
+    def __init__(self,
+                 message: Optional[str] = 'Generic Encryption exception',
+                 exc_info: Optional[Dict[str, Any]] = None
+                 ) -> None:
+        super().__init__(message=message, exc_info=exc_info)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class DecryptionFailureException(CryptoException):
-    def __init__(self, params=None,
-                 message="Generic decryption failure.", **kwargs):
-        super(DecryptionFailureException, self).__init__(
-            params=params, message=message, **kwargs
-        )
+    def __init__(self,
+                 message: Optional[str] = 'Generic Decryption exception',
+                 exc_info: Optional[Dict[str, Any]] = None
+                 ) -> None:
+        super().__init__(message=message, exc_info=exc_info)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()})"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class CryptoKeyNotFoundException(CryptoException):
     def __init__(self, message):
         self._message = message
-        super(CryptoKeyNotFoundException, self).__init__(message=message)
+        super().__init__(message=message)
+
+    def __repr__(self):
+        return f'{type(self).__name__}(message={self._message})'
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self._message)
+        return self.__repr__()
 
 
 class InvalidCryptoKeyException(CryptoException):
     def __init__(self, message):
         self._message = message
-        super(InvalidCryptoKeyException, self).__init__(message=message)
+        super().__init__(message=message)
+
+    def __repr__(self):
+        return f'{type(self).__name__}(message={self._message})'
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self._message)
+        return self.__repr__()
 
 
 class EncrypterNotFoundException(CryptoException):
     def __init__(self, message):
         self._message = message
-        super(EncrypterNotFoundException, self).__init__(message=message)
+        super().__init__(message=message)
+
+    def __repr__(self):
+        return f'{type(self).__name__}(message={self._message})'
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self._message)
+        return self.__repr__()
 
 
 class DecrypterNotFoundException(CryptoException):
     def __init__(self, message):
         self._message = message
-        super(DecrypterNotFoundException, self).__init__(message=message)
+        super().__init__(message=message)
+
+    def __repr__(self):
+        return f'{type(self).__name__}(message={self._message})'
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self._message)
+        return self.__repr__()
 
 
 class EncrypterAlreadyExistsException(CryptoException):
     def __init__(self, message):
         self._message = message
-        super(EncrypterAlreadyExistsException, self).__init__(message=message)
+        super().__init__(message=message)
+
+    def __repr__(self):
+        return f'{type(self).__name__}(message={self._message})'
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self._message)
+        return self.__repr__()
 
 
 class DecrypterAlreadyExistsException(CryptoException):
     def __init__(self, message):
         self._message = message
-        super(DecrypterAlreadyExistsException, self).__init__(message=message)
+        super().__init__(message=message)
+
+    def __repr__(self):
+        return f'{type(self).__name__}(message={self._message})'
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self._message)
+        return self.__repr__()
 
 
 class InvalidCipherTextException(CryptoException):
     def __init__(self, message):
         self._message = message
-        super(InvalidCipherTextException, self).__init__(message=message)
+        super().__init__(message=message)
+
+    def __repr__(self):
+        return f'{type(self).__name__}(message={self._message})'
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self._message)
+        return self.__repr__()
 
 
 # CXX Error Map

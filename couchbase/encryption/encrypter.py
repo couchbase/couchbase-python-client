@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2025. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -20,10 +20,8 @@ from couchbase.encryption import EncryptionResult, Keyring
 
 
 class Encrypter(ABC):
-    def __init__(self,
-                 keyring,  # type: Keyring
-                 key,  # type: str
-                 ):
+
+    def __init__(self, keyring: Keyring, key: str) -> None:
         self._keyring = keyring
         self._key = key
 
@@ -36,9 +34,7 @@ class Encrypter(ABC):
         return self._key
 
     @abstractmethod
-    def encrypt(self,
-                plaintext,  # type: Union[str, bytes, bytearray]
-                ) -> EncryptionResult:
+    def encrypt(self, plaintext: Union[str, bytes, bytearray]) -> EncryptionResult:
         """Encrypts the given plaintext
 
         Args:
@@ -52,4 +48,3 @@ class Encrypter(ABC):
             :class:`~couchbase.exceptions.InvalidCryptoKeyException`: If the :class:`.Encrypter` has an invalid
             key for encryption.
         """
-        pass

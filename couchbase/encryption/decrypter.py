@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2025. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,10 +14,9 @@
 #  limitations under the License.
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
-if TYPE_CHECKING:
-    from couchbase.encryption import EncryptionResult, Keyring
+from couchbase.encryption import EncryptionResult, Keyring
 
 
 class Decrypter(ABC):
@@ -25,15 +24,12 @@ class Decrypter(ABC):
 
     """
 
-    def __init__(self,
-                 keyring,  # type: Keyring
-                 alg=None,  # type: Optional[str]
-                 ):
+    def __init__(self, keyring: Keyring, alg: Optional[str] = None) -> None:
         self._keyring = keyring
         self._alg = alg
 
     @property
-    def keyring(self):
+    def keyring(self) -> Keyring:
         return self._keyring
 
     def algorithm(self) -> str:
@@ -45,9 +41,7 @@ class Decrypter(ABC):
         return self._alg
 
     @abstractmethod
-    def decrypt(self,
-                encrypted,  # type: EncryptionResult
-                ) -> bytes:
+    def decrypt(self, encrypted: EncryptionResult) -> bytes:
         """Decrypts the given :class:`~couchbase.encryption.EncryptionResult` ciphertext.
 
         The Decrypter's algorithm should match the `alg` property of the given

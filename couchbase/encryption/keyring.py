@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2025. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,21 +14,18 @@
 #  limitations under the License.
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from couchbase.encryption import Key
+from couchbase.encryption import Key
 
 
 class Keyring(ABC):
+
     @abstractmethod
-    def get_key(self,
-                key_id,  # type: str
-                ) -> Key:
+    def get_key(self, key_id: str) -> Key:
         """Returns requested key
 
         Args:
-            keyid (str): Key ID to retrieve
+            key_id (str): Key ID to retrieve
 
         Returns:
             :class:`~couchbase.encryption.Key`: The corresponding :class:`~couchbase.encryption.Key`
