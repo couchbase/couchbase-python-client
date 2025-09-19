@@ -23,34 +23,29 @@ from tests.environments import CollectionType
 
 class ExceptionTestSuite:
     TEST_MANIFEST = [
+        'test_couchbase_exception_base',
         'test_exceptions_create_only_message',
     ]
 
     @pytest.fixture(scope='class', name='cb_exceptions')
     def get_couchbase_exceptions(self):
         couchbase_exceptions = []
-        skip_list = [
-            'CouchbaseException',
-            'CryptoException',
-            'EncryptionFailureException',
-            'DecryptionFailureException',
-            'CryptoKeyNotFoundException',
-            'InvalidCryptoKeyException',
-            'EncrypterNotFoundException',
-            'DecrypterNotFoundException',
-            'EncrypterAlreadyExistsException',
-            'DecrypterAlreadyExistsException',
-            'InvalidCipherTextException'
-        ]
         for ex in dir(E):
             exp = getattr(sys.modules['couchbase.exceptions'], ex)
             try:
-                if issubclass(exp, E.CouchbaseException) and exp.__name__ not in skip_list:
+                if issubclass(exp, E.CouchbaseException) and exp.__name__ != 'CouchbaseException':
                     couchbase_exceptions.append(exp)
             except TypeError:
                 pass
 
         return couchbase_exceptions
+
+    def test_couchbase_exception_base(self):
+        base = E.CouchbaseException(message='This is a test message.')
+        assert isinstance(base, Exception)
+        assert isinstance(base, E.CouchbaseException)
+        assert str(base).startswith('<')
+        assert 'message=This is a test message.' in str(base)
 
     def test_exceptions_create_only_message(self, cb_exceptions):
         for ex in cb_exceptions:

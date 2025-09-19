@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2025. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,8 +14,10 @@
 #  limitations under the License.
 
 from .crypto_manager import CryptoManager  # noqa: F401
-from .decrypter import Decrypter  # noqa: F401
-from .encrypter import Encrypter  # noqa: F401
 from .encryption_result import EncryptionResult  # noqa: F401
 from .key import Key  # noqa: F401
 from .keyring import Keyring  # noqa: F401
+
+# import Encrypter/Decrypter last to avoid circular import
+from .decrypter import Decrypter  # nopep8 # isort:skip # noqa: F401
+from .encrypter import Encrypter  # nopep8 # isort:skip # noqa: F401

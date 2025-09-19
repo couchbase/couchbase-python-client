@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2025. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -17,10 +17,7 @@ from typing import Union
 
 
 class Key:
-    def __init__(self,
-                 id,  # type: str
-                 bytes_,  # type: Union[bytes, bytearray]
-                 ):
+    def __init__(self, id: str, bytes_: Union[bytes, bytearray]) -> None:
         self._id = id
         self._bytes = bytes_ if isinstance(bytes_, bytes) else bytes(bytes_)
 
