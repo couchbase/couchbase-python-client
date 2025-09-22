@@ -347,8 +347,7 @@ class BucketSettings(dict):
     mapping = BidirectionalMapping([
         BidirectionalTransform("flush_enabled",
                                ParamTransform("flushEnabled", Identity(bool)),
-                               ParamTransform("flushEnabled", Identity(bool)),
-                               default=False),
+                               ParamTransform("flushEnabled", Identity(bool))),
         BidirectionalTransform("num_replicas",
                                ParamTransform("numReplicas", Identity(int)),
                                ParamTransform("numReplicas", Identity(int)),
@@ -358,14 +357,12 @@ class BucketSettings(dict):
                                ParamTransform("ramQuotaMB", Identity(int))),
         BidirectionalTransform("replica_index",
                                ParamTransform("replicaIndex", Identity(bool)),
-                               ParamTransform("replicaIndex", Identity(bool)),
-                               default=False),
+                               ParamTransform("replicaIndex", Identity(bool))),
         BidirectionalTransform("bucket_type",
                                ParamTransform(
                                    "bucketType", EnumToStr(BucketType)),
                                ParamTransform(
-                                   "bucketType", StrToEnum(BucketType)),
-                               default=BucketType.COUCHBASE),
+                                   "bucketType", StrToEnum(BucketType))),
         BidirectionalTransform("max_ttl",
                                ParamTransform("maxTTL", Identity(int)),
                                ParamTransform("maxTTL", Identity(int))),
@@ -419,7 +416,7 @@ class BucketSettings(dict):
     @overload
     def __init__(self,
                  name=None,  # type: str
-                 flush_enabled=False,  # type: bool
+                 flush_enabled=None,  # type: bool
                  ram_quota_mb=None,  # type: int
                  num_replicas=0,  # type: int
                  replica_index=None,  # type: bool
@@ -475,7 +472,7 @@ class BucketSettings(dict):
     def bucket_type(self):
         # type: (...) -> BucketType
         """BucketType {couchbase (sent on wire as membase), memcached, ephemeral}
-        The type of the bucket. Default to couchbase."""
+        The type of the bucket. Defaults to the server default (couchbase)."""
         return self.get('bucket_type')
 
     @property
