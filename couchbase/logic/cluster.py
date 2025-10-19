@@ -30,7 +30,9 @@ from couchbase import USER_AGENT_EXTRA
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.options import (ClusterOptions,
+from couchbase.options import (ClusterMetricsOptions,
+                               ClusterOptions,
+                               ClusterOrphanReportingOptions,
                                ClusterTimeoutOptions,
                                ClusterTracingOptions,
                                TLSVerifyMode,
@@ -144,8 +146,47 @@ class ClusterLogic:
         for key in ClusterTracingOptions.get_allowed_option_keys(use_transform_keys=True):
             if key in cluster_opts:
                 tracing_opts[key] = cluster_opts.pop(key)
+
+        orphan_opts = {}
+        for key in ClusterOrphanReportingOptions.get_allowed_option_keys(use_transform_keys=True):
+            if key in cluster_opts:
+                orphan_opts[key] = cluster_opts.pop(key)
+
+        # PYCBC-XXXX: C++ core split out orphan reporting from tracing, so we have separate options blocks now.
+        #           However, we have to check for the old options in the tracing block for backwards compatibility.
+        if tracing_opts:
+            sample_size = tracing_opts.pop('orphan_sample_size', None)
+            if sample_size and 'sample_size' not in orphan_opts:
+                orphan_opts['orphan_sample_size'] = sample_size
+            emit_interval = tracing_opts.pop('orphan_emit_interval', None)
+            if emit_interval and 'emit_interval' not in orphan_opts:
+                orphan_opts['orphan_emit_interval'] = emit_interval
+
+        cluster_enable_tracing = cluster_opts.pop('cluster_enable_tracing', None)
+        if cluster_enable_tracing is not None and 'enable_tracing' not in tracing_opts:
+            tracing_opts['enable_tracing'] = cluster_enable_tracing
         if tracing_opts:
             cluster_opts['tracing_options'] = tracing_opts
+
+        cluster_enable_orphan_reporting = cluster_opts.pop('cluster_enable_orphan_reporting', None)
+        if cluster_enable_orphan_reporting is not None and 'enable_orphan_reporting' not in orphan_opts:
+            orphan_opts['enable_orphan_reporting'] = cluster_enable_orphan_reporting
+        if orphan_opts:
+            cluster_opts['orphan_reporting_options'] = orphan_opts
+
+        metrics_opts = {}
+        for key in ClusterMetricsOptions.get_allowed_option_keys(use_transform_keys=True):
+            if key in cluster_opts:
+                metrics_opts[key] = cluster_opts.pop(key)
+
+        cluster_metrics_emit_interval = cluster_opts.pop('cluster_metrics_emit_interval', None)
+        if cluster_metrics_emit_interval and 'metrics_emit_interval' not in metrics_opts:
+            metrics_opts['metrics_emit_interval'] = cluster_metrics_emit_interval
+        cluster_enable_metrics = cluster_opts.pop('cluster_enable_metrics', None)
+        if cluster_enable_metrics is not None and 'enable_metrics' not in metrics_opts:
+            metrics_opts['enable_metrics'] = cluster_enable_metrics
+        if metrics_opts:
+            cluster_opts['metrics_options'] = metrics_opts
 
         self._default_serializer = cluster_opts.pop("serializer", None)
         if not self._default_serializer:

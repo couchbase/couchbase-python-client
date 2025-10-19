@@ -454,9 +454,102 @@ class ClusterTimeoutOptionsBase(dict):
         return list(ClusterTimeoutOptionsBase._VALID_OPTS.keys())
 
 
+class ClusterMetricsOptionsBase(dict):
+
+    _VALID_OPTS = {
+        "metrics_enable_metrics": {"enable_metrics": validate_bool},
+        "metrics_emit_interval": {"metrics_emit_interval": timedelta_as_microseconds}
+    }
+
+    @overload
+    def __init__(
+        self,
+        enable_metrics=None,  # type: Optional[bool]
+        emit_interval=None,  # type: Optional[timedelta]
+    ):
+        """ClusterMetricsOptions instance."""
+
+    def __init__(self, **kwargs):
+        kwargs = {f'metrics_{k}': v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    def as_dict(self):
+        opts = {}
+        allowed_opts = ClusterMetricsOptionsBase.get_allowed_option_keys()
+        for k, v in self.items():
+            if k not in allowed_opts:
+                continue
+            if v is None:
+                continue
+            if isinstance(v, timedelta):
+                opts[k] = v.total_seconds()
+            elif isinstance(v, (int, float)):
+                opts[k] = v
+        return opts
+
+    @staticmethod
+    def get_allowed_option_keys(use_transform_keys=False  # type: Optional[bool]
+                                ) -> List[str]:
+        if use_transform_keys is True:
+            keys = []
+            for val in ClusterMetricsOptionsBase._VALID_OPTS.values():
+                keys.append(list(val.keys())[0])
+            return keys
+
+        return list(ClusterMetricsOptionsBase._VALID_OPTS.keys())
+
+
+class ClusterOrphanReportingOptionsBase(dict):
+
+    _VALID_OPTS = {
+        "orphan_enable_orphan_reporting": {"enable_orphan_reporting": validate_bool},
+        "orphan_sample_size": {"orphan_sample_size": validate_int},
+        "orphan_emit_interval": {"orphan_emit_interval": timedelta_as_microseconds}
+    }
+
+    @overload
+    def __init__(
+        self,
+        enable_orphan_reporting=None,  # type: Optional[bool]
+        sample_size=None,  # type: Optional[int]
+        emit_interval=None,  # type: Optional[timedelta]
+    ):
+        """ClusterOrphanReportingOptions instance."""
+
+    def __init__(self, **kwargs):
+        kwargs = {f'orphan_{k}': v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    def as_dict(self):
+        opts = {}
+        allowed_opts = ClusterOrphanReportingOptionsBase.get_allowed_option_keys()
+        for k, v in self.items():
+            if k not in allowed_opts:
+                continue
+            if v is None:
+                continue
+            if isinstance(v, timedelta):
+                opts[k] = v.total_seconds()
+            elif isinstance(v, (int, float)):
+                opts[k] = v
+        return opts
+
+    @staticmethod
+    def get_allowed_option_keys(use_transform_keys=False  # type: Optional[bool]
+                                ) -> List[str]:
+        if use_transform_keys is True:
+            keys = []
+            for val in ClusterOrphanReportingOptionsBase._VALID_OPTS.values():
+                keys.append(list(val.keys())[0])
+            return keys
+
+        return list(ClusterOrphanReportingOptionsBase._VALID_OPTS.keys())
+
+
 class ClusterTracingOptionsBase(dict):
 
     _VALID_OPTS = {
+        "tracing_enable_tracing": {"enable_tracing": validate_bool},
         "tracing_threshold_kv": {"key_value_threshold": timedelta_as_microseconds},
         "tracing_threshold_view": {"view_threshold": timedelta_as_microseconds},
         "tracing_threshold_query": {"query_threshold": timedelta_as_microseconds},
@@ -466,13 +559,14 @@ class ClusterTracingOptionsBase(dict):
         "tracing_threshold_management": {"management_threshold": timedelta_as_microseconds},
         "tracing_threshold_queue_size": {"threshold_sample_size": validate_int},
         "tracing_threshold_queue_flush_interval": {"threshold_emit_interval": timedelta_as_microseconds},
-        "tracing_orphaned_queue_size": {"orphaned_sample_size": validate_int},
-        "tracing_orphaned_queue_flush_interval": {"orphaned_emit_interval": timedelta_as_microseconds}
+        "tracing_orphaned_queue_size": {"orphan_sample_size": validate_int},
+        "tracing_orphaned_queue_flush_interval": {"orphan_emit_interval": timedelta_as_microseconds}
     }
 
     @overload
     def __init__(
         self,
+        enable_tracing=None,  # type: Optional[bool]
         tracing_threshold_kv=None,  # type: Optional[timedelta]
         tracing_threshold_view=None,  # type: Optional[timedelta]
         tracing_threshold_query=None,  # type: Optional[timedelta]
@@ -489,6 +583,9 @@ class ClusterTracingOptionsBase(dict):
 
     def __init__(self, **kwargs):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        enable_tracing = kwargs.pop('enable_tracing', None)
+        if enable_tracing is not None:
+            kwargs['tracing_enable_tracing'] = enable_tracing
         super().__init__(**kwargs)
 
     def as_dict(self):
@@ -535,8 +632,9 @@ class ClusterOptionsBase(dict):
         "enable_unordered_execution": {"enable_unordered_execution": validate_bool},
         "enable_clustermap_notification": {"enable_clustermap_notification": validate_bool},
         "enable_compression": {"enable_compression": validate_bool},
-        "enable_tracing": {"enable_tracing": validate_bool},
-        "enable_metrics": {"enable_metrics": validate_bool},
+        "enable_tracing": {"cluster_enable_tracing": validate_bool},
+        "enable_metrics": {"cluster_enable_metrics": validate_bool},
+        "enable_orphan_reporting": {"cluster_enable_orphan_reporting": validate_bool},
         "network": {"network": validate_str},
         "tls_verify": {"tls_verify": TLSVerifyMode.to_str},
         "serializer": {"serializer": lambda x: x},
@@ -550,7 +648,7 @@ class ClusterOptionsBase(dict):
         "trust_store_path": {"trust_store_path": validate_str},
         "cert_path": {"cert_path": validate_str},
         "disable_mozilla_ca_certificates": {"disable_mozilla_ca_certificates": validate_bool},
-        "logging_meter_emit_interval": {"emit_interval": timedelta_as_microseconds},
+        "logging_meter_emit_interval": {"cluster_metrics_emit_interval": timedelta_as_microseconds},
         "num_io_threads": {"num_io_threads": validate_int},
         "transaction_config": {"transaction_config": lambda x: x},
         "tracer": {"tracer": lambda x: x},
@@ -572,6 +670,8 @@ class ClusterOptionsBase(dict):
         self,
         authenticator,  # type: Authenticator
         timeout_options=None,  # type: Optional[ClusterTimeoutOptionsBase]
+        orphan_reporting_options=None,  # type: Optional[ClusterOrphanReportingOptionsBase]
+        metrics_options=None,  # type: Optional[ClusterMetricsOptionsBase]
         tracing_options=None,  # type: Optional[ClusterTracingOptionsBase]
         enable_tls=None,    # type: Optional[bool]
         enable_mutation_tokens=None,    # type: Optional[bool]
@@ -584,6 +684,7 @@ class ClusterOptionsBase(dict):
         enable_compression=None,    # type: Optional[bool]
         enable_tracing=None,    # type: Optional[bool]
         enable_metrics=None,    # type: Optional[bool]
+        enable_orphan_reporting=None,    # type: Optional[bool]
         network=None,    # type: Optional[str]
         tls_verify=None,    # type: Optional[Union[TLSVerifyMode, str]]
         serializer=None,  # type: Optional[Serializer]
@@ -616,7 +717,7 @@ class ClusterOptionsBase(dict):
     ):
         """ClusterOptions instance."""
 
-    def __init__(self,
+    def __init__(self,  # noqa: C901
                  authenticator,  # type: Authenticator
                  **kwargs
                  ):
@@ -628,6 +729,18 @@ class ClusterOptionsBase(dict):
         tracing_opts = kwargs.pop('tracing_options', {})
         if tracing_opts:
             for k, v in tracing_opts.items():
+                if k not in kwargs:
+                    kwargs[k] = v
+
+        orphan_opts = kwargs.pop('orphan_reporting_options', {})
+        if orphan_opts:
+            for k, v in orphan_opts.items():
+                if k not in kwargs:
+                    kwargs[k] = v
+
+        metrics_opts = kwargs.pop('metrics_options', {})
+        if metrics_opts:
+            for k, v in metrics_opts.items():
                 if k not in kwargs:
                     kwargs[k] = v
 
@@ -654,6 +767,8 @@ class ClusterOptionsBase(dict):
 
             keys.extend(ClusterTimeoutOptionsBase.get_allowed_option_keys(use_transform_keys=True))
             keys.extend(ClusterTracingOptionsBase.get_allowed_option_keys(use_transform_keys=True))
+            keys.extend(ClusterMetricsOptionsBase.get_allowed_option_keys(use_transform_keys=True))
+            keys.extend(ClusterOrphanReportingOptionsBase.get_allowed_option_keys(use_transform_keys=True))
 
             return keys
 
@@ -661,6 +776,8 @@ class ClusterOptionsBase(dict):
             return list(ClusterOptionsBase._VALID_OPTS.keys())
 
         valid_keys = ClusterTimeoutOptionsBase.get_allowed_option_keys()
+        valid_keys.extend(ClusterOrphanReportingOptionsBase.get_allowed_option_keys())
+        valid_keys.extend(ClusterMetricsOptionsBase.get_allowed_option_keys())
         valid_keys.extend(ClusterTracingOptionsBase.get_allowed_option_keys())
         valid_keys.extend(list(ClusterOptionsBase._VALID_OPTS.keys()))
 
@@ -669,6 +786,8 @@ class ClusterOptionsBase(dict):
     @staticmethod
     def get_valid_options() -> Dict[str, Any]:
         valid_opts = copy.copy(ClusterTimeoutOptionsBase._VALID_OPTS)
+        valid_opts.update(copy.copy(ClusterMetricsOptionsBase._VALID_OPTS))
+        valid_opts.update(copy.copy(ClusterOrphanReportingOptionsBase._VALID_OPTS))
         valid_opts.update(copy.copy(ClusterTracingOptionsBase._VALID_OPTS))
         valid_opts.update(copy.copy(ClusterOptionsBase._VALID_OPTS))
         return valid_opts

@@ -286,12 +286,12 @@ get_cluster_credentials(PyObject* pyObj_auth)
 }
 
 PyObject*
-get_metrics_options(const couchbase::core::metrics::logging_meter_options& logging_options)
+get_metrics_options(const couchbase::core::metrics::logging_meter_options& metrics_options)
 {
   PyObject* pyObj_opts = PyDict_New();
-  std::chrono::duration<unsigned long long, std::milli> int_msec = logging_options.emit_interval;
+  std::chrono::duration<unsigned long long, std::milli> int_msec = metrics_options.emit_interval;
   PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
-  if (-1 == PyDict_SetItemString(pyObj_opts, "emit_interval", pyObj_tmp)) {
+  if (-1 == PyDict_SetItemString(pyObj_opts, "metrics_emit_interval", pyObj_tmp)) {
     PyErr_Print();
     PyErr_Clear();
   }
@@ -300,23 +300,25 @@ get_metrics_options(const couchbase::core::metrics::logging_meter_options& loggi
   return pyObj_opts;
 }
 
-void
-update_cluster_logging_meter_options(couchbase::core::cluster_options& options,
-                                     PyObject* pyObj_emit_interval)
+PyObject*
+get_orphan_reporting_options(const couchbase::core::orphan_reporter_options& orphan_options)
 {
-  couchbase::core::metrics::logging_meter_options logging_options{};
-  bool has_logging_meter_options = false;
-
-  if (pyObj_emit_interval != nullptr) {
-    auto emit_interval = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_emit_interval));
-    auto emit_interval_ms = std::chrono::milliseconds(std::max(0ULL, emit_interval / 1000ULL));
-    logging_options.emit_interval = emit_interval_ms;
-    has_logging_meter_options = true;
+  PyObject* pyObj_opts = PyDict_New();
+  std::chrono::duration<unsigned long long, std::milli> int_msec = orphan_options.emit_interval;
+  PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
+  if (-1 == PyDict_SetItemString(pyObj_opts, "orphan_emit_interval", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
   }
+  Py_XDECREF(pyObj_tmp);
 
-  if (has_logging_meter_options) {
-    options.metrics_options = logging_options;
+  pyObj_tmp = PyLong_FromSize_t(orphan_options.sample_size);
+  if (-1 == PyDict_SetItemString(pyObj_opts, "orphan_sample_size", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
   }
+  Py_XDECREF(pyObj_tmp);
+  return pyObj_opts;
 }
 
 PyObject*
@@ -324,23 +326,8 @@ get_tracing_options(const couchbase::core::tracing::threshold_logging_options& t
 {
   PyObject* pyObj_opts = PyDict_New();
   std::chrono::duration<unsigned long long, std::milli> int_msec =
-    tracing_options.orphaned_emit_interval;
+    tracing_options.threshold_emit_interval;
   PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
-  if (-1 == PyDict_SetItemString(pyObj_opts, "orphaned_emit_interval", pyObj_tmp)) {
-    PyErr_Print();
-    PyErr_Clear();
-  }
-  Py_XDECREF(pyObj_tmp);
-
-  pyObj_tmp = PyLong_FromSize_t(tracing_options.orphaned_sample_size);
-  if (-1 == PyDict_SetItemString(pyObj_opts, "orphaned_sample_size", pyObj_tmp)) {
-    PyErr_Print();
-    PyErr_Clear();
-  }
-  Py_XDECREF(pyObj_tmp);
-
-  int_msec = tracing_options.threshold_emit_interval;
-  pyObj_tmp = PyLong_FromUnsignedLongLong(int_msec.count());
   if (-1 == PyDict_SetItemString(pyObj_opts, "threshold_emit_interval", pyObj_tmp)) {
     PyErr_Print();
     PyErr_Clear();
@@ -414,9 +401,74 @@ get_tracing_options(const couchbase::core::tracing::threshold_logging_options& t
 }
 
 void
+update_metrics_options(couchbase::core::cluster_options& options, PyObject* pyObj_metrics_opts)
+{
+  PyObject* pyObj_enable_metrics = PyDict_GetItemString(pyObj_metrics_opts, "enable_metrics");
+  if (pyObj_enable_metrics != nullptr && pyObj_enable_metrics == Py_False) {
+    options.enable_metrics = false;
+    return;
+  }
+
+  couchbase::core::metrics::logging_meter_options metrics_options{};
+  bool has_metrics_options = false;
+
+  PyObject* pyObj_emit_interval = PyDict_GetItemString(pyObj_metrics_opts, "metrics_emit_interval");
+  if (pyObj_emit_interval != nullptr) {
+    auto emit_interval = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_emit_interval));
+    auto emit_interval_ms = std::chrono::milliseconds(std::max(0ULL, emit_interval / 1000ULL));
+    metrics_options.emit_interval = emit_interval_ms;
+    has_metrics_options = true;
+  }
+
+  if (has_metrics_options) {
+    options.metrics_options = metrics_options;
+  }
+}
+
+void
+update_cluster_orphan_reporting_options(couchbase::core::cluster_options& options,
+                                        PyObject* pyObj_orphan_opts)
+{
+  PyObject* pyObj_enable_orphan_reporting =
+    PyDict_GetItemString(pyObj_orphan_opts, "enable_orphan_reporting");
+  if (pyObj_enable_orphan_reporting != nullptr && pyObj_enable_orphan_reporting == Py_False) {
+    options.enable_orphan_reporting = false;
+    return;
+  }
+
+  couchbase::core::orphan_reporter_options orphan_options{};
+  bool has_orphan_options = false;
+
+  PyObject* pyObj_emit_interval = PyDict_GetItemString(pyObj_orphan_opts, "orphan_emit_interval");
+  if (pyObj_emit_interval != nullptr) {
+    auto emit_interval = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_emit_interval));
+    auto emit_interval_ms = std::chrono::milliseconds(std::max(0ULL, emit_interval / 1000ULL));
+    orphan_options.emit_interval = emit_interval_ms;
+    has_orphan_options = true;
+  }
+
+  PyObject* pyObj_sample_size = PyDict_GetItemString(pyObj_orphan_opts, "orphan_sample_size");
+  if (pyObj_sample_size != nullptr) {
+    auto sample_size = static_cast<size_t>(PyLong_AsUnsignedLong(pyObj_sample_size));
+    orphan_options.sample_size = sample_size;
+    has_orphan_options = true;
+  }
+
+  if (has_orphan_options) {
+    options.orphan_options = orphan_options;
+  }
+}
+
+void
 update_cluster_tracing_options(couchbase::core::cluster_options& options,
                                PyObject* pyObj_tracing_opts)
 {
+  PyObject* pyObj_enable_tracing = PyDict_GetItemString(pyObj_tracing_opts, "enable_tracing");
+  if (pyObj_enable_tracing != nullptr && pyObj_enable_tracing == Py_False) {
+    options.enable_tracing = false;
+    return;
+  }
+
   couchbase::core::tracing::threshold_logging_options tracing_options{};
   bool has_tracing_options = false;
 
@@ -504,26 +556,6 @@ update_cluster_tracing_options(couchbase::core::cluster_options& options,
     auto threshold_emit_interval_ms =
       std::chrono::milliseconds(std::max(0ULL, threshold_emit_interval / 1000ULL));
     tracing_options.threshold_emit_interval = threshold_emit_interval_ms;
-    has_tracing_options = true;
-  }
-
-  PyObject* pyObj_orphaned_emit_interval =
-    PyDict_GetItemString(pyObj_tracing_opts, "orphaned_emit_interval");
-  if (pyObj_orphaned_emit_interval != nullptr) {
-    auto orphaned_emit_interval =
-      static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_orphaned_emit_interval));
-    auto orphaned_emit_interval_ms =
-      std::chrono::milliseconds(std::max(0ULL, orphaned_emit_interval / 1000ULL));
-    tracing_options.orphaned_emit_interval = orphaned_emit_interval_ms;
-    has_tracing_options = true;
-  }
-
-  PyObject* pyObj_orphaned_sample_size =
-    PyDict_GetItemString(pyObj_tracing_opts, "orphaned_sample_size");
-  if (pyObj_orphaned_sample_size != nullptr) {
-    auto orphaned_sample_size =
-      static_cast<size_t>(PyLong_AsUnsignedLong(pyObj_orphaned_sample_size));
-    tracing_options.orphaned_sample_size = orphaned_sample_size;
     has_tracing_options = true;
   }
 
@@ -644,6 +676,16 @@ update_cluster_options(couchbase::core::cluster_options& options,
                        PyObject* pyObj_options,
                        PyObject* pyObj_auth)
 {
+  PyObject* pyObj_metrics_opts = PyDict_GetItemString(pyObj_options, "metrics_options");
+  if (pyObj_metrics_opts != nullptr) {
+    update_metrics_options(options, pyObj_metrics_opts);
+  }
+
+  PyObject* pyObj_orphan_opts = PyDict_GetItemString(pyObj_options, "orphan_reporting_options");
+  if (pyObj_orphan_opts != nullptr) {
+    update_cluster_orphan_reporting_options(options, pyObj_orphan_opts);
+  }
+
   PyObject* pyObj_timeout_opts = PyDict_GetItemString(pyObj_options, "timeout_options");
   if (pyObj_timeout_opts != nullptr) {
     update_cluster_timeout_options(options, pyObj_timeout_opts);
@@ -652,11 +694,6 @@ update_cluster_options(couchbase::core::cluster_options& options,
   PyObject* pyObj_tracing_opts = PyDict_GetItemString(pyObj_options, "tracing_options");
   if (pyObj_tracing_opts != nullptr) {
     update_cluster_tracing_options(options, pyObj_tracing_opts);
-  }
-
-  PyObject* pyObj_emit_interval = PyDict_GetItemString(pyObj_options, "emit_interval");
-  if (pyObj_emit_interval != nullptr) {
-    update_cluster_logging_meter_options(options, pyObj_emit_interval);
   }
 
   PyObject* pyObj_enable_tls = PyDict_GetItemString(pyObj_options, "enable_tls");
@@ -726,16 +763,6 @@ update_cluster_options(couchbase::core::cluster_options& options,
   PyObject* pyObj_enable_compression = PyDict_GetItemString(pyObj_options, "enable_compression");
   if (pyObj_enable_compression != nullptr && pyObj_enable_compression == Py_False) {
     options.enable_compression = false;
-  }
-
-  PyObject* pyObj_enable_tracing = PyDict_GetItemString(pyObj_options, "enable_tracing");
-  if (pyObj_enable_tracing != nullptr && pyObj_enable_tracing == Py_False) {
-    options.enable_tracing = false;
-  }
-
-  PyObject* pyObj_enable_metrics = PyDict_GetItemString(pyObj_options, "enable_metrics");
-  if (pyObj_enable_metrics != nullptr && pyObj_enable_metrics == Py_False) {
-    options.enable_metrics = false;
   }
 
   PyObject* pyObj_network = PyDict_GetItemString(pyObj_options, "network");
@@ -1175,6 +1202,13 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     PyErr_Clear();
   }
 
+  if (-1 == PyDict_SetItemString(pyObj_opts,
+                                 "enable_orphan_reporting",
+                                 opts.enable_orphan_reporting ? Py_True : Py_False)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+
   pyObj_tmp = PyUnicode_FromString(opts.network.c_str());
   if (-1 == PyDict_SetItemString(pyObj_opts, "network", pyObj_tmp)) {
     PyErr_Print();
@@ -1184,6 +1218,13 @@ get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
 
   pyObj_tmp = get_tracing_options(opts.tracing_options);
   if (-1 == PyDict_SetItemString(pyObj_opts, "tracing_options", pyObj_tmp)) {
+    PyErr_Print();
+    PyErr_Clear();
+  }
+  Py_XDECREF(pyObj_tmp);
+
+  pyObj_tmp = get_orphan_reporting_options(opts.orphan_options);
+  if (-1 == PyDict_SetItemString(pyObj_opts, "orphan_reporting_options", pyObj_tmp)) {
     PyErr_Print();
     PyErr_Clear();
   }

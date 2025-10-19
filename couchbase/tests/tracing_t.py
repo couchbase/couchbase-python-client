@@ -68,12 +68,12 @@ class TracerTestsSuite:
 
         spans = cb_env.tracer.spans()
         if with_parent:
-            assert len(spans) == 2
+            assert len(spans) == 3
             span = spans.pop(0)
             assert span == parent
             assert span.is_finished() is False
 
-        assert len(spans) == 1
+        assert len(spans) == 2
         assert spans[0].is_finished() is True
         assert spans[0].get_name() == span_name
         assert spans[0].get_parent() == parent
@@ -106,11 +106,11 @@ class TracerTestsSuite:
             pass
         spans = cb_env.tracer.spans()
         if http_with_parent:
-            assert len(spans) == 2
+            assert len(spans) == 3
             span = spans.pop(0)
             assert span == parent
             assert span.is_finished() is False
-        assert len(spans) == 1
+        assert len(spans) == 2
         assert spans[0].is_finished() is True
         assert spans[0].get_name() == http_span_name
         assert spans[0].get_parent() == parent

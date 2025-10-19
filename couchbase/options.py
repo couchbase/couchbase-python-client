@@ -46,7 +46,9 @@ from couchbase.logic.options import get_valid_args  # noqa: F401
 from couchbase.logic.options import get_valid_multi_args  # noqa: F401
 from couchbase.logic.options import (AnalyticsOptionsBase,
                                      AppendOptionsBase,
+                                     ClusterMetricsOptionsBase,
                                      ClusterOptionsBase,
+                                     ClusterOrphanReportingOptionsBase,
                                      ClusterTimeoutOptionsBase,
                                      ClusterTracingOptionsBase,
                                      ConstrainedIntBase,
@@ -103,29 +105,32 @@ if TYPE_CHECKING:
     from couchbase.transcoder import Transcoder
 
 
-class ClusterTracingOptions(ClusterTracingOptionsBase):
-    """Available tracing options to set when creating a cluster.
+class ClusterMetricsOptions(ClusterMetricsOptionsBase):
+    """Available metrics options to set when creating a cluster.
 
     .. warning::
         Importing options from ``couchbase.cluster`` is deprecated.
         All options should be imported from ``couchbase.options``.
 
-    These will be the default timeouts for operations for the entire cluster
+    Args:
+        enable_metrics (bool, optional): Set to False to disable default logging meter (enables no-op meter).
+            Defaults to True (enabled).
+        emit_interval (timedelta, optional): Interveral to flush metrics operations queue.
+    """
+
+
+class ClusterOrphanReportingOptions(ClusterOrphanReportingOptionsBase):
+    """Available orphan reporting options to set when creating a cluster.
+
+    .. warning::
+        Importing options from ``couchbase.cluster`` is deprecated.
+        All options should be imported from ``couchbase.options``.
 
     Args:
-        tracing_threshold_kv (timedelta, optional): KV operations threshold. Defaults to None.
-        tracing_threshold_view (timedelta, optional): Views operations threshold. Defaults to None.
-        tracing_threshold_query (timedelta, optional): Query operations threshold. Defaults to None.
-        tracing_threshold_search (timedelta, optional): Search operations threshold.. Defaults to None.
-        tracing_threshold_analytics (timedelta, optional): Analytics operations threshold. Defaults to None.
-        tracing_threshold_eventing (timedelta, optional): Eventing operations threshold. Defaults to None.
-        tracing_threshold_management (timedelta, optional): Management operations threshold. Defaults to None.
-        tracing_threshold_queue_size (int, optional): Size of tracing operations queue. Defaults to None.
-        tracing_threshold_queue_flush_interval (timedelta, optional): Interveral to flush tracing operations queue.
-            Defaults to None.
-        tracing_orphaned_queue_size (int, optional): Size of tracing orphaned operations queue. Defaults to None.
-        tracing_orphaned_queue_flush_interval (timedelta, optional): Interveral to flush tracing orphaned operations
-            queue. Defaults to None.
+        enable_reporting (bool, optional): Set to False to disable orphaned response reporting.
+            Defaults to True (enabled).
+        sample_size (int, optional): Size of orphan operations queue.
+        emit_interval (timedelta, optional): Interval to flush orphaned operations queue.
     """
 
 
@@ -155,6 +160,30 @@ class ClusterTimeoutOptions(ClusterTimeoutOptionsBase):
         config_idle_redial_timeout (timedelta, optional): Idle redial timeout. Defaults to None.
         config_total_timeout (timedelta, optional): **DEPRECATED** complete bootstrap timeout. Defaults to None.
     """
+
+
+class ClusterTracingOptions(ClusterTracingOptionsBase):
+    """Available tracing options to set when creating a cluster.
+
+    .. warning::
+        Importing options from ``couchbase.cluster`` is deprecated.
+        All options should be imported from ``couchbase.options``.
+
+    Args:
+        enable_tracing (bool, optional): Set to False to disable default threshold log tracing (enables no-op tracer).
+            Defaults to True (enabled).
+        tracing_threshold_kv (timedelta, optional): KV operations threshold. Defaults to None.
+        tracing_threshold_view (timedelta, optional): Views operations threshold. Defaults to None.
+        tracing_threshold_query (timedelta, optional): Query operations threshold. Defaults to None.
+        tracing_threshold_search (timedelta, optional): Search operations threshold.. Defaults to None.
+        tracing_threshold_analytics (timedelta, optional): Analytics operations threshold. Defaults to None.
+        tracing_threshold_eventing (timedelta, optional): Eventing operations threshold. Defaults to None.
+        tracing_threshold_management (timedelta, optional): Management operations threshold. Defaults to None.
+        tracing_threshold_queue_size (int, optional): Size of tracing operations queue. Defaults to None.
+        tracing_threshold_queue_flush_interval (timedelta, optional): Interval to flush tracing operations queue. Defaults to None.
+        tracing_orphaned_queue_size (int, optional): **DEPRECATED** Use `class:~.ClusterOrphanReportingOptions` instead.
+        tracing_orphaned_queue_flush_interval (timedelta, optional): **DEPRECATED** Use `class:~.ClusterOrphanReportingOptions` instead.
+    """  # noqa: E501
 
 
 class ConfigProfile(ABC):
@@ -312,6 +341,8 @@ class ClusterOptions(ClusterOptionsBase):
             authenticator instance
         timeout_options (:class:`~.ClusterTimeoutOptions`): Timeout options for
             various SDK operations. See :class:`~.options.ClusterTimeoutOptions` for details.
+        orphan_reporting_options (:class:`~.ClusterOrphanReportingOptions`): Options for SDK orphaned response reporting.
+            See :class:`~.ClusterOrphanReportingOptions` for details.
         tracing_options (:class:`~.options.ClusterTimeoutOptions`): Tracing options for SDK tracing bevavior.
             See :class:`~.options.ClusterTracingOptions` for details.  These are ignored if an external tracer
             is specified.
@@ -327,9 +358,11 @@ class ClusterOptions(ClusterOptionsBase):
         enable_clustermap_notification (bool, optional): Set to False to disable cluster map notification.
             Defaults to True (enabled).
         enable_compression (bool, optional): Set to False to disable compression. Defaults to True (enabled).
-        enable_tracing (bool, optional): Set to False to disable tracing (enables no-op tracer).
+        enable_tracing (bool, optional): Set to False to disable default threshold log tracing (enables no-op tracer).
             Defaults to True (enabled).
-        enable_metrics (bool, optional): Set to False to disable metrics (enables no-op meter).
+        enable_metrics (bool, optional): Set to False to disable default logging meter (enables no-op meter).
+            Defaults to True (enabled).
+        enable_orphan_reporting (bool, optional): Set to False to disable orphaned response reporting.
             Defaults to True (enabled).
         network (str, optional): Set network resolution method. Can be set to 'default' (if the client is running on the
             same network as the server) or 'external' (if the client is running on a different network). Defaults to
@@ -348,7 +381,7 @@ class ClusterOptions(ClusterOptionsBase):
         config_poll_floor (timedelta, optional): Config polling floor interval.
             Defaults to None.
         max_http_connections (int, optional): Maximum number of HTTP connections.  Defaults to None.
-        logging_meter_emit_interval (timedelta, optional): Logging meter emit interval.  Defaults to 10 minutes.
+        logging_meter_emit_interval (timedelta, optional): **DEPRECATED** Use `class:~.ClusterMetricsOptions` instead.
         transaction_config (:class:`.TransactionConfig`, optional): Global configuration for transactions.
             Defaults to None.
         log_redaction (bool, optional): Set to True to enable log redaction. Defaults to False (disabled).

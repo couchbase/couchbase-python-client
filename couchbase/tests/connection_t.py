@@ -27,7 +27,9 @@ from couchbase.exceptions import (CouchbaseException,
                                   UnAmbiguousTimeoutException)
 from couchbase.logic.cluster import ClusterLogic
 from couchbase.options import (CONFIG_PROFILES,
+                               ClusterMetricsOptions,
                                ClusterOptions,
+                               ClusterOrphanReportingOptions,
                                ClusterTimeoutOptions,
                                ClusterTracingOptions,
                                ConfigProfile,
@@ -60,12 +62,21 @@ class ConnectionTestSuite:
         'test_cluster_sasl_mech_default',
         'test_cluster_sasl_mech_legacy_multiple',
         'test_cluster_sasl_mech_multiple',
+        'test_cluster_metrics_options',
+        'test_cluster_metrics_options_fail',
+        'test_cluster_metrics_options_kwargs',
+        'test_cluster_metrics_options_override',
+        'test_cluster_orphan_reporting_options',
+        'test_cluster_orphan_reporting_options_fail',
+        'test_cluster_orphan_reporting_options_kwargs',
+        'test_cluster_orphan_reporting_options_override',
         'test_cluster_timeout_options',
         'test_cluster_timeout_options_fail',
         'test_cluster_timeout_options_kwargs',
         'test_cluster_tracing_options',
         'test_cluster_tracing_options_fail',
         'test_cluster_tracing_options_kwargs',
+        'test_cluster_tracing_options_override',
         'test_config_profile_fail',
         'test_custom_config_profile',
         'test_custom_config_profile_fail',
@@ -285,6 +296,7 @@ class ConnectionTestSuite:
             'enable_compression': True,
             'enable_tracing': True,
             'enable_metrics': True,
+            'enable_orphan_reporting': True,
             'network': 'external',
             'tls_verify': TLSVerifyMode.NO_VERIFY,
             'disable_mozilla_ca_certificates': False,
@@ -294,15 +306,14 @@ class ConnectionTestSuite:
             'config_poll_interval': timedelta(seconds=30),
             'config_poll_floor': timedelta(seconds=30),
             'max_http_connections': 10,
-            'logging_meter_emit_interval': timedelta(seconds=30),
             'num_io_threads': 1,
             'dump_configuration': True,
             'preferred_server_group': 'group1',
             'enable_app_telemetry': True,
             'app_telemetry_endpoint': 'ws://localhost:8093',
-            "app_telemetry_backoff": timedelta(seconds=10),
-            "app_telemetry_ping_interval": timedelta(seconds=60),
-            "app_telemetry_ping_timeout": timedelta(seconds=5),
+            'app_telemetry_backoff': timedelta(seconds=10),
+            'app_telemetry_ping_interval': timedelta(seconds=60),
+            'app_telemetry_ping_timeout': timedelta(seconds=5),
         }
 
         expected_opts = copy(opts)
@@ -322,9 +333,13 @@ class ConnectionTestSuite:
         expected_opts['use_ip_protocol'] = 'any'
         # TLSVerifyMode is translated to string
         expected_opts['tls_verify'] = 'none'
-        # change name of logging meter emit int.
-        expected_opts.pop('logging_meter_emit_interval')
-        expected_opts['emit_interval'] = 30000000
+        # PYCBC-1718: updates how metrics, orphan reporting and tracing options are handled
+        expected_opts.pop('enable_metrics')
+        expected_opts['metrics_options'] = {'enable_metrics': True}
+        expected_opts.pop('enable_orphan_reporting')
+        expected_opts['orphan_reporting_options'] = {'enable_orphan_reporting': True}
+        expected_opts.pop('enable_tracing')
+        expected_opts['tracing_options'] = {'enable_tracing': True}
 
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
@@ -525,6 +540,191 @@ class ConnectionTestSuite:
         assert auth_opts == expected_auth
 
     @pytest.mark.parametrize('opts, expected_opts',
+                             [({'enable_metrics': True, 'emit_interval': timedelta(seconds=30)},
+                               {'enable_metrics': True, 'metrics_emit_interval': 30000000}),
+                              ])
+    def test_cluster_metrics_options(self, couchbase_config, opts, expected_opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        cluster_opts = ClusterOptions(auth, metrics_options=ClusterMetricsOptions(**opts))
+        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster_opts = cluster._get_connection_opts(conn_only=True)
+        metrics_opts = cluster_opts.get('metrics_options', None)
+        assert metrics_opts is not None
+        assert isinstance(metrics_opts, dict)
+        assert metrics_opts == expected_opts
+
+    # when working w/ kwargs, some options append 'metrics_' to avoid key clash with orphan reporting options
+    @pytest.mark.parametrize('opts',
+                             [
+                                 {'enable_metrics': 1},
+                                 {'metrics_emit_interval': 30},
+                             ])
+    def test_cluster_metrics_options_fail(self, couchbase_config, opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        cluster_opts = ClusterOptions(auth)
+        with pytest.raises(InvalidArgumentException):
+            ClusterLogic(conn_string, cluster_opts, **opts)
+
+        cluster_opts = ClusterOptions(auth, metrics_options=opts)
+        with pytest.raises(InvalidArgumentException):
+            ClusterLogic(conn_string, cluster_opts)
+
+    # when working w/ kwargs, some options append 'metrics_' to avoid key clash with orphan reporting options
+    @pytest.mark.parametrize('opts, expected_opts',
+                             [({'enable_metrics': True, 'metrics_emit_interval': timedelta(seconds=30)},
+                               {'enable_metrics': True, 'metrics_emit_interval': 30000000}),
+                              ])
+    def test_cluster_metrics_options_kwargs(self, couchbase_config, opts, expected_opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        cluster_opts = ClusterOptions(auth)
+        cluster = ClusterLogic(conn_string, cluster_opts, **opts)
+        cluster_opts = cluster._get_connection_opts(conn_only=True)
+        metrics_opts = cluster_opts.get('metrics_options', None)
+        assert metrics_opts is not None
+        assert isinstance(metrics_opts, dict)
+        assert metrics_opts == expected_opts
+
+    @pytest.mark.parametrize('opts, cluster_opts, expected_opts',
+                             [(None,
+                               {'enable_metrics': False, 'logging_meter_emit_interval': timedelta(seconds=60)},
+                               {'enable_metrics': False, 'metrics_emit_interval': 60000000}),
+                              ({'enable_metrics': True, 'emit_interval': timedelta(seconds=60)},
+                               {'enable_metrics': False, 'logging_meter_emit_interval': timedelta(seconds=30)},
+                               {'enable_metrics': True, 'metrics_emit_interval': 60000000}),
+                              ])
+    def test_cluster_metrics_options_override(self, couchbase_config, opts, cluster_opts, expected_opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        metrics_options = ClusterMetricsOptions(**opts) if opts else None
+        cluster_options = ClusterOptions(auth,
+                                         metrics_options=metrics_options,
+                                         **cluster_opts)
+        cluster = ClusterLogic(conn_string, cluster_options)
+        conn_cluster_opts = cluster._get_connection_opts(conn_only=True)
+        assert 'logging_meter_emit_interval' not in conn_cluster_opts
+        metrics_opts = conn_cluster_opts.get('metrics_options', None)
+        assert metrics_opts is not None
+        assert isinstance(metrics_opts, dict)
+        assert metrics_opts == expected_opts
+
+    @pytest.mark.parametrize('opts, expected_opts',
+                             [({'enable_orphan_reporting': True,
+                                'emit_interval': timedelta(seconds=30),
+                                'sample_size': 20},
+                               {'enable_orphan_reporting': True,
+                                'orphan_emit_interval': 30000000,
+                                'orphan_sample_size': 20}),
+                              ])
+    def test_cluster_orphan_reporting_options(self, couchbase_config, opts, expected_opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        cluster_opts = ClusterOptions(auth, orphan_reporting_options=ClusterOrphanReportingOptions(**opts))
+        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster_opts = cluster._get_connection_opts(conn_only=True)
+        orphan_opts = cluster_opts.get('orphan_reporting_options', None)
+        assert orphan_opts is not None
+        assert isinstance(orphan_opts, dict)
+        assert orphan_opts == expected_opts
+
+    # when working w/ kwargs, some options append 'orphan_' to avoid key clash with metrics options
+    @pytest.mark.parametrize('opts',
+                             [
+                                 {'enable_orphan_reporting': 1},
+                                 {'orphan_emit_interval': 30},
+                                 {'orphan_sample_size': 35.1},
+                             ])
+    def test_cluster_orphan_reporting_options_fail(self, couchbase_config, opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        cluster_opts = ClusterOptions(auth)
+        with pytest.raises(InvalidArgumentException):
+            ClusterLogic(conn_string, cluster_opts, **opts)
+
+        cluster_opts = ClusterOptions(auth, orphan_reporting_options=opts)
+        with pytest.raises(InvalidArgumentException):
+            ClusterLogic(conn_string, cluster_opts)
+
+    # when working w/ kwargs, some options append 'orphan_' to avoid key clash with metrics options
+    @pytest.mark.parametrize('opts, expected_opts',
+                             [({'enable_orphan_reporting': True,
+                                'orphan_emit_interval': timedelta(seconds=30),
+                                'orphan_sample_size': 20},
+                               {'enable_orphan_reporting': True,
+                                'orphan_emit_interval': 30000000,
+                                'orphan_sample_size': 20}),
+                              ])
+    def test_cluster_orphan_reporting_options_kwargs(self, couchbase_config, opts, expected_opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        cluster_opts = ClusterOptions(auth)
+        cluster = ClusterLogic(conn_string, cluster_opts, **opts)
+        cluster_opts = cluster._get_connection_opts(conn_only=True)
+        orphan_opts = cluster_opts.get('orphan_reporting_options', None)
+        assert orphan_opts is not None
+        assert isinstance(orphan_opts, dict)
+        assert orphan_opts == expected_opts
+
+    @pytest.mark.parametrize('opts, cluster_opts, tracing_opts, expected_opts',
+                             [(None,
+                               {'enable_orphan_reporting': False},
+                               {'tracing_orphaned_queue_flush_interval': timedelta(seconds=60),
+                                'tracing_orphaned_queue_size': 50},
+                               {'enable_orphan_reporting': False,
+                                'orphan_emit_interval': 60000000,
+                                'orphan_sample_size': 50}),
+                              ({'enable_orphan_reporting': True,
+                                'emit_interval': timedelta(seconds=60),
+                                'sample_size': 50},
+                               {'enable_orphan_reporting': False},
+                               {'tracing_orphaned_queue_flush_interval': timedelta(seconds=30),
+                                'tracing_orphaned_queue_size': 20},
+                               {'enable_orphan_reporting': True,
+                                'orphan_emit_interval': 60000000,
+                                'orphan_sample_size': 50}),
+                              ])
+    def test_cluster_orphan_reporting_options_override(self,
+                                                       couchbase_config,
+                                                       opts,
+                                                       cluster_opts,
+                                                       tracing_opts,
+                                                       expected_opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        orphan_reporting_opts = ClusterOrphanReportingOptions(**opts) if opts else None
+        tracing_opts = ClusterTracingOptions(**tracing_opts)
+        cluster_opts = ClusterOptions(auth,
+                                      orphan_reporting_options=orphan_reporting_opts,
+                                      tracing_options=tracing_opts,
+                                      **cluster_opts)
+        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster_opts = cluster._get_connection_opts(conn_only=True)
+        orphan_opts = cluster_opts.get('orphan_reporting_options', None)
+        tracing_opts = cluster_opts.get('tracing_options', None)
+        assert tracing_opts is None
+        assert orphan_opts is not None
+        assert isinstance(orphan_opts, dict)
+        assert orphan_opts == expected_opts
+
+    @pytest.mark.parametrize('opts, expected_opts',
                              [({'bootstrap_timeout': timedelta(seconds=30)},
                                {'bootstrap_timeout': 30000000}),
                               ({'resolve_timeout': timedelta(seconds=30)},
@@ -680,15 +880,17 @@ class ConnectionTestSuite:
                               ({'tracing_threshold_queue_flush_interval': timedelta(
                                   seconds=30)}, {'threshold_emit_interval': 30000000}),
                               ({'tracing_orphaned_queue_size': 20},
-                              {'orphaned_sample_size': 20}),
+                              {'orphan_sample_size': 20}),
                               ({'tracing_orphaned_queue_flush_interval': timedelta(
-                                  seconds=30)}, {'orphaned_emit_interval': 30000000}),
-                              ({'tracing_threshold_kv': timedelta(milliseconds=60),
+                                  seconds=30)}, {'orphan_emit_interval': 30000000}),
+                              ({'enable_tracing': True,
+                                'tracing_threshold_kv': timedelta(milliseconds=60),
                                 'tracing_threshold_query': timedelta(milliseconds=5),
                                 'tracing_threshold_management': timedelta(milliseconds=30),
                                 'tracing_threshold_queue_size': 20},
-                               {'key_value_threshold': 60000,
-                               'query_threshold': 5000,
+                               {'enable_tracing': True,
+                                'key_value_threshold': 60000,
+                                'query_threshold': 5000,
                                 'management_threshold': 30000,
                                 'threshold_sample_size': 20}),
                               ])
@@ -701,12 +903,21 @@ class ConnectionTestSuite:
         cluster = ClusterLogic(conn_string, cluster_opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         tracing_options = cluster_opts.get('tracing_options', None)
-        assert tracing_options is not None
-        assert isinstance(tracing_options, dict)
-        assert tracing_options == expected_opts
+        orphan_reporting_options = cluster_opts.get('orphan_reporting_options', None)
+        if 'orphan_sample_size' in expected_opts or 'orphan_emit_interval' in expected_opts:
+            assert orphan_reporting_options is not None
+            assert tracing_options is None
+            assert isinstance(orphan_reporting_options, dict)
+            assert orphan_reporting_options == expected_opts
+        else:
+            assert orphan_reporting_options is None
+            assert tracing_options is not None
+            assert isinstance(tracing_options, dict)
+            assert tracing_options == expected_opts
 
     @pytest.mark.parametrize('opts',
                              [
+                                 {'enable_tracing': 1},
                                  {'tracing_threshold_kv': 30},
                                  {'tracing_threshold_view': 30},
                                  {'tracing_threshold_query': 30},
@@ -755,15 +966,17 @@ class ConnectionTestSuite:
                               ({'tracing_threshold_queue_flush_interval': timedelta(
                                   seconds=30)}, {'threshold_emit_interval': 30000000}),
                               ({'tracing_orphaned_queue_size': 20},
-                               {'orphaned_sample_size': 20}),
+                               {'orphan_sample_size': 20}),
                               ({'tracing_orphaned_queue_flush_interval': timedelta(
-                                  seconds=30)}, {'orphaned_emit_interval': 30000000}),
-                              ({'tracing_threshold_kv': timedelta(milliseconds=60),
+                                  seconds=30)}, {'orphan_emit_interval': 30000000}),
+                              ({'enable_tracing': True,
+                                'tracing_threshold_kv': timedelta(milliseconds=60),
                                 'tracing_threshold_query': timedelta(milliseconds=5),
                                 'tracing_threshold_management': timedelta(milliseconds=30),
                                 'tracing_threshold_queue_size': 20},
-                               {'key_value_threshold': 60000,
-                               'query_threshold': 5000,
+                               {'enable_tracing': True,
+                                'key_value_threshold': 60000,
+                                'query_threshold': 5000,
                                 'management_threshold': 30000,
                                 'threshold_sample_size': 20}),
                               ])
@@ -776,9 +989,41 @@ class ConnectionTestSuite:
         cluster = ClusterLogic(conn_string, cluster_opts, **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         tracing_options = cluster_opts.get('tracing_options', None)
-        assert tracing_options is not None
-        assert isinstance(tracing_options, dict)
-        assert tracing_options == expected_opts
+        orphan_reporting_options = cluster_opts.get('orphan_reporting_options', None)
+        if 'orphan_sample_size' in expected_opts or 'orphan_emit_interval' in expected_opts:
+            assert orphan_reporting_options is not None
+            assert tracing_options is None
+            assert isinstance(orphan_reporting_options, dict)
+            assert orphan_reporting_options == expected_opts
+        else:
+            assert orphan_reporting_options is None
+            assert tracing_options is not None
+            assert isinstance(tracing_options, dict)
+            assert tracing_options == expected_opts
+
+    @pytest.mark.parametrize('opts, cluster_opts, expected_opts',
+                             [(None,
+                               {'enable_tracing': False},
+                               {'enable_tracing': False, }),
+                              ({'enable_tracing': True},
+                               {'enable_tracing': False},
+                               {'enable_tracing': True}),
+                              ])
+    def test_cluster_tracing_options_override(self, couchbase_config, opts, cluster_opts, expected_opts):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+
+        auth = PasswordAuthenticator(username, pw)
+        tracing_options = ClusterTracingOptions(**opts) if opts else None
+        cluster_options = ClusterOptions(auth,
+                                         tracing_options=tracing_options,
+                                         **cluster_opts)
+        cluster = ClusterLogic(conn_string, cluster_options)
+        conn_cluster_opts = cluster._get_connection_opts(conn_only=True)
+        tracing_opts = conn_cluster_opts.get('tracing_options', None)
+        assert tracing_opts is not None
+        assert isinstance(tracing_opts, dict)
+        assert tracing_opts == expected_opts
 
     def test_config_profile_fail(self, couchbase_config):
         username, pw = couchbase_config.get_username_and_pw()
