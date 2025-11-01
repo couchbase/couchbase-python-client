@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Optional
 
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.logic.wrappers import decode_value
 from couchbase.pycbc_core import kv_range_scan_operation
 from couchbase.result import ScanResult
 
@@ -159,9 +158,4 @@ class RangeScanRequestLogic:
         if isinstance(resp, CouchbaseBaseException):
             raise ErrorMapper.build_exception(resp)
 
-        value = resp.raw_result.get('value', None)
-        flags = resp.raw_result.get('flags', None)
-        if value:
-            resp.raw_result['value'] = decode_value(self.transcoder, value, flags)
-
-        return ScanResult(resp, self._ids_only)
+        return ScanResult(resp, self._ids_only, self.transcoder)

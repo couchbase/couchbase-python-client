@@ -25,7 +25,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap,
                                   MissingConnectionException)
-from couchbase.logic import decode_replicas, decode_value
+from couchbase.logic import decode_replicas
 
 
 class TxWrapper:
@@ -268,17 +268,12 @@ class TxWrapper:
                             )
                             return
 
-                        value = res.raw_result.get('value', None)
-                        flags = res.raw_result.get('flags', None)
-
-                        res.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_subdoc)
-
                         if return_cls is None:
                             retval = None
                         elif return_cls is True:
                             retval = res
                         else:
-                            retval = return_cls(res)
+                            retval = return_cls(res, transcoder=transcoder, is_subdoc=is_subdoc)
                         self.loop.call_soon_threadsafe(ft.set_result, retval)
                     except CouchbaseException as e:
                         self.loop.call_soon_threadsafe(ft.set_exception, e)

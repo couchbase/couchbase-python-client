@@ -15,10 +15,8 @@
 
 from __future__ import annotations
 
-from copy import copy
 from functools import wraps
 
-from couchbase.constants import FMT_JSON
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   DocumentExistsException,
@@ -31,25 +29,6 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   UnAmbiguousTimeoutException)
 from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.exceptions import exception as CouchbaseBaseException
-
-
-def decode_value(transcoder, value, flags, is_subdoc=False):
-    if is_subdoc is False:
-        return transcoder.decode_value(value, flags)
-
-    final_value = []
-    for f in value:
-        if 'value' in f:
-            tmp = copy(f)
-            old = tmp.pop('value', None)
-            if old:
-                # no custom transcoder for subdoc ops, use JSON
-                tmp['value'] = transcoder.decode_value(old, FMT_JSON)
-            final_value.append(tmp)
-        else:
-            final_value.append(f)
-
-    return final_value
 
 
 def decode_replicas(transcoder, result, return_cls, is_subdoc=False):
@@ -66,10 +45,7 @@ def decode_replicas(transcoder, result, return_cls, is_subdoc=False):
             if res is None:
                 return
 
-            value = res.raw_result.get('value', None)
-            flags = res.raw_result.get('flags', None)
-            res.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_subdoc)
-            yield return_cls(res)
+            yield return_cls(res, transcoder=transcoder, is_subdoc=is_subdoc)
 
 
 class BlockingWrapper:
@@ -123,16 +99,12 @@ class BlockingWrapper:
                     if fn.__name__ in ['_get_all_replicas_internal', '_lookup_in_all_replicas_internal']:
                         return decode_replicas(transcoder, ret, return_cls, is_subdoc=is_subdoc)
 
-                    value = ret.raw_result.get('value', None)
-                    flags = ret.raw_result.get('flags', None)
-
-                    ret.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_subdoc)
                     if return_cls is None:
                         return None
                     elif return_cls is True:
                         retval = ret
                     else:
-                        retval = return_cls(ret)
+                        retval = return_cls(ret, transcoder=transcoder, is_subdoc=is_subdoc)
                     return retval
                 except CouchbaseException as e:
                     raise e

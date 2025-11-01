@@ -37,9 +37,7 @@ from couchbase.exceptions import (DocumentExistsException,
                                   QueueEmpty)
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.kv_range_scan import RangeScanRequest
-from couchbase.logic import (BlockingWrapper,
-                             decode_replicas,
-                             decode_value)
+from couchbase.logic import BlockingWrapper, decode_replicas
 from couchbase.logic.collection import CollectionLogic
 from couchbase.logic.supportability import Supportability
 from couchbase.management.queries import CollectionQueryIndexManager
@@ -2010,17 +2008,8 @@ class Collection(CollectionLogic):
             op_type=op_type,
             op_args=op_args
         )
-        for k, v in res.raw_result.items():
-            if k == 'all_okay':
-                continue
-            if isinstance(v, CouchbaseBaseException):
-                continue
-            value = v.raw_result.get('value', None)
-            flags = v.raw_result.get('flags', None)
-            tc = transcoders[k]
-            v.raw_result['value'] = decode_value(tc, value, flags)
 
-        return MultiGetResult(res, return_exceptions)
+        return MultiGetResult(res, return_exceptions, transcoders)
 
     def get_any_replica_multi(self,
                               keys,  # type: List[str]
@@ -2104,17 +2093,8 @@ class Collection(CollectionLogic):
             op_type=op_type,
             op_args=op_args
         )
-        for k, v in res.raw_result.items():
-            if k == 'all_okay':
-                continue
-            if isinstance(v, CouchbaseBaseException):
-                continue
-            value = v.raw_result.get('value', None)
-            flags = v.raw_result.get('flags', None)
-            tc = transcoders[k]
-            v.raw_result['value'] = decode_value(tc, value, flags)
 
-        return MultiGetReplicaResult(res, return_exceptions)
+        return MultiGetReplicaResult(res, return_exceptions, transcoders)
 
     def get_all_replicas_multi(self,
                                keys,  # type: List[str]
@@ -2309,17 +2289,8 @@ class Collection(CollectionLogic):
             op_type=op_type,
             op_args=op_args
         )
-        for k, v in res.raw_result.items():
-            if k == 'all_okay':
-                continue
-            if isinstance(v, CouchbaseBaseException):
-                continue
-            value = v.raw_result.get('value', None)
-            flags = v.raw_result.get('flags', None)
-            tc = transcoders[k]
-            v.raw_result['value'] = decode_value(tc, value, flags)
 
-        return MultiGetResult(res, return_exceptions)
+        return MultiGetResult(res, return_exceptions, transcoders)
 
     def exists_multi(self,
                      keys,  # type: List[str]

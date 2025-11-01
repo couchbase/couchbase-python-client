@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+from copy import copy
 from datetime import datetime
 from typing import (Any,
                     Dict,
@@ -27,6 +28,7 @@ from acouchbase.analytics import AsyncAnalyticsRequest
 from acouchbase.n1ql import AsyncN1QLRequest
 from acouchbase.search import AsyncFullTextSearchRequest
 from acouchbase.views import AsyncViewRequest
+from couchbase.constants import FMT_JSON
 from couchbase.diagnostics import (ClusterState,
                                    EndpointDiagnosticsReport,
                                    EndpointPingReport,
@@ -36,22 +38,30 @@ from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.pycbc_core import result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
+from couchbase.transcoder import Transcoder
 
 
 class Result:
     def __init__(
         self,
-        orig,  # type: result
+        orig,              # type: result
+        transcoder=None,  # type: Optional[Transcoder]
+        is_subdoc=None,  # type: Optional[bool]
     ):
-
         self._orig = orig
+        self._transcoder = transcoder
+        self._decoded_value: Optional[Any] = None
+        self._is_subdoc = is_subdoc if is_subdoc is not None else False
 
     @property
     def value(self) -> Optional[Any]:
         """
             Optional[Any]: The content of the document, if it exists.
         """
-        return self._orig.raw_result.get("value", None)
+        if self._decoded_value is not None:
+            return self._decoded_value
+        self._decode_value()
+        return self._decoded_value
 
     @property
     def cas(self) -> Optional[int]:
@@ -80,6 +90,27 @@ class Result:
             bool: Indicates if the operation was successful or not.
         """
         return self.cas != 0
+
+    def _decode_value(self) -> None:
+        if self._transcoder is None:
+            return
+
+        value = self._orig.raw_result.get('value', None)
+        if self._is_subdoc is False:
+            flags = self._orig.raw_result.get('flags', None)
+            self._decoded_value = self._transcoder.decode_value(value, flags)
+        else:
+            self._decoded_value = []
+            for f in value:
+                if 'value' in f:
+                    tmp = copy(f)
+                    old = tmp.pop('value', None)
+                    if old:
+                        # no custom transcoder for subdoc ops, use JSON
+                        tmp['value'] = self._transcoder.decode_value(old, FMT_JSON)
+                    self._decoded_value.append(tmp)
+                else:
+                    self._decoded_value.append(f)
 
 
 class ContentProxy:
@@ -353,7 +384,8 @@ class MultiResult:
     def __init__(self,
                  orig,  # type: result
                  result_type,  # type: Union[GetReplicaResult, GetResult]
-                 return_exceptions  # type: bool
+                 return_exceptions,  # type: bool
+                 transcoders=None  # type: Optional[Dict[str, Transcoder]]
                  ):
         self._orig = orig
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
@@ -369,7 +401,9 @@ class MultiResult:
                 if isinstance(v, list):
                     self._results[k] = v
                 else:
-                    self._results[k] = result_type(v)
+                    if transcoders is None:
+                        raise InvalidArgumentException("Transcoders dictionary must be provided")
+                    self._results[k] = result_type(v, transcoder=transcoders[k])
 
     @property
     def all_ok(self) -> bool:
@@ -394,9 +428,10 @@ class MultiResult:
 class MultiGetReplicaResult(MultiResult):
     def __init__(self,
                  orig,  # type: result
-                 return_exceptions  # type: bool
+                 return_exceptions,  # type: bool
+                 transcoders=None  # type: Optional[Dict[str, Transcoder]]
                  ):
-        super().__init__(orig, GetReplicaResult, return_exceptions)
+        super().__init__(orig, GetReplicaResult, return_exceptions, transcoders)
 
     @property
     def results(self) -> Dict[str, GetReplicaResult]:
@@ -423,9 +458,10 @@ class MultiGetReplicaResult(MultiResult):
 class MultiGetResult(MultiResult):
     def __init__(self,
                  orig,  # type: result
-                 return_exceptions  # type: bool
+                 return_exceptions,  # type: bool
+                 transcoders  # type: Dict[str, Transcoder]
                  ):
-        super().__init__(orig, GetResult, return_exceptions)
+        super().__init__(orig, GetResult, return_exceptions, transcoders)
 
     @property
     def results(self) -> Dict[str, GetResult]:
@@ -948,8 +984,8 @@ class HttpResult:
 
 class ScanResult(Result):
 
-    def __init__(self, orig, ids_only):
-        super().__init__(orig)
+    def __init__(self, orig, ids_only, transcoder):
+        super().__init__(orig, transcoder=transcoder)
         self._ids_only = ids_only
 
     @property

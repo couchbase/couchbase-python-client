@@ -177,7 +177,7 @@ class KeyValueOpTranscoderTestSuite:
         key, value = cb_env.get_existing_doc_by_type('bytes')
         tc = RawBinaryTranscoder()
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
+            cb_env.collection.get(key).content_as[bytes]
         res = cb_env.collection.get(key, GetOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
@@ -186,7 +186,7 @@ class KeyValueOpTranscoderTestSuite:
         key, value = cb_env.get_existing_doc_by_type('bytes')
         tc = RawBinaryTranscoder()
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get_and_touch(key, timedelta(seconds=30))
+            cb_env.collection.get_and_touch(key, timedelta(seconds=30)).content_as[bytes]
 
         res = cb_env.collection.get_and_touch(key,
                                               timedelta(seconds=3),
@@ -203,7 +203,7 @@ class KeyValueOpTranscoderTestSuite:
         key, value = cb_env.get_existing_doc_by_type('bytes')
         tc = RawBinaryTranscoder()
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get_and_lock(key, timedelta(seconds=1))
+            cb_env.collection.get_and_lock(key, timedelta(seconds=1)).content_as[bytes]
 
         # lets get another doc
         key, value = cb_env.get_existing_doc_by_type('bytes')
@@ -223,7 +223,7 @@ class KeyValueOpTranscoderTestSuite:
         # use RawStringTranscoder() so that get() fails as expected
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
+            cb_env.collection.get(key).content_as[bytes]
 
     def test_replace(self, cb_env):
         key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
@@ -233,14 +233,14 @@ class KeyValueOpTranscoderTestSuite:
         new_content = 'some new bytes content'.encode('utf-8')
         cb_env.collection.replace(key, new_content, ReplaceOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
+            cb_env.collection.get(key).content_as[bytes]
 
     def test_upsert(self, cb_env):
         key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
         # use RawBinaryTranscoder() so that get() fails as expected
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
+            cb_env.collection.get(key).content_as[bytes]
 
 
 class LegacyTranscoderTestSuite:
