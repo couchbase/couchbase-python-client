@@ -301,6 +301,17 @@ create_connection(PyObject* self, PyObject* args, PyObject* kwargs)
 }
 
 static PyObject*
+update_credentials(PyObject* self, PyObject* args, PyObject* kwargs)
+{
+  PyObject* res = handle_update_credentials(self, args, kwargs);
+  if (res == nullptr && PyErr_Occurred() == nullptr) {
+    pycbc_set_python_exception(
+      PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to update credentials.");
+  }
+  return res;
+}
+
+static PyObject*
 get_connection_information(PyObject* self, PyObject* args, PyObject* kwargs)
 {
   PyObject* res = get_connection_info(self, args, kwargs);
@@ -336,6 +347,10 @@ static struct PyMethodDef methods[] = {
     (PyCFunction)create_connection,
     METH_VARARGS | METH_KEYWORDS,
     "Create connection object" },
+  { "update_credentials",
+    (PyCFunction)update_credentials,
+    METH_VARARGS | METH_KEYWORDS,
+    "Update connection credentials" },
   { "get_connection_info",
     (PyCFunction)get_connection_information,
     METH_VARARGS | METH_KEYWORDS,

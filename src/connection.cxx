@@ -1565,3 +1565,43 @@ handle_open_or_close_bucket([[maybe_unused]] PyObject* self, PyObject* args, PyO
   }
   Py_RETURN_NONE;
 }
+
+PyObject*
+handle_update_credentials([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
+{
+  PyObject* pyObj_conn = nullptr;
+  PyObject* pyObj_auth = nullptr;
+
+  static const char* kw_list[] = { "", "auth", nullptr };
+
+  const char* kw_format = "O!O!";
+  int ret = PyArg_ParseTupleAndKeywords(args,
+                                        kwargs,
+                                        kw_format,
+                                        const_cast<char**>(kw_list),
+                                        &PyCapsule_Type,
+                                        &pyObj_conn,
+                                        &PyDict_Type,
+                                        &pyObj_auth);
+
+  if (!ret) {
+    std::string msg = "Cannot update credentials. Unable to parse args/kwargs.";
+    pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, msg.c_str());
+    return nullptr;
+  }
+
+  connection* conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
+  if (nullptr == conn) {
+    pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
+    return nullptr;
+  }
+
+  couchbase::core::cluster_credentials auth = get_cluster_credentials(pyObj_auth);
+
+  auto err = conn->cluster_.update_credentials(std::move(auth));
+  if (err.ec) {
+    return pycbc_build_exception(err.ec, __FILE__, __LINE__, err.message);
+  }
+
+  Py_RETURN_NONE;
+}

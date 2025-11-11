@@ -19,9 +19,11 @@ import time
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict)
+                    Dict,
+                    Union)
 
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
+from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.bucket import Bucket
 from couchbase.diagnostics import ClusterState, ServiceType
 from couchbase.exceptions import ErrorMapper, UnAmbiguousTimeoutException
@@ -228,6 +230,17 @@ class Cluster(ClusterLogic):
         """
 
         return super().diagnostics(*opts, **kwargs)
+
+    def update_credentials(self, authenticator: Union[CertificateAuthenticator, PasswordAuthenticator]) -> None:
+        """Update the credentials used by this Cluster.
+
+        Args:
+            authenticator (Union[CertificateAuthenticator, PasswordAuthenticator]): New authenticator.
+        """
+        if not self.connected:
+            raise RuntimeError("Cluster not yet connected.")
+        super()._update_credentials(auth=authenticator.as_dict())
+        self._auth = authenticator.as_dict()
 
     def wait_until_ready(self,
                          timeout,  # type: timedelta

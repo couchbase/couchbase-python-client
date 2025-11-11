@@ -30,3 +30,6 @@ handle_close_connection(PyObject* self, PyObject* args, PyObject* kwargs);
 
 PyObject*
 handle_open_or_close_bucket(PyObject* self, PyObject* args, PyObject* kwargs);
+
+PyObject*
+handle_update_credentials(PyObject* self, PyObject* args, PyObject* kwargs);

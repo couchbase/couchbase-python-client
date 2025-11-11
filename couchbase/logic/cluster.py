@@ -29,7 +29,8 @@ from urllib.parse import parse_qs, urlparse
 from couchbase import USER_AGENT_EXTRA
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.diagnostics import ServiceType
-from couchbase.exceptions import InvalidArgumentException
+from couchbase.exceptions import ErrorMapper, InvalidArgumentException
+from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.options import (ClusterMetricsOptions,
                                ClusterOptions,
                                ClusterOrphanReportingOptions,
@@ -46,7 +47,8 @@ from couchbase.pycbc_core import (close_connection,
                                   get_connection_info,
                                   management_operation,
                                   mgmt_operations,
-                                  operations)
+                                  operations,
+                                  update_credentials)
 from couchbase.result import (ClusterInfoResult,
                               DiagnosticsResult,
                               PingResult)
@@ -470,6 +472,22 @@ class ClusterLogic:
         return close_connection(
             self._connection, **close_kwargs
         )
+
+    def _update_credentials(self, **kwargs):
+        """**INTERNAL** not intended for use in public API.
+
+        Expects kwargs to contain:
+          - auth: dict of authenticator values (see couchbase.auth.Authenticator.as_dict())
+        """
+
+        auth = kwargs.pop('auth', None)
+        if auth is None:
+            raise InvalidArgumentException('Authenticator (auth) must be provided.')
+
+        ret = update_credentials(self._connection, auth=auth)
+        if isinstance(ret, BaseCouchbaseException):
+            raise ErrorMapper.build_exception(ret)
+        return ret
 
     def _set_connection(self, conn):
         self._connection = conn

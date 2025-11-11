@@ -22,7 +22,8 @@ from time import perf_counter
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
-                    Dict)
+                    Dict,
+                    Union)
 
 from acouchbase import get_event_loop
 from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
@@ -37,6 +38,7 @@ from acouchbase.management.users import UserManager
 from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
 from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
 from acouchbase.transactions import Transactions
+from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.diagnostics import ClusterState, ServiceType
 from couchbase.exceptions import UnAmbiguousTimeoutException
 from couchbase.logic.cluster import ClusterLogic
@@ -178,6 +180,19 @@ class AsyncCluster(ClusterLogic):
 
         await self._close_ftr
         super()._destroy_connection()
+
+    def update_credentials(self, authenticator: Union[CertificateAuthenticator, PasswordAuthenticator]) -> None:
+        """Update the credentials used by this Cluster.
+
+        Args:
+            authenticator (Union[CertificateAuthenticator, PasswordAuthenticator]): New authenticator.
+        """
+        if not self.connected:
+            raise RuntimeError("Cluster is not connected, cannot update credentials.")
+
+        # This is a fast, synchronous operation in the core; call directly.
+        super()._update_credentials(auth=authenticator.as_dict())
+        self._auth = authenticator.as_dict()
 
     def bucket(self, bucket_name) -> AsyncBucket:
         """Creates a Bucket instance to a specific bucket.
