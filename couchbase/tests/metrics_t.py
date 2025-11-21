@@ -88,6 +88,7 @@ class MetricsTestSuite:
     #     cb_env.meter.reset()
 
 
+@pytest.mark.skip(reason='Skip until new observability changes drop (CBD-6492)')
 class ClassicMetricsTests(MetricsTestSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):

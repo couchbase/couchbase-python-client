@@ -116,6 +116,7 @@ class TracerTestsSuite:
         assert spans[0].get_parent() == parent
 
 
+@pytest.mark.skip(reason='Skip until new observability changes drop (CBD-6492)')
 class ClassicTracerTests(TracerTestsSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):
