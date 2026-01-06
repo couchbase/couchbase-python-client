@@ -155,6 +155,12 @@ class Bucket(BucketLogic):
                    ) -> ViewResult:
         """Executes a View query against the bucket.
 
+        .. deprecated:: 4.6.0
+
+            Views are deprecated in Couchbase Server 7.0+, and will be removed from a future server version.
+            Views are not compatible with the Magma storage engine. Instead of views, use indexes and queries using the
+            Index Service (GSI) and the Query Service (SQL++).
+
         .. note::
 
             The query is executed lazily in that it is executed once iteration over the
@@ -216,6 +222,12 @@ class Bucket(BucketLogic):
         """
         Get a :class:`~couchbase.management.views.ViewIndexManager` which can be used to manage the view design documents
         and views of this bucket.
+
+        .. deprecated:: 4.6.0
+
+            Views are deprecated in Couchbase Server 7.0+, and will be removed from a future server version.
+            Views are not compatible with the Magma storage engine. Instead of views, use indexes and queries using the
+            Index Service (GSI) and the Query Service (SQL++).
 
         Returns:
             :class:`~couchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.

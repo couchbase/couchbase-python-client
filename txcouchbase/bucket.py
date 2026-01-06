@@ -127,6 +127,15 @@ class Bucket(BucketLogic):
                    *view_options,   # type: ViewOptions
                    **kwargs
                    ) -> Deferred[ViewResult]:
+        """Executes a View query against the bucket.
+
+        .. deprecated:: 4.6.0
+
+            Views are deprecated in Couchbase Server 7.0+, and will be removed from a future server version.
+            Views are not compatible with the Magma storage engine. Instead of views, use indexes and queries using the
+            Index Service (GSI) and the Query Service (SQL++).
+
+        """
 
         query = ViewQuery.create_view_query_object(
             self.name, design_doc, view_name, *view_options, **kwargs

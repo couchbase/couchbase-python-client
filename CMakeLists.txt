@@ -182,6 +182,9 @@ set(COUCHBASE_CXX_CLIENT_BUILD_TESTS
 set(COUCHBASE_CXX_CLIENT_BUILD_TOOLS
     OFF
     CACHE BOOL "" FORCE)
+set(COUCHBASE_CXX_CLIENT_BUILD_OPENTELEMETRY
+    OFF
+    CACHE BOOL "" FORCE)
 
 # cmake-format: off
 # PYCBC-1374 + PYCBC-1495: Move to dynamically link against static stdlib to avoid issues with:
@@ -249,6 +252,8 @@ file(
   "src/management/*.cxx"
   "src/transactions/*.cxx")
 add_library(pycbc_core SHARED ${SOURCE_FILES})
+
+target_compile_definitions(pycbc_core PRIVATE COUCHBASE_CXX_CLIENT_IGNORE_CORE_DEPRECATIONS)
 
 target_include_directories(
   pycbc_core PRIVATE SYSTEM
