@@ -350,8 +350,7 @@ class BucketSettings(dict):
                                ParamTransform("flushEnabled", Identity(bool))),
         BidirectionalTransform("num_replicas",
                                ParamTransform("numReplicas", Identity(int)),
-                               ParamTransform("numReplicas", Identity(int)),
-                               default=0),
+                               ParamTransform("numReplicas", Identity(int))),
         BidirectionalTransform("ram_quota_mb",
                                ParamTransform("ramQuotaMB", Identity(int)),
                                ParamTransform("ramQuotaMB", Identity(int))),
@@ -418,7 +417,7 @@ class BucketSettings(dict):
                  name=None,  # type: str
                  flush_enabled=None,  # type: bool
                  ram_quota_mb=None,  # type: int
-                 num_replicas=0,  # type: int
+                 num_replicas=None,  # type: Optional[int]
                  replica_index=None,  # type: bool
                  bucket_type=None,  # type: BucketType
                  eviction_policy=None,  # type: EvictionPolicyType
@@ -458,7 +457,7 @@ class BucketSettings(dict):
 
     @property
     def num_replicas(self):
-        # type: (...) -> int
+        # type: (...) -> Optional[int]
         """NumReplicas (int) - The number of replicas for documents."""
         return self.get('replica_number')
 
@@ -572,7 +571,7 @@ class CreateBucketSettings(BucketSettings):
                  name=None,  # type: str
                  flush_enabled=False,  # type: bool
                  ram_quota_mb=None,  # type: int
-                 num_replicas=0,  # type: int
+                 num_replicas=None,  # type: Optional[int]
                  replica_index=None,  # type: bool
                  bucket_type=None,  # type: BucketType
                  eviction_policy=None,  # type: EvictionPolicyType
@@ -594,7 +593,8 @@ class CreateBucketSettings(BucketSettings):
         :param name: name of the bucket
         :param flush_enabled: whether flush is enabled
         :param ram_quota_mb: raw quota in megabytes
-        :param num_replicas: number of replicas
+        :param num_replicas: number of replicas. If not specified (None), the server's default
+            replica count will be used (typically 1).
         :param replica_index: whether this is a replica index
         :param bucket_type: type of bucket
         :param eviction_policy: policy for eviction
