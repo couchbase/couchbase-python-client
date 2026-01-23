@@ -1102,10 +1102,9 @@ class AsyncCollection:
         Returns:
             :class:`~acouchbase.management.queries.CollectionQueryIndexManager`: A :class:`~acouchbase.management.queries.CollectionQueryIndexManager` instance.
         """  # noqa: E501
-        return CollectionQueryIndexManager(self._impl.connection,
-                                           self._impl.loop,
+        return CollectionQueryIndexManager(self._impl._client_adapter,
                                            self._impl.bucket_name,
-                                           self._impl.scope.name,
+                                           self._impl.scope_name,
                                            self.name)
 
     @staticmethod

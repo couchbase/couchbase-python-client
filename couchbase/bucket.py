@@ -189,7 +189,7 @@ class Bucket:
         Returns:
             :class:`~couchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
         """  # noqa: E501
-        return CollectionManager(self._impl.connection, self.name)
+        return CollectionManager(self._impl._client_adapter, self.name)
 
     def view_indexes(self) -> ViewIndexManager:
         """
@@ -205,7 +205,7 @@ class Bucket:
         Returns:
             :class:`~couchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
         """  # noqa: E501
-        return ViewIndexManager(self._impl.connection, self.name)
+        return ViewIndexManager(self._impl._client_adapter, self.name)
 
 
 """

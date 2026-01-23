@@ -13,8 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from inspect import Parameter, Signature
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Awaitable,
                     Dict,
                     Iterable,
@@ -36,12 +39,15 @@ from couchbase.management.options import (CreateCollectionOptions,
                                           GetAllScopesOptions,
                                           UpdateCollectionOptions)
 
+if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
+
 
 class CollectionManager(CollectionManagerLogic):
 
-    def __init__(self, connection, loop, bucket_name):
-        super().__init__(connection, bucket_name)
-        self._loop = loop
+    def __init__(self, client_adapter: AsyncClientAdapter, bucket_name: str) -> None:
+        super().__init__(client_adapter.connection, bucket_name)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

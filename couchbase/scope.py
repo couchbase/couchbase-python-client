@@ -406,7 +406,7 @@ class Scope:
             :class:`~couchbase.management.search.ScopeSearchIndexManager`: A :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
 
         """  # noqa: E501
-        return ScopeSearchIndexManager(self._impl.connection, self.bucket_name, self.name)
+        return ScopeSearchIndexManager(self._impl._client_adapter, self.bucket_name, self.name)
 
     def eventing_functions(self) -> ScopeEventingFunctionManager:
         """
@@ -417,7 +417,7 @@ class Scope:
             :class:`~couchbase.management.search.ScopeEventingFunctionManager`: A :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
 
         """  # noqa: E501
-        return ScopeEventingFunctionManager(self._impl.connection, self.bucket_name, self.name)
+        return ScopeEventingFunctionManager(self._impl._client_adapter, self.bucket_name, self.name)
 
     @staticmethod
     def default_name() -> str:

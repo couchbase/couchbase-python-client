@@ -20,13 +20,18 @@ from typing import (Any,
                     Dict,
                     TypedDict)
 
-from couchbase.logic.operation_types import (BucketMgmtOperationType,
+from couchbase.logic.operation_types import (AnalyticsIndexMgmtOperationType,
+                                             BucketMgmtOperationType,
                                              BucketOperationType,
                                              ClusterOperationType,
                                              CollectionMgmtOperationType,
+                                             EventingFunctionMgmtOperationType,
                                              KeyValueMultiOperationType,
                                              KeyValueOperationType,
-                                             QueryIndexMgmtOperationType)
+                                             QueryIndexMgmtOperationType,
+                                             SearchIndexMgmtOperationType,
+                                             UserMgmtOperationType,
+                                             ViewIndexMgmtOperationType)
 from couchbase.pycbc_core import (binary_multi_operation,
                                   binary_operation,
                                   close_connection,
@@ -39,6 +44,24 @@ from couchbase.pycbc_core import (binary_multi_operation,
                                   open_or_close_bucket,
                                   subdoc_operation,
                                   update_credentials)
+
+
+class AnalyticsIndexMgmtOperationMap(TypedDict):
+    connect_link: Callable[..., Any]
+    create_dataset: Callable[..., Any]
+    create_dataverse: Callable[..., Any]
+    create_index: Callable[..., Any]
+    create_link: Callable[..., Any]
+    disconnect_link: Callable[..., Any]
+    drop_dataset: Callable[..., Any]
+    drop_dataverse: Callable[..., Any]
+    drop_link: Callable[..., Any]
+    drop_index: Callable[..., Any]
+    get_all_datasets: Callable[..., Any]
+    get_all_indexes: Callable[..., Any]
+    get_links: Callable[..., Any]
+    get_pending_mutations: Callable[..., Any]
+    replace_link: Callable[..., Any]
 
 
 class BucketMgmtOperationMap(TypedDict):
@@ -74,6 +97,18 @@ class CollectionMgmtOperationMap(TypedDict):
     drop_scope: Callable[..., Any]
     get_all_scopes: Callable[..., Any]
     update_collection: Callable[..., Any]
+
+
+class EventingFunctionMgmtOperationMap(TypedDict):
+    deploy_function: Callable[..., Any]
+    drop_function: Callable[..., Any]
+    functions_status: Callable[..., Any]
+    get_all_functions: Callable[..., Any]
+    get_function: Callable[..., Any]
+    pause_function: Callable[..., Any]
+    resume_function: Callable[..., Any]
+    undeploy_function: Callable[..., Any]
+    upsert_function: Callable[..., Any]
 
 
 class KeyValueMultiOperationMap(TypedDict):
@@ -128,6 +163,44 @@ class QueryIndexMgmtOperationMap(TypedDict):
     build_deferred_indexes: Callable[..., Any]
 
 
+class SearchIndexMgmtOperationMap(TypedDict):
+    allow_querying: Callable[..., Any]
+    analyze_document: Callable[..., Any]
+    disallow_querying: Callable[..., Any]
+    drop_index: Callable[..., Any]
+    freeze_plan: Callable[..., Any]
+    get_all_indexes: Callable[..., Any]
+    get_all_index_stats: Callable[..., Any]
+    get_index: Callable[..., Any]
+    get_indexed_documents_count: Callable[..., Any]
+    get_index_stats: Callable[..., Any]
+    pause_ingest: Callable[..., Any]
+    resume_ingest: Callable[..., Any]
+    unfreeze_plan: Callable[..., Any]
+    upsert_index: Callable[..., Any]
+
+
+class UserMgmtOperationMap(TypedDict):
+    change_password: Callable[..., Any]
+    drop_group: Callable[..., Any]
+    drop_user: Callable[..., Any]
+    get_all_groups: Callable[..., Any]
+    get_all_users: Callable[..., Any]
+    get_group: Callable[..., Any]
+    get_roles: Callable[..., Any]
+    get_user: Callable[..., Any]
+    upsert_group: Callable[..., Any]
+    upsert_user: Callable[..., Any]
+
+
+class ViewIndexMgmtOperationMap(TypedDict):
+    drop_design_document: Callable[..., Any]
+    get_all_design_documents: Callable[..., Any]
+    get_design_document: Callable[..., Any]
+    publish_design_document: Callable[..., Any]
+    upsert_design_document: Callable[..., Any]
+
+
 class BindingMap:
 
     def __init__(self) -> None:
@@ -135,17 +208,41 @@ class BindingMap:
         self._load_op_map()
 
     def _load_op_map(self) -> None:
+        self._load_analytics_index_mgmt_op_map()
         self._load_bucket_mgmt_op_map()
         self._load_bucket_op_map()
         self._load_cluster_op_map()
         self._load_collection_mgmt_op_map()
+        self._load_eventing_function_mgmt_op_map()
         self._load_key_value_multi_op_map()
         self._load_key_value_op_map()
         self._load_query_index_mgmt_op_map()
+        self._load_search_index_mgmt_op_map()
+        self._load_user_mgmt_op_map()
+        self._load_view_index_mgmt_op_map()
 
     @property
     def op_map(self) -> Dict[str, Callable[..., Any]]:
         return self._op_map
+
+    def _load_analytics_index_mgmt_op_map(self) -> None:
+        self._op_map.update(**{
+            AnalyticsIndexMgmtOperationType.ConnectLink.value: management_operation,
+            AnalyticsIndexMgmtOperationType.CreateDataset.value: management_operation,
+            AnalyticsIndexMgmtOperationType.CreateDataverse.value: management_operation,
+            AnalyticsIndexMgmtOperationType.CreateIndex.value: management_operation,
+            AnalyticsIndexMgmtOperationType.CreateLink.value: management_operation,
+            AnalyticsIndexMgmtOperationType.DisconnectLink.value: management_operation,
+            AnalyticsIndexMgmtOperationType.DropDataset.value: management_operation,
+            AnalyticsIndexMgmtOperationType.DropDataverse.value: management_operation,
+            AnalyticsIndexMgmtOperationType.DropLink.value: management_operation,
+            AnalyticsIndexMgmtOperationType.DropIndex.value: management_operation,
+            AnalyticsIndexMgmtOperationType.GetAllDatasets.value: management_operation,
+            AnalyticsIndexMgmtOperationType.GetAllIndexes.value: management_operation,
+            AnalyticsIndexMgmtOperationType.GetLinks.value: management_operation,
+            AnalyticsIndexMgmtOperationType.GetPendingMutations.value: management_operation,
+            AnalyticsIndexMgmtOperationType.ReplaceLink.value: management_operation,
+        })
 
     def _load_bucket_mgmt_op_map(self) -> None:
         self._op_map.update(**{
@@ -184,6 +281,19 @@ class BindingMap:
             CollectionMgmtOperationType.DropScope.value: management_operation,
             CollectionMgmtOperationType.GetAllScopes.value: management_operation,
             CollectionMgmtOperationType.UpdateCollection.value: management_operation,
+        })
+
+    def _load_eventing_function_mgmt_op_map(self) -> None:
+        self._op_map.update(**{
+            EventingFunctionMgmtOperationType.DeployFunction.value: management_operation,
+            EventingFunctionMgmtOperationType.DropFunction.value: management_operation,
+            EventingFunctionMgmtOperationType.FunctionsStatus.value: management_operation,
+            EventingFunctionMgmtOperationType.GetAllFunctions.value: management_operation,
+            EventingFunctionMgmtOperationType.GetFunction.value: management_operation,
+            EventingFunctionMgmtOperationType.PauseFunction.value: management_operation,
+            EventingFunctionMgmtOperationType.ResumeFunction.value: management_operation,
+            EventingFunctionMgmtOperationType.UndeployFunction.value: management_operation,
+            EventingFunctionMgmtOperationType.UpsertFunction.value: management_operation,
         })
 
     def _load_key_value_multi_op_map(self) -> None:
@@ -238,4 +348,45 @@ class BindingMap:
             QueryIndexMgmtOperationType.DropPrimaryIndex.value: management_operation,
             QueryIndexMgmtOperationType.GetAllIndexes.value: management_operation,
             QueryIndexMgmtOperationType.BuildDeferredIndexes.value: management_operation,
+        })
+
+    def _load_search_index_mgmt_op_map(self) -> None:
+        self._op_map.update(**{
+            SearchIndexMgmtOperationType.AllowQuerying.value: management_operation,
+            SearchIndexMgmtOperationType.AnalyzeDocument.value: management_operation,
+            SearchIndexMgmtOperationType.DisallowQuerying.value: management_operation,
+            SearchIndexMgmtOperationType.DropIndex.value: management_operation,
+            SearchIndexMgmtOperationType.FreezePlan.value: management_operation,
+            SearchIndexMgmtOperationType.GetAllIndexes.value: management_operation,
+            SearchIndexMgmtOperationType.GetAllIndexStats.value: management_operation,
+            SearchIndexMgmtOperationType.GetIndex.value: management_operation,
+            SearchIndexMgmtOperationType.GetIndexedDocumentsCount.value: management_operation,
+            SearchIndexMgmtOperationType.GetIndexStats.value: management_operation,
+            SearchIndexMgmtOperationType.PauseIngest.value: management_operation,
+            SearchIndexMgmtOperationType.ResumeIngest.value: management_operation,
+            SearchIndexMgmtOperationType.UnfreezePlan.value: management_operation,
+            SearchIndexMgmtOperationType.UpsertIndex.value: management_operation,
+        })
+
+    def _load_user_mgmt_op_map(self) -> None:
+        self._op_map.update(**{
+            UserMgmtOperationType.ChangePassword.value: management_operation,
+            UserMgmtOperationType.DropGroup.value: management_operation,
+            UserMgmtOperationType.DropUser.value: management_operation,
+            UserMgmtOperationType.GetAllGroups.value: management_operation,
+            UserMgmtOperationType.GetAllUsers.value: management_operation,
+            UserMgmtOperationType.GetGroup.value: management_operation,
+            UserMgmtOperationType.GetRoles.value: management_operation,
+            UserMgmtOperationType.GetUser.value: management_operation,
+            UserMgmtOperationType.UpsertGroup.value: management_operation,
+            UserMgmtOperationType.UpsertUser.value: management_operation,
+        })
+
+    def _load_view_index_mgmt_op_map(self) -> None:
+        self._op_map.update(**{
+            ViewIndexMgmtOperationType.DropDesignDocument.value: management_operation,
+            ViewIndexMgmtOperationType.GetAllDesignDocuments.value: management_operation,
+            ViewIndexMgmtOperationType.GetDesignDocument.value: management_operation,
+            ViewIndexMgmtOperationType.PublishDesignDocument.value: management_operation,
+            ViewIndexMgmtOperationType.UpsertDesignDocument.value: management_operation,
         })

@@ -200,7 +200,7 @@ class AsyncBucket:
         Returns:
             :class:`~acouchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
         """  # noqa: E501
-        return CollectionManager(self._impl.connection, self._impl.loop, self.name)
+        return CollectionManager(self._impl._client_adapter, self.name)
 
     def view_indexes(self) -> ViewIndexManager:
         """
@@ -216,7 +216,7 @@ class AsyncBucket:
         Returns:
             :class:`~acouchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
         """  # noqa: E501
-        return ViewIndexManager(self._impl.connection, self._impl.loop, self.name)
+        return ViewIndexManager(self._impl._client_adapter, self.name)
 
 
 Bucket = AsyncBucket

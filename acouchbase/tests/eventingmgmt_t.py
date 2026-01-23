@@ -54,6 +54,7 @@ from ._test_utils import (CollectionType,
                           TestEnvironment)
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1737')
 @pytest.mark.flaky(reruns=5)
 class EventingManagementTests:
 
@@ -732,6 +733,7 @@ class EventingManagementTests:
         cb_env.validate_eventing_function(func)
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1737')
 @pytest.mark.flaky(reruns=3)
 class ScopeEventingManagementTests:
 

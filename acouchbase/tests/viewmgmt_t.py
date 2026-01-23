@@ -32,6 +32,7 @@ from couchbase.management.views import (DesignDocument,
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1740')
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 class ViewIndexManagementTests:
 

@@ -13,7 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import (Any,
+from __future__ import annotations
+
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Iterable)
 
@@ -30,10 +33,14 @@ from couchbase.management.options import (DropDesignDocumentOptions,
                                           PublishDesignDocumentOptions,
                                           UpsertDesignDocumentOptions)
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class ViewIndexManager(ViewIndexManagerLogic):
-    def __init__(self, connection, bucket_name):
-        super().__init__(connection, bucket_name)
+
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str) -> str:
+        super().__init__(client_adapter.connection, bucket_name)
 
     @BlockingMgmtWrapper.block(DesignDocument, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def get_design_document(self,

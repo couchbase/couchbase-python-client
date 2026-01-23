@@ -16,7 +16,24 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Union
+
+
+class AnalyticsIndexMgmtOperationType(Enum):
+    ConnectLink = 'connect_link'
+    CreateDataset = 'create_dataset'
+    CreateDataverse = 'create_dataverse'
+    CreateIndex = 'create_index'
+    CreateLink = 'create_link'
+    DisconnectLink = 'disconnect_link'
+    DropDataset = 'drop_dataset'
+    DropDataverse = 'drop_dataverse'
+    DropLink = 'drop_link'
+    DropIndex = 'drop_index'
+    GetAllDatasets = 'get_all_datasets'
+    GetAllIndexes = 'get_all_indexes'
+    GetLinks = 'get_links'
+    GetPendingMutations = 'get_pending_mutations'
+    ReplaceLink = 'replace_link'
 
 
 class BucketMgmtOperationType(Enum):
@@ -56,6 +73,18 @@ class CollectionMgmtOperationType(Enum):
     DropScope = 'drop_scope'
     GetAllScopes = 'get_all_scopes'
     UpdateCollection = 'update_collection'
+
+
+class EventingFunctionMgmtOperationType(Enum):
+    DeployFunction = 'deploy_function'
+    DropFunction = 'drop_function'
+    FunctionsStatus = 'functions_status'
+    GetAllFunctions = 'get_all_functions'
+    GetFunction = 'get_function'
+    PauseFunction = 'pause_function'
+    ResumeFunction = 'resume_function'
+    UndeployFunction = 'undeploy_function'
+    UpsertFunction = 'upsert_function'
 
 
 class KeyValueMultiOperationType(Enum):
@@ -119,4 +148,39 @@ class ScopeOperationType(Enum):
     SearchQuery = 'search_query'
 
 
-MgmtOperationType = Union[BucketMgmtOperationType, CollectionMgmtOperationType, QueryIndexMgmtOperationType]
+class SearchIndexMgmtOperationType(Enum):
+    AllowQuerying = 'allow_querying'
+    AnalyzeDocument = 'analyze_document'
+    DisallowQuerying = 'disallow_querying'
+    DropIndex = 'drop_index'
+    FreezePlan = 'freeze_plan'
+    GetAllIndexes = 'get_all_indexes'
+    GetAllIndexStats = 'get_all_index_stats'
+    GetIndex = 'get_index'
+    GetIndexedDocumentsCount = 'get_indexed_documents_count'
+    GetIndexStats = 'get_index_stats'
+    PauseIngest = 'pause_ingest'
+    ResumeIngest = 'resume_ingest'
+    UnfreezePlan = 'unfreeze_plan'
+    UpsertIndex = 'upsert_index'
+
+
+class UserMgmtOperationType(Enum):
+    ChangePassword = 'change_password'
+    DropGroup = 'drop_group'
+    DropUser = 'drop_user'
+    GetAllGroups = 'get_all_groups'
+    GetAllUsers = 'get_all_users'
+    GetGroup = 'get_group'
+    GetRoles = 'get_roles'
+    GetUser = 'get_user'
+    UpsertGroup = 'upsert_group'
+    UpsertUser = 'upsert_user'
+
+
+class ViewIndexMgmtOperationType(Enum):
+    DropDesignDocument = 'drop_design_document'
+    GetAllDesignDocuments = 'get_all_design_documents'
+    GetDesignDocument = 'get_design_document'
+    PublishDesignDocument = 'publish_design_document'
+    UpsertDesignDocument = 'upsert_design_document'

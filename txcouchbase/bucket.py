@@ -92,7 +92,7 @@ class Bucket:
 
         :return: the :class:`.management.collections.CollectionManager` for this bucket.
         """
-        return CollectionManager(self._impl.connection, self._impl.loop, self.name)
+        return CollectionManager(self._impl._client_adapter, self.name)
 
 
 TxBucket = Bucket

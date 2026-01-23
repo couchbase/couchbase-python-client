@@ -13,9 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from datetime import timedelta
 from time import perf_counter, sleep
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Iterable)
 
@@ -36,6 +39,9 @@ from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                           WatchQueryIndexOptions)
 from couchbase.options import forward_args
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class QueryIndexManager(QueryIndexManagerLogic):
     """
@@ -44,8 +50,8 @@ class QueryIndexManager(QueryIndexManagerLogic):
     For managing query indexes at the collection level, :class:`.CollectionQueryIndexManager` should be used.
     """
 
-    def __init__(self, connection):
-        super().__init__(connection)
+    def __init__(self, client_adapter: ClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
 
     @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_index(self,
@@ -298,11 +304,15 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
     Performs management operations on query indexes at the collection level.
     """
 
-    def __init__(self, connection, bucket_name, scope_name, collection_name):
+    def __init__(self,
+                 client_adapter: ClientAdapter,
+                 bucket_name: str,
+                 scope_name: str,
+                 collection_name: str) -> None:
         self._bucket_name = bucket_name
         self._scope_name = scope_name
         self._collection_name = collection_name
-        super().__init__(connection)
+        super().__init__(client_adapter.connection)
 
     @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_index(self,

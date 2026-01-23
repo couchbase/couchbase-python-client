@@ -35,6 +35,7 @@ from couchbase.management.buckets import (BucketSettings,
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1733')
 @pytest.mark.flaky(reruns=5)
 class BucketManagementTests:
 

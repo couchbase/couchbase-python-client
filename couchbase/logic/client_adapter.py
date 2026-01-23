@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from couchbase.logic.bucket_types import BucketRequest
     from couchbase.logic.cluster_types import ClusterRequest, CreateConnectionRequest
     from couchbase.logic.collection_types import CollectionRequest
+    from couchbase.management.logic.mgmt_req import MgmtRequest
 
 
 class ClientAdapter:
@@ -80,6 +81,13 @@ class ClientAdapter:
         ret = self._execute_req(req.op_name, req_dict)
         if isinstance(ret, BaseCouchbaseException):
             raise ErrorMapper.build_exception(ret)
+        return ret
+
+    def execute_mgmt_request(self, req: MgmtRequest) -> Any:
+        req_dict = req.req_to_dict(self._connection)
+        ret = self._execute_req(req.op_name, req_dict)
+        if isinstance(ret, BaseCouchbaseException):
+            raise ErrorMapper.build_exception(ret, mapping=req.error_map)
         return ret
 
     def open_bucket(self, bucket_name: str) -> None:

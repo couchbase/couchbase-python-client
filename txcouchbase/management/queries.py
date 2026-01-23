@@ -13,8 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# from datetime import timedelta
-# from time import perf_counter, sleep
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -23,13 +23,10 @@ from typing import (TYPE_CHECKING,
 from twisted.internet.defer import Deferred
 
 from couchbase.management.logic.query_index_logic import QueryIndex, QueryIndexManagerLogic
-
-# from couchbase.exceptions import QueryIndexNotFoundException, WatchQueryIndexTimeoutException
 from couchbase.management.options import GetAllQueryIndexOptions
 
-# from couchbase.options import forward_args
-
 if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
     from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                               CreatePrimaryQueryIndexOptions,
                                               CreateQueryIndexOptions,
@@ -38,9 +35,10 @@ if TYPE_CHECKING:
 
 
 class QueryIndexManager(QueryIndexManagerLogic):
-    def __init__(self, connection, loop):
-        super().__init__(connection)
-        self._loop = loop
+
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

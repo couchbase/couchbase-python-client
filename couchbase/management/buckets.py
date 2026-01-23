@@ -13,7 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import (Any,
+from __future__ import annotations
+
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     List)
 
@@ -38,10 +41,13 @@ from couchbase.management.options import (BucketDescribeOptions,
                                           GetBucketOptions,
                                           UpdateBucketOptions)
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class BucketManager(BucketManagerLogic):
-    def __init__(self, connection):
-        super().__init__(connection)
+    def __init__(self, client_adapter: ClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
 
     @BlockingMgmtWrapper.block(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def create_bucket(self,

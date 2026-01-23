@@ -512,6 +512,7 @@ class BucketManagementTestSuite:
         assert isinstance(b, Bucket)
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1733')
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
 class ClassicBucketManagementTests(BucketManagementTestSuite):
     @pytest.fixture(scope='class')

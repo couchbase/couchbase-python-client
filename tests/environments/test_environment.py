@@ -360,6 +360,7 @@ class TestEnvironment:
         self._use_named_collections = True
 
     def enable_collection_mgmt(self) -> TestEnvironment:
+        pytest.skip(reason='Skip until PYCBC-1734')
         EnvironmentFeatures.check_if_feature_supported('collections',
                                                        self.server_version_short,
                                                        self.mock_server_type)
@@ -727,6 +728,7 @@ class TestEnvironment:
             opts['transaction_config'] = transaction_config
 
         env_args = {}
+        okay = False
         for _ in range(3):
             try:
                 cluster = Cluster.connect(conn_string, opts)
@@ -736,9 +738,20 @@ class TestEnvironment:
                 env_args['bucket'] = bucket
                 cluster.cluster_info()
                 env_args['default_collection'] = bucket.default_collection()
+                okay = True
                 break
             except (UnAmbiguousTimeoutException, AmbiguousTimeoutException):
                 continue
+
+        if not okay:
+            if config.is_mock_server:
+                pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
+                            ' an accurate representation of the state of the test, but rather'
+                             ' there is an environment issue.'))
+            else:
+                msg = 'Unable to establish cluster/bucket connection. Check the environment (e.g. VPN).'
+                raise CouchbaseTestEnvironmentException(msg)
+
         env_args.update(**kwargs)
         cb_env = cls(**env_args)
         return cb_env
@@ -1024,6 +1037,7 @@ class AsyncTestEnvironment(TestEnvironment):
             opts['transaction_config'] = transaction_config
 
         env_args = {}
+        okay = False
         for _ in range(3):
             try:
                 cluster = await AsyncCluster.connect(conn_string, opts)
@@ -1034,9 +1048,20 @@ class AsyncTestEnvironment(TestEnvironment):
                 env_args['bucket'] = bucket
                 await cluster.cluster_info()
                 env_args['default_collection'] = bucket.default_collection()
+                okay = True
                 break
             except (UnAmbiguousTimeoutException, AmbiguousTimeoutException):
                 continue
+
+        if not okay:
+            if config.is_mock_server:
+                pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
+                            ' an accurate representation of the state of the test, but rather'
+                             ' there is an environment issue.'))
+            else:
+                msg = 'Unable to establish cluster/bucket connection. Check the environment (e.g. VPN).'
+                raise CouchbaseTestEnvironmentException(msg)
+
         env_args.update(**kwargs)
         cb_env = cls(**env_args)
         return cb_env

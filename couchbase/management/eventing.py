@@ -15,7 +15,8 @@
 
 from __future__ import annotations
 
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     List)
 
@@ -52,10 +53,14 @@ from couchbase.management.options import (DeployFunctionOptions,
                                           UndeployFunctionOptions,
                                           UpsertFunctionOptions)
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class EventingFunctionManager(EventingFunctionManagerLogic):
-    def __init__(self, connection):
-        super().__init__(connection)
+
+    def __init__(self, client_adapter: ClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
 
     @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
     def upsert_function(
@@ -153,12 +158,8 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
 
 
 class ScopeEventingFunctionManager(EventingFunctionManagerLogic):
-    def __init__(self,
-                 connection,
-                 bucket_name,  # type: str
-                 scope_name,  # type: str
-                 ):
-        super().__init__(connection, bucket_name=bucket_name, scope_name=scope_name)
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str) -> None:
+        super().__init__(client_adapter.connection, bucket_name=bucket_name, scope_name=scope_name)
 
     @BlockingMgmtWrapper.block(None, ManagementType.EventingFunctionMgmt, EventingFunctionManagerLogic._ERROR_MAPPING)
     def upsert_function(

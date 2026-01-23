@@ -13,7 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any, Iterable
+from __future__ import annotations
+
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Iterable)
 
 from couchbase.management.logic.users_logic import Origin  # noqa: F401
 from couchbase.management.logic.users_logic import Role  # noqa: F401
@@ -37,11 +41,14 @@ from couchbase.management.options import (ChangePasswordOptions,
                                           UpsertGroupOptions,
                                           UpsertUserOptions)
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class UserManager(UserManagerLogic):
 
-    def __init__(self, connection):
-        super().__init__(connection)
+    def __init__(self, client_adapter: ClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
 
     @BlockingMgmtWrapper.block(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_user(self,

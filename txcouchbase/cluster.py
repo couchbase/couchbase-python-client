@@ -145,7 +145,7 @@ class Cluster:
         :return: A :class:`~.management.BucketManager` with which you can create or
               modify buckets on the cluster.
         """
-        return BucketManager(self._impl.connection, self.loop)
+        return BucketManager(self._impl._client_adapter)
 
     def users(self) -> UserManager:
         """
@@ -153,7 +153,7 @@ class Cluster:
 
         :return: A :class:`~.management.UserManager` with which you can create or update cluster users and roles.
         """
-        return UserManager(self._impl.connection, self.loop)
+        return UserManager(self._impl._client_adapter)
 
     def query_indexes(self) -> QueryIndexManager:
         """
@@ -162,7 +162,7 @@ class Cluster:
         :return:  A :class:`~.management.queries.QueryIndexManager` with which you can
               create or modify query indexes on the cluster.
         """
-        return QueryIndexManager(self.impl.connection, self.loop)
+        return QueryIndexManager(self._impl._client_adapter)
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """
@@ -171,7 +171,7 @@ class Cluster:
         :return:  A :class:`~.management.AnalyticsIndexManager` with which you can create or modify analytics datasets,
             dataverses, etc.. on the cluster.
         """
-        return AnalyticsIndexManager(self._impl.connection, self.loop)
+        return AnalyticsIndexManager(self._impl.client_adapter)
 
     def search_indexes(self) -> SearchIndexManager:
         """
@@ -180,7 +180,7 @@ class Cluster:
         :return:  A :class:`~.management.SearchIndexManager` with which you can create or modify analytics datasets,
             dataverses, etc.. on the cluster.
         """
-        return SearchIndexManager(self._impl.connection, self.loop)
+        return SearchIndexManager(self._impl._client_adapter)
 
 
 TxCluster = Cluster

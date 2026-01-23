@@ -28,6 +28,7 @@ from couchbase.management.logic.eventing_logic import (EventingFunction,
                                                        EventingFunctionStatus)
 
 if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
     from couchbase.management.options import (DeployFunctionOptions,
                                               DropFunctionOptions,
                                               FunctionsStatusOptions,
@@ -41,9 +42,9 @@ if TYPE_CHECKING:
 
 class EventingFunctionManager(EventingFunctionManagerLogic):
 
-    def __init__(self, connection, loop):
-        super().__init__(connection)
-        self._loop = loop
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):
@@ -155,14 +156,9 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
 
 class ScopeEventingFunctionManager(EventingFunctionManagerLogic):
 
-    def __init__(self,
-                 connection,
-                 loop,
-                 bucket_name,  # type: str
-                 scope_name,  # type: str
-                 ):
-        super().__init__(connection, bucket_name=bucket_name, scope_name=scope_name)
-        self._loop = loop
+    def __init__(self, client_adapter: AsyncClientAdapter, bucket_name: str, scope_name: str) -> None:
+        super().__init__(client_adapter.connection, bucket_name=bucket_name, scope_name=scope_name)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

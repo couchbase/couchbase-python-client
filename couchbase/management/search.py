@@ -13,7 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import (Any,
+from __future__ import annotations
+
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Iterable)
 
@@ -36,16 +39,17 @@ from couchbase.management.options import (AllowQueryingSearchIndexOptions,
                                           UnfreezePlanSearchIndexOptions,
                                           UpsertSearchIndexOptions)
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class SearchIndexManager(SearchIndexManagerLogic):
     """
     Allows to manage search indexes in a Couchbase cluster.
     """
 
-    def __init__(self,
-                 connection
-                 ):
-        super().__init__(connection)
+    def __init__(self, client_adapter: ClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def upsert_index(self,
@@ -352,12 +356,8 @@ class ScopeSearchIndexManager(SearchIndexManagerLogic):
     Allows to manage scope-level search indexes in a Couchbase cluster.
     """
 
-    def __init__(self,
-                 connection,
-                 bucket_name,  # type: str
-                 scope_name  # type: str
-                 ):
-        super().__init__(connection, bucket_name=bucket_name, scope_name=scope_name)
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str) -> None:
+        super().__init__(client_adapter.connection, bucket_name=bucket_name, scope_name=scope_name)
 
     @BlockingMgmtWrapper.block(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def upsert_index(self,

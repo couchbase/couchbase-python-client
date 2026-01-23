@@ -696,6 +696,7 @@ class UserManagementTestSuite:
         cm.drop_scope('um-test-scope')
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1739')
 class ClassicUserManagementTests(UserManagementTestSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):

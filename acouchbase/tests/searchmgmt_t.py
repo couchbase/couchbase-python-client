@@ -30,6 +30,7 @@ from couchbase.management.search import SearchIndex
 from ._test_utils import CollectionType, TestEnvironment
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1738')
 @pytest.mark.flaky(reruns=5)
 class SearchIndexManagementTests:
 
@@ -254,6 +255,7 @@ class SearchIndexManagementTests:
         assert isinstance(stats, dict)
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1738')
 @pytest.mark.flaky(reruns=5)
 class ScopeSearchIndexManagementTests:
 

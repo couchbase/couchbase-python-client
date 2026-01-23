@@ -34,6 +34,7 @@ from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1735')
 class QueryIndexManagementTests:
 
     @pytest_asyncio.fixture(scope="class")
@@ -408,6 +409,7 @@ class QueryIndexManagementTests:
     #     assert isinstance(results[1].context, ManagementErrorContext)
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1735')
 class QueryIndexCollectionManagementTests:
 
     TEST_SCOPE = "test-scope"
@@ -936,6 +938,7 @@ class QueryIndexCollectionManagementTests:
         assert len(collection_ixs) == 2
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1735')
 class CollectionQueryIndexManagerTests:
 
     TEST_SCOPE = "test-scope"

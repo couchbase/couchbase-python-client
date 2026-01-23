@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import asyncio
 from datetime import timedelta
 from time import perf_counter
@@ -33,6 +35,7 @@ from couchbase.management.options import GetAllQueryIndexOptions
 from couchbase.options import forward_args
 
 if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
     from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                               CreatePrimaryQueryIndexOptions,
                                               CreateQueryIndexOptions,
@@ -42,9 +45,10 @@ if TYPE_CHECKING:
 
 
 class QueryIndexManager(QueryIndexManagerLogic):
-    def __init__(self, connection, loop):
-        super().__init__(connection)
-        self._loop = loop
+
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):
@@ -298,12 +302,16 @@ class QueryIndexManager(QueryIndexManagerLogic):
 
 
 class CollectionQueryIndexManager(QueryIndexManagerLogic):
-    def __init__(self, connection, loop, bucket_name, scope_name, collection_name):
-        super().__init__(connection)
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 bucket_name: str,
+                 scope_name: str,
+                 collection_name: str) -> None:
+        super().__init__(client_adapter.connection)
         self._bucket_name = bucket_name
         self._scope_name = scope_name
         self._collection_name = collection_name
-        self._loop = loop
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

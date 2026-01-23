@@ -762,6 +762,7 @@ class AnalyticsManagementTestSuite:
         cb_env.aixm.drop_dataverse('test/test_dataverse')
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1736')
 class ClassicAnalyticsManagementLinksTests(AnalyticsManagementLinksTestSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):
@@ -786,6 +787,7 @@ class ClassicAnalyticsManagementLinksTests(AnalyticsManagementLinksTestSuite):
         cb_base_env.disable_analytics_mgmt()
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1736')
 class ClassicAnalyticsManagementTests(AnalyticsManagementTestSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):

@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
@@ -27,6 +29,7 @@ from couchbase.management.logic.buckets_logic import (BucketDescribeResult,
                                                       CreateBucketSettings)
 
 if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
     from couchbase.management.options import (BucketDescribeOptions,
                                               CreateBucketOptions,
                                               DropBucketOptions,
@@ -37,9 +40,10 @@ if TYPE_CHECKING:
 
 
 class BucketManager(BucketManagerLogic):
-    def __init__(self, connection, loop):
-        super().__init__(connection)
-        self._loop = loop
+
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

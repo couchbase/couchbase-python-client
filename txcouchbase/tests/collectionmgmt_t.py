@@ -35,6 +35,7 @@ from tests.environments.test_environment import EnvironmentFeatures
 from ._test_utils import TestEnvironment, run_in_reactor_thread
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1734')
 class CollectionManagementTests:
 
     TEST_BUCKET = "test-bucket"

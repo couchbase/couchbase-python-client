@@ -13,8 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from inspect import Parameter, Signature
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Iterable,
                     Optional)
@@ -36,11 +39,14 @@ from couchbase.management.options import (CreateCollectionOptions,
                                           GetAllScopesOptions,
                                           UpdateCollectionOptions)
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class CollectionManager(CollectionManagerLogic):
 
-    def __init__(self, connection, bucket_name):
-        super().__init__(connection, bucket_name)
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str) -> None:
+        super().__init__(client_adapter.connection, bucket_name)
 
     @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def create_scope(self,

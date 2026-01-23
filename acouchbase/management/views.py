@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
@@ -26,6 +28,7 @@ from couchbase.management.logic.view_index_logic import (DesignDocument,
                                                          ViewIndexManagerLogic)
 
 if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
     from couchbase.management.options import (DropDesignDocumentOptions,
                                               GetAllDesignDocumentsOptions,
                                               GetDesignDocumentOptions,
@@ -34,9 +37,10 @@ if TYPE_CHECKING:
 
 
 class ViewIndexManager(ViewIndexManagerLogic):
-    def __init__(self, connection, loop, bucket_name):
-        super().__init__(connection, bucket_name)
-        self._loop = loop
+
+    def __init__(self, client_adapter: AsyncClientAdapter, bucket_name: str) -> None:
+        super().__init__(client_adapter.connection, bucket_name)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

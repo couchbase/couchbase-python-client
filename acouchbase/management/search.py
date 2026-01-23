@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
@@ -24,6 +26,7 @@ from couchbase.management.logic import ManagementType
 from couchbase.management.logic.search_index_logic import SearchIndex, SearchIndexManagerLogic
 
 if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
     from couchbase.management.options import (AllowQueryingSearchIndexOptions,
                                               AnalyzeDocumentSearchIndexOptions,
                                               DisallowQueryingSearchIndexOptions,
@@ -41,12 +44,10 @@ if TYPE_CHECKING:
 
 
 class SearchIndexManager(SearchIndexManagerLogic):
-    def __init__(self,
-                 connection,
-                 loop
-                 ):
-        super().__init__(connection)
-        self._loop = loop
+
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):
@@ -174,14 +175,9 @@ class SearchIndexManager(SearchIndexManagerLogic):
 
 class ScopeSearchIndexManager(SearchIndexManagerLogic):
 
-    def __init__(self,
-                 connection,
-                 loop,
-                 bucket_name,  # type: str
-                 scope_name  # type: str
-                 ):
-        super().__init__(connection, bucket_name=bucket_name, scope_name=scope_name)
-        self._loop = loop
+    def __init__(self, client_adapter: AsyncClientAdapter, bucket_name: str, scope_name: str) -> AsyncClientAdapter:
+        super().__init__(client_adapter.connection, bucket_name=bucket_name, scope_name=scope_name)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

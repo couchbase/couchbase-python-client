@@ -425,7 +425,7 @@ class AsyncScope:
             :class:`~acouchbase.management.search.ScopeSearchIndexManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
 
         """  # noqa: E501
-        return ScopeSearchIndexManager(self._impl.connection, self._impl.loop, self.bucket_name, self.name)
+        return ScopeSearchIndexManager(self._impl._client_adapter, self.bucket_name, self.name)
 
     def eventing_functions(self) -> ScopeEventingFunctionManager:
         """
@@ -436,7 +436,7 @@ class AsyncScope:
             :class:`~acouchbase.management.search.ScopeEventingFunctionManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
 
         """  # noqa: E501
-        return ScopeEventingFunctionManager(self._impl.connection, self._impl.loop, self.bucket_name, self.name)
+        return ScopeEventingFunctionManager(self._impl._client_adapter, self.bucket_name, self.name)
 
     @staticmethod
     def default_name() -> str:

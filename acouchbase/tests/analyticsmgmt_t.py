@@ -48,6 +48,7 @@ from couchbase.management.options import (ConnectLinkOptions,
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1736')
 class AnalyticsManagementTests:
     DATASET_NAME = 'test-dataset'
 
@@ -297,6 +298,7 @@ class AnalyticsManagementTests:
         await cb_env.am.drop_dataverse("test/test_dataverse")
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1736')
 class AnalyticsManagementLinksTests:
     DATASET_NAME = 'test-dataset'
 

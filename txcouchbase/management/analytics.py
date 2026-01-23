@@ -31,6 +31,7 @@ from couchbase.management.logic.analytics_logic import (AnalyticsDataset,
                                                         AnalyticsManagerLogic)
 
 if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
     from couchbase.management.options import (ConnectLinkOptions,
                                               CreateAnalyticsIndexOptions,
                                               CreateDatasetOptions,
@@ -50,9 +51,9 @@ if TYPE_CHECKING:
 
 class AnalyticsIndexManager(AnalyticsManagerLogic):
 
-    def __init__(self, connection, loop):
-        super().__init__(connection)
-        self._loop = loop
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
+        self._loop = client_adapter.loop
 
     @property
     def loop(self):

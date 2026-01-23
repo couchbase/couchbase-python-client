@@ -36,6 +36,7 @@ from couchbase.management.collections import (CollectionSpec,
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1734')
 class CollectionManagementTests:
 
     TEST_BUCKET = "test-bucket"

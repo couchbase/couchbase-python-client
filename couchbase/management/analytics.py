@@ -15,7 +15,8 @@
 
 from __future__ import annotations
 
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Iterable,
                     Optional)
@@ -51,11 +52,14 @@ from couchbase.management.options import (ConnectLinkOptions,
                                           GetPendingMutationsOptions,
                                           ReplaceLinkAnalyticsOptions)
 
+if TYPE_CHECKING:
+    from couchbase.logic.client_adapter import ClientAdapter
+
 
 class AnalyticsIndexManager(AnalyticsManagerLogic):
 
-    def __init__(self, connection):
-        super().__init__(connection)
+    def __init__(self, client_adapter: ClientAdapter) -> None:
+        super().__init__(client_adapter.connection)
 
     @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def create_dataverse(self,

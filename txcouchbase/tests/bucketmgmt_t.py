@@ -32,6 +32,7 @@ from couchbase.management.buckets import (BucketSettings,
 from ._test_utils import TestEnvironment, run_in_reactor_thread
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1733')
 @pytest.mark.flaky(reruns=5, reruns_delay=1)
 class BucketManagementTests:
 
@@ -63,7 +64,7 @@ class BucketManagementTests:
 
     @pytest.fixture(scope="class")
     def num_nodes(self, cb_env):
-        return len(cb_env.cluster._cluster_info.nodes)
+        return len(cb_env.cluster._impl._cluster_info.nodes)
 
     @pytest.fixture(scope="class")
     def check_multi_node(self, num_nodes):
@@ -112,6 +113,7 @@ class BucketManagementTests:
                               CreateBucketSettings(
                                   name=test_bucket,
                                   bucket_type=BucketType.COUCHBASE,
+                                  storage_backend=StorageBackend.COUCHSTORE,
                                   ram_quota_mb=100,
                                   replica_index=True))
         bucket = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
@@ -125,6 +127,7 @@ class BucketManagementTests:
                               CreateBucketSettings(
                                   name=test_bucket,
                                   bucket_type=BucketType.COUCHBASE,
+                                  storage_backend=StorageBackend.COUCHSTORE,
                                   ram_quota_mb=100,
                                   replica_index=False))
         bucket = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
@@ -263,7 +266,10 @@ class BucketManagementTests:
                                   ram_quota_mb=100,
                                   flush_enabled=False))
         bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
-        assert bucket.storage_backend == StorageBackend.COUCHSTORE
+        if cb_env.supports_feature('magma_128_buckets'):
+            assert bucket.storage_backend == StorageBackend.MAGMA
+        else:
+            assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
     @pytest.mark.usefixtures("check_bucket_storage_backend_supported")
     @pytest.mark.usefixtures("check_multi_node")

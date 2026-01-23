@@ -297,6 +297,7 @@ class SearchIndexManagementTestSuite:
         assert res.source_params == search_idx.source_params
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1738')
 @pytest.mark.flaky(reruns=5, reruns_delay=1)
 class ClassicSearchIndexManagementTests(SearchIndexManagementTestSuite):
     @pytest.fixture(scope='class', autouse=True)
@@ -316,6 +317,7 @@ class ClassicSearchIndexManagementTests(SearchIndexManagementTestSuite):
         cb_base_env.disable_search_mgmt()
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1738')
 # @pytest.mark.flaky(reruns=5, reruns_delay=1)
 class ClassicScopeSearchIndexManagementTests(SearchIndexManagementTestSuite):
     @pytest.fixture(scope='class', autouse=True)

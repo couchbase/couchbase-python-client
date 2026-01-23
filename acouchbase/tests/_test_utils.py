@@ -232,10 +232,9 @@ class TestEnvironment(CouchbaseTestEnvironment):
                 pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
                             ' an accurate representation of the state of the test, but rather'
                              ' there is an environment issue.'))
-            elif not cluster or not bucket:
-                pytest.skip(('Skipping tests as failure is not'
-                            ' an accurate representation of the state of the test, but rather'
-                             ' there is an environment issue.'))
+            else:
+                msg = 'Unable to establish cluster/bucket connection. Check the environment (e.g. VPN).'
+                raise CouchbaseTestEnvironmentException(msg)
 
         coll = bucket.default_collection()
         if coll_type == CollectionType.DEFAULT:

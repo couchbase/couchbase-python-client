@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from couchbase.logic.bucket_types import BucketRequest
     from couchbase.logic.cluster_types import ClusterRequest, CreateConnectionRequest
     from couchbase.logic.collection_types import CollectionRequest
+    from couchbase.management.logic.mgmt_req import MgmtRequest
 
 
 class AsyncClientAdapter:
@@ -154,6 +155,26 @@ class AsyncClientAdapter:
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret)
+            if not ft.done():
+                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+
+        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        if not self.connected:
+            chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
+            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
+        else:
+            self._execute_req(ft, req.op_name, req_dict)
+        return ft
+
+    def execute_mgmt_request(self, req: MgmtRequest) -> Future[Any]:
+        ft = self._loop.create_future()
+
+        def _callback(ret: Any) -> None:
+            if not ft.done():
+                self._loop.call_soon_threadsafe(ft.set_result, ret)
+
+        def _errback(ret: Any) -> None:
+            excptn = ErrorMapper.build_exception(ret, mapping=req.error_map)
             if not ft.done():
                 self._loop.call_soon_threadsafe(ft.set_exception, excptn)
 
