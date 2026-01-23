@@ -664,7 +664,6 @@ class KeyValueOpTranscoderTests(KeyValueOpTranscoderTestSuite):
         cb_env.teardown(request.param)
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicLegacyTranscoderTests(LegacyTranscoderTestSuite):
 
     @pytest.fixture(scope='class')
@@ -683,14 +682,17 @@ class ClassicLegacyTranscoderTests(LegacyTranscoderTestSuite):
 
         cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
         cb_env.setup(request.param)
-        cb_env.cluster.default_transcoder = LegacyTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(LegacyTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(LegacyTranscoder())
         yield cb_env
         cb_env.teardown(request.param)
         # reset the transcoder
-        cb_env.cluster.default_transcoder = JSONTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicRawBinaryTranscoderTests(RawBinaryTranscoderTestSuite):
 
     @pytest.fixture(scope='class')
@@ -709,14 +711,17 @@ class ClassicRawBinaryTranscoderTests(RawBinaryTranscoderTestSuite):
 
         cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
         cb_env.setup(request.param)
-        cb_env.cluster.default_transcoder = RawBinaryTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(RawBinaryTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(RawBinaryTranscoder())
         yield cb_env
         cb_env.teardown(request.param)
         # reset the transcoder
-        cb_env.cluster.default_transcoder = JSONTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicRawJsonTranscoderTests(RawJsonTranscoderTestSuite):
 
     @pytest.fixture(scope='class')
@@ -735,14 +740,17 @@ class ClassicRawJsonTranscoderTests(RawJsonTranscoderTestSuite):
 
         cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
         cb_env.setup(request.param)
-        cb_env.cluster.default_transcoder = RawJSONTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(RawJSONTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(RawJSONTranscoder())
         yield cb_env
         cb_env.teardown(request.param)
         # reset the transcoder
-        cb_env.cluster.default_transcoder = JSONTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicRawStringTranscoderTests(RawStringTranscoderTestSuite):
 
     @pytest.fixture(scope='class')
@@ -761,8 +769,12 @@ class ClassicRawStringTranscoderTests(RawStringTranscoderTestSuite):
 
         cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
         cb_env.setup(request.param)
-        cb_env.cluster.default_transcoder = RawStringTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(RawStringTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(RawStringTranscoder())
         yield cb_env
         cb_env.teardown(request.param)
         # reset the transcoder
-        cb_env.cluster.default_transcoder = JSONTranscoder()
+        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
+        if cb_env.named_collection:
+            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())

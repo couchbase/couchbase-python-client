@@ -99,7 +99,7 @@ class DurabilityTestSuite:
         key, value = cb_env.get_new_doc()
         durability = ClientDurability(
             persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-        cb_env.collection.insert(key, value, InsertOptions(durability=durability))
+        cb_env.collection.insert(key, value, InsertOptions(durability=durability, timeout=timedelta(seconds=10)))
         result = cb_env.collection.get(key)
         assert value == result.content_as[dict]
 

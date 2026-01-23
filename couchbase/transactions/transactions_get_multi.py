@@ -59,8 +59,8 @@ class TransactionGetMultiSpec:
         """
           **INTERNAL**
         """
-        return (self.collection._scope.bucket_name,
-                self.collection._scope.name,
+        return (self.collection._impl.bucket_name,
+                self.collection._impl.scope_name,
                 self.collection.name,
                 self.id)
 
@@ -75,8 +75,8 @@ class TransactionGetMultiReplicasFromPreferredServerGroupSpec:
         """
           **INTERNAL**
         """
-        return (self.collection._scope.bucket_name,
-                self.collection._scope.name,
+        return (self.collection._impl.bucket_name,
+                self.collection._impl.scope_name,
                 self.collection.name,
                 self.id)
 

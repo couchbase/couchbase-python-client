@@ -192,7 +192,7 @@ class BindingMap:
             KeyValueMultiOperationType.DecrementMulti.value: binary_multi_operation,
             KeyValueMultiOperationType.ExistsMulti.value: kv_multi_operation,
             KeyValueMultiOperationType.GetMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.GetAllReplicasMulti.value: kv_operation,
+            KeyValueMultiOperationType.GetAllReplicasMulti.value: kv_multi_operation,
             KeyValueMultiOperationType.GetAndLockMulti.value: kv_multi_operation,
             KeyValueMultiOperationType.GetAnyReplicaMulti.value: kv_multi_operation,
             KeyValueMultiOperationType.IncrementMulti.value: binary_multi_operation,

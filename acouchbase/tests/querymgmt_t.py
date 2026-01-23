@@ -219,7 +219,7 @@ class QueryIndexManagementTests:
         ixname = 'ix2'
         keys = ('fld1', 'fld2')
         await ixm.create_index(bucket_name, ixname,
-                               fields=keys, timeout=timedelta(seconds=120))
+                               keys=keys, timeout=timedelta(seconds=120))
         n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(
             bucket_name, *keys)
         await cb_env.cluster.query(n1ql).execute()
@@ -651,7 +651,7 @@ class QueryIndexCollectionManagementTests:
         ixname = 'ix2'
         keys = ('fld1', 'fld2')
         await ixm.create_index(bucket_name, ixname,
-                               fields=keys,
+                               keys=keys,
                                timeout=timedelta(seconds=120),
                                scope_name=self.TEST_SCOPE,
                                collection_name=self.TEST_COLLECTION)
@@ -1110,7 +1110,7 @@ class CollectionQueryIndexManagerTests:
     async def test_create_secondary_indexes_fields_kwarg(self, cb_env, fqdn):
         ixname = 'ix2'
         keys = ('fld1', 'fld2')
-        await cb_env.cixm.create_index(ixname, fields=keys, timeout=timedelta(seconds=120))
+        await cb_env.cixm.create_index(ixname, keys=keys, timeout=timedelta(seconds=120))
         n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(fqdn, *keys)
         await cb_env.cluster.query(n1ql).execute()
 

@@ -71,7 +71,7 @@ class TestEnvironment:
         self._config = kwargs.pop('couchbase_config', None)
         self._data_provider = kwargs.pop('data_provider', None)
         self._default_collection = kwargs.pop('default_collection', None)
-        self._default_scope = self._default_collection._scope if self._default_collection else None
+        self._default_scope = self._default_collection._impl._scope if self._default_collection else None
         self._extra_docs = {}
         self._loaded_docs = {}
         self._named_collection = None

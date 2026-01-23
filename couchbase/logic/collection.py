@@ -75,7 +75,7 @@ class CollectionLogic:
         #     raise RuntimeError("No connection provided")
         self._scope = scope
         self._collection_name = name
-        self._connection = scope.connection
+        self._connection = scope._impl.connection
 
     @property
     def connection(self):
@@ -86,7 +86,7 @@ class CollectionLogic:
 
     @property
     def default_transcoder(self) -> Optional[Transcoder]:
-        return self._scope.default_transcoder
+        return self._scope._impl.default_transcoder
 
     @property
     def name(self) -> str:

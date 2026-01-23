@@ -19,15 +19,11 @@ from __future__ import annotations
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
-                    Iterable,
-                    Union)
+                    Iterable)
 
 from twisted.internet.defer import Deferred
 
-from couchbase.logic.collection import CollectionLogic
-from couchbase.options import forward_args
-from couchbase.result import (CounterResult,
-                              ExistsResult,
+from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
                               LookupInReplicaResult,
@@ -35,131 +31,87 @@ from couchbase.result import (CounterResult,
                               MutateInResult,
                               MutationResult)
 from txcouchbase.binary_collection import BinaryCollection
-from txcouchbase.logic import TxWrapper
+from txcouchbase.logic.collection_impl import TxCollectionImpl
 
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import JSONType
-    from couchbase.options import (AppendOptions,
-                                   DecrementOptions,
-                                   ExistsOptions,
+    from couchbase.logic.top_level_types import JSONType
+    from couchbase.options import (ExistsOptions,
                                    GetAllReplicasOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
                                    GetAnyReplicaOptions,
                                    GetOptions,
-                                   IncrementOptions,
                                    InsertOptions,
                                    LookupInAllReplicasOptions,
                                    LookupInAnyReplicaOptions,
                                    LookupInOptions,
                                    MutateInOptions,
-                                   PrependOptions,
                                    RemoveOptions,
                                    ReplaceOptions,
                                    TouchOptions,
                                    UnlockOptions,
                                    UpsertOptions)
     from couchbase.subdocument import Spec
+    from txcouchbase.scope import TxScope
 
 
-class Collection(CollectionLogic):
+class Collection:
 
-    def __init__(self, scope, name):
-        super().__init__(scope, name)
-        self._loop = scope.loop
+    def __init__(self, scope: TxScope, name: str) -> None:
+        self._impl = TxCollectionImpl(name, scope)
 
     @property
-    def loop(self):
+    def name(self) -> str:
         """
-        **INTERNAL**
+            str: The name of this :class:`~.Collection` instance.
         """
-        return self._loop
+        return self._impl.name
 
     def get(self,
             key,  # type: str
             *opts,  # type: GetOptions
             **kwargs,  # type: Dict[str, Any]
             ) -> Deferred[GetResult]:
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
-
-        return self._get_internal(key, **final_args)
-
-    @TxWrapper.inject_callbacks_and_decode(GetResult)
-    def _get_internal(
-        self,
-        key,  # type: str
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Deferred[GetResult]:
-        super().get(key, **kwargs)
+        req = self._impl.request_builder.build_get_request(key, *opts, **kwargs)
+        return self._impl.get_deferred(req)
 
     def get_any_replica(self,
                         key,  # type: str
                         *opts,  # type: GetAnyReplicaOptions
                         **kwargs,  # type: Dict[str, Any]
                         ) -> Deferred[GetResult]:
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
-
-        return self._get_any_replica_internal(key, **final_args)
-
-    @TxWrapper.inject_callbacks_and_decode(GetReplicaResult)
-    def _get_any_replica_internal(
-        self,
-        key,  # type: str
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Deferred[GetReplicaResult]:
-        super().get_any_replica(key, **kwargs)
+        req = self._impl.request_builder.build_get_any_replica_request(key, *opts, **kwargs)
+        return self._impl.get_any_replica_deferred(req)
 
     def get_all_replicas(self,
                          key,  # type: str
                          *opts,  # type: GetAllReplicasOptions
                          **kwargs,  # type: Dict[str, Any]
                          ) -> Deferred[Iterable[GetReplicaResult]]:
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
+        req = self._impl.request_builder.build_get_all_replicas_request(key, *opts, **kwargs)
+        return self._impl.get_all_replicas_deferred(req)
 
-        return self._get_all_replicas_internal(key, **final_args)
-
-    @TxWrapper.inject_callbacks_and_decode(GetReplicaResult)
-    def _get_all_replicas_internal(
-        self,
-        key,  # type: str
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Deferred[Iterable[GetReplicaResult]]:
-        super().get_all_replicas(key, **kwargs)
-
-    @TxWrapper.inject_callbacks(ExistsResult)
     def exists(
         self,
         key,  # type: str
         *opts,  # type: ExistsOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[ExistsResult]:
-        super().exists(key, *opts, **kwargs)
+        req = self._impl.request_builder.build_exists_request(key, *opts, **kwargs)
+        return self._impl.exists_deferred(req)
 
-    @TxWrapper.inject_callbacks(MutationResult)
     def insert(
-        self,  # type: "Collection"
+        self,
         key,  # type: str
         value,  # type: JSONType
         *opts,  # type: InsertOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[MutationResult]:
-        super().insert(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_insert_request(key, value, *opts, **kwargs)
+        return self._impl.insert_deferred(req)
 
-    @TxWrapper.inject_callbacks(MutationResult)
     def upsert(
         self,
         key,  # type: str
@@ -167,56 +119,43 @@ class Collection(CollectionLogic):
         *opts,  # type: UpsertOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[MutationResult]:
-        super().upsert(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_upsert_request(key, value, *opts, **kwargs)
+        return self._impl.upsert_deferred(req)
 
-    @TxWrapper.inject_callbacks(MutationResult)
     def replace(self,
                 key,  # type: str
                 value,  # type: JSONType
                 *opts,  # type: ReplaceOptions
                 **kwargs,  # type: Dict[str, Any]
-                ) -> MutationResult:
-        super().replace(key, value, *opts, **kwargs)
+                ) -> Deferred[MutationResult]:
+        req = self._impl.request_builder.build_replace_request(key, value, *opts, **kwargs)
+        return self._impl.replace_deferred(req)
 
-    @TxWrapper.inject_callbacks(MutationResult)
     def remove(self,
                key,  # type: str
                *opts,  # type: RemoveOptions
                **kwargs,  # type: Dict[str, Any]
-               ) -> MutationResult:
-        super().remove(key, *opts, **kwargs)
+               ) -> Deferred[MutationResult]:
+        req = self._impl.request_builder.build_remove_request(key, *opts, **kwargs)
+        return self._impl.remove_deferred(req)
 
-    @TxWrapper.inject_callbacks(MutationResult)
     def touch(self,
               key,  # type: str
               expiry,  # type: timedelta
               *opts,  # type: TouchOptions
               **kwargs,  # type: Dict[str, Any]
-              ) -> MutationResult:
-        super().touch(key, expiry, *opts, **kwargs)
+              ) -> Deferred[MutationResult]:
+        req = self._impl.request_builder.build_touch_request(key, expiry, *opts, **kwargs)
+        return self._impl.touch_deferred(req)
 
     def get_and_touch(self,
                       key,  # type: str
                       expiry,  # type: timedelta
                       *opts,  # type: GetAndTouchOptions
                       **kwargs,  # type: Dict[str, Any]
-                      ) -> GetResult:
-        # add to kwargs for conversion to int
-        kwargs["expiry"] = expiry
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
-
-        return self._get_and_touch_internal(key, **final_args)
-
-    @TxWrapper.inject_callbacks_and_decode(GetResult)
-    def _get_and_touch_internal(self,
-                                key,  # type: str
-                                **kwargs,  # type: Dict[str, Any]
-                                ) -> GetResult:
-        super().get_and_touch(key, **kwargs)
+                      ) -> Deferred[GetResult]:
+        req = self._impl.request_builder.build_get_and_touch_request(key, expiry, *opts, **kwargs)
+        return self._impl.get_and_touch_deferred(req)
 
     def get_and_lock(
         self,
@@ -224,32 +163,18 @@ class Collection(CollectionLogic):
         lock_time,  # type: timedelta
         *opts,  # type: GetAndLockOptions
         **kwargs,  # type: Dict[str, Any]
-    ) -> GetResult:
-        # add to kwargs for conversion to int
-        kwargs["lock_time"] = lock_time
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
+    ) -> Deferred[GetResult]:
+        req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, *opts, **kwargs)
+        return self._impl.get_and_lock_deferred(req)
 
-        return self._get_and_lock_internal(key, **final_args)
-
-    @TxWrapper.inject_callbacks_and_decode(GetResult)
-    def _get_and_lock_internal(self,
-                               key,  # type: str
-                               **kwargs,  # type: Dict[str, Any]
-                               ) -> GetResult:
-        super().get_and_lock(key, **kwargs)
-
-    @TxWrapper.inject_callbacks(None)
     def unlock(self,
                key,  # type: str
                cas,  # type: int
                *opts,  # type: UnlockOptions
                **kwargs,  # type: Dict[str, Any]
-               ) -> None:
-        super().unlock(key, cas, *opts, **kwargs)
+               ) -> Deferred[None]:
+        req = self._impl.request_builder.build_unlock_request(key, cas, *opts, **kwargs)
+        self._impl.unlock_deferred(req)
 
     def lookup_in(
         self,
@@ -257,22 +182,9 @@ class Collection(CollectionLogic):
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInOptions
         **kwargs,  # type: Dict[str, Any]
-    ) -> LookupInResult:
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
-        return self._lookup_in_internal(key, spec, **final_args)
-
-    @TxWrapper.inject_callbacks_and_decode(LookupInResult)
-    def _lookup_in_internal(
-        self,
-        key,  # type: str
-        spec,  # type: Iterable[Spec]
-        **kwargs,  # type: Dict[str, Any]
-    ) -> LookupInResult:
-        super().lookup_in(key, spec, **kwargs)
+    ) -> Deferred[LookupInResult]:
+        req = self._impl.request_builder.build_lookup_in_request(key, spec, *opts, **kwargs)
+        return self._impl.lookup_in_deferred(req)
 
     def lookup_in_any_replica(
         self,
@@ -280,22 +192,9 @@ class Collection(CollectionLogic):
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInAnyReplicaOptions
         **kwargs,  # type: Dict[str, Any]
-    ) -> LookupInReplicaResult:
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
-        return self._lookup_in_any_replica_internal(key, spec, **final_args)
-
-    @TxWrapper.inject_callbacks_and_decode(LookupInReplicaResult)
-    def _lookup_in_any_replica_internal(
-        self,
-        key,  # type: str
-        spec,  # type: Iterable[Spec]
-        **kwargs,  # type: Dict[str, Any]
-    ) -> LookupInReplicaResult:
-        super().lookup_in_any_replica(key, spec, **kwargs)
+    ) -> Deferred[LookupInReplicaResult]:
+        req = self._impl.request_builder.build_lookup_in_any_replica_request(key, spec, *opts, **kwargs)
+        return self._impl.lookup_in_any_replica_deferred(req)
 
     def lookup_in_all_replicas(
         self,
@@ -303,76 +202,25 @@ class Collection(CollectionLogic):
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInAllReplicasOptions
         **kwargs,  # type: Dict[str, Any]
-    ) -> Iterable[LookupInReplicaResult]:
-        final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.get('transcoder', None)
-        if not transcoder:
-            transcoder = self.default_transcoder
-        final_args['transcoder'] = transcoder
-        return self._lookup_in_all_replicas_internal(key, spec, **final_args)
+    ) -> Deferred[Iterable[LookupInReplicaResult]]:
+        req = self._impl.request_builder.build_lookup_in_all_replicas_request(key, spec, *opts, **kwargs)
+        return self._impl.lookup_in_all_replicas_deferred(req)
 
-    @TxWrapper.inject_callbacks_and_decode(LookupInReplicaResult)
-    def _lookup_in_all_replicas_internal(
-        self,
-        key,  # type: str
-        spec,  # type: Iterable[Spec]
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Iterable[LookupInReplicaResult]:
-        super().lookup_in_all_replicas(key, spec, **kwargs)
-
-    @TxWrapper.inject_callbacks(MutateInResult)
     def mutate_in(
         self,
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: MutateInOptions
         **kwargs,  # type: Dict[str, Any]
-    ) -> MutateInResult:
-        super().mutate_in(key, spec, *opts, **kwargs)
+    ) -> Deferred[MutateInResult]:
+        req = self._impl.request_builder.build_mutate_in_request(key, spec, *opts, **kwargs)
+        return self._impl.mutate_in_deferred(req)
 
     def binary(self) -> BinaryCollection:
-        return BinaryCollection(self)
-
-    @TxWrapper.inject_callbacks(MutationResult)
-    def _append(
-        self,
-        key,  # type: str
-        value,  # type: Union[str,bytes,bytearray]
-        *opts,  # type: AppendOptions
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Deferred[MutationResult]:
-        super().append(key, value, *opts, **kwargs)
-
-    @TxWrapper.inject_callbacks(MutationResult)
-    def _prepend(
-        self,
-        key,  # type: str
-        value,  # type: Union[str,bytes,bytearray]
-        *opts,  # type: PrependOptions
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Deferred[MutationResult]:
-        super().prepend(key, value, *opts, **kwargs)
-
-    @TxWrapper.inject_callbacks(CounterResult)
-    def _increment(
-        self,
-        key,  # type: str
-        *opts,  # type: IncrementOptions
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Deferred[CounterResult]:
-        super().increment(key, *opts, **kwargs)
-
-    @TxWrapper.inject_callbacks(CounterResult)
-    def _decrement(
-        self,
-        key,  # type: str
-        *opts,  # type: DecrementOptions
-        **kwargs,  # type: Dict[str, Any]
-    ) -> Deferred[CounterResult]:
-        super().decrement(key, *opts, **kwargs)
+        return BinaryCollection(self._impl)
 
     @staticmethod
-    def default_name():
+    def default_name() -> str:
         return "_default"
 
 

@@ -15,19 +15,15 @@
 
 from __future__ import annotations
 
-from asyncio import AbstractEventLoop
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
                     Dict,
                     Optional)
 
-from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
 from acouchbase.collection import Collection
+from acouchbase.logic.scope_impl import AsyncScopeImpl
 from acouchbase.management.eventing import ScopeEventingFunctionManager
 from acouchbase.management.search import ScopeSearchIndexManager
-from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
-from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
 from couchbase.logic.top_level_types import PyCapsuleType
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
@@ -35,8 +31,6 @@ from couchbase.options import (AnalyticsOptions,
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
-from couchbase.serializer import Serializer
-from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from acouchbase.bucket import AsyncBucket
@@ -56,55 +50,30 @@ class AsyncScope:
     """
 
     def __init__(self, bucket: AsyncBucket, scope_name: str) -> None:
-        self._bucket = bucket
-        self._set_connection()
-        self._scope_name = scope_name
+        self._impl = AsyncScopeImpl(scope_name, bucket)
 
     @property
     def connection(self) -> Optional[PyCapsuleType]:
         """
         **INTERNAL**
         """
-        return self._connection
-
-    @property
-    def loop(self) -> AbstractEventLoop:
-        """
-        **INTERNAL**
-        """
-        return self._bucket._impl.loop
-
-    @property
-    def default_serializer(self) -> Optional[Serializer]:
-        return self._bucket._impl.default_serializer
-
-    @property
-    def streaming_timeouts(self):
-        """
-        **INTERNAL**
-        """
-        return self._bucket._impl.streaming_timeouts
-
-    @property
-    def default_transcoder(self) -> Optional[Transcoder]:
-        return self._bucket._impl.default_transcoder
+        return self._impl.connection
 
     @property
     def name(self):
         """
             str: The name of this :class:`~acouchbase.scope.Scope` instance.
         """
-        return self._scope_name
+        return self._impl.name
 
     @property
     def bucket_name(self):
         """
             str: The name of the bucket in which this :class:`~acouchbase.scope.Scope` instance belongs.
         """
-        return self._bucket.name
+        return self._impl.bucket_name
 
-    def collection(self, name  # type: str
-                   ) -> Collection:
+    def collection(self, name) -> Collection:
         """Creates a :class:`~acouchbase.collection.Collection` instance of the specified collection.
 
         Args:
@@ -114,18 +83,6 @@ class AsyncScope:
             :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the specified collection.
         """  # noqa: E501
         return Collection(self, name)
-
-    def _connect_bucket(self) -> Awaitable:
-        """
-        **INTERNAL**
-        """
-        return self._bucket._impl.bucket_connect_ft
-
-    def _set_connection(self):
-        """
-        **INTERNAL**
-        """
-        self._connection = self._bucket._impl.connection
 
     def query(self,
               statement,  # type: str
@@ -199,28 +156,8 @@ class AsyncScope:
                 print(f'Query metrics: {q_res.metadata().metrics()}')
 
         """
-        opt = QueryOptions()
-        opts = list(options)
-        for o in opts:
-            if isinstance(o, QueryOptions):
-                opt = o
-                opts.remove(o)
-
-        request_args = dict()
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-
-        # set the query context as this bucket and scope if not provided
-        if not ('query_context' in opt or 'query_context' in kwargs):
-            kwargs['query_context'] = '`{}`.`{}`'.format(self.bucket_name, self.name)
-
-        query = N1QLQuery.create_query_object(
-            statement, opt, **kwargs)
-        return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self.connection,
-                                                                  self.loop,
-                                                                  query.params,
-                                                                  **request_args))
+        req = self._impl.request_builder.build_query_request(statement, *options, **kwargs)
+        return self._impl.query(req)
 
     def analytics_query(self,
                         statement,  # type: str
@@ -294,28 +231,8 @@ class AsyncScope:
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
         """  # noqa: E501
-        opt = AnalyticsOptions()
-        opts = list(options)
-        for o in opts:
-            if isinstance(o, AnalyticsOptions):
-                opt = o
-                opts.remove(o)
-
-        request_args = dict()
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-
-        # set the query context as this bucket and scope if not provided
-        if not ('query_context' in opt or 'query_context' in kwargs):
-            kwargs['query_context'] = 'default:`{}`.`{}`'.format(self.bucket_name, self.name)
-
-        query = AnalyticsQuery.create_query_object(
-            statement, *options, **kwargs)
-        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
-                                                                                self.loop,
-                                                                                query.params,
-                                                                                **request_args))
+        req = self._impl.request_builder.build_analytics_query_request(statement, *options, **kwargs)
+        return self._impl.analytics_query(req)
 
     def search_query(self,
                      index,  # type: str
@@ -410,27 +327,8 @@ class AsyncScope:
                     print(f'Locations: {row.locations}')
 
         """
-        opt = SearchOptions()
-        opts = list(options)
-        for o in opts:
-            if isinstance(o, SearchOptions):
-                opt = o
-                opts.remove(o)
-
-        request_args = dict()
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-
-        # set the scope_name as this scope if not provided
-        if not ('scope_name' in opt or 'scope_name' in kwargs):
-            kwargs['scope_name'] = f'{self.name}'
-
-        query = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
-        return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
-                                                                               self.loop,
-                                                                               query.as_encodable(),
-                                                                               **request_args))
+        req = self._impl.request_builder.build_search_request(index, query, *options, **kwargs)
+        return self._impl.search(req)
 
     def search(self,
                index,  # type: str
@@ -515,17 +413,8 @@ class AsyncScope:
                 async for row in q_res.rows():
                     print(f'Found row: {row}')
         """  # noqa: E501
-        # See couchbase.cluster.search() for note on streaming timeout
-        streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
-        query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
-        req = AsyncFullTextSearchRequest.generate_search_request(self.connection,
-                                                                 self.loop,
-                                                                 query.as_encodable(),
-                                                                 default_serializer=self.default_serializer,
-                                                                 streaming_timeout=streaming_timeout,
-                                                                 bucket_name=self.bucket_name,
-                                                                 scope_name=self.name)
-        return SearchResult(req)
+        req = self._impl.request_builder.build_search_request(index, request, *options, **kwargs)
+        return self._impl.search(req)
 
     def search_indexes(self) -> ScopeSearchIndexManager:
         """
@@ -536,8 +425,7 @@ class AsyncScope:
             :class:`~acouchbase.management.search.ScopeSearchIndexManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
 
         """  # noqa: E501
-        # TODO:  AlreadyShutdownException?
-        return ScopeSearchIndexManager(self.connection, self.loop, self.bucket_name, self.name)
+        return ScopeSearchIndexManager(self._impl.connection, self._impl.loop, self.bucket_name, self.name)
 
     def eventing_functions(self) -> ScopeEventingFunctionManager:
         """
@@ -548,10 +436,10 @@ class AsyncScope:
             :class:`~acouchbase.management.search.ScopeEventingFunctionManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
 
         """  # noqa: E501
-        return ScopeEventingFunctionManager(self.connection, self.loop, self.bucket_name, self.name)
+        return ScopeEventingFunctionManager(self._impl.connection, self._impl.loop, self.bucket_name, self.name)
 
     @staticmethod
-    def default_name():
+    def default_name() -> str:
         return "_default"
 
 

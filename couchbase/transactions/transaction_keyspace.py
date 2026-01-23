@@ -34,8 +34,8 @@ class TransactionKeyspace:
         self._scope = None
         self._collection = None
         if 'coll' in kwargs:
-            self._bucket = kwargs['coll']._scope._bucket.name
-            self._scope = kwargs['coll']._scope.name
+            self._bucket = kwargs['coll']._impl.bucket_name
+            self._scope = kwargs['coll']._impl.scope_name
             self._collection = kwargs['coll'].name
         else:
             self._bucket = kwargs['bucket']

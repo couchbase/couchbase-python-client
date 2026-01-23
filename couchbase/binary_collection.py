@@ -14,6 +14,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -26,6 +28,7 @@ from couchbase.result import (CounterResult,
                               MutationResult)
 
 if TYPE_CHECKING:
+    from couchbase.logic.collection_impl import CollectionImpl
     from couchbase.options import (AppendMultiOptions,
                                    AppendOptions,
                                    DecrementMultiOptions,
@@ -38,8 +41,8 @@ if TYPE_CHECKING:
 
 class BinaryCollection:
 
-    def __init__(self, collection):
-        self._collection = collection
+    def __init__(self, collection_impl: CollectionImpl) -> None:
+        self._impl = collection_impl
 
     def increment(
         self,
@@ -86,7 +89,8 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        return self._collection._increment(key, *opts, **kwargs)
+        req = self._impl.request_builder.build_increment_request(key, *opts, **kwargs)
+        return self._impl.increment(req)
 
     def decrement(
         self,
@@ -133,7 +137,8 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        return self._collection._decrement(key, *opts, **kwargs)
+        req = self._impl.request_builder.build_decrement_request(key, *opts, **kwargs)
+        return self._impl.decrement(req)
 
     def append(
         self,
@@ -188,7 +193,8 @@ class BinaryCollection:
                                                 AppendOptions(timeout=timedelta(seconds=2)))
 
         """
-        return self._collection._append(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_append_request(key, value, *opts, **kwargs)
+        return self._impl.append(req)
 
     def prepend(
         self,
@@ -243,7 +249,8 @@ class BinaryCollection:
                                                 PrependOptions(timeout=timedelta(seconds=2)))
 
         """
-        return self._collection._prepend(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_prepend_request(key, value, *opts, **kwargs)
+        return self._impl.prepend(req)
 
     def append_multi(
         self,
@@ -339,7 +346,8 @@ class BinaryCollection:
 
 
         """
-        return self._collection._append_multi(keys_and_values, *opts, **kwargs)
+        req = self._impl.multi_request_builder.build_append_multi_request(keys_and_values, *opts, **kwargs)
+        return self._impl.append_multi(req)
 
     def prepend_multi(
         self,
@@ -436,7 +444,9 @@ class BinaryCollection:
 
 
         """
-        return self._collection._prepend_multi(keys_and_values, *opts, **kwargs)
+        req = self._impl.multi_request_builder.build_prepend_multi_request(
+            keys_and_values, *opts, **kwargs)
+        return self._impl.prepend_multi(req)
 
     def increment_multi(
         self,
@@ -521,7 +531,8 @@ class BinaryCollection:
 
 
         """
-        return self._collection._increment_multi(keys, *opts, **kwargs)
+        req = self._impl.multi_request_builder.build_increment_multi_request(keys, *opts, **kwargs)
+        return self._impl.increment_multi(req)
 
     def decrement_multi(
         self,
@@ -606,4 +617,5 @@ class BinaryCollection:
 
 
         """
-        return self._collection._decrement_multi(keys, *opts, **kwargs)
+        req = self._impl.multi_request_builder.build_decrement_multi_request(keys, *opts, **kwargs)
+        return self._impl.decrement_multi(req)

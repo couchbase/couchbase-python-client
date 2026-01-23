@@ -13,25 +13,34 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import asyncio
 import time
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
+                    Callable,
+                    Coroutine,
                     Dict,
                     Generator,
                     List,
-                    Optional)
+                    Optional,
+                    Union)
 
-from acouchbase.logic.wrappers import AsyncWrapper
 from couchbase.exceptions import (CasMismatchException,
+                                  DocumentExistsException,
                                   DocumentNotFoundException,
                                   InvalidArgumentException,
                                   PathExistsException,
                                   PathNotFoundException,
                                   QueueEmpty,
                                   UnAmbiguousTimeoutException)
+from couchbase.logic.collection_types import (GetRequest,
+                                              LookupInRequest,
+                                              MutateInRequest)
 from couchbase.options import MutateInOptions
+from couchbase.result import LookupInResult
 from couchbase.subdocument import (array_addunique,
                                    array_append,
                                    array_prepend,
@@ -43,37 +52,49 @@ from couchbase.subdocument import (remove,
                                    upsert)
 
 if TYPE_CHECKING:
-    from acouchbase.collection import Collection
+    from acouchbase.logic.collection_impl import AsyncCollectionImpl
     from couchbase._utils import JSONType
+
+DataStructureRequest = Union[GetRequest, LookupInRequest, MutateInRequest]
 
 
 class CouchbaseList:
-    def __init__(self, key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: AsyncCollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
         self._iter = False
         self._full_list = None
 
-    @AsyncWrapper.datastructure_op(create_type=list)
+    async def _execute_op(self,
+                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
+                          req: DataStructureRequest,
+                          create_type: Optional[bool] = None) -> Any:
+        try:
+            return await fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
+                    await self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return await fn(req)
+            else:
+                raise
+
     async def _get(self) -> List:
         """
         Get the entire list.
         """
+        req = self._impl.request_builder.build_get_request(self._key)
+        return await self._execute_op(self._impl.get, req, create_type=True)
 
-        return await self._collection.get(self._key)
-
-    @AsyncWrapper.datastructure_op(create_type=list)
-    async def append(self, value  # type: JSONType
-                     ) -> None:
+    async def append(self, value: JSONType) -> None:
         """
         Add an item to the end of a list.
 
         :param value: The value to append
         :return: None
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified.
 
         example::
 
@@ -83,18 +104,15 @@ class CouchbaseList:
         .. seealso:: :meth:`map_add`
         """
         op = array_append('', value)
-        await self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        await self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    @AsyncWrapper.datastructure_op(create_type=list)
-    async def prepend(self, value  # type: JSONType
-                      ) -> None:
+    async def prepend(self, value: JSONType) -> None:
         """
         Add an item to the beginning of a list.
 
         :param value: Value to prepend
         :return: :class:`OperationResult`.
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified.
 
         This function is identical to :meth:`list_append`, except for prepending
         rather than appending the item
@@ -102,11 +120,10 @@ class CouchbaseList:
         .. seealso:: :meth:`list_append`, :meth:`map_add`
         """
         op = array_prepend('', value)
-        await self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        await self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    async def set_at(self, index,  # type: int
-                     value  # type: JSONType
-                     ) -> None:
+    async def set_at(self, index: int, value: JSONType) -> None:
         """
         Sets an item within a list at a given position.
 
@@ -125,30 +142,28 @@ class CouchbaseList:
         """
         try:
             op = replace(f'[{index}]', value)
-            await self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            await self._execute_op(self._impl.mutate_in, req)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
-    @AsyncWrapper.datastructure_op(create_type=list)
-    async def get_at(self, index  # type: int
-                     ) -> Any:
+    async def get_at(self, index: int) -> Any:
         """
         Get a specific element within a list.
 
         :param index: The index to retrieve
         :return: value for the element
         :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         try:
             op = subdoc_get(f'[{index}]')
-            sdres = await self._collection.lookup_in(self._key, (op,))
-            return sdres.value[0].get("value", None)
+            req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+            sdres: LookupInResult = await self._execute_op(self._impl.lookup_in, req, create_type=True)
+            return sdres.value[0].get('value', None)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
-    async def remove_at(self, index  # type: int
-                        ) -> None:
+    async def remove_at(self, index: int) -> None:
         """
         Remove the element at a specific index from a list.
 
@@ -160,31 +175,28 @@ class CouchbaseList:
         """
         try:
             op = remove(f'[{index}]')
-            await self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            await self._execute_op(self._impl.mutate_in, req)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
-    @AsyncWrapper.datastructure_op(create_type=list)
     async def size(self) -> int:
         """
         Retrieve the number of elements in the list.
 
         :return: The number of elements within the list
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         op = count('')
-        sdres = await self._collection.lookup_in(self._key, (op,))
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sdres: LookupInResult = await self._execute_op(self._impl.lookup_in, req, create_type=True)
         return sdres.value[0].get("value", None)
 
-    @AsyncWrapper.datastructure_op(create_type=list)
-    async def index_of(self, value  # type: Any
-                       ) -> int:
+    async def index_of(self, value: Any) -> int:
         """
         Retrieve the index of the specified value in the list.
 
         :param value: the value to look-up
         :return: The index of the specified value, -1 if not found
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
 
         list_ = await self._get()
@@ -199,7 +211,6 @@ class CouchbaseList:
         Retrieves the entire list.
 
         :return: The entire CouchbaseList
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
 
         list_ = await self._get()
@@ -210,10 +221,10 @@ class CouchbaseList:
         Clears the list.
 
         :return: clears the CouchbaseList
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         try:
-            await self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            await self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 
@@ -237,24 +248,36 @@ class CouchbaseList:
 
 
 class CouchbaseMap:
-    def __init__(self, key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: AsyncCollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
         self._full_map = None
 
-    @AsyncWrapper.datastructure_op(create_type=dict)
+    async def _execute_op(self,
+                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
+                          req: DataStructureRequest,
+                          create_type: Optional[bool] = None) -> Any:
+        try:
+            return await fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, dict())
+                    await self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return await fn(req)
+            else:
+                raise
+
     async def _get(self) -> Dict:
         """
         Get the entire map.
         """
-        return await self._collection.get(self._key)
+        req = self._impl.request_builder.build_get_request(self._key)
+        return await self._execute_op(self._impl.get, req, create_type=True)
 
-    @AsyncWrapper.datastructure_op(create_type=dict)
-    async def add(self, mapkey,  # type: str
-                  value  # type: Any
-                  ) -> None:
+    async def add(self, mapkey: str, value: Any) -> None:
         """
         Set a value for a key in a map.
 
@@ -263,8 +286,6 @@ class CouchbaseMap:
 
         :param mapkey: The key in the map to set
         :param value: The value to use (anything serializable to JSON)
-        :raise: :cb_exc:`Document.DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified
 
         .. Initialize a map and add a value
 
@@ -275,28 +296,25 @@ class CouchbaseMap:
 
         """
         op = upsert(mapkey, value)
-        await self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        return await self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    @AsyncWrapper.datastructure_op(create_type=dict)
-    async def get(self, mapkey,  # type: str
-                  ) -> Any:
+    async def get(self, mapkey: str) -> Any:
         """
         Retrieve a value from a map.
 
         :param key: The document ID
         :param mapkey: Key within the map to retrieve
         :return: :class:`~.ValueResult`
-        :raise: :exc:`IndexError` if the mapkey does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. seealso:: :meth:`map_add` for an example
         """
         op = subdoc_get(mapkey)
-        sd_res = await self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res = await self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
-    async def remove(self, mapkey  # type: str
-                     ) -> None:
+    async def remove(self, mapkey: str) -> None:
         """
         Remove an item from a map.
 
@@ -314,39 +332,37 @@ class CouchbaseMap:
         """
         try:
             op = remove(mapkey)
-            await self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            await self._impl.mutate_in(req)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Key: {mapkey} is not in the map.') from None
 
-    @AsyncWrapper.datastructure_op(create_type=dict)
     async def size(self) -> int:
         """
         Get the number of items in the map.
 
         :param key: The document ID of the map
         :return int: The number of items in the map
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. seealso:: :meth:`map_add`
         """
         op = count('')
-        sd_res = await self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
-    @AsyncWrapper.datastructure_op(create_type=dict)
-    async def exists(self, key  # type: Any
-                     ) -> bool:
+    async def exists(self, key: str) -> bool:
         """
-        hecks whether a specific key exists in the map.
+        Checks whether a specific key exists in the map.
 
         :param key: The key to check
         :return bool: If the key exists in the map or not
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. seealso:: :meth:`map_add`
         """
         op = subdoc_exists(key)
-        sd_res = await self._collection.lookup_in(self._key, (op,))
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in, req, create_type=True)
         return sd_res.exists(0)
 
     async def keys(self) -> List[str]:
@@ -354,7 +370,6 @@ class CouchbaseMap:
         Returns a list of all the keys which exist in the map.
 
         :return: The keys in CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the map does not exist
         """
 
         map_ = await self._get()
@@ -365,7 +380,6 @@ class CouchbaseMap:
         Returns a list of all the values which exist in the map.
 
         :return: The keys in CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the map does not exist
         """
 
         map_ = await self._get()
@@ -376,7 +390,6 @@ class CouchbaseMap:
         Retrieves the entire map.
 
         :return: The entire CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
 
         map_ = await self._get()
@@ -387,10 +400,10 @@ class CouchbaseMap:
         Clears the map.
 
         :return: clears the CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         try:
-            await self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            await self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 
@@ -399,7 +412,6 @@ class CouchbaseMap:
         Provide mechanism to loop over the entire map.
 
         :return: Generator expression for CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
 
         map_ = await self._get()
@@ -407,22 +419,35 @@ class CouchbaseMap:
 
 
 class CouchbaseSet:
-    def __init__(self, key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: AsyncCollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
 
-    @AsyncWrapper.datastructure_op(create_type=list)
+    async def _execute_op(self,
+                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
+                          req: DataStructureRequest,
+                          create_type: Optional[bool] = None) -> Any:
+        try:
+            return await fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
+                    await self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return await fn(req)
+            else:
+                raise
+
     async def _get(self) -> List:
         """
         Get the entire set.
         """
-        return await self._collection.get(self._key)
+        req = self._impl.request_builder.build_get_request(self._key)
+        return await self._execute_op(self._impl.get, req, create_type=True)
 
-    @AsyncWrapper.datastructure_op(create_type=list)
-    async def add(self, value  # type: Any
-                  ) -> None:
+    async def add(self, value: Any) -> None:
         """
         Add an item to a set if the item does not yet exist.
 
@@ -431,14 +456,13 @@ class CouchbaseSet:
         """
         try:
             op = array_addunique('', value)
-            await self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            await self._execute_op(self._impl.mutate_in, req, create_type=True)
             return True
         except PathExistsException:
             return False
 
-    async def remove(self, value,  # type: Any  # noqa: C901
-                     timeout=None  # type: Optional[timedelta]
-                     ) -> None:
+    async def remove(self, value: Any, timeout: Optional[timedelta] = None) -> None:  # noqa: C901
         """
         Remove an item from a set.
 
@@ -469,7 +493,10 @@ class CouchbaseSet:
             if val_idx >= 0:
                 try:
                     op = remove(f'[{val_idx}]')
-                    await self._collection.mutate_in(self._key, (op,), MutateInOptions(cas=sd_res.cas))
+                    req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                             (op,),
+                                                                             MutateInOptions(cas=sd_res.cas))
+                    await self._impl.mutate_in(req)
                     break
                 except CasMismatchException:
                     pass
@@ -489,15 +516,12 @@ class CouchbaseSet:
 
             await asyncio.sleep(interval_millis / 1000)
 
-    @AsyncWrapper.datastructure_op(create_type=list)
-    async def contains(self, value  # type: Any
-                       ) -> None:
+    async def contains(self, value: Any) -> None:
         """
         Check whether or not the CouchbaseSet contains a value
 
         :param value: Value to remove
         :return: True if `value` exists in the set, False otherwise
-        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
 
         .. seealso:: :meth:`set_add`, :meth:`map_add`
         """
@@ -505,19 +529,18 @@ class CouchbaseSet:
         list_ = sd_res.content_as[list]
         return value in list_
 
-    @AsyncWrapper.datastructure_op(create_type=list)
     async def size(self) -> int:
         """
         Get the number of items in the set.
 
         :return int: The number of items in the map
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. seealso:: :meth:`map_add`
         """
         op = count('')
-        sd_res = await self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
     async def clear(self) -> None:
         """
@@ -526,17 +549,16 @@ class CouchbaseSet:
         :return: clears the CouchbaseSet
         """
         try:
-            await self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            await self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 
-    @AsyncWrapper.datastructure_op(create_type=list)
     async def values(self) -> List[Any]:
         """
         Returns a list of all the values which exist in the set.
 
         :return: The keys in CouchbaseSet
-        :raise: :cb_exc:`DocumentNotFoundException` if the map does not exist
         """
 
         list_ = await self._get()
@@ -544,34 +566,47 @@ class CouchbaseSet:
 
 
 class CouchbaseQueue:
-    def __init__(self, key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: AsyncCollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
         self._full_queue = None
         self._iter = False
 
-    @AsyncWrapper.datastructure_op(create_type=list)
+    async def _execute_op(self,
+                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
+                          req: DataStructureRequest,
+                          create_type: Optional[bool] = None) -> Any:
+        try:
+            return await fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
+                    await self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return await fn(req)
+            else:
+                raise
+
     async def _get(self) -> List:
         """
         Get the entire queuee.
         """
-        return await self._collection.get(self._key)
+        req = self._impl.request_builder.build_get_request(self._key)
+        return await self._execute_op(self._impl.get, req, create_type=True)
 
-    @AsyncWrapper.datastructure_op(create_type=list)
-    async def push(self, value  # type: JSONType
-                   ) -> None:
+    async def push(self, value: JSONType) -> None:
         """
         Add an item to the queue.
 
         :param value: Value to push onto queue
         """
         op = array_prepend('', value)
-        await self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        await self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    async def pop(self, timeout=None  # type: Optional[timedelta]
-                  ) -> None:
+    async def pop(self, timeout: Optional[timedelta] = None) -> None:
         """
         Pop an item from the queue.
 
@@ -592,12 +627,17 @@ class CouchbaseQueue:
         while True:
             try:
                 op = subdoc_get('[-1]')
-                sd_res = await self._collection.lookup_in(self._key, (op,))
-                val = sd_res.value[0].get("value", None)
+                lookup_in_req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+                sd_res = await self._impl.lookup_in(lookup_in_req)
+                val = sd_res.value[0].get('value', None)
 
                 try:
                     op = remove('[-1]')
-                    await self._collection.mutate_in(self._key, (op,), MutateInOptions(cas=sd_res.cas))
+                    mutate_in_opts = MutateInOptions(cas=sd_res.cas)
+                    mutate_in_req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                                       (op,),
+                                                                                       mutate_in_opts)
+                    await self._impl.mutate_in(mutate_in_req)
                     return val
                 except CasMismatchException:
                     pass
@@ -617,19 +657,18 @@ class CouchbaseQueue:
             except PathNotFoundException:
                 raise QueueEmpty('No items to remove from the queue')
 
-    @AsyncWrapper.datastructure_op(create_type=list)
     async def size(self) -> int:
         """
         Get the number of items in the queue.
 
         :return int: The number of items in the queue
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. seealso:: :meth:`map_add`
         """
         op = count('')
-        sd_res = await self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
     async def clear(self) -> None:
         """
@@ -639,7 +678,8 @@ class CouchbaseQueue:
         :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         try:
-            await self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            await self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 

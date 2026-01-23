@@ -339,7 +339,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
         return None
 
     async def purge_data(self):
-        await asyncio.gather(*[self.collection.remove(key) for key in self._loaded_keys])
+        await asyncio.gather(*[self.collection.remove(key) for key in self._loaded_keys], return_exceptions=True)
 
     # binary data load/purge
 

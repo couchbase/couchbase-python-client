@@ -14,14 +14,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
                     Union)
 
 from couchbase.result import CounterResult, MutationResult
 
 if TYPE_CHECKING:
+    from acouchbase.logic.collection_impl import AsyncCollectionImpl
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    IncrementOptions,
@@ -30,15 +32,14 @@ if TYPE_CHECKING:
 
 class BinaryCollection:
 
-    def __init__(self, collection):
-        self._collection = collection
+    def __init__(self, collection_impl: AsyncCollectionImpl):
+        self._impl = collection_impl
 
-    def increment(
-        self,
-        key,  # type: str
-        *opts,  # type: IncrementOptions
-        **kwargs,  # type: Any
-    ) -> Awaitable[CounterResult]:
+    async def increment(self,
+                        key,  # type: str
+                        *opts,  # type: IncrementOptions
+                        **kwargs,  # type: Any
+                        ) -> CounterResult:
         """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
@@ -79,14 +80,14 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        return self._collection._increment(key, *opts, **kwargs)
+        req = self._impl.request_builder.build_increment_request(key, *opts, **kwargs)
+        return await self._impl.increment(req)
 
-    def decrement(
-        self,
-        key,  # type: str
-        *opts,  # type: DecrementOptions
-        **kwargs,  # type: Any
-    ) -> Awaitable[CounterResult]:
+    async def decrement(self,
+                        key,  # type: str
+                        *opts,  # type: DecrementOptions
+                        **kwargs,  # type: Any
+                        ) -> CounterResult:
         """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
@@ -127,15 +128,15 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        return self._collection._decrement(key, *opts, **kwargs)
+        req = self._impl.request_builder.build_decrement_request(key, *opts, **kwargs)
+        return await self._impl.decrement(req)
 
-    def append(
-        self,
-        key,  # type: str
-        value,  # type: Union[str,bytes,bytearray]
-        *opts,  # type: AppendOptions
-        **kwargs,  # type: Any
-    ) -> Awaitable[MutationResult]:
+    async def append(self,
+                     key,  # type: str
+                     value,  # type: Union[str,bytes,bytearray]
+                     *opts,  # type: AppendOptions
+                     **kwargs,  # type: Any
+                     ) -> MutationResult:
         """Appends the specified value to the beginning of document of the specified key.
 
         Args:
@@ -183,15 +184,15 @@ class BinaryCollection:
                                                         AppendOptions(timeout=timedelta(seconds=2)))
 
         """
-        return self._collection._append(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_append_request(key, value, *opts, **kwargs)
+        return await self._impl.append(req)
 
-    def prepend(
-        self,
-        key,  # type: str
-        value,  # type: Union[str,bytes,bytearray]
-        *opts,  # type: PrependOptions
-        **kwargs,  # type: Any
-    ) -> Awaitable[MutationResult]:
+    async def prepend(self,
+                      key,  # type: str
+                      value,  # type: Union[str,bytes,bytearray]
+                      *opts,  # type: PrependOptions
+                      **kwargs,  # type: Any
+                      ) -> MutationResult:
         """Prepends the specified value to the beginning of document of the specified key.
 
         Args:
@@ -239,4 +240,5 @@ class BinaryCollection:
                                                         PrependOptions(timeout=timedelta(seconds=2)))
 
         """
-        return self._collection._prepend(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_prepend_request(key, value, *opts, **kwargs)
+        return await self._impl.prepend(req)

@@ -14,6 +14,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Union)
@@ -27,12 +29,13 @@ if TYPE_CHECKING:
                                    DecrementOptions,
                                    IncrementOptions,
                                    PrependOptions)
+    from txcouchbase.logic.collection_impl import TxCollectionImpl
 
 
 class BinaryCollection:
 
-    def __init__(self, collection):
-        self._collection = collection
+    def __init__(self, collection_impl: TxCollectionImpl) -> None:
+        self._impl = collection_impl
 
     def increment(
         self,
@@ -40,7 +43,8 @@ class BinaryCollection:
         *opts,  # type: IncrementOptions
         **kwargs,  # type: Any
     ) -> Deferred[CounterResult]:
-        return self._collection._increment(key, *opts, **kwargs)
+        req = self._impl.request_builder.build_increment_request(key, *opts, **kwargs)
+        return self._impl.increment_deferred(req)
 
     def decrement(
         self,
@@ -48,7 +52,8 @@ class BinaryCollection:
         *opts,  # type: DecrementOptions
         **kwargs,  # type: Any
     ) -> Deferred[CounterResult]:
-        return self._collection._decrement(key, *opts, **kwargs)
+        req = self._impl.request_builder.build_decrement_request(key, *opts, **kwargs)
+        return self._impl.decrement_deferred(req)
 
     def append(
         self,
@@ -57,7 +62,8 @@ class BinaryCollection:
         *opts,  # type: AppendOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
-        return self._collection._append(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_append_request(key, value, *opts, **kwargs)
+        return self._impl.append_deferred(req)
 
     def prepend(
         self,
@@ -66,4 +72,5 @@ class BinaryCollection:
         *opts,  # type: PrependOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
-        return self._collection._prepend(key, value, *opts, **kwargs)
+        req = self._impl.request_builder.build_prepend_request(key, value, *opts, **kwargs)
+        return self._impl.prepend_deferred(req)

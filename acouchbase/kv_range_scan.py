@@ -16,7 +16,6 @@
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
@@ -27,10 +26,7 @@ from couchbase.logic.kv_range_scan import RangeScanRequestLogic
 
 
 class AsyncRangeScanRequest(RangeScanRequestLogic):
-    def __init__(self,
-                 loop,
-                 **kwargs,  # type: Dict[str, Any]
-                 ):
+    def __init__(self, loop: asyncio.AbstractEventLoop, **kwargs: object) -> None:
         num_workers = kwargs.pop('num_workers', 2)
         super().__init__(**kwargs)
         self._loop = loop
@@ -38,7 +34,7 @@ class AsyncRangeScanRequest(RangeScanRequestLogic):
         self._tp_executor = ThreadPoolExecutor(num_workers)
 
     @property
-    def loop(self):
+    def loop(self) -> asyncio.AbstractEventLoop:
         """
         **INTERNAL**
         """

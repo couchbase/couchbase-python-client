@@ -679,7 +679,7 @@ class TransactionTestSuite:
         cfg = cls(metadata_collection=TransactionKeyspace(coll=coll))
         cfg_coll = cfg._base.to_dict().get('metadata_collection', None)
         assert cfg_coll is not None
-        assert cfg_coll == f'{coll._scope.bucket_name}.{coll._scope.name}.{coll.name}'
+        assert cfg_coll == f'{coll._impl.bucket_name}.{coll._impl.scope_name}.{coll.name}'
 
     # creating a new connection, allow retries
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
@@ -772,7 +772,7 @@ class TransactionTestSuite:
         key, value = cb_env.get_new_doc()
 
         def txn_logic(ctx):
-            location = f"default:`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
+            location = f"default:`{coll._impl.bucket_name}`.`{coll._impl.scope_name}`.`{coll.name}`"
             ctx.query(
                 f'INSERT INTO {location} VALUES("{key}", {json.dumps(value)})',
                 TransactionQueryOptions(metrics=False))
@@ -832,7 +832,7 @@ class TransactionTestSuite:
         coll.insert(key, value)
 
         def txn_logic(ctx):
-            fdqn = f"`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
+            fdqn = f"`{coll._impl.bucket_name}`.`{coll._impl.scope_name}`.`{coll.name}`"
             statement = f'SELECT * FROM {fdqn} WHERE META().id IN $1 ORDER BY META().id ASC'
             res = ctx.query(statement, TransactionQueryOptions(positional_parameters=[[key]]))
             assert len(res.rows()) == 1
@@ -853,7 +853,7 @@ class TransactionTestSuite:
 
         def txn_logic(ctx):
             ctx.insert(coll, key1, value1)
-            fdqn = f"`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
+            fdqn = f"`{coll._impl.bucket_name}`.`{coll._impl.scope_name}`.`{coll.name}`"
             statement = f'SELECT * FROM {fdqn} WHERE META().id IN $1 ORDER BY META().id ASC'
             res = ctx.query(statement, TransactionQueryOptions(positional_parameters=[[key, key1]]))
             assert len(res.rows()) == 2
@@ -1023,14 +1023,14 @@ class TransactionTestSuite:
 
     def test_scope_qualifier(self, cb_env):
         pytest.skip('CBD-5091: Pending Transactions changes')
-        cfg = TransactionQueryOptions(scope=cb_env.collection._scope)
+        cfg = TransactionQueryOptions(scope=cb_env.collection._impl._scope)
         cfg_scope_qualifier = cfg._base.to_dict().get('scope_qualifier', None)
-        expected = f'default:`{cb_env.collection._scope.bucket_name}`.`{cb_env.collection._scope.name}`'
+        expected = f'default:`{cb_env.collection._impl.bucket_name}`.`{cb_env.collection._impl.scope_name}`'
         assert cfg_scope_qualifier is not None
         assert cfg_scope_qualifier == expected
         bucket, scope = cfg.split_scope_qualifier()
-        assert bucket == cb_env.collection._scope.bucket_name
-        assert scope == cb_env.collection._scope.name
+        assert bucket == cb_env.collection._impl.bucket_name
+        assert scope == cb_env.collection._impl.scope_name
 
     @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
     @pytest.mark.parametrize('exp', [timedelta(seconds=30), timedelta(milliseconds=100)])

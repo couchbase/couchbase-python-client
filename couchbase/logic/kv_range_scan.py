@@ -25,6 +25,7 @@ from couchbase.pycbc_core import kv_range_scan_operation
 from couchbase.result import ScanResult
 
 if TYPE_CHECKING:
+    from couchbase.logic.top_level_types import PyCapsuleType
     from couchbase.transcoder import Transcoder
 
 
@@ -142,6 +143,9 @@ class RangeScanRequestLogic:
     def cancel_scan(self) -> None:
         if self._scan_iterator.is_cancelled() is False:
             self._scan_iterator.cancel_scan()
+
+    def set_connection(self, connection: PyCapsuleType) -> None:
+        self._scan_args['conn'] = connection
 
     def _submit_scan(self):
         if self.done_streaming:

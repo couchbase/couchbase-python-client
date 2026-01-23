@@ -65,12 +65,12 @@ class SubDocumentTests:
 
     @pytest.fixture(scope="class")
     def skip_if_less_than_cheshire_cat(self, cb_env):
-        if cb_env.cluster.server_version_short < 7.0:
+        if cb_env.cluster._impl.server_version_short < 7.0:
             pytest.skip("Feature only available on CBS >= 7.0")
 
     @pytest.fixture(scope="class")
     def skip_if_less_than_alice(self, cb_env):
-        if cb_env.cluster.server_version_short < 6.5:
+        if cb_env.cluster._impl.server_version_short < 6.5:
             pytest.skip("Feature only available on CBS >= 6.5")
 
     @pytest.fixture(scope="class")

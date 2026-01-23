@@ -40,6 +40,7 @@ if TYPE_CHECKING:
 
     from couchbase.logic.bucket_types import BucketRequest
     from couchbase.logic.cluster_types import ClusterRequest, CreateConnectionRequest
+    from couchbase.logic.collection_types import CollectionRequest
 
 
 class AsyncClientAdapter:
@@ -125,6 +126,23 @@ class AsyncClientAdapter:
         if isinstance(ret, BaseCouchbaseException):
             raise ErrorMapper.build_exception(ret)
         return ret
+
+    def execute_collection_request(self, req: CollectionRequest) -> Future[Any]:
+        if not self.connected:
+            raise RuntimeError('Cannot attempt collection request without first establishing a connection.')
+
+        ft = self._loop.create_future()
+
+        def _callback(result) -> None:
+            self._loop.call_soon_threadsafe(ft.set_result, result)
+
+        def _errback(exc) -> None:
+            excptn = ErrorMapper.build_exception(exc)
+            self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+
+        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        self._execute_req(ft, req.op_name, req_dict)
+        return ft
 
     def execute_connect_bucket_request(self, bucket_name: str) -> Future[None]:
         req = OpenBucketRequest(bucket_name, OpenOrCloseBucket.OPEN)

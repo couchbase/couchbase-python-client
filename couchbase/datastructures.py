@@ -13,23 +13,30 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import time
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
+                    Callable,
                     Dict,
                     Generator,
                     List,
-                    Optional)
+                    Optional,
+                    Union)
 
 from couchbase.exceptions import (CasMismatchException,
+                                  DocumentExistsException,
                                   DocumentNotFoundException,
                                   InvalidArgumentException,
                                   PathExistsException,
                                   PathNotFoundException,
                                   QueueEmpty,
                                   UnAmbiguousTimeoutException)
-from couchbase.logic.wrappers import BlockingWrapper
+from couchbase.logic.collection_types import (GetRequest,
+                                              LookupInRequest,
+                                              MutateInRequest)
 from couchbase.options import MutateInOptions
 from couchbase.subdocument import (array_addunique,
                                    array_append,
@@ -42,8 +49,11 @@ from couchbase.subdocument import (remove,
                                    upsert)
 
 if TYPE_CHECKING:
-    from couchbase._utils import JSONType
-    from couchbase.collection import Collection
+    from couchbase.logic.collection_impl import CollectionImpl
+    from couchbase.logic.top_level_types import JSONType
+    from couchbase.result import LookupInResult
+
+DataStructureRequest = Union[GetRequest, LookupInRequest, MutateInRequest]
 
 
 class CouchbaseList:
@@ -57,24 +67,36 @@ class CouchbaseList:
 
     """
 
-    def __init__(self, key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: CollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
         self._full_list = None
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def _get(self) -> List:
+    def _execute_op(self,
+                    fn: Callable[[DataStructureRequest], Any],
+                    req: DataStructureRequest,
+                    create_type: Optional[bool] = None) -> Any:
+        try:
+            return fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
+                    self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return fn(req)
+            else:
+                raise
+
+    def _get(self) -> List[Any]:
         """
         Get the entire list.
         """
+        req = self._impl.request_builder.build_get_request(self._key)
+        return self._execute_op(self._impl.get, req, create_type=True)
 
-        return self._collection.get(self._key)
-
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def append(self, value  # type: JSONType
-               ) -> None:
+    def append(self, value: JSONType) -> None:
         """Add an item to the end of the list.
 
         Args:
@@ -82,11 +104,10 @@ class CouchbaseList:
 
         """
         op = array_append('', value)
-        self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def prepend(self, value  # type: JSONType
-                ) -> None:
+    def prepend(self, value: JSONType) -> None:
         """Add an item to the beginning of the list.
 
         Args:
@@ -94,11 +115,10 @@ class CouchbaseList:
 
         """
         op = array_prepend('', value)
-        self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    def set_at(self, index,  # type: int
-               value  # type: JSONType
-               ) -> None:
+    def set_at(self, index: int, value: JSONType) -> None:
         """Sets an item within a list at a specified index.
 
         Args:
@@ -111,13 +131,12 @@ class CouchbaseList:
         """
         try:
             op = replace(f'[{index}]', value)
-            self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            self._execute_op(self._impl.mutate_in, req)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def get_at(self, index  # type: int
-               ) -> Any:
+    def get_at(self, index: int) -> Any:
         """Retrieves the item at a specific index in the list.
 
         Args:
@@ -132,13 +151,13 @@ class CouchbaseList:
         """
         try:
             op = subdoc_get(f'[{index}]')
-            sdres = self._collection.lookup_in(self._key, (op,))
-            return sdres.value[0].get("value", None)
+            req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+            sdres: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
+            return sdres.value[0].get('value', None)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
-    def remove_at(self, index  # type: int
-                  ) -> None:
+    def remove_at(self, index: int) -> None:
         """Removes an item at a specific index from the list.
 
         Args:
@@ -150,11 +169,11 @@ class CouchbaseList:
         """
         try:
             op = remove(f'[{index}]')
-            self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            self._execute_op(self._impl.mutate_in, req)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
-    @BlockingWrapper.datastructure_op(create_type=list)
     def size(self) -> int:
         """Returns the number of items in the list.
 
@@ -163,12 +182,11 @@ class CouchbaseList:
 
         """
         op = count('')
-        sdres = self._collection.lookup_in(self._key, (op,))
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sdres: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
         return sdres.value[0].get("value", None)
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def index_of(self, value  # type: JSONType
-                 ) -> int:
+    def index_of(self, value: JSONType) -> int:
         """Returns the index of a specific value from the list.
 
         Args:
@@ -203,7 +221,8 @@ class CouchbaseList:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the list does not already exist.
         """
         try:
-            self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 
@@ -227,25 +246,36 @@ class CouchbaseMap:
 
     """
 
-    def __init__(self, key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: CollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
         self._full_map = None
 
-    @BlockingWrapper.datastructure_op(create_type=dict)
+    def _execute_op(self,
+                    fn: Callable[[DataStructureRequest], Any],
+                    req: DataStructureRequest,
+                    create_type: Optional[bool] = None) -> Any:
+        try:
+            return fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, dict())
+                    self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return fn(req)
+            else:
+                raise
+
     def _get(self) -> Dict[str, Any]:
         """
         Get the entire map.
         """
-        return self._collection.get(self._key)
+        req = self._impl.request_builder.build_get_request(self._key)
+        return self._execute_op(self._impl.get, req, create_type=True)
 
-    @BlockingWrapper.datastructure_op(create_type=dict)
-    def add(self,
-            mapkey,  # type: str
-            value  # type: Any
-            ) -> None:
+    def add(self, mapkey: str, value: Any) -> None:
         """Sets a specific key to the specified value in the map.
 
         Args:
@@ -254,12 +284,10 @@ class CouchbaseMap:
 
         """
         op = upsert(mapkey, value)
-        self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        return self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    @BlockingWrapper.datastructure_op(create_type=dict)
-    def get(self,
-            mapkey,  # type: str
-            ) -> Any:
+    def get(self, mapkey: str) -> Any:
         """Fetches a specific key from the map.
 
         Args:
@@ -270,12 +298,11 @@ class CouchbaseMap:
 
         """
         op = subdoc_get(mapkey)
-        sd_res = self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res = self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
-    def remove(self,
-               mapkey  # type: str
-               ) -> None:
+    def remove(self, mapkey: str) -> None:
         """Removes a specific key from the map.
 
         Args:
@@ -287,11 +314,11 @@ class CouchbaseMap:
         """
         try:
             op = remove(mapkey)
-            self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            self._impl.mutate_in(req)
         except PathNotFoundException:
             raise InvalidArgumentException(message=f'Key: {mapkey} is not in the map.') from None
 
-    @BlockingWrapper.datastructure_op(create_type=dict)
     def size(self) -> int:
         """Returns the number of items in the map.
 
@@ -300,13 +327,11 @@ class CouchbaseMap:
 
         """
         op = count('')
-        sd_res = self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
-    @BlockingWrapper.datastructure_op(create_type=dict)
-    def exists(self,
-               key  # type: str
-               ) -> bool:
+    def exists(self, key: str) -> bool:
         """Checks whether a specific key exists in the map.
 
         Args:
@@ -317,7 +342,8 @@ class CouchbaseMap:
 
         """
         op = subdoc_exists(key)
-        sd_res = self._collection.lookup_in(self._key, (op,))
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
         return sd_res.exists(0)
 
     def keys(self) -> List[str]:
@@ -326,7 +352,6 @@ class CouchbaseMap:
         Returns:
             List[str]: A list of all the keys that exist in the map.
         """
-
         map_ = self._get()
         return list(map_.content_as[dict].keys())
 
@@ -336,7 +361,6 @@ class CouchbaseMap:
         Returns:
             List[Any]: A list of all the values that exist in the map.
         """
-
         map_ = self._get()
         return list(map_.content_as[dict].values())
 
@@ -353,7 +377,8 @@ class CouchbaseMap:
         """Clears the map.
         """
         try:
-            self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 
@@ -379,24 +404,35 @@ class CouchbaseSet:
 
     """
 
-    def __init__(self,
-                 key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: CollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def _get(self) -> List:
+    def _execute_op(self,
+                    fn: Callable[[DataStructureRequest], Any],
+                    req: DataStructureRequest,
+                    create_type: Optional[bool] = None) -> Any:
+        try:
+            return fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
+                    self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return fn(req)
+            else:
+                raise
+
+    def _get(self) -> List[Any]:
         """
         Get the entire set.
         """
-        return self._collection.get(self._key)
+        req = self._impl.request_builder.build_get_request(self._key)
+        return self._execute_op(self._impl.get, req, create_type=True)
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def add(self,
-            value  # type: Any
-            ) -> bool:
+    def add(self, value: Any) -> bool:
         """Adds a new item to the set. Returning whether the item already existed in the set or not.
 
         Args:
@@ -409,15 +445,13 @@ class CouchbaseSet:
         """
         try:
             op = array_addunique('', value)
-            self._collection.mutate_in(self._key, (op,))
+            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+            self._execute_op(self._impl.mutate_in, req, create_type=True)
             return True
         except PathExistsException:
             return False
 
-    def remove(self,   # noqa: C901
-               value,  # type: Any
-               timeout=None  # type: Optional[timedelta]
-               ) -> None:
+    def remove(self, value: Any, timeout: Optional[timedelta] = None) -> None:  # noqa: C901
         """Removes a specific value from the set.
 
         Args:
@@ -426,7 +460,6 @@ class CouchbaseSet:
                 to remove the value.  Defaults to 10 seconds.
 
         """
-
         if timeout is None:
             timeout = timedelta(seconds=10)
 
@@ -447,7 +480,10 @@ class CouchbaseSet:
             if val_idx >= 0:
                 try:
                     op = remove(f'[{val_idx}]')
-                    self._collection.mutate_in(self._key, (op,), MutateInOptions(cas=sd_res.cas))
+                    req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                             (op,),
+                                                                             MutateInOptions(cas=sd_res.cas))
+                    self._impl.mutate_in(req)
                     break
                 except CasMismatchException:
                     pass
@@ -467,10 +503,7 @@ class CouchbaseSet:
 
             time.sleep(interval_millis / 1000)
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def contains(self,
-                 value  # type: Any
-                 ) -> bool:
+    def contains(self, value: Any) -> bool:
         """Returns whether a specific value already exists in the set.
 
         Args:
@@ -483,7 +516,6 @@ class CouchbaseSet:
         list_ = self._get().content_as[list]
         return value in list_
 
-    @BlockingWrapper.datastructure_op(create_type=list)
     def size(self) -> int:
         """Returns the number of items in the set.
 
@@ -492,18 +524,19 @@ class CouchbaseSet:
 
         """
         op = count('')
-        sd_res = self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
     def clear(self) -> None:
         """Clears the set.
         """
         try:
-            self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 
-    @BlockingWrapper.datastructure_op(create_type=list)
     def values(self) -> List[Any]:
         """Returns a list of all the values which exist in the set.
 
@@ -526,25 +559,36 @@ class CouchbaseQueue:
 
     """
 
-    def __init__(self,
-                 key,  # type: str
-                 collection  # type: Collection
-                 ) -> None:
+    def __init__(self, key: str, collection_impl: CollectionImpl) -> None:
         self._key = key
-        self._collection = collection
+        self._impl = collection_impl
         self._full_queue = None
 
-    @BlockingWrapper.datastructure_op(create_type=list)
+    def _execute_op(self,
+                    fn: Callable[[DataStructureRequest], Any],
+                    req: DataStructureRequest,
+                    create_type: Optional[bool] = None) -> Any:
+        try:
+            return fn(req)
+        except DocumentNotFoundException:
+            if create_type is True:
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
+                    self._impl.insert(ins_req)
+                except DocumentExistsException:
+                    pass
+                return fn(req)
+            else:
+                raise
+
     def _get(self) -> List:
         """
         Get the entire queuee.
         """
-        return self._collection.get(self._key)
+        req = self._impl.request_builder.build_get_request(self._key)
+        return self._execute_op(self._impl.get, req, create_type=True)
 
-    @BlockingWrapper.datastructure_op(create_type=list)
-    def push(self,
-             value  # type: JSONType
-             ) -> None:
+    def push(self, value: JSONType) -> None:
         """Adds a new item to the back of the queue.
 
         Args:
@@ -552,11 +596,10 @@ class CouchbaseQueue:
 
         """
         op = array_prepend('', value)
-        self._collection.mutate_in(self._key, (op,))
+        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
+        self._execute_op(self._impl.mutate_in, req, create_type=True)
 
-    def pop(self,
-            timeout=None  # type: Optional[timedelta]
-            ) -> Any:
+    def pop(self, timeout: Optional[timedelta] = None) -> Any:
         """Removes an item from the front of the queue.
 
         Args:
@@ -579,12 +622,17 @@ class CouchbaseQueue:
         while True:
             try:
                 op = subdoc_get('[-1]')
-                sd_res = self._collection.lookup_in(self._key, (op,))
-                val = sd_res.value[0].get("value", None)
+                lookup_in_req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+                sd_res = self._impl.lookup_in(lookup_in_req)
+                val = sd_res.value[0].get('value', None)
 
                 try:
                     op = remove('[-1]')
-                    self._collection.mutate_in(self._key, (op,), MutateInOptions(cas=sd_res.cas))
+                    mutate_in_opts = MutateInOptions(cas=sd_res.cas)
+                    mutate_in_req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                                       (op,),
+                                                                                       mutate_in_opts)
+                    self._impl.mutate_in(mutate_in_req)
                     return val
                 except CasMismatchException:
                     pass
@@ -604,7 +652,6 @@ class CouchbaseQueue:
             except PathNotFoundException:
                 raise QueueEmpty('No items to remove from the queue')
 
-    @BlockingWrapper.datastructure_op(create_type=list)
     def size(self) -> int:
         """Returns the number of items in the queue.
 
@@ -613,14 +660,16 @@ class CouchbaseQueue:
 
         """
         op = count('')
-        sd_res = self._collection.lookup_in(self._key, (op,))
-        return sd_res.value[0].get("value", None)
+        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
+        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
+        return sd_res.value[0].get('value', None)
 
     def clear(self) -> None:
         """Clears the queue.
         """
         try:
-            self._collection.remove(self._key)
+            req = self._impl.request_builder.build_remove_request(self._key)
+            self._impl.remove(req)
         except DocumentNotFoundException:
             pass
 
