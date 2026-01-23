@@ -130,7 +130,7 @@ class CollectionTestSuite:
 
     @pytest.fixture(scope='class')
     def num_nodes(self, cb_env):
-        return len(cb_env.cluster._cluster_info.nodes)
+        return len(cb_env.cluster._impl.cluster_info.nodes)
 
     @pytest.fixture(scope='class')
     def check_multi_node(self, num_nodes):

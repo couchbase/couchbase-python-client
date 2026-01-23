@@ -244,7 +244,7 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator.ldap_compatible(username, pw)
         cluster = Cluster.connect(conn_string, ClusterOptions(auth))
 
-        client_opts = cluster._get_client_connection_info()
+        client_opts = cluster._impl.get_connection_info()
         assert client_opts['credentials'] is not None
         assert client_opts['credentials']['allowed_sasl_mechanisms'] == ['PLAIN']
 
@@ -269,7 +269,7 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator(username, pw)
         cluster = Cluster.connect(f'{conn_string}?sasl_mech_force=PLAIN', ClusterOptions(auth))
 
-        client_opts = cluster._get_client_connection_info()
+        client_opts = cluster._impl.get_connection_info()
         assert client_opts['credentials'] is not None
         assert client_opts['credentials']['allowed_sasl_mechanisms'] == ['PLAIN']
 
@@ -481,7 +481,7 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator(username, pw)
         cluster = Cluster.connect(f'{conn_string}', ClusterOptions(auth))
 
-        client_opts = cluster._get_client_connection_info()
+        client_opts = cluster._impl.get_connection_info()
         assert client_opts['credentials'] is not None
         assert client_opts['credentials']['allowed_sasl_mechanisms'] == []
 
@@ -1072,7 +1072,7 @@ class ConnectionTestSuite:
         opts = ClusterOptions(auth)
         opts.apply_profile('test_profile')
         cluster = Cluster.connect(conn_string, opts)
-        client_opts = cluster._get_client_connection_info()
+        client_opts = cluster._impl.get_connection_info()
         for k in expected_opts.keys():
             assert client_opts[k] == expected_opts[k]
 
@@ -1201,7 +1201,7 @@ class ConnectionTestSuite:
         opts = ClusterOptions(auth)
         opts.apply_profile(profile)
         cluster = Cluster.connect(conn_string, opts)
-        client_opts = cluster._get_client_connection_info()
+        client_opts = cluster._impl.get_connection_info()
         for k in expected_opts.keys():
             assert client_opts[k] == expected_opts[k]
 
@@ -1226,7 +1226,7 @@ class ConnectionTestSuite:
         username, pw = couchbase_config.get_username_and_pw()
         auth = PasswordAuthenticator(username, pw)
         cluster = Cluster.connect(conn_string, ClusterOptions.create_options_with_profile(auth, profile))
-        client_opts = cluster._get_client_connection_info()
+        client_opts = cluster._impl.get_connection_info()
         for k in expected_opts.keys():
             assert client_opts[k] == expected_opts[k]
 

@@ -142,7 +142,7 @@ class TestEnvironment:
 
     @property
     def is_developer_preview(self) -> Optional[bool]:
-        return self._cluster.is_developer_preview
+        return self._cluster._impl.is_developer_preview
 
     @property
     def is_mock_server(self) -> bool:
@@ -179,15 +179,15 @@ class TestEnvironment:
 
     @property
     def server_version(self) -> Optional[str]:
-        return self._cluster.server_version
+        return self._cluster._impl.server_version
 
     @property
     def server_version_full(self) -> Optional[str]:
-        return self._cluster.server_version_full
+        return self._cluster._impl.server_version_full
 
     @property
     def server_version_short(self) -> Optional[float]:
-        return self._cluster.server_version_short
+        return self._cluster._impl.server_version_short
 
     @property
     def server_version_patch(self) -> Optional[int]:
@@ -1056,8 +1056,8 @@ class AsyncTestEnvironment(TestEnvironment):
         for _ in range(num_times):
             try:
                 return await func(*args, **kwargs)
-            except Exception:
-                print(f'trying {func} failed, sleeping for {seconds_between} seconds...')
+            except Exception as ex:
+                print(f'trying {func} failed ({ex}), sleeping for {seconds_between} seconds...')
                 await asyncio.sleep(seconds_between)
 
     @staticmethod

@@ -12,6 +12,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+from __future__ import annotations
+
 import json
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
@@ -47,6 +50,7 @@ from couchbase.subdocument import (Spec,
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
+    from acouchbase.scope import AsyncScope
     from couchbase._utils import JSONType
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
@@ -64,7 +68,7 @@ if TYPE_CHECKING:
 
 
 class CollectionLogic:
-    def __init__(self, scope, name):
+    def __init__(self, scope: AsyncScope, name: str) -> None:
         if not scope:
             raise InvalidArgumentException(message="Collection must be given a scope")
         # if not scope.connection:

@@ -45,6 +45,7 @@ from couchbase.result import (CounterResult,
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from acouchbase.scope import AsyncScope
     from couchbase._utils import JSONType
     from couchbase.kv_range_scan import ScanType
     from couchbase.options import (AppendOptions,
@@ -73,7 +74,7 @@ if TYPE_CHECKING:
 
 class AsyncCollection(CollectionLogic):
 
-    def __init__(self, scope, name):
+    def __init__(self, scope: AsyncScope, name: str) -> None:
         super().__init__(scope, name)
         self._loop = scope.loop
 

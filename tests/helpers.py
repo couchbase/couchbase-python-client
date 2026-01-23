@@ -357,15 +357,15 @@ class CouchbaseTestEnvironment:
 
     @property
     def server_version(self) -> Optional[str]:
-        return self._cluster.server_version
+        return self._cluster._impl.server_version
 
     @property
     def server_version_short(self) -> Optional[float]:
-        return self._cluster.server_version_short
+        return self._cluster._impl.server_version_short
 
     @property
     def server_version_full(self) -> Optional[str]:
-        return self._cluster.server_version_full
+        return self._cluster._impl.server_version_full
 
     @property
     def server_version_patch(self) -> Optional[int]:
@@ -378,7 +378,7 @@ class CouchbaseTestEnvironment:
 
     @property
     def is_developer_preview(self) -> Optional[bool]:
-        return self._cluster.is_developer_preview
+        return self._cluster._impl.is_developer_preview
 
     def get_default_key_value(self):
         return self.KEY, self.CONTENT

@@ -87,7 +87,7 @@ class BinaryDurabilityTestSuite:
 
     @pytest.fixture(scope='class')
     def num_nodes(self, cb_env):
-        return len(cb_env.cluster._cluster_info.nodes)
+        return len(cb_env.cluster._impl.cluster_info.nodes)
 
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_has_replicas')

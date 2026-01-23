@@ -47,7 +47,7 @@ class AsyncCredentialsTests:
         new_pass = f"pw_{uuid.uuid4().hex[:8]}"
         cluster.update_credentials(PasswordAuthenticator(new_user, new_pass))
 
-        info_after = cluster._get_client_connection_info()
+        info_after = cluster._impl.get_connection_info()
         assert info_after['credentials']['username'] == new_user
         assert info_after['credentials']['password'] == new_pass
 
@@ -64,7 +64,7 @@ class AsyncCredentialsTests:
         cluster = cb_env.cluster
 
         # capture original
-        info_before = cluster._get_client_connection_info()
+        info_before = cluster._impl.get_connection_info()
         assert 'credentials' in info_before
         orig_creds = info_before['credentials']
 
@@ -74,5 +74,5 @@ class AsyncCredentialsTests:
                                                                 key_path='path/to/key'))
 
         # ensure credentials are unchanged after the failed update
-        info_after = cluster._get_client_connection_info()
+        info_after = cluster._impl.get_connection_info()
         assert info_after['credentials'] == orig_creds

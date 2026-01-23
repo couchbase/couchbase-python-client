@@ -15,34 +15,24 @@
 
 from __future__ import annotations
 
-import asyncio
 from asyncio import AbstractEventLoop
 from datetime import timedelta
-from time import perf_counter
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
                     Dict,
                     Union)
 
-from acouchbase import get_event_loop
-from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
+from acouchbase import get_event_loop  # noqa: F401
 from acouchbase.bucket import AsyncBucket
-from acouchbase.logic import AsyncWrapper
+from acouchbase.logic.cluster_impl import AsyncClusterImpl
 from acouchbase.management.analytics import AnalyticsIndexManager
 from acouchbase.management.buckets import BucketManager
 from acouchbase.management.eventing import EventingFunctionManager
 from acouchbase.management.queries import QueryIndexManager
 from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
-from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
-from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
 from acouchbase.transactions import Transactions
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
-from couchbase.diagnostics import ClusterState, ServiceType
-from couchbase.exceptions import UnAmbiguousTimeoutException
-from couchbase.logic.cluster import ClusterLogic
-from couchbase.options import PingOptions, forward_args
 from couchbase.result import (AnalyticsResult,
                               ClusterInfoResult,
                               DiagnosticsResult,
@@ -54,13 +44,14 @@ if TYPE_CHECKING:
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    DiagnosticsOptions,
+                                   PingOptions,
                                    QueryOptions,
                                    SearchOptions,
                                    WaitUntilReadyOptions)
     from couchbase.search import SearchQuery, SearchRequest
 
 
-class AsyncCluster(ClusterLogic):
+class AsyncCluster:
     """Create a Couchbase Cluster instance.
 
     The cluster instance exposes the operations which are available to be performed against a cluster.
@@ -97,29 +88,15 @@ class AsyncCluster(ClusterLogic):
                  connstr,  # type: str
                  *options,  # type: ClusterOptions
                  **kwargs,  # type: Dict[str, Any]
-                 ) -> AsyncCluster:
-
-        self._loop = self._get_loop(kwargs.pop("loop", None))
-        super().__init__(connstr, *options, **kwargs)
-
-        self._close_ftr = None
-        self._connect_ftr = self._connect()
+                 ) -> None:
+        self._impl = AsyncClusterImpl(connstr, *options, **kwargs)
 
     @property
     def loop(self) -> AbstractEventLoop:
         """
         **INTERNAL**
         """
-        return self._loop
-
-    def _get_loop(self, loop=None) -> AbstractEventLoop:
-        if not loop:
-            loop = get_event_loop()
-
-        if not loop.is_running():
-            raise RuntimeError("Event loop is not running.")
-
-        return loop
+        return self._impl.loop
 
     @property
     def transactions(self) -> Transactions:
@@ -127,43 +104,19 @@ class AsyncCluster(ClusterLogic):
             :class:`~acouchbase.transactions.Transactions`: A Transactions instance which can be used to
                 perform transactions on this cluster.
         """
-        if not self._transactions:
-            self._transactions = Transactions(self, self._transaction_config)
-        return self._transactions
+        return self._impl.transactions
 
-    @AsyncWrapper.inject_connection_callbacks()
-    def _connect(self, **kwargs) -> Awaitable:
-        """
-        **INTERNAL**
-        """
-        super()._connect_cluster(**kwargs)
-
-    def on_connect(self) -> Awaitable:
-        """Returns an awaitable future that indicates connecting to the Couchbase cluster has completed.
+    async def on_connect(self) -> None:
+        """Waits until the AsyncCluster connection has been established.
 
         .. note::
             It is recommended to use the AsyncCluster's static :meth:`.AsyncCluster.connect` method.
             See :meth:`.AsyncCluster.connect` for connect for examples.
 
-        Returns:
-            Awaitable: An empty future.  If a result is provided, connecting to the Couchbase cluster is complete.
-                Otherwise an exception is raised.
-
         Raises:
             :class:`~couchbase.exceptions.UnAmbiguousTimeoutException`: If an error occured while trying to connect.
         """
-        if not (self._connect_ftr or self.connected):
-            self._connect_ftr = self._connect()
-            self._close_ftr = None
-
-        return self._connect_ftr
-
-    @AsyncWrapper.inject_close_callbacks()
-    def _close(self, **kwargs) -> Awaitable:
-        """
-        **INTERNAL**
-        """
-        super()._close_cluster(**kwargs)
+        await self._impl.wait_until_connected()
 
     async def close(self) -> None:
         """Shuts down this cluster instance. Cleaning up all resources associated with it.
@@ -174,12 +127,7 @@ class AsyncCluster(ClusterLogic):
             is necessary and in those types of applications, this method might be beneficial.
 
         """
-        if self.connected and not self._close_ftr:
-            self._close_ftr = self._close()
-            self._connect_ftr = None
-
-        await self._close_ftr
-        super()._destroy_connection()
+        await self._impl.close_connection()
 
     def update_credentials(self, authenticator: Union[CertificateAuthenticator, PasswordAuthenticator]) -> None:
         """Update the credentials used by this Cluster.
@@ -187,14 +135,10 @@ class AsyncCluster(ClusterLogic):
         Args:
             authenticator (Union[CertificateAuthenticator, PasswordAuthenticator]): New authenticator.
         """
-        if not self.connected:
-            raise RuntimeError("Cluster is not connected, cannot update credentials.")
+        req = self._impl.request_builder.build_udpate_credential_request(authenticator)
+        self._impl.update_credentials(req)
 
-        # This is a fast, synchronous operation in the core; call directly.
-        super()._update_credentials(auth=authenticator.as_dict())
-        self._auth = authenticator.as_dict()
-
-    def bucket(self, bucket_name) -> AsyncBucket:
+    def bucket(self, bucket_name: str) -> AsyncBucket:
         """Creates a Bucket instance to a specific bucket.
 
         .. seealso::
@@ -213,7 +157,7 @@ class AsyncCluster(ClusterLogic):
         """
         return AsyncBucket(self, bucket_name)
 
-    def cluster_info(self) -> Awaitable[ClusterInfoResult]:
+    async def cluster_info(self) -> ClusterInfoResult:
         """Retrieve the Couchbase cluster information
 
         .. note::
@@ -231,30 +175,13 @@ class AsyncCluster(ClusterLogic):
                 to a bucket if using server version < 6.6.
 
         """
-        if not self.connected:
-            # @TODO(jc):  chain??
-            raise RuntimeError(
-                "Cluster is not connected, cannot get cluster info. "
-                "Use await cluster.on_connect() to connect a cluster.")
+        req = self._impl.request_builder.build_cluster_info_request()
+        return await self._impl.get_cluster_info(req)
 
-        return self._get_cluster_info()
-
-    @AsyncWrapper.inject_cluster_callbacks(ClusterInfoResult, set_cluster_info=True)
-    def _get_cluster_info(self, **kwargs) -> Awaitable[ClusterInfoResult]:
-        """**INTERNAL**
-
-        use cluster_info()
-
-        Returns:
-            Awaitable: _description_
-        """
-        super()._get_cluster_info(**kwargs)
-
-    @AsyncWrapper.inject_cluster_callbacks(PingResult, chain_connection=True)
-    def ping(self,
-             *opts,  # type: PingOptions
-             **kwargs  # type: Any
-             ) -> Awaitable[PingResult]:
+    async def ping(self,
+                   *opts,  # type: PingOptions
+                   **kwargs  # type: Any
+                   ) -> PingResult:
         """Performs a ping operation against the cluster.
 
         The ping operation pings the services which are specified
@@ -269,13 +196,13 @@ class AsyncCluster(ClusterLogic):
             ping operations which were performed.
 
         """
-        return super().ping(*opts, **kwargs)
+        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
+        return await self._impl.ping(req)
 
-    @AsyncWrapper.inject_cluster_callbacks(DiagnosticsResult, chain_connection=True)
-    def diagnostics(self,
-                    *opts,  # type: DiagnosticsOptions
-                    **kwargs  # type: Dict[str, Any]
-                    ) -> Awaitable[DiagnosticsResult]:
+    async def diagnostics(self,
+                          *opts,  # type: DiagnosticsOptions
+                          **kwargs  # type: Dict[str, Any]
+                          ) -> DiagnosticsResult:
         """Performs a diagnostic operation against the cluster.
 
         The diagnostic operations returns a report about the current active connections with the cluster.
@@ -289,13 +216,14 @@ class AsyncCluster(ClusterLogic):
             connections with the cluster.
 
         """
-        return super().diagnostics(*opts, **kwargs)
+        req = self._impl.request_builder.build_diagnostics_request(*opts, **kwargs)
+        return await self._impl.diagnostics(req)
 
     async def wait_until_ready(self,
                                timeout,  # type: timedelta
                                *opts,  # type: WaitUntilReadyOptions
                                **kwargs  # type: Dict[str, Any]
-                               ) -> Awaitable[None]:
+                               ) -> None:
         """Wait until the cluster is ready for use.
 
             Check the current connections to see if the desired state has been reached.  If not,
@@ -334,43 +262,8 @@ class AsyncCluster(ClusterLogic):
                          WaitUntilReadyOptions(service_types=[ServiceType.KeyValue, ServiceType.Query]))
 
         """
-        final_args = forward_args(kwargs, *opts)
-        service_types = final_args.get("service_types", None)
-        if not service_types:
-            service_types = [ServiceType(st.value) for st in ServiceType]
-
-        desired_state = final_args.get("desired_state", ClusterState.Online)
-        service_types_set = set(map(lambda st: st.value if isinstance(st, ServiceType) else st, service_types))
-
-        # @TODO: handle units
-        timeout_millis = timeout.total_seconds() * 1000
-
-        interval_millis = float(50)
-        start = perf_counter()
-        time_left = timeout_millis
-        while True:
-
-            diag_res = await self.diagnostics()
-            endpoint_svc_types = set(map(lambda st: st.value, diag_res.endpoints.keys()))
-            if not endpoint_svc_types.issuperset(service_types_set):
-                await self.ping(PingOptions(service_types=service_types))
-                diag_res = await self.diagnostics()
-
-            if diag_res.state == desired_state:
-                break
-
-            interval_millis += 500
-            if interval_millis > 1000:
-                interval_millis = 1000
-
-            time_left = timeout_millis - ((perf_counter() - start) * 1000)
-            if interval_millis > time_left:
-                interval_millis = time_left
-
-            if time_left <= 0:
-                raise UnAmbiguousTimeoutException(message="Desired state not found.")
-
-            await asyncio.sleep(interval_millis / 1000)
+        req = self._impl.request_builder.build_wait_until_ready_request(timeout, *opts, **kwargs)
+        await self._impl.wait_until_ready(req)
 
     def query(self,
               statement,  # type: str
@@ -441,17 +334,8 @@ class AsyncCluster(ClusterLogic):
                 print(f'Query metrics: {q_res.metadata().metrics()}')
 
         """
-
-        request_args = dict(default_serialize=self.default_serializer,
-                            streaming_timeout=self.streaming_timeouts.get('query_timeout', None))
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-        query = N1QLQuery.create_query_object(statement, *options, **kwargs)
-        return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self.connection,
-                                                                  self.loop,
-                                                                  query.params,
-                                                                  **request_args))
+        req = self._impl.request_builder.build_query_request(statement, *options, **kwargs)
+        return self._impl.query(req)
 
     def analytics_query(self,  # type: Cluster
                         statement,  # type: str
@@ -526,17 +410,8 @@ class AsyncCluster(ClusterLogic):
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
         """  # noqa: E501
-
-        request_args = dict(default_serialize=self.default_serializer,
-                            streaming_timeout=self.streaming_timeouts.get('analytics_timeout', None))
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-        query = AnalyticsQuery.create_query_object(statement, *options, **kwargs)
-        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
-                                                                                self.loop,
-                                                                                query.params,
-                                                                                **request_args))
+        req = self._impl.request_builder.build_analytics_query_request(statement, *options, **kwargs)
+        return self._impl.analytics_query(req)
 
     def search_query(self,
                      index,  # type: str
@@ -631,16 +506,8 @@ class AsyncCluster(ClusterLogic):
                     print(f'Locations: {row.locations}')
 
         """
-        request_args = dict(default_serialize=self.default_serializer,
-                            streaming_timeout=self.streaming_timeouts.get('search_timeout', None))
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-        query = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
-        return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
-                                                                               self.loop,
-                                                                               query.as_encodable(),
-                                                                               **request_args))
+        req = self._impl.request_builder.build_search_request(index, query, *options, **kwargs)
+        return self._impl.search(req)
 
     def search(self,
                index,  # type: str
@@ -731,16 +598,8 @@ class AsyncCluster(ClusterLogic):
                 async for row in q_res.rows():
                     print(f'Found row: {row}')
         """  # noqa: E501
-        request_args = dict(default_serialize=self.default_serializer,
-                            streaming_timeout=self.streaming_timeouts.get('search_timeout', None))
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-        query = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
-        return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
-                                                                               self.loop,
-                                                                               query.as_encodable(),
-                                                                               **request_args))
+        req = self._impl.request_builder.build_search_request(index, request, *options, **kwargs)
+        return self._impl.search(req)
 
     def buckets(self) -> BucketManager:
         """
@@ -750,8 +609,7 @@ class AsyncCluster(ClusterLogic):
         Returns:
             :class:`~acouchbase.management.buckets.BucketManager`: A :class:`~acouchbase.management.buckets.BucketManager` instance.
         """  # noqa: E501
-        # TODO:  AlreadyShutdownException?
-        return BucketManager(self.connection, self.loop)
+        return BucketManager(self._impl.connection, self.loop)
 
     def users(self) -> UserManager:
         """
@@ -761,8 +619,7 @@ class AsyncCluster(ClusterLogic):
         Returns:
             :class:`~acouchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager` instance.
         """  # noqa: E501
-        # TODO:  AlreadyShutdownException?
-        return UserManager(self.connection, self.loop)
+        return UserManager(self._impl.connection, self.loop)
 
     def query_indexes(self) -> QueryIndexManager:
         """
@@ -772,8 +629,7 @@ class AsyncCluster(ClusterLogic):
         Returns:
             :class:`~acouchbase.management.queries.QueryIndexManager`: A :class:`~acouchbase.management.queries.QueryIndexManager` instance.
         """  # noqa: E501
-        # TODO:  AlreadyShutdownException?
-        return QueryIndexManager(self.connection, self.loop)
+        return QueryIndexManager(self._impl.connection, self.loop)
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """
@@ -783,8 +639,7 @@ class AsyncCluster(ClusterLogic):
         Returns:
             :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: An :class:`~acouchbase.management.analytics.AnalyticsIndexManager` instance.
         """  # noqa: E501
-        # TODO:  AlreadyShutdownException?
-        return AnalyticsIndexManager(self.connection, self.loop)
+        return AnalyticsIndexManager(self._impl.connection, self.loop)
 
     def search_indexes(self) -> SearchIndexManager:
         """
@@ -795,8 +650,7 @@ class AsyncCluster(ClusterLogic):
             :class:`~acouchbase.management.search.SearchIndexManager`: A :class:`~acouchbase.management.search.SearchIndexManager` instance.
 
         """  # noqa: E501
-        # TODO:  AlreadyShutdownException?
-        return SearchIndexManager(self.connection, self.loop)
+        return SearchIndexManager(self._impl.connection, self.loop)
 
     def eventing_functions(self) -> EventingFunctionManager:
         """
@@ -811,8 +665,7 @@ class AsyncCluster(ClusterLogic):
             :class:`~acouchbase.management.eventing.EventingFunctionManager`: An :class:`~acouchbase.management.eventing.EventingFunctionManager` instance.
 
         """  # noqa: E501
-        # TODO:  AlreadyShutdownException?
-        return EventingFunctionManager(self.connection, self.loop)
+        return EventingFunctionManager(self._impl.connection, self.loop)
 
     @staticmethod
     async def connect(connstr,  # type: str

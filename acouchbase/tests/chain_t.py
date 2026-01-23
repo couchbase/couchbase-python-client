@@ -44,17 +44,17 @@ class ConnectionChainingTests:
         cluster = Cluster(conn_string, ClusterOptions(auth))
         # validate the cluster, at this point, the connect future should be pending
         assert isinstance(cluster, AsyncCluster)
-        assert cluster._connect_ftr.done() is False
+        assert cluster._impl.client_adapter.connect_ft.done() is False
 
         bucket = cluster.bucket(couchbase_config.bucket_name)
         assert isinstance(bucket, AsyncBucket)
         await bucket.on_connect()
         # after connecting the bucket, the cluster connection should now exist b/c the connection
         # futures are chained (i.e. cluster.connect -> bucket.connect)
-        assert cluster._connect_ftr is not None
-        assert cluster._connect_ftr.done() is True
-        assert cluster._connection is not None
-        assert bucket._connect_ftr.done() is True
+        assert cluster._impl.client_adapter.connect_ft is not None
+        assert cluster._impl.client_adapter.connect_ft.done() is True
+        assert cluster._impl.connection is not None
+        assert bucket._impl.bucket_connect_ft.done() is True
 
     @pytest.mark.asyncio
     async def test_kv_op_chain(self, couchbase_config):
@@ -77,8 +77,8 @@ class ConnectionChainingTests:
 
         # after executing the KV op, the cluster connection should now exist b/c the connection
         # futures are chained (i.e. cluster.connect -> bucket.connect -> KV op)
-        assert cluster._connect_ftr.done() is True
-        assert bucket._connect_ftr.done() is True
+        assert cluster._impl.client_adapter.connect_ft.done() is True
+        assert bucket._impl.bucket_connect_ft.done() is True
         assert isinstance(res, GetResult)
         assert res.content_as[dict] == doc
 

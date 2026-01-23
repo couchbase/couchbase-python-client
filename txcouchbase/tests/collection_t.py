@@ -31,7 +31,6 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentUnretrievableException,
                                   DurabilityImpossibleException,
                                   InvalidArgumentException,
-                                  PathNotFoundException,
                                   TemporaryFailException)
 from couchbase.options import (GetOptions,
                                InsertOptions,
@@ -227,12 +226,20 @@ class CollectionTests:
         assert result.expiry_time is None
 
     def test_project_bad_path(self, cb_env, default_kvp):
-        cb = cb_env.collection
+        # cb = cb_env.collection
+        # key = default_kvp.key
+        # with pytest.raises(PathNotFoundException):
+        #     run_in_reactor_thread(cb.get,
+        #                           key,
+        #                           GetOptions(project=["some", "qzx"]))
+
         key = default_kvp.key
-        with pytest.raises(PathNotFoundException):
-            run_in_reactor_thread(cb.get,
-                                  key,
-                                  GetOptions(project=["some", "qzx"]))
+        # CXXCBC-295 - b8bb98c31d377100934dd4b33998f0a118df41e8, bad path no longer raises PathNotFoundException
+        result = run_in_reactor_thread(cb_env.collection.get, key, GetOptions(project=['qzx']))
+        assert result.cas is not None
+        res_dict = result.content_as[dict]
+        assert res_dict == {}
+        assert 'qzx' not in res_dict
 
     def test_project_project_not_list(self, cb_env, default_kvp):
         cb = cb_env.collection
@@ -777,17 +784,17 @@ class CollectionTests:
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
-        before = int(time() - 1.0)
-        try:
+        if expiry == -1:
+            with pytest.raises(InvalidArgumentException):
+                run_in_reactor_thread(cb.upsert, key, value, expiry=timedelta(seconds=expiry))
+        else:
+            before = int(time() - 1.0)
             result = run_in_reactor_thread(cb.upsert, key, value, expiry=timedelta(seconds=expiry))
             assert result.cas is not None
-        except InvalidArgumentException:
-            if expiry != -1:
-                raise
 
-        expiry_path = "$document.exptime"
-        res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        res_expiry = res.content_as[int](0)
+            expiry_path = "$document.exptime"
+            res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+            res_expiry = res.content_as[int](0)
 
-        after = int(time() + 1.0)
-        before + expiry <= res_expiry <= after + expiry
+            after = int(time() + 1.0)
+            before + expiry <= res_expiry <= after + expiry

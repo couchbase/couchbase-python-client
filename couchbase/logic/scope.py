@@ -13,13 +13,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
-                    Optional)
+                    Dict)
 
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
 from couchbase.collection import Collection
+from couchbase.logic.cluster_settings import StreamingTimeouts
 from couchbase.management.eventing import ScopeEventingFunctionManager
 from couchbase.management.search import ScopeSearchIndexManager
 from couchbase.n1ql import N1QLQuery, N1QLRequest
@@ -36,11 +38,12 @@ from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
+    from couchbase.bucket import Bucket
     from couchbase.search import SearchQuery
 
 
 class ScopeLogic:
-    def __init__(self, bucket, scope_name):
+    def __init__(self, bucket: Bucket, scope_name: str) -> None:
         self._bucket = bucket
         self._scope_name = scope_name
 
@@ -49,22 +52,22 @@ class ScopeLogic:
         """
         **INTERNAL**
         """
-        return self._bucket.connection
+        return self._bucket._impl.connection
 
     @property
-    def streaming_timeouts(self):
+    def streaming_timeouts(self) -> StreamingTimeouts:
         """
         **INTERNAL**
         """
-        return self._bucket.streaming_timeouts
+        return self._bucket._impl.streaming_timeouts
 
     @property
-    def default_serializer(self) -> Optional[Serializer]:
-        return self._bucket.default_serializer
+    def default_serializer(self) -> Serializer:
+        return self._bucket._impl.default_serializer
 
     @property
-    def default_transcoder(self) -> Optional[Transcoder]:
-        return self._bucket.default_transcoder
+    def default_transcoder(self) -> Transcoder:
+        return self._bucket._impl.default_transcoder
 
     @property
     def name(self) -> str:

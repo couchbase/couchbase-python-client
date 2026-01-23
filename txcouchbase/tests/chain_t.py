@@ -32,17 +32,19 @@ class ConnectionChainTests:
         cluster = TxCluster(conn_string, ClusterOptions(auth))
         # validate the cluster, at this point, the connect deferred should be pending
         assert isinstance(cluster, Cluster)
-        assert cluster._connect_d.called is False
+        # NOTE: We use the acouchbase implementation under the hood, so that is why we are checking the future
+        assert cluster._impl.client_adapter.connect_ft.done() is False
 
         bucket = cluster.bucket(couchbase_config.bucket_name)
         assert isinstance(bucket, Bucket)
         run_in_reactor_thread(bucket.on_connect)
         # after connecting the bucket, the cluster connection should now exist b/c the connection
         # deferreds are chained (i.e. cluster.connect -> bucket.connect)
-        assert cluster._connect_d is not None
-        assert cluster._connect_d.called is True
-        assert cluster._connection is not None
-        assert bucket._connect_d.called is True
+        # NOTE: We use the acouchbase implementation under the hood, so that is why we are checking futures
+        assert cluster._impl.client_adapter.connect_ft is not None
+        assert cluster._impl.client_adapter.connect_ft.done() is True
+        assert cluster._impl.connection is not None
+        assert bucket._impl.bucket_connect_ft.done() is True
 
     def test_kv_op_chain(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -64,8 +66,9 @@ class ConnectionChainTests:
 
         # after executing the KV op, the cluster connection should now exist b/c the connection
         # deferreds are chained (i.e. cluster.connect -> bucket.connect -> KV op)
-        assert cluster._connect_d.called is True
-        assert bucket._connect_d.called is True
+        # NOTE: We use the acouchbase implementation under the hood, so that is why we are checking futures
+        assert cluster._impl.client_adapter.connect_ft.done() is True
+        assert bucket._impl.bucket_connect_ft.done() is True
         assert isinstance(res, GetResult)
         assert res.content_as[dict] == doc
 

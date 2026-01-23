@@ -13,12 +13,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import logging
 from typing import (TYPE_CHECKING,
                     Any,
                     Callable,
                     Coroutine)
 
+from couchbase._utils import PyCapsuleType
 from couchbase.exceptions import TransactionExpired, TransactionFailed
 from couchbase.pycbc_core import create_transactions, destroy_transactions
 from couchbase.transactions.transaction_result import TransactionResult
@@ -26,25 +29,19 @@ from couchbase.transcoder import JSONTranscoder
 
 if TYPE_CHECKING:
     from acouchbase.transactions import AttemptContext as AsyncAttemptContext
-    from couchbase.logic.cluster import ClusterLogic
     from couchbase.options import TransactionConfig
+    from couchbase.serializer import Serializer
     from couchbase.transactions import AttemptContext as BlockingAttemptContext
 
 log = logging.getLogger(__name__)
 
 
 class TransactionsLogic:
-    def __init__(self,
-                 cluster,  # type: ClusterLogic
-                 config   # type: TransactionConfig
-                 ):
+    def __init__(self, connection: PyCapsuleType, config: TransactionConfig, default_serializer: Serializer) -> None:
         self._config = config
-        self._loop = None
         # while the cluster has a default transcoder, it might not be a JSONTranscoder
-        self._transcoder = JSONTranscoder(cluster.default_serializer)
-        if hasattr(cluster, "loop"):
-            self._loop = cluster.loop
-        self._txns = create_transactions(cluster.connection, self._config._base)
+        self._transcoder = JSONTranscoder(default_serializer)
+        self._txns = create_transactions(connection, self._config._base)
         log.info('created transactions object using config=%s, transcoder=%s', self._config, self._transcoder)
 
     def run(self,

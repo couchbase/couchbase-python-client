@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import logging
 from functools import wraps
 from typing import (TYPE_CHECKING,
@@ -49,6 +51,7 @@ from .transactions_get_multi import (TransactionGetMultiReplicasFromPreferredSer
 if TYPE_CHECKING:
     from couchbase._utils import JSONType, PyCapsuleType
     from couchbase.collection import Collection
+    from couchbase.logic.cluster_impl import ClusterImpl
     from couchbase.options import TransactionOptions
     from couchbase.transcoder import Transcoder
 
@@ -89,6 +92,11 @@ class BlockingWrapper:
 
 
 class Transactions(TransactionsLogic):
+
+    def __init__(self, cluster: ClusterImpl) -> None:
+        super().__init__(cluster.connection,
+                         cluster.cluster_settings.transaction_config,
+                         cluster.cluster_settings.default_serializer)
 
     def run(self,
             txn_logic,                 # type: Callable[[AttemptContext], None]

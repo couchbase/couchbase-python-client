@@ -13,28 +13,26 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict)
 
 from couchbase.collection import Collection
-from couchbase.exceptions import ErrorMapper
-from couchbase.exceptions import exception as BaseCouchbaseException
-from couchbase.logic import BlockingWrapper
-from couchbase.logic.bucket import BucketLogic
+from couchbase.logic.bucket_impl import BucketImpl
 from couchbase.logic.supportability import Supportability
 from couchbase.management.collections import CollectionManager
 from couchbase.management.views import ViewIndexManager
 from couchbase.result import PingResult, ViewResult
 from couchbase.scope import Scope
-from couchbase.views import ViewQuery, ViewRequest
 
 if TYPE_CHECKING:
     from couchbase.cluster import Cluster
     from couchbase.options import PingOptions, ViewOptions
 
 
-class Bucket(BucketLogic):
+class Bucket:
     """Create a Couchbase Bucket instance.
 
     Exposes the operations which are available to be performed against a bucket. Namely the ability to
@@ -49,24 +47,12 @@ class Bucket(BucketLogic):
 
     """
 
-    def __init__(self,
-                 cluster,  # type: Cluster
-                 bucket_name  # type: str
-                 ):
-        super().__init__(cluster, bucket_name)
-        self._open_bucket()
+    def __init__(self, cluster: Cluster, bucket_name: str) -> None:
+        self._impl = BucketImpl(bucket_name, cluster)
 
-    @BlockingWrapper.block(True)
-    def _open_bucket(self, **kwargs):
-        ret = super()._open_or_close_bucket(open_bucket=True, **kwargs)
-        if isinstance(ret, BaseCouchbaseException):
-            raise ErrorMapper.build_exception(ret)
-        self._set_connected(ret)
-
-    @BlockingWrapper.block(True)
-    def _close_bucket(self, **kwargs):
-        super()._open_or_close_bucket(open_bucket=False, **kwargs)
-        self._destroy_connection()
+    @property
+    def name(self) -> str:
+        return self._impl.bucket_name
 
     def close(self):
         """Shuts down this bucket instance. Cleaning up all resources associated with it.
@@ -77,9 +63,7 @@ class Bucket(BucketLogic):
             is necessary and in those types of applications, this method might be beneficial.
 
         """
-        # only close if we are connected
-        if self.connected:
-            self._close_bucket()
+        self._impl.close_bucket()
 
     def default_scope(self) -> Scope:
         """Creates a :class:`~.scope.Scope` instance of the default scope.
@@ -90,8 +74,7 @@ class Bucket(BucketLogic):
         """
         return self.scope(Scope.default_name())
 
-    def scope(self, name  # type: str
-              ) -> Scope:
+    def scope(self, name: str) -> Scope:
         """Creates a :class:`~couchbase.scope.Scope` instance of the specified scope.
 
         Args:
@@ -103,8 +86,7 @@ class Bucket(BucketLogic):
         """
         return Scope(self, name)
 
-    def collection(self, collection_name  # type: str
-                   ) -> Collection:
+    def collection(self, collection_name: str) -> Collection:
         """Creates a :class:`~couchbase.collection.Collection` instance of the specified collection.
 
         Args:
@@ -126,7 +108,6 @@ class Bucket(BucketLogic):
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    @BlockingWrapper.block(PingResult)
     def ping(self,
              *opts,  # type: PingOptions
              **kwargs  # type: Dict[str, Any]
@@ -145,7 +126,8 @@ class Bucket(BucketLogic):
             which were performed.
 
         """
-        return super().ping(*opts, **kwargs)
+        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
+        return self._impl.ping(req)
 
     def view_query(self,
                    design_doc,      # type: str
@@ -196,17 +178,8 @@ class Bucket(BucketLogic):
                     print(f'Found row: {row}')
 
         """
-        # If the view_query was provided a timeout we will use that value for the streaming timeout
-        # when the streaming object is created in the bindings.  If the view_query does not specify a
-        # timeout, the streaming_timeout defaults to cluster's view_timeout (set here). If the cluster
-        # also does not specify a view_timeout we set the streaming_timeout to
-        # couchbase::core::timeout_defaults::view_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self.streaming_timeouts.get('view_timeout', None)
-        query = ViewQuery.create_view_query_object(self.name, design_doc, view_name, *view_options, **kwargs)
-        return ViewResult(ViewRequest.generate_view_request(self.connection,
-                                                            query.as_encodable(),
-                                                            default_serializer=self.default_serializer,
-                                                            streaming_timeout=streaming_timeout))
+        req = self._impl.request_builder.build_view_query_request(design_doc, view_name, *view_options, **kwargs)
+        return self._impl.view_query(req)
 
     def collections(self) -> CollectionManager:
         """
@@ -216,7 +189,7 @@ class Bucket(BucketLogic):
         Returns:
             :class:`~couchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
         """  # noqa: E501
-        return CollectionManager(self.connection, self.name)
+        return CollectionManager(self._impl.connection, self.name)
 
     def view_indexes(self) -> ViewIndexManager:
         """
@@ -232,7 +205,7 @@ class Bucket(BucketLogic):
         Returns:
             :class:`~couchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
         """  # noqa: E501
-        return ViewIndexManager(self.connection, self.name)
+        return ViewIndexManager(self._impl.connection, self.name)
 
 
 """

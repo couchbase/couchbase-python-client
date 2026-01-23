@@ -13,26 +13,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
                     Dict)
 
 from acouchbase.collection import Collection
-from acouchbase.logic import AsyncWrapper
+from acouchbase.logic.bucket_impl import AsyncBucketImpl
 from acouchbase.management.collections import CollectionManager
 from acouchbase.management.views import ViewIndexManager
 from acouchbase.scope import Scope
-from acouchbase.views import AsyncViewRequest, ViewQuery
-from couchbase.logic.bucket import BucketLogic
 from couchbase.result import PingResult, ViewResult
 
 if TYPE_CHECKING:
-    from acouchbase.cluster import Cluster
+    from acouchbase.cluster import AsyncCluster
     from couchbase.options import PingOptions, ViewOptions
 
 
-class AsyncBucket(BucketLogic):
+class AsyncBucket:
     """Create a Couchbase Bucket instance.
 
     Exposes the operations which are available to be performed against a bucket. Namely the ability to
@@ -47,44 +46,14 @@ class AsyncBucket(BucketLogic):
 
     """
 
-    def __init__(self, cluster,  # type: Cluster
-                 bucket_name  # type: str
-                 ):
-        super().__init__(cluster, bucket_name)
-        self._close_ftr = None
-        self._connect_ftr = self._open_bucket()
+    def __init__(self, cluster: AsyncCluster, bucket_name: str) -> None:
+        self._impl = AsyncBucketImpl(bucket_name, cluster)
 
     @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._cluster.loop
+    def name(self) -> str:
+        return self._impl.bucket_name
 
-    # def _connect_bucket(self):
-    #     """
-    #     **INTERNAL**
-    #     Used w/in wrappers if a collection op is called when not connected
-    #     """
-    #     if self._connect_ftr is not None:
-    #         return
-
-    #     if not self._cluster.connected:
-    #         self._connect_ftr = self.loop.create_future()
-    #         ft = self._cluster.on_connect()
-    #         ft.add_done_callback(partial(AsyncWrapper.chain_connect_callbacks, self))
-    #     else:
-    #         self._connect_ftr = super()._open_or_close_bucket(open_bucket=True)
-
-    @AsyncWrapper.inject_bucket_open_callbacks()
-    def _open_bucket(self, **kwargs) -> Awaitable:
-        super()._open_or_close_bucket(open_bucket=True, **kwargs)
-
-    @AsyncWrapper.inject_close_callbacks()
-    def _close_bucket(self, **kwargs):
-        super()._open_or_close_bucket(open_bucket=False, **kwargs)
-
-    def on_connect(self) -> Awaitable:
+    async def on_connect(self) -> None:
         """Returns an awaitable future that indicates connecting to the Couchbase bucket has completed.
 
         Returns:
@@ -94,11 +63,7 @@ class AsyncBucket(BucketLogic):
         Raises:
             :class:`~couchbase.exceptions.UnAmbiguousTimeoutException`: If an error occured while trying to connect.
         """
-        if not (self._connect_ftr or self.connected):
-            self._connect_ftr = self._open_bucket()
-            self._close_ftr = None
-
-        return self._connect_ftr
+        await self._impl.wait_until_bucket_connected()
 
     async def close(self) -> None:
         """Shuts down this bucket instance. Cleaning up all resources associated with it.
@@ -109,15 +74,9 @@ class AsyncBucket(BucketLogic):
             is necessary and in those types of applications, this method might be beneficial.
 
         """
-        if self.connected and not self._close_ftr:
-            self._close_ftr = self._close_bucket()
-            self._connect_ftr = None
+        await self._impl.close_bucket()
 
-        await self._close_ftr
-        super()._destroy_connection()
-
-    def default_scope(self
-                      ) -> Scope:
+    def default_scope(self) -> Scope:
         """Creates a :class:`~acouchbase.scope.Scope` instance of the default scope.
 
         Returns:
@@ -126,8 +85,7 @@ class AsyncBucket(BucketLogic):
         """
         return self.scope(Scope.default_name())
 
-    def scope(self, name  # type: str
-              ) -> Scope:
+    def scope(self, name: str) -> Scope:
         """Creates a :class:`~acouchbase.scope.Scope` instance of the specified scope.
 
         Args:
@@ -139,7 +97,7 @@ class AsyncBucket(BucketLogic):
         """
         return Scope(self, name)
 
-    def collection(self, collection_name):
+    def collection(self, collection_name: str) -> Collection:
         """Creates a :class:`~acouchbase.collection.Collection` instance of the specified collection.
 
         Args:
@@ -161,11 +119,10 @@ class AsyncBucket(BucketLogic):
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    @AsyncWrapper.inject_cluster_callbacks(PingResult)
-    def ping(self,
-             *opts,  # type: PingOptions
-             **kwargs  # type: Dict[str, Any]
-             ) -> Awaitable[PingResult]:
+    async def ping(self,
+                   *opts,  # type: PingOptions
+                   **kwargs  # type: Dict[str, Any]
+                   ) -> PingResult:
         """Performs a ping operation against the bucket.
 
         The ping operation pings the services which are specified
@@ -180,7 +137,8 @@ class AsyncBucket(BucketLogic):
             operations which were performed.
 
         """
-        return super().ping(*opts, **kwargs)
+        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
+        return await self._impl.ping(req)
 
     def view_query(self,
                    design_doc,      # type: str
@@ -231,17 +189,8 @@ class AsyncBucket(BucketLogic):
                     print(f'Found row: {row}')
 
         """
-        request_args = dict(default_serialize=self.default_serializer,
-                            streaming_timeout=self.streaming_timeouts.get('view_timeout', None))
-        num_workers = kwargs.pop('num_workers', None)
-        if num_workers:
-            request_args['num_workers'] = num_workers
-
-        query = ViewQuery.create_view_query_object(self.name, design_doc, view_name, *view_options, **kwargs)
-        return ViewResult(AsyncViewRequest.generate_view_request(self.connection,
-                                                                 self.loop,
-                                                                 query.as_encodable(),
-                                                                 **request_args))
+        req = self._impl.request_builder.build_view_query_request(design_doc, view_name, *view_options, **kwargs)
+        return self._impl.view_query(req)
 
     def collections(self) -> CollectionManager:
         """
@@ -251,7 +200,7 @@ class AsyncBucket(BucketLogic):
         Returns:
             :class:`~acouchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
         """  # noqa: E501
-        return CollectionManager(self.connection, self.loop, self.name)
+        return CollectionManager(self._impl.connection, self._impl.loop, self.name)
 
     def view_indexes(self) -> ViewIndexManager:
         """
@@ -267,7 +216,7 @@ class AsyncBucket(BucketLogic):
         Returns:
             :class:`~acouchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
         """  # noqa: E501
-        return ViewIndexManager(self.connection, self.loop, self.name)
+        return ViewIndexManager(self._impl.connection, self._impl.loop, self.name)
 
 
 Bucket = AsyncBucket

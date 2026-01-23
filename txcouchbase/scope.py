@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from asyncio import AbstractEventLoop
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -23,6 +24,7 @@ from twisted.internet.defer import Deferred
 from couchbase.logic.analytics import AnalyticsQuery
 from couchbase.logic.n1ql import N1QLQuery
 from couchbase.logic.search import SearchQueryBuilder
+from couchbase.logic.top_level_types import PyCapsuleType
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
@@ -45,38 +47,36 @@ class Scope:
     def __init__(self, bucket, scope_name):
         self._bucket = bucket
         self._set_connection()
-        self._loop = bucket.loop
+        # self._loop = bucket.loop
         self._scope_name = scope_name
 
     @property
-    def connection(self):
+    def connection(self) -> Optional[PyCapsuleType]:
         """
         **INTERNAL**
         """
         return self._connection
 
     @property
-    def loop(self):
+    def loop(self) -> AbstractEventLoop:
         """
         **INTERNAL**
         """
-        return self._loop
+        return self._bucket._impl.loop
 
     @property
     def default_transcoder(self) -> Optional[Transcoder]:
-        return self._bucket.default_transcoder
+        return self._bucket._impl.default_transcoder
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._scope_name
 
     @property
-    def bucket_name(self):
+    def bucket_name(self) -> str:
         return self._bucket.name
 
-    def collection(self, name  # type: str
-                   ) -> Collection:
-
+    def collection(self, name: str) -> Collection:
         return Collection(self, name)
 
     def query(
@@ -243,7 +243,7 @@ class Scope:
         """
         **INTERNAL**
         """
-        self._connection = self._bucket.connection
+        self._connection = self._bucket._impl.connection
 
     @staticmethod
     def default_name():

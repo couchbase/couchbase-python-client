@@ -13,113 +13,60 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict)
 
 from twisted.internet.defer import Deferred
 
-from couchbase.logic.bucket import BucketLogic
-from couchbase.logic.views import ViewQuery
 from couchbase.result import PingResult, ViewResult
 from txcouchbase.collection import Collection
-from txcouchbase.logic import TxWrapper
+from txcouchbase.logic.bucket_impl import TxBucketImpl
 from txcouchbase.management.collections import CollectionManager
 from txcouchbase.scope import Scope
-from txcouchbase.views import ViewRequest
 
 if TYPE_CHECKING:
     from couchbase.options import PingOptions, ViewOptions
+    from txcouchbase.cluster import TxCluster
 
 
-class Bucket(BucketLogic):
+class Bucket:
 
-    def __init__(self, cluster, bucket_name):
-        super().__init__(cluster, bucket_name)
-        self._close_d = None
-        self._connect_d = self._open_bucket()
+    def __init__(self, cluster: TxCluster, bucket_name: str) -> None:
+        self._impl = TxBucketImpl(bucket_name, cluster)
 
     @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._cluster.loop
+    def name(self) -> str:
+        return self._impl.bucket_name
 
-    # def _connect_bucket(self):
-    #     """
-    #     **INTERNAL**
-    #     """
-
-    #     def cb(_, self):
-    #         self._connection = self._cluster.connection
-    #         return Deferred.fromFuture(super(Bucket, self)._open_or_close_bucket(open_bucket=True))
-
-    #     if not self._cluster.connected:
-    #         d = self._cluster.on_connect()
-    #         d.addCallback(cb, self)
-    #         self._connect_d = d
-    #     else:
-    #         self._connect_d = Deferred.fromFuture(super()._open_or_close_bucket(open_bucket=True))
-
-    @TxWrapper.inject_bucket_open_callbacks()
-    def _open_bucket(self, **kwargs) -> Deferred:
-        super()._open_or_close_bucket(open_bucket=True, **kwargs)
-
-    @TxWrapper.inject_close_callbacks()
-    def _close_bucket(self, **kwargs) -> Deferred:
-        super()._open_or_close_bucket(open_bucket=False, **kwargs)
-
-    def on_connect(self) -> Deferred:
-        # only open if the connect deferred doesn't exist and we are not connected
-        if not self._connect_d and not self.connected:
-            self._connect_d = self._open_bucket()
-            self._close_d = None
-
-        return self._connect_d
+    def on_connect(self) -> Deferred[None]:
+        return self._impl.wait_until_bucket_connected_deferred()
 
     def close(self) -> Deferred:
-        # only close if we are connected
-        if self.connected and not self._close_d:
-            self._close_d = self._close_bucket()
-            self._connect_d = None
+        return self._impl.close_bucket_deferred()
 
-        d = Deferred()
-
-        def _on_okay(_):
-            super()._destroy_connection()
-            d.callback(None)
-
-        def _on_err(exc):
-            d.errback(exc)
-
-        self._close_d.addCallback(_on_okay)
-        self._close_d.addErrback(_on_err)
-
-        return d
-
-    def default_scope(self
-                      ) -> Scope:
+    def default_scope(self) -> Scope:
         return self.scope(Scope.default_name())
 
-    def scope(self, name  # type: str
-              ) -> Scope:
+    def scope(self, name: str) -> Scope:
         return Scope(self, name)
 
-    def collection(self, collection_name):
+    def collection(self, collection_name: str) -> Collection:
         scope = self.default_scope()
         return scope.collection(collection_name)
 
-    def default_collection(self):
+    def default_collection(self) -> Collection:
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    @TxWrapper.inject_cluster_callbacks(PingResult)
     def ping(self,
              *opts,  # type: PingOptions
              **kwargs  # type: Dict[str, Any]
              ) -> Deferred[PingResult]:
-        super().ping(*opts, **kwargs)
+        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
+        return self._impl.ping_deferred(req)
 
     def view_query(self,
                    design_doc,      # type: str
@@ -136,27 +83,8 @@ class Bucket(BucketLogic):
             Index Service (GSI) and the Query Service (SQL++).
 
         """
-
-        query = ViewQuery.create_view_query_object(
-            self.name, design_doc, view_name, *view_options, **kwargs
-        )
-        request = ViewRequest.generate_view_request(self.connection,
-                                                    self.loop,
-                                                    query.as_encodable(),
-                                                    default_serializer=self.default_serializer)
-
-        d = Deferred()
-
-        def _on_ok(_):
-            d.callback(ViewResult(request))
-
-        def _on_err(exc):
-            d.errback(exc)
-
-        query_d = request.execute_view_query()
-        query_d.addCallback(_on_ok)
-        query_d.addErrback(_on_err)
-        return d
+        req = self._impl.request_builder.build_view_query_request(design_doc, view_name, *view_options, **kwargs)
+        return self._impl.view_query_deferred(req)
 
     def collections(self) -> CollectionManager:
         """
@@ -164,7 +92,7 @@ class Bucket(BucketLogic):
 
         :return: the :class:`.management.collections.CollectionManager` for this bucket.
         """
-        return CollectionManager(self.connection, self.loop, self.name)
+        return CollectionManager(self._impl.connection, self._impl.loop, self.name)
 
 
 TxBucket = Bucket

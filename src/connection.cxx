@@ -85,12 +85,16 @@ dealloc_conn(PyObject* obj)
     f.get();
     conn->io_.stop();
     for (auto& t : conn->io_threads_) {
-      if (t.joinable()) {
+      if (t.get_id() == std::this_thread::get_id()) {
+        // Cannot join from the same thread - detach instead to avoid deadlock
+        CB_LOG_DEBUG("PYCBC: dealloc_conn called from IO thread, detaching instead of joining");
+        t.detach();
+      } else {
         t.join();
       }
     }
   }
-  CB_LOG_DEBUG("{}: dealloc_conn completed", "PYCBC");
+  CB_LOG_DEBUG("PYCBC: dealloc_conn completed");
   delete conn;
 }
 
@@ -923,7 +927,7 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
   PyObject* pyObj_errback = nullptr;
   PyObject* pyObj_result = nullptr;
 
-  static const char* kw_list[] = { "", "auth", "options", "callback", "errback", nullptr };
+  static const char* kw_list[] = { "connstr", "auth", "options", "callback", "errback", nullptr };
 
   const char* kw_format = "s|OOOO";
   int ret = PyArg_ParseTupleAndKeywords(args,
@@ -1006,7 +1010,7 @@ PyObject*
 get_connection_info([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
 {
   PyObject* pyObj_conn = nullptr;
-  static const char* kw_list[] = { "", nullptr };
+  static const char* kw_list[] = { "conn", nullptr };
 
   const char* kw_format = "O!";
   int ret = PyArg_ParseTupleAndKeywords(
@@ -1427,7 +1431,7 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
   PyObject* pyObj_errback = nullptr;
   PyObject* pyObj_result = nullptr;
 
-  static const char* kw_list[] = { "", "callback", "errback", nullptr };
+  static const char* kw_list[] = { "conn", "callback", "errback", nullptr };
 
   const char* kw_format = "O!|OO";
   int ret = PyArg_ParseTupleAndKeywords(args,
@@ -1491,7 +1495,8 @@ handle_open_or_close_bucket([[maybe_unused]] PyObject* self, PyObject* args, PyO
 
   int open = 1;
 
-  static const char* kw_list[] = { "", "", "callback", "errback", "open_bucket", nullptr };
+  static const char* kw_list[] = { "conn",    "bucket_name", "callback",
+                                   "errback", "open_bucket", nullptr };
 
   // TODO:  something about passing in a boolean corrupts the param before it
   //      "O!s|OOp" would cause the errback PyObject to be corrupted -- no idea why???
@@ -1572,7 +1577,7 @@ handle_update_credentials([[maybe_unused]] PyObject* self, PyObject* args, PyObj
   PyObject* pyObj_conn = nullptr;
   PyObject* pyObj_auth = nullptr;
 
-  static const char* kw_list[] = { "", "auth", nullptr };
+  static const char* kw_list[] = { "conn", "auth", nullptr };
 
   const char* kw_format = "O!O!";
   int ret = PyArg_ParseTupleAndKeywords(args,

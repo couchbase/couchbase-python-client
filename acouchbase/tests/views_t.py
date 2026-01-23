@@ -40,7 +40,6 @@ class ViewsTestSuite:
         'test_view_query_raw',
         'test_view_query_raw_fail',
         'test_view_query_startkey_docid',
-        'test_view_query_timeout',
     ]
 
     @pytest.mark.asyncio

@@ -1,0 +1,262 @@
+#  Copyright 2016-2023. Couchbase, Inc.
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License")
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+from __future__ import annotations
+
+from asyncio import Future
+from functools import partial
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Callable,
+                    Dict,
+                    Optional)
+
+from acouchbase import get_event_loop
+from couchbase.exceptions import (PYCBC_ERROR_MAP,
+                                  CouchbaseException,
+                                  ErrorMapper,
+                                  ExceptionMap,
+                                  InternalSDKException)
+from couchbase.exceptions import exception as BaseCouchbaseException
+from couchbase.logic.binding_map import BindingMap
+from couchbase.logic.bucket_types import CloseBucketRequest, OpenBucketRequest
+from couchbase.logic.cluster_types import CloseConnectionRequest
+from couchbase.logic.top_level_types import OpenOrCloseBucket, PyCapsuleType
+
+if TYPE_CHECKING:
+    from asyncio import AbstractEventLoop
+
+    from couchbase.logic.bucket_types import BucketRequest
+    from couchbase.logic.cluster_types import ClusterRequest, CreateConnectionRequest
+
+
+class AsyncClientAdapter:
+
+    def __init__(self,
+                 loop: AbstractEventLoop,
+                 connect_req: CreateConnectionRequest,
+                 loop_validator: Optional[Callable[[Optional[AbstractEventLoop]], AbstractEventLoop]] = None
+                 ) -> None:
+        self._connection: Optional[PyCapsuleType] = None
+        if loop_validator:
+            self._loop = loop_validator(loop)
+        else:
+            self._loop = self._get_loop(loop)
+        self._connect_req = connect_req
+        self._binding_map = BindingMap()
+        self._close_ft: Optional[Future[None]] = None
+        self._connect_ft: Optional[Future[None]] = None
+        self._create_connection()
+
+    @property
+    def connected(self) -> bool:
+        return self._connection is not None
+
+    @property
+    def connection(self) -> Optional[PyCapsuleType]:
+        return self._connection
+
+    @property
+    def connect_ft(self) -> Optional[Future[None]]:
+        return self._connect_ft
+
+    @property
+    def loop(self) -> AbstractEventLoop:
+        return self._loop
+
+    async def close_connection(self) -> None:
+        self._close_ft = self._execute_close_connection_request()
+        await self._close_ft
+
+    def execute_bucket_request(self, req: BucketRequest) -> Future[Any]:
+        if not self.connected:
+            raise RuntimeError('Cannot attempt bucket request without first establishing a connection.')
+
+        ft = self._loop.create_future()
+
+        def _callback(result) -> None:
+            self._loop.call_soon_threadsafe(ft.set_result, result)
+
+        def _errback(exc) -> None:
+            excptn = ErrorMapper.build_exception(exc)
+            self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+
+        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        self._execute_req(ft, req.op_name, req_dict)
+        return ft
+
+    def execute_close_bucket_request(self, bucket_name: str) -> Future[None]:
+        req = CloseBucketRequest(bucket_name, OpenOrCloseBucket.CLOSE)
+        return self.execute_bucket_request(req)
+
+    def execute_cluster_request(self, req: ClusterRequest) -> Future[Any]:
+        ft = self._loop.create_future()
+
+        def _callback(result) -> None:
+            self._loop.call_soon_threadsafe(ft.set_result, result)
+
+        def _errback(exc) -> None:
+            excptn = ErrorMapper.build_exception(exc)
+            self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+
+        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        if not self.connected:
+            chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
+            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
+        else:
+            self._execute_req(ft, req.op_name, req_dict)
+        return ft
+
+    def execute_cluster_request_sync(self, req: ClusterRequest) -> Any:
+        req_dict = req.req_to_dict(self._connection)
+        ret = self._execute_req_sync(req.op_name, req_dict)
+        if isinstance(ret, BaseCouchbaseException):
+            raise ErrorMapper.build_exception(ret)
+        return ret
+
+    def execute_connect_bucket_request(self, bucket_name: str) -> Future[None]:
+        req = OpenBucketRequest(bucket_name, OpenOrCloseBucket.OPEN)
+        ft = self._loop.create_future()
+
+        def _callback(_) -> None:
+            if not ft.done():
+                self._loop.call_soon_threadsafe(ft.set_result, None)
+
+        def _errback(ret: Any) -> None:
+            excptn = ErrorMapper.build_exception(ret)
+            if not ft.done():
+                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+
+        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        if not self.connected:
+            chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
+            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
+        else:
+            self._execute_req(ft, req.op_name, req_dict)
+        return ft
+
+    async def wait_until_connected(self) -> None:
+        if self.connected:
+            return
+        if self._connect_ft is None:
+            self._create_connection()
+        await self._connect_ft
+
+    def _create_connection(self) -> None:
+        if self._close_ft is not None and self._close_ft.done() is not True:
+            raise RuntimeError('Cannot attempt to connect when close attempt is pending.')
+
+        if self._close_ft is not None:
+            self._close_ft = None
+
+        self._connect_ft = self._execute_connect_request()
+
+    def _execute_chained_req(self,
+                             ft: Future[Any],
+                             op_name: str,
+                             req_dict: Dict[str, Any],
+                             chained_future: Future[Any]) -> None:
+        if chained_future.cancelled():
+            ft.cancel()
+            return
+
+        exc = chained_future.exception()
+        if exc is not None:
+            ft.set_exception(exc)
+            return
+
+        req_dict['conn'] = self._connection
+        self._execute_req(ft, op_name, req_dict)
+
+    def _execute_close_connection_request(self) -> Future[None]:
+        req = CloseConnectionRequest()
+        ft = self._loop.create_future()
+
+        def _callback(_) -> None:
+            if not ft.done():
+                self._reset_connection()
+                self._loop.call_soon_threadsafe(ft.set_result, None)
+
+        def _errback(ret: Any) -> None:
+            excptn = ErrorMapper.build_exception(ret)
+            if not ft.done():
+                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+
+        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        if not self.connected:
+            chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
+            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
+        else:
+            self._execute_req(ft, req.op_name, req_dict)
+        return ft
+
+    def _execute_connect_request(self) -> Future[None]:
+        ft = self._loop.create_future()
+
+        def _callback(ret: PyCapsuleType) -> None:
+            if not ft.done():
+                self._connection = ret
+                self._loop.call_soon_threadsafe(ft.set_result, None)
+
+        def _errback(ret: Any) -> None:
+            excptn = ErrorMapper.build_exception(ret)
+            if not ft.done():
+                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+
+        req_dict = self._connect_req.req_to_dict(callback=_callback, errback=_errback)
+        self._execute_req(ft, self._connect_req.op_name, req_dict)
+        return ft
+
+    def _execute_req(self, ft: Future[Any], op_name: str, req_dict: Dict[str, Any]) -> None:
+        try:
+            self._binding_map.op_map[op_name](**req_dict)
+        except KeyError as e:
+            msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
+            ft.set_exception(InternalSDKException(message=msg))
+        except CouchbaseException as e:
+            ft.set_exception(e)
+        except Exception as e:
+            if isinstance(e, (TypeError, ValueError)):
+                ft.set_exception(e)
+            else:
+                exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+                excptn = exc_cls(str(e))
+                ft.set_exception(excptn)
+
+    def _execute_req_sync(self, op_name: str, req_dict: Dict[str, Any]) -> Any:
+        try:
+            return self._binding_map.op_map[op_name](**req_dict)
+        except KeyError as e:
+            msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
+            raise InternalSDKException(message=msg) from None
+        except CouchbaseException:
+            raise
+        except Exception as ex:
+            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+            excptn = exc_cls(message=str(ex))
+            raise excptn from None
+
+    def _get_loop(self, loop: Optional[AbstractEventLoop] = None) -> AbstractEventLoop:
+        if not loop:
+            loop = get_event_loop()
+
+        if not loop.is_running():
+            raise RuntimeError('Event loop is not running.')
+
+        return loop
+
+    def _reset_connection(self):
+        self._connect_ft = None
+        self._connection = None

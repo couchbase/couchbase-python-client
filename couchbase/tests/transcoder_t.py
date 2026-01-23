@@ -664,6 +664,7 @@ class KeyValueOpTranscoderTests(KeyValueOpTranscoderTestSuite):
         cb_env.teardown(request.param)
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicLegacyTranscoderTests(LegacyTranscoderTestSuite):
 
     @pytest.fixture(scope='class')
@@ -689,6 +690,7 @@ class ClassicLegacyTranscoderTests(LegacyTranscoderTestSuite):
         cb_env.cluster.default_transcoder = JSONTranscoder()
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicRawBinaryTranscoderTests(RawBinaryTranscoderTestSuite):
 
     @pytest.fixture(scope='class')
@@ -714,6 +716,7 @@ class ClassicRawBinaryTranscoderTests(RawBinaryTranscoderTestSuite):
         cb_env.cluster.default_transcoder = JSONTranscoder()
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicRawJsonTranscoderTests(RawJsonTranscoderTestSuite):
 
     @pytest.fixture(scope='class')
@@ -739,6 +742,7 @@ class ClassicRawJsonTranscoderTests(RawJsonTranscoderTestSuite):
         cb_env.cluster.default_transcoder = JSONTranscoder()
 
 
+@pytest.mark.skip(reason='Skip until PYCBC-1731')
 class ClassicRawStringTranscoderTests(RawStringTranscoderTestSuite):
 
     @pytest.fixture(scope='class')

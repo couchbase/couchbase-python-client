@@ -168,7 +168,6 @@ class SearchTestSuite:
         'test_search_match_operator_fail',
         'test_search_no_include_locations',
         'test_search_raw_query',
-        'test_search_timeout',
     ]
 
     @pytest.fixture(scope="class")

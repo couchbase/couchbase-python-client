@@ -92,9 +92,9 @@ class BucketManagementTestSuite:
 
     @pytest.fixture(scope='class')
     def num_nodes(self, cb_env):
-        if cb_env.cluster._cluster_info is None:
+        if cb_env.cluster._impl._cluster_info is None:
             cb_env.cluster.cluster_info()
-        return len(cb_env.cluster._cluster_info.nodes)
+        return len(cb_env.cluster._impl._cluster_info.nodes)
 
     @pytest.fixture(scope='class')
     def check_multi_node(self, num_nodes):

@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import logging
 from functools import wraps
 from typing import (TYPE_CHECKING,
@@ -48,10 +50,10 @@ from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
-    from acouchbase.cluster import AsyncCluster
     from acouchbase.collection import AsyncCollection
+    from acouchbase.logic.cluster_impl import AsyncClusterImpl
     from couchbase._utils import JSONType, PyCapsuleType
-    from couchbase.options import TransactionConfig, TransactionOptions
+    from couchbase.options import TransactionOptions
     from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)
@@ -118,11 +120,11 @@ class AsyncWrapper:
 
 class Transactions(TransactionsLogic):
 
-    def __init__(self,
-                 cluster,  # type: AsyncCluster
-                 config    # type: TransactionConfig
-                 ):
-        super().__init__(cluster, config)
+    def __init__(self, cluster: AsyncClusterImpl) -> None:
+        self._loop = cluster.loop
+        super().__init__(cluster.connection,
+                         cluster.cluster_settings.transaction_config,
+                         cluster.cluster_settings.default_serializer)
 
     async def run(self,
                   txn_logic,  # type:  Callable[[AttemptContextLogic], Coroutine[Any, Any, None]]

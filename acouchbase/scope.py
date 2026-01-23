@@ -13,6 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
+from asyncio import AbstractEventLoop
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
@@ -25,6 +28,7 @@ from acouchbase.management.eventing import ScopeEventingFunctionManager
 from acouchbase.management.search import ScopeSearchIndexManager
 from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
 from acouchbase.search import AsyncFullTextSearchRequest, SearchQueryBuilder
+from couchbase.logic.top_level_types import PyCapsuleType
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions)
@@ -35,6 +39,7 @@ from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
+    from acouchbase.bucket import AsyncBucket
     from couchbase.search import SearchQuery, SearchRequest
 
 
@@ -50,39 +55,39 @@ class AsyncScope:
 
     """
 
-    def __init__(self, bucket, scope_name):
+    def __init__(self, bucket: AsyncBucket, scope_name: str) -> None:
         self._bucket = bucket
         self._set_connection()
         self._scope_name = scope_name
 
     @property
-    def connection(self):
+    def connection(self) -> Optional[PyCapsuleType]:
         """
         **INTERNAL**
         """
         return self._connection
 
     @property
-    def loop(self):
+    def loop(self) -> AbstractEventLoop:
         """
         **INTERNAL**
         """
-        return self._bucket.loop
+        return self._bucket._impl.loop
 
     @property
     def default_serializer(self) -> Optional[Serializer]:
-        return self._bucket.default_serializer
+        return self._bucket._impl.default_serializer
 
     @property
     def streaming_timeouts(self):
         """
         **INTERNAL**
         """
-        return self._bucket.streaming_timeouts
+        return self._bucket._impl.streaming_timeouts
 
     @property
     def default_transcoder(self) -> Optional[Transcoder]:
-        return self._bucket.default_transcoder
+        return self._bucket._impl.default_transcoder
 
     @property
     def name(self):
@@ -114,13 +119,13 @@ class AsyncScope:
         """
         **INTERNAL**
         """
-        return self._bucket.on_connect()
+        return self._bucket._impl.bucket_connect_ft
 
     def _set_connection(self):
         """
         **INTERNAL**
         """
-        self._connection = self._bucket.connection
+        self._connection = self._bucket._impl.connection
 
     def query(self,
               statement,  # type: str

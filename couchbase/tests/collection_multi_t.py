@@ -115,7 +115,7 @@ class CollectionMultiTestSuite:
 
     @pytest.fixture(scope='class')
     def num_nodes(self, cb_env):
-        return len(cb_env.cluster._cluster_info.nodes)
+        return len(cb_env.cluster._impl.cluster_info.nodes)
 
     def test_multi_exists_simple(self, cb_env):
         keys_and_docs = cb_env.get_docs(4)
