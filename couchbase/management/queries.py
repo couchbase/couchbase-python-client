@@ -15,19 +15,12 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
-from time import perf_counter, sleep
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     Iterable)
 
-from couchbase.exceptions import (AmbiguousTimeoutException,
-                                  InvalidArgumentException,
-                                  QueryIndexNotFoundException,
-                                  WatchQueryIndexTimeoutException)
-from couchbase.management.logic.query_index_logic import QueryIndex, QueryIndexManagerLogic
-from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
+from couchbase.management.logic.query_index_mgmt_impl import QueryIndex, QueryIndexMgmtImpl
 
 # @TODO:  lets deprecate import of options from couchbase.management.queries
 from couchbase.management.options import (BuildDeferredQueryIndexOptions,
@@ -37,13 +30,12 @@ from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           GetAllQueryIndexOptions,
                                           WatchQueryIndexOptions)
-from couchbase.options import forward_args
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
 
 
-class QueryIndexManager(QueryIndexManagerLogic):
+class QueryIndexManager:
     """
     Performs management operations on query indexes.
 
@@ -51,9 +43,9 @@ class QueryIndexManager(QueryIndexManagerLogic):
     """
 
     def __init__(self, client_adapter: ClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
+        self._impl = QueryIndexMgmtImpl(client_adapter)
+        self._collection_ctx = None
 
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_index(self,
                      bucket_name,   # type: str
                      index_name,    # type: str
@@ -77,17 +69,14 @@ class QueryIndexManager(QueryIndexManagerLogic):
                 are invalid types.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
+        req = self._impl.request_builder.build_create_index_request(bucket_name,
+                                                                    index_name,
+                                                                    keys,
+                                                                    self._collection_ctx,
+                                                                    *options,
+                                                                    **kwargs)
+        self._impl.create_index(req)
 
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when creating a secondary index.')
-        if not isinstance(index_name, str):
-            raise InvalidArgumentException('The index_name must be provided when creating a secondary index.')
-        if not isinstance(keys, (list, tuple)):
-            raise InvalidArgumentException('Index keys must be provided when creating a secondary index.')
-
-        return super().create_index(bucket_name, index_name, keys, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_primary_index(self,
                              bucket_name,   # type: str
                              *options,      # type: CreatePrimaryQueryIndexOptions
@@ -106,12 +95,12 @@ class QueryIndexManager(QueryIndexManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when creating a primary index.')
+        req = self._impl.request_builder.build_create_primary_index_request(bucket_name,
+                                                                            self._collection_ctx,
+                                                                            *options,
+                                                                            **kwargs)
+        self._impl.create_primary_index(req)
 
-        return super().create_primary_index(bucket_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def drop_index(self,
                    bucket_name,     # type: str
                    index_name,      # type: str
@@ -133,14 +122,13 @@ class QueryIndexManager(QueryIndexManagerLogic):
                 invalid types.
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when dropping a secondary index.')
-        if not isinstance(index_name, str):
-            raise InvalidArgumentException('The index_name must be provided when dropping a secondary index.')
+        req = self._impl.request_builder.build_drop_index_request(bucket_name,
+                                                                  index_name,
+                                                                  self._collection_ctx,
+                                                                  *options,
+                                                                  **kwargs)
+        self._impl.drop_index(req)
 
-        return super().drop_index(bucket_name, index_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def drop_primary_index(self,
                            bucket_name,     # type: str
                            *options,        # type: DropPrimaryQueryIndexOptions
@@ -159,13 +147,12 @@ class QueryIndexManager(QueryIndexManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
+        req = self._impl.request_builder.build_drop_primary_index_request(bucket_name,
+                                                                          self._collection_ctx,
+                                                                          *options,
+                                                                          **kwargs)
+        self._impl.drop_primary_index(req)
 
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when dropping a primary index.')
-
-        return super().drop_primary_index(bucket_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(QueryIndex, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def get_all_indexes(self,
                         bucket_name,    # type: str
                         *options,       # type: GetAllQueryIndexOptions
@@ -186,12 +173,12 @@ class QueryIndexManager(QueryIndexManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
         """
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when retrieving all indexes.')
+        req = self._impl.request_builder.build_get_all_indexes_request(bucket_name,
+                                                                       self._collection_ctx,
+                                                                       *options,
+                                                                       **kwargs)
+        return self._impl.get_all_indexes(req)
 
-        return super().get_all_indexes(bucket_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def build_deferred_indexes(self,
                                bucket_name,     # type: str
                                *options,        # type: BuildDeferredQueryIndexOptions
@@ -209,10 +196,11 @@ class QueryIndexManager(QueryIndexManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
         """
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when building deferred indexes.')
-
-        return super().build_deferred_indexes(bucket_name, *options, **kwargs)
+        req = self._impl.request_builder.build_build_deferred_indexes_request(bucket_name,
+                                                                              self._collection_ctx,
+                                                                              *options,
+                                                                              **kwargs)
+        self._impl.build_deferred_indexes(req)
 
     def watch_indexes(self,   # noqa: C901
                       bucket_name,  # type: str
@@ -236,85 +224,24 @@ class QueryIndexManager(QueryIndexManagerLogic):
             :class:`~couchbase.exceptions.WatchQueryIndexTimeoutException`: If the specified timeout is reached
                 before all the specified indexes are ready to use.
         """
-
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when watching indexes.')
-        if not isinstance(index_names, (list, tuple)):
-            raise InvalidArgumentException('One or more index_names must be provided when watching indexes.')
-
-        final_args = forward_args(kwargs, *options)
-
-        scope_name = final_args.get('scope_name', None)
-        collection_name = final_args.get('collection_name', None)
-
-        if final_args.get('watch_primary', False):
-            index_names.append('#primary')
-
-        timeout = final_args.get("timeout", None)
-        if not timeout:
-            raise InvalidArgumentException('Must specify a timeout condition for watch indexes')
-
-        def check_indexes(index_names, indexes):
-            for idx_name in index_names:
-                match = next((i for i in indexes if i.name == idx_name), None)
-                if not match:
-                    raise QueryIndexNotFoundException(f'Cannot find index with name: {idx_name}')
-
-            return all(map(lambda i: i.state == 'online', indexes))
-
-        # timeout is converted to microsecs via final_args()
-        timeout_millis = timeout / 1000
-
-        interval_millis = float(50)
-        start = perf_counter()
-        time_left = timeout_millis
-        while True:
-
-            opts = GetAllQueryIndexOptions(
-                timeout=timedelta(milliseconds=time_left))
-            if scope_name:
-                opts['scope_name'] = scope_name
-                opts['collection_name'] = collection_name
-
-            try:
-                indexes = self.get_all_indexes(bucket_name, opts)
-            except AmbiguousTimeoutException:
-                pass  # go ahead and move on, raise WatchQueryIndexTimeoutException later if needed
-
-            all_online = check_indexes(index_names, indexes)
-            if all_online:
-                break
-
-            interval_millis += 500
-            if interval_millis > 1000:
-                interval_millis = 1000
-
-            time_left = timeout_millis - ((perf_counter() - start) * 1000)
-            if interval_millis > time_left:
-                interval_millis = time_left
-
-            if time_left <= 0:
-                raise WatchQueryIndexTimeoutException('Failed to find all indexes online within the alloted time.')
-
-            sleep(interval_millis / 1000)
+        req = self._impl.request_builder.build_watch_indexes_request(bucket_name,
+                                                                     index_names,
+                                                                     self._collection_ctx,
+                                                                     *options,
+                                                                     **kwargs)
+        self._impl.watch_indexes(req)
 
 
-class CollectionQueryIndexManager(QueryIndexManagerLogic):
+class CollectionQueryIndexManager:
     """
     Performs management operations on query indexes at the collection level.
     """
 
-    def __init__(self,
-                 client_adapter: ClientAdapter,
-                 bucket_name: str,
-                 scope_name: str,
-                 collection_name: str) -> None:
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str, collection_name: str) -> None:
         self._bucket_name = bucket_name
-        self._scope_name = scope_name
-        self._collection_name = collection_name
-        super().__init__(client_adapter.connection)
+        self._impl = QueryIndexMgmtImpl(client_adapter)
+        self._collection_ctx = (collection_name, scope_name)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_index(self,
                      index_name,    # type: str
                      keys,        # type: Iterable[str]
@@ -335,27 +262,14 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or keys are invalid types.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
+        req = self._impl.request_builder.build_create_index_request(self._bucket_name,
+                                                                    index_name,
+                                                                    keys,
+                                                                    self._collection_ctx,
+                                                                    *options,
+                                                                    **kwargs)
+        self._impl.create_index(req)
 
-        if not isinstance(index_name, str):
-            raise InvalidArgumentException('The index_name must be provided when creating a secondary index.')
-        if not isinstance(keys, (list, tuple)):
-            raise InvalidArgumentException('Index keys must be provided when creating a secondary index.')
-
-        if not kwargs:
-            kwargs = {}
-
-        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
-                                           'query index manager')
-        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
-        kwargs['scope_name'] = self._scope_name
-        kwargs['collection_name'] = self._collection_name
-        return super().create_index(self._bucket_name, index_name, keys, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_primary_index(self,
                              *options,      # type: CreatePrimaryQueryIndexOptions
                              **kwargs       # type: Dict[str, Any]
@@ -371,22 +285,12 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
+        req = self._impl.request_builder.build_create_primary_index_request(self._bucket_name,
+                                                                            self._collection_ctx,
+                                                                            *options,
+                                                                            **kwargs)
+        self._impl.create_primary_index(req)
 
-        if not kwargs:
-            kwargs = {}
-
-        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
-                                           'query index manager')
-        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
-        kwargs['scope_name'] = self._scope_name
-        kwargs['collection_name'] = self._collection_name
-        return super().create_primary_index(self._bucket_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def drop_index(self,
                    index_name,      # type: str
                    *options,        # type: DropQueryIndexOptions
@@ -405,24 +309,13 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name is an invalid types.
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
-        if not isinstance(index_name, str):
-            raise InvalidArgumentException('The index_name must be provided when dropping a secondary index.')
+        req = self._impl.request_builder.build_drop_index_request(self._bucket_name,
+                                                                  index_name,
+                                                                  self._collection_ctx,
+                                                                  *options,
+                                                                  **kwargs)
+        self._impl.drop_index(req)
 
-        if not kwargs:
-            kwargs = {}
-
-        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
-                                           'query index manager')
-        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
-        kwargs['scope_name'] = self._scope_name
-        kwargs['collection_name'] = self._collection_name
-        return super().drop_index(self._bucket_name, index_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def drop_primary_index(self,
                            *options,        # type: DropPrimaryQueryIndexOptions
                            **kwargs         # type: Dict[str, Any]
@@ -438,21 +331,12 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
-        if not kwargs:
-            kwargs = {}
+        req = self._impl.request_builder.build_drop_primary_index_request(self._bucket_name,
+                                                                          self._collection_ctx,
+                                                                          *options,
+                                                                          **kwargs)
+        self._impl.drop_primary_index(req)
 
-        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
-                                           'query index manager')
-        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
-        kwargs['scope_name'] = self._scope_name
-        kwargs['collection_name'] = self._collection_name
-        return super().drop_primary_index(self._bucket_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(QueryIndex, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def get_all_indexes(self,
                         *options,       # type: GetAllQueryIndexOptions
                         **kwargs        # type: Dict[str,Any]
@@ -469,22 +353,12 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
             Iterable[:class:`.QueryIndex`]: A list of indexes.
 
         """
+        req = self._impl.request_builder.build_get_all_indexes_request(self._bucket_name,
+                                                                       self._collection_ctx,
+                                                                       *options,
+                                                                       **kwargs)
+        return self._impl.get_all_indexes(req)
 
-        if not kwargs:
-            kwargs = {}
-
-        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
-                                           'query index manager')
-        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
-        kwargs['scope_name'] = self._scope_name
-        kwargs['collection_name'] = self._collection_name
-        return super().get_all_indexes(self._bucket_name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def build_deferred_indexes(self,
                                *options,        # type: BuildDeferredQueryIndexOptions
                                **kwargs         # type: Dict[str, Any]
@@ -498,25 +372,16 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
                 for this operation.
 
         """
+        req = self._impl.request_builder.build_build_deferred_indexes_request(self._bucket_name,
+                                                                              self._collection_ctx,
+                                                                              *options,
+                                                                              **kwargs)
+        self._impl.build_deferred_indexes(req)
 
-        if not kwargs:
-            kwargs = {}
-
-        if kwargs.get('scope_name') or (options and options[0].get('scope_name')):
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
-                                           'query index manager')
-        if kwargs.get('collection_name') or (options and options[0].get('collection_name')):
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
-        kwargs['scope_name'] = self._scope_name
-        kwargs['collection_name'] = self._collection_name
-        return super().build_deferred_indexes(self._bucket_name, *options, **kwargs)
-
-    def watch_indexes(self,   # noqa: C901
+    def watch_indexes(self,
                       index_names,  # type: Iterable[str]
                       *options,     # type: WatchQueryIndexOptions
-                      **kwargs      # type: Dict[str,Any]
+                      **kwargs      # type: Dict[str, Any]
                       ) -> None:
         """Waits for a number of indexes to finish creation and be ready to use.
 
@@ -532,60 +397,9 @@ class CollectionQueryIndexManager(QueryIndexManagerLogic):
             :class:`~couchbase.exceptions.WatchQueryIndexTimeoutException`: If the specified timeout is reached
                 before all the specified indexes are ready to use.
         """
-
-        if not isinstance(index_names, (list, tuple)):
-            raise InvalidArgumentException('One or more index_names must be provided when watching indexes.')
-
-        final_args = forward_args(kwargs, *options)
-        if final_args.get('watch_primary', False):
-            index_names.append('#primary')
-
-        if final_args.get('scope_name'):
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the collection-level '
-                                           'query index manager')
-        if final_args.get('collection_name'):
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
-        timeout = final_args.get('timeout', None)
-        if not timeout:
-            raise InvalidArgumentException('Must specify a timeout condition for watch indexes')
-
-        def check_indexes(index_names, indexes):
-            for idx_name in index_names:
-                match = next((i for i in indexes if i.name == idx_name), None)
-                if not match:
-                    raise QueryIndexNotFoundException(f'Cannot find index with name: {idx_name}')
-
-            return all(map(lambda i: i.state == 'online', indexes))
-
-        # timeout is converted to microsecs via final_args()
-        timeout_millis = timeout / 1000
-
-        interval_millis = float(50)
-        start = perf_counter()
-        time_left = timeout_millis
-        while True:
-            opts = GetAllQueryIndexOptions(timeout=timedelta(milliseconds=time_left))
-
-            try:
-                indexes = self.get_all_indexes(opts)
-            except AmbiguousTimeoutException:
-                pass  # go ahead and move on, raise WatchQueryIndexTimeoutException later if needed
-
-            all_online = check_indexes(index_names, indexes)
-            if all_online:
-                break
-
-            interval_millis += 500
-            if interval_millis > 1000:
-                interval_millis = 1000
-
-            time_left = timeout_millis - ((perf_counter() - start) * 1000)
-            if interval_millis > time_left:
-                interval_millis = time_left
-
-            if time_left <= 0:
-                raise WatchQueryIndexTimeoutException('Failed to find all indexes online within the alloted time.')
-
-            sleep(interval_millis / 1000)
+        req = self._impl.request_builder.build_watch_indexes_request(self._bucket_name,
+                                                                     index_names,
+                                                                     self._collection_ctx,
+                                                                     *options,
+                                                                     **kwargs)
+        self._impl.watch_indexes(req)

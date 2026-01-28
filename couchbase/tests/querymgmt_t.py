@@ -1042,7 +1042,6 @@ class QueryIndexManagementTestSuite:
                                       WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1735')
 class ClassicQueryIndexManagementCollectionTests(QueryIndexManagementCollectionTestSuite):
     @pytest.fixture(scope='class', autouse=True)
     def manifest_validated(self):
@@ -1062,7 +1061,6 @@ class ClassicQueryIndexManagementCollectionTests(QueryIndexManagementCollectionT
         cb_env.teardown(request.param)
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1735')
 class ClassicQueryIndexManagementTests(QueryIndexManagementTestSuite):
     @pytest.fixture(scope='class', autouse=True)
     def manifest_validated(self):
@@ -1082,7 +1080,6 @@ class ClassicQueryIndexManagementTests(QueryIndexManagementTestSuite):
         cb_env.teardown(request.param)
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1735')
 class ClassicCollectionQueryIndexManagementTests(CollectionQueryIndexManagementTestSuite):
     @pytest.fixture(scope='class', autouse=True)
     def manifest_validated(self):

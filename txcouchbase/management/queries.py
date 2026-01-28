@@ -22,8 +22,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
-from couchbase.management.logic.query_index_logic import QueryIndex, QueryIndexManagerLogic
-from couchbase.management.options import GetAllQueryIndexOptions
+from couchbase.management.logic.query_index_mgmt_req_types import QueryIndex
+from txcouchbase.management.logic.query_index_mgmt_impl import TxQueryIndexMgmtImpl
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -31,21 +31,16 @@ if TYPE_CHECKING:
                                               CreatePrimaryQueryIndexOptions,
                                               CreateQueryIndexOptions,
                                               DropPrimaryQueryIndexOptions,
-                                              DropQueryIndexOptions)
+                                              DropQueryIndexOptions,
+                                              GetAllQueryIndexOptions,
+                                              WatchQueryIndexOptions)
 
 
-class QueryIndexManager(QueryIndexManagerLogic):
+class QueryIndexManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
-        self._loop = client_adapter.loop
-
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
+        self._impl = TxQueryIndexMgmtImpl(client_adapter)
+        self._collection_ctx = None
 
     def create_index(self,
                      bucket_name,   # type: str
@@ -54,60 +49,57 @@ class QueryIndexManager(QueryIndexManagerLogic):
                      *options,      # type: CreateQueryIndexOptions
                      **kwargs
                      ) -> Deferred[None]:
-
-        if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when creating a secondary index.")
-        if not isinstance(index_name, str):
-            raise ValueError("index_name must be provided when creating a secondary index.")
-        if not isinstance(keys, (list, tuple)):
-            raise ValueError("keys must be provided when creating a secondary index.")
-
-        return Deferred.fromFuture(super().create_index(bucket_name, index_name, keys, *options, **kwargs))
+        req = self._impl.request_builder.build_create_index_request(bucket_name,
+                                                                    index_name,
+                                                                    keys,
+                                                                    self._collection_ctx,
+                                                                    *options,
+                                                                    **kwargs)
+        return self._impl.create_index_deferred(req)
 
     def create_primary_index(self,
                              bucket_name,   # type: str
                              *options,      # type: CreatePrimaryQueryIndexOptions
                              **kwargs
                              ) -> Deferred[None]:
-
-        if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when creating a primary index.")
-
-        return Deferred.fromFuture(super().create_primary_index(bucket_name, *options, **kwargs))
+        req = self._impl.request_builder.build_create_primary_index_request(bucket_name,
+                                                                            self._collection_ctx,
+                                                                            *options,
+                                                                            **kwargs)
+        return self._impl.create_primary_index_deferred(req)
 
     def drop_index(self,
                    bucket_name,     # type: str
                    index_name,      # type: str
                    *options,        # type: DropQueryIndexOptions
                    **kwargs) -> Deferred[None]:
-
-        if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when dropping a secondary index.")
-        if not isinstance(index_name, str):
-            raise ValueError("index_name must be provided when dropping a secondary index.")
-
-        return Deferred.fromFuture(super().drop_index(bucket_name, index_name, *options, **kwargs))
+        req = self._impl.request_builder.build_drop_index_request(bucket_name,
+                                                                  index_name,
+                                                                  self._collection_ctx,
+                                                                  *options,
+                                                                  **kwargs)
+        return self._impl.drop_index_deferred(req)
 
     def drop_primary_index(self,
                            bucket_name,     # type: str
                            *options,        # type: DropPrimaryQueryIndexOptions
                            **kwargs) -> Deferred[None]:
-
-        if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when dropping a primary index.")
-
-        return Deferred.fromFuture(super().drop_primary_index(bucket_name, *options, **kwargs))
+        req = self._impl.request_builder.build_drop_primary_index_request(bucket_name,
+                                                                          self._collection_ctx,
+                                                                          *options,
+                                                                          **kwargs)
+        return self._impl.drop_primary_index_deferred(req)
 
     def get_all_indexes(self,
                         bucket_name,    # type: str
                         *options,       # type: GetAllQueryIndexOptions
                         **kwargs        # type: Dict[str,Any]
                         ) -> Deferred[Iterable[QueryIndex]]:
-
-        if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when dropping a secondary index.")
-
-        return Deferred.fromFuture(super().get_all_indexes(bucket_name, *options, **kwargs))
+        req = self._impl.request_builder.build_get_all_indexes_request(bucket_name,
+                                                                       self._collection_ctx,
+                                                                       *options,
+                                                                       **kwargs)
+        return self._impl.get_all_indexes_deferred(req)
 
     def build_deferred_indexes(self,
                                bucket_name,     # type: str
@@ -123,74 +115,31 @@ class QueryIndexManager(QueryIndexManagerLogic):
         :raise: InvalidArgumentsException
 
         """
+        req = self._impl.request_builder.build_build_deferred_indexes_request(bucket_name,
+                                                                              self._collection_ctx,
+                                                                              *options,
+                                                                              **kwargs)
+        return self._impl.build_deferred_indexes_deferred(req)
 
-        if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when building deferred indexes.")
+    def watch_indexes(self,
+                      bucket_name,  # type: str
+                      index_names,  # type: Iterable[str]
+                      *options,     # type: WatchQueryIndexOptions
+                      **kwargs      # type: Dict[str,Any]
+                      ) -> Deferred[None]:
+        """
+        Watch polls indexes until they are online.
 
-        return Deferred.fromFuture(super().build_deferred_indexes(bucket_name, *options, **kwargs))
-
-    # def watch_indexes(self,   # noqa: C901
-    #                   bucket_name,  # type: str
-    #                   index_names,  # type: Iterable[str]
-    #                   *options,     # type: WatchQueryIndexOptions
-    #                   **kwargs      # type: Dict[str,Any]
-    #                   ) -> Deferred[None]:
-    #     """
-    #     Watch polls indexes until they are online.
-
-    #     :param str bucket_name: name of the bucket.
-    #     :param Iterable[str] index_names: name(s) of the index(es).
-    #     :param WatchQueryIndexOptions options: Options for request to watch indexes.
-    #     :param Any kwargs: Override corresponding valud in options.
-    #     :raises: QueryIndexNotFoundException
-    #     :raises: WatchQueryIndexTimeoutException
-    #     """
-    #     final_args = forward_args(kwargs, *options)
-
-    #     if final_args.get("watch_primary", False):
-    #         index_names.append("#primary")
-
-    #     timeout = final_args.get("timeout", None)
-    #     if not timeout:
-    #         raise ValueError(
-    #             'Must specify a timeout condition for watch indexes')
-
-    #     def check_indexes(index_names, indexes):
-    #         for idx_name in index_names:
-    #             match = next((i for i in indexes if i.name == idx_name), None)
-    #             if not match:
-    #                 raise QueryIndexNotFoundException(
-    #                     "Cannot find index with name: {}".format(idx_name))
-
-    #         return all(map(lambda i: i.state == "online", indexes))
-
-    #     # timeout is converted to microsecs via final_args()
-    #     timeout_millis = timeout / 1000
-
-    #     interval_millis = float(50)
-    #     start = perf_counter()
-    #     time_left = timeout_millis
-    #     while True:
-
-    #         opts = GetAllQueryIndexOptions(
-    #             timeout=timedelta(milliseconds=time_left))
-
-    #         indexes = self.get_all_indexes(bucket_name, opts)
-
-    #         all_online = check_indexes(index_names, indexes)
-    #         if all_online:
-    #             break
-
-    #         interval_millis += 500
-    #         if interval_millis > 1000:
-    #             interval_millis = 1000
-
-    #         time_left = timeout_millis - ((perf_counter() - start) * 1000)
-    #         if interval_millis > time_left:
-    #             interval_millis = time_left
-
-    #         if time_left <= 0:
-    #             raise WatchQueryIndexTimeoutException(
-    #                 "Failed to find all indexes online within the alloted time.")
-
-    #         sleep(interval_millis / 1000)
+        :param str bucket_name: name of the bucket.
+        :param Iterable[str] index_names: name(s) of the index(es).
+        :param WatchQueryIndexOptions options: Options for request to watch indexes.
+        :param Any kwargs: Override corresponding valud in options.
+        :raises: QueryIndexNotFoundException
+        :raises: WatchQueryIndexTimeoutException
+        """
+        req = self._impl.request_builder.build_watch_indexes_request(bucket_name,
+                                                                     index_names,
+                                                                     self._collection_ctx,
+                                                                     *options,
+                                                                     **kwargs)
+        return self._impl.watch_indexes_deferred(req)
