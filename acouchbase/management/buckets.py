@@ -21,12 +21,10 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     List)
 
-from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
-from couchbase.management.logic import ManagementType
-from couchbase.management.logic.buckets_logic import (BucketDescribeResult,
-                                                      BucketManagerLogic,
-                                                      BucketSettings,
-                                                      CreateBucketSettings)
+from acouchbase.management.logic.bucket_mgmt_impl import AsyncBucketMgmtImpl
+from couchbase.management.logic.bucket_mgmt_types import (BucketDescribeResult,
+                                                          BucketSettings,
+                                                          CreateBucketSettings)
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -39,25 +37,15 @@ if TYPE_CHECKING:
                                               UpdateBucketOptions)
 
 
-class BucketManager(BucketManagerLogic):
-
+class BucketManager:
     def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
-        self._loop = client_adapter.loop
+        self._impl = AsyncBucketMgmtImpl(client_adapter)
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
-    def create_bucket(self,
-                      settings,  # type: CreateBucketSettings
-                      *options,  # type: CreateBucketOptions
-                      **kwargs   # type: Any
-                      ) -> Awaitable[None]:
+    async def create_bucket(self,
+                            settings,  # type: CreateBucketSettings
+                            *options,  # type: CreateBucketOptions
+                            **kwargs   # type: Any
+                            ) -> None:
         """
         Creates a new bucket.
 
@@ -68,60 +56,53 @@ class BucketManager(BucketManagerLogic):
         :raises: BucketAlreadyExistsException
         :raises: InvalidArgumentsException
         """
-        super().create_bucket(settings, *options, **kwargs)
+        req = self._impl.request_builder.build_create_bucket_request(settings, *options, **kwargs)
+        await self._impl.create_bucket(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
-    def update_bucket(self,
-                      settings,  # type: BucketSettings
-                      *options,  # type: UpdateBucketOptions
-                      **kwargs  # type: Dict[str, Any]
-                      ) -> Awaitable[None]:
+    async def update_bucket(self,
+                            settings,  # type: BucketSettings
+                            *options,  # type: UpdateBucketOptions
+                            **kwargs  # type: Dict[str, Any]
+                            ) -> None:
+        req = self._impl.request_builder.build_update_bucket_request(settings, *options, **kwargs)
+        await self._impl.update_bucket(req)
 
-        super().update_bucket(settings, *options, **kwargs)
+    async def drop_bucket(self,
+                          bucket_name,  # type: str
+                          *options,     # type: DropBucketOptions
+                          **kwargs      # type: Dict[str, Any]
+                          ) -> None:
+        req = self._impl.request_builder.build_drop_bucket_request(bucket_name, *options, **kwargs)
+        await self._impl.drop_bucket(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
-    def drop_bucket(self,
-                    bucket_name,  # type: str
-                    *options,     # type: DropBucketOptions
-                    **kwargs      # type: Dict[str, Any]
-                    ) -> Awaitable[None]:
+    async def get_bucket(self,
+                         bucket_name,   # type: str
+                         *options,      # type: GetBucketOptions
+                         **kwargs       # type: Dict[str, Any]
+                         ) -> Awaitable[BucketSettings]:
+        req = self._impl.request_builder.build_get_bucket_request(bucket_name, *options, **kwargs)
+        return await self._impl.get_bucket(req)
 
-        super().drop_bucket(bucket_name, *options, **kwargs)
+    async def get_all_buckets(self,
+                              *options,  # type: GetAllBucketOptions
+                              **kwargs  # type: Dict[str, Any]
+                              ) -> Awaitable[List[BucketSettings]]:
+        req = self._impl.request_builder.build_get_all_buckets_request(*options, **kwargs)
+        return await self._impl.get_all_buckets(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
-    def get_bucket(self,
-                   bucket_name,   # type: str
-                   *options,      # type: GetBucketOptions
-                   **kwargs       # type: Dict[str, Any]
-                   ) -> Awaitable[BucketSettings]:
+    async def flush_bucket(self,
+                           bucket_name,   # type: str
+                           *options,      # type: FlushBucketOptions
+                           **kwargs       # type: Dict[str, Any]
+                           ) -> Awaitable[None]:
+        req = self._impl.request_builder.build_flush_bucket_request(bucket_name, *options, **kwargs)
+        await self._impl.flush_bucket(req)
 
-        super().get_bucket(bucket_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
-    def get_all_buckets(self,
-                        *options,  # type: GetAllBucketOptions
-                        **kwargs  # type: Dict[str, Any]
-                        ) -> Awaitable[List[BucketSettings]]:
-
-        super().get_all_buckets(*options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
-    def flush_bucket(self,
-                     bucket_name,   # type: str
-                     *options,      # type: FlushBucketOptions
-                     **kwargs       # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
-
-        super().flush_bucket(bucket_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(BucketDescribeResult,
-                                       ManagementType.BucketMgmt,
-                                       BucketManagerLogic._ERROR_MAPPING)
-    def bucket_describe(self,
-                        bucket_name,   # type: str
-                        *options,      # type: BucketDescribeOptions
-                        **kwargs       # type: Dict[str, Any]
-                        ) -> BucketDescribeResult:
+    async def bucket_describe(self,
+                              bucket_name,   # type: str
+                              *options,      # type: BucketDescribeOptions
+                              **kwargs       # type: Dict[str, Any]
+                              ) -> BucketDescribeResult:
         """Provides details on provided the bucket.
 
         Args:
@@ -137,4 +118,5 @@ class BucketManager(BucketManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        super().bucket_describe(bucket_name, *options, **kwargs)
+        req = self._impl.request_builder.build_bucket_describe_request(bucket_name, *options, **kwargs)
+        return await self._impl.bucket_describe(req)

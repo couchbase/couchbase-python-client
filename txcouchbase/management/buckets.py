@@ -22,11 +22,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
-from couchbase.management.logic import ManagementType
-from couchbase.management.logic.buckets_logic import (BucketManagerLogic,
-                                                      BucketSettings,
-                                                      CreateBucketSettings)
-from txcouchbase.management.logic.wrappers import TxMgmtWrapper
+from couchbase.management.logic.bucket_mgmt_types import BucketSettings, CreateBucketSettings
+from txcouchbase.management.logic.bucket_mgmt_impl import TxBucketMgmtImpl
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -38,20 +35,10 @@ if TYPE_CHECKING:
                                               UpdateBucketOptions)
 
 
-class BucketManager(BucketManagerLogic):
-
+class BucketManager:
     def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
-        self._loop = client_adapter.loop
+        self._impl = TxBucketMgmtImpl(client_adapter)
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
-
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def create_bucket(self,
                       settings,  # type: CreateBucketSettings
                       *options,  # type: CreateBucketOptions
@@ -74,9 +61,9 @@ class BucketManager(BucketManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
                 settings argument.
         """
-        super().create_bucket(settings, *options, **kwargs)
+        req = self._impl.request_builder.build_create_bucket_request(settings, *options, **kwargs)
+        return self._impl.create_bucket_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def update_bucket(self,
                       settings,  # type: BucketSettings
                       *options,  # type: UpdateBucketOptions
@@ -98,9 +85,9 @@ class BucketManager(BucketManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
                 settings argument.
         """
-        super().update_bucket(settings, *options, **kwargs)
+        req = self._impl.request_builder.build_update_bucket_request(settings, *options, **kwargs)
+        return self._impl.update_bucket_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def drop_bucket(self,
                     bucket_name,  # type: str
                     *options,     # type: DropBucketOptions
@@ -121,9 +108,9 @@ class BucketManager(BucketManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        super().drop_bucket(bucket_name, *options, **kwargs)
+        req = self._impl.request_builder.build_drop_bucket_request(bucket_name, *options, **kwargs)
+        return self._impl.drop_bucket_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_bucket(self,
                    bucket_name,   # type: str
                    *options,      # type: GetBucketOptions
@@ -144,9 +131,9 @@ class BucketManager(BucketManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        super().get_bucket(bucket_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_bucket_request(bucket_name, *options, **kwargs)
+        return self._impl.get_bucket_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_all_buckets(self,
                         *options,  # type: GetAllBucketOptions
                         **kwargs  # type: Dict[str, Any]
@@ -162,9 +149,9 @@ class BucketManager(BucketManagerLogic):
         Returns:
             Deferred[List[:class:`.BucketSettings`]]: A list of existing buckets in the cluster.
         """
-        super().get_all_buckets(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_buckets_request(*options, **kwargs)
+        return self._impl.get_all_buckets_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def flush_bucket(self,
                      bucket_name,   # type: str
                      *options,      # type: FlushBucketOptions
@@ -187,4 +174,5 @@ class BucketManager(BucketManagerLogic):
             :class:`~couchbase.exceptions.BucketNotFlushableException`: If the bucket's settings have
                 flushing disabled.
         """
-        super().flush_bucket(bucket_name, *options, **kwargs)
+        req = self._impl.request_builder.build_flush_bucket_request(bucket_name, *options, **kwargs)
+        return self._impl.flush_bucket_deferred(req)
