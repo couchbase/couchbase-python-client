@@ -574,7 +574,6 @@ class CollectionManagementTestSuite:
             cb_env.test_bucket_cm.drop_collection(collection)
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1734')
 class ClassicCollectionManagementTests(CollectionManagementTestSuite):
 
     @pytest.fixture(scope='class', autouse=True)

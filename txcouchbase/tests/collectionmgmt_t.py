@@ -35,7 +35,6 @@ from tests.environments.test_environment import EnvironmentFeatures
 from ._test_utils import TestEnvironment, run_in_reactor_thread
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1734')
 class CollectionManagementTests:
 
     TEST_BUCKET = "test-bucket"
@@ -355,7 +354,7 @@ class CollectionManagementTests:
 
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     def test_create_collection_history_retention(self, cb_env):
-        bucket_name = 'test-magma-bucket'
+        bucket_name = f'test-bucket-{str(uuid4())[:6]}'
         scope_name = '_default'
         collection_name = self.TEST_COLLECTION
 
@@ -385,27 +384,39 @@ class CollectionManagementTests:
 
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     def test_create_collection_history_retention_unsupported(self, cb_env):
+        bucket_name = f'test-bucket-{str(uuid4())[:6]}'
         scope_name = '_default'
         collection_name = self.TEST_COLLECTION
 
+        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.COUCHSTORE)
+        bucket = cb_env.cluster.bucket(bucket_name)
+        cb_env.try_n_times(10, 1, bucket.on_connect)
+        cm = bucket.collections()
+
         # Couchstore does not support history retention
         with pytest.raises(FeatureUnavailableException):
-            run_in_reactor_thread(cb_env.test_bucket_cm.create_collection,
+            run_in_reactor_thread(cm.create_collection,
                                   scope_name,
                                   collection_name,
                                   CreateCollectionSettings(history=True))
 
         with pytest.raises(FeatureUnavailableException):
-            run_in_reactor_thread(cb_env.test_bucket_cm.create_collection,
+            run_in_reactor_thread(cm.create_collection,
                                   scope_name,
                                   collection_name,
                                   CreateCollectionSettings(history=False))
+
+        cb_env.try_n_times_till_exception(10,
+                                          3,
+                                          cb_env.bm.drop_bucket,
+                                          bucket_name,
+                                          expected_exceptions=(BucketDoesNotExistException,))
 
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('check_update_collection_supported')
     @pytest.mark.usefixtures("cleanup_collection")
     def test_update_collection_history_retention(self, cb_env):
-        bucket_name = 'test-magma-bucket'
+        bucket_name = f'test-bucket-{str(uuid4())[:6]}'
         scope_name = '_default'
         collection_name = self.TEST_COLLECTION
 
@@ -445,25 +456,37 @@ class CollectionManagementTests:
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('check_update_collection_supported')
     def test_update_collection_history_retention_unsupported(self, cb_env):
+        bucket_name = f'test-bucket-{str(uuid4())[:6]}'
         scope_name = '_default'
         collection_name = self.TEST_COLLECTION
 
-        run_in_reactor_thread(cb_env.test_bucket_cm.create_collection, scope_name, collection_name)
-        collection_spec = cb_env.get_collection(scope_name, collection_name)
+        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.COUCHSTORE)
+        bucket = cb_env.cluster.bucket(bucket_name)
+        cb_env.try_n_times(10, 1, bucket.on_connect)
+        cm = bucket.collections()
+
+        run_in_reactor_thread(cm.create_collection, scope_name, collection_name)
+        collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name, cm)
         assert collection_spec is not None
         assert collection_spec.history is False
 
         # Couchstore does not support history retention
         with pytest.raises(FeatureUnavailableException):
-            run_in_reactor_thread(cb_env.test_bucket_cm.update_collection,
+            run_in_reactor_thread(cm.update_collection,
                                   scope_name,
                                   collection_name,
                                   UpdateCollectionSettings(history=True))
 
         # Collection history retention setting remains unchanged
-        collection_spec = cb_env.get_collection(scope_name, collection_name)
+        collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name, cm)
         assert collection_spec is not None
         assert collection_spec.history is False
+
+        cb_env.try_n_times_till_exception(10,
+                                          3,
+                                          cb_env.bm.drop_bucket,
+                                          bucket_name,
+                                          expected_exceptions=(BucketDoesNotExistException,))
 
     @pytest.mark.usefixtures("cleanup_collection")
     @pytest.mark.usefixtures('check_update_collection_supported')

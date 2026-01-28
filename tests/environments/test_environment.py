@@ -360,7 +360,6 @@ class TestEnvironment:
         self._use_named_collections = True
 
     def enable_collection_mgmt(self) -> TestEnvironment:
-        pytest.skip(reason='Skip until PYCBC-1734')
         EnvironmentFeatures.check_if_feature_supported('collections',
                                                        self.server_version_short,
                                                        self.mock_server_type)

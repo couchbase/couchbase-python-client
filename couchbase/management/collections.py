@@ -15,21 +15,23 @@
 
 from __future__ import annotations
 
-from inspect import Parameter, Signature
+import sys
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Iterable,
-                    Optional)
+                    Optional,
+                    overload)
 
-from couchbase._utils import OverloadType
-from couchbase.logic.supportability import Supportability
-from couchbase.management.logic.collections_logic import (CollectionManagerLogic,
-                                                          CollectionSpec,
-                                                          CreateCollectionSettings,
-                                                          ScopeSpec,
-                                                          UpdateCollectionSettings)
-from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
+if sys.version_info >= (3, 13):
+    from warnings import deprecated
+else:
+    from typing_extensions import deprecated
+
+from couchbase.management.logic.collection_mgmt_impl import CollectionMgmtImpl
+from couchbase.management.logic.collection_mgmt_req_types import (CollectionSpec,
+                                                                  CreateCollectionSettings,
+                                                                  ScopeSpec,
+                                                                  UpdateCollectionSettings)
 
 # @TODO:  lets deprecate import of options from couchbase.management.collections
 from couchbase.management.options import (CreateCollectionOptions,
@@ -43,16 +45,16 @@ if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
 
 
-class CollectionManager(CollectionManagerLogic):
+class CollectionManager:
 
     def __init__(self, client_adapter: ClientAdapter, bucket_name: str) -> None:
-        super().__init__(client_adapter.connection, bucket_name)
+        self._bucket_name = bucket_name
+        self._impl = CollectionMgmtImpl(client_adapter)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def create_scope(self,
                      scope_name: str,
                      *options: CreateScopeOptions,
-                     **kwargs: Dict[str, Any]
+                     **kwargs: Any
                      ) -> None:
         """Creates a new scope.
 
@@ -64,13 +66,16 @@ class CollectionManager(CollectionManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.ScopeAlreadyExistsException`: If the scope already exists.
         """  # noqa: E501
-        return super().create_scope(scope_name, *options, **kwargs)
+        req = self._impl.request_builder.build_create_scope_request(self._bucket_name,
+                                                                    scope_name,
+                                                                    *options,
+                                                                    **kwargs)
+        self._impl.create_scope(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def drop_scope(self,
                    scope_name: str,
                    *options: DropScopeOptions,
-                   **kwargs: Dict[str, Any]
+                   **kwargs: Any
                    ) -> None:
         """Drops an existing scope.
 
@@ -82,13 +87,15 @@ class CollectionManager(CollectionManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
         """  # noqa: E501
-        return super().drop_scope(scope_name, *options, **kwargs)
+        req = self._impl.request_builder.build_drop_scope_request(self._bucket_name,
+                                                                  scope_name,
+                                                                  *options,
+                                                                  **kwargs)
+        self._impl.drop_scope(req)
 
-    @BlockingMgmtWrapper.block((ScopeSpec, CollectionSpec), ManagementType.CollectionMgmt,
-                               CollectionManagerLogic._ERROR_MAPPING)
     def get_all_scopes(self,
                        *options: GetAllScopesOptions,
-                       **kwargs: Dict[str, Any]
+                       **kwargs: Any
                        ) -> Iterable[ScopeSpec]:
         """Returns all configured scopes along with their collections.
 
@@ -100,72 +107,36 @@ class CollectionManager(CollectionManagerLogic):
         Returns:
             Iterable[:class:`.ScopeSpec`]: A list of all configured scopes.
         """  # noqa: E501
-        return super().get_all_scopes(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_scopes_request(self._bucket_name,
+                                                                      *options,
+                                                                      **kwargs)
+        return self._impl.get_all_scopes(req)
 
-    @BlockingMgmtWrapper.block(None,
-                               ManagementType.CollectionMgmt,
-                               CollectionManagerLogic._ERROR_MAPPING,
-                               OverloadType.SECONDARY)
+    @overload
+    @deprecated("Use ``create_collection(scope_name, collection_name, settings=None, *options, **kwargs)`` instead.")
     def create_collection(self,
                           collection: CollectionSpec,
                           *options: CreateCollectionOptions,
-                          **kwargs: Dict[str, Any]
+                          **kwargs: Any
                           ) -> None:
-        """
-        .. deprecated:: 4.1.9
-            Use ``create_collection(scope_name, collection_name, settings=None, *options, **kwargs)`` instead.
+        ...
 
-        Creates a new collection in a specified scope.
-
-        Args:
-            collection (:class:`.CollectionSpec`): The collection details.
-            options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
-
-        Raises:
-            :class:`~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
-            :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
-        """  # noqa: E501
-        Supportability.method_signature_deprecated(
-            'create_collection',
-            Signature(
-                parameters=[
-                    Parameter('collection', Parameter.POSITIONAL_OR_KEYWORD, annotation=CollectionSpec),
-                    Parameter('options', Parameter.VAR_POSITIONAL, annotation=CreateCollectionOptions),
-                    Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
-                ],
-                return_annotation=None
-            ),
-            Signature(
-                parameters=[
-                    Parameter('scope_name', Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
-                    Parameter('collection_name', Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
-                    Parameter('settings', Parameter.POSITIONAL_OR_KEYWORD,
-                              annotation=Optional[CreateCollectionSettings]),
-                    Parameter('options', Parameter.VAR_POSITIONAL, annotation=CreateCollectionOptions),
-                    Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
-                ],
-                return_annotation=None
-            )
-        )
-        settings = None
-        if collection.max_expiry is not None:
-            settings = CreateCollectionSettings(max_expiry=collection.max_expiry)
-
-        return super().create_collection(collection.scope_name, collection.name, settings, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None,
-                               ManagementType.CollectionMgmt,
-                               CollectionManagerLogic._ERROR_MAPPING,
-                               OverloadType.DEFAULT)
-    def create_collection(self,  # noqa: F811
+    @overload
+    def create_collection(self,
                           scope_name: str,
                           collection_name: str,
                           settings: Optional[CreateCollectionSettings] = None,
                           *options: CreateCollectionOptions,
-                          **kwargs: Dict[str, Any]
+                          **kwargs: Any
                           ) -> None:
+        ...
+
+    def create_collection(self, *args: object, **kwargs: object) -> None:
         """Creates a new collection in a specified scope.
+
+        .. note::
+            The overloaded create_collection method that takes a CollectionSpec is deprecated as of v4.1.9
+            and will be removed in a future version.
 
         Args:
             scope_name (str): The name of the scope the collection will be created in.
@@ -178,63 +149,32 @@ class CollectionManager(CollectionManagerLogic):
             :class:`~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
         """  # noqa: E501
-        return super().create_collection(scope_name, collection_name, settings, *options, **kwargs)
+        req = self._impl.request_builder.build_create_collection_request(self._bucket_name, *args, **kwargs)
+        self._impl.create_collection(req)
 
-    @BlockingMgmtWrapper.block(None,
-                               ManagementType.CollectionMgmt,
-                               CollectionManagerLogic._ERROR_MAPPING,
-                               OverloadType.SECONDARY)
+    @overload
+    @deprecated("Use ``drop_collection(scope_name, collection_name, *options, **kwargs)`` instead.")
     def drop_collection(self,
                         collection: CollectionSpec,
                         *options: DropCollectionOptions,
-                        **kwargs: Dict[str, Any]
+                        **kwargs: Any
                         ) -> None:
-        """
-        .. deprecated:: 4.1.9
-            Use ``drop_collection(scope_name, collection_name, *options, **kwargs)`` instead.
+        ...
 
-        Drops a collection from the specified scope.
-
-        Args:
-            collection (:class:`.CollectionSpec`): The collection details.
-            options (:class:`~couchbase.management.options.DropCollectionOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
-
-        Raises:
-            :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
-        """  # noqa: E501
-        Supportability.method_signature_deprecated(
-            'drop_collection',
-            Signature(
-                parameters=[
-                    Parameter('collection', Parameter.POSITIONAL_OR_KEYWORD, annotation=CollectionSpec),
-                    Parameter('options', Parameter.VAR_POSITIONAL, annotation=DropCollectionOptions),
-                    Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
-                ],
-                return_annotation=None,
-            ),
-            Signature(
-                parameters=[
-                    Parameter('scope_name', Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
-                    Parameter('collection_name', Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
-                    Parameter('options', Parameter.VAR_POSITIONAL, annotation=DropCollectionOptions),
-                    Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
-                ],
-                return_annotation=None
-            )
-        )
-        return super().drop_collection(collection.scope_name, collection.name, *options, **kwargs)
-
-    @BlockingMgmtWrapper.block(None,
-                               ManagementType.CollectionMgmt,
-                               CollectionManagerLogic._ERROR_MAPPING,
-                               OverloadType.DEFAULT)
-    def drop_collection(self,  # noqa: F811
+    @overload
+    def drop_collection(self,
                         scope_name: str,
                         collection_name: str,
                         *options: DropCollectionOptions,
-                        **kwargs: Dict[str, Any]) -> None:
+                        **kwargs: Any) -> None:
+        ...
+
+    def drop_collection(self, *args: object, **kwargs: object) -> None:
         """Drops a collection from the specified scope.
+
+        .. note::
+            The overloaded drop_collection method that takes a CollectionSpec is deprecated as of v4.1.9
+            and will be removed in a future version.
 
         Args:
             scope_name (str): The name of the scope the collection is in.
@@ -245,15 +185,15 @@ class CollectionManager(CollectionManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
         """  # noqa: E501
-        return super().drop_collection(scope_name, collection_name, *options, **kwargs)
+        req = self._impl.request_builder.build_drop_collection_request(self._bucket_name, *args, **kwargs)
+        self._impl.drop_collection(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def update_collection(self,
                           scope_name: str,
                           collection_name: str,
                           settings: UpdateCollectionSettings,
                           *options: UpdateCollectionOptions,
-                          **kwargs: Dict[str, Any]
+                          **kwargs: Any
                           ) -> None:
         """Updates a collection in a specified scope.
 
@@ -268,4 +208,10 @@ class CollectionManager(CollectionManagerLogic):
             :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
         """  # noqa: E501
-        return super().update_collection(scope_name, collection_name, settings, *options, **kwargs)
+        req = self._impl.request_builder.build_update_collection_request(self._bucket_name,
+                                                                         scope_name,
+                                                                         collection_name,
+                                                                         settings,
+                                                                         *options,
+                                                                         **kwargs)
+        self._impl.update_collection(req)
