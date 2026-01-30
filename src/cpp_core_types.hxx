@@ -159,6 +159,7 @@ struct py_to_cbpp_t<couchbase::core::cluster_credentials> {
     extract_field(pyObj, "cert_path", creds.certificate_path);
     extract_field(pyObj, "key_path", creds.key_path);
     extract_field(pyObj, "allowed_sasl_mechanisms", creds.allowed_sasl_mechanisms);
+    extract_field(pyObj, "jwt_token", creds.jwt_token);
 
     return creds;
   }
@@ -174,6 +175,7 @@ struct py_to_cbpp_t<couchbase::core::cluster_credentials> {
     add_string_field_if_not_empty(dict, "password", creds.password);
     add_string_field_if_not_empty(dict, "cert_path", creds.certificate_path);
     add_string_field_if_not_empty(dict, "key_path", creds.key_path);
+    add_string_field_if_not_empty(dict, "jwt_token", creds.jwt_token);
 
     if (creds.allowed_sasl_mechanisms.has_value() &&
         !creds.allowed_sasl_mechanisms.value().empty()) {

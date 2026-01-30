@@ -21,7 +21,9 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Union)
 
-from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
+from couchbase.auth import (CertificateAuthenticator,
+                            JwtAuthenticator,
+                            PasswordAuthenticator)
 from couchbase.bucket import Bucket
 from couchbase.logic.cluster_impl import ClusterImpl
 from couchbase.logic.supportability import Supportability
@@ -191,13 +193,29 @@ class Cluster:
         req = self._impl.request_builder.build_diagnostics_request(*opts, **kwargs)
         return self._impl.diagnostics(req)
 
-    def update_credentials(self, authenticator: Union[CertificateAuthenticator, PasswordAuthenticator]) -> None:
-        """Update the credentials used by this Cluster.
+    def set_authenticator(
+            self, authenticator: Union[CertificateAuthenticator, JwtAuthenticator, PasswordAuthenticator]
+    ) -> None:
+        """Replace the authenticator used by this Cluster.
+
+        Allows updating credentials without restarting the application.
+        The effect on existing connections depends on the authenticator type:
+
+        - JwtAuthenticator: Live re-auth on existing KV connections via OAUTHBEARER SASL.
+          HTTP requests use the new Bearer token immediately.
+        - PasswordAuthenticator: No effect on existing KV connections (they keep old
+          credentials). New HTTP requests use the new Basic auth header.
+        - CertificateAuthenticator: No effect on existing connections (TLS handshake
+          already completed). Only new connections use the new certificate.
 
         Args:
-            authenticator (Union[CertificateAuthenticator, PasswordAuthenticator]): New authenticator.
+            authenticator: New authenticator to use. Must be the same type as the
+                current authenticator.
+
+        Raises:
+            RuntimeError: If cluster is not connected.
         """
-        req = self._impl.request_builder.build_udpate_credential_request(authenticator)
+        req = self._impl.request_builder.build_update_credential_request(authenticator)
         self._impl.update_credentials(req)
 
     def wait_until_ready(self,

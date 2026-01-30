@@ -37,7 +37,9 @@ from couchbase.search import (SearchQuery,
                               SearchRequest)
 
 if TYPE_CHECKING:
-    from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
+    from couchbase.auth import (CertificateAuthenticator,
+                                JwtAuthenticator,
+                                PasswordAuthenticator)
 
 
 class ClusterRequestBuilder:
@@ -113,8 +115,9 @@ class ClusterRequestBuilder:
             req.num_workers = num_workers
         return req
 
-    def build_udpate_credential_request(
-            self, authenticator: Union[CertificateAuthenticator, PasswordAuthenticator]) -> UpdateCredentialsRequest:
+    def build_update_credential_request(
+            self, authenticator: Union[CertificateAuthenticator, JwtAuthenticator, PasswordAuthenticator]
+    ) -> UpdateCredentialsRequest:
         return UpdateCredentialsRequest(authenticator.as_dict())
 
     def build_wait_until_ready_request(self,

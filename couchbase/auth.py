@@ -100,6 +100,40 @@ class PasswordAuthenticator(Authenticator):
         return auth
 
 
+class JwtAuthenticator(Authenticator):
+    """
+    JWT (JSON Web Token) authentication mechanism.
+
+    Uses OAUTHBEARER SASL mechanism for KV connections and Bearer token
+    for HTTP services.
+
+    Args:
+        token (str): The JWT token to use for authentication.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If token is not a string.
+    """
+
+    def __init__(self, token  # type: str
+                 ):
+        """JwtAuthenticator instance."""
+        if not isinstance(token, str):
+            msg = 'The token must be a str.'
+            raise InvalidArgumentException(msg)
+
+        self._token = token
+
+        super().__init__(**self.as_dict())
+
+    def valid_keys(self):
+        return ['jwt_token']
+
+    def as_dict(self):
+        return {
+            'jwt_token': self._token
+        }
+
+
 class CertificateAuthenticator(Authenticator):
     """
     Certificate authentication mechanism.
