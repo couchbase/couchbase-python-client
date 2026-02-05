@@ -17,22 +17,15 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
                     Dict,
                     Iterable,
                     Optional)
 
-from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.management.logic import ManagementType
-from couchbase.management.logic.analytics_logic import (AnalyticsDataset,
-                                                        AnalyticsDataType,
-                                                        AnalyticsIndex,
-                                                        AnalyticsLink,
-                                                        AnalyticsManagerLogic,
-                                                        AzureBlobExternalAnalyticsLink,
-                                                        CouchbaseRemoteAnalyticsLink,
-                                                        S3ExternalAnalyticsLink)
+from acouchbase.management.logic.analytics_mgmt_impl import AsyncAnalyticsMgmtImpl
+from couchbase.management.logic.analytics_mgmt_types import (AnalyticsDataset,
+                                                             AnalyticsDataType,
+                                                             AnalyticsIndex,
+                                                             AnalyticsLink)
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -53,193 +46,133 @@ if TYPE_CHECKING:
                                               ReplaceLinkAnalyticsOptions)
 
 
-class AnalyticsIndexManager(AnalyticsManagerLogic):
+class AnalyticsIndexManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
-        self._loop = client_adapter.loop
+        self._impl = AsyncAnalyticsMgmtImpl(client_adapter)
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
+    async def create_dataverse(self,
+                               dataverse_name,    # type: str
+                               options=None,      # type: Optional[CreateDataverseOptions]
+                               **kwargs           # type: Any
+                               ) -> None:
+        req = self._impl.request_builder.build_create_dataverse_request(dataverse_name, options, **kwargs)
+        await self._impl.create_dataverse(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def create_dataverse(self,
-                         dataverse_name,    # type: str
-                         options=None,      # type: Optional[CreateDataverseOptions]
-                         **kwargs           # type: Dict[str, Any]
-                         ) -> Awaitable[None]:
+    async def drop_dataverse(self,
+                             dataverse_name,    # type: str
+                             options=None,      # type: Optional[DropDataverseOptions]
+                             **kwargs           # type: Any
+                             ) -> None:
+        req = self._impl.request_builder.build_drop_dataverse_request(dataverse_name, options, **kwargs)
+        await self._impl.drop_dataverse(req)
 
-        if not isinstance(dataverse_name, str):
-            raise InvalidArgumentException("dataverse_name must be provided when creating an analytics dataverse.")
+    async def create_dataset(self,
+                             dataset_name,    # type: str
+                             bucket_name,     # type: str
+                             options=None,    # type: Optional[CreateDatasetOptions]
+                             **kwargs         # type: Any
+                             ) -> None:
+        req = self._impl.request_builder.build_create_dataset_request(dataset_name, bucket_name, options, **kwargs)
+        await self._impl.create_dataset(req)
 
-        super().create_dataverse(dataverse_name, options, **kwargs)
+    async def drop_dataset(self,
+                           dataset_name,  # type: str
+                           options=None,  # type: Optional[DropDatasetOptions]
+                           **kwargs       # type: Any
+                           ) -> None:
+        req = self._impl.request_builder.build_drop_dataset_request(dataset_name, options, **kwargs)
+        await self._impl.drop_dataset(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def drop_dataverse(self,
-                       dataverse_name,    # type: str
-                       options=None,      # type: Optional[DropDataverseOptions]
-                       **kwargs           # type: Dict[str, Any]
-                       ) -> Awaitable[None]:
+    async def get_all_datasets(self,
+                               options=None,   # type: Optional[GetAllDatasetOptions]
+                               **kwargs   # type: Any
+                               ) -> Iterable[AnalyticsDataset]:
+        req = self._impl.request_builder.build_get_all_datasets_request(options, **kwargs)
+        return await self._impl.get_all_datasets(req)
 
-        if not isinstance(dataverse_name, str):
-            raise InvalidArgumentException("dataverse_name must be provided when dropping an analytics dataverse.")
+    async def create_index(self,
+                           index_name,    # type: str
+                           dataset_name,  # type: str
+                           fields,        # type: Dict[str, AnalyticsDataType]
+                           options=None,  # type: Optional[CreateAnalyticsIndexOptions]
+                           **kwargs       # type: Any
+                           ) -> None:
+        req = self._impl.request_builder.build_create_index_request(index_name,
+                                                                    dataset_name,
+                                                                    fields,
+                                                                    options,
+                                                                    **kwargs)
+        await self._impl.create_index(req)
 
-        super().drop_dataverse(dataverse_name, options, **kwargs)
+    async def drop_index(self,
+                         index_name,    # type: str
+                         dataset_name,  # type: str
+                         options=None,  # type: Optional[DropAnalyticsIndexOptions]
+                         **kwargs       # type: Any
+                         ) -> None:
+        req = self._impl.request_builder.build_drop_index_request(index_name,
+                                                                  dataset_name,
+                                                                  options,
+                                                                  **kwargs)
+        await self._impl.drop_index(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def create_dataset(self,
-                       dataset_name,    # type: str
-                       bucket_name,     # type: str
-                       options=None,    # type: Optional[CreateDatasetOptions]
-                       **kwargs         # type: Dict[str, Any]
-                       ) -> Awaitable[None]:
+    async def get_all_indexes(self,
+                              options=None,   # type: Optional[GetAllAnalyticsIndexesOptions]
+                              **kwargs   # type: Any
+                              ) -> Iterable[AnalyticsIndex]:
+        req = self._impl.request_builder.build_get_all_indexes_request(options, **kwargs)
+        return await self._impl.get_all_indexes(req)
 
-        if not isinstance(dataset_name, str):
-            raise InvalidArgumentException("dataset_name must be provided when creating an analytics dataset.")
+    async def connect_link(self,
+                           options=None,  # type: Optional[ConnectLinkOptions]
+                           **kwargs   # type: Any
+                           ) -> None:
+        req = self._impl.request_builder.build_connect_link_request(options, **kwargs)
+        await self._impl.connect_link(req)
 
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException("bucket_name must be provided when creating an analytics dataset.")
+    async def disconnect_link(self,
+                              options=None,  # type: Optional[DisconnectLinkOptions]
+                              **kwargs   # type: Any
+                              ) -> None:
+        req = self._impl.request_builder.build_disconnect_link_request(options, **kwargs)
+        await self._impl.disconnect_link(req)
 
-        super().create_dataset(dataset_name, bucket_name, options, **kwargs)
+    async def get_pending_mutations(self,
+                                    options=None,     # type: Optional[GetPendingMutationsOptions]
+                                    **kwargs     # type: Any
+                                    ) -> Dict[str, int]:
+        req = self._impl.request_builder.build_get_pending_mutations_request(options, **kwargs)
+        return await self._impl.get_pending_mutations(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def drop_dataset(self,
-                     dataset_name,  # type: str
-                     options=None,  # type: Optional[DropDatasetOptions]
-                     **kwargs       # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
+    async def create_link(self,
+                          link,  # type: AnalyticsLink
+                          options=None,     # type: Optional[CreateLinkAnalyticsOptions]
+                          **kwargs          # type: Any
+                          ) -> None:
+        req = self._impl.request_builder.build_create_link_request(link, options, **kwargs)
+        await self._impl.create_link(req)
 
-        if not isinstance(dataset_name, str):
-            raise InvalidArgumentException("dataset_name must be provided when dropping an analytics dataset.")
+    async def replace_link(self,
+                           link,  # type: AnalyticsLink
+                           options=None,     # type: Optional[ReplaceLinkAnalyticsOptions]
+                           **kwargs          # type: Any
+                           ) -> None:
+        req = self._impl.request_builder.build_replace_link_request(link, options, **kwargs)
+        await self._impl.replace_link(req)
 
-        super().drop_dataset(dataset_name, options, **kwargs)
+    async def drop_link(self,
+                        link_name,  # type: str
+                        dataverse_name,  # type: str
+                        options=None,     # type: Optional[DropLinkAnalyticsOptions]
+                        **kwargs          # type: Any
+                        ) -> None:
+        req = self._impl.request_builder.build_drop_link_request(link_name, dataverse_name, options, **kwargs)
+        await self._impl.drop_link(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(AnalyticsDataset, ManagementType.AnalyticsIndexMgmt,
-                                       AnalyticsManagerLogic._ERROR_MAPPING)
-    def get_all_datasets(self,
-                         options=None,   # type: Optional[GetAllDatasetOptions]
-                         **kwargs   # type: Dict[str, Any]
-                         ) -> Awaitable[Iterable[AnalyticsDataset]]:
-
-        super().get_all_datasets(options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def create_index(self,
-                     index_name,    # type: str
-                     dataset_name,  # type: str
-                     fields,        # type: Dict[str, AnalyticsDataType]
-                     options=None,  # type: Optional[CreateAnalyticsIndexOptions]
-                     **kwargs       # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
-
-        if not isinstance(index_name, str):
-            raise InvalidArgumentException("index_name must be provided when creating an analytics index.")
-
-        if not isinstance(dataset_name, str):
-            raise InvalidArgumentException("dataset_name must be provided when creating an analytics index.")
-
-        if fields is not None:
-            if not isinstance(fields, dict):
-                raise InvalidArgumentException("fields must be provided when creating an analytics index.")
-
-            if not all(map(lambda v: isinstance(v, AnalyticsDataType), fields.values())):
-                raise InvalidArgumentException("fields must all be an AnalyticsDataType.")
-
-        super().create_index(index_name, dataset_name, fields, options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def drop_index(self,
-                   index_name,    # type: str
-                   dataset_name,  # type: str
-                   options=None,  # type: Optional[DropAnalyticsIndexOptions]
-                   **kwargs       # type: Dict[str, Any]
-                   ) -> Awaitable[None]:
-
-        if not isinstance(index_name, str):
-            raise InvalidArgumentException("index_name must be provided when dropping an analytics index.")
-
-        if not isinstance(dataset_name, str):
-            raise InvalidArgumentException("dataset_name must be provided when dropping an analytics index.")
-
-        super().drop_index(index_name, dataset_name, options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(AnalyticsIndex, ManagementType.AnalyticsIndexMgmt,
-                                       AnalyticsManagerLogic._ERROR_MAPPING)
-    def get_all_indexes(self,
-                        options=None,   # type: Optional[GetAllAnalyticsIndexesOptions]
-                        **kwargs   # type: Dict[str, Any]
-                        ) -> Awaitable[Iterable[AnalyticsIndex]]:
-
-        super().get_all_indexes(options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def connect_link(self,
-                     options=None,  # type: Optional[ConnectLinkOptions]
-                     **kwargs   # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
-        super().connect_link(options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def disconnect_link(self,
-                        options=None,  # type: Optional[DisconnectLinkOptions]
-                        **kwargs   # type: Dict[str, Any]
-                        ) -> Awaitable[None]:
-        super().disconnect_link(options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def get_pending_mutations(self,
-                              options=None,     # type: Optional[GetPendingMutationsOptions]
-                              **kwargs     # type: Dict[str, Any]
-                              ) -> Dict[str, int]:
-
-        super().get_pending_mutations(options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def create_link(
-        self,
-        link,  # type: AnalyticsLink
-        options=None,     # type: Optional[CreateLinkAnalyticsOptions]
-        **kwargs
-    ) -> Awaitable[None]:
-        super().create_link(link, options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def replace_link(
-        self,
-        link,  # type: AnalyticsLink
-        options=None,     # type: Optional[ReplaceLinkAnalyticsOptions]
-        **kwargs
-    ) -> Awaitable[None]:
-        super().replace_link(link, options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def drop_link(
-        self,
-        link_name,  # type: str
-        dataverse_name,  # type: str
-        options=None,     # type: Optional[DropLinkAnalyticsOptions]
-        **kwargs
-    ) -> Awaitable[None]:
-
-        if not isinstance(link_name, str):
-            raise InvalidArgumentException("link_name must be provided when dropping an analytics link.")
-
-        if not isinstance(dataverse_name, str):
-            raise InvalidArgumentException("dataverse_name must be provided when dropping an analytics link.")
-
-        super().drop_link(link_name, dataverse_name, options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks((CouchbaseRemoteAnalyticsLink,
-                                        S3ExternalAnalyticsLink,
-                                        AzureBlobExternalAnalyticsLink),
-                                       ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
-    def get_links(
-        self,
-        options=None,  # type: Optional[GetLinksAnalyticsOptions]
-        **kwargs
-    ) -> Awaitable[Iterable[AnalyticsLink]]:
-        super().get_links(options, **kwargs)
+    async def get_links(self,
+                        options=None,  # type: Optional[GetLinksAnalyticsOptions]
+                        **kwargs       # type: Any
+                        ) -> Iterable[AnalyticsLink]:
+        req = self._impl.request_builder.build_get_links_request(options, **kwargs)
+        return await self._impl.get_links(req)

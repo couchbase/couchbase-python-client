@@ -141,7 +141,6 @@ class AnalyticsParamTestSuite:
         assert a_status == expected
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1736')
 class ClassicAnalyticsParamTests(AnalyticsParamTestSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):

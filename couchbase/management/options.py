@@ -17,7 +17,7 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     overload)
 
-from couchbase.management.logic.analytics_logic import AnalyticsLinkType
+from couchbase.management.logic.analytics_mgmt_types import AnalyticsLinkType
 
 if TYPE_CHECKING:
     from datetime import timedelta
