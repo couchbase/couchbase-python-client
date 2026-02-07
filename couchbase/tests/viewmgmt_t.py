@@ -148,7 +148,6 @@ class ViewIndexManagementTestSuite:
         cb_env.vixm.upsert_design_document(cb_env.test_ddoc, DesignDocumentNamespace.DEVELOPMENT)
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1740')
 class ClassicViewIndexManagementTests(ViewIndexManagementTestSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):

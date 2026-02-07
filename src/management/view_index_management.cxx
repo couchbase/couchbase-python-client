@@ -388,7 +388,7 @@ get_view_index_upsert_req(PyObject* op_args)
   auto req =
     get_view_mgmt_req_base<couchbase::core::operations::management::view_index_upsert_request>(
       op_args);
-  PyObject* pyObj_design_doc = PyDict_GetItemString(op_args, "design_docucment");
+  PyObject* pyObj_design_doc = PyDict_GetItemString(op_args, "design_document");
   if (pyObj_design_doc != nullptr) {
     auto design_doc = get_design_doc(pyObj_design_doc);
     req.document = design_doc;

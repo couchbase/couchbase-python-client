@@ -1,0 +1,92 @@
+#  Copyright 2016-2023. Couchbase, Inc.
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License")
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+from __future__ import annotations
+
+from asyncio import AbstractEventLoop
+from typing import TYPE_CHECKING, Iterable
+
+from couchbase.management.logic.view_index_mgmt_req_builder import ViewIndexMgmtRequestBuilder
+from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
+
+if TYPE_CHECKING:
+    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from couchbase.management.logic.view_index_mgmt_types import (DropDesignDocumentRequest,
+                                                                  GetAllDesignDocumentsRequest,
+                                                                  GetDesignDocumentRequest,
+                                                                  UpsertDesignDocumentRequest)
+
+
+class AsyncViewIndexMgmtImpl:
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+        self._client_adapter = client_adapter
+        self._request_builder = ViewIndexMgmtRequestBuilder()
+
+    @property
+    def loop(self) -> AbstractEventLoop:
+        """**INTERNAL**"""
+        return self._client_adapter.loop
+
+    @property
+    def request_builder(self) -> ViewIndexMgmtRequestBuilder:
+        """**INTERNAL**"""
+        return self._request_builder
+
+    async def drop_design_document(self, req: DropDesignDocumentRequest) -> None:
+        """**INTERNAL**"""
+        await self._client_adapter.execute_mgmt_request(req)
+
+    async def get_all_design_documents(self, req: GetAllDesignDocumentsRequest) -> Iterable[DesignDocument]:
+        """**INTERNAL**"""
+        ret = await self._client_adapter.execute_mgmt_request(req)
+        ddocs = []
+        raw_ddocs = ret.raw_result.get('design_documents', None)
+        if raw_ddocs:
+            ddocs = [DesignDocument.from_json(ddoc) for ddoc in raw_ddocs]
+
+        return ddocs
+
+    async def get_design_document(self, req: GetDesignDocumentRequest) -> DesignDocument:
+        """**INTERNAL**"""
+        ret = await self._client_adapter.execute_mgmt_request(req)
+        raw_ddoc = ret.raw_result.get('design_document', None)
+        ddoc = None
+        if raw_ddoc:
+            ddoc = DesignDocument.from_json(raw_ddoc)
+
+        return ddoc
+
+    async def publish_design_document(self,
+                                      bucket_name: str,
+                                      design_doc_name: str,
+                                      *options: object,
+                                      **kwargs: object) -> None:
+        """**INTERNAL**"""
+        req = self._request_builder.build_get_design_document_request(bucket_name,
+                                                                      design_doc_name,
+                                                                      DesignDocumentNamespace.DEVELOPMENT,
+                                                                      *options,
+                                                                      **kwargs)
+        design_doc = await self.get_design_document(req)
+        up_req = self._request_builder.build_upsert_design_document_request(bucket_name,
+                                                                            design_doc,
+                                                                            DesignDocumentNamespace.PRODUCTION,
+                                                                            *options,
+                                                                            **kwargs)
+        await self.upsert_design_document(up_req)
+
+    async def upsert_design_document(self, req: UpsertDesignDocumentRequest) -> None:
+        """**INTERNAL**"""
+        await self._client_adapter.execute_mgmt_request(req)

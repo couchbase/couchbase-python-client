@@ -17,14 +17,11 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Iterable)
 
-from couchbase.management.logic.view_index_logic import View  # noqa: F401
-from couchbase.management.logic.view_index_logic import (DesignDocument,
-                                                         DesignDocumentNamespace,
-                                                         ViewIndexManagerLogic)
-from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
+from couchbase.management.logic.view_index_mgmt_impl import ViewIndexMgmtImpl
+from couchbase.management.logic.view_index_mgmt_types import View  # noqa: F401
+from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
 
 # @TODO:  lets deprecate import of options from couchbase.management.views
 from couchbase.management.options import (DropDesignDocumentOptions,
@@ -37,53 +34,65 @@ if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
 
 
-class ViewIndexManager(ViewIndexManagerLogic):
+class ViewIndexManager:
 
     def __init__(self, client_adapter: ClientAdapter, bucket_name: str) -> str:
-        super().__init__(client_adapter.connection, bucket_name)
+        self._impl = ViewIndexMgmtImpl(client_adapter)
+        self._bucket_name = bucket_name
 
-    @BlockingMgmtWrapper.block(DesignDocument, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def get_design_document(self,
                             design_doc_name,  # type: str
                             namespace,  # type: DesignDocumentNamespace
                             *options,   # type: GetDesignDocumentOptions
-                            **kwargs    # type: Dict[str, Any]
+                            **kwargs    # type: Any
                             ) -> DesignDocument:
-        return super().get_design_document(design_doc_name, namespace, *options, **kwargs)
+        req = self._impl.request_builder.build_get_design_document_request(self._bucket_name,
+                                                                           design_doc_name,
+                                                                           namespace,
+                                                                           *options,
+                                                                           **kwargs)
+        return self._impl.get_design_document(req)
 
-    @BlockingMgmtWrapper.block(DesignDocument, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def get_all_design_documents(self,
                                  namespace,     # type: DesignDocumentNamespace
                                  *options,      # type: GetAllDesignDocumentsOptions
-                                 **kwargs       # type: Dict[str, Any]
+                                 **kwargs       # type: Any
                                  ) -> Iterable[DesignDocument]:
-        return super().get_all_design_documents(namespace, *options, **kwargs)
+        req = self._impl.request_builder.build_get_all_design_documents_request(self._bucket_name,
+                                                                                namespace,
+                                                                                *options,
+                                                                                **kwargs)
+        return self._impl.get_all_design_documents(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def upsert_design_document(self,
                                design_doc_data,     # type: DesignDocument
                                namespace,           # type: DesignDocumentNamespace
                                *options,            # type: UpsertDesignDocumentOptions
-                               **kwargs             # type: Dict[str, Any]
+                               **kwargs             # type: Any
                                ) -> None:
-        return super().upsert_design_document(design_doc_data, namespace, *options, **kwargs)
+        req = self._impl.request_builder.build_upsert_design_document_request(self._bucket_name,
+                                                                              design_doc_data,
+                                                                              namespace,
+                                                                              *options,
+                                                                              **kwargs)
+        self._impl.upsert_design_document(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def drop_design_document(self,
                              design_doc_name,   # type: str
                              namespace,         # type: DesignDocumentNamespace
                              *options,          # type: DropDesignDocumentOptions
-                             **kwargs           # type: Dict[str, Any]
+                             **kwargs           # type: Any
                              ) -> None:
-        return super().drop_design_document(design_doc_name, namespace, *options, **kwargs)
+        req = self._impl.request_builder.build_drop_design_document_request(self._bucket_name,
+                                                                            design_doc_name,
+                                                                            namespace,
+                                                                            *options,
+                                                                            **kwargs)
+        self._impl.drop_design_document(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def publish_design_document(self,
                                 design_doc_name,    # type: str
                                 *options,           # type: PublishDesignDocumentOptions
-                                **kwargs            # type: Dict[str, Any]
+                                **kwargs            # type: Any
                                 ) -> None:
-        doc = self.get_design_document(
-            design_doc_name, DesignDocumentNamespace.DEVELOPMENT, *options, **kwargs)
-        return self.upsert_design_document(
-            doc, DesignDocumentNamespace.PRODUCTION, *options, **kwargs)
+        self._impl.publish_design_document(self._bucket_name, design_doc_name, *options, **kwargs)

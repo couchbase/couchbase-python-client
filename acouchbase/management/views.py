@@ -17,15 +17,10 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
-                    Dict,
                     Iterable)
 
-from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
-from couchbase.management.logic import ManagementType
-from couchbase.management.logic.view_index_logic import (DesignDocument,
-                                                         DesignDocumentNamespace,
-                                                         ViewIndexManagerLogic)
+from acouchbase.management.logic.view_index_mgmt_impl import AsyncViewIndexMgmtImpl
+from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -36,62 +31,65 @@ if TYPE_CHECKING:
                                               UpsertDesignDocumentOptions)
 
 
-class ViewIndexManager(ViewIndexManagerLogic):
+class ViewIndexManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter, bucket_name: str) -> None:
-        super().__init__(client_adapter.connection, bucket_name)
-        self._loop = client_adapter.loop
+        self._impl = AsyncViewIndexMgmtImpl(client_adapter)
+        self._bucket_name = bucket_name
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
+    async def get_design_document(self,
+                                  design_doc_name,  # type: str
+                                  namespace,  # type: DesignDocumentNamespace
+                                  *options,   # type: GetDesignDocumentOptions
+                                  **kwargs    # type: Any
+                                  ) -> DesignDocument:
+        req = self._impl.request_builder.build_get_design_document_request(self._bucket_name,
+                                                                           design_doc_name,
+                                                                           namespace,
+                                                                           *options,
+                                                                           **kwargs)
+        return await self._impl.get_design_document(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(DesignDocument, ManagementType.ViewIndexMgmt,
-                                       ViewIndexManagerLogic._ERROR_MAPPING)
-    def get_design_document(self,
-                            design_doc_name,  # type: str
-                            namespace,  # type: DesignDocumentNamespace
-                            *options,   # type: GetDesignDocumentOptions
-                            **kwargs    # type: Dict[str, Any]
-                            ) -> Awaitable[DesignDocument]:
-        super().get_design_document(design_doc_name, namespace, *options, **kwargs)
+    async def get_all_design_documents(self,
+                                       namespace,     # type: DesignDocumentNamespace
+                                       *options,      # type: GetAllDesignDocumentsOptions
+                                       **kwargs       # type: Any
+                                       ) -> Iterable[DesignDocument]:
+        req = self._impl.request_builder.build_get_all_design_documents_request(self._bucket_name,
+                                                                                namespace,
+                                                                                *options,
+                                                                                **kwargs)
+        return await self._impl.get_all_design_documents(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(DesignDocument, ManagementType.ViewIndexMgmt,
-                                       ViewIndexManagerLogic._ERROR_MAPPING)
-    def get_all_design_documents(self,
-                                 namespace,     # type: DesignDocumentNamespace
-                                 *options,      # type: GetAllDesignDocumentsOptions
-                                 **kwargs       # type: Dict[str, Any]
-                                 ) -> Awaitable[Iterable[DesignDocument]]:
-        super().get_all_design_documents(namespace, *options, **kwargs)
+    async def upsert_design_document(self,
+                                     design_doc_data,     # type: DesignDocument
+                                     namespace,           # type: DesignDocumentNamespace
+                                     *options,            # type: UpsertDesignDocumentOptions
+                                     **kwargs             # type: Any
+                                     ) -> None:
+        req = self._impl.request_builder.build_upsert_design_document_request(self._bucket_name,
+                                                                              design_doc_data,
+                                                                              namespace,
+                                                                              *options,
+                                                                              **kwargs)
+        await self._impl.upsert_design_document(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
-    def upsert_design_document(self,
-                               design_doc_data,     # type: DesignDocument
-                               namespace,           # type: DesignDocumentNamespace
-                               *options,            # type: UpsertDesignDocumentOptions
-                               **kwargs             # type: Dict[str, Any]
-                               ) -> Awaitable[None]:
-        super().upsert_design_document(design_doc_data, namespace, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
-    def drop_design_document(self,
-                             design_doc_name,   # type: str
-                             namespace,         # type: DesignDocumentNamespace
-                             *options,          # type: DropDesignDocumentOptions
-                             **kwargs           # type: Dict[str, Any]
-                             ) -> Awaitable[None]:
-        super().drop_design_document(design_doc_name, namespace, *options, **kwargs)
+    async def drop_design_document(self,
+                                   design_doc_name,   # type: str
+                                   namespace,         # type: DesignDocumentNamespace
+                                   *options,          # type: DropDesignDocumentOptions
+                                   **kwargs           # type: Any
+                                   ) -> None:
+        req = self._impl.request_builder.build_drop_design_document_request(self._bucket_name,
+                                                                            design_doc_name,
+                                                                            namespace,
+                                                                            *options,
+                                                                            **kwargs)
+        await self._impl.drop_design_document(req)
 
     async def publish_design_document(self,
                                       design_doc_name,    # type: str
                                       *options,           # type: PublishDesignDocumentOptions
-                                      **kwargs            # type: Dict[str, Any]
-                                      ) -> Awaitable[None]:
-        doc = await self.get_design_document(
-            design_doc_name, DesignDocumentNamespace.DEVELOPMENT, *options, **kwargs)
-        await self.upsert_design_document(
-            doc, DesignDocumentNamespace.PRODUCTION, *options, **kwargs)
+                                      **kwargs            # type: Any
+                                      ) -> None:
+        await self._impl.publish_design_document(self._bucket_name, design_doc_name, *options, **kwargs)
