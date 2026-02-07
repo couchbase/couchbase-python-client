@@ -39,7 +39,6 @@ from couchbase.options import ClusterOptions
 from ._test_utils import TestEnvironment
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1739')
 class UserManagementTests:
 
     @pytest_asyncio.fixture(scope="class")
@@ -219,7 +218,7 @@ class UserManagementTests:
         new_cluster = None
         while True:
             try:
-                new_cluster = await Cluster.connect(cb_env.cluster._connstr, ClusterOptions(auth))
+                new_cluster = await Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr, ClusterOptions(auth))
             except AuthenticationException:
                 continue
             break
@@ -231,7 +230,8 @@ class UserManagementTests:
         success_auth = PasswordAuthenticator(username, new_password)
         while True:
             try:
-                success_cluster = await Cluster.connect(cb_env.cluster._connstr, ClusterOptions(success_auth))
+                success_cluster = await Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr,
+                                                        ClusterOptions(success_auth))
             except AuthenticationException:
                 continue
             await success_cluster.close()
@@ -240,7 +240,7 @@ class UserManagementTests:
         # Assert cannot authenticate using old password
         fail_auth = PasswordAuthenticator(username, original_password)
         with pytest.raises(AuthenticationException):
-            await Cluster.connect(cb_env.cluster._connstr, ClusterOptions(fail_auth))
+            await Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr, ClusterOptions(fail_auth))
 
         await new_cluster.close()
 

@@ -596,7 +596,7 @@ class UserManagementTestSuite:
         new_cluster = None
         while True:
             try:
-                new_cluster = Cluster.connect(cb_env.cluster._connstr, ClusterOptions(auth))
+                new_cluster = Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr, ClusterOptions(auth))
             except AuthenticationException:
                 continue
             break
@@ -608,7 +608,8 @@ class UserManagementTestSuite:
         success_auth = PasswordAuthenticator(username, new_password)
         while True:
             try:
-                success_cluster = Cluster.connect(cb_env.cluster._connstr, ClusterOptions(success_auth))
+                success_cluster = Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr,
+                                                  ClusterOptions(success_auth))
             except AuthenticationException:
                 continue
             success_cluster.close()
@@ -617,7 +618,7 @@ class UserManagementTestSuite:
         # Assert cannot authenticate using old password
         fail_auth = PasswordAuthenticator(username, original_password)
         with pytest.raises(AuthenticationException):
-            Cluster.connect(cb_env.cluster._connstr, ClusterOptions(fail_auth))
+            Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr, ClusterOptions(fail_auth))
 
         new_cluster.close()
 
@@ -696,7 +697,6 @@ class UserManagementTestSuite:
         cm.drop_scope('um-test-scope')
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1739')
 class ClassicUserManagementTests(UserManagementTestSuite):
     @pytest.fixture(scope='class')
     def test_manifest_validated(self):

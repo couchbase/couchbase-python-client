@@ -19,15 +19,14 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Iterable)
 
-from couchbase.management.logic.users_logic import Origin  # noqa: F401
-from couchbase.management.logic.users_logic import Role  # noqa: F401
-from couchbase.management.logic.users_logic import RoleAndOrigins  # noqa: F401
-from couchbase.management.logic.users_logic import (Group,
-                                                    RoleAndDescription,
-                                                    User,
-                                                    UserAndMetadata,
-                                                    UserManagerLogic)
-from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
+from couchbase.management.logic.user_mgmt_impl import UserMgmtImpl
+from couchbase.management.logic.user_mgmt_types import Origin  # noqa: F401
+from couchbase.management.logic.user_mgmt_types import Role  # noqa: F401
+from couchbase.management.logic.user_mgmt_types import RoleAndOrigins  # noqa: F401
+from couchbase.management.logic.user_mgmt_types import (Group,
+                                                        RoleAndDescription,
+                                                        User,
+                                                        UserAndMetadata)
 
 # @TODO:  lets deprecate import of options from couchbase.management.users
 from couchbase.management.options import (ChangePasswordOptions,
@@ -45,12 +44,11 @@ if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
 
 
-class UserManager(UserManagerLogic):
+class UserManager:
 
     def __init__(self, client_adapter: ClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
+        self._impl = UserMgmtImpl(client_adapter)
 
-    @BlockingMgmtWrapper.block(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_user(self,
                  username,  # type: str
                  *options,  # type: GetUserOptions
@@ -71,9 +69,9 @@ class UserManager(UserManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
         """
-        return super().get_user(username, *options, **kwargs)
+        req = self._impl.request_builder.build_get_user_request(username, *options, **kwargs)
+        return self._impl.get_user(req)
 
-    @BlockingMgmtWrapper.block(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_all_users(self,
                       *options,  # type: GetAllUsersOptions
                       **kwargs  # type: Any
@@ -89,9 +87,9 @@ class UserManager(UserManagerLogic):
         Returns:
             Iterable[:class:`UserAndMetadata`]: A list of existing users.
         """
-        return super().get_all_users(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_users_request(*options, **kwargs)
+        return self._impl.get_all_users(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def upsert_user(self,
                     user,     # type: User
                     *options,  # type: UpsertUserOptions
@@ -110,9 +108,9 @@ class UserManager(UserManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided user argument contains an
                 invalid value or type.
         """
-        return super().upsert_user(user, *options, **kwargs)
+        req = self._impl.request_builder.build_upsert_user_request(user, *options, **kwargs)
+        self._impl.upsert_user(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def drop_user(self,
                   username,  # type: str
                   *options,  # type: DropUserOptions
@@ -130,9 +128,9 @@ class UserManager(UserManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
         """
-        return super().drop_user(username, *options, **kwargs)
+        req = self._impl.request_builder.build_drop_user_request(username, *options, **kwargs)
+        self._impl.drop_user(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def change_password(self,
                         new_password,  # type: str
                         *options,     # type: ChangePasswordOptions
@@ -153,9 +151,9 @@ class UserManager(UserManagerLogic):
                 invalid value or type.
 
         """
-        return super().change_password(new_password, *options, **kwargs)
+        req = self._impl.request_builder.build_change_password_request(new_password, *options, **kwargs)
+        self._impl.change_password(req)
 
-    @BlockingMgmtWrapper.block(RoleAndDescription, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_roles(self,
                   *options,  # type: GetRolesOptions
                   **kwargs   # type: Any
@@ -171,9 +169,9 @@ class UserManager(UserManagerLogic):
         Returns:
             Iterable[:class:`RoleAndDescription`]: A list of roles available on the server.
         """
-        return super().get_roles(*options, **kwargs)
+        req = self._impl.request_builder.build_get_roles_request(*options, **kwargs)
+        return self._impl.get_roles(req)
 
-    @BlockingMgmtWrapper.block(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_group(self,
                   group_name,   # type: str
                   *options,     # type: GetGroupOptions
@@ -194,9 +192,9 @@ class UserManager(UserManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
         """
-        return super().get_group(group_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_group_request(group_name, *options, **kwargs)
+        return self._impl.get_group(req)
 
-    @BlockingMgmtWrapper.block(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_all_groups(self,
                        *options,    # type: GetAllGroupsOptions
                        **kwargs     # type: Any
@@ -212,9 +210,9 @@ class UserManager(UserManagerLogic):
         Returns:
             Iterable[:class:`Group`]: A list of existing groups.
         """
-        return super().get_all_groups(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_groups_request(*options, **kwargs)
+        return self._impl.get_all_groups(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def upsert_group(self,
                      group,     # type: Group
                      *options,  # type: UpsertGroupOptions
@@ -233,9 +231,9 @@ class UserManager(UserManagerLogic):
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided group argument contains an
                 invalid value or type.
         """
-        return super().upsert_group(group, *options, **kwargs)
+        req = self._impl.request_builder.build_upsert_group_request(group, *options, **kwargs)
+        self._impl.upsert_group(req)
 
-    @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def drop_group(self,
                    group_name,  # type: str
                    *options,    # type: DropGroupOptions
@@ -253,4 +251,5 @@ class UserManager(UserManagerLogic):
         Raises:
             :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
         """
-        return super().drop_group(group_name, *options, **kwargs)
+        req = self._impl.request_builder.build_drop_group_request(group_name, *options, **kwargs)
+        self._impl.drop_group(req)

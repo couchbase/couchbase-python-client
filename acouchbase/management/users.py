@@ -17,16 +17,13 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
                     Iterable)
 
-from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
-from couchbase.management.logic import ManagementType
-from couchbase.management.logic.users_logic import (Group,
-                                                    RoleAndDescription,
-                                                    User,
-                                                    UserAndMetadata,
-                                                    UserManagerLogic)
+from acouchbase.management.logic.user_mgmt_impl import AsyncUserMgmtImpl
+from couchbase.management.logic.user_mgmt_types import (Group,
+                                                        RoleAndDescription,
+                                                        User,
+                                                        UserAndMetadata)
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -42,93 +39,84 @@ if TYPE_CHECKING:
                                               UpsertUserOptions)
 
 
-class UserManager(UserManagerLogic):
+class UserManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
-        self._loop = client_adapter.loop
+        self._impl = AsyncUserMgmtImpl(client_adapter)
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
+    async def get_user(self,
+                       username,  # type: str
+                       *options,  # type: GetUserOptions
+                       **kwargs   # type: Any
+                       ) -> UserAndMetadata:
+        req = self._impl.request_builder.build_get_user_request(username, *options, **kwargs)
+        return await self._impl.get_user(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def get_user(self,
-                 username,  # type: str
-                 *options,  # type: GetUserOptions
-                 **kwargs   # type: Any
-                 ) -> Awaitable[UserAndMetadata]:
-        super().get_user(username, *options, **kwargs)
+    async def get_all_users(self,
+                            *options,  # type: GetAllUsersOptions
+                            **kwargs  # type: Any
+                            ) -> Iterable[UserAndMetadata]:
+        req = self._impl.request_builder.build_get_all_users_request(*options, **kwargs)
+        return await self._impl.get_all_users(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def get_all_users(self,
-                      *options,  # type: GetAllUsersOptions
-                      **kwargs  # type: Any
-                      ) -> Awaitable[Iterable[UserAndMetadata]]:
-        super().get_all_users(*options, **kwargs)
+    async def upsert_user(self,
+                          user,     # type: User
+                          *options,  # type: UpsertUserOptions
+                          **kwargs  # type: Any
+                          ) -> None:
+        req = self._impl.request_builder.build_upsert_user_request(user, *options, **kwargs)
+        await self._impl.upsert_user(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def upsert_user(self,
-                    user,     # type: User
-                    *options,  # type: UpsertUserOptions
-                    **kwargs  # type: Any
-                    ) -> Awaitable[None]:
+    async def drop_user(self,
+                        username,  # type: str
+                        *options,  # type: DropUserOptions
+                        **kwargs   # type: Any
+                        ) -> None:
+        req = self._impl.request_builder.build_drop_user_request(username, *options, **kwargs)
+        await self._impl.drop_user(req)
 
-        super().upsert_user(user, *options, **kwargs)
+    async def change_password(self,
+                              new_password,  # type: str
+                              *options,     # type: ChangePasswordOptions
+                              **kwargs      # type: Any
+                              ) -> None:
+        req = self._impl.request_builder.build_change_password_request(new_password, *options, **kwargs)
+        await self._impl.change_password(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def drop_user(self,
-                  username,  # type: str
-                  *options,  # type: DropUserOptions
-                  **kwargs   # type: Any
-                  ) -> Awaitable[None]:
-        super().drop_user(username, *options, **kwargs)
+    async def get_roles(self,
+                        *options,  # type: GetRolesOptions
+                        **kwargs   # type: Any
+                        ) -> Iterable[RoleAndDescription]:
+        req = self._impl.request_builder.build_get_roles_request(*options, **kwargs)
+        return await self._impl.get_roles(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def change_password(self,
-                        new_password,  # type: str
-                        *options,     # type: ChangePasswordOptions
+    async def get_group(self,
+                        group_name,   # type: str
+                        *options,     # type: GetGroupOptions
                         **kwargs      # type: Any
-                        ) -> Awaitable[None]:
-        super().change_password(new_password, *options, **kwargs)
+                        ) -> Group:
+        req = self._impl.request_builder.build_get_group_request(group_name, *options, **kwargs)
+        return await self._impl.get_group(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(RoleAndDescription, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def get_roles(self,
-                  *options,  # type: GetRolesOptions
-                  **kwargs   # type: Any
-                  ) -> Awaitable[Iterable[RoleAndDescription]]:
-        super().get_roles(*options, **kwargs)
+    async def get_all_groups(self,
+                             *options,    # type: GetAllGroupsOptions
+                             **kwargs     # type: Any
+                             ) -> Iterable[Group]:
+        req = self._impl.request_builder.build_get_all_groups_request(*options, **kwargs)
+        return await self._impl.get_all_groups(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def get_group(self,
-                  group_name,   # type: str
-                  *options,     # type: GetGroupOptions
-                  **kwargs      # type: Any
-                  ) -> Awaitable[Group]:
-        super().get_group(group_name, *options, **kwargs)
+    async def upsert_group(self,
+                           group,     # type: Group
+                           *options,  # type: UpsertGroupOptions
+                           **kwargs   # type: Any
+                           ) -> None:
+        req = self._impl.request_builder.build_upsert_group_request(group, *options, **kwargs)
+        await self._impl.upsert_group(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def get_all_groups(self,
-                       *options,    # type: GetAllGroupsOptions
-                       **kwargs     # type: Any
-                       ) -> Awaitable[Iterable[Group]]:
-        super().get_all_groups(*options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def upsert_group(self,
-                     group,     # type: Group
-                     *options,  # type: UpsertGroupOptions
-                     **kwargs   # type: Any
-                     ) -> Awaitable[None]:
-        super().upsert_group(group, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
-    def drop_group(self,
-                   group_name,  # type: str
-                   *options,    # type: DropGroupOptions
-                   **kwargs     # type: Any
-                   ) -> Awaitable[None]:
-        super().drop_group(group_name, *options, **kwargs)
+    async def drop_group(self,
+                         group_name,  # type: str
+                         *options,    # type: DropGroupOptions
+                         **kwargs     # type: Any
+                         ) -> None:
+        req = self._impl.request_builder.build_drop_group_request(group_name, *options, **kwargs)
+        await self._impl.drop_group(req)
