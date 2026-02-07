@@ -17,13 +17,11 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable,
                     Dict,
                     Iterable)
 
-from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
-from couchbase.management.logic import ManagementType
-from couchbase.management.logic.search_index_logic import SearchIndex, SearchIndexManagerLogic
+from acouchbase.management.logic.search_index_mgmt_imply import AsyncSearchIndexMgmtImpl
+from couchbase.management.logic.search_index_mgmt_types import SearchIndex
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -43,261 +41,298 @@ if TYPE_CHECKING:
                                               UpsertSearchIndexOptions)
 
 
-class SearchIndexManager(SearchIndexManagerLogic):
+class SearchIndexManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
-        self._loop = client_adapter.loop
+        self._impl = AsyncSearchIndexMgmtImpl(client_adapter)
+        self._scope_context = None
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
+    async def upsert_index(self,
+                           index,     # type: SearchIndex
+                           *options,  # type: UpsertSearchIndexOptions
+                           **kwargs   # type: Dict[str, Any]
+                           ) -> None:
+        req = self._impl.request_builder.build_upsert_index_request(index, self._scope_context, *options, **kwargs)
+        await self._impl.upsert_index(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def upsert_index(self,
-                     index,     # type: SearchIndex
-                     *options,  # type: UpsertSearchIndexOptions
-                     **kwargs   # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
-
-        super().upsert_index(index, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def drop_index(self,
-                   index_name,  # type: str
-                   *options,   # type: DropSearchIndexOptions
-                   **kwargs    # type: Dict[str, Any]
-                   ) -> Awaitable[None]:
-
-        super().drop_index(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt,
-                                       SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_index(self,
-                  index_name,  # type: str
-                  *options,   # type: GetSearchIndexOptions
-                  **kwargs    # type: Dict[str, Any]
-                  ) -> Awaitable[SearchIndex]:
-
-        super().get_index(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt,
-                                       SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_all_indexes(self,
-                        *options,  # type: GetAllSearchIndexesOptions
-                        **kwargs  # type: Dict[str, Any]
-                        ) -> Awaitable[Iterable[SearchIndex]]:
-        super().get_all_indexes(*options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(int, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_indexed_documents_count(self,
-                                    index_name,  # type: str
-                                    *options,   # type: GetSearchIndexedDocumentsCountOptions
-                                    **kwargs    # type: Dict[str, Any]
-                                    ) -> Awaitable[int]:
-        super().get_indexed_documents_count(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def pause_ingest(self,
-                     index_name,  # type: str
-                     *options,  # type: PauseIngestSearchIndexOptions
-                     **kwargs  # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
-        super().pause_ingest(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def resume_ingest(self,
-                      index_name,  # type: str
-                      *options,  # type: ResumeIngestSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
-                      ) -> Awaitable[None]:
-        super().resume_ingest(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def allow_querying(self,
-                       index_name,  # type: str
-                       *options,  # type: AllowQueryingSearchIndexOptions
-                       **kwargs  # type: Dict[str, Any]
-                       ) -> Awaitable[None]:
-        super().allow_querying(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def disallow_querying(self,
-                          index_name,  # type: str
-                          *options,  # type: DisallowQueryingSearchIndexOptions
-                          **kwargs  # type: Dict[str, Any]
-                          ) -> Awaitable[None]:
-        super().disallow_querying(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def freeze_plan(self,
-                    index_name,  # type: str
-                    *options,  # type: FreezePlanSearchIndexOptions
-                    **kwargs  # type: Dict[str, Any]
-                    ) -> Awaitable[None]:
-        super().freeze_plan(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def unfreeze_plan(self,
-                      index_name,  # type: str
-                      *options,  # type: UnfreezePlanSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
-                      ) -> Awaitable[None]:
-        super().unfreeze_plan(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def analyze_document(self,
+    async def drop_index(self,
                          index_name,  # type: str
-                         document,  # type: Any
-                         *options,  # type: AnalyzeDocumentSearchIndexOptions
-                         **kwargs  # type: Dict[str, Any]
-                         ) -> Awaitable[Dict[str, Any]]:
-        super().analyze_document(index_name, document, *options, **kwargs)
+                         *options,   # type: DropSearchIndexOptions
+                         **kwargs    # type: Dict[str, Any]
+                         ) -> None:
+        req = self._impl.request_builder.build_drop_index_request(index_name, self._scope_context, *options, **kwargs)
+        await self._impl.drop_index(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_index_stats(self,
+    async def get_index(self,
                         index_name,  # type: str
-                        *options,  # type: GetSearchIndexStatsOptions
-                        **kwargs  # type: Dict[str, Any]
-                        ) -> Awaitable[Dict[str, Any]]:
-        super().get_index_stats(index_name, *options, **kwargs)
+                        *options,   # type: GetSearchIndexOptions
+                        **kwargs    # type: Dict[str, Any]
+                        ) -> SearchIndex:
+        req = self._impl.request_builder.build_get_index_request(index_name, self._scope_context, *options, **kwargs)
+        return await self._impl.get_index(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_all_index_stats(self,
-                            *options,  # type: GetAllSearchIndexStatsOptions
+    async def get_all_indexes(self,
+                              *options,  # type: GetAllSearchIndexesOptions
+                              **kwargs  # type: Dict[str, Any]
+                              ) -> Iterable[SearchIndex]:
+        req = self._impl.request_builder.build_get_all_indexes_request(self._scope_context, *options, **kwargs)
+        return await self._impl.get_all_indexes(req)
+
+    async def get_indexed_documents_count(self,
+                                          index_name,  # type: str
+                                          *options,   # type: GetSearchIndexedDocumentsCountOptions
+                                          **kwargs    # type: Dict[str, Any]
+                                          ) -> int:
+        req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
+                                                                                   self._scope_context,
+                                                                                   *options,
+                                                                                   **kwargs)
+        return await self._impl.get_indexed_documents_count(req)
+
+    async def pause_ingest(self,
+                           index_name,  # type: str
+                           *options,  # type: PauseIngestSearchIndexOptions
+                           **kwargs  # type: Dict[str, Any]
+                           ) -> None:
+        req = self._impl.request_builder.build_pause_ingest_request(index_name, self._scope_context, *options, **kwargs)
+        await self._impl.pause_ingest(req)
+
+    async def resume_ingest(self,
+                            index_name,  # type: str
+                            *options,  # type: ResumeIngestSearchIndexOptions
                             **kwargs  # type: Dict[str, Any]
-                            ) -> Awaitable[Dict[str, Any]]:
-        super().get_all_index_stats(*options, **kwargs)
+                            ) -> None:
+        req = self._impl.request_builder.build_resume_ingest_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        await self._impl.resume_ingest(req)
+
+    async def allow_querying(self,
+                             index_name,  # type: str
+                             *options,  # type: AllowQueryingSearchIndexOptions
+                             **kwargs  # type: Dict[str, Any]
+                             ) -> None:
+        req = self._impl.request_builder.build_allow_querying_request(index_name,
+                                                                      self._scope_context,
+                                                                      *options,
+                                                                      **kwargs)
+        await self._impl.allow_querying(req)
+
+    async def disallow_querying(self,
+                                index_name,  # type: str
+                                *options,  # type: DisallowQueryingSearchIndexOptions
+                                **kwargs  # type: Dict[str, Any]
+                                ) -> None:
+        req = self._impl.request_builder.build_disallow_querying_request(index_name,
+                                                                         self._scope_context,
+                                                                         *options,
+                                                                         **kwargs)
+        await self._impl.disallow_querying(req)
+
+    async def freeze_plan(self,
+                          index_name,  # type: str
+                          *options,  # type: FreezePlanSearchIndexOptions
+                          **kwargs  # type: Dict[str, Any]
+                          ) -> None:
+        req = self._impl.request_builder.build_freeze_plan_request(index_name, self._scope_context, *options, **kwargs)
+        await self._impl.freeze_plan(req)
+
+    async def unfreeze_plan(self,
+                            index_name,  # type: str
+                            *options,  # type: UnfreezePlanSearchIndexOptions
+                            **kwargs  # type: Dict[str, Any]
+                            ) -> None:
+        req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        await self._impl.unfreeze_plan(req)
+
+    async def analyze_document(self,
+                               index_name,  # type: str
+                               document,  # type: Any
+                               *options,  # type: AnalyzeDocumentSearchIndexOptions
+                               **kwargs  # type: Dict[str, Any]
+                               ) -> Dict[str, Any]:
+        req = self._impl.request_builder.build_analyze_document_request(index_name,
+                                                                        document,
+                                                                        self._scope_context,
+                                                                        *options,
+                                                                        **kwargs)
+        return await self._impl.analyze_document(req)
+
+    async def get_index_stats(self,
+                              index_name,  # type: str
+                              *options,  # type: GetSearchIndexStatsOptions
+                              **kwargs  # type: Dict[str, Any]
+                              ) -> Dict[str, Any]:
+        req = self._impl.request_builder.build_get_index_stats_request(index_name,
+                                                                       self._scope_context,
+                                                                       *options,
+                                                                       **kwargs)
+        return await self._impl.get_index_stats(req)
+
+    async def get_all_index_stats(self,
+                                  *options,  # type: GetAllSearchIndexStatsOptions
+                                  **kwargs  # type: Dict[str, Any]
+                                  ) -> Dict[str, Any]:
+        req = self._impl.request_builder.build_get_all_index_stats_request(*options, **kwargs)
+        return await self._impl.get_all_index_stats(req)
 
 
-class ScopeSearchIndexManager(SearchIndexManagerLogic):
+class ScopeSearchIndexManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter, bucket_name: str, scope_name: str) -> AsyncClientAdapter:
-        super().__init__(client_adapter.connection, bucket_name=bucket_name, scope_name=scope_name)
-        self._loop = client_adapter.loop
+        self._impl = AsyncSearchIndexMgmtImpl(client_adapter)
+        self._scope_context = bucket_name, scope_name
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
+    async def upsert_index(self,
+                           index,     # type: SearchIndex
+                           *options,  # type: UpsertSearchIndexOptions
+                           **kwargs   # type: Dict[str, Any]
+                           ) -> None:
+        req = self._impl.request_builder.build_upsert_index_request(index,
+                                                                    self._scope_context,
+                                                                    *options,
+                                                                    **kwargs)
+        await self._impl.upsert_index(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def upsert_index(self,
-                     index,     # type: SearchIndex
-                     *options,  # type: UpsertSearchIndexOptions
-                     **kwargs   # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
-
-        super().upsert_index(index, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def drop_index(self,
-                   index_name,  # type: str
-                   *options,   # type: DropSearchIndexOptions
-                   **kwargs    # type: Dict[str, Any]
-                   ) -> Awaitable[None]:
-
-        super().drop_index(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt,
-                                       SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_index(self,
-                  index_name,  # type: str
-                  *options,   # type: GetSearchIndexOptions
-                  **kwargs    # type: Dict[str, Any]
-                  ) -> Awaitable[SearchIndex]:
-
-        super().get_index(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt,
-                                       SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_all_indexes(self,
-                        *options,  # type: GetAllSearchIndexesOptions
-                        **kwargs  # type: Dict[str, Any]
-                        ) -> Awaitable[Iterable[SearchIndex]]:
-        super().get_all_indexes(*options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(int, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_indexed_documents_count(self,
-                                    index_name,  # type: str
-                                    *options,   # type: GetSearchIndexedDocumentsCountOptions
-                                    **kwargs    # type: Dict[str, Any]
-                                    ) -> Awaitable[int]:
-        super().get_indexed_documents_count(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def pause_ingest(self,
-                     index_name,  # type: str
-                     *options,  # type: PauseIngestSearchIndexOptions
-                     **kwargs  # type: Dict[str, Any]
-                     ) -> Awaitable[None]:
-        super().pause_ingest(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def resume_ingest(self,
-                      index_name,  # type: str
-                      *options,  # type: ResumeIngestSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
-                      ) -> Awaitable[None]:
-        super().resume_ingest(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def allow_querying(self,
-                       index_name,  # type: str
-                       *options,  # type: AllowQueryingSearchIndexOptions
-                       **kwargs  # type: Dict[str, Any]
-                       ) -> Awaitable[None]:
-        super().allow_querying(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def disallow_querying(self,
-                          index_name,  # type: str
-                          *options,  # type: DisallowQueryingSearchIndexOptions
-                          **kwargs  # type: Dict[str, Any]
-                          ) -> Awaitable[None]:
-        super().disallow_querying(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def freeze_plan(self,
-                    index_name,  # type: str
-                    *options,  # type: FreezePlanSearchIndexOptions
-                    **kwargs  # type: Dict[str, Any]
-                    ) -> Awaitable[None]:
-        super().freeze_plan(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def unfreeze_plan(self,
-                      index_name,  # type: str
-                      *options,  # type: UnfreezePlanSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
-                      ) -> Awaitable[None]:
-        super().unfreeze_plan(index_name, *options, **kwargs)
-
-    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def analyze_document(self,
+    async def drop_index(self,
                          index_name,  # type: str
-                         document,  # type: Any
-                         *options,  # type: AnalyzeDocumentSearchIndexOptions
-                         **kwargs  # type: Dict[str, Any]
-                         ) -> Awaitable[Dict[str, Any]]:
-        super().analyze_document(index_name, document, *options, **kwargs)
+                         *options,   # type: DropSearchIndexOptions
+                         **kwargs    # type: Dict[str, Any]
+                         ) -> None:
+        req = self._impl.request_builder.build_drop_index_request(index_name,
+                                                                  self._scope_context,
+                                                                  *options,
+                                                                  **kwargs)
+        await self._impl.drop_index(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_index_stats(self,
+    async def get_index(self,
                         index_name,  # type: str
-                        *options,  # type: GetSearchIndexStatsOptions
-                        **kwargs  # type: Dict[str, Any]
-                        ) -> Awaitable[Dict[str, Any]]:
-        super().get_index_stats(index_name, *options, **kwargs)
+                        *options,   # type: GetSearchIndexOptions
+                        **kwargs    # type: Dict[str, Any]
+                        ) -> SearchIndex:
+        req = self._impl.request_builder.build_get_index_request(index_name,
+                                                                 self._scope_context,
+                                                                 *options,
+                                                                 **kwargs)
+        return await self._impl.get_index(req)
 
-    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
-    def get_all_index_stats(self,
-                            *options,  # type: GetAllSearchIndexStatsOptions
+    async def get_all_indexes(self,
+                              *options,  # type: GetAllSearchIndexesOptions
+                              **kwargs  # type: Dict[str, Any]
+                              ) -> Iterable[SearchIndex]:
+        req = self._impl.request_builder.build_get_all_indexes_request(self._scope_context,
+                                                                       *options,
+                                                                       **kwargs)
+        return await self._impl.get_all_indexes(req)
+
+    async def get_indexed_documents_count(self,
+                                          index_name,  # type: str
+                                          *options,   # type: GetSearchIndexedDocumentsCountOptions
+                                          **kwargs    # type: Dict[str, Any]
+                                          ) -> int:
+        req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
+                                                                                   self._scope_context,
+                                                                                   *options,
+                                                                                   **kwargs)
+        return await self._impl.get_indexed_documents_count(req)
+
+    async def pause_ingest(self,
+                           index_name,  # type: str
+                           *options,  # type: PauseIngestSearchIndexOptions
+                           **kwargs  # type: Dict[str, Any]
+                           ) -> None:
+        req = self._impl.request_builder.build_pause_ingest_request(index_name,
+                                                                    self._scope_context,
+                                                                    *options,
+                                                                    **kwargs)
+        await self._impl.pause_ingest(req)
+
+    async def resume_ingest(self,
+                            index_name,  # type: str
+                            *options,  # type: ResumeIngestSearchIndexOptions
                             **kwargs  # type: Dict[str, Any]
-                            ) -> Awaitable[Dict[str, Any]]:
-        super().get_all_index_stats(*options, **kwargs)
+                            ) -> None:
+        req = self._impl.request_builder.build_resume_ingest_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        await self._impl.resume_ingest(req)
+
+    async def allow_querying(self,
+                             index_name,  # type: str
+                             *options,  # type: AllowQueryingSearchIndexOptions
+                             **kwargs  # type: Dict[str, Any]
+                             ) -> None:
+        req = self._impl.request_builder.build_allow_querying_request(index_name,
+                                                                      self._scope_context,
+                                                                      *options,
+                                                                      **kwargs)
+        await self._impl.allow_querying(req)
+
+    async def disallow_querying(self,
+                                index_name,  # type: str
+                                *options,  # type: DisallowQueryingSearchIndexOptions
+                                **kwargs  # type: Dict[str, Any]
+                                ) -> None:
+        req = self._impl.request_builder.build_disallow_querying_request(index_name,
+                                                                         self._scope_context,
+                                                                         *options,
+                                                                         **kwargs)
+        await self._impl.disallow_querying(req)
+
+    async def freeze_plan(self,
+                          index_name,  # type: str
+                          *options,  # type: FreezePlanSearchIndexOptions
+                          **kwargs  # type: Dict[str, Any]
+                          ) -> None:
+        req = self._impl.request_builder.build_freeze_plan_request(index_name,
+                                                                   self._scope_context,
+                                                                   *options,
+                                                                   **kwargs)
+        await self._impl.freeze_plan(req)
+
+    async def unfreeze_plan(self,
+                            index_name,  # type: str
+                            *options,  # type: UnfreezePlanSearchIndexOptions
+                            **kwargs  # type: Dict[str, Any]
+                            ) -> None:
+        req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        await self._impl.unfreeze_plan(req)
+
+    async def analyze_document(self,
+                               index_name,  # type: str
+                               document,  # type: Any
+                               *options,  # type: AnalyzeDocumentSearchIndexOptions
+                               **kwargs  # type: Dict[str, Any]
+                               ) -> Dict[str, Any]:
+        req = self._impl.request_builder.build_analyze_document_request(index_name,
+                                                                        document,
+                                                                        self._scope_context,
+                                                                        *options,
+                                                                        **kwargs)
+        return await self._impl.analyze_document(req)
+
+    async def get_index_stats(self,
+                              index_name,  # type: str
+                              *options,  # type: GetSearchIndexStatsOptions
+                              **kwargs  # type: Dict[str, Any]
+                              ) -> Dict[str, Any]:
+        req = self._impl.request_builder.build_get_index_stats_request(index_name,
+                                                                       self._scope_context,
+                                                                       *options,
+                                                                       **kwargs)
+        return await self._impl.get_index_stats(req)
+
+    async def get_all_index_stats(self,
+                                  *options,  # type: GetAllSearchIndexStatsOptions
+                                  **kwargs  # type: Dict[str, Any]
+                                  ) -> Dict[str, Any]:
+        req = self._impl.request_builder.build_get_all_index_stats_request(*options, **kwargs)
+        return await self._impl.get_all_index_stats(req)

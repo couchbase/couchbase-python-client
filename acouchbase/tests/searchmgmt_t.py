@@ -30,7 +30,6 @@ from couchbase.management.search import SearchIndex
 from ._test_utils import CollectionType, TestEnvironment
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1738')
 @pytest.mark.flaky(reruns=5)
 class SearchIndexManagementTests:
 
@@ -148,8 +147,7 @@ class SearchIndexManagementTests:
         if cb_env.server_version_short < 6.5:
             pytest.skip((f'FTS analyzeDoc only supported on server versions >= 6.5. '
                         f'Using server version: {cb_env.server_version}.'))
-        # like getting the doc count, this can fail immediately after index
-        # creation
+        # like getting the doc count, this can fail immediately after index creation
         doc = {"field": "I got text in here"}
         analysis = await cb_env.try_n_times(
             5, 2, cb_env.sixm.analyze_document, test_idx.name, doc)
@@ -255,7 +253,6 @@ class SearchIndexManagementTests:
         assert isinstance(stats, dict)
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1738')
 @pytest.mark.flaky(reruns=5)
 class ScopeSearchIndexManagementTests:
 
@@ -393,8 +390,13 @@ class ScopeSearchIndexManagementTests:
         if cb_env.server_version_short < 6.5:
             pytest.skip((f'FTS analyzeDoc only supported on server versions >= 6.5. '
                         f'Using server version: {cb_env.server_version}.'))
-        with pytest.raises(FeatureUnavailableException):
-            await cb_env.sixm.analyze_document(test_idx.name, {"field": "I got text in here"})
+
+        doc = {"field": "I got text in here"}
+        analysis = await cb_env.try_n_times(5, 2, cb_env.sixm.analyze_document, test_idx.name, doc)
+
+        assert analysis.get('analysis', None) is not None
+        assert isinstance(analysis.get('analysis'), (list, dict))
+        assert analysis.get('status', None) == 'ok'
 
     @pytest.mark.usefixtures("create_test_index")
     @pytest.mark.usefixtures("drop_test_index")

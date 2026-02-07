@@ -22,9 +22,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
-from couchbase.management.logic import ManagementType
-from couchbase.management.logic.search_index_logic import SearchIndex, SearchIndexManagerLogic
-from txcouchbase.management.logic.wrappers import TxMgmtWrapper
+from couchbase.management.logic.search_index_mgmt_types import SearchIndex
+from txcouchbase.management.logic.search_index_mgmt_imply import TxSearchIndexMgmtImpl
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -44,251 +43,298 @@ if TYPE_CHECKING:
                                               UpsertSearchIndexOptions)
 
 
-class SearchIndexManager(SearchIndexManagerLogic):
+class SearchIndexManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter.connection)
-        self._loop = client_adapter.loop
+        self._impl = TxSearchIndexMgmtImpl(client_adapter)
+        self._scope_context = None
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
-
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def upsert_index(self,
                      index,     # type: SearchIndex
                      *options,  # type: UpsertSearchIndexOptions
                      **kwargs   # type: Dict[str, Any]
                      ) -> Deferred[None]:
-        super().upsert_index(index, *options, **kwargs)
+        req = self._impl.request_builder.build_upsert_index_request(index, self._scope_context, *options, **kwargs)
+        return self._impl.upsert_index_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def drop_index(self,
                    index_name,  # type: str
                    *options,   # type: DropSearchIndexOptions
                    **kwargs    # type: Dict[str, Any]
                    ) -> Deferred[None]:
+        req = self._impl.request_builder.build_drop_index_request(index_name, self._scope_context, *options, **kwargs)
+        return self._impl.drop_index_deferred(req)
 
-        super().drop_index(index_name, *options, **kwargs)
-
-    @TxMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_index(self,
                   index_name,  # type: str
                   *options,   # type: GetSearchIndexOptions
                   **kwargs    # type: Dict[str, Any]
                   ) -> Deferred[SearchIndex]:
-        super().get_index(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_index_request(index_name, self._scope_context, *options, **kwargs)
+        return self._impl.get_index_deferred(req)
 
     def get_all_indexes(self,
                         *options,  # type: GetAllSearchIndexesOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Deferred[Iterable[SearchIndex]]:
-        super().get_all_indexes(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_indexes_request(self._scope_context, *options, **kwargs)
+        return self._impl.get_all_indexes_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(int, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_indexed_documents_count(self,
                                     index_name,  # type: str
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
                                     **kwargs    # type: Dict[str, Any]
                                     ) -> Deferred[int]:
-        super().get_indexed_documents_count(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
+                                                                                   self._scope_context,
+                                                                                   *options,
+                                                                                   **kwargs)
+        return self._impl.get_indexed_documents_count_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def pause_ingest(self,
                      index_name,  # type: str
                      *options,  # type: PauseIngestSearchIndexOptions
                      **kwargs  # type: Dict[str, Any]
                      ) -> Deferred[None]:
-        super().pause_ingest(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_pause_ingest_request(index_name, self._scope_context, *options, **kwargs)
+        return self._impl.pause_ingest_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def resume_ingest(self,
                       index_name,  # type: str
                       *options,  # type: ResumeIngestSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> Deferred[None]:
-        super().resume_ingest(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_resume_ingest_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        return self._impl.resume_ingest_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def allow_querying(self,
                        index_name,  # type: str
                        *options,  # type: AllowQueryingSearchIndexOptions
                        **kwargs  # type: Dict[str, Any]
                        ) -> Deferred[None]:
-        super().allow_querying(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_allow_querying_request(index_name,
+                                                                      self._scope_context,
+                                                                      *options,
+                                                                      **kwargs)
+        return self._impl.allow_querying_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def disallow_querying(self,
                           index_name,  # type: str
                           *options,  # type: DisallowQueryingSearchIndexOptions
                           **kwargs  # type: Dict[str, Any]
                           ) -> Deferred[None]:
-        super().disallow_querying(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_disallow_querying_request(index_name,
+                                                                         self._scope_context,
+                                                                         *options,
+                                                                         **kwargs)
+        return self._impl.disallow_querying_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def freeze_plan(self,
                     index_name,  # type: str
                     *options,  # type: FreezePlanSearchIndexOptions
                     **kwargs  # type: Dict[str, Any]
                     ) -> Deferred[None]:
-        super().freeze_plan(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_freeze_plan_request(index_name, self._scope_context, *options, **kwargs)
+        return self._impl.freeze_plan_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def unfreeze_plan(self,
                       index_name,  # type: str
                       *options,  # type: UnfreezePlanSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> Deferred[None]:
-        super().unfreeze_plan(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        return self._impl.unfreeze_plan_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def analyze_document(self,
                          index_name,  # type: str
                          document,  # type: Any
                          *options,  # type: AnalyzeDocumentSearchIndexOptions
                          **kwargs  # type: Dict[str, Any]
                          ) -> Deferred[Dict[str, Any]]:
-        super().analyze_document(index_name, document, *options, **kwargs)
+        req = self._impl.request_builder.build_analyze_document_request(index_name,
+                                                                        document,
+                                                                        self._scope_context,
+                                                                        *options,
+                                                                        **kwargs)
+        return self._impl.analyze_document_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_index_stats(self,
                         index_name,  # type: str
                         *options,  # type: GetSearchIndexStatsOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Deferred[Dict[str, Any]]:
-        super().get_index_stats(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_index_stats_request(index_name,
+                                                                       self._scope_context,
+                                                                       *options,
+                                                                       **kwargs)
+        return self._impl.get_index_stats_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_all_index_stats(self,
                             *options,  # type: GetAllSearchIndexStatsOptions
                             **kwargs  # type: Dict[str, Any]
                             ) -> Deferred[Dict[str, Any]]:
-        super().get_all_index_stats(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_index_stats_request(*options, **kwargs)
+        return self._impl.get_all_index_stats_deferred(req)
 
 
-class ScopeSearchIndexManager(SearchIndexManagerLogic):
+class ScopeSearchIndexManager:
 
     def __init__(self, client_adapter: AsyncClientAdapter, bucket_name: str, scope_name: str) -> None:
-        super().__init__(client_adapter.connection, bucket_name=bucket_name, scope_name=scope_name)
-        self._loop = client_adapter.loop
+        self._impl = TxSearchIndexMgmtImpl(client_adapter)
+        self._scope_context = bucket_name, scope_name
 
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
-
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def upsert_index(self,
                      index,     # type: SearchIndex
                      *options,  # type: UpsertSearchIndexOptions
                      **kwargs   # type: Dict[str, Any]
                      ) -> Deferred[None]:
-        super().upsert_index(index, *options, **kwargs)
+        req = self._impl.request_builder.build_upsert_index_request(index,
+                                                                    self._scope_context,
+                                                                    *options,
+                                                                    **kwargs)
+        return self._impl.upsert_index_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def drop_index(self,
                    index_name,  # type: str
                    *options,   # type: DropSearchIndexOptions
                    **kwargs    # type: Dict[str, Any]
                    ) -> Deferred[None]:
+        req = self._impl.request_builder.build_drop_index_request(index_name,
+                                                                  self._scope_context,
+                                                                  *options,
+                                                                  **kwargs)
+        return self._impl.drop_index_deferred(req)
 
-        super().drop_index(index_name, *options, **kwargs)
-
-    @TxMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_index(self,
                   index_name,  # type: str
                   *options,   # type: GetSearchIndexOptions
                   **kwargs    # type: Dict[str, Any]
                   ) -> Deferred[SearchIndex]:
-        super().get_index(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_index_request(index_name,
+                                                                 self._scope_context,
+                                                                 *options,
+                                                                 **kwargs)
+        return self._impl.get_index_deferred(req)
 
     def get_all_indexes(self,
                         *options,  # type: GetAllSearchIndexesOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Deferred[Iterable[SearchIndex]]:
-        super().get_all_indexes(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_indexes_request(self._scope_context,
+                                                                       *options,
+                                                                       **kwargs)
+        return self._impl.get_all_indexes_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(int, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_indexed_documents_count(self,
                                     index_name,  # type: str
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
                                     **kwargs    # type: Dict[str, Any]
                                     ) -> Deferred[int]:
-        super().get_indexed_documents_count(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
+                                                                                   self._scope_context,
+                                                                                   *options,
+                                                                                   **kwargs)
+        return self._impl.get_indexed_documents_count_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def pause_ingest(self,
                      index_name,  # type: str
                      *options,  # type: PauseIngestSearchIndexOptions
                      **kwargs  # type: Dict[str, Any]
                      ) -> Deferred[None]:
-        super().pause_ingest(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_pause_ingest_request(index_name,
+                                                                    self._scope_context,
+                                                                    *options,
+                                                                    **kwargs)
+        return self._impl.pause_ingest_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def resume_ingest(self,
                       index_name,  # type: str
                       *options,  # type: ResumeIngestSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> Deferred[None]:
-        super().resume_ingest(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_resume_ingest_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        return self._impl.resume_ingest_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def allow_querying(self,
                        index_name,  # type: str
                        *options,  # type: AllowQueryingSearchIndexOptions
                        **kwargs  # type: Dict[str, Any]
                        ) -> Deferred[None]:
-        super().allow_querying(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_allow_querying_request(index_name,
+                                                                      self._scope_context,
+                                                                      *options,
+                                                                      **kwargs)
+        return self._impl.allow_querying_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def disallow_querying(self,
                           index_name,  # type: str
                           *options,  # type: DisallowQueryingSearchIndexOptions
                           **kwargs  # type: Dict[str, Any]
                           ) -> Deferred[None]:
-        super().disallow_querying(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_disallow_querying_request(index_name,
+                                                                         self._scope_context,
+                                                                         *options,
+                                                                         **kwargs)
+        return self._impl.disallow_querying_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def freeze_plan(self,
                     index_name,  # type: str
                     *options,  # type: FreezePlanSearchIndexOptions
                     **kwargs  # type: Dict[str, Any]
                     ) -> Deferred[None]:
-        super().freeze_plan(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_freeze_plan_request(index_name,
+                                                                   self._scope_context,
+                                                                   *options,
+                                                                   **kwargs)
+        return self._impl.freeze_plan_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def unfreeze_plan(self,
                       index_name,  # type: str
                       *options,  # type: UnfreezePlanSearchIndexOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> Deferred[None]:
-        super().unfreeze_plan(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
+                                                                     self._scope_context,
+                                                                     *options,
+                                                                     **kwargs)
+        return self._impl.unfreeze_plan_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def analyze_document(self,
                          index_name,  # type: str
                          document,  # type: Any
                          *options,  # type: AnalyzeDocumentSearchIndexOptions
                          **kwargs  # type: Dict[str, Any]
                          ) -> Deferred[Dict[str, Any]]:
-        super().analyze_document(index_name, document, *options, **kwargs)
+        req = self._impl.request_builder.build_analyze_document_request(index_name,
+                                                                        document,
+                                                                        self._scope_context,
+                                                                        *options,
+                                                                        **kwargs)
+        return self._impl.analyze_document_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_index_stats(self,
                         index_name,  # type: str
                         *options,  # type: GetSearchIndexStatsOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Deferred[Dict[str, Any]]:
-        super().get_index_stats(index_name, *options, **kwargs)
+        req = self._impl.request_builder.build_get_index_stats_request(index_name,
+                                                                       self._scope_context,
+                                                                       *options,
+                                                                       **kwargs)
+        return self._impl.get_index_stats_deferred(req)
 
-    @TxMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_all_index_stats(self,
                             *options,  # type: GetAllSearchIndexStatsOptions
                             **kwargs  # type: Dict[str, Any]
                             ) -> Deferred[Dict[str, Any]]:
-        super().get_all_index_stats(*options, **kwargs)
+        req = self._impl.request_builder.build_get_all_index_stats_request(*options, **kwargs)
+        return self._impl.get_all_index_stats_deferred(req)
