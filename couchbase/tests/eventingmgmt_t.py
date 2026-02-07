@@ -104,7 +104,7 @@ class EventingManagementTestSuite:
                                                        1,
                                                        cb_env.efm.get_function,
                                                        fn_name,
-                                                       EventingFunctionNotFoundException)
+                                                       expected_exceptions=(EventingFunctionNotFoundException,))
         cb_env.function_names = []
 
     @pytest.fixture()
@@ -590,7 +590,6 @@ class EventingManagementTestSuite:
         cb_env.validate_eventing_function(func)
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1737')
 @pytest.mark.flaky(reruns=5, reruns_delay=1)
 class ClassicEventingManagementTests(EventingManagementTestSuite):
 
@@ -614,7 +613,6 @@ class ClassicEventingManagementTests(EventingManagementTestSuite):
         cb_env.teardown()
 
 
-@pytest.mark.skip(reason='Skip until PYCBC-1737')
 @pytest.mark.flaky(reruns=2, reruns_delay=1)
 class ClassicScopeEventingManagementTests(EventingManagementTestSuite):
 

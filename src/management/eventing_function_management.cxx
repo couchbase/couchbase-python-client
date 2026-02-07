@@ -1079,7 +1079,7 @@ create_result_from_eventing_function_mgmt_response<
     }
     Py_DECREF(pyObj_eventing_function);
   }
-  if (-1 == PyDict_SetItemString(res->dict, "function", pyObj_functions)) {
+  if (-1 == PyDict_SetItemString(res->dict, "functions", pyObj_functions)) {
     Py_XDECREF(pyObj_result);
     Py_XDECREF(pyObj_functions);
     return nullptr;
