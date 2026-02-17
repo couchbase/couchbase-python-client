@@ -18,12 +18,27 @@ from functools import wraps
 
 import pytest
 
-from acouchbase.logic.wrappers import call_async_fn
 from acouchbase.transactions.transactions import AsyncWrapper as TxnAsyncWrapper
-from couchbase.exceptions import (CouchbaseException,
+from couchbase.exceptions import (PYCBC_ERROR_MAP,
+                                  CouchbaseException,
                                   ErrorMapper,
+                                  ExceptionMap,
                                   InternalSDKException)
 from couchbase.exceptions import exception as BaseCouchbaseException
+
+
+def call_async_fn(ft, self, fn, *args, **kwargs):
+    try:
+        fn(self, *args, **kwargs)
+    except CouchbaseException as e:
+        ft.set_exception(e)
+    except Exception as e:
+        if isinstance(e, (TypeError, ValueError)):
+            ft.set_exception(e)
+        else:
+            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+            excptn = exc_cls(str(e))
+            ft.set_exception(excptn)
 
 
 class AsyncTestWrapper:

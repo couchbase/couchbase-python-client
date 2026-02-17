@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import platform
 import warnings
 from copy import copy
@@ -25,7 +27,7 @@ from couchbase.cluster import Cluster
 from couchbase.exceptions import (CouchbaseException,
                                   InvalidArgumentException,
                                   UnAmbiguousTimeoutException)
-from couchbase.logic.cluster import ClusterLogic
+from couchbase.logic.cluster_impl import ClusterImpl
 from couchbase.options import (CONFIG_PROFILES,
                                ClusterMetricsOptions,
                                ClusterOptions,
@@ -90,7 +92,7 @@ class ConnectionTestSuite:
     def test_cluster_auth_fail(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string)
+            ClusterImpl(conn_string)
 
     def test_cluster_cert_auth(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -102,14 +104,14 @@ class ConnectionTestSuite:
         }
 
         auth = CertificateAuthenticator(**expected_auth)
-        cluster = ClusterLogic(conn_string, ClusterOptions(auth))
+        cluster = ClusterImpl(conn_string, ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts, _ = cluster._get_connection_opts()
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
         assert auth_opts == expected_auth
 
         # check as kwargs
-        cluster = ClusterLogic(conn_string, authenticator=auth)
+        cluster = ClusterImpl(conn_string, authenticator=auth, skip_connect='TEST_SKIP_CONNECT')
         auth_opts, _ = cluster._get_connection_opts()
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -154,10 +156,10 @@ class ConnectionTestSuite:
 
         auth = CertificateAuthenticator(**expected_auth)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, ClusterOptions(auth), trust_store_path=ts_path)
+            ClusterImpl(conn_string, ClusterOptions(auth), trust_store_path=ts_path)
 
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, authenticator=auth, trust_store_path=ts_path)
+            ClusterImpl(conn_string, authenticator=auth, trust_store_path=ts_path)
 
     def test_cluster_cert_auth_ts_connstr(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
@@ -169,7 +171,9 @@ class ConnectionTestSuite:
 
         auth = CertificateAuthenticator(**expected_auth)
         ts_path = 'path/to/truststore'
-        cluster = ClusterLogic(f'{conn_string}?truststorepath={ts_path}', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}?truststorepath={ts_path}',
+                              ClusterOptions(auth),
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -180,9 +184,10 @@ class ConnectionTestSuite:
         assert cluster_opts['trust_store_path'] == ts_path
 
         # check as kwargs
-        cluster = ClusterLogic(f'{conn_string}?truststorepath={ts_path}',
-                               authenticator=auth,
-                               trust_store_path=ts_path)
+        cluster = ClusterImpl(f'{conn_string}?truststorepath={ts_path}',
+                              authenticator=auth,
+                              trust_store_path=ts_path,
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -202,7 +207,10 @@ class ConnectionTestSuite:
 
         auth = CertificateAuthenticator(**expected_auth)
         ts_path = 'path/to/truststore'
-        cluster = ClusterLogic(conn_string, ClusterOptions(auth), trust_store_path=ts_path)
+        cluster = ClusterImpl(conn_string,
+                              ClusterOptions(auth),
+                              trust_store_path=ts_path,
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -213,7 +221,10 @@ class ConnectionTestSuite:
         assert cluster_opts['trust_store_path'] == ts_path
 
         # check as kwargs
-        cluster = ClusterLogic(conn_string, authenticator=auth, trust_store_path=ts_path)
+        cluster = ClusterImpl(conn_string,
+                              authenticator=auth,
+                              trust_store_path=ts_path,
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -230,7 +241,7 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator.ldap_compatible(username, pw)
         assert isinstance(auth, PasswordAuthenticator)
         expected_auth = auth.as_dict()
-        cluster = ClusterLogic(conn_string, ClusterOptions(auth))
+        cluster = ClusterImpl(conn_string, ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -255,7 +266,9 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator(username, pw)
         expected_auth = auth.as_dict()
         expected_auth['allowed_sasl_mechanisms'] = ['PLAIN']
-        cluster = ClusterLogic(f'{conn_string}?sasl_mech_force=PLAIN', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}?sasl_mech_force=PLAIN',
+                              ClusterOptions(auth),
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None
@@ -278,7 +291,7 @@ class ConnectionTestSuite:
         username, pw = couchbase_config.get_username_and_pw()
 
         auth = PasswordAuthenticator(username, pw)
-        cluster = ClusterLogic(f'{conn_string}?ssl=no_verify', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}?ssl=no_verify', ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         assert cluster_opts is not None
         assert cluster_opts['tls_verify'] == 'none'
@@ -348,7 +361,7 @@ class ConnectionTestSuite:
 
         # check via ClusterOptions
         cluster_opts = ClusterOptions(auth, **opts)
-        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         user_agent = cluster_opts.pop('user_agent_extra', None)
         assert cluster_opts is not None
@@ -358,7 +371,7 @@ class ConnectionTestSuite:
 
         # check via kwargs
         cluster_opts = ClusterOptions(auth)
-        cluster = ClusterLogic(conn_string, cluster_opts, **opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT', **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         user_agent = cluster_opts.pop('user_agent_extra', None)
         assert cluster_opts is not None
@@ -372,7 +385,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         expected_auth = auth.as_dict()
-        cluster = ClusterLogic(conn_string, ClusterOptions(auth))
+        cluster = ClusterImpl(conn_string, ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -380,7 +393,7 @@ class ConnectionTestSuite:
         assert auth_opts['allowed_sasl_mechanisms'] is None
 
         # check as kwargs
-        cluster = ClusterLogic(conn_string, authenticator=auth)
+        cluster = ClusterImpl(conn_string, authenticator=auth, skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -425,14 +438,14 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw, cert_path='path/to/cert')
         expected_auth = auth.as_dict()
-        cluster = ClusterLogic(conn_string, ClusterOptions(auth))
+        cluster = ClusterImpl(conn_string, ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
         assert auth_opts == expected_auth
 
         # check as kwargs
-        cluster = ClusterLogic(conn_string, authenticator=auth)
+        cluster = ClusterImpl(conn_string, authenticator=auth, skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -446,7 +459,9 @@ class ConnectionTestSuite:
         cert_path = 'path/to/cert'
         expected_auth = auth.as_dict()
         expected_auth['cert_path'] = cert_path
-        cluster = ClusterLogic(f'{conn_string}?certpath={cert_path}', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}?certpath={cert_path}',
+                              ClusterOptions(auth),
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -460,14 +475,17 @@ class ConnectionTestSuite:
         cert_path = 'path/to/cert'
         expected_auth = auth.as_dict()
         expected_auth['cert_path'] = cert_path
-        cluster = ClusterLogic(conn_string, ClusterOptions(auth), cert_path=cert_path)
+        cluster = ClusterImpl(conn_string,
+                              ClusterOptions(auth),
+                              cert_path=cert_path,
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
         assert auth_opts == expected_auth
 
         # check as kwargs
-        cluster = ClusterLogic(conn_string, authenticator=auth, cert_path=cert_path)
+        cluster = ClusterImpl(conn_string, authenticator=auth, cert_path=cert_path, skip_connect='TEST_SKIP_CONNECT')
         auth_opts = cluster._get_connection_opts(auth_only=True)
         assert auth_opts is not None
         assert isinstance(auth_opts, dict)
@@ -493,13 +511,15 @@ class ConnectionTestSuite:
         expected_auth = auth.as_dict()
         expected_auth['allowed_sasl_mechanisms'] = ['SCRAM-SHA512', 'SCRAM-SHA256']
         conn_str = f'{conn_string}?sasl_mech_force=SCRAM-SHA512&sasl_mech_force=SCRAM-SHA256'
-        cluster = ClusterLogic(conn_str, ClusterOptions(auth))
+        cluster = ClusterImpl(conn_str, ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None
         assert auth_opts == expected_auth
 
-        cluster = ClusterLogic(f'{conn_string}?sasl_mech_force=SCRAM-SHA512,SCRAM-SHA256', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}?sasl_mech_force=SCRAM-SHA512,SCRAM-SHA256',
+                              ClusterOptions(auth),
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None
@@ -513,27 +533,29 @@ class ConnectionTestSuite:
         expected_auth = auth.as_dict()
         expected_auth['allowed_sasl_mechanisms'] = ['SCRAM-SHA512', 'SCRAM-SHA256']
         conn_str = f'{conn_string}?allowed_sasl_mechanisms=SCRAM-SHA512&allowed_sasl_mechanisms=SCRAM-SHA256'
-        cluster = ClusterLogic(conn_str, ClusterOptions(auth))
+        cluster = ClusterImpl(conn_str, ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None
         assert auth_opts == expected_auth
 
-        cluster = ClusterLogic(f'{conn_string}?allowed_sasl_mechanisms=SCRAM-SHA512,SCRAM-SHA256', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}?allowed_sasl_mechanisms=SCRAM-SHA512,SCRAM-SHA256',
+                              ClusterOptions(auth),
+                              skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None
         assert auth_opts == expected_auth
 
         auth = PasswordAuthenticator(username, pw, allowed_sasl_mechanisms='SCRAM-SHA512,SCRAM-SHA256')
-        cluster = ClusterLogic(f'{conn_string}', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}', ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None
         assert auth_opts == expected_auth
 
         auth = PasswordAuthenticator(username, pw, allowed_sasl_mechanisms=['SCRAM-SHA512', 'SCRAM-SHA256'])
-        cluster = ClusterLogic(f'{conn_string}', ClusterOptions(auth))
+        cluster = ClusterImpl(f'{conn_string}', ClusterOptions(auth), skip_connect='TEST_SKIP_CONNECT')
         auth_opts, cluster_opts = cluster._get_connection_opts()
         assert cluster_opts is not None
         assert auth_opts is not None
@@ -549,7 +571,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth, metrics_options=ClusterMetricsOptions(**opts))
-        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         metrics_opts = cluster_opts.get('metrics_options', None)
         assert metrics_opts is not None
@@ -569,11 +591,11 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts, **opts)
+            ClusterImpl(conn_string, cluster_opts, **opts)
 
         cluster_opts = ClusterOptions(auth, metrics_options=opts)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts)
+            ClusterImpl(conn_string, cluster_opts)
 
     # when working w/ kwargs, some options append 'metrics_' to avoid key clash with orphan reporting options
     @pytest.mark.parametrize('opts, expected_opts',
@@ -586,7 +608,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
-        cluster = ClusterLogic(conn_string, cluster_opts, **opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT', **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         metrics_opts = cluster_opts.get('metrics_options', None)
         assert metrics_opts is not None
@@ -610,7 +632,7 @@ class ConnectionTestSuite:
         cluster_options = ClusterOptions(auth,
                                          metrics_options=metrics_options,
                                          **cluster_opts)
-        cluster = ClusterLogic(conn_string, cluster_options)
+        cluster = ClusterImpl(conn_string, cluster_options, skip_connect='TEST_SKIP_CONNECT')
         conn_cluster_opts = cluster._get_connection_opts(conn_only=True)
         assert 'logging_meter_emit_interval' not in conn_cluster_opts
         metrics_opts = conn_cluster_opts.get('metrics_options', None)
@@ -632,7 +654,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth, orphan_reporting_options=ClusterOrphanReportingOptions(**opts))
-        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         orphan_opts = cluster_opts.get('orphan_reporting_options', None)
         assert orphan_opts is not None
@@ -653,11 +675,11 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts, **opts)
+            ClusterImpl(conn_string, cluster_opts, **opts)
 
         cluster_opts = ClusterOptions(auth, orphan_reporting_options=opts)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts)
+            ClusterImpl(conn_string, cluster_opts)
 
     # when working w/ kwargs, some options append 'orphan_' to avoid key clash with metrics options
     @pytest.mark.parametrize('opts, expected_opts',
@@ -674,7 +696,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
-        cluster = ClusterLogic(conn_string, cluster_opts, **opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT', **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         orphan_opts = cluster_opts.get('orphan_reporting_options', None)
         assert orphan_opts is not None
@@ -715,7 +737,7 @@ class ConnectionTestSuite:
                                       orphan_reporting_options=orphan_reporting_opts,
                                       tracing_options=tracing_opts,
                                       **cluster_opts)
-        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         orphan_opts = cluster_opts.get('orphan_reporting_options', None)
         tracing_opts = cluster_opts.get('tracing_options', None)
@@ -768,7 +790,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth, timeout_options=ClusterTimeoutOptions(**opts))
-        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         timeout_opts = cluster_opts.get('timeout_options', None)
         assert timeout_opts is not None
@@ -803,11 +825,11 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts, **opts)
+            ClusterImpl(conn_string, cluster_opts, **opts)
 
         cluster_opts = ClusterOptions(auth, timeout_options=opts)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts)
+            ClusterImpl(conn_string, cluster_opts)
 
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'bootstrap_timeout': timedelta(seconds=30)},
@@ -853,7 +875,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
-        cluster = ClusterLogic(conn_string, cluster_opts, **opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT', **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         timeout_opts = cluster_opts.get('timeout_options', None)
         assert timeout_opts is not None
@@ -900,7 +922,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth, tracing_options=ClusterTracingOptions(**opts))
-        cluster = ClusterLogic(conn_string, cluster_opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         tracing_options = cluster_opts.get('tracing_options', None)
         orphan_reporting_options = cluster_opts.get('orphan_reporting_options', None)
@@ -940,11 +962,11 @@ class ConnectionTestSuite:
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts, **opts)
+            ClusterImpl(conn_string, cluster_opts, **opts)
 
         cluster_opts = ClusterOptions(auth, tracing_options=opts)
         with pytest.raises(InvalidArgumentException):
-            ClusterLogic(conn_string, cluster_opts)
+            ClusterImpl(conn_string, cluster_opts)
 
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'tracing_threshold_kv': timedelta(milliseconds=30)},
@@ -986,7 +1008,7 @@ class ConnectionTestSuite:
 
         auth = PasswordAuthenticator(username, pw)
         cluster_opts = ClusterOptions(auth)
-        cluster = ClusterLogic(conn_string, cluster_opts, **opts)
+        cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT', **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
         tracing_options = cluster_opts.get('tracing_options', None)
         orphan_reporting_options = cluster_opts.get('orphan_reporting_options', None)
@@ -1018,7 +1040,7 @@ class ConnectionTestSuite:
         cluster_options = ClusterOptions(auth,
                                          tracing_options=tracing_options,
                                          **cluster_opts)
-        cluster = ClusterLogic(conn_string, cluster_options)
+        cluster = ClusterImpl(conn_string, cluster_options, skip_connect='TEST_SKIP_CONNECT')
         conn_cluster_opts = cluster._get_connection_opts(conn_only=True)
         tracing_opts = conn_cluster_opts.get('tracing_options', None)
         assert tracing_opts is not None
@@ -1135,20 +1157,24 @@ class ConnectionTestSuite:
                     # Cause all warnings to always be triggered.
                     warnings.simplefilter("always")
 
-                    cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator(
-                        'Administrator', 'password'), bootstrap_timeout=timedelta(seconds=1))
+                    cl = ClusterImpl(conn_str,
+                                     authenticator=PasswordAuthenticator('Administrator', 'password'),
+                                     skip_connect='TEST_SKIP_CONNECT',
+                                     bootstrap_timeout=timedelta(seconds=1))
                     assert len(w) == 1
                     assert issubclass(w[-1].category, DeprecationWarning)
                     assert "deprecated" in str(w[-1].message)
             else:
-                cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator(
-                    'Administrator', 'password'), bootstrap_timeout=timedelta(seconds=1))
+                cl = ClusterImpl(conn_str,
+                                 authenticator=PasswordAuthenticator('Administrator', 'password'),
+                                 skip_connect='TEST_SKIP_CONNECT',
+                                 bootstrap_timeout=timedelta(seconds=1))
 
-            user_agent = cl._cluster_opts.pop('user_agent_extra', None)
-            assert expected_opts == cl._cluster_opts
+            user_agent = cl.cluster_settings.cluster_options.pop('user_agent_extra', None)
+            assert expected_opts == cl.cluster_settings.cluster_options
             assert user_agent == f'python/{platform.python_version()}'
             expected_conn_str = conn_str.split('?')[0]
-            assert expected_conn_str == cl._connstr
+            assert expected_conn_str == cl.cluster_settings.connstr
         except CouchbaseException:
             pass
         except Exception as ex:
@@ -1166,13 +1192,15 @@ class ConnectionTestSuite:
                               ])
     def test_connection_string_options(self, conn_str, expected_opts):
         try:
-            cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator('Administrator', 'password'))
+            cl = ClusterImpl(conn_str,
+                             authenticator=PasswordAuthenticator('Administrator', 'password'),
+                             skip_connect='TEST_SKIP_CONNECT')
 
-            user_agent = cl._cluster_opts.pop('user_agent_extra', None)
-            assert expected_opts == cl._cluster_opts
+            user_agent = cl.cluster_settings.cluster_options.pop('user_agent_extra', None)
+            assert expected_opts == cl.cluster_settings.cluster_options
             assert user_agent == f'python/{platform.python_version()}'
             expected_conn_str = conn_str.split('?')[0]
-            assert expected_conn_str == cl._connstr
+            assert expected_conn_str == cl.cluster_settings.connstr
         except CouchbaseException:
             pass
         except Exception as ex:

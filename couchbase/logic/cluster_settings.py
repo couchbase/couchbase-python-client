@@ -141,8 +141,6 @@ def parse_query_string_value(value: List[str]) -> Union[List[str], str, bool, in
 def parse_legacy_query_options(**query_opts: object) -> Dict[str, Any]:
     """Parse legacy query string options
 
-    See :attr:`~.ClusterLogic._LEGACY_CONNSTR_QUERY_ARGS`
-
     Returns:
         Dict[str, Any]: Representation of parsed query string parameters.
     """

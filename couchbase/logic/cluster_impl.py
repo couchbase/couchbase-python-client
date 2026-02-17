@@ -19,7 +19,9 @@ import time
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
-                    Optional)
+                    Optional,
+                    Tuple,
+                    Union)
 
 from couchbase.analytics import AnalyticsRequest
 from couchbase.exceptions import ServiceUnavailableException, UnAmbiguousTimeoutException
@@ -52,11 +54,12 @@ if TYPE_CHECKING:
 
 class ClusterImpl:
     def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
+        skip_connect = kwargs.pop('skip_connect', None)
         self._cluster_settings = ClusterSettings.build_cluster_settings(connstr, *options, **kwargs)
         connect_request = CreateConnectionRequest(self._cluster_settings.connstr,
                                                   self._cluster_settings.auth,
                                                   self._cluster_settings.cluster_options)
-        self._client_adapter = ClientAdapter(connect_request)
+        self._client_adapter = ClientAdapter(connect_request, skip_connect=skip_connect)
         self._request_builder = ClusterRequestBuilder()
         self._cluster_info: Optional[ClusterInfoResult] = None
         self._transactions: Optional[Transactions] = None
@@ -231,3 +234,25 @@ class ClusterImpl:
             if deadline < (current_time + delay):
                 raise UnAmbiguousTimeoutException('Desired state not found.')
             time.sleep(delay)
+
+    def _get_connection_opts(self,
+                             auth_only: Optional[bool] = None,
+                             conn_only: Optional[bool] = None
+                             ) -> Union[Dict[str, Any], Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+        """Get connection related options
+
+        **INTERNAL** not intended for use in public API.
+
+        Args:
+            auth_only (bool, optional): Set to True to return only auth options. Defaults to False.
+            conn_only (bool, optional): Set to True to return only cluster options. Defaults to False.
+
+        Returns:
+            Union[Dict[str, Any], Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]: Either the
+                cluster auth, cluster options or a tuple of both the cluster auth and cluster options.
+        """
+        if auth_only is True:
+            return self._cluster_settings.auth
+        if conn_only is True:
+            return self._cluster_settings.cluster_options
+        return self._cluster_settings.auth, self._cluster_settings.cluster_options

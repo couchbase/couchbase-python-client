@@ -38,11 +38,13 @@ if TYPE_CHECKING:
 
 class ClientAdapter:
 
-    def __init__(self, connect_req: CreateConnectionRequest) -> None:
+    def __init__(self, connect_req: CreateConnectionRequest, **kwargs: Any) -> None:
         self._connection: Optional[PyCapsuleType] = None
         self._connect_req = connect_req
         self._binding_map = BindingMap()
-        self._execute_connect_request()
+        # for testing we sometimes want to skip the actual C++ core connection
+        if not (kwargs.get('skip_connect', None) == 'TEST_SKIP_CONNECT'):
+            self._execute_connect_request()
 
     @property
     def connected(self) -> bool:

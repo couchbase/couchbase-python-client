@@ -21,6 +21,7 @@ from typing import (List,
                     Optional,
                     get_type_hints)
 
+from couchbase.logic.n1ql import QueryScanConsistency
 from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionBucketAccess,
                                            EventingFunctionBucketBinding,
@@ -38,7 +39,6 @@ from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionUrlAuthDigest,
                                            EventingFunctionUrlBinding,
                                            EventingFunctionUrlNoAuth)
-from couchbase.management.logic.eventing_logic import QueryScanConsistency
 from tests.environments import CollectionType
 from tests.environments.test_environment import TestEnvironment
 from tests.test_features import EnvironmentFeatures

@@ -32,6 +32,7 @@ import pytest
 
 import couchbase.search as search
 from couchbase.auth import AuthDomain
+from couchbase.logic.n1ql import QueryScanConsistency
 from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionBucketAccess,
                                            EventingFunctionBucketBinding,
@@ -48,7 +49,6 @@ from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionUrlAuthDigest,
                                            EventingFunctionUrlBinding,
                                            EventingFunctionUrlNoAuth)
-from couchbase.management.logic.eventing_logic import QueryScanConsistency
 from couchbase.management.users import (Role,
                                         RoleAndOrigins,
                                         User)
