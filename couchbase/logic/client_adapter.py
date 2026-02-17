@@ -40,6 +40,7 @@ class ClientAdapter:
 
     def __init__(self, connect_req: CreateConnectionRequest, **kwargs: Any) -> None:
         self._connection: Optional[PyCapsuleType] = None
+        self._closed = False
         self._connect_req = connect_req
         self._binding_map = BindingMap()
         # for testing we sometimes want to skip the actual C++ core connection
@@ -54,17 +55,35 @@ class ClientAdapter:
     def connection(self) -> Optional[PyCapsuleType]:
         return self._connection
 
-    def close_bucket(self, bucket_name: str) -> None:
+    def _ensure_not_closed(self) -> None:
+        if self._closed:
+            raise RuntimeError(
+                'Cannot perform operations on a closed cluster. Create a new cluster instance to reconnect.')
+
+    def _ensure_connected(self) -> None:
         if not self.connected:
-            raise RuntimeError('Cannot close a bucket if a connection has not been established.')
+            raise RuntimeError('Cannot perform operations without first establishing a connection.')
+
+    def close_bucket(self, bucket_name: str) -> None:
+        self._ensure_not_closed()
+        self._ensure_connected()
         self.execute_bucket_request(CloseBucketRequest(bucket_name, OpenOrCloseBucket.CLOSE))
 
     def close_connection(self) -> None:
+        if self._closed:
+            return  # Already closed, idempotent behavior
+
         if not self.connected:
-            raise RuntimeError('Cannot close a connection if one has not been established.')
+            # Not currently connected, but mark as closed anyway
+            self._closed = True
+            return
+
         self.execute_cluster_request(CloseConnectionRequest())
+        self._closed = True
+        self._connection = None
 
     def execute_bucket_request(self, req: BucketRequest) -> Any:
+        self._ensure_not_closed()
         req_dict = req.req_to_dict(self._connection)
         ret = self._execute_req(req.op_name, req_dict)
         if isinstance(ret, BaseCouchbaseException):
@@ -72,6 +91,7 @@ class ClientAdapter:
         return ret
 
     def execute_collection_request(self, req: CollectionRequest) -> Any:
+        self._ensure_not_closed()
         req_dict = req.req_to_dict(self._connection)
         ret = self._execute_req(req.op_name, req_dict)
         if isinstance(ret, BaseCouchbaseException):
@@ -79,6 +99,7 @@ class ClientAdapter:
         return ret
 
     def execute_cluster_request(self, req: ClusterRequest) -> Any:
+        self._ensure_not_closed()
         req_dict = req.req_to_dict(self._connection)
         ret = self._execute_req(req.op_name, req_dict)
         if isinstance(ret, BaseCouchbaseException):
@@ -86,6 +107,7 @@ class ClientAdapter:
         return ret
 
     def execute_mgmt_request(self, req: MgmtRequest) -> Any:
+        self._ensure_not_closed()
         req_dict = req.req_to_dict(self._connection)
         ret = self._execute_req(req.op_name, req_dict)
         if isinstance(ret, BaseCouchbaseException):
@@ -93,8 +115,8 @@ class ClientAdapter:
         return ret
 
     def open_bucket(self, bucket_name: str) -> None:
-        if not self.connected:
-            raise RuntimeError('Cannot open a bucket if a connection has not been established.')
+        self._ensure_not_closed()
+        self._ensure_connected()
         self.execute_bucket_request(OpenBucketRequest(bucket_name, OpenOrCloseBucket.OPEN))
 
     def _execute_connect_request(self) -> None:

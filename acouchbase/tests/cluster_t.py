@@ -20,7 +20,8 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import get_event_loop
+from acouchbase.cluster import Cluster, get_event_loop
+from couchbase.auth import PasswordAuthenticator
 from couchbase.diagnostics import (ClusterState,
                                    EndpointPingReport,
                                    EndpointState,
@@ -30,7 +31,9 @@ from couchbase.exceptions import (InternalServerFailureException,
                                   InvalidArgumentException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
-from couchbase.options import DiagnosticsOptions, PingOptions
+from couchbase.options import (ClusterOptions,
+                               DiagnosticsOptions,
+                               PingOptions)
 from couchbase.result import DiagnosticsResult, PingResult
 
 from ._test_utils import TestEnvironment
@@ -218,3 +221,139 @@ class ClusterDiagnosticsTests:
                 assert data[0]['remote'] is not None
                 assert data[0]['local'] is not None
                 assert data[0]['state'] is not None
+
+    @pytest.mark.asyncio
+    async def test_await_on_close_cluster(self, cb_env):
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        cluster = Cluster(conn_string, opts)
+        assert cluster._impl.connected is False
+        await cluster.close()
+        assert cluster._impl.connected is False
+
+    @pytest.mark.asyncio
+    async def test_multiple_close_cluster(self, cb_env):
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        cluster = await Cluster.connect(conn_string, opts)
+        assert cluster._impl.connected is True
+        for _ in range(10):
+            await cluster.close()
+        assert cluster._impl.connected is False
+
+    @pytest.mark.asyncio
+    async def test_operations_after_close(self, cb_env):
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        cluster = await Cluster.connect(conn_string, opts)
+        assert cluster._impl.connected is True
+
+        # Close the cluster
+        await cluster.close()
+        assert cluster._impl.connected is False
+
+        # Verify operations after close raise RuntimeError
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.ping()
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.diagnostics()
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            cluster.bucket(cb_env.bucket.name)
+
+    @pytest.mark.asyncio
+    async def test_connected_property(self, cb_env):
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        cluster = await Cluster.connect(conn_string, opts)
+        assert cluster._impl.connected is True
+
+        # Close the cluster
+        await cluster.close()
+
+        assert cluster._impl.connected is False
+
+    @pytest.mark.asyncio
+    async def test_streaming_operations_after_close(self, cb_env):
+        """Verify all streaming operations raise RuntimeError after cluster close"""
+        from couchbase.search import MatchQuery
+
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        cluster = await Cluster.connect(conn_string, opts)
+
+        # Close the cluster
+        await cluster.close()
+
+        # Test cluster.query
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            cluster.query("SELECT 1=1")
+
+        # Test cluster.analytics_query
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            cluster.analytics_query("SELECT 1=1")
+
+        # Test cluster.search
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            cluster.search_query("dummy-index", MatchQuery("test"))
+
+        # Test bucket.view_query
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            bucket = cluster.bucket(cb_env.bucket.name)
+            bucket.view_query("dummy-design", "dummy-view")
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    @pytest.mark.asyncio
+    async def test_management_operations_after_close(self, cb_env):
+        from couchbase.management.views import DesignDocumentNamespace
+
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        opts = ClusterOptions(auth)
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket_name = cb_env.bucket.name
+
+        # Get bucket instance before closing (for bucket-level manager tests)
+        bucket = cluster.bucket(bucket_name)
+
+        # Close the cluster
+        await cluster.close()
+        assert cluster._impl.connected is False
+
+        # Test cluster-level management APIs
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.buckets().get_all_buckets()
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.users().get_all_users()
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.query_indexes().get_all_indexes(bucket_name)
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.analytics_indexes().get_all_datasets()
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.search_indexes().get_all_indexes()
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await cluster.eventing_functions().get_all_functions()
+
+        # Test bucket-level management APIs
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await bucket.collections().get_all_scopes()
+
+        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
+            await bucket.view_indexes().get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT)

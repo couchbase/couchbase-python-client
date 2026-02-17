@@ -89,6 +89,8 @@ class ScopeImpl:
         return self._scope_name
 
     def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
+        self._client_adapter._ensure_not_closed()
+        self._client_adapter._ensure_connected()
         # If the analytics_query was provided a timeout we will use that value for the streaming timeout
         # when the streaming object is created in the bindings.  If the analytics_query does not specify a
         # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
@@ -101,6 +103,8 @@ class ScopeImpl:
                                                                            streaming_timeout=streaming_timeout))
 
     def query(self, req: QueryRequest) -> QueryResult:
+        self._client_adapter._ensure_not_closed()
+        self._client_adapter._ensure_connected()
         # If the n1ql_query was provided a timeout we will use that value for the streaming timeout
         # when the streaming object is created in the bindings.  If the n1ql_query does not specify a
         # timeout, the streaming_timeout defaults to cluster's query_timeout (set here). If the cluster
@@ -113,6 +117,8 @@ class ScopeImpl:
                                                              streaming_timeout=streaming_timeout))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
+        self._client_adapter._ensure_not_closed()
+        self._client_adapter._ensure_connected()
         # If the search_query was provided a timeout we will use that value for the streaming timeout
         # when the streaming object is created in the bindings.  If the search_query does not specify a
         # timeout, the streaming_timeout defaults to cluster's search_timeout (set here). If the cluster

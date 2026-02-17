@@ -117,8 +117,9 @@ class AsyncBucketImpl:
 
     def view_query(self, req: ViewQueryRequest) -> ViewResult:
         """**INTERNAL**"""
+        self._client_adapter._ensure_not_closed()
         if not self.connected or not self.bucket_connected:
-            raise RuntimeError('Cannot attempt to execute a view query to establishing a connection.')
+            raise RuntimeError('Cannot perform operations without first establishing a connection.')
         # If the view_query was provided a timeout we will use that value for the streaming timeout
         # when the streaming object is created in the bindings.  If the view_query does not specify a
         # timeout, the streaming_timeout defaults to cluster's view_timeout (set here). If the cluster

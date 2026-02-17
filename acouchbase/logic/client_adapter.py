@@ -60,6 +60,7 @@ class AsyncClientAdapter:
         self._binding_map = BindingMap()
         self._close_ft: Optional[Future[None]] = None
         self._connect_ft: Optional[Future[None]] = None
+        self._closed = False
         self._create_connection()
 
     @property
@@ -78,13 +79,26 @@ class AsyncClientAdapter:
     def loop(self) -> AbstractEventLoop:
         return self._loop
 
+    def _ensure_not_closed(self) -> None:
+        if self._closed:
+            raise RuntimeError(
+                'Cannot perform operations on a closed cluster. Create a new cluster instance to reconnect.')
+
+    def _ensure_connected(self) -> None:
+        if not self.connected:
+            raise RuntimeError('Cannot perform operations without first establishing a connection.')
+
     async def close_connection(self) -> None:
+        if self._closed:
+            return  # Already closed, idempotent behavior
+
         self._close_ft = self._execute_close_connection_request()
         await self._close_ft
+        self._closed = True
 
     def execute_bucket_request(self, req: BucketRequest) -> Future[Any]:
-        if not self.connected:
-            raise RuntimeError('Cannot attempt bucket request without first establishing a connection.')
+        self._ensure_not_closed()
+        self._ensure_connected()
 
         ft = self._loop.create_future()
 
@@ -104,6 +118,8 @@ class AsyncClientAdapter:
         return self.execute_bucket_request(req)
 
     def execute_cluster_request(self, req: ClusterRequest) -> Future[Any]:
+        self._ensure_not_closed()
+
         ft = self._loop.create_future()
 
         def _callback(result) -> None:
@@ -122,6 +138,7 @@ class AsyncClientAdapter:
         return ft
 
     def execute_cluster_request_sync(self, req: ClusterRequest) -> Any:
+        self._ensure_not_closed()
         req_dict = req.req_to_dict(self._connection)
         ret = self._execute_req_sync(req.op_name, req_dict)
         if isinstance(ret, BaseCouchbaseException):
@@ -129,8 +146,8 @@ class AsyncClientAdapter:
         return ret
 
     def execute_collection_request(self, req: CollectionRequest) -> Future[Any]:
-        if not self.connected:
-            raise RuntimeError('Cannot attempt collection request without first establishing a connection.')
+        self._ensure_not_closed()
+        self._ensure_connected()
 
         ft = self._loop.create_future()
 
@@ -146,6 +163,8 @@ class AsyncClientAdapter:
         return ft
 
     def execute_connect_bucket_request(self, bucket_name: str) -> Future[None]:
+        self._ensure_not_closed()
+
         req = OpenBucketRequest(bucket_name, OpenOrCloseBucket.OPEN)
         ft = self._loop.create_future()
 
@@ -167,6 +186,8 @@ class AsyncClientAdapter:
         return ft
 
     def execute_mgmt_request(self, req: MgmtRequest) -> Future[Any]:
+        self._ensure_not_closed()
+
         ft = self._loop.create_future()
 
         def _callback(ret: Any) -> None:
@@ -187,6 +208,7 @@ class AsyncClientAdapter:
         return ft
 
     async def wait_until_connected(self) -> None:
+        self._ensure_not_closed()
         if self.connected:
             return
         if self._connect_ft is None:
@@ -194,6 +216,7 @@ class AsyncClientAdapter:
         await self._connect_ft
 
     def _create_connection(self) -> None:
+        self._ensure_not_closed()
         if self._close_ft is not None and self._close_ft.done() is not True:
             raise RuntimeError('Cannot attempt to connect when close attempt is pending.')
 
@@ -235,6 +258,11 @@ class AsyncClientAdapter:
 
         req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
         if not self.connected:
+            # If we're closed, don't try to reconnect just to close again
+            if self._closed:
+                ft.set_result(None)
+                return ft
+
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
             chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
         else:

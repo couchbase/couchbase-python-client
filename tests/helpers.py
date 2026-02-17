@@ -326,6 +326,10 @@ class CouchbaseTestEnvironment:
         self._cluster_config = cluster_config
 
     @property
+    def config(self):
+        return self._cluster_config
+
+    @property
     def cluster(self):
         return self._cluster
 
