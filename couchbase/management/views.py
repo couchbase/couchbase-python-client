@@ -19,6 +19,8 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Iterable)
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import MgmtOperationType, ViewIndexMgmtOperationType
 from couchbase.management.logic.view_index_mgmt_impl import ViewIndexMgmtImpl
 from couchbase.management.logic.view_index_mgmt_types import View  # noqa: F401
 from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
@@ -32,12 +34,13 @@ from couchbase.management.options import (DropDesignDocumentOptions,
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
 
 
 class ViewIndexManager:
 
-    def __init__(self, client_adapter: ClientAdapter, bucket_name: str) -> str:
-        self._impl = ViewIndexMgmtImpl(client_adapter)
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, observability_instruments: ObservabilityInstruments) -> None:  # noqa: E501
+        self._impl = ViewIndexMgmtImpl(client_adapter, observability_instruments)
         self._bucket_name = bucket_name
 
     def get_design_document(self,
@@ -46,23 +49,29 @@ class ViewIndexManager:
                             *options,   # type: GetDesignDocumentOptions
                             **kwargs    # type: Any
                             ) -> DesignDocument:
-        req = self._impl.request_builder.build_get_design_document_request(self._bucket_name,
-                                                                           design_doc_name,
-                                                                           namespace,
-                                                                           *options,
-                                                                           **kwargs)
-        return self._impl.get_design_document(req)
+        op_type = ViewIndexMgmtOperationType.ViewIndexGet
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_design_document_request(self._bucket_name,
+                                                                               design_doc_name,
+                                                                               namespace,
+                                                                               obs_handler,
+                                                                               *options,
+                                                                               **kwargs)
+            return self._impl.get_design_document(req, obs_handler)
 
     def get_all_design_documents(self,
                                  namespace,     # type: DesignDocumentNamespace
                                  *options,      # type: GetAllDesignDocumentsOptions
                                  **kwargs       # type: Any
                                  ) -> Iterable[DesignDocument]:
-        req = self._impl.request_builder.build_get_all_design_documents_request(self._bucket_name,
-                                                                                namespace,
-                                                                                *options,
-                                                                                **kwargs)
-        return self._impl.get_all_design_documents(req)
+        op_type = ViewIndexMgmtOperationType.ViewIndexGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_design_documents_request(self._bucket_name,
+                                                                                    namespace,
+                                                                                    obs_handler,
+                                                                                    *options,
+                                                                                    **kwargs)
+            return self._impl.get_all_design_documents(req, obs_handler)
 
     def upsert_design_document(self,
                                design_doc_data,     # type: DesignDocument
@@ -70,12 +79,15 @@ class ViewIndexManager:
                                *options,            # type: UpsertDesignDocumentOptions
                                **kwargs             # type: Any
                                ) -> None:
-        req = self._impl.request_builder.build_upsert_design_document_request(self._bucket_name,
-                                                                              design_doc_data,
-                                                                              namespace,
-                                                                              *options,
-                                                                              **kwargs)
-        self._impl.upsert_design_document(req)
+        op_type = ViewIndexMgmtOperationType.ViewIndexUpsert
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_upsert_design_document_request(self._bucket_name,
+                                                                                  design_doc_data,
+                                                                                  namespace,
+                                                                                  obs_handler,
+                                                                                  *options,
+                                                                                  **kwargs)
+            self._impl.upsert_design_document(req, obs_handler)
 
     def drop_design_document(self,
                              design_doc_name,   # type: str
@@ -83,16 +95,26 @@ class ViewIndexManager:
                              *options,          # type: DropDesignDocumentOptions
                              **kwargs           # type: Any
                              ) -> None:
-        req = self._impl.request_builder.build_drop_design_document_request(self._bucket_name,
-                                                                            design_doc_name,
-                                                                            namespace,
-                                                                            *options,
-                                                                            **kwargs)
-        self._impl.drop_design_document(req)
+        op_type = ViewIndexMgmtOperationType.ViewIndexDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_design_document_request(self._bucket_name,
+                                                                                design_doc_name,
+                                                                                namespace,
+                                                                                obs_handler,
+                                                                                *options,
+                                                                                **kwargs)
+            self._impl.drop_design_document(req, obs_handler)
 
     def publish_design_document(self,
                                 design_doc_name,    # type: str
                                 *options,           # type: PublishDesignDocumentOptions
                                 **kwargs            # type: Any
                                 ) -> None:
-        self._impl.publish_design_document(self._bucket_name, design_doc_name, *options, **kwargs)
+        op_type = MgmtOperationType.ViewIndexPublish
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_publish_design_document_request(self._bucket_name,
+                                                                                   design_doc_name,
+                                                                                   obs_handler,
+                                                                                   *options,
+                                                                                   **kwargs)
+            self._impl.publish_design_document(req, obs_handler)

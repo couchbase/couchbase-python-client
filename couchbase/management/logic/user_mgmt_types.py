@@ -490,6 +490,15 @@ class UserMgmtRequest(MgmtRequest):
         if errback is not None:
             mgmt_kwargs['errback'] = errback
 
+        if obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if obs_handler.is_legacy_tracer:
+                legacy_request_span = obs_handler.legacy_request_span
+                if legacy_request_span:
+                    mgmt_kwargs['parent_span'] = legacy_request_span
+            else:
+                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
+
         return mgmt_kwargs
 
 
@@ -503,9 +512,10 @@ class ChangePasswordRequest(UserMgmtRequest):
         return UserMgmtOperationType.ChangePassword.value
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        op_kwargs = super().req_to_dict(callback=callback, errback=errback)
+        op_kwargs = super().req_to_dict(obs_handler=obs_handler, callback=callback, errback=errback)
         pw = op_kwargs.pop('password')
         op_kwargs['newPassword'] = pw
         return op_kwargs

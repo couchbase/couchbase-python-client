@@ -19,6 +19,7 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Tuple)
 
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.management.logic.eventing_function_mgmt_types import (EVENTING_FUNCTION_MGMT_ERROR_MAP,
                                                                      DeployFunctionRequest,
                                                                      DropFunctionRequest,
@@ -50,11 +51,14 @@ class EventingFunctionMgmtRequestBuilder:
     def build_deploy_function_request(self,
                                       name: str,
                                       scope_context: Optional[Tuple[str, str]] = None,
+                                      obs_handler: ObservableRequestHandler = None,
                                       *options: object,
                                       **kwargs: object) -> DeployFunctionRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = DeployFunctionRequest(self._error_map,
                                     name=name,
                                     bucket_name=bucket_name,
@@ -68,11 +72,14 @@ class EventingFunctionMgmtRequestBuilder:
     def build_drop_function_request(self,
                                     name: str,
                                     scope_context: Optional[Tuple[str, str]] = None,
+                                    obs_handler: ObservableRequestHandler = None,
                                     *options: object,
                                     **kwargs: object) -> DropFunctionRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = DropFunctionRequest(self._error_map,
                                   name=name,
                                   bucket_name=bucket_name,
@@ -85,11 +92,14 @@ class EventingFunctionMgmtRequestBuilder:
 
     def build_get_all_functions_request(self,
                                         scope_context: Optional[Tuple[str, str]] = None,
+                                        obs_handler: ObservableRequestHandler = None,
                                         *options: object,
                                         **kwargs: object) -> GetAllFunctionsRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = GetAllFunctionsRequest(self._error_map,
                                      bucket_name=bucket_name,
                                      scope_name=scope_name,
@@ -102,9 +112,12 @@ class EventingFunctionMgmtRequestBuilder:
     def build_get_function_request(self,
                                    name: str,
                                    scope_context: Optional[Tuple[str, str]] = None,
+                                   obs_handler: ObservableRequestHandler = None,
                                    *options: object,
                                    **kwargs: object) -> GetFunctionRequest:
         final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetFunctionRequest(self._error_map,
@@ -119,11 +132,14 @@ class EventingFunctionMgmtRequestBuilder:
 
     def build_get_functions_status_request(self,
                                            scope_context: Optional[Tuple[str, str]] = None,
+                                           obs_handler: ObservableRequestHandler = None,
                                            *options: object,
                                            **kwargs: object) -> GetFunctionsStatusRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = GetFunctionsStatusRequest(self._error_map,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
@@ -136,11 +152,14 @@ class EventingFunctionMgmtRequestBuilder:
     def build_pause_function_request(self,
                                      name: str,
                                      scope_context: Optional[Tuple[str, str]] = None,
+                                     obs_handler: ObservableRequestHandler = None,
                                      *options: object,
                                      **kwargs: object) -> PauseFunctionRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = PauseFunctionRequest(self._error_map,
                                    name=name,
                                    bucket_name=bucket_name,
@@ -154,11 +173,14 @@ class EventingFunctionMgmtRequestBuilder:
     def build_resume_function_request(self,
                                       name: str,
                                       scope_context: Optional[Tuple[str, str]] = None,
+                                      obs_handler: ObservableRequestHandler = None,
                                       *options: object,
                                       **kwargs: object) -> ResumeFunctionRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = ResumeFunctionRequest(self._error_map,
                                     name=name,
                                     bucket_name=bucket_name,
@@ -172,11 +194,14 @@ class EventingFunctionMgmtRequestBuilder:
     def build_undeploy_function_request(self,
                                         name: str,
                                         scope_context: Optional[Tuple[str, str]] = None,
+                                        obs_handler: ObservableRequestHandler = None,
                                         *options: object,
                                         **kwargs: object) -> UndeployFunctionRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = UndeployFunctionRequest(self._error_map,
                                       name=name,
                                       bucket_name=bucket_name,
@@ -190,11 +215,14 @@ class EventingFunctionMgmtRequestBuilder:
     def build_upsert_function_request(self,
                                       function: EventingFunction,
                                       scope_context: Optional[Tuple[str, str]] = None,
+                                      obs_handler: ObservableRequestHandler = None,
                                       *options: object,
                                       **kwargs: object) -> UpsertFunctionRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = UpsertFunctionRequest(self._error_map,
                                     function=function.as_dict(),
                                     bucket_name=bucket_name,

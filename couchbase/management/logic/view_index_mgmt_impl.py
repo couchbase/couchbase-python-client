@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
 
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.logic.operation_types import ViewIndexMgmtOperationType
 from couchbase.management.logic.view_index_mgmt_req_builder import ViewIndexMgmtRequestBuilder
 from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
 
@@ -25,54 +27,88 @@ if TYPE_CHECKING:
     from couchbase.management.logic.view_index_mgmt_types import (DropDesignDocumentRequest,
                                                                   GetAllDesignDocumentsRequest,
                                                                   GetDesignDocumentRequest,
+                                                                  PublishDesignDocumentRequest,
                                                                   UpsertDesignDocumentRequest)
 
 
 class ViewIndexMgmtImpl:
-    def __init__(self, client_adapter: ClientAdapter) -> None:
+    def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = ViewIndexMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
+
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._observability_instruments
 
     @property
     def request_builder(self) -> ViewIndexMgmtRequestBuilder:
         """**INTERNAL**"""
         return self._request_builder
 
-    def drop_design_document(self, req: DropDesignDocumentRequest) -> None:
+    def drop_design_document(
+        self,
+        req: DropDesignDocumentRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def get_all_design_documents(self, req: GetAllDesignDocumentsRequest) -> Iterable[DesignDocument]:
+    def get_all_design_documents(
+        self,
+        req: GetAllDesignDocumentsRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Iterable[DesignDocument]:
         """**INTERNAL**"""
-        ret = self._client_adapter.execute_mgmt_request(req)
+        ret = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_ddocs = ret.raw_result['design_documents']
         return [DesignDocument.from_json(ddoc) for ddoc in raw_ddocs]
 
-    def get_design_document(self, req: GetDesignDocumentRequest) -> DesignDocument:
+    def get_design_document(
+        self,
+        req: GetDesignDocumentRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> DesignDocument:
         """**INTERNAL**"""
-        ret = self._client_adapter.execute_mgmt_request(req)
+        ret = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_ddoc = ret.raw_result['document']
         return DesignDocument.from_json(raw_ddoc)
 
-    def publish_design_document(self,
-                                bucket_name: str,
-                                design_doc_name: str,
-                                *options: object,
-                                **kwargs: object) -> None:
+    def publish_design_document(
+        self,
+        req: PublishDesignDocumentRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> None:
         """**INTERNAL**"""
-        req = self._request_builder.build_get_design_document_request(bucket_name,
-                                                                      design_doc_name,
-                                                                      DesignDocumentNamespace.DEVELOPMENT,
-                                                                      *options,
-                                                                      **kwargs)
-        design_doc = self.get_design_document(req)
-        up_req = self._request_builder.build_upsert_design_document_request(bucket_name,
-                                                                            design_doc,
-                                                                            DesignDocumentNamespace.PRODUCTION,
-                                                                            *options,
-                                                                            **kwargs)
-        self.upsert_design_document(up_req)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=obs_handler.wrapped_span)
 
-    def upsert_design_document(self, req: UpsertDesignDocumentRequest) -> None:
+        op_type = ViewIndexMgmtOperationType.ViewIndexGet
+        with ObservableRequestHandler(op_type, self._observability_instruments) as sub_obs_handler:
+            sub_obs_handler.create_http_span(bucket_name=req.bucket_name, parent_span=parent_span)
+            get_req = self._request_builder.build_get_design_document_request(
+                req.bucket_name,
+                req.design_doc_name,
+                DesignDocumentNamespace.DEVELOPMENT,
+                sub_obs_handler,
+            )
+            design_doc = self.get_design_document(get_req, sub_obs_handler)
+
+        op_type = ViewIndexMgmtOperationType.ViewIndexUpsert
+        with ObservableRequestHandler(op_type, self._observability_instruments) as sub_obs_handler:
+            sub_obs_handler.create_http_span(bucket_name=req.bucket_name, parent_span=parent_span)
+            up_req = self._request_builder.build_upsert_design_document_request(
+                req.bucket_name,
+                design_doc,
+                DesignDocumentNamespace.PRODUCTION,
+                sub_obs_handler,
+            )
+            self.upsert_design_document(up_req, sub_obs_handler)
+
+    def upsert_design_document(
+        self,
+        req: UpsertDesignDocumentRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

@@ -628,7 +628,7 @@ class Cluster:
         Returns:
             :class:`~couchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager` instance.
         """  # noqa: E501
-        return UserManager(self._impl._client_adapter)
+        return UserManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def query_indexes(self) -> QueryIndexManager:
         """
@@ -648,7 +648,7 @@ class Cluster:
         Returns:
             :class:`~couchbase.management.analytics.AnalyticsIndexManager`: An :class:`~couchbase.management.analytics.AnalyticsIndexManager` instance.
         """  # noqa: E501
-        return AnalyticsIndexManager(self._impl._client_adapter)
+        return AnalyticsIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def search_indexes(self) -> SearchIndexManager:
         """
@@ -659,7 +659,7 @@ class Cluster:
             :class:`~couchbase.management.search.SearchIndexManager`: A :class:`~couchbase.management.search.SearchIndexManager` instance.
 
         """  # noqa: E501
-        return SearchIndexManager(self._impl._client_adapter)
+        return SearchIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def eventing_functions(self) -> EventingFunctionManager:
         """
@@ -674,7 +674,7 @@ class Cluster:
             :class:`~couchbase.management.eventing.EventingFunctionManager`: An :class:`~couchbase.management.eventing.EventingFunctionManager` instance.
 
         """  # noqa: E501
-        return EventingFunctionManager(self._impl._client_adapter)
+        return EventingFunctionManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     @staticmethod
     def connect(connstr,  # type: str

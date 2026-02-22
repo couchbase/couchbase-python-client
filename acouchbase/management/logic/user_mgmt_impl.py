@@ -25,6 +25,7 @@ from couchbase.management.logic.user_mgmt_types import (Group,
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
     from couchbase.management.logic.user_mgmt_types import (ChangePasswordRequest,
                                                             DropGroupRequest,
                                                             DropUserRequest,
@@ -38,9 +39,10 @@ if TYPE_CHECKING:
 
 
 class AsyncUserMgmtImpl:
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self, client_adapter: AsyncClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = UserMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -48,25 +50,30 @@ class AsyncUserMgmtImpl:
         return self._client_adapter.loop
 
     @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._observability_instruments
+
+    @property
     def request_builder(self) -> UserMgmtRequestBuilder:
         """**INTERNAL**"""
         return self._request_builder
 
-    async def change_password(self, req: ChangePasswordRequest) -> None:
+    async def change_password(self, req: ChangePasswordRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def drop_group(self, req: DropGroupRequest) -> None:
+    async def drop_group(self, req: DropGroupRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def drop_user(self, req: DropUserRequest) -> None:
+    async def drop_user(self, req: DropUserRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_all_groups(self, req: GetAllGroupsRequest) -> Iterable[Group]:
+    async def get_all_groups(self, req: GetAllGroupsRequest, obs_handler: ObservableRequestHandler) -> Iterable[Group]:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         groups = []
         raw_groups = ret.raw_result['groups']
         for g in raw_groups:
@@ -75,9 +82,13 @@ class AsyncUserMgmtImpl:
 
         return groups
 
-    async def get_all_users(self, req: GetAllUsersRequest) -> Iterable[UserAndMetadata]:
+    async def get_all_users(
+        self,
+        req: GetAllUsersRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Iterable[UserAndMetadata]:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         users = []
         raw_users = ret.raw_result['users']
         for u in raw_users:
@@ -86,15 +97,23 @@ class AsyncUserMgmtImpl:
 
         return users
 
-    async def get_group(self, req: GetGroupRequest) -> Group:
+    async def get_group(
+        self,
+        req: GetGroupRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Group:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_group = ret.raw_result['group']
         return Group.create_group(raw_group)
 
-    async def get_roles(self, req: GetRolesRequest) -> Iterable[RoleAndDescription]:
+    async def get_roles(
+        self,
+        req: GetRolesRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Iterable[RoleAndDescription]:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         roles = []
         raw_roles = ret.raw_result['roles']
         for r in raw_roles:
@@ -103,16 +122,16 @@ class AsyncUserMgmtImpl:
 
         return roles
 
-    async def get_user(self, req: GetUserRequest) -> UserAndMetadata:
+    async def get_user(self, req: GetUserRequest, obs_handler: ObservableRequestHandler) -> UserAndMetadata:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_user = ret.raw_result['user']
         return UserAndMetadata.create_user_and_metadata(raw_user)
 
-    async def upsert_group(self, req: UpsertGroupRequest) -> None:
+    async def upsert_group(self, req: UpsertGroupRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def upsert_user(self, req: UpsertUserRequest) -> None:
+    async def upsert_user(self, req: UpsertUserRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

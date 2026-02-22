@@ -25,7 +25,7 @@ from typing import (Any,
 
 from couchbase.exceptions import DesignDocumentNotFoundException, RateLimitedException
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import ViewIndexMgmtOperationType
+from couchbase.logic.operation_types import MgmtOperationType, ViewIndexMgmtOperationType
 from couchbase.management.logic.mgmt_req import MgmtRequest
 
 
@@ -169,6 +169,15 @@ class ViewIndexMgmtRequest(MgmtRequest):
         if errback is not None:
             mgmt_kwargs['errback'] = errback
 
+        if obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if obs_handler.is_legacy_tracer:
+                legacy_request_span = obs_handler.legacy_request_span
+                if legacy_request_span:
+                    mgmt_kwargs['parent_span'] = legacy_request_span
+            else:
+                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
+
         return mgmt_kwargs
 
 
@@ -219,6 +228,22 @@ class UpsertDesignDocumentRequest(ViewIndexMgmtRequest):
     @property
     def op_name(self) -> str:
         return ViewIndexMgmtOperationType.ViewIndexUpsert.value
+
+
+@dataclass
+class PublishDesignDocumentRequest:
+    """Request for publish_design_document.
+
+    This is a Python-only composite operation (get + upsert) that doesn't
+    have a corresponding C++ core request. This class holds the necessary
+    info for the operation to keep the API consistent with other operations.
+    """
+    bucket_name: str
+    design_doc_name: str
+
+    @property
+    def op_name(self) -> str:
+        return MgmtOperationType.ViewIndexPublish.value
 
 
 VIEW_INDEX_MGMT_ERROR_MAP: Dict[str, Exception] = {

@@ -61,6 +61,7 @@ class DatastructureOperationType(Enum):
 
 class MgmtOperationType(Enum):
     QueryIndexWatchIndexes = 'query_index_watch_indexes'
+    ViewIndexPublish = 'view_index_publish'
 
 # TODO:  needed?  All scope operations are covered by StreamingOperationType.
 # class ScopeOperationType(Enum):

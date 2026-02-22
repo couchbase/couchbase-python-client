@@ -304,12 +304,15 @@ class UserOptions(dict):
 
     def __init__(self,
                  domain_name="local",     # type: Optional[str]
-                 timeout=None            # type: Optional[timedelta]
+                 timeout=None,            # type: Optional[timedelta]
+                 parent_span=None                # type: Optional[RequestSpan]
                  ):
 
         kwargs = {"domain_name": domain_name}
         if timeout:
             kwargs["timeout"] = timeout
+        if parent_span:
+            kwargs["parent_span"] = parent_span
 
         super().__init__(**kwargs)
 
@@ -324,9 +327,10 @@ class GetUserOptions(UserOptions):
     Args:
         domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
             to ``local``.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     def __init__(self, **kwargs):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
@@ -343,9 +347,10 @@ class GetAllUsersOptions(UserOptions):
     Args:
         domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
             to ``local``.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
 
 class UpsertUserOptions(UserOptions):
@@ -358,9 +363,10 @@ class UpsertUserOptions(UserOptions):
     Args:
         domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
             to ``local``.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
 
 class ChangePasswordOptions(UserOptions):
@@ -373,9 +379,10 @@ class ChangePasswordOptions(UserOptions):
     Args:
         domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
             to ``local``.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
 
 class DropUserOptions(UserOptions):
@@ -388,9 +395,10 @@ class DropUserOptions(UserOptions):
     Args:
         domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
             to ``local``.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
 
 class GetRolesOptions(dict):
@@ -401,17 +409,21 @@ class GetRolesOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     def __init__(
         self,
-        timeout=None  # type: Optional[timedelta]
+        timeout=None,  # type: Optional[timedelta]
+        parent_span=None      # type: Optional[RequestSpan]
     ):
         kwargs = {}
         if timeout:
             kwargs["timeout"] = timeout
+        if parent_span:
+            kwargs["parent_span"] = parent_span
 
         super().__init__(**kwargs)
 
@@ -424,17 +436,21 @@ class DropGroupOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     def __init__(
         self,
-        timeout=None  # type: Optional[timedelta]
+        timeout=None,  # type: Optional[timedelta]
+        parent_span=None      # type: Optional[RequestSpan]
     ):
         kwargs = {}
         if timeout:
             kwargs["timeout"] = timeout
+        if parent_span:
+            kwargs["parent_span"] = parent_span
 
         super().__init__(**kwargs)
 
@@ -447,17 +463,21 @@ class GetGroupOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     def __init__(
         self,
-        timeout=None  # type: Optional[timedelta]
+        timeout=None,  # type: Optional[timedelta]
+        parent_span=None      # type: Optional[RequestSpan]
     ):
         kwargs = {}
         if timeout:
             kwargs["timeout"] = timeout
+        if parent_span:
+            kwargs["parent_span"] = parent_span
 
         super().__init__(**kwargs)
 
@@ -470,17 +490,21 @@ class GetAllGroupsOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     def __init__(
         self,
-        timeout=None  # type: Optional[timedelta]
+        timeout=None,  # type: Optional[timedelta]
+        parent_span=None      # type: Optional[RequestSpan]
     ):
         kwargs = {}
         if timeout:
             kwargs["timeout"] = timeout
+        if parent_span:
+            kwargs["parent_span"] = parent_span
 
         super().__init__(**kwargs)
 
@@ -493,17 +517,21 @@ class UpsertGroupOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     def __init__(
         self,
-        timeout=None  # type: Optional[timedelta]
+        timeout=None,  # type: Optional[timedelta]
+        parent_span=None      # type: Optional[RequestSpan]
     ):
         kwargs = {}
         if timeout:
             kwargs["timeout"] = timeout
+        if parent_span:
+            kwargs["parent_span"] = parent_span
 
         super().__init__(**kwargs)
 
@@ -740,6 +768,7 @@ class BuildDeferredQueryIndexOptions(dict):
             Specifies the scope of the index.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
     """  # noqa: E501
     @overload
     def __init__(self,
@@ -761,7 +790,8 @@ class CreateDataverseOptions(dict):
     @overload
     def __init__(self,
                  timeout=None,              # type: timedelta
-                 ignore_if_exists=False     # type: bool
+                 ignore_if_exists=False,    # type: bool
+                 parent_span=None                  # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -778,7 +808,8 @@ class DropDataverseOptions(dict):
     @overload
     def __init__(self,
                  timeout=None,                  # type: timedelta
-                 ignore_if_not_exists=False     # type: bool
+                 ignore_if_not_exists=False,    # type: bool
+                 parent_span=None                      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -797,7 +828,8 @@ class CreateDatasetOptions(dict):
                  timeout=None,                  # type: Optional[timedelta]
                  ignore_if_exists=None,        # type: Optional[bool]
                  condition=None,                # type: Optional[str]
-                 dataverse_name=None      # type: Optional[str]
+                 dataverse_name=None,           # type: Optional[str]
+                 parent_span=None                      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -824,6 +856,7 @@ class DropDatasetOptions(dict):
                  timeout=None,                  # type: Optional[timedelta]
                  ignore_if_not_exists=None,    # type: Optional[bool]
                  dataverse_name=None,           # type: Optional[str]
+                 parent_span=None                      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -843,7 +876,8 @@ class DropDatasetOptions(dict):
 class GetAllDatasetOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None                  # type: Optional[timedelta]
+                 timeout=None,                 # type: Optional[timedelta]
+                 parent_span=None                     # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -857,7 +891,8 @@ class CreateAnalyticsIndexOptions(dict):
     def __init__(self,
                  timeout=None,              # type: Optional[timedelta]
                  ignore_if_exists=None,    # type: Optional[bool]
-                 dataverse_name=None,  # type: Optional[str]
+                 dataverse_name=None,       # type: Optional[str]
+                 parent_span=None                  # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -879,7 +914,8 @@ class DropAnalyticsIndexOptions(dict):
     def __init__(self,
                  timeout=None,                  # type: Optional[timedelta]
                  ignore_if_not_exists=None,    # type: Optional[bool]
-                 dataverse_name=None       # type: Optional[str]
+                 dataverse_name=None,           # type: Optional[str]
+                 parent_span=None                      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -899,7 +935,8 @@ class DropAnalyticsIndexOptions(dict):
 class GetAllAnalyticsIndexesOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None                  # type: Optional[timedelta]
+                 timeout=None,                 # type: Optional[timedelta]
+                 parent_span=None                     # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -912,9 +949,10 @@ class ConnectLinkOptions(dict):
     @overload
     def __init__(self,
                  timeout=None,              # type: Optional[timedelta]
-                 dataverse_name=None,  # type: Optional[str]
-                 link_name=None,         # type: Optional[str]
-                 force=None                # type: Optional[bool]
+                 dataverse_name=None,       # type: Optional[str]
+                 link_name=None,            # type: Optional[str]
+                 force=None,                # type: Optional[bool]
+                 parent_span=None                  # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -938,8 +976,9 @@ class DisconnectLinkOptions(dict):
     @overload
     def __init__(self,
                  timeout=None,              # type: Optional[timedelta]
-                 dataverse_name=None,  # type: Optional[str]
-                 link_name=None         # type: Optional[str]
+                 dataverse_name=None,       # type: Optional[str]
+                 link_name=None,            # type: Optional[str]
+                 parent_span=None                  # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -958,7 +997,8 @@ class DisconnectLinkOptions(dict):
 class GetPendingMutationsOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None                  # type: Optional[timedelta]
+                 timeout=None,                 # type: Optional[timedelta]
+                 parent_span=None                     # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -970,7 +1010,8 @@ class GetPendingMutationsOptions(dict):
 class CreateLinkAnalyticsOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None                  # type: Optional[timedelta]
+                 timeout=None,                 # type: Optional[timedelta]
+                 parent_span=None                     # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -982,7 +1023,8 @@ class CreateLinkAnalyticsOptions(dict):
 class ReplaceLinkAnalyticsOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None                  # type: Optional[timedelta]
+                 timeout=None,                 # type: Optional[timedelta]
+                 parent_span=None                     # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -994,7 +1036,8 @@ class ReplaceLinkAnalyticsOptions(dict):
 class DropLinkAnalyticsOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None                  # type: Optional[timedelta]
+                 timeout=None,                 # type: Optional[timedelta]
+                 parent_span=None                     # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1010,6 +1053,7 @@ class GetLinksAnalyticsOptions(dict):
                  dataverse_name=None,   # type: Optional[str]
                  name=None,             # type: Optional[str]
                  link_type=None,        # type: Optional[AnalyticsLinkType]
+                 parent_span=None              # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1039,13 +1083,15 @@ class UpsertSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1062,13 +1108,15 @@ class DropSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1085,13 +1133,15 @@ class GetSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1108,13 +1158,15 @@ class GetAllSearchIndexesOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1131,13 +1183,15 @@ class GetSearchIndexedDocumentsCountOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1154,13 +1208,15 @@ class PauseIngestSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1177,13 +1233,15 @@ class ResumeIngestSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1200,13 +1258,15 @@ class AllowQueryingSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1223,13 +1283,15 @@ class DisallowQueryingSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1246,13 +1308,15 @@ class FreezePlanSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1269,13 +1333,15 @@ class UnfreezePlanSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1292,13 +1358,15 @@ class AnalyzeDocumentSearchIndexOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1315,13 +1383,15 @@ class GetSearchIndexStatsOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1338,13 +1408,15 @@ class GetAllSearchIndexStatsOptions(dict):
         All management options should be imported from ``couchbase.management.options``.
 
     Args:
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
             management operation timeout.
-    """
+    """  # noqa: E501
 
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 parent_span=None      # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1358,7 +1430,8 @@ class GetAllSearchIndexStatsOptions(dict):
 class GetDesignDocumentOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1370,7 +1443,8 @@ class GetDesignDocumentOptions(dict):
 class GetAllDesignDocumentsOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1382,7 +1456,8 @@ class GetAllDesignDocumentsOptions(dict):
 class UpsertDesignDocumentOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1394,7 +1469,8 @@ class UpsertDesignDocumentOptions(dict):
 class DropDesignDocumentOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1406,7 +1482,8 @@ class DropDesignDocumentOptions(dict):
 class PublishDesignDocumentOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1419,21 +1496,24 @@ class PublishDesignDocumentOptions(dict):
 
 class EventingFunctionOptions(dict):
     def __init__(self, **kwargs):
-        """
-        EventingFunctionOptions
-        Various options for eventing function management API
+        """Various options for eventing function management API
 
-        :param timeout:
-            Uses this timeout value, rather than the default for the cluster.
-        :type timeout: timedelta
-        """
+        .. note::
+            All management options should be imported from ``couchbase.management.options``.
+
+        Args:
+            parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this operation.
+            timeout (timedelta, optional): The timeout for this operation. Defaults to global
+
+        """  # noqa: E501
         super(EventingFunctionOptions, self).__init__(**kwargs)
 
 
 class UpsertFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1445,7 +1525,8 @@ class UpsertFunctionOptions(dict):
 class DropFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1457,7 +1538,8 @@ class DropFunctionOptions(dict):
 class DeployFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1469,7 +1551,8 @@ class DeployFunctionOptions(dict):
 class GetAllFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1481,7 +1564,8 @@ class GetAllFunctionOptions(dict):
 class GetFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1493,7 +1577,8 @@ class GetFunctionOptions(dict):
 class PauseFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1505,7 +1590,8 @@ class PauseFunctionOptions(dict):
 class ResumeFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1517,7 +1603,8 @@ class ResumeFunctionOptions(dict):
 class UndeployFunctionOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 
@@ -1529,7 +1616,8 @@ class UndeployFunctionOptions(dict):
 class FunctionsStatusOptions(dict):
     @overload
     def __init__(self,
-                 timeout=None    # type: Optional[timedelta]
+                 timeout=None,   # type: Optional[timedelta]
+                 parent_span=None       # type: Optional[RequestSpan]
                  ):
         pass
 

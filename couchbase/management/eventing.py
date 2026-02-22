@@ -20,6 +20,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     List)
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import EventingFunctionMgmtOperationType
 from couchbase.management.logic.eventing_function_mgmt_impl import EventingFunctionMgmtImpl
 from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionBucketAccess  # noqa: F401
 from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionBucketBinding  # noqa: F401
@@ -54,12 +56,13 @@ from couchbase.management.options import (DeployFunctionOptions,
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
 
 
 class EventingFunctionManager:
 
-    def __init__(self, client_adapter: ClientAdapter) -> None:
-        self._impl = EventingFunctionMgmtImpl(client_adapter)
+    def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
+        self._impl = EventingFunctionMgmtImpl(client_adapter, observability_instruments)
         self._scope_context = None
 
     def upsert_function(self,
@@ -67,73 +70,100 @@ class EventingFunctionManager:
                         *options,  # type: UpsertFunctionOptions
                         **kwargs  # type: Any
                         ) -> None:
-        req = self._impl.request_builder.build_upsert_function_request(function,
-                                                                       self._scope_context,
-                                                                       *options,
-                                                                       **kwargs)
-        self._impl.upsert_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingUpsertFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_upsert_function_request(function,
+                                                                           self._scope_context,
+                                                                           obs_handler,
+                                                                           *options,
+                                                                           **kwargs)
+            self._impl.upsert_function(req, obs_handler)
 
     def drop_function(self,
                       name,  # type: str
                       *options,  # type: DropFunctionOptions
                       **kwargs  # type: Any
                       ) -> None:
-        req = self._impl.request_builder.build_drop_function_request(name, self._scope_context, *options, **kwargs)
-        self._impl.drop_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingDropFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_function_request(
+                name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.drop_function(req, obs_handler)
 
     def deploy_function(self,
                         name,  # type: str
                         *options,  # type: DeployFunctionOptions
                         **kwargs  # type: Any
                         ) -> None:
-        req = self._impl.request_builder.build_deploy_function_request(name, self._scope_context, *options, **kwargs)
-        self._impl.deploy_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingDeployFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_deploy_function_request(
+                name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.deploy_function(req, obs_handler)
 
     def get_all_functions(self,
                           *options,  # type: GetAllFunctionOptions
                           **kwargs  # type: Any
                           ) -> List[EventingFunction]:
-        req = self._impl.request_builder.build_get_all_functions_request(self._scope_context, *options, **kwargs)
-        return self._impl.get_all_functions(req)
+        op_type = EventingFunctionMgmtOperationType.EventingGetAllFunctions
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_functions_request(
+                self._scope_context, obs_handler, *options, **kwargs)
+            return self._impl.get_all_functions(req, obs_handler)
 
     def get_function(self,
                      name,  # type: str
                      *options,  # type: GetFunctionOptions
                      **kwargs  # type: Any
                      ) -> EventingFunction:
-        req = self._impl.request_builder.build_get_function_request(name, self._scope_context, *options, **kwargs)
-        return self._impl.get_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingGetFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_function_request(
+                name, self._scope_context, obs_handler, *options, **kwargs)
+            return self._impl.get_function(req, obs_handler)
 
     def pause_function(self,
                        name,  # type: str
                        *options,  # type: PauseFunctionOptions
                        **kwargs  # type: Any
                        ) -> None:
-        req = self._impl.request_builder.build_pause_function_request(name, self._scope_context, *options, **kwargs)
-        self._impl.pause_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingPauseFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_pause_function_request(
+                name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.pause_function(req, obs_handler)
 
     def resume_function(self,
                         name,  # type: str
                         *options,  # type: ResumeFunctionOptions
                         **kwargs  # type: Any
                         ) -> None:
-        req = self._impl.request_builder.build_resume_function_request(name, self._scope_context, *options, **kwargs)
-        self._impl.resume_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingResumeFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_resume_function_request(
+                name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.resume_function(req, obs_handler)
 
     def undeploy_function(self,
                           name,  # type: str
                           *options,  # type: UndeployFunctionOptions
                           **kwargs  # type: Any
                           ) -> None:
-        req = self._impl.request_builder.build_undeploy_function_request(name, self._scope_context, *options, **kwargs)
-        self._impl.undeploy_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingUndeployFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_undeploy_function_request(
+                name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.undeploy_function(req, obs_handler)
 
     def functions_status(self,
                          *options,  # type: FunctionsStatusOptions
                          **kwargs  # type: Any
                          ) -> EventingFunctionsStatus:
-        req = self._impl.request_builder.build_get_functions_status_request(self._scope_context, *options, **kwargs)
-        return self._impl.get_functions_status(req)
+        op_type = EventingFunctionMgmtOperationType.EventingGetStatus
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_functions_status_request(
+                self._scope_context, obs_handler, *options, **kwargs)
+            return self._impl.get_functions_status(req, obs_handler)
 
     def _get_status(self, name: str) -> EventingFunctionStatus:
         statuses = self.functions_status()
@@ -146,8 +176,8 @@ class EventingFunctionManager:
 
 class ScopeEventingFunctionManager:
 
-    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str) -> None:
-        self._impl = EventingFunctionMgmtImpl(client_adapter)
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str, observability_instruments: ObservabilityInstruments) -> None:  # noqa: E501
+        self._impl = EventingFunctionMgmtImpl(client_adapter, observability_instruments)
         self._scope_context = bucket_name, scope_name
 
     def upsert_function(self,
@@ -155,95 +185,122 @@ class ScopeEventingFunctionManager:
                         *options,  # type: UpsertFunctionOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> None:
-        req = self._impl.request_builder.build_upsert_function_request(function,
-                                                                       self._scope_context,
-                                                                       *options,
-                                                                       **kwargs)
-        self._impl.upsert_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingUpsertFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_upsert_function_request(function,
+                                                                           self._scope_context,
+                                                                           obs_handler,
+                                                                           *options,
+                                                                           **kwargs)
+            self._impl.upsert_function(req, obs_handler)
 
     def drop_function(self,
                       name,  # type: str
                       *options,  # type: DropFunctionOptions
                       **kwargs  # type: Any
                       ) -> None:
-        req = self._impl.request_builder.build_drop_function_request(name,
-                                                                     self._scope_context,
-                                                                     *options,
-                                                                     **kwargs)
-        self._impl.drop_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingDropFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_function_request(name,
+                                                                         self._scope_context,
+                                                                         obs_handler,
+                                                                         *options,
+                                                                         **kwargs)
+            self._impl.drop_function(req, obs_handler)
 
     def deploy_function(self,
                         name,  # type: str
                         *options,  # type: DeployFunctionOptions
                         **kwargs  # type: Any
                         ) -> None:
-        req = self._impl.request_builder.build_deploy_function_request(name,
-                                                                       self._scope_context,
-                                                                       *options,
-                                                                       **kwargs)
-        self._impl.deploy_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingDeployFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_deploy_function_request(name,
+                                                                           self._scope_context,
+                                                                           obs_handler,
+                                                                           *options,
+                                                                           **kwargs)
+            self._impl.deploy_function(req, obs_handler)
 
     def get_all_functions(self,
                           *options,  # type: GetAllFunctionOptions
                           **kwargs  # type: Any
                           ) -> List[EventingFunction]:
-        req = self._impl.request_builder.build_get_all_functions_request(self._scope_context,
-                                                                         *options,
-                                                                         **kwargs)
-        return self._impl.get_all_functions(req)
+        op_type = EventingFunctionMgmtOperationType.EventingGetAllFunctions
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_functions_request(self._scope_context,
+                                                                             obs_handler,
+                                                                             *options,
+                                                                             **kwargs)
+            return self._impl.get_all_functions(req, obs_handler)
 
     def get_function(self,
                      name,  # type: str
                      *options,  # type: GetFunctionOptions
                      **kwargs  # type: Any
                      ) -> EventingFunction:
-        req = self._impl.request_builder.build_get_function_request(name,
-                                                                    self._scope_context,
-                                                                    *options,
-                                                                    **kwargs)
-        return self._impl.get_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingGetFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_function_request(name,
+                                                                        self._scope_context,
+                                                                        obs_handler,
+                                                                        *options,
+                                                                        **kwargs)
+            return self._impl.get_function(req, obs_handler)
 
     def pause_function(self,
                        name,  # type: str
                        *options,  # type: PauseFunctionOptions
                        **kwargs  # type: Any
                        ) -> None:
-        req = self._impl.request_builder.build_pause_function_request(name,
-                                                                      self._scope_context,
-                                                                      *options,
-                                                                      **kwargs)
-        self._impl.pause_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingPauseFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_pause_function_request(name,
+                                                                          self._scope_context,
+                                                                          obs_handler,
+                                                                          *options,
+                                                                          **kwargs)
+            self._impl.pause_function(req, obs_handler)
 
     def resume_function(self,
                         name,  # type: str
                         *options,  # type: ResumeFunctionOptions
                         **kwargs  # type: Any
                         ) -> None:
-        req = self._impl.request_builder.build_resume_function_request(name,
-                                                                       self._scope_context,
-                                                                       *options,
-                                                                       **kwargs)
-        self._impl.resume_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingResumeFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_resume_function_request(name,
+                                                                           self._scope_context,
+                                                                           obs_handler,
+                                                                           *options,
+                                                                           **kwargs)
+            self._impl.resume_function(req, obs_handler)
 
     def undeploy_function(self,
                           name,  # type: str
                           *options,  # type: UndeployFunctionOptions
                           **kwargs  # type: Any
                           ) -> None:
-        req = self._impl.request_builder.build_undeploy_function_request(name,
-                                                                         self._scope_context,
-                                                                         *options,
-                                                                         **kwargs)
-        self._impl.undeploy_function(req)
+        op_type = EventingFunctionMgmtOperationType.EventingUndeployFunction
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_undeploy_function_request(name,
+                                                                             self._scope_context,
+                                                                             obs_handler,
+                                                                             *options,
+                                                                             **kwargs)
+            self._impl.undeploy_function(req, obs_handler)
 
     def functions_status(self,
                          *options,  # type: FunctionsStatusOptions
                          **kwargs  # type: Any
                          ) -> EventingFunctionsStatus:
-        req = self._impl.request_builder.build_get_functions_status_request(self._scope_context,
-                                                                            *options,
-                                                                            **kwargs)
-        return self._impl.get_functions_status(req)
+        op_type = EventingFunctionMgmtOperationType.EventingGetStatus
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_functions_status_request(self._scope_context,
+                                                                                obs_handler,
+                                                                                *options,
+                                                                                **kwargs)
+            return self._impl.get_functions_status(req, obs_handler)
 
     def _get_status(self, name: str) -> EventingFunctionStatus:
         statuses = self.functions_status()

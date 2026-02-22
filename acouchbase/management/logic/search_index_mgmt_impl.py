@@ -27,6 +27,7 @@ from couchbase.management.logic.search_index_mgmt_types import SearchIndex
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
     from couchbase.management.logic.search_index_mgmt_types import (AllowQueryingRequest,
                                                                     AnalyzeDocumentRequest,
                                                                     DisallowQueryingRequest,
@@ -44,9 +45,10 @@ if TYPE_CHECKING:
 
 
 class AsyncSearchIndexMgmtImpl:
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self, client_adapter: AsyncClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = SearchIndexMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -54,17 +56,26 @@ class AsyncSearchIndexMgmtImpl:
         return self._client_adapter.loop
 
     @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._observability_instruments
+
+    @property
     def request_builder(self) -> SearchIndexMgmtRequestBuilder:
         """**INTERNAL**"""
         return self._request_builder
 
-    async def allow_querying(self, req: AllowQueryingRequest) -> None:
+    async def allow_querying(self, req: AllowQueryingRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def analyze_document(self, req: AnalyzeDocumentRequest) -> Dict[str, Any]:
+    async def analyze_document(
+        self,
+        req: AnalyzeDocumentRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Dict[str, Any]:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         analysis = ret.raw_result['analysis']
         status = ret.raw_result['status']
         return {
@@ -72,59 +83,83 @@ class AsyncSearchIndexMgmtImpl:
             'status': status
         }
 
-    async def drop_index(self, req: DropIndexRequest) -> None:
+    async def drop_index(
+        self,
+        req: DropIndexRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def disallow_querying(self, req: DisallowQueryingRequest) -> None:
+    async def disallow_querying(
+        self,
+        req: DisallowQueryingRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def freeze_plan(self, req: FreezePlanRequest) -> None:
+    async def freeze_plan(
+        self,
+        req: FreezePlanRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_all_indexes(self, req: GetAllIndexesRequest) -> Iterable[SearchIndex]:
+    async def get_all_indexes(
+        self,
+        req: GetAllIndexesRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Iterable[SearchIndex]:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_indexes = ret.raw_result['indexes']
         return [SearchIndex.from_server(idx) for idx in raw_indexes]
 
-    async def get_all_index_stats(self, req: GetAllIndexStatsRequest) -> Dict[str, Any]:
+    async def get_all_index_stats(
+        self,
+        req: GetAllIndexStatsRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Dict[str, Any]:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_stats = ret.raw_result['stats']
         return json.loads(raw_stats)
 
-    async def get_indexed_documents_count(self, req: GetIndexedDocumentsCountRequest) -> int:
+    async def get_indexed_documents_count(
+        self,
+        req: GetIndexedDocumentsCountRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> int:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         return ret.raw_result['count']
 
-    async def get_index(self, req: GetIndexRequest) -> SearchIndex:
+    async def get_index(self, req: GetIndexRequest, obs_handler: ObservableRequestHandler) -> SearchIndex:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_index = ret.raw_result['index']
         return SearchIndex.from_server(raw_index)
 
-    async def get_index_stats(self, req: GetIndexStatsRequest) -> Dict[str, Any]:
+    async def get_index_stats(self, req: GetIndexStatsRequest, obs_handler: ObservableRequestHandler) -> Dict[str, Any]:
         """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req)
+        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_stats = ret.raw_result['stats']
         return json.loads(raw_stats)
 
-    async def pause_ingest(self, req: PauseIngestRequest) -> None:
+    async def pause_ingest(self, req: PauseIngestRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def resume_ingest(self, req: ResumeIngestRequest) -> None:
+    async def resume_ingest(self, req: ResumeIngestRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def unfreeze_plan(self, req: UnfreezePlanRequest) -> None:
+    async def unfreeze_plan(self, req: UnfreezePlanRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def upsert_index(self, req: UpsertIndexRequest) -> None:
+    async def upsert_index(self, req: UpsertIndexRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

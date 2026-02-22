@@ -20,6 +20,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import SearchIndexMgmtOperationType
 from couchbase.management.logic.search_index_mgmt_impl import SearchIndexMgmtImpl
 from couchbase.management.logic.search_index_mgmt_types import SearchIndex
 
@@ -41,6 +43,7 @@ from couchbase.management.options import (AllowQueryingSearchIndexOptions,
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
 
 
 class SearchIndexManager:
@@ -48,8 +51,8 @@ class SearchIndexManager:
     Allows to manage search indexes in a Couchbase cluster.
     """
 
-    def __init__(self, client_adapter: ClientAdapter) -> None:
-        self._impl = SearchIndexMgmtImpl(client_adapter)
+    def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
+        self._impl = SearchIndexMgmtImpl(client_adapter, observability_instruments)
         self._scope_context = None
 
     def upsert_index(self,
@@ -68,8 +71,11 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index definition is invalid.
         """
-        req = self._impl.request_builder.build_upsert_index_request(index, self._scope_context, *options, **kwargs)
-        self._impl.upsert_index(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexUpsert
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_upsert_index_request(
+                index, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.upsert_index(req, obs_handler)
 
     def drop_index(self,
                    index_name,  # type: str
@@ -87,8 +93,11 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_drop_index_request(index_name, self._scope_context, *options, **kwargs)
-        self._impl.drop_index(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_index_request(
+                index_name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.drop_index(req, obs_handler)
 
     def get_index(self,
                   index_name,  # type: str
@@ -109,8 +118,11 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_get_index_request(index_name, self._scope_context, *options, **kwargs)
-        return self._impl.get_index(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGet
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_index_request(
+                index_name, self._scope_context, obs_handler, *options, **kwargs)
+            return self._impl.get_index(req, obs_handler)
 
     def get_all_indexes(self,
                         *options,  # type: GetAllSearchIndexesOptions
@@ -126,8 +138,11 @@ class SearchIndexManager:
         Returns:
             Iterable[:class:`.SearchIndex`]: A list of all indexes.
         """
-        req = self._impl.request_builder.build_get_all_indexes_request(self._scope_context, *options, **kwargs)
-        return self._impl.get_all_indexes(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_indexes_request(
+                self._scope_context, obs_handler, *options, **kwargs)
+            return self._impl.get_all_indexes(req, obs_handler)
 
     def get_indexed_documents_count(self,
                                     index_name,  # type: str
@@ -148,11 +163,14 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
-                                                                                   self._scope_context,
-                                                                                   *options,
-                                                                                   **kwargs)
-        return self._impl.get_indexed_documents_count(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
+                                                                                       self._scope_context,
+                                                                                       obs_handler,
+                                                                                       *options,
+                                                                                       **kwargs)
+            return self._impl.get_indexed_documents_count(req, obs_handler)
 
     def pause_ingest(self,
                      index_name,  # type: str
@@ -170,8 +188,12 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_pause_ingest_request(index_name, self._scope_context, *options, **kwargs)
-        self._impl.pause_ingest(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=True) as obs_handler:
+            req = self._impl.request_builder.build_pause_ingest_request(
+                index_name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.pause_ingest(req, obs_handler)
 
     def resume_ingest(self,
                       index_name,  # type: str
@@ -189,11 +211,15 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_resume_ingest_request(index_name,
-                                                                     self._scope_context,
-                                                                     *options,
-                                                                     **kwargs)
-        self._impl.resume_ingest(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=False) as obs_handler:
+            req = self._impl.request_builder.build_resume_ingest_request(index_name,
+                                                                         self._scope_context,
+                                                                         obs_handler,
+                                                                         *options,
+                                                                         **kwargs)
+            self._impl.resume_ingest(req, obs_handler)
 
     def allow_querying(self,
                        index_name,  # type: str
@@ -211,11 +237,15 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_allow_querying_request(index_name,
-                                                                      self._scope_context,
-                                                                      *options,
-                                                                      **kwargs)
-        self._impl.allow_querying(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=True) as obs_handler:
+            req = self._impl.request_builder.build_allow_querying_request(index_name,
+                                                                          self._scope_context,
+                                                                          obs_handler,
+                                                                          *options,
+                                                                          **kwargs)
+            self._impl.allow_querying(req, obs_handler)
 
     def disallow_querying(self,
                           index_name,  # type: str
@@ -233,11 +263,15 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_disallow_querying_request(index_name,
-                                                                         self._scope_context,
-                                                                         *options,
-                                                                         **kwargs)
-        self._impl.disallow_querying(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=False) as obs_handler:
+            req = self._impl.request_builder.build_disallow_querying_request(index_name,
+                                                                             self._scope_context,
+                                                                             obs_handler,
+                                                                             *options,
+                                                                             **kwargs)
+            self._impl.disallow_querying(req, obs_handler)
 
     def freeze_plan(self,
                     index_name,  # type: str
@@ -255,8 +289,12 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_freeze_plan_request(index_name, self._scope_context, *options, **kwargs)
-        self._impl.freeze_plan(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=True) as obs_handler:
+            req = self._impl.request_builder.build_freeze_plan_request(
+                index_name, self._scope_context, obs_handler, *options, **kwargs)
+            self._impl.freeze_plan(req, obs_handler)
 
     def unfreeze_plan(self,
                       index_name,  # type: str
@@ -274,11 +312,15 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
-                                                                     self._scope_context,
-                                                                     *options,
-                                                                     **kwargs)
-        self._impl.unfreeze_plan(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=False) as obs_handler:
+            req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
+                                                                         self._scope_context,
+                                                                         obs_handler,
+                                                                         *options,
+                                                                         **kwargs)
+            self._impl.unfreeze_plan(req, obs_handler)
 
     def analyze_document(self,
                          index_name,  # type: str
@@ -301,12 +343,15 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_analyze_document_request(index_name,
-                                                                        document,
-                                                                        self._scope_context,
-                                                                        *options,
-                                                                        **kwargs)
-        return self._impl.analyze_document(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_analyze_document_request(index_name,
+                                                                            document,
+                                                                            self._scope_context,
+                                                                            obs_handler,
+                                                                            *options,
+                                                                            **kwargs)
+            return self._impl.analyze_document(req, obs_handler)
 
     def get_index_stats(self,
                         index_name,  # type: str
@@ -331,11 +376,14 @@ class SearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_get_index_stats_request(index_name,
-                                                                       self._scope_context,
-                                                                       *options,
-                                                                       **kwargs)
-        return self._impl.get_index_stats(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGetStats
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_index_stats_request(index_name,
+                                                                           self._scope_context,
+                                                                           obs_handler,
+                                                                           *options,
+                                                                           **kwargs)
+            return self._impl.get_index_stats(req, obs_handler)
 
     def get_all_index_stats(self,
                             *options,  # type: GetAllSearchIndexStatsOptions
@@ -356,8 +404,10 @@ class SearchIndexManager:
         Returns:
             Dict[str, Any]: The stats report.
         """
-        req = self._impl.request_builder.build_get_all_index_stats_request(*options, **kwargs)
-        return self._impl.get_all_index_stats(req)
+        op_type = SearchIndexMgmtOperationType.SearchGetStats
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_index_stats_request(obs_handler, *options, **kwargs)
+            return self._impl.get_all_index_stats(req, obs_handler)
 
 
 class ScopeSearchIndexManager:
@@ -365,8 +415,8 @@ class ScopeSearchIndexManager:
     Allows to manage scope-level search indexes in a Couchbase cluster.
     """
 
-    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str) -> None:
-        self._impl = SearchIndexMgmtImpl(client_adapter)
+    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str, observability_instruments: ObservabilityInstruments) -> None:  # noqa: E501
+        self._impl = SearchIndexMgmtImpl(client_adapter, observability_instruments)
         self._scope_context = bucket_name, scope_name
 
     def upsert_index(self,
@@ -385,11 +435,14 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index definition is invalid.
         """
-        req = self._impl.request_builder.build_upsert_index_request(index,
-                                                                    self._scope_context,
-                                                                    *options,
-                                                                    **kwargs)
-        self._impl.upsert_index(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexUpsert
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_upsert_index_request(index,
+                                                                        self._scope_context,
+                                                                        obs_handler,
+                                                                        *options,
+                                                                        **kwargs)
+            self._impl.upsert_index(req, obs_handler)
 
     def drop_index(self,
                    index_name,  # type: str
@@ -407,11 +460,14 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_drop_index_request(index_name,
-                                                                  self._scope_context,
-                                                                  *options,
-                                                                  **kwargs)
-        self._impl.drop_index(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_index_request(index_name,
+                                                                      self._scope_context,
+                                                                      obs_handler,
+                                                                      *options,
+                                                                      **kwargs)
+            self._impl.drop_index(req, obs_handler)
 
     def get_index(self,
                   index_name,  # type: str
@@ -432,11 +488,14 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_get_index_request(index_name,
-                                                                 self._scope_context,
-                                                                 *options,
-                                                                 **kwargs)
-        return self._impl.get_index(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGet
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_index_request(index_name,
+                                                                     self._scope_context,
+                                                                     obs_handler,
+                                                                     *options,
+                                                                     **kwargs)
+            return self._impl.get_index(req, obs_handler)
 
     def get_all_indexes(self,
                         *options,  # type: GetAllSearchIndexesOptions
@@ -452,10 +511,13 @@ class ScopeSearchIndexManager:
         Returns:
             Iterable[:class:`.SearchIndex`]: A list of all indexes.
         """
-        req = self._impl.request_builder.build_get_all_indexes_request(self._scope_context,
-                                                                       *options,
-                                                                       **kwargs)
-        return self._impl.get_all_indexes(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_indexes_request(self._scope_context,
+                                                                           obs_handler,
+                                                                           *options,
+                                                                           **kwargs)
+            return self._impl.get_all_indexes(req, obs_handler)
 
     def get_indexed_documents_count(self,
                                     index_name,  # type: str
@@ -476,11 +538,14 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
-                                                                                   self._scope_context,
-                                                                                   *options,
-                                                                                   **kwargs)
-        return self._impl.get_indexed_documents_count(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_indexed_documents_count_request(index_name,
+                                                                                       self._scope_context,
+                                                                                       obs_handler,
+                                                                                       *options,
+                                                                                       **kwargs)
+            return self._impl.get_indexed_documents_count(req, obs_handler)
 
     def pause_ingest(self,
                      index_name,  # type: str
@@ -498,11 +563,15 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_pause_ingest_request(index_name,
-                                                                    self._scope_context,
-                                                                    *options,
-                                                                    **kwargs)
-        self._impl.pause_ingest(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=True) as obs_handler:
+            req = self._impl.request_builder.build_pause_ingest_request(index_name,
+                                                                        self._scope_context,
+                                                                        obs_handler,
+                                                                        *options,
+                                                                        **kwargs)
+            self._impl.pause_ingest(req, obs_handler)
 
     def resume_ingest(self,
                       index_name,  # type: str
@@ -520,11 +589,15 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_resume_ingest_request(index_name,
-                                                                     self._scope_context,
-                                                                     *options,
-                                                                     **kwargs)
-        self._impl.resume_ingest(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=False) as obs_handler:
+            req = self._impl.request_builder.build_resume_ingest_request(index_name,
+                                                                         self._scope_context,
+                                                                         obs_handler,
+                                                                         *options,
+                                                                         **kwargs)
+            self._impl.resume_ingest(req, obs_handler)
 
     def allow_querying(self,
                        index_name,  # type: str
@@ -542,11 +615,15 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_allow_querying_request(index_name,
-                                                                      self._scope_context,
-                                                                      *options,
-                                                                      **kwargs)
-        self._impl.allow_querying(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=True) as obs_handler:
+            req = self._impl.request_builder.build_allow_querying_request(index_name,
+                                                                          self._scope_context,
+                                                                          obs_handler,
+                                                                          *options,
+                                                                          **kwargs)
+            self._impl.allow_querying(req, obs_handler)
 
     def disallow_querying(self,
                           index_name,  # type: str
@@ -564,11 +641,15 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_disallow_querying_request(index_name,
-                                                                         self._scope_context,
-                                                                         *options,
-                                                                         **kwargs)
-        self._impl.disallow_querying(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=False) as obs_handler:
+            req = self._impl.request_builder.build_disallow_querying_request(index_name,
+                                                                             self._scope_context,
+                                                                             obs_handler,
+                                                                             *options,
+                                                                             **kwargs)
+            self._impl.disallow_querying(req, obs_handler)
 
     def freeze_plan(self,
                     index_name,  # type: str
@@ -586,11 +667,15 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_freeze_plan_request(index_name,
-                                                                   self._scope_context,
-                                                                   *options,
-                                                                   **kwargs)
-        self._impl.freeze_plan(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=True) as obs_handler:
+            req = self._impl.request_builder.build_freeze_plan_request(index_name,
+                                                                       self._scope_context,
+                                                                       obs_handler,
+                                                                       *options,
+                                                                       **kwargs)
+            self._impl.freeze_plan(req, obs_handler)
 
     def unfreeze_plan(self,
                       index_name,  # type: str
@@ -608,11 +693,15 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
-                                                                     self._scope_context,
-                                                                     *options,
-                                                                     **kwargs)
-        self._impl.unfreeze_plan(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments,
+                                      op_type_toggle=False) as obs_handler:
+            req = self._impl.request_builder.build_unfreeze_plan_request(index_name,
+                                                                         self._scope_context,
+                                                                         obs_handler,
+                                                                         *options,
+                                                                         **kwargs)
+            self._impl.unfreeze_plan(req, obs_handler)
 
     def analyze_document(self,
                          index_name,  # type: str
@@ -635,12 +724,15 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_analyze_document_request(index_name,
-                                                                        document,
-                                                                        self._scope_context,
-                                                                        *options,
-                                                                        **kwargs)
-        return self._impl.analyze_document(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_analyze_document_request(index_name,
+                                                                            document,
+                                                                            self._scope_context,
+                                                                            obs_handler,
+                                                                            *options,
+                                                                            **kwargs)
+            return self._impl.analyze_document(req, obs_handler)
 
     def get_index_stats(self,
                         index_name,  # type: str
@@ -666,11 +758,14 @@ class ScopeSearchIndexManager:
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
         """
-        req = self._impl.request_builder.build_get_index_stats_request(index_name,
-                                                                       self._scope_context,
-                                                                       *options,
-                                                                       **kwargs)
-        return self._impl.get_index_stats(req)
+        op_type = SearchIndexMgmtOperationType.SearchIndexGetStats
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_index_stats_request(index_name,
+                                                                           self._scope_context,
+                                                                           obs_handler,
+                                                                           *options,
+                                                                           **kwargs)
+            return self._impl.get_index_stats(req, obs_handler)
 
     def get_all_index_stats(self,
                             *options,  # type: GetAllSearchIndexStatsOptions
@@ -692,5 +787,7 @@ class ScopeSearchIndexManager:
         Returns:
             Dict[str, Any]: The stats report.
         """
-        req = self._impl.request_builder.build_get_all_index_stats_request(*options, **kwargs)
-        return self._impl.get_all_index_stats(req)
+        op_type = SearchIndexMgmtOperationType.SearchGetStats
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_index_stats_request(obs_handler, *options, **kwargs)
+            return self._impl.get_all_index_stats(req, obs_handler)

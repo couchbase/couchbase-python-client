@@ -165,8 +165,12 @@ class ServiceType(Enum):
             return ServiceType.Analytics
         elif isinstance(opt_type, EventingFunctionMgmtOperationType):
             return ServiceType.Eventing
-        # MgmtOperationType is a special case for QueryIndexWatchIndexes
-        elif isinstance(opt_type, (MgmtOperationType, QueryIndexMgmtOperationType)):
+        # MgmtOperationType is a special case for Python-only composite operations
+        elif isinstance(opt_type, MgmtOperationType):
+            if opt_type is MgmtOperationType.ViewIndexPublish:
+                return ServiceType.Views
+            return ServiceType.Query
+        elif isinstance(opt_type, QueryIndexMgmtOperationType):
             return ServiceType.Query
         elif isinstance(opt_type, SearchIndexMgmtOperationType):
             return ServiceType.Search

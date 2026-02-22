@@ -163,7 +163,7 @@ class Cluster:
 
         :return: A :class:`~.management.UserManager` with which you can create or update cluster users and roles.
         """
-        return UserManager(self._impl._client_adapter)
+        return UserManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def query_indexes(self) -> QueryIndexManager:
         """
@@ -181,7 +181,7 @@ class Cluster:
         :return:  A :class:`~.management.AnalyticsIndexManager` with which you can create or modify analytics datasets,
             dataverses, etc.. on the cluster.
         """
-        return AnalyticsIndexManager(self._impl.client_adapter)
+        return AnalyticsIndexManager(self._impl.client_adapter, self._impl.observability_instruments)
 
     def search_indexes(self) -> SearchIndexManager:
         """
@@ -190,7 +190,7 @@ class Cluster:
         :return:  A :class:`~.management.SearchIndexManager` with which you can create or modify analytics datasets,
             dataverses, etc.. on the cluster.
         """
-        return SearchIndexManager(self._impl._client_adapter)
+        return SearchIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
 
 TxCluster = Cluster

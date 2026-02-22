@@ -224,7 +224,7 @@ class AsyncBucket:
         Returns:
             :class:`~acouchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
         """  # noqa: E501
-        return ViewIndexManager(self._impl._client_adapter, self.name)
+        return ViewIndexManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
 
 
 Bucket = AsyncBucket

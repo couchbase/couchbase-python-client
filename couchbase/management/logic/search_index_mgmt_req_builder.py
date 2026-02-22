@@ -23,6 +23,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase._utils import is_null_or_empty
 from couchbase.exceptions import FeatureUnavailableException, InvalidArgumentException
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.management.logic.search_index_mgmt_types import (SEARCH_INDEX_MGMT_ERROR_MAP,
                                                                 AllowQueryingRequest,
                                                                 AnalyzeDocumentRequest,
@@ -83,12 +84,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_allow_querying_request(self,
                                      index_name: str,
                                      scope_context: Optional[Tuple[str, str]] = None,
+                                     obs_handler: ObservableRequestHandler = None,
                                      *options: object,
                                      **kwargs: object) -> AllowQueryingRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = AllowQueryingRequest(self._error_map,
                                    index_name=index_name,
                                    allow=True,
@@ -104,13 +108,16 @@ class SearchIndexMgmtRequestBuilder:
                                        index_name: str,
                                        document: Any,
                                        scope_context: Optional[Tuple[str, str]] = None,
+                                       obs_handler: ObservableRequestHandler = None,
                                        *options: object,
                                        **kwargs: object) -> AnalyzeDocumentRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
         encoded_document = self._get_valid_document(document)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = AnalyzeDocumentRequest(self._error_map,
                                      index_name=index_name,
                                      encoded_document=encoded_document,
@@ -125,12 +132,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_drop_index_request(self,
                                  index_name: str,
                                  scope_context: Optional[Tuple[str, str]] = None,
+                                 obs_handler: ObservableRequestHandler = None,
                                  *options: object,
                                  **kwargs: object) -> DropIndexRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = DropIndexRequest(self._error_map,
                                index_name=index_name,
                                bucket_name=bucket_name,
@@ -144,12 +154,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_disallow_querying_request(self,
                                         index_name: str,
                                         scope_context: Optional[Tuple[str, str]] = None,
+                                        obs_handler: ObservableRequestHandler = None,
                                         *options: object,
                                         **kwargs: object) -> DisallowQueryingRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = DisallowQueryingRequest(self._error_map,
                                       index_name=index_name,
                                       allow=False,
@@ -164,12 +177,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_freeze_plan_request(self,
                                   index_name: str,
                                   scope_context: Optional[Tuple[str, str]] = None,
+                                  obs_handler: ObservableRequestHandler = None,
                                   *options: object,
                                   **kwargs: object) -> FreezePlanRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = FreezePlanRequest(self._error_map,
                                 index_name=index_name,
                                 freeze=True,
@@ -183,11 +199,14 @@ class SearchIndexMgmtRequestBuilder:
 
     def build_get_all_indexes_request(self,
                                       scope_context: Optional[Tuple[str, str]] = None,
+                                      obs_handler: ObservableRequestHandler = None,
                                       *options: object,
                                       **kwargs: object) -> GetAllIndexesRequest:
         final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
+        timeout = final_args.pop('timeout', None)
         req = GetAllIndexesRequest(self._error_map,
                                    bucket_name=bucket_name,
                                    scope_name=scope_name,
@@ -197,8 +216,13 @@ class SearchIndexMgmtRequestBuilder:
 
         return req
 
-    def build_get_all_index_stats_request(self, *options: object, **kwargs: object) -> GetAllIndexStatsRequest:
+    def build_get_all_index_stats_request(self,
+                                          obs_handler: ObservableRequestHandler = None,
+                                          *options: object,
+                                          **kwargs: object) -> GetAllIndexStatsRequest:
         final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=None, scope_name=None)
         timeout = final_args.pop('timeout', None)
         req = GetAllIndexStatsRequest(self._error_map, **final_args)
         if timeout is not None:
@@ -209,12 +233,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_get_indexed_documents_count_request(self,
                                                   index_name: str,
                                                   scope_context: Optional[Tuple[str, str]] = None,
+                                                  obs_handler: ObservableRequestHandler = None,
                                                   *options: object,
                                                   **kwargs: object) -> GetIndexedDocumentsCountRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetIndexedDocumentsCountRequest(self._error_map,
                                               index_name=index_name,
                                               bucket_name=bucket_name,
@@ -228,12 +255,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_get_index_request(self,
                                 index_name: str,
                                 scope_context: Optional[Tuple[str, str]] = None,
+                                obs_handler: ObservableRequestHandler = None,
                                 *options: object,
                                 **kwargs: object) -> GetIndexRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetIndexRequest(self._error_map,
                               index_name=index_name,
                               bucket_name=bucket_name,
@@ -247,13 +277,17 @@ class SearchIndexMgmtRequestBuilder:
     def build_get_index_stats_request(self,
                                       index_name: str,
                                       scope_context: Optional[Tuple[str, str]] = None,
+                                      obs_handler: ObservableRequestHandler = None,
                                       *options: object,
                                       **kwargs: object) -> GetIndexStatsRequest:
+        final_args = forward_args(kwargs, *options)
         bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         if bucket_name is not None and scope_name is not None:
             raise FeatureUnavailableException(('get_index_stats unavailable at scope level. '
                                                'Use cluster.searchIndexes().get_index_stats(...) instead.'))
-        final_args = forward_args(kwargs, *options)
+
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
         req = GetIndexStatsRequest(self._error_map,
@@ -269,12 +303,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_pause_ingest_request(self,
                                    index_name: str,
                                    scope_context: Optional[Tuple[str, str]] = None,
+                                   obs_handler: ObservableRequestHandler = None,
                                    *options: object,
                                    **kwargs: object) -> PauseIngestRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = PauseIngestRequest(self._error_map,
                                  index_name=index_name,
                                  pause=True,
@@ -289,12 +326,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_resume_ingest_request(self,
                                     index_name: str,
                                     scope_context: Optional[Tuple[str, str]] = None,
+                                    obs_handler: ObservableRequestHandler = None,
                                     *options: object,
                                     **kwargs: object) -> ResumeIngestRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = ResumeIngestRequest(self._error_map,
                                   index_name=index_name,
                                   pause=False,
@@ -309,12 +349,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_unfreeze_plan_request(self,
                                     index_name: str,
                                     scope_context: Optional[Tuple[str, str]] = None,
+                                    obs_handler: ObservableRequestHandler = None,
                                     *options: object,
                                     **kwargs: object) -> UnfreezePlanRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = UnfreezePlanRequest(self._error_map,
                                   index_name=index_name,
                                   freeze=False,
@@ -329,12 +372,15 @@ class SearchIndexMgmtRequestBuilder:
     def build_upsert_index_request(self,
                                    index: SearchIndex,
                                    scope_context: Optional[Tuple[str, str]] = None,
+                                   obs_handler: ObservableRequestHandler = None,
                                    *options: object,
                                    **kwargs: object) -> UpsertIndexRequest:
         final_args = forward_args(kwargs, *options)
+        bucket_name, scope_name = self._get_scope_context(scope_context)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name, scope_name=scope_name)
         timeout = final_args.pop('timeout', None)
         self._validate_index(index)
-        bucket_name, scope_name = self._get_scope_context(scope_context)
         req = UpsertIndexRequest(self._error_map,
                                  index=index.as_dict(),
                                  bucket_name=bucket_name,

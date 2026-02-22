@@ -22,8 +22,10 @@ from typing import (TYPE_CHECKING,
                     Iterable)
 
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 from acouchbase.management.logic.search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.management.logic.search_index_mgmt_types import SearchIndex
 
 if TYPE_CHECKING:
@@ -45,103 +47,143 @@ if TYPE_CHECKING:
 
 
 class TxSearchIndexMgmtImpl(AsyncSearchIndexMgmtImpl):
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        super().__init__(client_adapter)
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments) -> None:
+        super().__init__(client_adapter, observability_instruments)
 
-    def allow_querying_deferred(self, req: AllowQueryingRequest) -> Deferred[None]:
+    def _finish_span(self, result, obs_handler: ObservableRequestHandler):
+        """Callback to properly end the span on success or failure."""
+        if isinstance(result, Failure):
+            exc = result.value
+            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
+            return result
+        else:
+            obs_handler.__exit__(None, None, None)
+            return result
+
+    def allow_querying_deferred(self,
+                                req: AllowQueryingRequest,
+                                obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().allow_querying(req)
+        coro = super().allow_querying(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def analyze_document_deferred(self, req: AnalyzeDocumentRequest) -> Deferred[Dict[str, Any]]:
+    def analyze_document_deferred(self,
+                                  req: AnalyzeDocumentRequest,
+                                  obs_handler: ObservableRequestHandler) -> Deferred[Dict[str, Any]]:
         """**INTERNAL**"""
-        coro = super().analyze_documents(req)
+        coro = super().analyze_document(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def drop_index_deferred(self, req: DropIndexRequest) -> Deferred[None]:
+    def drop_index_deferred(self,
+                            req: DropIndexRequest,
+                            obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().drop_index(req)
+        coro = super().drop_index(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def disallow_querying_deferred(self, req: DisallowQueryingRequest) -> Deferred[None]:
+    def disallow_querying_deferred(self,
+                                   req: DisallowQueryingRequest,
+                                   obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().disallow_querying(req)
+        coro = super().disallow_querying(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def freeze_plan_deferred(self, req: FreezePlanRequest) -> Deferred[None]:
+    def freeze_plan_deferred(self,
+                             req: FreezePlanRequest,
+                             obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().freeze_plan(req)
+        coro = super().freeze_plan(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_all_indexes_deferred(self, req: GetAllIndexesRequest) -> Deferred[Iterable[SearchIndex]]:
+    def get_all_indexes_deferred(self,
+                                 req: GetAllIndexesRequest,
+                                 obs_handler: ObservableRequestHandler) -> Deferred[Iterable[SearchIndex]]:
         """**INTERNAL**"""
-        coro = super().get_all_indexes(req)
+        coro = super().get_all_indexes(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_all_index_stats_deferred(self, req: GetAllIndexStatsRequest) -> Deferred[Dict[str, Any]]:
+    def get_all_index_stats_deferred(self,
+                                     req: GetAllIndexStatsRequest,
+                                     obs_handler: ObservableRequestHandler) -> Deferred[Dict[str, Any]]:
         """**INTERNAL**"""
-        coro = super().get_all_index_stats(req)
+        coro = super().get_all_index_stats(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_indexed_documents_count_deferred(self, req: GetIndexedDocumentsCountRequest) -> Deferred[int]:
+    def get_indexed_documents_count_deferred(self,
+                                             req: GetIndexedDocumentsCountRequest,
+                                             obs_handler: ObservableRequestHandler) -> Deferred[int]:
         """**INTERNAL**"""
-        coro = super().get_indexed_documents_count(req)
+        coro = super().get_indexed_documents_count(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_index_deferred(self, req: GetIndexRequest) -> Deferred[SearchIndex]:
+    def get_index_deferred(self,
+                           req: GetIndexRequest,
+                           obs_handler: ObservableRequestHandler) -> Deferred[SearchIndex]:
         """**INTERNAL**"""
-        coro = super().get_index(req)
+        coro = super().get_index(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_index_stats_deferred(self, req: GetIndexStatsRequest) -> Deferred[Dict[str, Any]]:
+    def get_index_stats_deferred(self,
+                                 req: GetIndexStatsRequest,
+                                 obs_handler: ObservableRequestHandler) -> Deferred[Dict[str, Any]]:
         """**INTERNAL**"""
-        coro = super().get_index_stats(req)
+        coro = super().get_index_stats(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def pause_ingest_deferred(self, req: PauseIngestRequest) -> Deferred[None]:
+    def pause_ingest_deferred(self,
+                              req: PauseIngestRequest,
+                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().pause_ingest(req)
+        coro = super().pause_ingest(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def resume_ingest_deferred(self, req: ResumeIngestRequest) -> Deferred[None]:
+    def resume_ingest_deferred(self,
+                               req: ResumeIngestRequest,
+                               obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().resume_ingest(req)
+        coro = super().resume_ingest(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def unfreeze_plan_deferred(self, req: UnfreezePlanRequest) -> Deferred[None]:
+    def unfreeze_plan_deferred(self,
+                               req: UnfreezePlanRequest,
+                               obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().unfreeze_plan(req)
+        coro = super().unfreeze_plan(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def upsert_index_deferred(self, req: UpsertIndexRequest) -> Deferred[None]:
+    def upsert_index_deferred(self,
+                              req: UpsertIndexRequest,
+                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().upsert_index(req)
+        coro = super().upsert_index(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d

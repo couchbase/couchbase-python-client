@@ -647,7 +647,7 @@ class AsyncCluster:
         Returns:
             :class:`~acouchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager` instance.
         """  # noqa: E501
-        return UserManager(self._impl._client_adapter)
+        return UserManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def query_indexes(self) -> QueryIndexManager:
         """
@@ -667,7 +667,7 @@ class AsyncCluster:
         Returns:
             :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: An :class:`~acouchbase.management.analytics.AnalyticsIndexManager` instance.
         """  # noqa: E501
-        return AnalyticsIndexManager(self._impl._client_adapter)
+        return AnalyticsIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def search_indexes(self) -> SearchIndexManager:
         """
@@ -678,7 +678,7 @@ class AsyncCluster:
             :class:`~acouchbase.management.search.SearchIndexManager`: A :class:`~acouchbase.management.search.SearchIndexManager` instance.
 
         """  # noqa: E501
-        return SearchIndexManager(self._impl._client_adapter)
+        return SearchIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def eventing_functions(self) -> EventingFunctionManager:
         """
@@ -693,7 +693,7 @@ class AsyncCluster:
             :class:`~acouchbase.management.eventing.EventingFunctionManager`: An :class:`~acouchbase.management.eventing.EventingFunctionManager` instance.
 
         """  # noqa: E501
-        return EventingFunctionManager(self._impl._client_adapter)
+        return EventingFunctionManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     @staticmethod
     async def connect(connstr,  # type: str

@@ -29,6 +29,7 @@ from couchbase.management.logic.analytics_mgmt_types import (AnalyticsDataset,
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
     from couchbase.management.logic.analytics_mgmt_types import (ConnectLinkRequest,
                                                                  CreateDatasetRequest,
                                                                  CreateDataverseRequest,
@@ -47,71 +48,85 @@ if TYPE_CHECKING:
 
 
 class AnalyticsMgmtImpl:
-    def __init__(self, client_adapter: ClientAdapter) -> None:
+    def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = AnalyticsMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
+
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._observability_instruments
 
     @property
     def request_builder(self) -> AnalyticsMgmtRequestBuilder:
         """**INTERNAL**"""
         return self._request_builder
 
-    def connect_link(self, req: ConnectLinkRequest) -> None:
+    def connect_link(self, req: ConnectLinkRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def create_dataset(self, req: CreateDatasetRequest) -> None:
+    def create_dataset(self, req: CreateDatasetRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def create_dataverse(self, req: CreateDataverseRequest) -> None:
+    def create_dataverse(self, req: CreateDataverseRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def create_index(self, req: CreateIndexRequest) -> None:
+    def create_index(self, req: CreateIndexRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def create_link(self, req: CreateLinkRequest) -> None:
+    def create_link(self, req: CreateLinkRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def disconnect_link(self, req: DisconnectLinkRequest) -> None:
+    def disconnect_link(self, req: DisconnectLinkRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def drop_dataset(self, req: DropDatasetRequest) -> None:
+    def drop_dataset(self, req: DropDatasetRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def drop_dataverse(self, req: DropDataverseRequest) -> None:
+    def drop_dataverse(self, req: DropDataverseRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def drop_index(self, req: DropIndexRequest) -> None:
+    def drop_index(self, req: DropIndexRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def drop_link(self, req: DropLinkRequest) -> None:
+    def drop_link(self, req: DropLinkRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def get_all_datasets(self, req: GetAllDatasetsRequest) -> Iterable[AnalyticsDataset]:
+    def get_all_datasets(
+        self,
+        req: GetAllDatasetsRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Iterable[AnalyticsDataset]:
         """**INTERNAL**"""
-        ret = self._client_adapter.execute_mgmt_request(req)
+        ret = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_datasets = ret.raw_result['datasets']
         return [AnalyticsDataset.from_server(ds) for ds in raw_datasets]
 
-    def get_all_indexes(self, req: GetAllIndexesRequest) -> Iterable[AnalyticsIndex]:
+    def get_all_indexes(
+        self,
+        req: GetAllIndexesRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Iterable[AnalyticsIndex]:
         """**INTERNAL**"""
-        ret = self._client_adapter.execute_mgmt_request(req)
+        ret = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_indexes = ret.raw_result['indexes']
         return [AnalyticsIndex(**ds) for ds in raw_indexes]
 
-    def get_links(self, req: GetLinksRequest) -> Iterable[AnalyticsLink]:
+    def get_links(self, req: GetLinksRequest, obs_handler: ObservableRequestHandler) -> Iterable[AnalyticsLink]:
         """**INTERNAL**"""
         analytics_links = []
-        ret = self._client_adapter.execute_mgmt_request(req)
+        ret = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         cb_links = ret.raw_result.get('couchbase', None)
         if cb_links and len(cb_links) > 0:
             analytics_links.extend(map(lambda l: CouchbaseRemoteAnalyticsLink.link_from_server_json(l), cb_links))
@@ -125,11 +140,15 @@ class AnalyticsMgmtImpl:
 
         return analytics_links
 
-    def get_pending_mutations(self, req: GetPendingMutationsRequest) -> Dict[str, int]:
+    def get_pending_mutations(
+        self,
+        req: GetPendingMutationsRequest,
+        obs_handler: ObservableRequestHandler,
+    ) -> Dict[str, int]:
         """**INTERNAL**"""
-        ret = self._client_adapter.execute_mgmt_request(req)
+        ret = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         return ret.raw_result.get('stats', {})
 
-    def replace_link(self, req: ReplaceLinkRequest) -> None:
+    def replace_link(self, req: ReplaceLinkRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

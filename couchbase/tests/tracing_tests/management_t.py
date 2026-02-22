@@ -32,12 +32,26 @@ from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                           DropBucketOptions,
                                           DropCollectionOptions,
                                           DropScopeOptions,
+                                          DropSearchIndexOptions,
+                                          DropUserOptions,
                                           FlushBucketOptions,
                                           GetAllBucketOptions,
+                                          GetAllDatasetOptions,
+                                          GetAllDesignDocumentsOptions,
+                                          GetAllFunctionOptions,
                                           GetAllQueryIndexOptions,
                                           GetAllScopesOptions,
+                                          GetAllSearchIndexesOptions,
+                                          GetAllUsersOptions,
                                           GetBucketOptions,
+                                          GetSearchIndexOptions,
+                                          GetUserOptions,
+                                          UpsertSearchIndexOptions,
+                                          UpsertUserOptions,
                                           WatchQueryIndexOptions)
+from couchbase.management.search import SearchIndex
+from couchbase.management.users import Role, User
+from couchbase.management.views import DesignDocumentNamespace
 from tests.environments.tracing import ManagementTracingEnvironment
 from tests.environments.tracing.base_tracing_environment import TracingType
 
@@ -45,20 +59,25 @@ from tests.environments.tracing.base_tracing_environment import TracingType
 class ManagementTracingTestsSuite:
 
     TEST_MANIFEST = [
-        # 'test_analytics_mgmt',
+        'test_analytics_mgmt',
+        'test_analytics_mgmt_with_parent',
         'test_bucket_mgmt',
         'test_bucket_mgmt_op_no_dispatch_failure',
         'test_bucket_mgmt_with_parent',
         'test_collection_mgmt',
         'test_collection_mgmt_op_no_dispatch_failure',
         'test_collection_mgmt_with_parent',
-        # 'test_eventing_function_mgmt',
+        'test_eventing_function_mgmt',
+        'test_eventing_function_mgmt_with_parent',
         'test_query_index_mgmt',
         'test_query_index_mgmt_op_no_dispatch_failure',
         'test_query_index_mgmt_with_parent',
-        # 'test_search_index_mgmt',
-        # 'test_user_mgmt',
-        # 'test_view_index_mgmt',
+        'test_search_index_mgmt',
+        'test_search_index_mgmt_with_parent',
+        'test_user_mgmt',
+        'test_user_mgmt_with_parent',
+        'test_view_index_mgmt',
+        'test_view_index_mgmt_with_parent',
     ]
 
     @pytest.fixture(autouse=True)
@@ -94,6 +113,36 @@ class ManagementTracingTestsSuite:
         cb_env.enable_tracing_query_index_mgmt()
         yield
         cb_env.disable_tracing_query_index_mgmt()
+
+    @pytest.fixture(scope='function')
+    def enable_analytics_mgmt(self, cb_env: ManagementTracingEnvironment):
+        cb_env.enable_analytics_mgmt()
+        yield
+        cb_env.disable_analytics_mgmt()
+
+    @pytest.fixture(scope='function')
+    def enable_eventing_mgmt(self, cb_env: ManagementTracingEnvironment):
+        cb_env.enable_eventing_mgmt()
+        yield
+        cb_env.disable_eventing_mgmt()
+
+    @pytest.fixture(scope='function')
+    def enable_search_mgmt(self, cb_env: ManagementTracingEnvironment):
+        cb_env.enable_search_mgmt()
+        yield
+        cb_env.disable_search_mgmt()
+
+    @pytest.fixture(scope='function')
+    def enable_user_mgmt(self, cb_env: ManagementTracingEnvironment):
+        cb_env.enable_user_mgmt()
+        yield
+        cb_env.disable_user_mgmt()
+
+    @pytest.fixture(scope='function')
+    def enable_views_mgmt(self, cb_env: ManagementTracingEnvironment):
+        cb_env.enable_views_mgmt()
+        yield
+        cb_env.disable_views_mgmt()
 
     @pytest.mark.usefixtures('enable_bucket_mgmt')
     def test_bucket_mgmt(self, cb_env: ManagementTracingEnvironment) -> None:
@@ -729,6 +778,218 @@ class ManagementTracingTestsSuite:
                                   ix_names,
                                   WatchQueryIndexOptions(parent_span=parent_span,
                                                          timeout=timedelta(seconds=30)))  # Should be OK
+        validator.validate_http_op(end_parent=True)
+
+    @pytest.mark.usefixtures('enable_analytics_mgmt')
+    def test_analytics_mgmt(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+        validator.reset(op_name=OpName.AnalyticsDatasetGetAll)
+        cb_env.aixm.get_all_datasets()
+        validator.validate_http_op()
+
+    @pytest.mark.usefixtures('enable_analytics_mgmt')
+    def test_analytics_mgmt_with_parent(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+
+        op_name = OpName.AnalyticsDatasetGetAll
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        cb_env.aixm.get_all_datasets(GetAllDatasetOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+    @pytest.mark.usefixtures('enable_eventing_mgmt')
+    def test_eventing_function_mgmt(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+        validator.reset(op_name=OpName.EventingGetAllFunctions)
+        cb_env.efm.get_all_functions()
+        validator.validate_http_op()
+
+    @pytest.mark.usefixtures('enable_eventing_mgmt')
+    def test_eventing_function_mgmt_with_parent(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+
+        op_name = OpName.EventingGetAllFunctions
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        cb_env.efm.get_all_functions(GetAllFunctionOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+    @pytest.mark.usefixtures('enable_search_mgmt')
+    def test_search_index_mgmt(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+
+        validator.reset(op_name=OpName.SearchIndexUpsert)
+        idx = SearchIndex(name='tracing-test-index', source_name='default')
+        cb_env.sixm.upsert_index(idx)
+        validator.validate_http_op()
+
+        validator.reset(op_name=OpName.SearchIndexGet)
+        cb_env.sixm.get_index('tracing-test-index')
+        validator.validate_http_op()
+
+        validator.reset(op_name=OpName.SearchIndexGetAll)
+        cb_env.sixm.get_all_indexes()
+        validator.validate_http_op()
+
+        validator.reset(op_name=OpName.SearchIndexDrop)
+        cb_env.sixm.drop_index('tracing-test-index')
+        validator.validate_http_op()
+
+        validator.reset(op_name=OpName.SearchIndexDrop, validate_error=True)
+        try:
+            cb_env.sixm.drop_index('tracing-test-index')
+        except Exception:
+            pass
+        validator.validate_http_op()
+
+    @pytest.mark.usefixtures('enable_search_mgmt')
+    def test_search_index_mgmt_with_parent(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+
+        op_name = OpName.SearchIndexUpsert
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        idx = SearchIndex(name='tracing-parent-test-index', source_name='default')
+        cb_env.sixm.upsert_index(idx, UpsertSearchIndexOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        op_name = OpName.SearchIndexGet
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        cb_env.sixm.get_index('tracing-parent-test-index', GetSearchIndexOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        op_name = OpName.SearchIndexGetAll
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        cb_env.sixm.get_all_indexes(GetAllSearchIndexesOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        op_name = OpName.SearchIndexDrop
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span, validate_error=False)
+        cb_env.sixm.drop_index('tracing-parent-test-index', DropSearchIndexOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        op_name = OpName.SearchIndexDrop
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span, validate_error=True)
+        try:
+            cb_env.sixm.drop_index('tracing-parent-test-index', DropSearchIndexOptions(parent_span=parent_span))
+        except Exception:
+            pass
+        validator.validate_http_op(end_parent=True)
+
+    @pytest.mark.usefixtures('enable_user_mgmt')
+    def test_user_mgmt(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+
+        username = 'tracing-test-user'
+        validator.reset(op_name=OpName.UserUpsert)
+        test_user = User(username=username,
+                         password='password123!',
+                         roles=[Role(name='admin')])
+        cb_env.um.upsert_user(test_user)
+        validator.validate_http_op()
+
+        cb_env.consistency.wait_until_user_present(username)
+
+        validator.reset(op_name=OpName.UserGet)
+        cb_env.um.get_user(username)
+        validator.validate_http_op()
+
+        validator.reset(op_name=OpName.UserGetAll)
+        cb_env.um.get_all_users()
+        validator.validate_http_op()
+
+        validator.reset(op_name=OpName.UserDrop)
+        cb_env.um.drop_user(username)
+        validator.validate_http_op()
+
+        cb_env.consistency.wait_until_user_dropped(username)
+
+        validator.reset(op_name=OpName.UserDrop, validate_error=True)
+        try:
+            cb_env.um.drop_user(username)
+        except Exception:
+            pass
+        validator.validate_http_op()
+
+    @pytest.mark.usefixtures('enable_user_mgmt')
+    def test_user_mgmt_with_parent(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+
+        username = 'tracing-parent-test-user'
+        op_name = OpName.UserUpsert
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        test_user = User(username=username,
+                         password='password123!',
+                         roles=[Role(name='admin')])
+        cb_env.um.upsert_user(test_user, UpsertUserOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        cb_env.consistency.wait_until_user_present(username)
+
+        op_name = OpName.UserGet
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        cb_env.um.get_user(username, GetUserOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        op_name = OpName.UserGetAll
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span)
+        cb_env.um.get_all_users(GetAllUsersOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        op_name = OpName.UserDrop
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span, validate_error=False)
+        cb_env.um.drop_user(username, DropUserOptions(parent_span=parent_span))
+        validator.validate_http_op(end_parent=True)
+
+        cb_env.consistency.wait_until_user_dropped(username)
+
+        op_name = OpName.UserDrop
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span, validate_error=True)
+        try:
+            cb_env.um.drop_user(username, DropUserOptions(parent_span=parent_span))
+        except Exception:
+            pass
+        validator.validate_http_op(end_parent=True)
+
+    @pytest.mark.usefixtures('enable_views_mgmt')
+    def test_view_index_mgmt(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+        validator.reset(op_name=OpName.ViewIndexGetAll, bucket_name=cb_env.bucket.name)
+        cb_env.vixm.get_all_design_documents(DesignDocumentNamespace.PRODUCTION)
+        validator.validate_http_op()
+
+    @pytest.mark.usefixtures('enable_views_mgmt')
+    def test_view_index_mgmt_with_parent(self, cb_env: ManagementTracingEnvironment) -> None:
+        validator = cb_env.http_span_validator
+
+        op_name = OpName.ViewIndexGetAll
+        cb_env.tracer.clear_spans()
+        parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
+        validator.reset(op_name=op_name, do_not_clear_spans=True,
+                        bucket_name=cb_env.bucket.name, parent_span=parent_span)
+        cb_env.vixm.get_all_design_documents(DesignDocumentNamespace.PRODUCTION,
+                                             GetAllDesignDocumentsOptions(parent_span=parent_span))
         validator.validate_http_op(end_parent=True)
 
 
