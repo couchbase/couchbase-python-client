@@ -68,17 +68,16 @@ class AsyncCollectionMgmtImpl:
         """**INTERNAL**"""
         res = await self._client_adapter.execute_mgmt_request(req)
         scopes = []
-        raw_scopes = res.raw_result.get('scopes', None)
-        if raw_scopes:
-            for s in raw_scopes:
-                scope = ScopeSpec(s['name'], list())
-                for c in s['collections']:
-                    scope.collections.append(
-                        CollectionSpec(c['name'],
-                                       c['scope_name'],
-                                       timedelta(seconds=c['max_expiry']),
-                                       history=c.get('history')))
-                scopes.append(scope)
+        raw_scopes = res.raw_result['manifest']['scopes']
+        for s in raw_scopes:
+            scope = ScopeSpec(s['name'], list())
+            for c in s['collections']:
+                scope.collections.append(
+                    CollectionSpec(c['name'],
+                                   s['name'],
+                                   timedelta(seconds=c['max_expiry']),
+                                   history=c.get('history')))
+            scopes.append(scope)
 
         return scopes
 

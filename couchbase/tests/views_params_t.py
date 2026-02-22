@@ -165,7 +165,7 @@ class ViewsParamSuite:
         query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['namespace'] = DesignDocumentNamespace.DEVELOPMENT.value
+        exp_opts['ns'] = DesignDocumentNamespace.DEVELOPMENT.to_str()
         params = query.as_encodable()
         assert params == exp_opts
         assert query.namespace == DesignDocumentNamespace.DEVELOPMENT
@@ -175,7 +175,7 @@ class ViewsParamSuite:
         query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['on_error'] = ViewErrorMode.CONTINUE.value
+        exp_opts['on_error'] = ViewErrorMode.CONTINUE.to_str()
         params = query.as_encodable()
         assert params == exp_opts
         assert query.on_error == ViewErrorMode.CONTINUE
@@ -185,7 +185,7 @@ class ViewsParamSuite:
         query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['order'] = ViewOrdering.ASCENDING.value
+        exp_opts['order'] = ViewOrdering.ASCENDING.to_str()
         params = query.as_encodable()
         assert params == exp_opts
         assert query.order == ViewOrdering.ASCENDING
@@ -204,7 +204,7 @@ class ViewsParamSuite:
         query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['scan_consistency'] = ViewScanConsistency.REQUEST_PLUS.value
+        exp_opts['scan_consistency'] = ViewScanConsistency.REQUEST_PLUS.to_str()
         params = query.as_encodable()
         assert params == exp_opts
         assert query.consistency == ViewScanConsistency.REQUEST_PLUS

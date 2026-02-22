@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,380 +13,257 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# flake8: noqa: E501
 from __future__ import annotations
 
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    TypedDict)
+from typing import TYPE_CHECKING
 
-from couchbase.logic.operation_types import (AnalyticsIndexMgmtOperationType,
+from couchbase.logic.operation_types import (AnalyticsMgmtOperationType,
                                              BucketMgmtOperationType,
                                              BucketOperationType,
+                                             ClusterMgmtOperationType,
                                              ClusterOperationType,
                                              CollectionMgmtOperationType,
+                                             CollectionOperationType,
                                              EventingFunctionMgmtOperationType,
                                              KeyValueMultiOperationType,
                                              KeyValueOperationType,
                                              QueryIndexMgmtOperationType,
                                              SearchIndexMgmtOperationType,
+                                             StreamingOperationType,
                                              UserMgmtOperationType,
                                              ViewIndexMgmtOperationType)
-from couchbase.pycbc_core import (binary_multi_operation,
-                                  binary_operation,
-                                  close_connection,
-                                  create_connection,
-                                  diagnostics_operation,
-                                  get_connection_info,
-                                  kv_multi_operation,
-                                  kv_operation,
-                                  management_operation,
-                                  open_or_close_bucket,
-                                  subdoc_operation,
-                                  update_credentials)
+from couchbase.logic.pycbc_core.binding_map_types import PycbcConnectionOpMap
 
-
-class AnalyticsIndexMgmtOperationMap(TypedDict):
-    connect_link: Callable[..., Any]
-    create_dataset: Callable[..., Any]
-    create_dataverse: Callable[..., Any]
-    create_index: Callable[..., Any]
-    create_link: Callable[..., Any]
-    disconnect_link: Callable[..., Any]
-    drop_dataset: Callable[..., Any]
-    drop_dataverse: Callable[..., Any]
-    drop_link: Callable[..., Any]
-    drop_index: Callable[..., Any]
-    get_all_datasets: Callable[..., Any]
-    get_all_indexes: Callable[..., Any]
-    get_links: Callable[..., Any]
-    get_pending_mutations: Callable[..., Any]
-    replace_link: Callable[..., Any]
-
-
-class BucketMgmtOperationMap(TypedDict):
-    bucket_describe: Callable[..., Any]
-    create_bucket: Callable[..., Any]
-    drop_bucket: Callable[..., Any]
-    flush_bucket: Callable[..., Any]
-    get_all_buckets: Callable[..., Any]
-    get_bucket: Callable[..., Any]
-    update_bucket: Callable[..., Any]
-
-
-class BucketOperationMap(TypedDict):
-    close_bucket: Callable[..., Any]
-    open_bucket: Callable[..., Any]
-    ping: Callable[..., Any]
-
-
-class ClusterOperationMap(TypedDict):
-    create_connection: Callable[..., Any]
-    close_connection: Callable[..., Any]
-    diagnostics: Callable[..., Any]
-    get_cluster_info: Callable[..., Any]
-    get_connection_info: Callable[..., Any]
-    ping: Callable[..., Any]
-    update_credentials: Callable[..., Any]
-
-
-class CollectionMgmtOperationMap(TypedDict):
-    create_collection: Callable[..., Any]
-    create_scope: Callable[..., Any]
-    drop_collection: Callable[..., Any]
-    drop_scope: Callable[..., Any]
-    get_all_scopes: Callable[..., Any]
-    update_collection: Callable[..., Any]
-
-
-class EventingFunctionMgmtOperationMap(TypedDict):
-    deploy_function: Callable[..., Any]
-    drop_function: Callable[..., Any]
-    functions_status: Callable[..., Any]
-    get_all_functions: Callable[..., Any]
-    get_function: Callable[..., Any]
-    pause_function: Callable[..., Any]
-    resume_function: Callable[..., Any]
-    undeploy_function: Callable[..., Any]
-    upsert_function: Callable[..., Any]
-
-
-class KeyValueMultiOperationMap(TypedDict):
-    append_multi: Callable[..., Any]
-    decrement_multi: Callable[..., Any]
-    exist_multis: Callable[..., Any]
-    get_multi: Callable[..., Any]
-    get_all_replicas_multi: Callable[..., Any]
-    get_and_lock_multi: Callable[..., Any]
-    get_and_touch_multi: Callable[..., Any]
-    get_any_replica_multi: Callable[..., Any]
-    incremen_multit: Callable[..., Any]
-    insert_multi: Callable[..., Any]
-    prepend_multi: Callable[..., Any]
-    remove_multi: Callable[..., Any]
-    replace_multi: Callable[..., Any]
-    touch_multi: Callable[..., Any]
-    unlock_multi: Callable[..., Any]
-    upsert_multi: Callable[..., Any]
-
-
-class KeyValueOperationMap(TypedDict):
-    append: Callable[..., Any]
-    decrement: Callable[..., Any]
-    exists: Callable[..., Any]
-    get: Callable[..., Any]
-    get_all_replicas: Callable[..., Any]
-    get_and_lock: Callable[..., Any]
-    get_and_touch: Callable[..., Any]
-    get_any_replica: Callable[..., Any]
-    get_project: Callable[..., Any]
-    increment: Callable[..., Any]
-    insert: Callable[..., Any]
-    lookup_in: Callable[..., Any]
-    lookup_in_all_replicas: Callable[..., Any]
-    lookup_in_any_replica: Callable[..., Any]
-    mutate_in: Callable[..., Any]
-    prepend: Callable[..., Any]
-    remove: Callable[..., Any]
-    replace: Callable[..., Any]
-    touch: Callable[..., Any]
-    unlock: Callable[..., Any]
-    upsert: Callable[..., Any]
-
-
-class QueryIndexMgmtOperationMap(TypedDict):
-    create_index: Callable[..., Any]
-    create_primary_index: Callable[..., Any]
-    drop_index: Callable[..., Any]
-    drop_primary_index: Callable[..., Any]
-    get_all_indexes: Callable[..., Any]
-    build_deferred_indexes: Callable[..., Any]
-
-
-class SearchIndexMgmtOperationMap(TypedDict):
-    allow_querying: Callable[..., Any]
-    analyze_document: Callable[..., Any]
-    disallow_querying: Callable[..., Any]
-    drop_index: Callable[..., Any]
-    freeze_plan: Callable[..., Any]
-    get_all_indexes: Callable[..., Any]
-    get_all_index_stats: Callable[..., Any]
-    get_index: Callable[..., Any]
-    get_indexed_documents_count: Callable[..., Any]
-    get_index_stats: Callable[..., Any]
-    pause_ingest: Callable[..., Any]
-    resume_ingest: Callable[..., Any]
-    unfreeze_plan: Callable[..., Any]
-    upsert_index: Callable[..., Any]
-
-
-class UserMgmtOperationMap(TypedDict):
-    change_password: Callable[..., Any]
-    drop_group: Callable[..., Any]
-    drop_user: Callable[..., Any]
-    get_all_groups: Callable[..., Any]
-    get_all_users: Callable[..., Any]
-    get_group: Callable[..., Any]
-    get_roles: Callable[..., Any]
-    get_user: Callable[..., Any]
-    upsert_group: Callable[..., Any]
-    upsert_user: Callable[..., Any]
-
-
-class ViewIndexMgmtOperationMap(TypedDict):
-    drop_design_document: Callable[..., Any]
-    get_all_design_documents: Callable[..., Any]
-    get_design_document: Callable[..., Any]
-    publish_design_document: Callable[..., Any]
-    upsert_design_document: Callable[..., Any]
+if TYPE_CHECKING:
+    from couchbase.logic.pycbc_core import pycbc_connection
 
 
 class BindingMap:
 
-    def __init__(self) -> None:
-        self._op_map = {}
+    def __init__(self, pycbc_conn: pycbc_connection) -> None:
+        self._conn = pycbc_conn
+        self._op_map: PycbcConnectionOpMap = {}
         self._load_op_map()
 
-    def _load_op_map(self) -> None:
-        self._load_analytics_index_mgmt_op_map()
-        self._load_bucket_mgmt_op_map()
-        self._load_bucket_op_map()
-        self._load_cluster_op_map()
-        self._load_collection_mgmt_op_map()
-        self._load_eventing_function_mgmt_op_map()
-        self._load_key_value_multi_op_map()
-        self._load_key_value_op_map()
-        self._load_query_index_mgmt_op_map()
-        self._load_search_index_mgmt_op_map()
-        self._load_user_mgmt_op_map()
-        self._load_view_index_mgmt_op_map()
-
     @property
-    def op_map(self) -> Dict[str, Callable[..., Any]]:
+    def op_map(self) -> PycbcConnectionOpMap:
         return self._op_map
 
-    def _load_analytics_index_mgmt_op_map(self) -> None:
+    def _load_op_map(self) -> None:
+        """**INTERNAL**"""
+        # cluster operations
         self._op_map.update(**{
-            AnalyticsIndexMgmtOperationType.ConnectLink.value: management_operation,
-            AnalyticsIndexMgmtOperationType.CreateDataset.value: management_operation,
-            AnalyticsIndexMgmtOperationType.CreateDataverse.value: management_operation,
-            AnalyticsIndexMgmtOperationType.CreateIndex.value: management_operation,
-            AnalyticsIndexMgmtOperationType.CreateLink.value: management_operation,
-            AnalyticsIndexMgmtOperationType.DisconnectLink.value: management_operation,
-            AnalyticsIndexMgmtOperationType.DropDataset.value: management_operation,
-            AnalyticsIndexMgmtOperationType.DropDataverse.value: management_operation,
-            AnalyticsIndexMgmtOperationType.DropLink.value: management_operation,
-            AnalyticsIndexMgmtOperationType.DropIndex.value: management_operation,
-            AnalyticsIndexMgmtOperationType.GetAllDatasets.value: management_operation,
-            AnalyticsIndexMgmtOperationType.GetAllIndexes.value: management_operation,
-            AnalyticsIndexMgmtOperationType.GetLinks.value: management_operation,
-            AnalyticsIndexMgmtOperationType.GetPendingMutations.value: management_operation,
-            AnalyticsIndexMgmtOperationType.ReplaceLink.value: management_operation,
+            ClusterOperationType.Close.value: self._conn.pycbc_close,
+            ClusterOperationType.Connect.value: self._conn.pycbc_connect,
+            ClusterOperationType.Diagnostics.value: self._conn.pycbc_diagnostics,
+            ClusterOperationType.GetClusterLabels.value: self._conn.pycbc_get_cluster_labels,
+            ClusterOperationType.GetConnectionInfo.value: self._conn.pycbc_get_connection_info,
+            ClusterOperationType.GetDefaultTimeouts.value: self._conn.pycbc_get_default_timeouts,
+            ClusterOperationType.Ping.value: self._conn.pycbc_ping,
+            ClusterOperationType.UpdateCredentials.value: self._conn.pycbc_update_credentials,
+        })
+        # bucket operations
+        self._op_map.update(**{
+            BucketOperationType.CloseBucket.value: self._conn.pycbc_close_bucket,
+            BucketOperationType.OpenBucket.value: self._conn.pycbc_open_bucket,
+            # ping is same as ClusterOperationType.Ping
         })
 
-    def _load_bucket_mgmt_op_map(self) -> None:
+        # KV Range Scan operations
         self._op_map.update(**{
-            BucketMgmtOperationType.BucketDescribe.value: management_operation,
-            BucketMgmtOperationType.CreateBucket.value: management_operation,
-            BucketMgmtOperationType.DropBucket.value: management_operation,
-            BucketMgmtOperationType.FlushBucket.value: management_operation,
-            BucketMgmtOperationType.GetAllBuckets.value: management_operation,
-            BucketMgmtOperationType.GetBucket.value: management_operation,
-            BucketMgmtOperationType.UpdateBucket.value: management_operation,
+            CollectionOperationType.KeyValueRangeScan.value: self._conn.pycbc_kv_range_scan,
         })
 
-    def _load_bucket_op_map(self) -> None:
-        self._op_map.update(**{
-            BucketOperationType.CloseBucket.value: open_or_close_bucket,
-            BucketOperationType.OpenBucket.value: open_or_close_bucket,
-            BucketOperationType.Ping.value: diagnostics_operation,
+# ====================================================================================================
+# AUTOGENERATED SECTION START - DO NOT EDIT MANUALLY
+# Generated-On: 2026-02-21 16:18:41
+# Content-Hash: 21d3f2aa18faa8b35563b2cfebec9026
+# ====================================================================================================
+        # key-value operations
+        self._op_map.update({
+            KeyValueOperationType.Append.value: self._conn.pycbc_append,
+            KeyValueOperationType.AppendWithLegacyDurability.value: self._conn.pycbc_append_with_legacy_durability,
+            KeyValueOperationType.Decrement.value: self._conn.pycbc_decrement,
+            KeyValueOperationType.DecrementWithLegacyDurability.value: self._conn.pycbc_decrement_with_legacy_durability,
+            KeyValueOperationType.Exists.value: self._conn.pycbc_exists,
+            KeyValueOperationType.Get.value: self._conn.pycbc_get,
+            KeyValueOperationType.GetAllReplicas.value: self._conn.pycbc_get_all_replicas,
+            KeyValueOperationType.GetAndLock.value: self._conn.pycbc_get_and_lock,
+            KeyValueOperationType.GetAndTouch.value: self._conn.pycbc_get_and_touch,
+            KeyValueOperationType.GetAnyReplica.value: self._conn.pycbc_get_any_replica,
+            KeyValueOperationType.GetProjected.value: self._conn.pycbc_get_projected,
+            KeyValueOperationType.Increment.value: self._conn.pycbc_increment,
+            KeyValueOperationType.IncrementWithLegacyDurability.value: self._conn.pycbc_increment_with_legacy_durability,
+            KeyValueOperationType.Insert.value: self._conn.pycbc_insert,
+            KeyValueOperationType.InsertWithLegacyDurability.value: self._conn.pycbc_insert_with_legacy_durability,
+            KeyValueOperationType.LookupIn.value: self._conn.pycbc_lookup_in,
+            KeyValueOperationType.LookupInAllReplicas.value: self._conn.pycbc_lookup_in_all_replicas,
+            KeyValueOperationType.LookupInAnyReplica.value: self._conn.pycbc_lookup_in_any_replica,
+            KeyValueOperationType.MutateIn.value: self._conn.pycbc_mutate_in,
+            KeyValueOperationType.MutateInWithLegacyDurability.value: self._conn.pycbc_mutate_in_with_legacy_durability,
+            KeyValueOperationType.Prepend.value: self._conn.pycbc_prepend,
+            KeyValueOperationType.PrependWithLegacyDurability.value: self._conn.pycbc_prepend_with_legacy_durability,
+            KeyValueOperationType.Remove.value: self._conn.pycbc_remove,
+            KeyValueOperationType.RemoveWithLegacyDurability.value: self._conn.pycbc_remove_with_legacy_durability,
+            KeyValueOperationType.Replace.value: self._conn.pycbc_replace,
+            KeyValueOperationType.ReplaceWithLegacyDurability.value: self._conn.pycbc_replace_with_legacy_durability,
+            KeyValueOperationType.Touch.value: self._conn.pycbc_touch,
+            KeyValueOperationType.Unlock.value: self._conn.pycbc_unlock,
+            KeyValueOperationType.Upsert.value: self._conn.pycbc_upsert,
+            KeyValueOperationType.UpsertWithLegacyDurability.value: self._conn.pycbc_upsert_with_legacy_durability,
+
+        })
+        # key-value multi operations
+        self._op_map.update({
+            KeyValueMultiOperationType.AppendMulti.value: self._conn.pycbc_append_multi,
+            KeyValueMultiOperationType.AppendWithLegacyDurabilityMulti.value: self._conn.pycbc_append_with_legacy_durability_multi,
+            KeyValueMultiOperationType.DecrementMulti.value: self._conn.pycbc_decrement_multi,
+            KeyValueMultiOperationType.DecrementWithLegacyDurabilityMulti.value: self._conn.pycbc_decrement_with_legacy_durability_multi,
+            KeyValueMultiOperationType.ExistsMulti.value: self._conn.pycbc_exists_multi,
+            KeyValueMultiOperationType.GetMulti.value: self._conn.pycbc_get_multi,
+            KeyValueMultiOperationType.GetAllReplicasMulti.value: self._conn.pycbc_get_all_replicas_multi,
+            KeyValueMultiOperationType.GetAndLockMulti.value: self._conn.pycbc_get_and_lock_multi,
+            KeyValueMultiOperationType.GetAndTouchMulti.value: self._conn.pycbc_get_and_touch_multi,
+            KeyValueMultiOperationType.GetAnyReplicaMulti.value: self._conn.pycbc_get_any_replica_multi,
+            KeyValueMultiOperationType.IncrementMulti.value: self._conn.pycbc_increment_multi,
+            KeyValueMultiOperationType.IncrementWithLegacyDurabilityMulti.value: self._conn.pycbc_increment_with_legacy_durability_multi,
+            KeyValueMultiOperationType.InsertMulti.value: self._conn.pycbc_insert_multi,
+            KeyValueMultiOperationType.InsertWithLegacyDurabilityMulti.value: self._conn.pycbc_insert_with_legacy_durability_multi,
+            KeyValueMultiOperationType.PrependMulti.value: self._conn.pycbc_prepend_multi,
+            KeyValueMultiOperationType.PrependWithLegacyDurabilityMulti.value: self._conn.pycbc_prepend_with_legacy_durability_multi,
+            KeyValueMultiOperationType.RemoveMulti.value: self._conn.pycbc_remove_multi,
+            KeyValueMultiOperationType.RemoveWithLegacyDurabilityMulti.value: self._conn.pycbc_remove_with_legacy_durability_multi,
+            KeyValueMultiOperationType.ReplaceMulti.value: self._conn.pycbc_replace_multi,
+            KeyValueMultiOperationType.ReplaceWithLegacyDurabilityMulti.value: self._conn.pycbc_replace_with_legacy_durability_multi,
+            KeyValueMultiOperationType.TouchMulti.value: self._conn.pycbc_touch_multi,
+            KeyValueMultiOperationType.UnlockMulti.value: self._conn.pycbc_unlock_multi,
+            KeyValueMultiOperationType.UpsertMulti.value: self._conn.pycbc_upsert_multi,
+            KeyValueMultiOperationType.UpsertWithLegacyDurabilityMulti.value: self._conn.pycbc_upsert_with_legacy_durability_multi,
+
+        })
+        # streaming operations
+        self._op_map.update({
+            StreamingOperationType.AnalyticsQuery.value: self._conn.pycbc_analytics_query,
+            StreamingOperationType.Query.value: self._conn.pycbc_query,
+            StreamingOperationType.SearchQuery.value: self._conn.pycbc_search_query,
+            StreamingOperationType.ViewQuery.value: self._conn.pycbc_view_query,
+
         })
 
-    def _load_cluster_op_map(self) -> None:
-        self._op_map.update(**{
-            ClusterOperationType.CreateConnection.value: create_connection,
-            ClusterOperationType.CloseConnection.value: close_connection,
-            ClusterOperationType.Diagnostics.value: diagnostics_operation,
-            ClusterOperationType.GetClusterInfo.value: management_operation,
-            ClusterOperationType.GetConnectionInfo.value: get_connection_info,
-            ClusterOperationType.Ping.value: diagnostics_operation,
-            ClusterOperationType.UpdateCredentials.value: update_credentials,
+        # Analytics management operations
+        self._op_map.update({
+            AnalyticsMgmtOperationType.AnalyticsDatasetCreate.value: self._conn.pycbc_analytics_dataset_create,
+            AnalyticsMgmtOperationType.AnalyticsDatasetDrop.value: self._conn.pycbc_analytics_dataset_drop,
+            AnalyticsMgmtOperationType.AnalyticsDatasetGetAll.value: self._conn.pycbc_analytics_dataset_get_all,
+            AnalyticsMgmtOperationType.AnalyticsDataverseCreate.value: self._conn.pycbc_analytics_dataverse_create,
+            AnalyticsMgmtOperationType.AnalyticsDataverseDrop.value: self._conn.pycbc_analytics_dataverse_drop,
+            AnalyticsMgmtOperationType.AnalyticsGetPendingMutations.value: self._conn.pycbc_analytics_get_pending_mutations,
+            AnalyticsMgmtOperationType.AnalyticsIndexCreate.value: self._conn.pycbc_analytics_index_create,
+            AnalyticsMgmtOperationType.AnalyticsIndexDrop.value: self._conn.pycbc_analytics_index_drop,
+            AnalyticsMgmtOperationType.AnalyticsIndexGetAll.value: self._conn.pycbc_analytics_index_get_all,
+            AnalyticsMgmtOperationType.AnalyticsLinkConnect.value: self._conn.pycbc_analytics_link_connect,
+            AnalyticsMgmtOperationType.AnalyticsLinkCreateCouchbaseRemoteLink.value: self._conn.pycbc_analytics_link_create_couchbase_remote_link,
+            AnalyticsMgmtOperationType.AnalyticsLinkCreateS3ExternalLink.value: self._conn.pycbc_analytics_link_create_s3_external_link,
+            AnalyticsMgmtOperationType.AnalyticsLinkCreateAzureBlobExternalLink.value: self._conn.pycbc_analytics_link_create_azure_blob_external_link,
+            AnalyticsMgmtOperationType.AnalyticsLinkDisconnect.value: self._conn.pycbc_analytics_link_disconnect,
+            AnalyticsMgmtOperationType.AnalyticsLinkDrop.value: self._conn.pycbc_analytics_link_drop,
+            AnalyticsMgmtOperationType.AnalyticsLinkGetAll.value: self._conn.pycbc_analytics_link_get_all,
+            AnalyticsMgmtOperationType.AnalyticsLinkReplaceCouchbaseRemoteLink.value: self._conn.pycbc_analytics_link_replace_couchbase_remote_link,
+            AnalyticsMgmtOperationType.AnalyticsLinkReplaceS3ExternalLink.value: self._conn.pycbc_analytics_link_replace_s3_external_link,
+            AnalyticsMgmtOperationType.AnalyticsLinkReplaceAzureBlobExternalLink.value: self._conn.pycbc_analytics_link_replace_azure_blob_external_link,
         })
 
-    def _load_collection_mgmt_op_map(self) -> None:
-        self._op_map.update(**{
-            CollectionMgmtOperationType.CreateCollection.value: management_operation,
-            CollectionMgmtOperationType.CreateScope.value: management_operation,
-            CollectionMgmtOperationType.DropCollection.value: management_operation,
-            CollectionMgmtOperationType.DropScope.value: management_operation,
-            CollectionMgmtOperationType.GetAllScopes.value: management_operation,
-            CollectionMgmtOperationType.UpdateCollection.value: management_operation,
+        # Bucket management operations
+        self._op_map.update({
+            BucketMgmtOperationType.BucketCreate.value: self._conn.pycbc_bucket_create,
+            BucketMgmtOperationType.BucketDrop.value: self._conn.pycbc_bucket_drop,
+            BucketMgmtOperationType.BucketFlush.value: self._conn.pycbc_bucket_flush,
+            BucketMgmtOperationType.BucketGet.value: self._conn.pycbc_bucket_get,
+            BucketMgmtOperationType.BucketGetAll.value: self._conn.pycbc_bucket_get_all,
+            BucketMgmtOperationType.BucketUpdate.value: self._conn.pycbc_bucket_update,
+            BucketMgmtOperationType.BucketDescribe.value: self._conn.pycbc_bucket_describe,
         })
 
-    def _load_eventing_function_mgmt_op_map(self) -> None:
-        self._op_map.update(**{
-            EventingFunctionMgmtOperationType.DeployFunction.value: management_operation,
-            EventingFunctionMgmtOperationType.DropFunction.value: management_operation,
-            EventingFunctionMgmtOperationType.FunctionsStatus.value: management_operation,
-            EventingFunctionMgmtOperationType.GetAllFunctions.value: management_operation,
-            EventingFunctionMgmtOperationType.GetFunction.value: management_operation,
-            EventingFunctionMgmtOperationType.PauseFunction.value: management_operation,
-            EventingFunctionMgmtOperationType.ResumeFunction.value: management_operation,
-            EventingFunctionMgmtOperationType.UndeployFunction.value: management_operation,
-            EventingFunctionMgmtOperationType.UpsertFunction.value: management_operation,
+        # Cluster management operations
+        self._op_map.update({
+            ClusterMgmtOperationType.ClusterDescribe.value: self._conn.pycbc_cluster_describe,
+            ClusterMgmtOperationType.ClusterDeveloperPreviewEnable.value: self._conn.pycbc_cluster_developer_preview_enable,
         })
 
-    def _load_key_value_multi_op_map(self) -> None:
-        self._op_map.update(**{
-            KeyValueMultiOperationType.AppendMulti.value: binary_multi_operation,
-            KeyValueMultiOperationType.DecrementMulti.value: binary_multi_operation,
-            KeyValueMultiOperationType.ExistsMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.GetMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.GetAllReplicasMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.GetAndLockMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.GetAnyReplicaMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.IncrementMulti.value: binary_multi_operation,
-            KeyValueMultiOperationType.InsertMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.PrependMulti.value: binary_multi_operation,
-            KeyValueMultiOperationType.RemoveMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.ReplaceMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.TouchMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.UnlockMulti.value: kv_multi_operation,
-            KeyValueMultiOperationType.UpsertMulti.value: kv_multi_operation
+        # Collection management operations
+        self._op_map.update({
+            CollectionMgmtOperationType.CollectionCreate.value: self._conn.pycbc_collection_create,
+            CollectionMgmtOperationType.CollectionsManifestGet.value: self._conn.pycbc_collections_manifest_get,
+            CollectionMgmtOperationType.CollectionDrop.value: self._conn.pycbc_collection_drop,
+            CollectionMgmtOperationType.CollectionUpdate.value: self._conn.pycbc_collection_update,
+            CollectionMgmtOperationType.ScopeCreate.value: self._conn.pycbc_scope_create,
+            CollectionMgmtOperationType.ScopeDrop.value: self._conn.pycbc_scope_drop,
+            CollectionMgmtOperationType.ScopeGetAll.value: self._conn.pycbc_scope_get_all,
         })
 
-    def _load_key_value_op_map(self) -> None:
-        self._op_map.update(**{
-            KeyValueOperationType.Append.value: binary_operation,
-            KeyValueOperationType.Decrement.value: binary_operation,
-            KeyValueOperationType.Exists.value: kv_operation,
-            KeyValueOperationType.Get.value: kv_operation,
-            KeyValueOperationType.GetAllReplicas.value: kv_operation,
-            KeyValueOperationType.GetAndLock.value: kv_operation,
-            KeyValueOperationType.GetAndTouch.value: kv_operation,
-            KeyValueOperationType.GetAnyReplica.value: kv_operation,
-            KeyValueOperationType.GetProject.value: kv_operation,
-            KeyValueOperationType.Increment.value: binary_operation,
-            KeyValueOperationType.Insert.value: kv_operation,
-            KeyValueOperationType.LookupIn.value: subdoc_operation,
-            KeyValueOperationType.LookupInAllReplicas.value: subdoc_operation,
-            KeyValueOperationType.LookupInAnyReplica.value: subdoc_operation,
-            KeyValueOperationType.MutateIn.value: subdoc_operation,
-            KeyValueOperationType.Prepend.value: binary_operation,
-            KeyValueOperationType.Remove.value: kv_operation,
-            KeyValueOperationType.Replace.value: kv_operation,
-            KeyValueOperationType.Touch.value: kv_operation,
-            KeyValueOperationType.Unlock.value: kv_operation,
-            KeyValueOperationType.Upsert.value: kv_operation
+        # EventingFunction management operations
+        self._op_map.update({
+            EventingFunctionMgmtOperationType.EventingDeployFunction.value: self._conn.pycbc_eventing_deploy_function,
+            EventingFunctionMgmtOperationType.EventingDropFunction.value: self._conn.pycbc_eventing_drop_function,
+            EventingFunctionMgmtOperationType.EventingGetAllFunctions.value: self._conn.pycbc_eventing_get_all_functions,
+            EventingFunctionMgmtOperationType.EventingGetFunction.value: self._conn.pycbc_eventing_get_function,
+            EventingFunctionMgmtOperationType.EventingGetStatus.value: self._conn.pycbc_eventing_get_status,
+            EventingFunctionMgmtOperationType.EventingPauseFunction.value: self._conn.pycbc_eventing_pause_function,
+            EventingFunctionMgmtOperationType.EventingResumeFunction.value: self._conn.pycbc_eventing_resume_function,
+            EventingFunctionMgmtOperationType.EventingUndeployFunction.value: self._conn.pycbc_eventing_undeploy_function,
+            EventingFunctionMgmtOperationType.EventingUpsertFunction.value: self._conn.pycbc_eventing_upsert_function,
         })
 
-    def _load_query_index_mgmt_op_map(self) -> None:
-        self._op_map.update(**{
-            QueryIndexMgmtOperationType.CreateIndex.value: management_operation,
-            QueryIndexMgmtOperationType.CreatePrimaryIndex.value: management_operation,
-            QueryIndexMgmtOperationType.DropIndex.value: management_operation,
-            QueryIndexMgmtOperationType.DropPrimaryIndex.value: management_operation,
-            QueryIndexMgmtOperationType.GetAllIndexes.value: management_operation,
-            QueryIndexMgmtOperationType.BuildDeferredIndexes.value: management_operation,
+        # QueryIndex management operations
+        self._op_map.update({
+            QueryIndexMgmtOperationType.QueryIndexBuild.value: self._conn.pycbc_query_index_build,
+            QueryIndexMgmtOperationType.QueryIndexBuildDeferred.value: self._conn.pycbc_query_index_build_deferred,
+            QueryIndexMgmtOperationType.QueryIndexCreate.value: self._conn.pycbc_query_index_create,
+            QueryIndexMgmtOperationType.QueryIndexDrop.value: self._conn.pycbc_query_index_drop,
+            QueryIndexMgmtOperationType.QueryIndexGetAll.value: self._conn.pycbc_query_index_get_all,
+            QueryIndexMgmtOperationType.QueryIndexGetAllDeferred.value: self._conn.pycbc_query_index_get_all_deferred,
         })
 
-    def _load_search_index_mgmt_op_map(self) -> None:
-        self._op_map.update(**{
-            SearchIndexMgmtOperationType.AllowQuerying.value: management_operation,
-            SearchIndexMgmtOperationType.AnalyzeDocument.value: management_operation,
-            SearchIndexMgmtOperationType.DisallowQuerying.value: management_operation,
-            SearchIndexMgmtOperationType.DropIndex.value: management_operation,
-            SearchIndexMgmtOperationType.FreezePlan.value: management_operation,
-            SearchIndexMgmtOperationType.GetAllIndexes.value: management_operation,
-            SearchIndexMgmtOperationType.GetAllIndexStats.value: management_operation,
-            SearchIndexMgmtOperationType.GetIndex.value: management_operation,
-            SearchIndexMgmtOperationType.GetIndexedDocumentsCount.value: management_operation,
-            SearchIndexMgmtOperationType.GetIndexStats.value: management_operation,
-            SearchIndexMgmtOperationType.PauseIngest.value: management_operation,
-            SearchIndexMgmtOperationType.ResumeIngest.value: management_operation,
-            SearchIndexMgmtOperationType.UnfreezePlan.value: management_operation,
-            SearchIndexMgmtOperationType.UpsertIndex.value: management_operation,
+        # SearchIndex management operations
+        self._op_map.update({
+            SearchIndexMgmtOperationType.SearchGetStats.value: self._conn.pycbc_search_get_stats,
+            SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument.value: self._conn.pycbc_search_index_analyze_document,
+            SearchIndexMgmtOperationType.SearchIndexControlIngest.value: self._conn.pycbc_search_index_control_ingest,
+            SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze.value: self._conn.pycbc_search_index_control_plan_freeze,
+            SearchIndexMgmtOperationType.SearchIndexControlQuery.value: self._conn.pycbc_search_index_control_query,
+            SearchIndexMgmtOperationType.SearchIndexDrop.value: self._conn.pycbc_search_index_drop,
+            SearchIndexMgmtOperationType.SearchIndexGet.value: self._conn.pycbc_search_index_get,
+            SearchIndexMgmtOperationType.SearchIndexGetAll.value: self._conn.pycbc_search_index_get_all,
+            SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount.value: self._conn.pycbc_search_index_get_documents_count,
+            SearchIndexMgmtOperationType.SearchIndexGetStats.value: self._conn.pycbc_search_index_get_stats,
+            SearchIndexMgmtOperationType.SearchIndexUpsert.value: self._conn.pycbc_search_index_upsert,
         })
 
-    def _load_user_mgmt_op_map(self) -> None:
-        self._op_map.update(**{
-            UserMgmtOperationType.ChangePassword.value: management_operation,
-            UserMgmtOperationType.DropGroup.value: management_operation,
-            UserMgmtOperationType.DropUser.value: management_operation,
-            UserMgmtOperationType.GetAllGroups.value: management_operation,
-            UserMgmtOperationType.GetAllUsers.value: management_operation,
-            UserMgmtOperationType.GetGroup.value: management_operation,
-            UserMgmtOperationType.GetRoles.value: management_operation,
-            UserMgmtOperationType.GetUser.value: management_operation,
-            UserMgmtOperationType.UpsertGroup.value: management_operation,
-            UserMgmtOperationType.UpsertUser.value: management_operation,
+        # User management operations
+        self._op_map.update({
+            UserMgmtOperationType.ChangePassword.value: self._conn.pycbc_change_password,
+            UserMgmtOperationType.GroupDrop.value: self._conn.pycbc_group_drop,
+            UserMgmtOperationType.GroupGet.value: self._conn.pycbc_group_get,
+            UserMgmtOperationType.GroupGetAll.value: self._conn.pycbc_group_get_all,
+            UserMgmtOperationType.GroupUpsert.value: self._conn.pycbc_group_upsert,
+            UserMgmtOperationType.RoleGetAll.value: self._conn.pycbc_role_get_all,
+            UserMgmtOperationType.UserDrop.value: self._conn.pycbc_user_drop,
+            UserMgmtOperationType.UserGet.value: self._conn.pycbc_user_get,
+            UserMgmtOperationType.UserGetAll.value: self._conn.pycbc_user_get_all,
+            UserMgmtOperationType.UserUpsert.value: self._conn.pycbc_user_upsert,
         })
 
-    def _load_view_index_mgmt_op_map(self) -> None:
-        self._op_map.update(**{
-            ViewIndexMgmtOperationType.DropDesignDocument.value: management_operation,
-            ViewIndexMgmtOperationType.GetAllDesignDocuments.value: management_operation,
-            ViewIndexMgmtOperationType.GetDesignDocument.value: management_operation,
-            ViewIndexMgmtOperationType.PublishDesignDocument.value: management_operation,
-            ViewIndexMgmtOperationType.UpsertDesignDocument.value: management_operation,
+        # ViewIndex management operations
+        self._op_map.update({
+            ViewIndexMgmtOperationType.ViewIndexDrop.value: self._conn.pycbc_view_index_drop,
+            ViewIndexMgmtOperationType.ViewIndexGet.value: self._conn.pycbc_view_index_get,
+            ViewIndexMgmtOperationType.ViewIndexGetAll.value: self._conn.pycbc_view_index_get_all,
+            ViewIndexMgmtOperationType.ViewIndexUpsert.value: self._conn.pycbc_view_index_upsert,
         })
+
+# ====================================================================================================
+# AUTOGENERATED SECTION END - DO NOT EDIT MANUALLY
+# Generated-On: 2026-02-21 16:18:41
+# Content-Hash: 21d3f2aa18faa8b35563b2cfebec9026
+# ====================================================================================================

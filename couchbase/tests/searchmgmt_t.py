@@ -297,7 +297,7 @@ class SearchIndexManagementTestSuite:
         assert res.source_params == search_idx.source_params
 
 
-@pytest.mark.flaky(reruns=5, reruns_delay=1)
+# @pytest.mark.flaky(reruns=5, reruns_delay=1)
 class ClassicSearchIndexManagementTests(SearchIndexManagementTestSuite):
     @pytest.fixture(scope='class', autouse=True)
     def validate_test_manifest(self):
@@ -316,7 +316,7 @@ class ClassicSearchIndexManagementTests(SearchIndexManagementTestSuite):
         cb_base_env.disable_search_mgmt()
 
 
-@pytest.mark.flaky(reruns=5, reruns_delay=1)
+# @pytest.mark.flaky(reruns=5, reruns_delay=1)
 class ClassicScopeSearchIndexManagementTests(SearchIndexManagementTestSuite):
     @pytest.fixture(scope='class', autouse=True)
     def validate_test_manifest(self):

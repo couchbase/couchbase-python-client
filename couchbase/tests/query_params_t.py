@@ -250,7 +250,7 @@ class QueryParamTestSuite:
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['profile_mode'] = QueryProfile.PHASES.value
+        exp_opts['profile'] = QueryProfile.PHASES.value
         assert query.params == exp_opts
         assert query.profile == QueryProfile.PHASES
 
@@ -287,7 +287,7 @@ class QueryParamTestSuite:
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['scan_wait'] = 30000000
+        exp_opts['scan_wait'] = 30000
         assert query.params == exp_opts
 
     def test_params_scan_consistency(self, base_opts):
@@ -319,21 +319,21 @@ class QueryParamTestSuite:
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 20000000
+        exp_opts['timeout'] = 20000
         assert query.params == exp_opts
 
         q_opts = QueryOptions(timeout=20)
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 20000000
+        exp_opts['timeout'] = 20000
         assert query.params == exp_opts
 
         q_opts = QueryOptions(timeout=25.5)
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 25500000
+        exp_opts['timeout'] = 25500
         assert query.params == exp_opts
 
 

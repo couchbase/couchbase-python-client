@@ -60,31 +60,20 @@ class AsyncEventingFunctionMgmtImpl:
     async def get_all_functions(self, req: GetAllFunctionsRequest) -> List[EventingFunction]:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        functions = []
-        raw_functions = ret.raw_result.get('functions', None)
-        if raw_functions:
-            functions = [EventingFunction.from_server(f) for f in raw_functions]
-
-        return functions
+        raw_functions = ret.raw_result['functions']
+        return [EventingFunction.from_server(f) for f in raw_functions]
 
     async def get_function(self, req: GetFunctionRequest) -> EventingFunction:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_func = ret.raw_result.get('function', None)
-        func = None
-        if raw_func:
-            func = EventingFunction.from_server(raw_func)
-        return func
+        raw_func = ret.raw_result['function']
+        return EventingFunction.from_server(raw_func)
 
     async def get_functions_status(self, req: GetFunctionsStatusRequest) -> EventingFunctionsStatus:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_status = ret.raw_result.get('status', None)
-        status = None
-        if raw_status:
-            status = EventingFunctionsStatus.from_server(raw_status)
-
-        return status
+        raw_status = ret.raw_result['status']
+        return EventingFunctionsStatus.from_server(raw_status)
 
     async def pause_function(self, req: PauseFunctionRequest) -> None:
         """**INTERNAL**"""

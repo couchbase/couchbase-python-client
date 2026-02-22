@@ -23,7 +23,7 @@ try:
     # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
     # This is particularly helpful on M1 macs (PYCBC-1386).
     import ssl  # noqa: F401 # nopep8 # isort:skip # noqa: E402
-    import couchbase.pycbc_core  # noqa: F401 # nopep8 # isort:skip # noqa: E402
+    import couchbase.logic.pycbc_core  # noqa: F401 # nopep8 # isort:skip # noqa: E402
 except ImportError:
     import os  # nopep8 # isort:skip # noqa: E402
     import sys  # nopep8 # isort:skip # noqa: E402
@@ -62,7 +62,7 @@ except Exception:  # nosec
 import json  # nopep8 # isort:skip # noqa: E402
 import logging  # nopep8 # isort:skip # noqa: E402
 
-from couchbase.pycbc_core import CXXCBC_METADATA, pycbc_logger, shutdown_logger  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.pycbc_core import CXXCBC_METADATA, pycbc_logger, shutdown_logger  # nopep8 # isort:skip # noqa: E402, E501
 
 _PYCBC_LOGGER = pycbc_logger()
 _CXXCBC_METADATA_JSON = json.loads(CXXCBC_METADATA)

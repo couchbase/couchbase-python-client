@@ -18,15 +18,14 @@ from __future__ import annotations
 from typing import (TYPE_CHECKING,
                     Iterable,
                     Iterator,
-                    Optional,
                     Union)
 
 from acouchbase.logic.client_adapter import AsyncClientAdapter
 from couchbase.exceptions import ErrorMapper, UnAmbiguousTimeoutException
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.collection_req_builder import CollectionRequestBuilder
 from couchbase.logic.collection_types import CollectionDetails
-from couchbase.logic.top_level_types import PyCapsuleType
+from couchbase.logic.pycbc_core import pycbc_connection
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.result import (CounterResult,
                               ExistsResult,
                               GetReplicaResult,
@@ -92,7 +91,7 @@ class AsyncCollectionImpl:
         return self._scope._impl._bucket_impl.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         """
         **INTERNAL**
         """
@@ -123,17 +122,17 @@ class AsyncCollectionImpl:
     async def append(self, req: AppendRequest) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutationResult(ret)
+        return MutationResult(ret, key=req.key)
 
     async def decrement(self, req: DecrementRequest) -> CounterResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return CounterResult(ret)
+        return CounterResult(ret, key=req.key)
 
     async def exists(self, req: ExistsRequest) -> ExistsResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return ExistsResult(ret)
+        return ExistsResult(ret, key=req.key)
 
     async def get_all_replicas(self, req: GetAllReplicasRequest) -> Iterable[GetReplicaResult]:
         await self.wait_until_bucket_connected()
@@ -147,50 +146,50 @@ class AsyncCollectionImpl:
                     # this is a timeout from pulling a result from the queue, kill the generator
                     raise UnAmbiguousTimeoutException('Timeout reached waiting for result in queue.') from None
                 else:
-                    if isinstance(res, CouchbaseBaseException):
+                    if isinstance(res, PycbcCoreException):
                         raise ErrorMapper.build_exception(res)
                     # should only be None once all replicas have been retrieved
                     if res is None:
                         return
 
-                    yield GetReplicaResult(res, transcoder=req.transcoder)
+                    yield GetReplicaResult(res, transcoder=req.transcoder, key=req.key)
 
         return _decode_replicas()
 
     async def get_and_lock(self, req: GetAndLockRequest) -> GetResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return GetResult(ret, transcoder=req.transcoder)
+        return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
     async def get_and_touch(self, req: GetAndTouchRequest) -> GetResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return GetResult(ret, transcoder=req.transcoder)
+        return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
     async def get_any_replica(self, req: GetAnyReplicaRequest) -> GetReplicaResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return GetReplicaResult(ret, transcoder=req.transcoder)
+        return GetReplicaResult(ret, transcoder=req.transcoder, key=req.key)
 
     async def get(self, req: GetRequest) -> GetResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return GetResult(ret, transcoder=req.transcoder)
+        return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
     async def increment(self, req: IncrementRequest) -> CounterResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return CounterResult(ret)
+        return CounterResult(ret, key=req.key)
 
     async def insert(self, req: InsertRequest) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutationResult(ret)
+        return MutationResult(ret, key=req.key)
 
     async def lookup_in(self, req: LookupInRequest) -> LookupInResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return LookupInResult(ret, transcoder=req.transcoder, is_subdoc=True)
+        return LookupInResult(ret, transcoder=req.transcoder, is_subdoc=True, key=req.key)
 
     async def lookup_in_all_replicas(self, req: LookupInAllReplicasRequest) -> Iterable[LookupInReplicaResult]:
         await self.wait_until_bucket_connected()
@@ -204,48 +203,47 @@ class AsyncCollectionImpl:
                     # this is a timeout from pulling a result from the queue, kill the generator
                     raise UnAmbiguousTimeoutException('Timeout reached waiting for result in queue.') from None
                 else:
-                    if isinstance(res, CouchbaseBaseException):
+                    if isinstance(res, PycbcCoreException):
                         raise ErrorMapper.build_exception(res)
                     # should only be None once all replicas have been retrieved
                     if res is None:
                         return
 
-                    yield LookupInReplicaResult(res, transcoder=req.transcoder, is_subdoc=True)
+                    yield LookupInReplicaResult(res, transcoder=req.transcoder, is_subdoc=True, key=req.key)
         return _decode_replicas()
 
     async def lookup_in_any_replica(self, req: LookupInAnyReplicaRequest) -> LookupInReplicaResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return LookupInReplicaResult(ret, transcoder=req.transcoder, is_subdoc=True)
+        return LookupInReplicaResult(ret, transcoder=req.transcoder, is_subdoc=True, key=req.key)
 
     async def mutate_in(self, req: MutateInRequest) -> MutateInResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutateInResult(ret)
+        return MutateInResult(ret, key=req.key)
 
     async def prepend(self, req: PrependRequest) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutationResult(ret)
+        return MutationResult(ret, key=req.key)
 
     def range_scan(self, req: AsyncRangeScanRequest) -> ScanResultIterable:
-        req.set_connection(self.client_adapter.connection)
         return ScanResultIterable(req)
 
     async def remove(self, req: RemoveRequest) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutationResult(ret)
+        return MutationResult(ret, key=req.key)
 
     async def replace(self, req: ReplaceRequest) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutationResult(ret)
+        return MutationResult(ret, key=req.key)
 
     async def touch(self, req: TouchRequest) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutationResult(ret)
+        return MutationResult(ret, key=req.key)
 
     async def unlock(self, req: UnlockRequest) -> None:
         await self.wait_until_bucket_connected()
@@ -254,7 +252,7 @@ class AsyncCollectionImpl:
     async def upsert(self, req: UpsertRequest) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req)
-        return MutationResult(ret)
+        return MutationResult(ret, key=req.key)
 
     async def wait_until_bucket_connected(self) -> None:
         if self.connected:

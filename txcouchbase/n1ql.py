@@ -20,8 +20,8 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.n1ql import QueryRequestLogic
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class N1QLRequest(QueryRequestLogic):
@@ -49,7 +49,6 @@ class N1QLRequest(QueryRequestLogic):
         return cls(connection, loop, query_params, row_factory=row_factory, **kwargs)
 
     def execute_query(self):
-        # if self._query_request_ftr is not None and self._query_request_ftr.done():
         if self.done_streaming:
             raise AlreadyQueriedException()
 
@@ -74,17 +73,6 @@ class N1QLRequest(QueryRequestLogic):
             excptn = exc_cls(str(ex))
             raise excptn
 
-    # def _get_metadata(self):
-    #     if self._query_request_ftr.done():
-    #         if self._query_request_ftr.exception():
-    #             print('raising exception')
-    #             raise self._query_request_ftr.exception()
-    #         else:
-    #             self._set_metadata()
-    #     else:
-    #         self._loop.run_until_complete(self._query_request_ftr)
-    #         self._set_metadata()
-
     def __iter__(self):
         return self
 
@@ -93,7 +81,7 @@ class N1QLRequest(QueryRequestLogic):
             return
 
         row = next(self._streaming_result)
-        if isinstance(row, CouchbaseBaseException):
+        if isinstance(row, PycbcCoreException):
             raise ErrorMapper.build_exception(row)
         # should only be None one query request is complete and _no_ errors found
         if row is None:

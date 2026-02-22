@@ -39,7 +39,6 @@ from couchbase.management.logic.search_index_mgmt_types import (SEARCH_INDEX_MGM
                                                                 UnfreezePlanRequest,
                                                                 UpsertIndexRequest)
 from couchbase.options import forward_args
-from couchbase.pycbc_core import mgmt_operations, search_index_mgmt_operations
 
 if TYPE_CHECKING:
     from couchbase.management.logic.search_index_mgmt_types import SearchIndex
@@ -91,8 +90,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = AllowQueryingRequest(self._error_map,
-                                   mgmt_operations.SEARCH_INDEX.value,
-                                   search_index_mgmt_operations.CONTROL_QUERY.value,
                                    index_name=index_name,
                                    allow=True,
                                    bucket_name=bucket_name,
@@ -115,8 +112,6 @@ class SearchIndexMgmtRequestBuilder:
         encoded_document = self._get_valid_document(document)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = AnalyzeDocumentRequest(self._error_map,
-                                     mgmt_operations.SEARCH_INDEX.value,
-                                     search_index_mgmt_operations.ANALYZE_DOCUMENT.value,
                                      index_name=index_name,
                                      encoded_document=encoded_document,
                                      bucket_name=bucket_name,
@@ -137,8 +132,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = DropIndexRequest(self._error_map,
-                               mgmt_operations.SEARCH_INDEX.value,
-                               search_index_mgmt_operations.DROP_INDEX.value,
                                index_name=index_name,
                                bucket_name=bucket_name,
                                scope_name=scope_name,
@@ -158,8 +151,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = DisallowQueryingRequest(self._error_map,
-                                      mgmt_operations.SEARCH_INDEX.value,
-                                      search_index_mgmt_operations.CONTROL_QUERY.value,
                                       index_name=index_name,
                                       allow=False,
                                       bucket_name=bucket_name,
@@ -180,8 +171,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = FreezePlanRequest(self._error_map,
-                                mgmt_operations.SEARCH_INDEX.value,
-                                search_index_mgmt_operations.FREEZE_PLAN.value,
                                 index_name=index_name,
                                 freeze=True,
                                 bucket_name=bucket_name,
@@ -200,8 +189,6 @@ class SearchIndexMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetAllIndexesRequest(self._error_map,
-                                   mgmt_operations.SEARCH_INDEX.value,
-                                   search_index_mgmt_operations.GET_ALL_INDEXES.value,
                                    bucket_name=bucket_name,
                                    scope_name=scope_name,
                                    **final_args)
@@ -213,10 +200,7 @@ class SearchIndexMgmtRequestBuilder:
     def build_get_all_index_stats_request(self, *options: object, **kwargs: object) -> GetAllIndexStatsRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetAllIndexStatsRequest(self._error_map,
-                                      mgmt_operations.SEARCH_INDEX.value,
-                                      search_index_mgmt_operations.GET_ALL_STATS.value,
-                                      **final_args)
+        req = GetAllIndexStatsRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -232,8 +216,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetIndexedDocumentsCountRequest(self._error_map,
-                                              mgmt_operations.SEARCH_INDEX.value,
-                                              search_index_mgmt_operations.GET_INDEX_DOCUMENT_COUNT.value,
                                               index_name=index_name,
                                               bucket_name=bucket_name,
                                               scope_name=scope_name,
@@ -253,8 +235,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetIndexRequest(self._error_map,
-                              mgmt_operations.SEARCH_INDEX.value,
-                              search_index_mgmt_operations.GET_INDEX.value,
                               index_name=index_name,
                               bucket_name=bucket_name,
                               scope_name=scope_name,
@@ -277,8 +257,6 @@ class SearchIndexMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         self._validate_index_name(index_name)
         req = GetIndexStatsRequest(self._error_map,
-                                   mgmt_operations.SEARCH_INDEX.value,
-                                   search_index_mgmt_operations.GET_INDEX_STATS.value,
                                    index_name=index_name,
                                    bucket_name=bucket_name,
                                    scope_name=scope_name,
@@ -298,8 +276,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = PauseIngestRequest(self._error_map,
-                                 mgmt_operations.SEARCH_INDEX.value,
-                                 search_index_mgmt_operations.CONTROL_INGEST.value,
                                  index_name=index_name,
                                  pause=True,
                                  bucket_name=bucket_name,
@@ -320,8 +296,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = ResumeIngestRequest(self._error_map,
-                                  mgmt_operations.SEARCH_INDEX.value,
-                                  search_index_mgmt_operations.CONTROL_INGEST.value,
                                   index_name=index_name,
                                   pause=False,
                                   bucket_name=bucket_name,
@@ -342,8 +316,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index_name(index_name)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = UnfreezePlanRequest(self._error_map,
-                                  mgmt_operations.SEARCH_INDEX.value,
-                                  search_index_mgmt_operations.FREEZE_PLAN.value,
                                   index_name=index_name,
                                   freeze=False,
                                   bucket_name=bucket_name,
@@ -364,8 +336,6 @@ class SearchIndexMgmtRequestBuilder:
         self._validate_index(index)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = UpsertIndexRequest(self._error_map,
-                                 mgmt_operations.SEARCH_INDEX.value,
-                                 search_index_mgmt_operations.UPSERT_INDEX.value,
                                  index=index.as_dict(),
                                  bucket_name=bucket_name,
                                  scope_name=scope_name,

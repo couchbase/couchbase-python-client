@@ -32,9 +32,6 @@ from couchbase.logic.cluster_types import (AnalyticsQueryRequest,
                                            WaitUntilReadyRequest)
 from couchbase.n1ql import N1QLQuery
 from couchbase.options import forward_args
-from couchbase.pycbc_core import (cluster_mgmt_operations,
-                                  mgmt_operations,
-                                  operations)
 from couchbase.search import (SearchQuery,
                               SearchQueryBuilder,
                               SearchRequest)
@@ -59,19 +56,19 @@ class ClusterRequestBuilder:
         return req
 
     def build_cluster_info_request(self) -> ClusterInfoRequest:
-        return ClusterInfoRequest(mgmt_operations.CLUSTER.value, cluster_mgmt_operations.GET_CLUSTER_INFO.value)
+        return ClusterInfoRequest()
 
     def build_diagnostics_request(self, *options: object, **kwargs: object) -> DiagnosticsRequest:
         # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = DiagnosticsRequest(operations.DIAGNOSTICS.value, **final_args)
+        req = DiagnosticsRequest(**final_args)
         if timeout:
             req.timeout = timeout
         return req
 
     def build_get_connection_info_request(self) -> GetConnectionInfoRequest:
-        return GetConnectionInfoRequest(mgmt_operations.CLUSTER.value, cluster_mgmt_operations.GET_CLUSTER_INFO.value)
+        return GetConnectionInfoRequest()
 
     def build_ping_request(self, *options: object, **kwargs: object) -> PingRequest:
         # TODO: OptionsProcessor
@@ -86,9 +83,9 @@ class ClusterRequestBuilder:
         if not isinstance(service_types, (list, set)):
             raise InvalidArgumentException('Service types must be a list/set.')
 
-        service_types = list(map(lambda st: st.value if isinstance(st, ServiceType) else st, service_types))
+        services = set(map(lambda st: st.value if isinstance(st, ServiceType) else st, service_types))
 
-        req = PingRequest(operations.PING.value, service_types, **final_args)
+        req = PingRequest(services, **final_args)
         if timeout:
             req.timeout = timeout
 

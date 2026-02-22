@@ -51,22 +51,14 @@ class AsyncViewIndexMgmtImpl:
     async def get_all_design_documents(self, req: GetAllDesignDocumentsRequest) -> Iterable[DesignDocument]:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        ddocs = []
-        raw_ddocs = ret.raw_result.get('design_documents', None)
-        if raw_ddocs:
-            ddocs = [DesignDocument.from_json(ddoc) for ddoc in raw_ddocs]
-
-        return ddocs
+        raw_ddocs = ret.raw_result['design_documents']
+        return [DesignDocument.from_json(ddoc) for ddoc in raw_ddocs]
 
     async def get_design_document(self, req: GetDesignDocumentRequest) -> DesignDocument:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_ddoc = ret.raw_result.get('design_document', None)
-        ddoc = None
-        if raw_ddoc:
-            ddoc = DesignDocument.from_json(raw_ddoc)
-
-        return ddoc
+        raw_ddoc = ret.raw_result['document']
+        return DesignDocument.from_json(raw_ddoc)
 
     async def publish_design_document(self,
                                       bucket_name: str,

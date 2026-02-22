@@ -17,13 +17,15 @@ import json
 import re
 import sys
 from enum import Enum
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Optional,
                     Set,
                     Union)
 
-from couchbase.pycbc_core import exception
+if TYPE_CHECKING:
+    from couchbase.logic.pycbc_core import pycbc_exception
 
 
 class CouchbaseErrorCategory(Enum):
@@ -337,7 +339,7 @@ ErrorContextType = Union[AnalyticsErrorContext,
 
 class CouchbaseException(Exception):
     def __init__(self,
-                 base=None,  # type: Optional[exception]
+                 base=None,  # type: Optional[pycbc_exception]
                  message=None,     # type: Optional[str]
                  context=None,      # type: Optional[ErrorContextType]
                  error_code=None,  # type: Optional[int]
@@ -2079,7 +2081,7 @@ class ErrorMapper:
 
     @classmethod
     def build_exception(cls,
-                        base_exc,  # type: exception
+                        base_exc,  # type: pycbc_exception
                         mapping=None,  # type: Dict[str, CouchbaseException]
                         ) -> CouchbaseException:
         exc_class = None

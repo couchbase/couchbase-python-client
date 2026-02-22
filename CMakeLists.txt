@@ -249,7 +249,6 @@ file(
   GLOB
   SOURCE_FILES
   "src/*.cxx"
-  "src/management/*.cxx"
   "src/transactions/*.cxx")
 add_library(pycbc_core SHARED ${SOURCE_FILES})
 
@@ -301,5 +300,5 @@ endif()
 set_target_properties(
   pycbc_core
   PROPERTIES PREFIX ""
-             OUTPUT_NAME pycbc_core
+             OUTPUT_NAME _core
              SUFFIX ${PYCBC_C_MOD_SUFFIX})

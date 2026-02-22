@@ -34,7 +34,6 @@ from couchbase.management.logic.user_mgmt_types import (USER_MGMT_ERROR_MAP,
                                                         UpsertGroupRequest,
                                                         UpsertUserRequest)
 from couchbase.options import forward_args
-from couchbase.pycbc_core import mgmt_operations, user_mgmt_operations
 
 if TYPE_CHECKING:
     from couchbase.management.logic.user_mgmt_types import Group, User
@@ -43,7 +42,7 @@ if TYPE_CHECKING:
 class UserMgmtRequestBuilder:
     VALID_AUTH_DOMAINS = ['local', 'external']
     VALID_GROUP_KEYS = ['name', 'description', 'ldap_group_reference']
-    VALID_USER_KEYS = ['password', 'name', 'username', 'groups']
+    VALID_USER_KEYS = ['password', 'display_name', 'username', 'groups']
 
     def __init__(self) -> None:
         self._error_map = USER_MGMT_ERROR_MAP
@@ -76,11 +75,7 @@ class UserMgmtRequestBuilder:
                                       **kwargs: object) -> ChangePasswordRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = ChangePasswordRequest(self._error_map,
-                                    mgmt_operations.USER.value,
-                                    user_mgmt_operations.CHANGE_PASSWORD.value,
-                                    password=password,
-                                    **final_args)
+        req = ChangePasswordRequest(self._error_map, password=password, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -89,11 +84,7 @@ class UserMgmtRequestBuilder:
     def build_drop_group_request(self, group_name: str, *options: object, **kwargs: object) -> DropGroupRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = DropGroupRequest(self._error_map,
-                               mgmt_operations.USER.value,
-                               user_mgmt_operations.DROP_GROUP.value,
-                               name=group_name,
-                               **final_args)
+        req = DropGroupRequest(self._error_map, name=group_name, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -103,12 +94,7 @@ class UserMgmtRequestBuilder:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
-        req = DropUserRequest(self._error_map,
-                              mgmt_operations.USER.value,
-                              user_mgmt_operations.DROP_USER.value,
-                              username=username,
-                              domain=domain,
-                              **final_args)
+        req = DropUserRequest(self._error_map, username=username, domain=domain, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -117,10 +103,7 @@ class UserMgmtRequestBuilder:
     def build_get_all_groups_request(self, *options: object, **kwargs: object) -> GetAllGroupsRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetAllGroupsRequest(self._error_map,
-                                  mgmt_operations.USER.value,
-                                  user_mgmt_operations.GET_ALL_GROUPS.value,
-                                  **final_args)
+        req = GetAllGroupsRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -130,11 +113,7 @@ class UserMgmtRequestBuilder:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
-        req = GetAllUsersRequest(self._error_map,
-                                 mgmt_operations.USER.value,
-                                 user_mgmt_operations.GET_ALL_USERS.value,
-                                 domain=domain,
-                                 **final_args)
+        req = GetAllUsersRequest(self._error_map, domain=domain, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -143,11 +122,7 @@ class UserMgmtRequestBuilder:
     def build_get_group_request(self, group_name: str, *options: object, **kwargs: object) -> GetGroupRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetGroupRequest(self._error_map,
-                              mgmt_operations.USER.value,
-                              user_mgmt_operations.GET_GROUP.value,
-                              name=group_name,
-                              **final_args)
+        req = GetGroupRequest(self._error_map, name=group_name, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -156,10 +131,7 @@ class UserMgmtRequestBuilder:
     def build_get_roles_request(self, *options: object, **kwargs: object) -> GetRolesRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetRolesRequest(self._error_map,
-                              mgmt_operations.USER.value,
-                              user_mgmt_operations.GET_ROLES.value,
-                              **final_args)
+        req = GetRolesRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -169,12 +141,7 @@ class UserMgmtRequestBuilder:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
-        req = GetUserRequest(self._error_map,
-                             mgmt_operations.USER.value,
-                             user_mgmt_operations.GET_USER.value,
-                             username=username,
-                             domain=domain,
-                             **final_args)
+        req = GetUserRequest(self._error_map, username=username, domain=domain, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -187,11 +154,7 @@ class UserMgmtRequestBuilder:
 
         if group.roles:
             group_dict["roles"] = list(map(lambda r: r.as_dict(), group.roles))
-        req = UpsertGroupRequest(self._error_map,
-                                 mgmt_operations.USER.value,
-                                 user_mgmt_operations.UPSERT_GROUP.value,
-                                 group=group_dict,
-                                 **final_args)
+        req = UpsertGroupRequest(self._error_map, group=group_dict, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -202,12 +165,7 @@ class UserMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
         user = self._get_valid_user(user, domain)
-        req = UpsertUserRequest(self._error_map,
-                                mgmt_operations.USER.value,
-                                user_mgmt_operations.UPSERT_USER.value,
-                                user=user,
-                                domain=domain,
-                                **final_args)
+        req = UpsertUserRequest(self._error_map, user=user, domain=domain, **final_args)
         if timeout is not None:
             req.timeout = timeout
 

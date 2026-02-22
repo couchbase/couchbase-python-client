@@ -1030,7 +1030,8 @@ class AsyncCollection:
 
 
         """  # noqa: E501
-        req = self._impl.request_builder.build_range_scan_async_request(scan_type, *opts, **kwargs)
+        req = self._impl.request_builder.build_range_scan_async_request(
+            self._impl.connection, scan_type, *opts, **kwargs)
         return self._impl.range_scan(req)
 
     def binary(self) -> BinaryCollection:

@@ -29,16 +29,15 @@ from typing import (TYPE_CHECKING,
                     Tuple,
                     Union)
 
-from couchbase._utils import is_null_or_empty, to_microseconds
+from couchbase._utils import is_null_or_empty, to_milliseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import SearchOptionsBase
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.supportability import Supportability
 from couchbase.logic.vector_search import VectorQueryCombination
 from couchbase.options import (SearchOptions,
                                UnsignedInt32,
                                UnsignedInt64)
-from couchbase.pycbc_core import search_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.tracing import CouchbaseSpan
 
@@ -799,6 +798,15 @@ class SearchRowLocation:
     end: UnsignedInt32 = None
     array_positions: List[UnsignedInt32] = None
 
+    @classmethod
+    def from_server(cls, json_data: Dict[str, Any]) -> SearchRowLocation:
+        return cls(json_data.get('field'),
+                   json_data.get('term'),
+                   json_data.get('position'),
+                   json_data.get('start_offset'),
+                   json_data.get('end_offset'),
+                   json_data.get('array_positions'))
+
 
 class SearchRowLocations:
     def __init__(self, locations):
@@ -808,7 +816,7 @@ class SearchRowLocations:
         """list all locations (any field, any term)"""
         locations = []
         for location in self._raw_locations:
-            locations.append(SearchRowLocation(**location))
+            locations.append(SearchRowLocation.from_server(location))
 
         # TODO:  maybe needed when using couchbase++ streaming
         # for loc_field, terms in self._raw_locations.items():
@@ -830,8 +838,8 @@ class SearchRowLocations:
         locations = []
         for loc in self._raw_locations[field][term]:
             new_location = {'field': field, 'term': term, 'position': None}
-            new_location.update({k: v for k, v in loc.items() if k != 'pos'})
-            new_location['position'] = loc.get('pos', None)
+            new_location.update({k: v for k, v in loc.items() if k != 'position'})
+            new_location['position'] = loc.get('position', None)
             locations.append(new_location)
 
         return [SearchRowLocation(**loc) for loc in locations]
@@ -985,10 +993,10 @@ class SearchQueryBuilder:
             'index_name': self._index_name
         }
         query = json.dumps(self._query.encodable)
-        params['query'] = query
+        params['query'] = query.encode('utf-8')
         vector_search = self.encode_vector_search()
         if vector_search:
-            params['vector_search'] = json.dumps(vector_search)
+            params['vector_search'] = json.dumps(vector_search).encode('utf-8')
 
         # deprecate the scope_name option, no need to pass it to the C++ client
         # as the search API will not use
@@ -1033,8 +1041,8 @@ class SearchQueryBuilder:
         if not value:
             self._params.pop('timeout', 0)
         else:
-            total_us = to_microseconds(value)
-            self.set_option('timeout', total_us)
+            total_ms = to_milliseconds(value)
+            self.set_option('timeout', total_ms)
 
     @property
     def metrics(self) -> bool:
@@ -1257,7 +1265,7 @@ class SearchQueryBuilder:
         for k in value.keys():
             if not isinstance(k, str):
                 raise TypeError("key for raw value must be str")
-        raw_params = {f'{k}': json.dumps(v) for k, v in value.items()}
+        raw_params = {f'{k}': json.dumps(v).encode('utf-8') for k, v in value.items()}
         self.set_option('raw', raw_params)
 
     @property
@@ -1498,13 +1506,15 @@ class FullTextSearchRequestLogic:
             self._result_facets[new_facet.name] = new_facet
 
     def _set_metadata(self, search_response):
-        if isinstance(search_response, CouchbaseBaseException):
+        if isinstance(search_response, PycbcCoreException):
             raise ErrorMapper.build_exception(search_response)
 
-        result = search_response.raw_result.get('value', None)
-        if result:
-            self._metadata = SearchMetaData(result.get('metadata', None))
-            self._set_facets(result.get('facets', None))
+        raw_metadata = search_response.raw_result.get('metadata', None)
+        if raw_metadata:
+            self._metadata = SearchMetaData(raw_metadata)
+        raw_facets = search_response.raw_result.get('facets', None)
+        if raw_facets:
+            self._set_facets(raw_facets)
 
     def _deserialize_row(self, row):
         # TODO:  until streaming, a dict is returned, no deserializing...
@@ -1516,6 +1526,8 @@ class FullTextSearchRequestLogic:
         locations = deserialized_row.get('locations', None)
         if locations:
             locations = SearchRowLocations(locations)
+        elif isinstance(locations, list):
+            locations = None
         deserialized_row['locations'] = locations
 
         fields = deserialized_row.get('fields', None)
@@ -1545,10 +1557,8 @@ class FullTextSearchRequestLogic:
             op_args['bucket_name'] = self._bucket_name
             op_args['scope_name'] = self._scope_name
 
-        search_kwargs = {
-            'conn': self._connection,
-            'op_args': op_args
-        }
+        search_kwargs = {}
+        search_kwargs.update(op_args)
         if span:
             search_kwargs['span'] = span
 
@@ -1565,7 +1575,7 @@ class FullTextSearchRequestLogic:
         if errback:
             search_kwargs['errback'] = errback
 
-        self._streaming_result = search_query(**search_kwargs)
+        self._streaming_result = self._connection.pycbc_search_query(**search_kwargs)
 
     def __iter__(self):
         raise NotImplementedError(

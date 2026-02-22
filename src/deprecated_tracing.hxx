@@ -1,5 +1,5 @@
 /*
- *   Copyright 2016-2022. Couchbase, Inc.
+ *   Copyright 2016-2026. Couchbase, Inc.
  *   All Rights Reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,30 +17,37 @@
 
 #pragma once
 
+#include "Python.h"
 #include <couchbase/tracing/request_tracer.hxx>
-// NOLINTNEXTLINE
-#include "Python.h" // NOLINT
 #include <iostream>
-// convenient aliasing...
-namespace tracing = couchbase::tracing;
+
+namespace cbtracing = couchbase::tracing;
 
 namespace pycbc
 {
 
-class request_span : public tracing::request_span
+class deprecated_request_span : public cbtracing::request_span
 {
 public:
-  explicit request_span(PyObject* span, std::shared_ptr<tracing::request_span> parent = nullptr)
-    : tracing::request_span("", parent) // name doesn't matter - it is in the underlying python span
+  explicit deprecated_request_span(PyObject* span,
+                                   std::shared_ptr<cbtracing::request_span> parent = nullptr)
+    : cbtracing::request_span("",
+                              parent) // name doesn't matter - it is in the underlying python span
     , pyObj_span_(span)
   {
-    // only called by start_span, which has the GIL, so...
+    // called by deprecated_request_tracer.start_span & KV/streaming ops (when building a C++ core
+    // request), so we are confident we have the GIL
     Py_INCREF(span);
     pyObj_set_attribute_ = PyObject_GetAttrString(pyObj_span_, "set_attribute");
   }
 
-  ~request_span() override
+  ~deprecated_request_span() override
   {
+    // PYCBC-1748 - This can be a race condition when the Python interpreter finalizes before we can
+    // decref.
+    //              The work-around (which has been in tests all along) is to call cluster.close().
+    //              The FIX is to not use the legacy (deprecated) tracing which will no longer be an
+    //              issue w/ PYCBC-1746.
     PyGILState_STATE state = PyGILState_Ensure();
     Py_DECREF(pyObj_set_attribute_);
     Py_DECREF(pyObj_span_);
@@ -55,6 +62,7 @@ public:
     Py_DECREF(pyObj_args);
     PyGILState_Release(state);
   }
+
   void add_tag(const std::string& name, const std::string& value) override
   {
     PyGILState_STATE state = PyGILState_Ensure();
@@ -63,6 +71,7 @@ public:
     Py_DECREF(pyObj_args);
     PyGILState_Release(state);
   }
+
   void end() override
   {
     PyGILState_STATE state = PyGILState_Ensure();
@@ -83,10 +92,10 @@ private:
   PyObject* pyObj_get_context_;
 };
 
-class request_tracer : public tracing::request_tracer
+class deprecated_request_tracer : public cbtracing::request_tracer
 {
 public:
-  request_tracer(PyObject* tracer)
+  deprecated_request_tracer(PyObject* tracer)
     : pyObj_tracer_(tracer)
   {
     // Assumption here is we have the GIL when we wrap the python tracer here
@@ -95,17 +104,22 @@ public:
     assert(pyObj_start_span_);
   }
 
-  ~request_tracer()
+  ~deprecated_request_tracer()
   {
+    // PYCBC-1748 - This can be a race condition when the Python interpreter finalizes before we can
+    // decref.
+    //              The work-around (which has been in tests all along) is to call cluster.close().
+    //              The FIX is to not use the legacy (deprecated) tracing which will no longer be an
+    //              issue w/ PYCBC-1746.
     PyGILState_STATE state = PyGILState_Ensure();
     Py_DECREF(pyObj_start_span_);
     Py_DECREF(pyObj_tracer_);
     PyGILState_Release(state);
   }
 
-  std::shared_ptr<tracing::request_span> start_span(
+  std::shared_ptr<cbtracing::request_span> start_span(
     std::string name,
-    std::shared_ptr<tracing::request_span> parent = {}) override
+    std::shared_ptr<cbtracing::request_span> parent = {}) override
   {
     // defer to the pyObj_tracer_, and wrap the result in a pycbc span.  Note: Taking the GIL here,
     // and elsewhere (like in the request_span) isn't perhaps the most efficient strategy.  We could
@@ -117,17 +131,26 @@ public:
     PyObject* pyObj_kwargs = PyDict_New();
     PyDict_SetItemString(pyObj_kwargs, "name", pyObj_name);
     if (parent) {
-      auto pyObj_parent = std::dynamic_pointer_cast<pycbc::request_span>(parent)->py_span();
+      auto pyObj_parent =
+        std::dynamic_pointer_cast<pycbc::deprecated_request_span>(parent)->py_span();
       PyDict_SetItemString(pyObj_kwargs, "parent", pyObj_parent);
     }
     auto pyObj_span = PyObject_Call(pyObj_start_span_, pyObj_args, pyObj_kwargs);
-    auto retval = std::make_shared<request_span>(pyObj_span, parent);
+    auto retval = std::make_shared<pycbc::deprecated_request_span>(pyObj_span, parent);
     Py_DECREF(pyObj_name);
     Py_DECREF(pyObj_args);
     Py_DECREF(pyObj_kwargs);
     Py_DECREF(pyObj_span);
     PyGILState_Release(state);
     return retval;
+  }
+
+  void start() override
+  {
+  }
+
+  void stop() override
+  {
   }
 
 private:

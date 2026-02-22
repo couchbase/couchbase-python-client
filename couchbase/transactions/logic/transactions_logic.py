@@ -21,14 +21,17 @@ from typing import (TYPE_CHECKING,
                     Callable,
                     Coroutine)
 
-from couchbase._utils import PyCapsuleType
-from couchbase.exceptions import TransactionExpired, TransactionFailed
-from couchbase.pycbc_core import create_transactions, destroy_transactions
+from couchbase.exceptions import (ErrorMapper,
+                                  TransactionExpired,
+                                  TransactionFailed)
+from couchbase.logic.pycbc_core import create_transactions, destroy_transactions
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.transactions.transaction_result import TransactionResult
 from couchbase.transcoder import JSONTranscoder
 
 if TYPE_CHECKING:
     from acouchbase.transactions import AttemptContext as AsyncAttemptContext
+    from couchbase.logic.pycbc_core import pycbc_connection
     from couchbase.options import TransactionConfig
     from couchbase.serializer import Serializer
     from couchbase.transactions import AttemptContext as BlockingAttemptContext
@@ -37,11 +40,14 @@ log = logging.getLogger(__name__)
 
 
 class TransactionsLogic:
-    def __init__(self, connection: PyCapsuleType, config: TransactionConfig, default_serializer: Serializer) -> None:
+    def __init__(self, connection: pycbc_connection, config: TransactionConfig, default_serializer: Serializer) -> None:
         self._config = config
         # while the cluster has a default transcoder, it might not be a JSONTranscoder
         self._transcoder = JSONTranscoder(default_serializer)
-        self._txns = create_transactions(connection, self._config._base)
+        ret = create_transactions(connection, self._config._base)
+        if isinstance(ret, PycbcCoreException):
+            raise ErrorMapper.build_exception(ret)
+        self._txns = ret
         log.info('created transactions object using config=%s, transcoder=%s', self._config, self._transcoder)
 
     def run(self,

@@ -29,7 +29,7 @@ from couchbase.logic.client_adapter import ClientAdapter
 from couchbase.logic.cluster_req_builder import ClusterRequestBuilder
 from couchbase.logic.cluster_settings import ClusterSettings
 from couchbase.logic.cluster_types import CreateConnectionRequest, GetConnectionInfoRequest
-from couchbase.logic.top_level_types import PyCapsuleType
+from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.n1ql import N1QLRequest
 from couchbase.result import (AnalyticsResult,
                               ClusterInfoResult,
@@ -85,7 +85,7 @@ class ClusterImpl:
         return self._client_adapter.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         """**INTERNAL**"""
         return self._client_adapter.connection
 
@@ -176,7 +176,11 @@ class ClusterImpl:
 
     def get_connection_info(self) -> Dict[str, Any]:
         """**INTERNAL**"""
-        return self._client_adapter.execute_cluster_request(GetConnectionInfoRequest())
+        res = self._client_adapter.execute_cluster_request(GetConnectionInfoRequest())
+        if 'credentials' in res:
+            if 'allowed_sasl_mechanisms' not in res['credentials']:
+                res['credentials']['allowed_sasl_mechanisms'] = []
+        return res
 
     def ping(self, req: PingRequest) -> PingResult:
         """**INTERNAL**"""

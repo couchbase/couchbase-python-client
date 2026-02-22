@@ -20,7 +20,6 @@ from typing import (Any,
                     Union)
 
 from couchbase._utils import is_null_or_empty
-from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.transforms import enum_to_str, to_seconds
 from couchbase.logic.validation import validate_bool, validate_int
@@ -40,7 +39,6 @@ from couchbase.management.logic.bucket_mgmt_types import (BUCKET_MGMT_ERROR_MAP,
                                                           StorageBackend,
                                                           UpdateBucketRequest)
 from couchbase.options import forward_args
-from couchbase.pycbc_core import bucket_mgmt_operations, mgmt_operations
 
 
 class BucketMgmtRequestBuilder:
@@ -54,56 +52,63 @@ class BucketMgmtRequestBuilder:
         output = {'name': settings['name']}
         bucket_type = settings.get('bucket_type', None)
         if bucket_type:
-            output['bucketType'] = enum_to_str(bucket_type, BucketType)
+            output['bucket_type'] = enum_to_str(bucket_type,
+                                                BucketType,
+                                                BucketType.to_server_str)
         compression_mode = settings.get('compression_mode', None)
         if compression_mode:
-            output['compressionMode'] = enum_to_str(compression_mode, CompressionMode)
+            output['compression_mode'] = enum_to_str(compression_mode, CompressionMode)
         conflict_resolution_type = settings.get('conflict_resolution_type', None)
         if conflict_resolution_type:
-            output['conflictResolutionType'] = enum_to_str(conflict_resolution_type, ConflictResolutionType)
+            output['conflict_resolution_type'] = enum_to_str(conflict_resolution_type,
+                                                             ConflictResolutionType,
+                                                             ConflictResolutionType.to_server_str)
         eviction_policy = settings.get('eviction_policy', None)
         if eviction_policy:
-            output['evictionPolicy'] = enum_to_str(eviction_policy, EvictionPolicyType)
+            output['eviction_policy'] = enum_to_str(eviction_policy,
+                                                    EvictionPolicyType,
+                                                    EvictionPolicyType.to_server_str)
         flush_enabled = settings.get('flush_enabled', None)
         if flush_enabled is not None:
-            output['flushEnabled'] = flush_enabled
+            output['flush_enabled'] = flush_enabled
         history_retention_collection_default = settings.get('history_retention_collection_default', None)
         if history_retention_collection_default is not None:
-            output['historyRetentionCollectionDefault'] = validate_bool(history_retention_collection_default)
+            output['history_retention_collection_default'] = validate_bool(history_retention_collection_default)
         history_retention_bytes = settings.get('history_retention_bytes', None)
         if history_retention_bytes is not None:
-            output['historyRetentionBytes'] = validate_int(history_retention_bytes)
+            output['history_retention_bytes'] = validate_int(history_retention_bytes)
         history_retention_duration = settings.get('history_retention_duration', None)
         if history_retention_duration is not None:
-            output['historyRetentionDuration'] = to_seconds(history_retention_duration)
-        max_expiry = settings.get('max_expiry', None)
-        if max_expiry is not None:
-            output['maxExpiry'] = to_seconds(max_expiry)
-        # TODO:  Has been deprecated for a while, not used by bindings.  Maybe now is the time to remove?
+            output['history_retention_duration'] = to_seconds(history_retention_duration)
+
+        # max_ttl not a thing in C++ core; if provided, convert to max_expiry and send to
+        # server, but max_expiry takes precedence
         max_ttl = settings.get('max_ttl', None)
         if max_ttl is not None:
-            output['maxTTL'] = validate_int(max_ttl)
+            output['max_expiry'] = validate_int(max_ttl)
+        max_expiry = settings.get('max_expiry', None)
+        if max_expiry is not None:
+            output['max_expiry'] = to_seconds(max_expiry)
         minimum_durability_level = settings.get('minimum_durability_level', None)
         if minimum_durability_level is not None:
-            output['durabilityMinLevel'] = enum_to_str(minimum_durability_level,
-                                                       DurabilityLevel,
-                                                       DurabilityLevel.to_server_str)
+            output['minimum_durability_level'] = minimum_durability_level.value
 
         num_replicas = settings.get('num_replicas', None)
         if num_replicas is not None:
-            output['numReplicas'] = validate_int(num_replicas)
+            output['num_replicas'] = validate_int(num_replicas)
         ram_quota_mb = settings.get('ram_quota_mb', None)
         if ram_quota_mb is not None:
-            output['ramQuotaMB'] = validate_int(ram_quota_mb)
+            output['ram_quota_mb'] = validate_int(ram_quota_mb)
         replica_index = settings.get('replica_index', None)
         if replica_index is not None:
-            output['replicaIndex'] = validate_bool(replica_index)
+            output['replica_indexes'] = validate_bool(replica_index)
         storage_backend = settings.get('storage_backend', None)
         if storage_backend:
-            output['storageBackend'] = enum_to_str(storage_backend, StorageBackend)
+            output['storage_backend'] = enum_to_str(storage_backend, StorageBackend)
         num_vbuckets = settings.get('num_vbuckets', None)
         if num_vbuckets is not None:
-            output['numVBuckets'] = validate_int(num_vbuckets)
+            output['num_vbuckets'] = validate_int(num_vbuckets)
+
         return output
 
     def _validate_bucket_name(self, bucket_name: str) -> None:
@@ -118,15 +123,9 @@ class BucketMgmtRequestBuilder:
                                       *options: object,
                                       **kwargs: object) -> BucketDescribeRequest:
         self._validate_bucket_name(bucket_name)
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        req = BucketDescribeRequest(mgmt_operations.BUCKET.value,
-                                    bucket_mgmt_operations.BUCKET_DESCRIBE.value,
-                                    **op_args)
+        req = BucketDescribeRequest(self._error_map, bucket_name)
         if timeout is not None:
             req.timeout = timeout
 
@@ -136,17 +135,10 @@ class BucketMgmtRequestBuilder:
                                     settings: CreateBucketSettings,
                                     *options: object,
                                     **kwargs: object) -> CreateBucketRequest:
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         bucket_settings = self._bucket_settings_to_server(settings)
-        op_args = {
-            'bucket_settings': bucket_settings,
-        }
-        req = CreateBucketRequest(self._error_map,
-                                  mgmt_operations.BUCKET.value,
-                                  bucket_mgmt_operations.CREATE_BUCKET.value,
-                                  **op_args)
+        req = CreateBucketRequest(self._error_map, bucket_settings)
         if timeout is not None:
             req.timeout = timeout
 
@@ -154,17 +146,9 @@ class BucketMgmtRequestBuilder:
 
     def build_drop_bucket_request(self, bucket_name: str, *options: object, **kwargs: object) -> DropBucketRequest:
         self._validate_bucket_name(bucket_name)
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        req = DropBucketRequest(self._error_map,
-                                mgmt_operations.BUCKET.value,
-                                bucket_mgmt_operations.DROP_BUCKET.value,
-                                **op_args)
-
+        req = DropBucketRequest(self._error_map, bucket_name)
         if timeout is not None:
             req.timeout = timeout
 
@@ -172,29 +156,18 @@ class BucketMgmtRequestBuilder:
 
     def build_flush_bucket_request(self, bucket_name: str, *options: object, **kwargs: object) -> FlushBucketRequest:
         self._validate_bucket_name(bucket_name)
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        req = FlushBucketRequest(self._error_map,
-                                 mgmt_operations.BUCKET.value,
-                                 bucket_mgmt_operations.FLUSH_BUCKET.value,
-                                 **op_args)
-
+        req = FlushBucketRequest(self._error_map, bucket_name)
         if timeout is not None:
             req.timeout = timeout
 
         return req
 
     def build_get_all_buckets_request(self, *options: object, **kwargs: object) -> GetAllBucketsRequest:
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetAllBucketsRequest(self._error_map,
-                                   mgmt_operations.BUCKET.value,
-                                   bucket_mgmt_operations.GET_ALL_BUCKETS.value)
+        req = GetAllBucketsRequest(self._error_map)
         if timeout is not None:
             req.timeout = timeout
 
@@ -202,16 +175,9 @@ class BucketMgmtRequestBuilder:
 
     def build_get_bucket_request(self, bucket_name: str, *options: object, **kwargs: object) -> GetBucketRequest:
         self._validate_bucket_name(bucket_name)
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        req = GetBucketRequest(self._error_map,
-                               mgmt_operations.BUCKET.value,
-                               bucket_mgmt_operations.GET_BUCKET.value,
-                               **op_args)
+        req = GetBucketRequest(self._error_map, bucket_name)
 
         if timeout is not None:
             req.timeout = timeout
@@ -222,18 +188,10 @@ class BucketMgmtRequestBuilder:
                                     settings: CreateBucketSettings,
                                     *options: object,
                                     **kwargs: object) -> UpdateBucketRequest:
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         bucket_settings = self._bucket_settings_to_server(settings)
-        op_args = {
-            'bucket_settings': bucket_settings,
-        }
-        req = UpdateBucketRequest(self._error_map,
-                                  mgmt_operations.BUCKET.value,
-                                  bucket_mgmt_operations.UPDATE_BUCKET.value,
-                                  **op_args)
-
+        req = UpdateBucketRequest(self._error_map, bucket_settings)
         if timeout is not None:
             req.timeout = timeout
 

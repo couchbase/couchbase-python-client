@@ -15,13 +15,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from couchbase.analytics import AnalyticsRequest
 from couchbase.logic.cluster_impl import ClusterSettings
 from couchbase.logic.cluster_settings import StreamingTimeouts
+from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.logic.scope_req_builder import ScopeRequestBuilder
-from couchbase.logic.top_level_types import PyCapsuleType
 from couchbase.n1ql import N1QLRequest
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
@@ -59,7 +59,7 @@ class ScopeImpl:
         return self._bucket_impl.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         """
         **INTERNAL**
         """

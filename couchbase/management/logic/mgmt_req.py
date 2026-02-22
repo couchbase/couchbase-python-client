@@ -26,7 +26,6 @@ from typing import (Any,
 class MgmtBaseRequest(ABC):
     @abstractmethod
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
 

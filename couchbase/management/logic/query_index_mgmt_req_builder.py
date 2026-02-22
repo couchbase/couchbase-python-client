@@ -30,7 +30,6 @@ from couchbase.management.logic.query_index_mgmt_req_types import (QUERY_INDEX_M
                                                                    GetAllIndexesRequest,
                                                                    WatchIndexesRequest)
 from couchbase.options import forward_args
-from couchbase.pycbc_core import mgmt_operations, query_index_mgmt_operations
 
 
 class QueryIndexMgmtRequestBuilder:
@@ -153,8 +152,6 @@ class QueryIndexMgmtRequestBuilder:
         self._validate_bucket_name(bucket_name)
         self._validate_index_name(index_name)
         self._validate_index_keys(keys)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
@@ -172,10 +169,7 @@ class QueryIndexMgmtRequestBuilder:
                                                  scope_name=scope_name,
                                                  **final_args)
 
-        req = CreateIndexRequest(self._error_map,
-                                 mgmt_operations.QUERY_INDEX.value,
-                                 query_index_mgmt_operations.CREATE_INDEX.value,
-                                 **op_args)
+        req = CreateIndexRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -187,8 +181,6 @@ class QueryIndexMgmtRequestBuilder:
                                            *options: object,
                                            **kwargs: object) -> CreateIndexRequest:
         self._validate_bucket_name(bucket_name)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
@@ -206,10 +198,7 @@ class QueryIndexMgmtRequestBuilder:
                                                  scope_name=scope_name,
                                                  **final_args)
 
-        req = CreateIndexRequest(self._error_map,
-                                 mgmt_operations.QUERY_INDEX.value,
-                                 query_index_mgmt_operations.CREATE_INDEX.value,
-                                 **op_args)
+        req = CreateIndexRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -223,8 +212,6 @@ class QueryIndexMgmtRequestBuilder:
                                  **kwargs: object) -> DropIndexRequest:
         self._validate_bucket_name(bucket_name)
         self._validate_index_name(index_name)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
@@ -241,10 +228,7 @@ class QueryIndexMgmtRequestBuilder:
                                                scope_name=scope_name,
                                                **final_args)
 
-        req = DropIndexRequest(self._error_map,
-                               mgmt_operations.QUERY_INDEX.value,
-                               query_index_mgmt_operations.DROP_INDEX.value,
-                               **op_args)
+        req = DropIndexRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -256,8 +240,6 @@ class QueryIndexMgmtRequestBuilder:
                                          *options: object,
                                          **kwargs: object) -> DropIndexRequest:
         self._validate_bucket_name(bucket_name)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
@@ -274,10 +256,7 @@ class QueryIndexMgmtRequestBuilder:
                                                scope_name=scope_name,
                                                **final_args)
 
-        req = DropIndexRequest(self._error_map,
-                               mgmt_operations.QUERY_INDEX.value,
-                               query_index_mgmt_operations.DROP_INDEX.value,
-                               **op_args)
+        req = DropIndexRequest(self._error_map, **op_args)
 
         if timeout is not None:
             req.timeout = timeout
@@ -290,8 +269,6 @@ class QueryIndexMgmtRequestBuilder:
                                       *options: object,
                                       **kwargs: object) -> GetAllIndexesRequest:
         self._validate_bucket_name(bucket_name)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
@@ -310,10 +287,7 @@ class QueryIndexMgmtRequestBuilder:
         if collection_name is not None:
             op_args['collection_name'] = collection_name
 
-        req = GetAllIndexesRequest(self._error_map,
-                                   mgmt_operations.QUERY_INDEX.value,
-                                   query_index_mgmt_operations.GET_ALL_INDEXES.value,
-                                   **op_args)
+        req = GetAllIndexesRequest(self._error_map, **op_args)
 
         if timeout is not None:
             req.timeout = timeout
@@ -326,8 +300,6 @@ class QueryIndexMgmtRequestBuilder:
                                              *options: object,
                                              **kwargs: object) -> BuildDeferredIndexesRequest:
         self._validate_bucket_name(bucket_name)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
@@ -346,10 +318,7 @@ class QueryIndexMgmtRequestBuilder:
         if collection_name is not None:
             op_args['collection_name'] = collection_name
 
-        req = BuildDeferredIndexesRequest(self._error_map,
-                                          mgmt_operations.QUERY_INDEX.value,
-                                          query_index_mgmt_operations.BUILD_DEFERRED_INDEXES.value,
-                                          **op_args)
+        req = BuildDeferredIndexesRequest(self._error_map, **op_args)
 
         if timeout is not None:
             req.timeout = timeout
@@ -364,8 +333,6 @@ class QueryIndexMgmtRequestBuilder:
                                     **kwargs: object) -> WatchIndexesRequest:
         self._validate_bucket_name(bucket_name)
         self._validate_index_names(index_names)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if timeout is None:
@@ -391,9 +358,4 @@ class QueryIndexMgmtRequestBuilder:
         if collection_name is not None:
             op_args['collection_name'] = collection_name
 
-        # NOTE:  we don't have a WATCH_INDEXES mgmt op, but we don't use the core so it doesn't matter
-        #        also, we should be moving away from mgmt_op, etc. soon
-        return WatchIndexesRequest(self._error_map,
-                                   mgmt_operations.QUERY_INDEX.value,
-                                   query_index_mgmt_operations.BUILD_DEFERRED_INDEXES.value,
-                                   **op_args)
+        return WatchIndexesRequest(self._error_map, **op_args)

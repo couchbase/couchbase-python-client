@@ -16,22 +16,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Callable,
                     Dict,
                     Iterable,
                     List,
                     Optional,
-                    Tuple,
-                    Union)
+                    Tuple)
 
 from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
-
-if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import PyCapsuleType
 
 # we have these params on the top-level pycbc_core request
 OPARG_SKIP_LIST = ['bucket_name',
@@ -67,75 +62,71 @@ class CollectionDetails:
 
 @dataclass
 class CollectionRequest:
-    op_type: int
     key: str
     bucket_name: str
     scope_name: str
     collection_name: str
 
     def req_to_dict(self,
-                    conn: PyCapsuleType,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         op_kwargs = {
-            'conn': conn,
-            'bucket': self.bucket_name,
-            'scope': self.scope_name,
-            'collection_name': self.collection_name,
-            'key': self.key,
-            'op_type': self.op_type,
+            'id': {
+                'bucket': self.bucket_name,
+                'scope': self.scope_name,
+                'collection': self.collection_name,
+                'key': self.key,
+            }
         }
 
-        op_args = {
+        op_kwargs.update(**{
             field.name: getattr(self, field.name)
             for field in fields(self)
             if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
+        })
 
         if callback is not None:
-            op_args['callback'] = callback
+            op_kwargs['callback'] = callback
 
         if errback is not None:
-            op_args['errback'] = errback
+            op_kwargs['errback'] = errback
 
         if hasattr(self, 'timeout') and getattr(self, 'timeout') is not None:
-            op_args['timeout'] = getattr(self, 'timeout')
-
-        op_kwargs['op_args'] = op_args
+            op_kwargs['timeout'] = getattr(self, 'timeout')
 
         return op_kwargs
 
 
 @dataclass
 class CollectionRequestWithEncoding(CollectionRequest):
-    value: Union[bytes, Tuple[bytes, int]]
+    value: bytes
+    flags: int
 
     def req_to_dict(self,
-                    conn: PyCapsuleType,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        op_kwargs = super().req_to_dict(conn, callback=callback, errback=errback)
+        op_kwargs = super().req_to_dict(callback=callback, errback=errback)
         op_kwargs['value'] = self.value
+        op_kwargs['flags'] = self.flags
         return op_kwargs
 
 
 @dataclass
 class SubdocumentRequest(CollectionRequest):
-    spec: Union[List[Tuple], Tuple[Tuple]]
+    specs: List[Dict[str, Any]]
 
     def req_to_dict(self,
-                    conn: PyCapsuleType,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        op_kwargs = super().req_to_dict(conn, callback=callback, errback=errback)
-        op_kwargs['spec'] = self.spec
+        op_kwargs = super().req_to_dict(callback=callback, errback=errback)
+        op_kwargs['specs'] = self.specs
         return op_kwargs
 
 
 @dataclass
 class AppendRequest(CollectionRequestWithEncoding):
     cas: Optional[int] = None
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     timeout: Optional[int] = None
 
     @property
@@ -144,16 +135,42 @@ class AppendRequest(CollectionRequestWithEncoding):
 
 
 @dataclass
+class AppendWithLegacyDurabilityRequest(CollectionRequestWithEncoding):
+    cas: Optional[int] = None
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.AppendWithLegacyDurability.value
+
+
+@dataclass
 class DecrementRequest(CollectionRequest):
     delta: int
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     expiry: Optional[int] = None
-    initial: Optional[int] = None
+    initial_value: Optional[int] = None
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
         return KeyValueOperationType.Decrement.value
+
+
+@dataclass
+class DecrementWithLegacyDurabilityRequest(CollectionRequest):
+    delta: int
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    expiry: Optional[int] = None
+    initial_value: Optional[int] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.DecrementWithLegacyDurability.value
 
 
 @dataclass
@@ -212,23 +229,32 @@ class GetAnyReplicaRequest(CollectionRequest):
 @dataclass
 class GetRequest(CollectionRequest):
     transcoder: Transcoder
-    project: Optional[Iterable[str]] = None
     timeout: Optional[int] = None
     with_expiry: Optional[bool] = None
 
     @property
     def op_name(self) -> str:
-        if self.project is not None or self.with_expiry:
-            return KeyValueOperationType.GetProject.value
         return KeyValueOperationType.Get.value
+
+
+@dataclass
+class GetProjectedRequest(CollectionRequest):
+    transcoder: Transcoder
+    projections: Optional[Iterable[str]] = None
+    timeout: Optional[int] = None
+    with_expiry: Optional[bool] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.GetProjected.value
 
 
 @dataclass
 class IncrementRequest(CollectionRequest):
     delta: int
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     expiry: Optional[int] = None
-    initial: Optional[int] = None
+    initial_value: Optional[int] = None
     timeout: Optional[int] = None
 
     @property
@@ -237,14 +263,40 @@ class IncrementRequest(CollectionRequest):
 
 
 @dataclass
+class IncrementWithLegacyDurabilityRequest(CollectionRequest):
+    delta: int
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    expiry: Optional[int] = None
+    initial_value: Optional[int] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.IncrementWithLegacyDurability.value
+
+
+@dataclass
 class InsertRequest(CollectionRequestWithEncoding):
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     expiry: Optional[int] = None
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
         return KeyValueOperationType.Insert.value
+
+
+@dataclass
+class InsertWithLegacyDurabilityRequest(CollectionRequestWithEncoding):
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    expiry: Optional[int] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.InsertWithLegacyDurability.value
 
 
 @dataclass
@@ -286,7 +338,7 @@ class LookupInRequest(SubdocumentRequest):
 class MutateInRequest(SubdocumentRequest):
     access_deleted: Optional[bool] = None
     cas: Optional[int] = None
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     expiry: Optional[int] = None
     preserve_expiry: Optional[bool] = None
     store_semantics: Optional[int] = None
@@ -298,9 +350,25 @@ class MutateInRequest(SubdocumentRequest):
 
 
 @dataclass
+class MutateInWithLegacyDurabilityRequest(SubdocumentRequest):
+    access_deleted: Optional[bool] = None
+    cas: Optional[int] = None
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    expiry: Optional[int] = None
+    preserve_expiry: Optional[bool] = None
+    store_semantics: Optional[int] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.MutateInWithLegacyDurability.value
+
+
+@dataclass
 class PrependRequest(CollectionRequestWithEncoding):
     cas: Optional[int] = None
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     timeout: Optional[int] = None
 
     @property
@@ -309,9 +377,21 @@ class PrependRequest(CollectionRequestWithEncoding):
 
 
 @dataclass
+class PrependWithLegacyDurabilityRequest(CollectionRequestWithEncoding):
+    cas: Optional[int] = None
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.PrependWithLegacyDurability.value
+
+
+@dataclass
 class RemoveRequest(CollectionRequest):
     cas: Optional[int] = None
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     timeout: Optional[int] = None
 
     @property
@@ -320,9 +400,21 @@ class RemoveRequest(CollectionRequest):
 
 
 @dataclass
+class RemoveWithLegacyDurabilityRequest(CollectionRequest):
+    cas: Optional[int] = None
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.RemoveWithLegacyDurability.value
+
+
+@dataclass
 class ReplaceRequest(CollectionRequestWithEncoding):
     cas: Optional[int] = None
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     expiry: Optional[int] = None
     preserve_expiry: Optional[bool] = None
     timeout: Optional[int] = None
@@ -330,6 +422,20 @@ class ReplaceRequest(CollectionRequestWithEncoding):
     @property
     def op_name(self) -> str:
         return KeyValueOperationType.Replace.value
+
+
+@dataclass
+class ReplaceWithLegacyDurabilityRequest(CollectionRequestWithEncoding):
+    cas: Optional[int] = None
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    expiry: Optional[int] = None
+    preserve_expiry: Optional[bool] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.ReplaceWithLegacyDurability.value
 
 
 @dataclass
@@ -354,7 +460,7 @@ class UnlockRequest(CollectionRequest):
 
 @dataclass
 class UpsertRequest(CollectionRequestWithEncoding):
-    durability: Optional[Union[int, Dict[str, int]]] = None
+    durability_level: Optional[int] = None
     expiry: Optional[int] = None
     preserve_expiry: Optional[bool] = None
     timeout: Optional[int] = None
@@ -362,3 +468,16 @@ class UpsertRequest(CollectionRequestWithEncoding):
     @property
     def op_name(self) -> str:
         return KeyValueOperationType.Upsert.value
+
+
+@dataclass
+class UpsertWithLegacyDurabilityRequest(CollectionRequestWithEncoding):
+    persist_to: Optional[int] = None
+    replicate_to: Optional[int] = None
+    expiry: Optional[int] = None
+    preserve_expiry: Optional[bool] = None
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueOperationType.UpsertWithLegacyDurability.value

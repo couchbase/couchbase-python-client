@@ -20,7 +20,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.search import FullTextSearchRequestLogic
 
 
@@ -48,7 +48,6 @@ class FullTextSearchRequest(FullTextSearchRequestLogic):
         return cls(connection, loop, encoded_query, **kwargs)
 
     def execute_search_query(self) -> Deferred:
-        # if self._query_request_ftr is not None and self._query_request_ftr.done():
         if self.done_streaming:
             raise AlreadyQueriedException()
 
@@ -81,7 +80,7 @@ class FullTextSearchRequest(FullTextSearchRequestLogic):
             return
 
         row = next(self._streaming_result)
-        if isinstance(row, CouchbaseBaseException):
+        if isinstance(row, PycbcCoreException):
             raise ErrorMapper.build_exception(row)
         # should only be None one query request is complete and _no_ errors found
         if row is None:

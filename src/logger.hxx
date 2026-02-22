@@ -1,5 +1,6 @@
 /*
- *     Copyright 2022 Couchbase, Inc.
+ *   Copyright 2016-2026. Couchbase, Inc.
+ *   All Rights Reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 #pragma once
 
 #include "Python.h"
+#include <atomic>
 #include <core/logger/configuration.hxx>
 #include <core/logger/logger.hxx>
 #include <core/transactions.hxx>
@@ -24,21 +26,8 @@
 #include <spdlog/details/log_msg.h>
 #include <spdlog/sinks/base_sink.h>
 
-// gh-108014 added Py_IsFinalizing() to Python 3.13.0a1
-//    PR: https://github.com/python/cpython/pull/108032/files
-// bpo-1856 added _Py_Finalizing to Python 3.2.1b1.
-#if (0x030201B1 <= PY_VERSION_HEX && PY_VERSION_HEX < 0x030D00A1)
-inline int
-Py_IsFinalizing(void)
+namespace pycbc
 {
-// _Py_IsFinalizing() was added to Python 3.7.0a1.
-#if PY_VERSION_HEX >= 0x30700A1
-  return _Py_IsFinalizing();
-#else
-  return (_Py_IsFinalizing != NULL);
-#endif
-}
-#endif
 
 // the spdlog::log_msg uses string_view, since it doesn't want
 // copies.   Since we consume the log_msg then asych process it,
@@ -65,9 +54,6 @@ struct log_msg_copy {
 size_t
 convert_spdlog_level(spdlog::level::level_enum lvl);
 
-couchbase::core::logger::level
-convert_python_log_level(PyObject* level);
-
 // Moved to implementing a spdlog::sinks::sink instead of a base_sink.  Allows us to not
 // worry about the mutex w/in the base_sink.  The GIL is the locking mechanism that makes
 // sure logging is thread safe as we acquire the GIL prior to passing the log message to
@@ -79,11 +65,16 @@ convert_python_log_level(PyObject* level);
 // loggers now.   This is probably the best solution, which we can do when we merge the txn lib
 // into the client lib.
 //
+// MODIFIED: Removed Py_IsFinalizing() usage for Py_LIMITED_API compatibility.
+// Uses std::atomic<bool> active_ flag for lifecycle management instead.
+// Python-side atexit handler calls deactivate() before interpreter shutdown.
+//
 class pycbc_logger_sink : public spdlog::sinks::sink
 {
 public:
   pycbc_logger_sink(PyObject* pyObj_logger)
     : pyObj_logger_(pyObj_logger)
+    , active_(true)
   {
     Py_INCREF(pyObj_logger_);
   }
@@ -95,9 +86,17 @@ public:
   pycbc_logger_sink& operator=(const pycbc_logger_sink&) = delete;
   pycbc_logger_sink& operator=(pycbc_logger_sink&&) = delete;
 
+  // Explicitly deactivate the sink before interpreter shutdown
+  // Called from Python atexit handler
+  void deactivate()
+  {
+    active_.store(false, std::memory_order_release);
+  }
+
   ~pycbc_logger_sink()
   {
-    if (0 == Py_IsFinalizing()) {
+    // Only DECREF if still active (not deactivated via atexit)
+    if (active_.load(std::memory_order_acquire)) {
       auto state = PyGILState_Ensure();
       Py_DECREF(pyObj_logger_);
       PyGILState_Release(state);
@@ -106,9 +105,11 @@ public:
 
   void log(const spdlog::details::log_msg& msg) final
   {
-    if (0 == Py_IsFinalizing()) {
-      log_it_(msg);
+    // Skip logging if deactivated
+    if (!active_.load(std::memory_order_acquire)) {
+      return;
     }
+    log_it_(msg);
   }
 
   void flush() final {};
@@ -153,8 +154,8 @@ protected:
       }
       PyGILState_Release(state);
     } catch (...) {
-      // There is still a possibility we hit this after the interpret has started to finalize
-      if (0 == Py_IsFinalizing()) {
+      // Only release GIL if still active
+      if (active_.load(std::memory_order_acquire)) {
         PyGILState_Release(state);
       }
       throw;
@@ -174,7 +175,7 @@ protected:
     // We need to supply the following keys/values:
     // name: str
     // level: int ( CRITICAL = 50, DEBUG=10, ERROR=40, FATAL=50, INFO=20, WARNING=30, NOTSET=0)
-    // TODO: map trace from spdlog - can start with making it debug as well, but really
+    // TODO:  map trace from spdlog - can start with making it debug as well, but really
     //       should add TRACE to python logging levels
     // pathname: str  (path to file that did the logging)
     // lineno: int (line number of line that logged in that file)
@@ -237,6 +238,7 @@ protected:
 
 private:
   PyObject* pyObj_logger_;
+  std::atomic<bool> active_;
 };
 
 struct pycbc_logger {
@@ -247,3 +249,5 @@ struct pycbc_logger {
 
 PyObject*
 add_logger_objects(PyObject* pyObj_module);
+
+} // namespace pycbc

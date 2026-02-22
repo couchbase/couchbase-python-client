@@ -30,12 +30,10 @@ from typing import (Any,
 from urllib.parse import quote
 
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.pycbc_core import exception
+from couchbase.logic.pycbc_core import pycbc_exception
 
 JSONType = Union[str, int, float, bool,
                  None, Dict[str, Any], List[Any]]
-
-PyCapsuleType = TypeVar('PyCapsuleType')
 
 
 def is_null_or_empty(
@@ -58,14 +56,10 @@ def identity(x  # type: Any
     return x
 
 
-def timedelta_as_microseconds(
-    duration,  # type: timedelta
-) -> int:
+def timedelta_as_milliseconds(duration: timedelta) -> int:
     if duration and not isinstance(duration, timedelta):
-        raise InvalidArgumentException(
-            message="Expected timedelta instead of {}".format(duration)
-        )
-    return int(duration.total_seconds() * 1e6 if duration else 0)
+        raise InvalidArgumentException(message=f'Expected timedelta instead of {type(duration)}')
+    return int(duration.total_seconds() * 1e3 if duration else 0)
 
 
 def to_microseconds(
@@ -80,6 +74,22 @@ def to_microseconds(
         total_us = int(timeout.total_seconds() * 1e6)
     else:
         total_us = int(timeout * 1e6)
+
+    return total_us
+
+
+def to_milliseconds(
+    timeout  # type: Union[timedelta, float, int]
+) -> int:
+    if timeout and not isinstance(timeout, (timedelta, float, int)):
+        raise InvalidArgumentException(message=("Excepted timeout to be of type "
+                                                f"Union[timedelta, float, int] instead of {timeout}"))
+    if not timeout:
+        total_us = 0
+    elif isinstance(timeout, timedelta):
+        total_us = int(timeout.total_seconds() * 1e3)
+    else:
+        total_us = int(timeout * 1e3)
 
     return total_us
 
@@ -139,7 +149,7 @@ class Identity:
             return x
         if not isinstance(x, self._type):
             exc = InvalidArgumentException.pycbc_create_exception(
-                exception(),
+                pycbc_exception(),
                 "Argument must be of type {} but got {}".format(
                     self._type, x))
             raise exc
@@ -162,7 +172,7 @@ class EnumToStr:
             return value
         if not isinstance(value, self._type):
             exc = InvalidArgumentException.pycbc_create_exception(
-                exception(),
+                pycbc_exception(),
                 "Argument must be of type {} but got {}".format(
                     self._type, value))
             raise exc
@@ -204,7 +214,7 @@ class SecondsToTimeDelta:
             return self._type(seconds=value)
         except (OverflowError, ValueError):
             exc = InvalidArgumentException.pycbc_create_exception(
-                exception(), "Invalid duration arg: {}".format(value))
+                pycbc_exception(), "Invalid duration arg: {}".format(value))
             raise exc
 
 

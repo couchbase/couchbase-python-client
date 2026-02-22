@@ -30,7 +30,6 @@ from couchbase.management.logic.eventing_function_mgmt_types import (EVENTING_FU
                                                                      UndeployFunctionRequest,
                                                                      UpsertFunctionRequest)
 from couchbase.options import forward_args
-from couchbase.pycbc_core import eventing_function_mgmt_operations, mgmt_operations
 
 if TYPE_CHECKING:
     from couchbase.management.logic.eventing_function_mgmt_types import EventingFunction
@@ -57,8 +56,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = DeployFunctionRequest(self._error_map,
-                                    mgmt_operations.EVENTING_FUNCTION.value,
-                                    eventing_function_mgmt_operations.DEPLOY_FUNCTION.value,
                                     name=name,
                                     bucket_name=bucket_name,
                                     scope_name=scope_name,
@@ -77,8 +74,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = DropFunctionRequest(self._error_map,
-                                  mgmt_operations.EVENTING_FUNCTION.value,
-                                  eventing_function_mgmt_operations.DROP_FUNCTION.value,
                                   name=name,
                                   bucket_name=bucket_name,
                                   scope_name=scope_name,
@@ -96,8 +91,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetAllFunctionsRequest(self._error_map,
-                                     mgmt_operations.EVENTING_FUNCTION.value,
-                                     eventing_function_mgmt_operations.GET_ALL_FUNCTIONS.value,
                                      bucket_name=bucket_name,
                                      scope_name=scope_name,
                                      **final_args)
@@ -115,8 +108,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetFunctionRequest(self._error_map,
-                                 mgmt_operations.EVENTING_FUNCTION.value,
-                                 eventing_function_mgmt_operations.GET_FUNCTION.value,
                                  name=name,
                                  bucket_name=bucket_name,
                                  scope_name=scope_name,
@@ -134,8 +125,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = GetFunctionsStatusRequest(self._error_map,
-                                        mgmt_operations.EVENTING_FUNCTION.value,
-                                        eventing_function_mgmt_operations.GET_STATUS.value,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
                                         **final_args)
@@ -153,8 +142,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = PauseFunctionRequest(self._error_map,
-                                   mgmt_operations.EVENTING_FUNCTION.value,
-                                   eventing_function_mgmt_operations.PAUSE_FUNCTION.value,
                                    name=name,
                                    bucket_name=bucket_name,
                                    scope_name=scope_name,
@@ -173,8 +160,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = ResumeFunctionRequest(self._error_map,
-                                    mgmt_operations.EVENTING_FUNCTION.value,
-                                    eventing_function_mgmt_operations.RESUME_FUNCTION.value,
                                     name=name,
                                     bucket_name=bucket_name,
                                     scope_name=scope_name,
@@ -193,8 +178,6 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = UndeployFunctionRequest(self._error_map,
-                                      mgmt_operations.EVENTING_FUNCTION.value,
-                                      eventing_function_mgmt_operations.UNDEPLOY_FUNCTION.value,
                                       name=name,
                                       bucket_name=bucket_name,
                                       scope_name=scope_name,
@@ -213,9 +196,7 @@ class EventingFunctionMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         bucket_name, scope_name = self._get_scope_context(scope_context)
         req = UpsertFunctionRequest(self._error_map,
-                                    mgmt_operations.EVENTING_FUNCTION.value,
-                                    eventing_function_mgmt_operations.UPSERT_FUNCTION.value,
-                                    eventing_function=function.as_dict(),
+                                    function=function.as_dict(),
                                     bucket_name=bucket_name,
                                     scope_name=scope_name,
                                     **final_args)

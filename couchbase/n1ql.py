@@ -18,7 +18,6 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.n1ql import N1QLQuery  # noqa: F401
 from couchbase.logic.n1ql import QueryError  # noqa: F401
 from couchbase.logic.n1ql import QueryMetaData  # noqa: F401
@@ -28,6 +27,7 @@ from couchbase.logic.n1ql import QueryScanConsistency  # noqa: F401
 from couchbase.logic.n1ql import QueryStatus  # noqa: F401
 from couchbase.logic.n1ql import QueryWarning  # noqa: F401
 from couchbase.logic.n1ql import QueryRequestLogic
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class N1QLRequest(QueryRequestLogic):
@@ -77,7 +77,7 @@ class N1QLRequest(QueryRequestLogic):
             # @TODO:  PYCBC-1524
             row = next(self._streaming_result)
 
-        if isinstance(row, CouchbaseBaseException):
+        if isinstance(row, PycbcCoreException):
             raise ErrorMapper.build_exception(row)
         # should only be None once query request is complete and _no_ errors found
         if row is None:

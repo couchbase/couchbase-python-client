@@ -55,7 +55,7 @@ class DesignDocumentNamespace(Enum):
 
 
 class View:
-    def __init__(self, map: str, reduce: Optional[str] = None) -> None:
+    def __init__(self, map: str, reduce: Optional[str] = None, name: Optional[str] = None) -> None:
         self._map = map
         self._reduce = reduce
 
@@ -67,9 +67,13 @@ class View:
     def reduce(self) -> Optional[str]:
         return self._reduce
 
-    def as_dict(self) -> Dict[str, Any]:
-        return {k: v for k, v in {"map": self._map,
-                                  "reduce": self._reduce}.items() if v}
+    def as_dict(self, name: Optional[str] = None) -> Dict[str, Any]:
+        output = {'map': self._map}
+        if self._reduce:
+            output['reduce'] = self._reduce
+        if name:
+            output['name'] = name
+        return output
 
     def to_json(self) -> str:
         return json.dumps(self.as_dict())
@@ -112,8 +116,8 @@ class DesignDocument(object):
             'name': self._name
         }
         if namespace is not None:
-            output['namespace'] = namespace.to_str()
-        output['views'] = dict({key: value.as_dict() for key, value in self.views.items()})
+            output['ns'] = namespace.to_str()
+        output['views'] = dict({key: value.as_dict(name=key) for key, value in self.views.items()})
 
         if self.rev:
             output['rev'] = self.rev
@@ -142,24 +146,19 @@ class DesignDocument(object):
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class ViewIndexMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
 
         if callback is not None:
@@ -168,15 +167,6 @@ class ViewIndexMgmtRequest(MgmtRequest):
         if errback is not None:
             mgmt_kwargs['errback'] = errback
 
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
-
         return mgmt_kwargs
 
 
@@ -184,49 +174,49 @@ class ViewIndexMgmtRequest(MgmtRequest):
 class DropDesignDocumentRequest(ViewIndexMgmtRequest):
     bucket_name: str
     document_name: str
-    namespace: str
+    ns: str
     client_context_id: Optional[str] = None
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return ViewIndexMgmtOperationType.DropDesignDocument.value
+        return ViewIndexMgmtOperationType.ViewIndexDrop.value
 
 
 @dataclass
 class GetAllDesignDocumentsRequest(ViewIndexMgmtRequest):
     bucket_name: str
-    namespace: str
+    ns: str
     client_context_id: Optional[str] = None
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return ViewIndexMgmtOperationType.GetAllDesignDocuments.value
+        return ViewIndexMgmtOperationType.ViewIndexGetAll.value
 
 
 @dataclass
 class GetDesignDocumentRequest(ViewIndexMgmtRequest):
     bucket_name: str
     document_name: str
-    namespace: str
+    ns: str
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return ViewIndexMgmtOperationType.GetDesignDocument.value
+        return ViewIndexMgmtOperationType.ViewIndexGet.value
 
 
 @dataclass
 class UpsertDesignDocumentRequest(ViewIndexMgmtRequest):
     bucket_name: str
-    design_document: Dict[str, Any]
+    document: Dict[str, Any]
     client_context_id: Optional[str] = None
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return ViewIndexMgmtOperationType.UpsertDesignDocument.value
+        return ViewIndexMgmtOperationType.ViewIndexUpsert.value
 
 
 VIEW_INDEX_MGMT_ERROR_MAP: Dict[str, Exception] = {

@@ -26,13 +26,12 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 from couchbase._utils import (JSONType,
-                              timedelta_as_microseconds,
-                              to_microseconds)
+                              timedelta_as_milliseconds,
+                              to_milliseconds)
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import QueryOptionsBase
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.options import QueryOptions, UnsignedInt64
-from couchbase.pycbc_core import n1ql_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.tracing import CouchbaseSpan
 
@@ -225,7 +224,7 @@ class QueryMetaData:
     def __init__(self, raw  # type: Dict[str, Any]
                  ) -> None:
         if raw is not None:
-            self._raw = raw.get('metadata', None)
+            self._raw = raw
             sig = self._raw.get('signature', None)
             if sig is not None:
                 self._raw['signature'] = json.loads(sig)
@@ -273,9 +272,10 @@ class QueryMetaData:
         Returns:
             List[:class:`.QueryWarning`]: Any warnings that occurred during the execution of the query.
         """
-        return list(
-            map(QueryWarning, self._raw.get("warnings", []))
-        )
+        warnings = self._raw.get('warnings')
+        if warnings is None:
+            return []
+        return list(map(QueryWarning, warnings))
 
     def errors(self) -> List[QueryError]:
         """Get errors that occurred during the execution of the query.
@@ -283,9 +283,10 @@ class QueryMetaData:
         Returns:
             List[:class:`.QueryWarning`]: Any errors that occurred during the execution of the query.
         """
-        return list(
-            map(QueryError, self._raw.get("errors", []))
-        )
+        errors = self._raw.get('errors')
+        if errors is None:
+            return []
+        return list(map(QueryWarning, errors))
 
     def metrics(self) -> Optional[QueryMetrics]:
         """Get the various metrics which are made available by the query engine.
@@ -327,7 +328,7 @@ class N1QLQuery:
         "query_context": {"query_context": lambda x: x},
         "raw": {"raw": lambda x: x},
         "scan_cap": {"scan_cap": lambda x: x},
-        "scan_wait": {"scan_wait": timedelta_as_microseconds},
+        "scan_wait": {"scan_wait": timedelta_as_milliseconds},
         "metrics": {"metrics": lambda x: x},
         "flex_index": {"flex_index": lambda x: x},
         "preserve_expiry": {"preserve_expiry": lambda x: x},
@@ -428,8 +429,8 @@ class N1QLQuery:
         if not value:
             self._params.pop('timeout', 0)
         else:
-            total_us = to_microseconds(value)
-            self.set_option('timeout', total_us)
+            total_ms = to_milliseconds(value)
+            self.set_option('timeout', total_ms)
 
     @property
     def readonly(self) -> bool:
@@ -496,8 +497,7 @@ class N1QLQuery:
         :type state: :class:`~.couchbase.mutation_state.MutationState`
         """
         if self.consistency != QueryScanConsistency.NOT_BOUNDED:
-            raise TypeError(
-                'consistent_with not valid with other consistency options')
+            raise TypeError('consistent_with not valid with other consistency options')
 
         # avoid circular import
         from couchbase.mutation_state import MutationState  # noqa: F811
@@ -555,7 +555,7 @@ class N1QLQuery:
     @property
     def profile(self) -> QueryProfile:
         value = self._params.get(
-            'profile_mode', None
+            'profile', None
         )
 
         if value is None:
@@ -572,9 +572,9 @@ class N1QLQuery:
     def profile(self, value  # type: Union[QueryProfile, str]
                 ) -> None:
         if isinstance(value, QueryProfile):
-            self.set_option('profile_mode', value.value)
+            self.set_option('profile', value.value)
         elif isinstance(value, str) and value in [pm.value for pm in QueryProfile]:
-            self.set_option('profile_mode', value)
+            self.set_option('profile', value)
         else:
             raise InvalidArgumentException(message=("Excepted profile to be either of type "
                                                     "QueryProfile or str representation of QueryProfile"))
@@ -622,7 +622,7 @@ class N1QLQuery:
         else:
             # if using the setter, need to validate/transform timedelta, otherwise, just add the value
             if 'scan_wait' in self._params:
-                value = timedelta_as_microseconds(value)
+                value = timedelta_as_milliseconds(value)
 
             self.set_option('scan_wait', value)
 
@@ -779,20 +779,18 @@ class QueryRequestLogic:
         return self._metadata
 
     def _set_metadata(self, query_response):
-        if isinstance(query_response, CouchbaseBaseException):
+        if isinstance(query_response, PycbcCoreException):
             raise ErrorMapper.build_exception(query_response)
 
-        self._metadata = QueryMetaData(query_response.raw_result.get('value', None))
+        self._metadata = QueryMetaData(query_response.raw_result.get('metadata', None))
 
     def _submit_query(self, **kwargs):
         if self.done_streaming:
             return
 
         self._started_streaming = True
-        n1ql_kwargs = {
-            'conn': self._connection,
-            'query_args': self.params,
-        }
+        n1ql_kwargs = {}
+        n1ql_kwargs.update(self.params)
 
         streaming_timeout = self.params.get('timeout', self._streaming_timeout)
         if streaming_timeout:
@@ -807,4 +805,4 @@ class QueryRequestLogic:
         if errback:
             n1ql_kwargs['errback'] = errback
 
-        self._streaming_result = n1ql_query(**n1ql_kwargs)
+        self._streaming_result = self._connection.pycbc_query(**n1ql_kwargs)

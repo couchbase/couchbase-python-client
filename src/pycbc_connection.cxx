@@ -1,0 +1,2293 @@
+/*
+ *   Copyright 2016-2026. Couchbase, Inc.
+ *   All Rights Reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+
+#include "pycbc_connection.hxx"
+#include "cpp_core_types.hxx"
+#include "utils.hxx"
+#include <core/cluster_options.hxx>
+#include <core/origin.hxx>
+#include <core/utils/connection_string.hxx>
+
+namespace pycbc
+{
+
+static void
+pycbc_connection__dealloc__(pycbc_connection* self);
+static PyObject*
+pycbc_connection__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs);
+static int
+pycbc_connection__init__(pycbc_connection* self, PyObject* args, PyObject* kwargs);
+
+// ==========================================================================================
+// Connection Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__connect__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "connect")) {
+    return nullptr;
+  }
+  return self->conn->connect(kwargs);
+}
+
+static PyObject*
+pycbc_connection__close__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "close", true)) {
+    return nullptr;
+  }
+  return self->conn->close(kwargs);
+}
+
+static PyObject*
+pycbc_connection__open_bucket__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "open_bucket")) {
+    return nullptr;
+  }
+  return self->conn->open_bucket(kwargs);
+}
+
+static PyObject*
+pycbc_connection__close_bucket__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "close_bucket")) {
+    return nullptr;
+  }
+  return self->conn->close_bucket(kwargs);
+}
+
+static PyObject*
+pycbc_connection__update_credentials__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "update_credentials")) {
+    return nullptr;
+  }
+  return self->conn->update_credentials(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get_default_timeouts__([[maybe_unused]] pycbc_connection* self,
+                                         [[maybe_unused]] PyObject* args)
+{
+  return get_default_timeouts();
+}
+
+// ==========================================================================================
+// Diagnostic Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__diagnostics__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "diagnostics")) {
+    return nullptr;
+  }
+  return self->conn->diagnostics(kwargs);
+}
+
+static PyObject*
+pycbc_connection__ping__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "ping")) {
+    return nullptr;
+  }
+  return self->conn->ping(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get_connection_info__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get_connection_info", true)) {
+    return nullptr;
+  }
+  return self->conn->get_connection_info();
+}
+
+// ==========================================================================================
+// Key-Value Range Scan Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__kv_range_scan__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "kv_range_scan")) {
+    return nullptr;
+  }
+  return self->conn->handle_range_scan_op(kwargs);
+}
+
+// ==========================================================================================
+// Observability Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__get_cluster_labels__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get_cluster_labels", true)) {
+    return nullptr;
+  }
+  return self->conn->get_cluster_labels_as_py_object();
+}
+
+// ====================================================================================================
+// AUTOGENERATED SECTION START - DO NOT EDIT MANUALLY
+// Generated-On: 2026-02-25 14:23:36
+// Content-Hash: 09a18153af55aee7954d59706b85562d
+// ====================================================================================================
+// ==========================================================================================
+// Key-Value Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__append__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "append")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::append_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__append_with_legacy_durability__(pycbc_connection* self,
+                                                  PyObject* args,
+                                                  PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "append_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::append_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__decrement__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "decrement")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::decrement_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__decrement_with_legacy_durability__(pycbc_connection* self,
+                                                     PyObject* args,
+                                                     PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "decrement_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::decrement_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__exists__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "exists")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::exists_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::get_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get_all_replicas__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get_all_replicas")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::get_all_replicas_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get_and_lock__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get_and_lock")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::get_and_lock_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get_and_touch__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get_and_touch")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::get_and_touch_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get_any_replica__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get_any_replica")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::get_any_replica_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__get_projected__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "get_projected")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::get_projected_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__increment__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "increment")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::increment_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__increment_with_legacy_durability__(pycbc_connection* self,
+                                                     PyObject* args,
+                                                     PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "increment_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::increment_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__insert__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "insert")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::insert_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__insert_with_legacy_durability__(pycbc_connection* self,
+                                                  PyObject* args,
+                                                  PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "insert_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::insert_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__lookup_in__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "lookup_in")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::lookup_in_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__lookup_in_all_replicas__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "lookup_in_all_replicas")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::lookup_in_all_replicas_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__lookup_in_any_replica__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "lookup_in_any_replica")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::lookup_in_any_replica_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__mutate_in__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "mutate_in")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::mutate_in_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__mutate_in_with_legacy_durability__(pycbc_connection* self,
+                                                     PyObject* args,
+                                                     PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "mutate_in_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::mutate_in_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__prepend__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "prepend")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::prepend_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__prepend_with_legacy_durability__(pycbc_connection* self,
+                                                   PyObject* args,
+                                                   PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "prepend_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::prepend_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__remove__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "remove")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::remove_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__remove_with_legacy_durability__(pycbc_connection* self,
+                                                  PyObject* args,
+                                                  PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "remove_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::remove_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__replace__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "replace")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::replace_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__replace_with_legacy_durability__(pycbc_connection* self,
+                                                   PyObject* args,
+                                                   PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "replace_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::replace_request_with_legacy_durability>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__touch__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "touch")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::touch_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__unlock__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "unlock")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::unlock_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__upsert__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "upsert")) {
+    return nullptr;
+  }
+  return self->conn->execute_kv_op<couchbase::core::operations::upsert_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__upsert_with_legacy_durability__(pycbc_connection* self,
+                                                  PyObject* args,
+                                                  PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "upsert_with_legacy_durability")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_kv_op<couchbase::core::operations::upsert_request_with_legacy_durability>(kwargs);
+}
+
+// ==========================================================================================
+// Key-Value Multi Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__append_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::append_request>(
+    self, args, kwargs, "append_multi");
+}
+
+static PyObject*
+pycbc_connection__append_with_legacy_durability_multi__(pycbc_connection* self,
+                                                        PyObject* args,
+                                                        PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::append_request_with_legacy_durability>(
+    self, args, kwargs, "append_with_legacy_durability_multi");
+}
+
+static PyObject*
+pycbc_connection__decrement_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::decrement_request>(
+    self, args, kwargs, "decrement_multi");
+}
+
+static PyObject*
+pycbc_connection__decrement_with_legacy_durability_multi__(pycbc_connection* self,
+                                                           PyObject* args,
+                                                           PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::decrement_request_with_legacy_durability>(
+    self, args, kwargs, "decrement_with_legacy_durability_multi");
+}
+
+static PyObject*
+pycbc_connection__exists_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::exists_request>(
+    self, args, kwargs, "exists_multi");
+}
+
+static PyObject*
+pycbc_connection__get_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::get_request>(
+    self, args, kwargs, "get_multi");
+}
+
+static PyObject*
+pycbc_connection__get_all_replicas_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::get_all_replicas_request>(
+    self, args, kwargs, "get_all_replicas_multi");
+}
+
+static PyObject*
+pycbc_connection__get_and_lock_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::get_and_lock_request>(
+    self, args, kwargs, "get_and_lock_multi");
+}
+
+static PyObject*
+pycbc_connection__get_and_touch_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::get_and_touch_request>(
+    self, args, kwargs, "get_and_touch_multi");
+}
+
+static PyObject*
+pycbc_connection__get_any_replica_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::get_any_replica_request>(
+    self, args, kwargs, "get_any_replica_multi");
+}
+
+static PyObject*
+pycbc_connection__increment_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::increment_request>(
+    self, args, kwargs, "increment_multi");
+}
+
+static PyObject*
+pycbc_connection__increment_with_legacy_durability_multi__(pycbc_connection* self,
+                                                           PyObject* args,
+                                                           PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::increment_request_with_legacy_durability>(
+    self, args, kwargs, "increment_with_legacy_durability_multi");
+}
+
+static PyObject*
+pycbc_connection__insert_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::insert_request>(
+    self, args, kwargs, "insert_multi");
+}
+
+static PyObject*
+pycbc_connection__insert_with_legacy_durability_multi__(pycbc_connection* self,
+                                                        PyObject* args,
+                                                        PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::insert_request_with_legacy_durability>(
+    self, args, kwargs, "insert_with_legacy_durability_multi");
+}
+
+static PyObject*
+pycbc_connection__prepend_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::prepend_request>(
+    self, args, kwargs, "prepend_multi");
+}
+
+static PyObject*
+pycbc_connection__prepend_with_legacy_durability_multi__(pycbc_connection* self,
+                                                         PyObject* args,
+                                                         PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::prepend_request_with_legacy_durability>(
+    self, args, kwargs, "prepend_with_legacy_durability_multi");
+}
+
+static PyObject*
+pycbc_connection__remove_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::remove_request>(
+    self, args, kwargs, "remove_multi");
+}
+
+static PyObject*
+pycbc_connection__remove_with_legacy_durability_multi__(pycbc_connection* self,
+                                                        PyObject* args,
+                                                        PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::remove_request_with_legacy_durability>(
+    self, args, kwargs, "remove_with_legacy_durability_multi");
+}
+
+static PyObject*
+pycbc_connection__replace_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::replace_request>(
+    self, args, kwargs, "replace_multi");
+}
+
+static PyObject*
+pycbc_connection__replace_with_legacy_durability_multi__(pycbc_connection* self,
+                                                         PyObject* args,
+                                                         PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::replace_request_with_legacy_durability>(
+    self, args, kwargs, "replace_with_legacy_durability_multi");
+}
+
+static PyObject*
+pycbc_connection__touch_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::touch_request>(
+    self, args, kwargs, "touch_multi");
+}
+
+static PyObject*
+pycbc_connection__unlock_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::unlock_request>(
+    self, args, kwargs, "unlock_multi");
+}
+
+static PyObject*
+pycbc_connection__upsert_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::upsert_request>(
+    self, args, kwargs, "upsert_multi");
+}
+
+static PyObject*
+pycbc_connection__upsert_with_legacy_durability_multi__(pycbc_connection* self,
+                                                        PyObject* args,
+                                                        PyObject* kwargs)
+{
+  return handle_multi_kv_op<couchbase::core::operations::upsert_request_with_legacy_durability>(
+    self, args, kwargs, "upsert_with_legacy_durability_multi");
+}
+
+// ==========================================================================================
+// Streaming Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__analytics_query__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics")) {
+    return nullptr;
+  }
+  return self->conn->execute_streaming_op<couchbase::core::operations::analytics_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__view_query__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "document_view")) {
+    return nullptr;
+  }
+  return self->conn->execute_streaming_op<couchbase::core::operations::document_view_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__query__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "query")) {
+    return nullptr;
+  }
+  return self->conn->execute_streaming_op<couchbase::core::operations::query_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_query__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search")) {
+    return nullptr;
+  }
+  return self->conn->execute_streaming_op<couchbase::core::operations::search_request>(kwargs);
+}
+
+// ==========================================================================================
+// Analytics Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__analytics_dataset_create__(pycbc_connection* self,
+                                             PyObject* args,
+                                             PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_dataset_create")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_dataset_create_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_dataset_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_dataset_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_dataset_drop_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_dataset_get_all__(pycbc_connection* self,
+                                              PyObject* args,
+                                              PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_dataset_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_dataset_get_all_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_dataverse_create__(pycbc_connection* self,
+                                               PyObject* args,
+                                               PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_dataverse_create")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_dataverse_create_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_dataverse_drop__(pycbc_connection* self,
+                                             PyObject* args,
+                                             PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_dataverse_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_dataverse_drop_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_get_pending_mutations__(pycbc_connection* self,
+                                                    PyObject* args,
+                                                    PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_get_pending_mutations")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<
+    couchbase::core::operations::management::analytics_get_pending_mutations_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_index_create__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_index_create")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_index_create_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_index_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_index_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_index_drop_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_index_get_all__(pycbc_connection* self,
+                                            PyObject* args,
+                                            PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_index_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_index_get_all_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_connect__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_link_connect")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_connect_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_create_azure_blob_external_link__(pycbc_connection* self,
+                                                                   PyObject* args,
+                                                                   PyObject* kwargs)
+{
+  if (!validate_connection_and_args(
+        self, args, kwargs, "analytics_link_create_azure_blob_external_link")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_create_request<
+      couchbase::core::management::analytics::azure_blob_external_link>>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_create_couchbase_remote_link__(pycbc_connection* self,
+                                                                PyObject* args,
+                                                                PyObject* kwargs)
+{
+  if (!validate_connection_and_args(
+        self, args, kwargs, "analytics_link_create_couchbase_remote_link")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_create_request<
+      couchbase::core::management::analytics::couchbase_remote_link>>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_create_s3_external_link__(pycbc_connection* self,
+                                                           PyObject* args,
+                                                           PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_link_create_s3_external_link")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_create_request<
+      couchbase::core::management::analytics::s3_external_link>>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_disconnect__(pycbc_connection* self,
+                                              PyObject* args,
+                                              PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_link_disconnect")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_disconnect_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_link_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_drop_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "analytics_link_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_get_all_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_replace_azure_blob_external_link__(pycbc_connection* self,
+                                                                    PyObject* args,
+                                                                    PyObject* kwargs)
+{
+  if (!validate_connection_and_args(
+        self, args, kwargs, "analytics_link_replace_azure_blob_external_link")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_replace_request<
+      couchbase::core::management::analytics::azure_blob_external_link>>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_replace_couchbase_remote_link__(pycbc_connection* self,
+                                                                 PyObject* args,
+                                                                 PyObject* kwargs)
+{
+  if (!validate_connection_and_args(
+        self, args, kwargs, "analytics_link_replace_couchbase_remote_link")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_replace_request<
+      couchbase::core::management::analytics::couchbase_remote_link>>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__analytics_link_replace_s3_external_link__(pycbc_connection* self,
+                                                            PyObject* args,
+                                                            PyObject* kwargs)
+{
+  if (!validate_connection_and_args(
+        self, args, kwargs, "analytics_link_replace_s3_external_link")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::analytics_link_replace_request<
+      couchbase::core::management::analytics::s3_external_link>>(kwargs);
+}
+
+// ==========================================================================================
+// Bucket Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__bucket_create__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "bucket_create")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::bucket_create_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__bucket_describe__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "bucket_describe")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::bucket_describe_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__bucket_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "bucket_drop")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::bucket_drop_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__bucket_flush__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "bucket_flush")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::bucket_flush_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__bucket_get__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "bucket_get")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::bucket_get_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__bucket_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "bucket_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::bucket_get_all_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__bucket_update__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "bucket_update")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::bucket_update_request>(kwargs);
+}
+
+// ==========================================================================================
+// Cluster Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__cluster_describe__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "cluster_describe")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::cluster_describe_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__cluster_developer_preview_enable__(pycbc_connection* self,
+                                                     PyObject* args,
+                                                     PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "cluster_developer_preview_enable")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<
+    couchbase::core::operations::management::cluster_developer_preview_enable_request>(kwargs);
+}
+
+// ==========================================================================================
+// Collection Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__collection_create__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "collection_create")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::collection_create_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__collection_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "collection_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::collection_drop_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__collection_update__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "collection_update")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::collection_update_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__collections_manifest_get__(pycbc_connection* self,
+                                             PyObject* args,
+                                             PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "collections_manifest_get")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::collections_manifest_get_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__scope_create__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "scope_create")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::scope_create_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__scope_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "scope_drop")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::scope_drop_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__scope_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "scope_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::scope_get_all_request>(kwargs);
+}
+
+// ==========================================================================================
+// EventingFunction Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__eventing_deploy_function__(pycbc_connection* self,
+                                             PyObject* args,
+                                             PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_deploy_function")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_deploy_function_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_drop_function__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_drop_function")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_drop_function_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_get_all_functions__(pycbc_connection* self,
+                                               PyObject* args,
+                                               PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_get_all_functions")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_get_all_functions_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_get_function__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_get_function")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_get_function_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_get_status__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_get_status")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_get_status_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_pause_function__(pycbc_connection* self,
+                                            PyObject* args,
+                                            PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_pause_function")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_pause_function_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_resume_function__(pycbc_connection* self,
+                                             PyObject* args,
+                                             PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_resume_function")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_resume_function_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_undeploy_function__(pycbc_connection* self,
+                                               PyObject* args,
+                                               PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_undeploy_function")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_undeploy_function_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__eventing_upsert_function__(pycbc_connection* self,
+                                             PyObject* args,
+                                             PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "eventing_upsert_function")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::eventing_upsert_function_request>(
+      kwargs);
+}
+
+// ==========================================================================================
+// QueryIndex Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__query_index_build__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "query_index_build")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::query_index_build_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__query_index_build_deferred__(pycbc_connection* self,
+                                               PyObject* args,
+                                               PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "query_index_build_deferred")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::query_index_build_deferred_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__query_index_create__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "query_index_create")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::query_index_create_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__query_index_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "query_index_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::query_index_drop_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__query_index_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "query_index_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::query_index_get_all_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__query_index_get_all_deferred__(pycbc_connection* self,
+                                                 PyObject* args,
+                                                 PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "query_index_get_all_deferred")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<
+    couchbase::core::operations::management::query_index_get_all_deferred_request>(kwargs);
+}
+
+// ==========================================================================================
+// SearchIndex Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__search_get_stats__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_get_stats")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_get_stats_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_analyze_document__(pycbc_connection* self,
+                                                  PyObject* args,
+                                                  PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_analyze_document")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<
+    couchbase::core::operations::management::search_index_analyze_document_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_control_ingest__(pycbc_connection* self,
+                                                PyObject* args,
+                                                PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_control_ingest")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_index_control_ingest_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_control_plan_freeze__(pycbc_connection* self,
+                                                     PyObject* args,
+                                                     PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_control_plan_freeze")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<
+    couchbase::core::operations::management::search_index_control_plan_freeze_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_control_query__(pycbc_connection* self,
+                                               PyObject* args,
+                                               PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_control_query")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_index_control_query_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_index_drop_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_get__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_get")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_index_get_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_index_get_all_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_get_documents_count__(pycbc_connection* self,
+                                                     PyObject* args,
+                                                     PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_get_documents_count")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<
+    couchbase::core::operations::management::search_index_get_documents_count_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_get_stats__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_get_stats")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_index_get_stats_request>(
+      kwargs);
+}
+
+static PyObject*
+pycbc_connection__search_index_upsert__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "search_index_upsert")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::search_index_upsert_request>(kwargs);
+}
+
+// ==========================================================================================
+// User Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__change_password__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "change_password")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::change_password_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__group_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "group_drop")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::group_drop_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__group_get__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "group_get")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::group_get_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__group_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "group_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::group_get_all_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__group_upsert__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "group_upsert")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::group_upsert_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__role_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "role_get_all")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::role_get_all_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__user_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "user_drop")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::user_drop_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__user_get__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "user_get")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::user_get_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__user_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "user_get_all")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::user_get_all_request>(
+    kwargs);
+}
+
+static PyObject*
+pycbc_connection__user_upsert__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "user_upsert")) {
+    return nullptr;
+  }
+  return self->conn->execute_mgmt_op<couchbase::core::operations::management::user_upsert_request>(
+    kwargs);
+}
+
+// ==========================================================================================
+// ViewIndex Management Operations
+// ==========================================================================================
+
+static PyObject*
+pycbc_connection__view_index_drop__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "view_index_drop")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::view_index_drop_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__view_index_get__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "view_index_get")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::view_index_get_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__view_index_get_all__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "view_index_get_all")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::view_index_get_all_request>(kwargs);
+}
+
+static PyObject*
+pycbc_connection__view_index_upsert__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  if (!validate_connection_and_args(self, args, kwargs, "view_index_upsert")) {
+    return nullptr;
+  }
+  return self->conn
+    ->execute_mgmt_op<couchbase::core::operations::management::view_index_upsert_request>(kwargs);
+}
+
+static PyMethodDef pycbc_connection_methods[] = {
+  // Connection management
+  { "pycbc_connect",
+    (PyCFunction)pycbc_connection__connect__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Connect to cluster") },
+  { "pycbc_close",
+    (PyCFunction)pycbc_connection__close__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Close cluster connection") },
+  { "pycbc_open_bucket",
+    (PyCFunction)pycbc_connection__open_bucket__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Open bucket") },
+  { "pycbc_close_bucket",
+    (PyCFunction)pycbc_connection__close_bucket__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Close bucket") },
+  { "pycbc_update_credentials",
+    (PyCFunction)pycbc_connection__update_credentials__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Update connection credentials") },
+  { "pycbc_get_default_timeouts",
+    (PyCFunction)pycbc_connection__get_default_timeouts__,
+    METH_NOARGS | METH_STATIC,
+    PyDoc_STR("Get C++ core default timeouts") },
+
+  // Diagnostics
+  { "pycbc_diagnostics",
+    (PyCFunction)pycbc_connection__diagnostics__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Diagnostics operation") },
+  { "pycbc_ping",
+    (PyCFunction)pycbc_connection__ping__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Ping operation") },
+  { "pycbc_get_connection_info",
+    (PyCFunction)pycbc_connection__get_connection_info__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Get connection info") },
+
+  // Key-Value Range Scan
+  { "pycbc_kv_range_scan",
+    (PyCFunction)pycbc_connection__kv_range_scan__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV range scan operation") },
+
+  // Observability
+  { "pycbc_get_cluster_labels",
+    (PyCFunction)pycbc_connection__get_cluster_labels__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("Get cluster labels") },
+
+  // Key-Value Operations
+  { "pycbc_append",
+    (PyCFunction)pycbc_connection__append__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV append operation") },
+  { "pycbc_append_with_legacy_durability",
+    (PyCFunction)pycbc_connection__append_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV append_with_legacy_durability operation") },
+  { "pycbc_decrement",
+    (PyCFunction)pycbc_connection__decrement__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV decrement operation") },
+  { "pycbc_decrement_with_legacy_durability",
+    (PyCFunction)pycbc_connection__decrement_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV decrement_with_legacy_durability operation") },
+  { "pycbc_exists",
+    (PyCFunction)pycbc_connection__exists__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV exists operation") },
+  { "pycbc_get",
+    (PyCFunction)pycbc_connection__get__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get operation") },
+  { "pycbc_get_all_replicas",
+    (PyCFunction)pycbc_connection__get_all_replicas__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_all_replicas operation") },
+  { "pycbc_get_and_lock",
+    (PyCFunction)pycbc_connection__get_and_lock__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_and_lock operation") },
+  { "pycbc_get_and_touch",
+    (PyCFunction)pycbc_connection__get_and_touch__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_and_touch operation") },
+  { "pycbc_get_any_replica",
+    (PyCFunction)pycbc_connection__get_any_replica__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_any_replica operation") },
+  { "pycbc_get_projected",
+    (PyCFunction)pycbc_connection__get_projected__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_projected operation") },
+  { "pycbc_increment",
+    (PyCFunction)pycbc_connection__increment__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV increment operation") },
+  { "pycbc_increment_with_legacy_durability",
+    (PyCFunction)pycbc_connection__increment_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV increment_with_legacy_durability operation") },
+  { "pycbc_insert",
+    (PyCFunction)pycbc_connection__insert__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV insert operation") },
+  { "pycbc_insert_with_legacy_durability",
+    (PyCFunction)pycbc_connection__insert_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV insert_with_legacy_durability operation") },
+  { "pycbc_lookup_in",
+    (PyCFunction)pycbc_connection__lookup_in__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV lookup_in operation") },
+  { "pycbc_lookup_in_all_replicas",
+    (PyCFunction)pycbc_connection__lookup_in_all_replicas__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV lookup_in_all_replicas operation") },
+  { "pycbc_lookup_in_any_replica",
+    (PyCFunction)pycbc_connection__lookup_in_any_replica__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV lookup_in_any_replica operation") },
+  { "pycbc_mutate_in",
+    (PyCFunction)pycbc_connection__mutate_in__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV mutate_in operation") },
+  { "pycbc_mutate_in_with_legacy_durability",
+    (PyCFunction)pycbc_connection__mutate_in_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV mutate_in_with_legacy_durability operation") },
+  { "pycbc_prepend",
+    (PyCFunction)pycbc_connection__prepend__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV prepend operation") },
+  { "pycbc_prepend_with_legacy_durability",
+    (PyCFunction)pycbc_connection__prepend_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV prepend_with_legacy_durability operation") },
+  { "pycbc_remove",
+    (PyCFunction)pycbc_connection__remove__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV remove operation") },
+  { "pycbc_remove_with_legacy_durability",
+    (PyCFunction)pycbc_connection__remove_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV remove_with_legacy_durability operation") },
+  { "pycbc_replace",
+    (PyCFunction)pycbc_connection__replace__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV replace operation") },
+  { "pycbc_replace_with_legacy_durability",
+    (PyCFunction)pycbc_connection__replace_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV replace_with_legacy_durability operation") },
+  { "pycbc_touch",
+    (PyCFunction)pycbc_connection__touch__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV touch operation") },
+  { "pycbc_unlock",
+    (PyCFunction)pycbc_connection__unlock__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV unlock operation") },
+  { "pycbc_upsert",
+    (PyCFunction)pycbc_connection__upsert__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV upsert operation") },
+  { "pycbc_upsert_with_legacy_durability",
+    (PyCFunction)pycbc_connection__upsert_with_legacy_durability__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV upsert_with_legacy_durability operation") },
+
+  // Key-Value Multi Operations
+  { "pycbc_append_multi",
+    (PyCFunction)pycbc_connection__append_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV append-multi operation") },
+  { "pycbc_append_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__append_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV append_with_legacy_durability-multi operation") },
+  { "pycbc_decrement_multi",
+    (PyCFunction)pycbc_connection__decrement_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV decrement-multi operation") },
+  { "pycbc_decrement_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__decrement_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV decrement_with_legacy_durability-multi operation") },
+  { "pycbc_exists_multi",
+    (PyCFunction)pycbc_connection__exists_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV exists-multi operation") },
+  { "pycbc_get_multi",
+    (PyCFunction)pycbc_connection__get_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get-multi operation") },
+  { "pycbc_get_all_replicas_multi",
+    (PyCFunction)pycbc_connection__get_all_replicas_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_all_replicas-multi operation") },
+  { "pycbc_get_and_lock_multi",
+    (PyCFunction)pycbc_connection__get_and_lock_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_and_lock-multi operation") },
+  { "pycbc_get_and_touch_multi",
+    (PyCFunction)pycbc_connection__get_and_touch_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_and_touch-multi operation") },
+  { "pycbc_get_any_replica_multi",
+    (PyCFunction)pycbc_connection__get_any_replica_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV get_any_replica-multi operation") },
+  { "pycbc_increment_multi",
+    (PyCFunction)pycbc_connection__increment_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV increment-multi operation") },
+  { "pycbc_increment_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__increment_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV increment_with_legacy_durability-multi operation") },
+  { "pycbc_insert_multi",
+    (PyCFunction)pycbc_connection__insert_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV insert-multi operation") },
+  { "pycbc_insert_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__insert_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV insert_with_legacy_durability-multi operation") },
+  { "pycbc_prepend_multi",
+    (PyCFunction)pycbc_connection__prepend_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV prepend-multi operation") },
+  { "pycbc_prepend_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__prepend_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV prepend_with_legacy_durability-multi operation") },
+  { "pycbc_remove_multi",
+    (PyCFunction)pycbc_connection__remove_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV remove-multi operation") },
+  { "pycbc_remove_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__remove_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV remove_with_legacy_durability-multi operation") },
+  { "pycbc_replace_multi",
+    (PyCFunction)pycbc_connection__replace_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV replace-multi operation") },
+  { "pycbc_replace_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__replace_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV replace_with_legacy_durability-multi operation") },
+  { "pycbc_touch_multi",
+    (PyCFunction)pycbc_connection__touch_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV touch-multi operation") },
+  { "pycbc_unlock_multi",
+    (PyCFunction)pycbc_connection__unlock_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV unlock-multi operation") },
+  { "pycbc_upsert_multi",
+    (PyCFunction)pycbc_connection__upsert_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV upsert-multi operation") },
+  { "pycbc_upsert_with_legacy_durability_multi",
+    (PyCFunction)pycbc_connection__upsert_with_legacy_durability_multi__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("KV upsert_with_legacy_durability-multi operation") },
+
+  // Streaming Operations
+  { "pycbc_analytics_query",
+    (PyCFunction)pycbc_connection__analytics_query__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("HTTP analytics operation") },
+  { "pycbc_view_query",
+    (PyCFunction)pycbc_connection__view_query__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("HTTP document_view operation") },
+  { "pycbc_query",
+    (PyCFunction)pycbc_connection__query__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("HTTP query operation") },
+  { "pycbc_search_query",
+    (PyCFunction)pycbc_connection__search_query__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("HTTP search operation") },
+
+  // Analytics Management Operations
+  { "pycbc_analytics_dataset_create",
+    (PyCFunction)pycbc_connection__analytics_dataset_create__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_dataset_create operation") },
+  { "pycbc_analytics_dataset_drop",
+    (PyCFunction)pycbc_connection__analytics_dataset_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_dataset_drop operation") },
+  { "pycbc_analytics_dataset_get_all",
+    (PyCFunction)pycbc_connection__analytics_dataset_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_dataset_get_all operation") },
+  { "pycbc_analytics_dataverse_create",
+    (PyCFunction)pycbc_connection__analytics_dataverse_create__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_dataverse_create operation") },
+  { "pycbc_analytics_dataverse_drop",
+    (PyCFunction)pycbc_connection__analytics_dataverse_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_dataverse_drop operation") },
+  { "pycbc_analytics_get_pending_mutations",
+    (PyCFunction)pycbc_connection__analytics_get_pending_mutations__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_get_pending_mutations operation") },
+  { "pycbc_analytics_index_create",
+    (PyCFunction)pycbc_connection__analytics_index_create__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_index_create operation") },
+  { "pycbc_analytics_index_drop",
+    (PyCFunction)pycbc_connection__analytics_index_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_index_drop operation") },
+  { "pycbc_analytics_index_get_all",
+    (PyCFunction)pycbc_connection__analytics_index_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_index_get_all operation") },
+  { "pycbc_analytics_link_connect",
+    (PyCFunction)pycbc_connection__analytics_link_connect__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_connect operation") },
+  { "pycbc_analytics_link_create_azure_blob_external_link",
+    (PyCFunction)pycbc_connection__analytics_link_create_azure_blob_external_link__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_create_azure_blob_external_link operation") },
+  { "pycbc_analytics_link_create_couchbase_remote_link",
+    (PyCFunction)pycbc_connection__analytics_link_create_couchbase_remote_link__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_create_couchbase_remote_link operation") },
+  { "pycbc_analytics_link_create_s3_external_link",
+    (PyCFunction)pycbc_connection__analytics_link_create_s3_external_link__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_create_s3_external_link operation") },
+  { "pycbc_analytics_link_disconnect",
+    (PyCFunction)pycbc_connection__analytics_link_disconnect__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_disconnect operation") },
+  { "pycbc_analytics_link_drop",
+    (PyCFunction)pycbc_connection__analytics_link_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_drop operation") },
+  { "pycbc_analytics_link_get_all",
+    (PyCFunction)pycbc_connection__analytics_link_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_get_all operation") },
+  { "pycbc_analytics_link_replace_azure_blob_external_link",
+    (PyCFunction)pycbc_connection__analytics_link_replace_azure_blob_external_link__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_replace_azure_blob_external_link operation") },
+  { "pycbc_analytics_link_replace_couchbase_remote_link",
+    (PyCFunction)pycbc_connection__analytics_link_replace_couchbase_remote_link__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_replace_couchbase_remote_link operation") },
+  { "pycbc_analytics_link_replace_s3_external_link",
+    (PyCFunction)pycbc_connection__analytics_link_replace_s3_external_link__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT analytics_link_replace_s3_external_link operation") },
+
+  // Bucket Management Operations
+  { "pycbc_bucket_create",
+    (PyCFunction)pycbc_connection__bucket_create__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT bucket_create operation") },
+  { "pycbc_bucket_describe",
+    (PyCFunction)pycbc_connection__bucket_describe__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT bucket_describe operation") },
+  { "pycbc_bucket_drop",
+    (PyCFunction)pycbc_connection__bucket_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT bucket_drop operation") },
+  { "pycbc_bucket_flush",
+    (PyCFunction)pycbc_connection__bucket_flush__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT bucket_flush operation") },
+  { "pycbc_bucket_get",
+    (PyCFunction)pycbc_connection__bucket_get__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT bucket_get operation") },
+  { "pycbc_bucket_get_all",
+    (PyCFunction)pycbc_connection__bucket_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT bucket_get_all operation") },
+  { "pycbc_bucket_update",
+    (PyCFunction)pycbc_connection__bucket_update__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT bucket_update operation") },
+
+  // Cluster Management Operations
+  { "pycbc_cluster_describe",
+    (PyCFunction)pycbc_connection__cluster_describe__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT cluster_describe operation") },
+  { "pycbc_cluster_developer_preview_enable",
+    (PyCFunction)pycbc_connection__cluster_developer_preview_enable__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT cluster_developer_preview_enable operation") },
+
+  // Collection Management Operations
+  { "pycbc_collection_create",
+    (PyCFunction)pycbc_connection__collection_create__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT collection_create operation") },
+  { "pycbc_collection_drop",
+    (PyCFunction)pycbc_connection__collection_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT collection_drop operation") },
+  { "pycbc_collection_update",
+    (PyCFunction)pycbc_connection__collection_update__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT collection_update operation") },
+  { "pycbc_collections_manifest_get",
+    (PyCFunction)pycbc_connection__collections_manifest_get__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT collections_manifest_get operation") },
+  { "pycbc_scope_create",
+    (PyCFunction)pycbc_connection__scope_create__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT scope_create operation") },
+  { "pycbc_scope_drop",
+    (PyCFunction)pycbc_connection__scope_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT scope_drop operation") },
+  { "pycbc_scope_get_all",
+    (PyCFunction)pycbc_connection__scope_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT scope_get_all operation") },
+
+  // EventingFunction Management Operations
+  { "pycbc_eventing_deploy_function",
+    (PyCFunction)pycbc_connection__eventing_deploy_function__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_deploy_function operation") },
+  { "pycbc_eventing_drop_function",
+    (PyCFunction)pycbc_connection__eventing_drop_function__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_drop_function operation") },
+  { "pycbc_eventing_get_all_functions",
+    (PyCFunction)pycbc_connection__eventing_get_all_functions__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_get_all_functions operation") },
+  { "pycbc_eventing_get_function",
+    (PyCFunction)pycbc_connection__eventing_get_function__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_get_function operation") },
+  { "pycbc_eventing_get_status",
+    (PyCFunction)pycbc_connection__eventing_get_status__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_get_status operation") },
+  { "pycbc_eventing_pause_function",
+    (PyCFunction)pycbc_connection__eventing_pause_function__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_pause_function operation") },
+  { "pycbc_eventing_resume_function",
+    (PyCFunction)pycbc_connection__eventing_resume_function__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_resume_function operation") },
+  { "pycbc_eventing_undeploy_function",
+    (PyCFunction)pycbc_connection__eventing_undeploy_function__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_undeploy_function operation") },
+  { "pycbc_eventing_upsert_function",
+    (PyCFunction)pycbc_connection__eventing_upsert_function__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT eventing_upsert_function operation") },
+
+  // QueryIndex Management Operations
+  { "pycbc_query_index_build",
+    (PyCFunction)pycbc_connection__query_index_build__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT query_index_build operation") },
+  { "pycbc_query_index_build_deferred",
+    (PyCFunction)pycbc_connection__query_index_build_deferred__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT query_index_build_deferred operation") },
+  { "pycbc_query_index_create",
+    (PyCFunction)pycbc_connection__query_index_create__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT query_index_create operation") },
+  { "pycbc_query_index_drop",
+    (PyCFunction)pycbc_connection__query_index_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT query_index_drop operation") },
+  { "pycbc_query_index_get_all",
+    (PyCFunction)pycbc_connection__query_index_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT query_index_get_all operation") },
+  { "pycbc_query_index_get_all_deferred",
+    (PyCFunction)pycbc_connection__query_index_get_all_deferred__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT query_index_get_all_deferred operation") },
+
+  // SearchIndex Management Operations
+  { "pycbc_search_get_stats",
+    (PyCFunction)pycbc_connection__search_get_stats__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_get_stats operation") },
+  { "pycbc_search_index_analyze_document",
+    (PyCFunction)pycbc_connection__search_index_analyze_document__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_analyze_document operation") },
+  { "pycbc_search_index_control_ingest",
+    (PyCFunction)pycbc_connection__search_index_control_ingest__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_control_ingest operation") },
+  { "pycbc_search_index_control_plan_freeze",
+    (PyCFunction)pycbc_connection__search_index_control_plan_freeze__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_control_plan_freeze operation") },
+  { "pycbc_search_index_control_query",
+    (PyCFunction)pycbc_connection__search_index_control_query__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_control_query operation") },
+  { "pycbc_search_index_drop",
+    (PyCFunction)pycbc_connection__search_index_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_drop operation") },
+  { "pycbc_search_index_get",
+    (PyCFunction)pycbc_connection__search_index_get__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_get operation") },
+  { "pycbc_search_index_get_all",
+    (PyCFunction)pycbc_connection__search_index_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_get_all operation") },
+  { "pycbc_search_index_get_documents_count",
+    (PyCFunction)pycbc_connection__search_index_get_documents_count__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_get_documents_count operation") },
+  { "pycbc_search_index_get_stats",
+    (PyCFunction)pycbc_connection__search_index_get_stats__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_get_stats operation") },
+  { "pycbc_search_index_upsert",
+    (PyCFunction)pycbc_connection__search_index_upsert__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT search_index_upsert operation") },
+
+  // User Management Operations
+  { "pycbc_change_password",
+    (PyCFunction)pycbc_connection__change_password__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT change_password operation") },
+  { "pycbc_group_drop",
+    (PyCFunction)pycbc_connection__group_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT group_drop operation") },
+  { "pycbc_group_get",
+    (PyCFunction)pycbc_connection__group_get__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT group_get operation") },
+  { "pycbc_group_get_all",
+    (PyCFunction)pycbc_connection__group_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT group_get_all operation") },
+  { "pycbc_group_upsert",
+    (PyCFunction)pycbc_connection__group_upsert__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT group_upsert operation") },
+  { "pycbc_role_get_all",
+    (PyCFunction)pycbc_connection__role_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT role_get_all operation") },
+  { "pycbc_user_drop",
+    (PyCFunction)pycbc_connection__user_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT user_drop operation") },
+  { "pycbc_user_get",
+    (PyCFunction)pycbc_connection__user_get__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT user_get operation") },
+  { "pycbc_user_get_all",
+    (PyCFunction)pycbc_connection__user_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT user_get_all operation") },
+  { "pycbc_user_upsert",
+    (PyCFunction)pycbc_connection__user_upsert__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT user_upsert operation") },
+
+  // ViewIndex Management Operations
+  { "pycbc_view_index_drop",
+    (PyCFunction)pycbc_connection__view_index_drop__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT view_index_drop operation") },
+  { "pycbc_view_index_get",
+    (PyCFunction)pycbc_connection__view_index_get__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT view_index_get operation") },
+  { "pycbc_view_index_get_all",
+    (PyCFunction)pycbc_connection__view_index_get_all__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT view_index_get_all operation") },
+  { "pycbc_view_index_upsert",
+    (PyCFunction)pycbc_connection__view_index_upsert__,
+    METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("MGMT view_index_upsert operation") },
+
+  { nullptr, nullptr, 0, nullptr }
+};
+
+// ====================================================================================================
+// AUTOGENERATED SECTION END - DO NOT EDIT MANUALLY
+// Generated-On: 2026-02-25 14:23:36
+// Content-Hash: 09a18153af55aee7954d59706b85562d
+// ====================================================================================================
+
+static PyObject*
+pycbc_connection__connected__get__(pycbc_connection* self, void* closure)
+{
+  if (self->conn && self->conn->is_connected()) {
+    Py_RETURN_TRUE;
+  }
+  Py_RETURN_FALSE;
+}
+
+// Property definitions
+static PyGetSetDef pycbc_connection_getsetters[] = {
+  { "connected",
+    (getter)pycbc_connection__connected__get__,
+    nullptr,
+    PyDoc_STR("Connection state (read-only)"),
+    nullptr },
+  { nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
+PyTypeObject pycbc_connection_type = {
+  PyVarObject_HEAD_INIT(nullptr, 0) "pycbc_core.pycbc_connection", // tp_name
+  sizeof(pycbc_connection),                                        // tp_basicsize
+  0,                                                               // tp_itemsize
+  (destructor)pycbc_connection__dealloc__,                         // tp_dealloc
+  0,                                                               // tp_vectorcall_offset/tp_print
+  nullptr,                                                         // tp_getattr
+  nullptr,                                                         // tp_setattr
+  nullptr,                                                         // tp_reserved/tp_as_async
+  nullptr,                                                         // tp_repr
+  nullptr,                                                         // tp_as_number
+  nullptr,                                                         // tp_as_sequence
+  nullptr,                                                         // tp_as_mapping
+  nullptr,                                                         // tp_hash
+  nullptr,                                                         // tp_call
+  nullptr,                                                         // tp_str
+  nullptr,                                                         // tp_getattro
+  nullptr,                                                         // tp_setattro
+  nullptr,                                                         // tp_as_buffer
+  Py_TPFLAGS_DEFAULT,                                              // tp_flags
+  PyDoc_STR("pycbc connection object"),                            // tp_doc
+  nullptr,                                                         // tp_traverse
+  nullptr,                                                         // tp_clear
+  nullptr,                                                         // tp_richcompare
+  0,                                                               // tp_weaklistoffset
+  nullptr,                                                         // tp_iter
+  nullptr,                                                         // tp_iternext
+  pycbc_connection_methods,                                        // tp_methods
+  nullptr,                                                         // tp_members
+  pycbc_connection_getsetters,                                     // tp_getset
+  nullptr,                                                         // tp_base
+  nullptr,                                                         // tp_dict
+  nullptr,                                                         // tp_descr_get
+  nullptr,                                                         // tp_descr_set
+  0,                                                               // tp_dictoffset
+  (initproc)pycbc_connection__init__,                              // tp_init
+  nullptr,                                                         // tp_alloc
+  pycbc_connection__new__,                                         // tp_new
+};
+
+static void
+pycbc_connection__dealloc__(pycbc_connection* self)
+{
+  self->conn.reset();
+  Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+static PyObject*
+pycbc_connection__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
+{
+  auto* self = reinterpret_cast<pycbc_connection*>(type->tp_alloc(type, 0));
+  if (self != nullptr) {
+    new (&self->conn) std::unique_ptr<Connection>();
+  }
+  return reinterpret_cast<PyObject*>(self);
+}
+
+static int
+pycbc_connection__init__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+  int num_io_threads = 1;
+
+  static const char* kw_list[] = { "num_io_threads", nullptr };
+  if (!PyArg_ParseTupleAndKeywords(
+        args, kwargs, "|i", const_cast<char**>(kw_list), &num_io_threads)) {
+    return -1;
+  }
+
+  try {
+    self->conn = std::make_unique<Connection>(num_io_threads);
+    return 0;
+  } catch (const std::exception& e) {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return -1;
+  }
+}
+
+int
+add_connection_type(PyObject* module)
+{
+  if (PyType_Ready(&pycbc_connection_type) < 0) {
+    return -1;
+  }
+
+  Py_INCREF(&pycbc_connection_type);
+  if (PyModule_AddObject(module, "pycbc_connection", (PyObject*)&pycbc_connection_type) < 0) {
+    Py_DECREF(&pycbc_connection_type);
+    return -1;
+  }
+
+  return 0;
+}
+
+} // namespace pycbc

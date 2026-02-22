@@ -36,7 +36,7 @@ from txcouchbase.logic.collection_impl import TxCollectionImpl
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase.logic.top_level_types import JSONType
+    from couchbase._utils import JSONType
     from couchbase.options import (ExistsOptions,
                                    GetAllReplicasOptions,
                                    GetAndLockOptions,

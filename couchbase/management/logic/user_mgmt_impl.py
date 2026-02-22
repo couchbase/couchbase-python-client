@@ -100,7 +100,7 @@ class UserMgmtImpl:
     def get_user(self, req: GetUserRequest) -> UserAndMetadata:
         """**INTERNAL**"""
         ret = self._client_adapter.execute_mgmt_request(req)
-        raw_user = ret.raw_result['user_and_metadata']
+        raw_user = ret.raw_result['user']
         return UserAndMetadata.create_user_and_metadata(raw_user)
 
     def upsert_group(self, req: UpsertGroupRequest) -> None:

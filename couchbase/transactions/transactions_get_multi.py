@@ -31,7 +31,7 @@ from couchbase.transcoder import Transcoder
 if TYPE_CHECKING:
     from acouchbase.collection import Collection as AsyncCollection
     from couchbase.collection import Collection
-    from couchbase.pycbc_core import transaction_get_multi_result
+    from couchbase.logic.pycbc_core import transaction_get_multi_result
 
 
 class TransactionGetMultiMode(Enum):

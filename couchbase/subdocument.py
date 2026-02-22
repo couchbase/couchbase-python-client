@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -139,6 +139,45 @@ class StoreSemantics(IntEnum):
     REPLACE = 0
     UPSERT = 1
     INSERT = 2
+
+
+class PathFlags(IntFlag):
+    NONE = 0
+    CREATE_PARENTS = 0b0000_0001
+    XATTR = 0b0000_0100
+    EXPAND_MACROS = 0b0001_0000
+    BINARY_VALUE = 0b0010_0000
+
+
+def build_mutate_in_path_flags(
+    xattr: bool,
+    create_path: bool,
+    expand_macro: bool,
+    binary: bool
+) -> PathFlags:
+    flags = PathFlags.NONE
+
+    if xattr:
+        flags |= PathFlags.XATTR
+        if binary:
+            flags |= PathFlags.BINARY_VALUE
+
+    if create_path:
+        flags |= PathFlags.CREATE_PARENTS
+
+    if expand_macro:
+        flags |= PathFlags.EXPAND_MACROS
+
+    return flags
+
+
+def build_lookup_in_path_flags(xattr: bool, binary: bool) -> PathFlags:
+    flags = PathFlags.NONE
+    if xattr:
+        flags |= PathFlags.XATTR
+        if binary:
+            flags |= PathFlags.BINARY_VALUE
+    return flags
 
 
 class LookupInMacro():

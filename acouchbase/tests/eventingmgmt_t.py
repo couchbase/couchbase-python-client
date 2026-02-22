@@ -167,6 +167,7 @@ class EventingManagementTests:
             await cb_env.efm.drop_function(self.BASIC_FUNC.name)
         except EventingFunctionNotFoundException:
             pass
+
         else:
             await cb_env.try_n_times_till_exception(10,
                                                     1,
@@ -492,14 +493,7 @@ class EventingManagementTests:
         )
 
         with pytest.raises(EventingFunctionNotFoundException):
-            await cb_env.efm.pause_function("not-a-function")
-
-        if cb_env.server_version_short >= 8.0:
-            with pytest.raises(InternalServerFailureException):
-                await cb_env.efm.pause_function(self.BASIC_FUNC.name)
-        else:
-            with pytest.raises(EventingFunctionNotBootstrappedException):
-                await cb_env.efm.pause_function(self.BASIC_FUNC.name)
+            await cb_env.efm.resume_function("not-a-function")
 
     @pytest.mark.usefixtures('drop_eventing_functions')
     @pytest.mark.asyncio
@@ -1153,14 +1147,7 @@ class ScopeEventingManagementTests:
         )
 
         with pytest.raises(EventingFunctionNotFoundException):
-            await cb_env.efm.pause_function("not-a-function")
-
-        if cb_env.server_version_short >= 8.0:
-            with pytest.raises(InternalServerFailureException):
-                await cb_env.efm.pause_function(self.BASIC_FUNC.name)
-        else:
-            with pytest.raises(EventingFunctionNotBootstrappedException):
-                await cb_env.efm.pause_function(self.BASIC_FUNC.name)
+            await cb_env.efm.resume_function("not-a-function")
 
     @pytest.mark.usefixtures('drop_eventing_functions')
     @pytest.mark.asyncio

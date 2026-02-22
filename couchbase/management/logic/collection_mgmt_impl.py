@@ -62,13 +62,13 @@ class CollectionMgmtImpl:
         """**INTERNAL**"""
         res = self._client_adapter.execute_mgmt_request(req)
         scopes = []
-        raw_scopes = res.raw_result['scopes']
+        raw_scopes = res.raw_result['manifest']['scopes']
         for s in raw_scopes:
             scope = ScopeSpec(s['name'], list())
             for c in s['collections']:
                 scope.collections.append(
                     CollectionSpec(c['name'],
-                                   c['scope_name'],
+                                   s['name'],
                                    timedelta(seconds=c['max_expiry']),
                                    history=c.get('history')))
             scopes.append(scope)

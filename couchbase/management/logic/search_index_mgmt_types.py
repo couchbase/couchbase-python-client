@@ -89,16 +89,19 @@ class SearchIndex:
     @classmethod
     def from_server(cls, json_data: Dict[str, Any]) -> SearchIndex:
         params = {}
-        if 'params_json' in json_data:
-            params = json.loads(json_data.get('params_json'))
+        params_json = json_data.get('params_json', None)
+        if params_json:
+            params = json.loads(params_json)
 
         source_params = {}
-        if 'source_params_json' in json_data:
-            source_params = json.loads(json_data.get('source_params_json'))
+        source_params_json = json_data.get('source_params_json', None)
+        if source_params_json:
+            source_params = json.loads(source_params_json)
 
         plan_params = {}
-        if 'plan_params_json' in json_data:
-            plan_params = json.loads(json_data.get('plan_params_json'))
+        plan_params_json = json_data.get('plan_params_json', None)
+        if plan_params_json:
+            plan_params = json.loads(plan_params_json)
 
         return cls(json_data.get('name'),
                    json_data.get('source_type'),
@@ -169,40 +172,25 @@ class SearchIndex:
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class SearchIndexMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
-
         if callback is not None:
             mgmt_kwargs['callback'] = callback
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
-
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
 
         return mgmt_kwargs
 
@@ -218,7 +206,7 @@ class AllowQueryingRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.AllowQuerying.value
+        return SearchIndexMgmtOperationType.SearchIndexControlQuery.value
 
 
 @dataclass
@@ -232,7 +220,7 @@ class AnalyzeDocumentRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.AnalyzeDocument.value
+        return SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument.value
 
 
 @dataclass
@@ -246,7 +234,7 @@ class DisallowQueryingRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.DisallowQuerying.value
+        return SearchIndexMgmtOperationType.SearchIndexControlQuery.value
 
 
 @dataclass
@@ -259,7 +247,7 @@ class DropIndexRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.DropIndex.value
+        return SearchIndexMgmtOperationType.SearchIndexDrop.value
 
 
 @dataclass
@@ -273,7 +261,7 @@ class FreezePlanRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.FreezePlan.value
+        return SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze.value
 
 
 @dataclass
@@ -285,7 +273,7 @@ class GetAllIndexesRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.GetAllIndexes.value
+        return SearchIndexMgmtOperationType.SearchIndexGetAll.value
 
 
 @dataclass
@@ -295,7 +283,7 @@ class GetAllIndexStatsRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.GetAllIndexStats.value
+        return SearchIndexMgmtOperationType.SearchGetStats.value
 
 
 @dataclass
@@ -308,7 +296,7 @@ class GetIndexedDocumentsCountRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.GetIndexedDocumentsCount.value
+        return SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount.value
 
 
 @dataclass
@@ -321,7 +309,7 @@ class GetIndexRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.GetIndex.value
+        return SearchIndexMgmtOperationType.SearchIndexGet.value
 
 
 @dataclass
@@ -334,7 +322,7 @@ class GetIndexStatsRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.GetAllIndexStats.value
+        return SearchIndexMgmtOperationType.SearchIndexGetStats.value
 
 
 @dataclass
@@ -348,7 +336,7 @@ class PauseIngestRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.PauseIngest.value
+        return SearchIndexMgmtOperationType.SearchIndexControlIngest.value
 
 
 @dataclass
@@ -362,7 +350,7 @@ class ResumeIngestRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.ResumeIngest.value
+        return SearchIndexMgmtOperationType.SearchIndexControlIngest.value
 
 
 @dataclass
@@ -376,7 +364,7 @@ class UnfreezePlanRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.UnfreezePlan.value
+        return SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze.value
 
 
 @dataclass
@@ -389,7 +377,7 @@ class UpsertIndexRequest(SearchIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return SearchIndexMgmtOperationType.UpsertIndex.value
+        return SearchIndexMgmtOperationType.SearchIndexUpsert.value
 
 
 SEARCH_INDEX_MGMT_ERROR_MAP: Dict[str, Exception] = {

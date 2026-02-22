@@ -20,7 +20,7 @@ from couchbase.result import ContentProxy
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
-    from couchbase.pycbc_core import transaction_get_result
+    from couchbase.logic.pycbc_core import transaction_get_result
 
 log = logging.getLogger(__name__)
 

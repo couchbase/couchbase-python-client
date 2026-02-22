@@ -44,7 +44,7 @@ class BucketMgmtImpl:
     def bucket_describe(self, req: BucketDescribeRequest) -> BucketDescribeResult:
         """**INTERNAL**"""
         res = self._client_adapter.execute_mgmt_request(req)
-        bucket_info = res.raw_result['bucket_info']
+        bucket_info = res.raw_result['info']
         return BucketDescribeResult(**bucket_info)
 
     def create_bucket(self, req: CreateBucketRequest) -> None:
@@ -73,7 +73,7 @@ class BucketMgmtImpl:
     def get_bucket(self, req: GetBucketRequest) -> BucketSettings:
         """**INTERNAL**"""
         res = self._client_adapter.execute_mgmt_request(req)
-        raw_settings = res.raw_result['bucket_settings']
+        raw_settings = res.raw_result['bucket']
         return BucketSettings.bucket_settings_from_server(raw_settings)
 
     def update_bucket(self, req: UpdateBucketRequest) -> None:

@@ -165,39 +165,27 @@ class ScopeSpec:
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class CollectionMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
+
         if callback is not None:
             mgmt_kwargs['callback'] = callback
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
-
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
 
         return mgmt_kwargs
 
@@ -213,7 +201,7 @@ class CreateCollectionRequest(CollectionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return CollectionMgmtOperationType.CreateCollection.value
+        return CollectionMgmtOperationType.CollectionCreate.value
 
 
 @dataclass
@@ -224,7 +212,7 @@ class CreateScopeRequest(CollectionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return CollectionMgmtOperationType.CreateScope.value
+        return CollectionMgmtOperationType.ScopeCreate.value
 
 
 @dataclass
@@ -236,7 +224,7 @@ class DropCollectionRequest(CollectionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return CollectionMgmtOperationType.DropCollection.value
+        return CollectionMgmtOperationType.CollectionDrop.value
 
 
 @dataclass
@@ -247,7 +235,7 @@ class DropScopeRequest(CollectionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return CollectionMgmtOperationType.DropScope.value
+        return CollectionMgmtOperationType.ScopeDrop.value
 
 
 @dataclass
@@ -257,7 +245,7 @@ class GetAllScopesRequest(CollectionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return CollectionMgmtOperationType.GetAllScopes.value
+        return CollectionMgmtOperationType.ScopeGetAll.value
 
 
 @dataclass
@@ -271,7 +259,7 @@ class UpdateCollectionRequest(CollectionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return CollectionMgmtOperationType.UpdateCollection.value
+        return CollectionMgmtOperationType.CollectionUpdate.value
 
 
 COLLECTION_MGMT_ERROR_MAP: Dict[str, Exception] = {

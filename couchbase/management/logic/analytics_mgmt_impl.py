@@ -100,7 +100,7 @@ class AnalyticsMgmtImpl:
         """**INTERNAL**"""
         ret = self._client_adapter.execute_mgmt_request(req)
         raw_datasets = ret.raw_result['datasets']
-        return [AnalyticsDataset(**ds) for ds in raw_datasets]
+        return [AnalyticsDataset.from_server(ds) for ds in raw_datasets]
 
     def get_all_indexes(self, req: GetAllIndexesRequest) -> Iterable[AnalyticsIndex]:
         """**INTERNAL**"""
@@ -112,13 +112,13 @@ class AnalyticsMgmtImpl:
         """**INTERNAL**"""
         analytics_links = []
         ret = self._client_adapter.execute_mgmt_request(req)
-        cb_links = ret.raw_result.get('couchbase_links', None)
+        cb_links = ret.raw_result.get('couchbase', None)
         if cb_links and len(cb_links) > 0:
             analytics_links.extend(map(lambda l: CouchbaseRemoteAnalyticsLink.link_from_server_json(l), cb_links))
-        s3_links = ret.raw_result.get('s3_links', None)
+        s3_links = ret.raw_result.get('s3', None)
         if s3_links and len(s3_links) > 0:
             analytics_links.extend(map(lambda l: S3ExternalAnalyticsLink.link_from_server_json(l), s3_links))
-        azure_blob_links = ret.raw_result.get('azure_blob_links', None)
+        azure_blob_links = ret.raw_result.get('azure_blob', None)
         if azure_blob_links and len(azure_blob_links) > 0:
             analytics_links.extend(
                 map(lambda l: AzureBlobExternalAnalyticsLink.link_from_server_json(l), azure_blob_links))

@@ -31,7 +31,6 @@ from couchbase.management.logic.query_index_mgmt_req_types import (BuildDeferred
                                                                    GetAllIndexesRequest,
                                                                    QueryIndex,
                                                                    WatchIndexesRequest)
-from couchbase.pycbc_core import mgmt_operations, query_index_mgmt_operations
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
@@ -71,12 +70,8 @@ class AsyncQueryIndexMgmtImpl:
     async def get_all_indexes(self, req: GetAllIndexesRequest) -> List[QueryIndex]:
         """**INTERNAL**"""
         res = await self._client_adapter.execute_mgmt_request(req)
-        indexes = []
-        raw_indexes = res.raw_result.get('indexes', None)
-        if raw_indexes:
-            indexes = [QueryIndex.from_server(idx) for idx in raw_indexes]
-
-        return indexes
+        raw_indexes = res.raw_result['indexes']
+        return [QueryIndex.from_server(idx) for idx in raw_indexes]
 
     async def build_deferred_indexes(self, req: BuildDeferredIndexesRequest) -> None:
         """**INTERNAL**"""
@@ -85,16 +80,14 @@ class AsyncQueryIndexMgmtImpl:
     async def watch_indexes(self, req: WatchIndexesRequest) -> None:
         """**INTERNAL**"""
         current_time = time.monotonic()
-        # timeout is converted to microsecs via options processing
-        timeout = req.timeout / 1000 / 1000
+        # timeout is converted to millisecs via options processing
+        timeout = req.timeout / 1000
         deadline = current_time + timeout
         delay = 0.1  # seconds
         # needs to be int b/c req.timeout expects int (this is what the bindings want)
-        delay_us = int(delay * 1e6)
+        delay_ms = int(delay * 1e3)
 
         get_all_indexes_req = GetAllIndexesRequest(self._request_builder._error_map,
-                                                   mgmt_operations.QUERY_INDEX.value,
-                                                   query_index_mgmt_operations.GET_ALL_INDEXES.value,
                                                    bucket_name=req.bucket_name,
                                                    scope_name=req.scope_name,
                                                    collection_name=req.collection_name,
@@ -114,7 +107,7 @@ class AsyncQueryIndexMgmtImpl:
             if deadline < (current_time + delay):
                 raise WatchQueryIndexTimeoutException('Failed to find all indexes online within the alloted time.')
             await asyncio.sleep(delay)
-            get_all_indexes_req.timeout -= delay_us
+            get_all_indexes_req.timeout -= delay_ms
 
     def _check_indexes(self, index_names: Iterable[str], indexes: Iterable[QueryIndex]):
         for idx_name in index_names:

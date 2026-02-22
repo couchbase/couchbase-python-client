@@ -19,7 +19,6 @@ from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.bucket_types import PingRequest, ViewQueryRequest
 from couchbase.options import forward_args
-from couchbase.pycbc_core import operations
 from couchbase.views import ViewQuery
 
 
@@ -41,9 +40,9 @@ class BucketRequestBuilder:
         if not isinstance(service_types, list):
             raise InvalidArgumentException('Service types must be a list/set.')
 
-        service_types = list(map(lambda st: st.value if isinstance(st, ServiceType) else st, service_types))
+        services = set(map(lambda st: st.value if isinstance(st, ServiceType) else st, service_types))
 
-        req = PingRequest(operations.PING.value, service_types, **final_args)
+        req = PingRequest(services, bucket_name=self._bucket_name, **final_args)
         if timeout:
             req.timeout = timeout
 

@@ -15,10 +15,20 @@
 
 import pytest
 
-from couchbase.options import (DecrementMultiOptions,
+from couchbase.durability import (ClientDurability,
+                                  DurabilityLevel,
+                                  PersistTo,
+                                  ReplicateTo,
+                                  ServerDurability)
+from couchbase.exceptions import InvalidArgumentException
+from couchbase.options import (AppendMultiOptions,
+                               AppendOptions,
+                               DecrementMultiOptions,
                                DecrementOptions,
                                IncrementMultiOptions,
                                IncrementOptions,
+                               PrependMultiOptions,
+                               PrependOptions,
                                SignedInt64)
 from couchbase.result import (CounterResult,
                               MultiCounterResult,
@@ -160,6 +170,56 @@ class BinaryCollectionMultiTestSuite:
         assert isinstance(res.results, dict)
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
+
+    @pytest.mark.parametrize(
+        'op_info',
+        [
+            ('append_multi', True, AppendMultiOptions, AppendOptions),
+            ('prepend_multi', True, PrependMultiOptions, PrependOptions),
+            ('increment_multi', False, IncrementMultiOptions, IncrementOptions),
+            ('decrement_multi', False, DecrementMultiOptions, DecrementOptions),
+        ]
+    )
+    def test_multi_mixed_durability_binary_fail(self, cb_env, op_info):
+        op_name, has_docs, multi_opts_type, key_opts_type = op_info
+
+        if op_name in ('append_multi', 'prepend_multi'):
+            keys = cb_env.get_multiple_existing_docs_by_type('bytes_empty', 4)
+            values = [b'foo', b'bar', b'baz', b'qux']
+            keys_and_docs = dict(zip(keys, values))
+        else:
+            keys = cb_env.get_multiple_existing_docs_by_type('counter_empty', 4)
+
+        key1 = keys[0]
+
+        bin_collection = cb_env.collection.binary()
+        collection_op = getattr(bin_collection, op_name)
+
+        # Scenario 1: global client durability, per-key server durability
+        opts = multi_opts_type(
+            durability=ServerDurability(level=DurabilityLevel.MAJORITY),
+            per_key_options={key1: key_opts_type(durability=ClientDurability(replicate_to=ReplicateTo.ONE))}
+        )
+
+        err_msg = 'Durability must be either client or server for all operations.'
+        with pytest.raises(InvalidArgumentException, match=err_msg):
+            if has_docs:
+                collection_op(keys_and_docs, opts)
+            else:
+                collection_op(keys, opts)
+
+        # Scenario 2: global server durability, per-key client durability
+        opts = multi_opts_type(
+            durability=ClientDurability(persist_to=PersistTo.ONE),
+            per_key_options={key1: key_opts_type(durability=ServerDurability(
+                level=DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE))}
+        )
+
+        with pytest.raises(InvalidArgumentException, match=err_msg):
+            if has_docs:
+                collection_op(keys_and_docs, opts)
+            else:
+                collection_op(keys, opts)
 
 
 class ClassicBinaryCollectionMultiTests(BinaryCollectionMultiTestSuite):

@@ -15,11 +15,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from couchbase.logic.bucket_req_builder import BucketRequestBuilder
 from couchbase.logic.cluster_settings import ClusterSettings, StreamingTimeouts
-from couchbase.logic.top_level_types import PyCapsuleType
+from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.result import PingResult, ViewResult
 from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
@@ -49,7 +49,7 @@ class BucketImpl:
         return self._client_adapter.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         """**INTERNAL**"""
         return self._client_adapter.connection
 

@@ -30,7 +30,6 @@ from couchbase.management.logic.query_index_mgmt_req_types import (BuildDeferred
                                                                    GetAllIndexesRequest,
                                                                    QueryIndex,
                                                                    WatchIndexesRequest)
-from couchbase.pycbc_core import mgmt_operations, query_index_mgmt_operations
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
@@ -75,16 +74,14 @@ class QueryIndexMgmtImpl:
     def watch_indexes(self, req: WatchIndexesRequest) -> None:
         """**INTERNAL**"""
         current_time = time.monotonic()
-        # timeout is converted to microsecs via options processing
-        timeout = req.timeout / 1000 / 1000
+        # timeout is converted to millisecs via options processing
+        timeout = req.timeout / 1000
         deadline = current_time + timeout
         delay = 0.1  # seconds
         # needs to be int b/c req.timeout expects int (this is what the bindings want)
-        delay_us = int(delay * 1e6)
+        delay_ms = int(delay * 1e3)
 
         get_all_indexes_req = GetAllIndexesRequest(self._request_builder._error_map,
-                                                   mgmt_operations.QUERY_INDEX.value,
-                                                   query_index_mgmt_operations.GET_ALL_INDEXES.value,
                                                    bucket_name=req.bucket_name,
                                                    scope_name=req.scope_name,
                                                    collection_name=req.collection_name,
@@ -104,7 +101,7 @@ class QueryIndexMgmtImpl:
             if deadline < (current_time + delay):
                 raise WatchQueryIndexTimeoutException('Failed to find all indexes online within the alloted time.')
             time.sleep(delay)
-            get_all_indexes_req.timeout -= delay_us
+            get_all_indexes_req.timeout -= delay_ms
 
     def _check_indexes(self, index_names: Iterable[str], indexes: Iterable[QueryIndex]):
         """**INTERNAL**"""

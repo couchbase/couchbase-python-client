@@ -18,6 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from couchbase.logic.operation_types import StreamingOperationType
+
 if TYPE_CHECKING:
     from couchbase.analytics import AnalyticsQuery
     from couchbase.n1ql import N1QLQuery
@@ -29,14 +31,26 @@ class AnalyticsQueryRequest:
     analytics_query: AnalyticsQuery
     num_workers: Optional[int] = None
 
+    @property
+    def op_name(self) -> str:
+        return StreamingOperationType.AnalyticsQuery.value
+
 
 @dataclass
 class QueryRequest:
     n1ql_query: N1QLQuery
     num_workers: Optional[int] = None
 
+    @property
+    def op_name(self) -> str:
+        return StreamingOperationType.Query.value
+
 
 @dataclass
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
     num_workers: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return StreamingOperationType.ViewQuery.value

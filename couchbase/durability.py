@@ -91,25 +91,25 @@ class DurabilityLevel(IntEnum):
     @classmethod
     def to_server_str(cls, value):
         if value == cls.MAJORITY_AND_PERSIST_TO_ACTIVE:
-            return 'majorityAndPersistActive'
+            return 'majority_and_persist_to_active'
         elif value == cls.NONE:
             return 'none'
         elif value == cls.MAJORITY:
             return 'majority'
         elif value == cls.PERSIST_TO_MAJORITY:
-            return 'persistToMajority'
+            return 'persist_to_majority'
         else:
             return 'none'
 
     @classmethod
     def from_server_str(cls, value):
-        if value == 'majorityAndPersistActive':
+        if value == 'majority_and_persist_to_active':
             return cls.MAJORITY_AND_PERSIST_TO_ACTIVE
         elif value == 'none':
             return cls.NONE
         elif value == 'majority':
             return cls.MAJORITY
-        elif value == 'persistToMajority':
+        elif value == 'persist_to_majority':
             return cls.PERSIST_TO_MAJORITY
         else:
             return cls.NONE

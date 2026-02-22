@@ -24,7 +24,6 @@ from couchbase.management.logic.view_index_mgmt_types import (VIEW_INDEX_MGMT_ER
                                                               GetDesignDocumentRequest,
                                                               UpsertDesignDocumentRequest)
 from couchbase.options import forward_args
-from couchbase.pycbc_core import mgmt_operations, view_index_mgmt_operations
 
 if TYPE_CHECKING:
     from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
@@ -60,11 +59,9 @@ class ViewIndexMgmtRequestBuilder:
         self._validate_design_document_name(design_doc_name)
         namespace_str = self._get_valid_namespace(namespace)
         req = DropDesignDocumentRequest(self._error_map,
-                                        mgmt_operations.VIEW_INDEX.value,
-                                        view_index_mgmt_operations.DROP_INDEX.value,
                                         bucket_name=bucket_name,
                                         document_name=design_doc_name,
-                                        namespace=namespace_str,
+                                        ns=namespace_str,
                                         **final_args)
         if timeout is not None:
             req.timeout = timeout
@@ -80,10 +77,8 @@ class ViewIndexMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         namespace_str = self._get_valid_namespace(namespace)
         req = GetAllDesignDocumentsRequest(self._error_map,
-                                           mgmt_operations.VIEW_INDEX.value,
-                                           view_index_mgmt_operations.GET_ALL_INDEXES.value,
                                            bucket_name=bucket_name,
-                                           namespace=namespace_str,
+                                           ns=namespace_str,
                                            **final_args)
         if timeout is not None:
             req.timeout = timeout
@@ -101,11 +96,9 @@ class ViewIndexMgmtRequestBuilder:
         self._validate_design_document_name(design_doc_name)
         namespace_str = self._get_valid_namespace(namespace)
         req = GetDesignDocumentRequest(self._error_map,
-                                       mgmt_operations.VIEW_INDEX.value,
-                                       view_index_mgmt_operations.GET_INDEX.value,
                                        bucket_name=bucket_name,
                                        document_name=design_doc_name,
-                                       namespace=namespace_str,
+                                       ns=namespace_str,
                                        **final_args)
         if timeout is not None:
             req.timeout = timeout
@@ -123,10 +116,8 @@ class ViewIndexMgmtRequestBuilder:
         self._get_valid_namespace(namespace)
         design_doc_dict = design_doc.as_dict(namespace)
         req = UpsertDesignDocumentRequest(self._error_map,
-                                          mgmt_operations.VIEW_INDEX.value,
-                                          view_index_mgmt_operations.UPSERT_INDEX.value,
                                           bucket_name=bucket_name,
-                                          design_document=design_doc_dict,
+                                          document=design_doc_dict,
                                           **final_args)
         if timeout is not None:
             req.timeout = timeout

@@ -17,17 +17,16 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
-                    Optional)
+                    Dict)
 
 from couchbase.exceptions import (CouchbaseException,
                                   ErrorMapper,
                                   InternalSDKException)
-from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.binding_map import BindingMap
 from couchbase.logic.bucket_types import CloseBucketRequest, OpenBucketRequest
 from couchbase.logic.cluster_types import CloseConnectionRequest
-from couchbase.logic.top_level_types import OpenOrCloseBucket, PyCapsuleType
+from couchbase.logic.pycbc_core import pycbc_connection
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
 if TYPE_CHECKING:
     from couchbase.logic.bucket_types import BucketRequest
@@ -39,20 +38,21 @@ if TYPE_CHECKING:
 class ClientAdapter:
 
     def __init__(self, connect_req: CreateConnectionRequest, **kwargs: Any) -> None:
-        self._connection: Optional[PyCapsuleType] = None
+        num_io_threads = connect_req.options.get('num_io_threads', None)
+        self._connection = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
         self._closed = False
         self._connect_req = connect_req
-        self._binding_map = BindingMap()
+        self._binding_map = BindingMap(self._connection)
         # for testing we sometimes want to skip the actual C++ core connection
         if not (kwargs.get('skip_connect', None) == 'TEST_SKIP_CONNECT'):
             self._execute_connect_request()
 
     @property
     def connected(self) -> bool:
-        return self._connection is not None
+        return self._connection is not None and self._connection.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         return self._connection
 
     def _ensure_not_closed(self) -> None:
@@ -67,7 +67,7 @@ class ClientAdapter:
     def close_bucket(self, bucket_name: str) -> None:
         self._ensure_not_closed()
         self._ensure_connected()
-        self.execute_bucket_request(CloseBucketRequest(bucket_name, OpenOrCloseBucket.CLOSE))
+        self.execute_bucket_request(CloseBucketRequest(bucket_name))
 
     def close_connection(self) -> None:
         if self._closed:
@@ -84,47 +84,46 @@ class ClientAdapter:
 
     def execute_bucket_request(self, req: BucketRequest) -> Any:
         self._ensure_not_closed()
-        req_dict = req.req_to_dict(self._connection)
+        req_dict = req.req_to_dict()
         ret = self._execute_req(req.op_name, req_dict)
-        if isinstance(ret, BaseCouchbaseException):
+        if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
 
     def execute_collection_request(self, req: CollectionRequest) -> Any:
         self._ensure_not_closed()
-        req_dict = req.req_to_dict(self._connection)
+        req_dict = req.req_to_dict()
         ret = self._execute_req(req.op_name, req_dict)
-        if isinstance(ret, BaseCouchbaseException):
+        if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
 
     def execute_cluster_request(self, req: ClusterRequest) -> Any:
         self._ensure_not_closed()
-        req_dict = req.req_to_dict(self._connection)
+        req_dict = req.req_to_dict()
         ret = self._execute_req(req.op_name, req_dict)
-        if isinstance(ret, BaseCouchbaseException):
+        if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
 
     def execute_mgmt_request(self, req: MgmtRequest) -> Any:
         self._ensure_not_closed()
-        req_dict = req.req_to_dict(self._connection)
+        req_dict = req.req_to_dict()
         ret = self._execute_req(req.op_name, req_dict)
-        if isinstance(ret, BaseCouchbaseException):
+        if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret, mapping=req.error_map)
         return ret
 
     def open_bucket(self, bucket_name: str) -> None:
         self._ensure_not_closed()
         self._ensure_connected()
-        self.execute_bucket_request(OpenBucketRequest(bucket_name, OpenOrCloseBucket.OPEN))
+        self.execute_bucket_request(OpenBucketRequest(bucket_name))
 
     def _execute_connect_request(self) -> None:
         req_dict = self._connect_req.req_to_dict()
         ret = self._execute_req(self._connect_req.op_name, req_dict)
-        if isinstance(ret, BaseCouchbaseException):
+        if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
-        self._connection = ret
 
     def _execute_req(self, op_name: str, req_dict: Dict[str, Any]) -> Any:
         try:

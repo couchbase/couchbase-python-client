@@ -15,17 +15,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict
+from typing import (TYPE_CHECKING,
+                    Dict,
+                    Union)
 
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.logic.analytics_mgmt_types import (ANALYTICS_MGMT_ERROR_MAP,
                                                              AnalyticsDataType,
                                                              AnalyticsLinkType,
                                                              ConnectLinkRequest,
+                                                             CreateAzureBlobExternalLinkRequest,
+                                                             CreateCouchbaseRemoteLinkRequest,
                                                              CreateDatasetRequest,
                                                              CreateDataverseRequest,
                                                              CreateIndexRequest,
-                                                             CreateLinkRequest,
+                                                             CreateS3ExternalLinkRequest,
                                                              DisconnectLinkRequest,
                                                              DropDatasetRequest,
                                                              DropDataverseRequest,
@@ -35,9 +39,10 @@ from couchbase.management.logic.analytics_mgmt_types import (ANALYTICS_MGMT_ERRO
                                                              GetAllIndexesRequest,
                                                              GetLinksRequest,
                                                              GetPendingMutationsRequest,
-                                                             ReplaceLinkRequest)
+                                                             ReplaceAzureBlobExternalLinkRequest,
+                                                             ReplaceCouchbaseRemoteLinkRequest,
+                                                             ReplaceS3ExternalLinkRequest)
 from couchbase.options import forward_args
-from couchbase.pycbc_core import analytics_mgmt_operations, mgmt_operations
 
 if TYPE_CHECKING:
     from couchbase.management.logic.analytics_mgmt_types import AnalyticsLink
@@ -79,10 +84,7 @@ class AnalyticsMgmtRequestBuilder:
     def build_connect_link_request(self, *options: object, **kwargs: object) -> ConnectLinkRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = ConnectLinkRequest(self._error_map,
-                                 mgmt_operations.ANALYTICS.value,
-                                 analytics_mgmt_operations.LINK_CONNECT.value,
-                                 **final_args)
+        req = ConnectLinkRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -98,8 +100,6 @@ class AnalyticsMgmtRequestBuilder:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         req = CreateDatasetRequest(self._error_map,
-                                   mgmt_operations.ANALYTICS.value,
-                                   analytics_mgmt_operations.CREATE_DATASET.value,
                                    dataset_name=dataset_name,
                                    bucket_name=bucket_name,
                                    **final_args)
@@ -116,8 +116,6 @@ class AnalyticsMgmtRequestBuilder:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         req = CreateDataverseRequest(self._error_map,
-                                     mgmt_operations.ANALYTICS.value,
-                                     analytics_mgmt_operations.CREATE_DATAVERSE.value,
                                      dataverse_name=dataverse_name,
                                      **final_args)
         if timeout is not None:
@@ -138,8 +136,6 @@ class AnalyticsMgmtRequestBuilder:
         fields = {k: v.value for k, v in fields.items()}
         timeout = final_args.pop('timeout', None)
         req = CreateIndexRequest(self._error_map,
-                                 mgmt_operations.ANALYTICS.value,
-                                 analytics_mgmt_operations.CREATE_INDEX.value,
                                  index_name=index_name,
                                  dataset_name=dataset_name,
                                  fields=fields,
@@ -152,18 +148,20 @@ class AnalyticsMgmtRequestBuilder:
     def build_create_link_request(self,
                                   link: AnalyticsLink,
                                   *options: object,
-                                  **kwargs: object) -> CreateLinkRequest:
+                                  **kwargs: object) -> Union[CreateAzureBlobExternalLinkRequest,
+                                                             CreateCouchbaseRemoteLinkRequest,
+                                                             CreateS3ExternalLinkRequest]:
         final_args = forward_args(kwargs, *options)
         link.validate()
         link_dict = link.as_dict()
-        link_type = link.link_type().value
         timeout = final_args.pop('timeout', None)
-        req = CreateLinkRequest(self._error_map,
-                                mgmt_operations.ANALYTICS.value,
-                                analytics_mgmt_operations.LINK_CREATE.value,
-                                link=link_dict,
-                                link_type=link_type,
-                                **final_args)
+        if link.link_type() == AnalyticsLinkType.AzureBlobExternal:
+            req = CreateAzureBlobExternalLinkRequest(self._error_map, link=link_dict, **final_args)
+        elif link.link_type() == AnalyticsLinkType.CouchbaseRemote:
+            req = CreateCouchbaseRemoteLinkRequest(self._error_map, link=link_dict, **final_args)
+        else:
+            req = CreateS3ExternalLinkRequest(self._error_map, link=link_dict, **final_args)
+
         if timeout is not None:
             req.timeout = timeout
 
@@ -172,10 +170,7 @@ class AnalyticsMgmtRequestBuilder:
     def build_disconnect_link_request(self, *options: object, **kwargs: object) -> DisconnectLinkRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = DisconnectLinkRequest(self._error_map,
-                                    mgmt_operations.ANALYTICS.value,
-                                    analytics_mgmt_operations.LINK_DISCONNECT.value,
-                                    **final_args)
+        req = DisconnectLinkRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -190,8 +185,6 @@ class AnalyticsMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         ignore_if_does_not_exist = final_args.pop('ignore_if_not_exists', None)
         req = DropDatasetRequest(self._error_map,
-                                 mgmt_operations.ANALYTICS.value,
-                                 analytics_mgmt_operations.DROP_DATASET.value,
                                  dataset_name=dataset_name,
                                  ignore_if_does_not_exist=ignore_if_does_not_exist,
                                  **final_args)
@@ -209,8 +202,6 @@ class AnalyticsMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         ignore_if_does_not_exist = final_args.pop('ignore_if_not_exists', None)
         req = DropDataverseRequest(self._error_map,
-                                   mgmt_operations.ANALYTICS.value,
-                                   analytics_mgmt_operations.DROP_DATAVERSE.value,
                                    dataverse_name=dataverse_name,
                                    ignore_if_does_not_exist=ignore_if_does_not_exist,
                                    **final_args)
@@ -230,8 +221,6 @@ class AnalyticsMgmtRequestBuilder:
         timeout = final_args.pop('timeout', None)
         ignore_if_does_not_exist = final_args.pop('ignore_if_not_exists', None)
         req = DropIndexRequest(self._error_map,
-                               mgmt_operations.ANALYTICS.value,
-                               analytics_mgmt_operations.DROP_INDEX.value,
                                index_name=index_name,
                                dataset_name=dataset_name,
                                ignore_if_does_not_exist=ignore_if_does_not_exist,
@@ -251,8 +240,6 @@ class AnalyticsMgmtRequestBuilder:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         req = DropLinkRequest(self._error_map,
-                              mgmt_operations.ANALYTICS.value,
-                              analytics_mgmt_operations.DROP_LINK.value,
                               link_name=link_name,
                               dataverse_name=dataverse_name,
                               **final_args)
@@ -264,10 +251,7 @@ class AnalyticsMgmtRequestBuilder:
     def build_get_all_datasets_request(self, *options: object, **kwargs: object) -> GetAllDatasetsRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetAllDatasetsRequest(self._error_map,
-                                    mgmt_operations.ANALYTICS.value,
-                                    analytics_mgmt_operations.GET_ALL_DATASETS.value,
-                                    **final_args)
+        req = GetAllDatasetsRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -276,10 +260,7 @@ class AnalyticsMgmtRequestBuilder:
     def build_get_all_indexes_request(self, *options: object, **kwargs: object) -> GetAllIndexesRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetAllIndexesRequest(self._error_map,
-                                   mgmt_operations.ANALYTICS.value,
-                                   analytics_mgmt_operations.GET_ALL_INDEXES.value,
-                                   **final_args)
+        req = GetAllIndexesRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -293,12 +274,7 @@ class AnalyticsMgmtRequestBuilder:
         if link_type:
             if isinstance(link_type, AnalyticsLinkType):
                 link_type = link_type.value
-        req = GetLinksRequest(self._error_map,
-                              mgmt_operations.ANALYTICS.value,
-                              analytics_mgmt_operations.GET_ALL_LINKS.value,
-                              link_name=link_name,
-                              link_type=link_type,
-                              **final_args)
+        req = GetLinksRequest(self._error_map, link_name=link_name, link_type=link_type, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -307,10 +283,7 @@ class AnalyticsMgmtRequestBuilder:
     def build_get_pending_mutations_request(self, *options: object, **kwargs: object) -> GetPendingMutationsRequest:
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
-        req = GetPendingMutationsRequest(self._error_map,
-                                         mgmt_operations.ANALYTICS.value,
-                                         analytics_mgmt_operations.GET_PENDING_MUTATIONS.value,
-                                         **final_args)
+        req = GetPendingMutationsRequest(self._error_map, **final_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -319,17 +292,19 @@ class AnalyticsMgmtRequestBuilder:
     def build_replace_link_request(self,
                                    link: AnalyticsLink,
                                    *options: object,
-                                   **kwargs: object) -> ReplaceLinkRequest:
+                                   **kwargs: object) -> Union[ReplaceAzureBlobExternalLinkRequest,
+                                                              ReplaceCouchbaseRemoteLinkRequest,
+                                                              ReplaceS3ExternalLinkRequest]:
         final_args = forward_args(kwargs, *options)
         link_dict = link.as_dict()
-        link_type = link.link_type().value
         timeout = final_args.pop('timeout', None)
-        req = ReplaceLinkRequest(self._error_map,
-                                 mgmt_operations.ANALYTICS.value,
-                                 analytics_mgmt_operations.LINK_REPLACE.value,
-                                 link=link_dict,
-                                 link_type=link_type,
-                                 **final_args)
+        if link.link_type() == AnalyticsLinkType.AzureBlobExternal:
+            req = ReplaceAzureBlobExternalLinkRequest(self._error_map, link=link_dict, **final_args)
+        elif link.link_type() == AnalyticsLinkType.CouchbaseRemote:
+            req = ReplaceCouchbaseRemoteLinkRequest(self._error_map, link=link_dict, **final_args)
+        else:
+            req = ReplaceS3ExternalLinkRequest(self._error_map, link=link_dict, **final_args)
+
         if timeout is not None:
             req.timeout = timeout
 

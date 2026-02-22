@@ -29,11 +29,11 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap,
                                   InternalSDKException)
-from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic.binding_map import BindingMap
 from couchbase.logic.bucket_types import CloseBucketRequest, OpenBucketRequest
 from couchbase.logic.cluster_types import CloseConnectionRequest
-from couchbase.logic.top_level_types import OpenOrCloseBucket, PyCapsuleType
+from couchbase.logic.pycbc_core import pycbc_connection
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -51,13 +51,14 @@ class AsyncClientAdapter:
                  connect_req: CreateConnectionRequest,
                  loop_validator: Optional[Callable[[Optional[AbstractEventLoop]], AbstractEventLoop]] = None
                  ) -> None:
-        self._connection: Optional[PyCapsuleType] = None
+        num_io_threads = connect_req.options.get('num_io_threads', None)
+        self._connection = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
         if loop_validator:
             self._loop = loop_validator(loop)
         else:
             self._loop = self._get_loop(loop)
         self._connect_req = connect_req
-        self._binding_map = BindingMap()
+        self._binding_map = BindingMap(self._connection)
         self._close_ft: Optional[Future[None]] = None
         self._connect_ft: Optional[Future[None]] = None
         self._closed = False
@@ -65,10 +66,10 @@ class AsyncClientAdapter:
 
     @property
     def connected(self) -> bool:
-        return self._connection is not None
+        return self._connection is not None and self._connection.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         return self._connection
 
     @property
@@ -109,12 +110,12 @@ class AsyncClientAdapter:
             excptn = ErrorMapper.build_exception(exc)
             self._loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         self._execute_req(ft, req.op_name, req_dict)
         return ft
 
     def execute_close_bucket_request(self, bucket_name: str) -> Future[None]:
-        req = CloseBucketRequest(bucket_name, OpenOrCloseBucket.CLOSE)
+        req = CloseBucketRequest(bucket_name)
         return self.execute_bucket_request(req)
 
     def execute_cluster_request(self, req: ClusterRequest) -> Future[Any]:
@@ -129,7 +130,7 @@ class AsyncClientAdapter:
             excptn = ErrorMapper.build_exception(exc)
             self._loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
             chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
@@ -139,9 +140,9 @@ class AsyncClientAdapter:
 
     def execute_cluster_request_sync(self, req: ClusterRequest) -> Any:
         self._ensure_not_closed()
-        req_dict = req.req_to_dict(self._connection)
+        req_dict = req.req_to_dict()
         ret = self._execute_req_sync(req.op_name, req_dict)
-        if isinstance(ret, BaseCouchbaseException):
+        if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
 
@@ -158,14 +159,14 @@ class AsyncClientAdapter:
             excptn = ErrorMapper.build_exception(exc)
             self._loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         self._execute_req(ft, req.op_name, req_dict)
         return ft
 
     def execute_connect_bucket_request(self, bucket_name: str) -> Future[None]:
         self._ensure_not_closed()
 
-        req = OpenBucketRequest(bucket_name, OpenOrCloseBucket.OPEN)
+        req = OpenBucketRequest(bucket_name)
         ft = self._loop.create_future()
 
         def _callback(_) -> None:
@@ -177,7 +178,7 @@ class AsyncClientAdapter:
             if not ft.done():
                 self._loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
             chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
@@ -199,7 +200,7 @@ class AsyncClientAdapter:
             if not ft.done():
                 self._loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
             chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
@@ -239,7 +240,6 @@ class AsyncClientAdapter:
             ft.set_exception(exc)
             return
 
-        req_dict['conn'] = self._connection
         self._execute_req(ft, op_name, req_dict)
 
     def _execute_close_connection_request(self) -> Future[None]:
@@ -256,7 +256,7 @@ class AsyncClientAdapter:
             if not ft.done():
                 self._loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(self._connection, callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
             # If we're closed, don't try to reconnect just to close again
             if self._closed:
@@ -272,9 +272,8 @@ class AsyncClientAdapter:
     def _execute_connect_request(self) -> Future[None]:
         ft = self._loop.create_future()
 
-        def _callback(ret: PyCapsuleType) -> None:
+        def _callback(_) -> None:
             if not ft.done():
-                self._connection = ret
                 self._loop.call_soon_threadsafe(ft.set_result, None)
 
         def _errback(ret: Any) -> None:

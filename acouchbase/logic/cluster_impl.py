@@ -31,7 +31,7 @@ from couchbase.exceptions import ServiceUnavailableException, UnAmbiguousTimeout
 from couchbase.logic.cluster_impl import ClusterSettings
 from couchbase.logic.cluster_req_builder import ClusterRequestBuilder
 from couchbase.logic.cluster_types import CreateConnectionRequest, GetConnectionInfoRequest
-from couchbase.logic.top_level_types import PyCapsuleType
+from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.result import (AnalyticsResult,
                               ClusterInfoResult,
                               DiagnosticsResult,
@@ -88,7 +88,7 @@ class AsyncClusterImpl:
         return self._client_adapter.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         """**INTERNAL**"""
         return self._client_adapter.connection
 

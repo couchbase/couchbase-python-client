@@ -25,10 +25,11 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     List,
                     Optional,
+                    Type,
                     Union,
                     overload)
 
-from couchbase._utils import (timedelta_as_microseconds,
+from couchbase._utils import (timedelta_as_milliseconds,
                               timedelta_as_timestamp,
                               validate_bool,
                               validate_int,
@@ -109,7 +110,7 @@ def get_valid_args(
 
 
 VALID_MULTI_OPTS = {
-    'timeout': timedelta_as_microseconds,
+    'timeout': timedelta_as_milliseconds,
     'expiry': timedelta_as_timestamp,
     'preserve_expiry': validate_bool,
     'with_expiry': validate_bool,
@@ -147,7 +148,8 @@ def _get_valid_global_multi_opts(
 def _get_per_key_opts(
     per_key_opts,  # type: Dict[str, Any]
     opt_type,  # type: OptionsBase
-    valid_opt_keys  # type: List[str]
+    valid_opt_keys,  # type: List[str]
+    durability_type     # type: Optional[Union[Type[Dict], Type[int]]]
 ) -> Dict[str, Any]:
     final_key_opts = {}
     for key, opts in per_key_opts.items():
@@ -159,7 +161,19 @@ def _get_per_key_opts(
                 continue
             transform = VALID_MULTI_OPTS.get(opt_key, None)
             if transform:
-                key_opts[opt_key] = transform(opt_value)
+                transformed_value = transform(opt_value)
+                if opt_key == 'durability':
+                    if durability_type is None:
+                        durability_type = dict if isinstance(transformed_value, dict) else int
+                    if not isinstance(transformed_value, durability_type):
+                        raise InvalidArgumentException('Durability must be either client or server for all operations.')
+                    if isinstance(transformed_value, dict):
+                        key_opts['persist_to'] = transformed_value['persist_to']
+                        key_opts['replicate_to'] = transformed_value['replicate_to']
+                    else:
+                        key_opts['durability_level'] = transformed_value
+                else:
+                    key_opts[opt_key] = transformed_value
 
         final_key_opts[key] = key_opts
 
@@ -184,7 +198,12 @@ def get_valid_multi_args(
     if not per_key_opts:
         return final_opts
 
-    final_key_opts = _get_per_key_opts(per_key_opts, opt_type, valid_opt_keys)
+    durability = final_opts.get('durability', None)
+    durability_type = None
+    if durability is not None:
+        durability_type = dict if isinstance(durability, dict) else int
+
+    final_key_opts = _get_per_key_opts(per_key_opts, opt_type, valid_opt_keys, durability_type)
 
     final_opts['per_key_options'] = final_key_opts
     return final_opts
@@ -378,19 +397,19 @@ Couchbase Python SDK Cluster related Options
 class ClusterTimeoutOptionsBase(dict):
 
     _VALID_OPTS = {
-        "bootstrap_timeout": {"bootstrap_timeout": timedelta_as_microseconds},
-        "resolve_timeout": {"resolve_timeout": timedelta_as_microseconds},
-        "connect_timeout": {"connect_timeout": timedelta_as_microseconds},
-        "kv_timeout": {"key_value_timeout": timedelta_as_microseconds},
-        "kv_durable_timeout": {"key_value_durable_timeout": timedelta_as_microseconds},
-        "views_timeout": {"view_timeout": timedelta_as_microseconds},
-        "query_timeout": {"query_timeout": timedelta_as_microseconds},
-        "analytics_timeout": {"analytics_timeout": timedelta_as_microseconds},
-        "search_timeout": {"search_timeout": timedelta_as_microseconds},
-        "management_timeout": {"management_timeout": timedelta_as_microseconds},
-        "dns_srv_timeout": {"dns_srv_timeout": timedelta_as_microseconds},
-        "idle_http_connection_timeout": {"idle_http_connection_timeout": timedelta_as_microseconds},
-        "config_idle_redial_timeout": {"config_idle_redial_timeout": timedelta_as_microseconds}
+        "bootstrap_timeout": {"bootstrap_timeout": timedelta_as_milliseconds},
+        "resolve_timeout": {"resolve_timeout": timedelta_as_milliseconds},
+        "connect_timeout": {"connect_timeout": timedelta_as_milliseconds},
+        "kv_timeout": {"key_value_timeout": timedelta_as_milliseconds},
+        "kv_durable_timeout": {"key_value_durable_timeout": timedelta_as_milliseconds},
+        "views_timeout": {"view_timeout": timedelta_as_milliseconds},
+        "query_timeout": {"query_timeout": timedelta_as_milliseconds},
+        "analytics_timeout": {"analytics_timeout": timedelta_as_milliseconds},
+        "search_timeout": {"search_timeout": timedelta_as_milliseconds},
+        "management_timeout": {"management_timeout": timedelta_as_milliseconds},
+        "dns_srv_timeout": {"dns_srv_timeout": timedelta_as_milliseconds},
+        "idle_http_connection_timeout": {"idle_http_connection_timeout": timedelta_as_milliseconds},
+        "config_idle_redial_timeout": {"config_idle_redial_timeout": timedelta_as_milliseconds}
     }
 
     @overload
@@ -458,7 +477,7 @@ class ClusterMetricsOptionsBase(dict):
 
     _VALID_OPTS = {
         "metrics_enable_metrics": {"enable_metrics": validate_bool},
-        "metrics_emit_interval": {"metrics_emit_interval": timedelta_as_microseconds}
+        "metrics_emit_interval": {"metrics_emit_interval": timedelta_as_milliseconds}
     }
 
     @overload
@@ -504,7 +523,7 @@ class ClusterOrphanReportingOptionsBase(dict):
     _VALID_OPTS = {
         "orphan_enable_orphan_reporting": {"enable_orphan_reporting": validate_bool},
         "orphan_sample_size": {"orphan_sample_size": validate_int},
-        "orphan_emit_interval": {"orphan_emit_interval": timedelta_as_microseconds}
+        "orphan_emit_interval": {"orphan_emit_interval": timedelta_as_milliseconds}
     }
 
     @overload
@@ -550,17 +569,17 @@ class ClusterTracingOptionsBase(dict):
 
     _VALID_OPTS = {
         "tracing_enable_tracing": {"enable_tracing": validate_bool},
-        "tracing_threshold_kv": {"key_value_threshold": timedelta_as_microseconds},
-        "tracing_threshold_view": {"view_threshold": timedelta_as_microseconds},
-        "tracing_threshold_query": {"query_threshold": timedelta_as_microseconds},
-        "tracing_threshold_search": {"search_threshold": timedelta_as_microseconds},
-        "tracing_threshold_analytics": {"analytics_threshold": timedelta_as_microseconds},
-        "tracing_threshold_eventing": {"eventing_threshold": timedelta_as_microseconds},
-        "tracing_threshold_management": {"management_threshold": timedelta_as_microseconds},
+        "tracing_threshold_kv": {"key_value_threshold": timedelta_as_milliseconds},
+        "tracing_threshold_view": {"view_threshold": timedelta_as_milliseconds},
+        "tracing_threshold_query": {"query_threshold": timedelta_as_milliseconds},
+        "tracing_threshold_search": {"search_threshold": timedelta_as_milliseconds},
+        "tracing_threshold_analytics": {"analytics_threshold": timedelta_as_milliseconds},
+        "tracing_threshold_eventing": {"eventing_threshold": timedelta_as_milliseconds},
+        "tracing_threshold_management": {"management_threshold": timedelta_as_milliseconds},
         "tracing_threshold_queue_size": {"threshold_sample_size": validate_int},
-        "tracing_threshold_queue_flush_interval": {"threshold_emit_interval": timedelta_as_microseconds},
+        "tracing_threshold_queue_flush_interval": {"threshold_emit_interval": timedelta_as_milliseconds},
         "tracing_orphaned_queue_size": {"orphan_sample_size": validate_int},
-        "tracing_orphaned_queue_flush_interval": {"orphan_emit_interval": timedelta_as_microseconds}
+        "tracing_orphaned_queue_flush_interval": {"orphan_emit_interval": timedelta_as_milliseconds}
     }
 
     @overload
@@ -640,15 +659,15 @@ class ClusterOptionsBase(dict):
         "serializer": {"serializer": lambda x: x},
         "transcoder": {"transcoder": lambda x: x},
         "span": {"span": lambda x: x},
-        "tcp_keep_alive_interval": {"tcp_keep_alive_interval": timedelta_as_microseconds},
-        "config_poll_interval": {"config_poll_interval": timedelta_as_microseconds},
-        "config_poll_floor": {"config_poll_floor": timedelta_as_microseconds},
+        "tcp_keep_alive_interval": {"tcp_keep_alive_interval": timedelta_as_milliseconds},
+        "config_poll_interval": {"config_poll_interval": timedelta_as_milliseconds},
+        "config_poll_floor": {"config_poll_floor": timedelta_as_milliseconds},
         "max_http_connections": {"max_http_connections": validate_int},
         "user_agent_extra": {"user_agent_extra": validate_str},
         "trust_store_path": {"trust_store_path": validate_str},
         "cert_path": {"cert_path": validate_str},
         "disable_mozilla_ca_certificates": {"disable_mozilla_ca_certificates": validate_bool},
-        "logging_meter_emit_interval": {"cluster_metrics_emit_interval": timedelta_as_microseconds},
+        "logging_meter_emit_interval": {"cluster_metrics_emit_interval": timedelta_as_milliseconds},
         "num_io_threads": {"num_io_threads": validate_int},
         "transaction_config": {"transaction_config": lambda x: x},
         "tracer": {"tracer": lambda x: x},
@@ -659,9 +678,9 @@ class ClusterOptionsBase(dict):
         "preferred_server_group": {"preferred_server_group": validate_str},
         "enable_app_telemetry": {"enable_app_telemetry": validate_bool},
         "app_telemetry_endpoint": {"app_telemetry_endpoint": validate_str},
-        "app_telemetry_backoff": {"app_telemetry_backoff": timedelta_as_microseconds},
-        "app_telemetry_ping_interval": {"app_telemetry_ping_interval": timedelta_as_microseconds},
-        "app_telemetry_ping_timeout": {"app_telemetry_ping_timeout": timedelta_as_microseconds},
+        "app_telemetry_backoff": {"app_telemetry_backoff": timedelta_as_milliseconds},
+        "app_telemetry_ping_interval": {"app_telemetry_ping_interval": timedelta_as_milliseconds},
+        "app_telemetry_ping_timeout": {"app_telemetry_ping_timeout": timedelta_as_milliseconds},
         "allow_enterprise_analytics": {"allow_enterprise_analytics": validate_bool},
     }
 

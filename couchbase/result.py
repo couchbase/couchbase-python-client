@@ -34,9 +34,11 @@ from couchbase.diagnostics import (ClusterState,
                                    EndpointPingReport,
                                    EndpointState,
                                    ServiceType)
-from couchbase.exceptions import ErrorMapper, InvalidArgumentException
-from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.pycbc_core import result
+from couchbase.exceptions import (CouchbaseException,
+                                  ErrorMapper,
+                                  InvalidArgumentException)
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
+from couchbase.logic.pycbc_core import pycbc_result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
 from couchbase.transcoder import Transcoder
 
@@ -44,14 +46,18 @@ from couchbase.transcoder import Transcoder
 class Result:
     def __init__(
         self,
-        orig,              # type: result
+        orig,            # type: pycbc_result
         transcoder=None,  # type: Optional[Transcoder]
         is_subdoc=None,  # type: Optional[bool]
+        key=None,        # type: Optional[str]
+        is_scan_result=None,  # type: Optional[bool]
     ):
         self._orig = orig
         self._transcoder = transcoder
         self._decoded_value: Optional[Any] = None
         self._is_subdoc = is_subdoc if is_subdoc is not None else False
+        self._key = key
+        self._is_scan_result = is_scan_result if is_scan_result is not None else False
 
     @property
     def value(self) -> Optional[Any]:
@@ -82,7 +88,8 @@ class Result:
         """
             Optional[str]: Key for the operation, if it exists.
         """
-        return self._orig.raw_result.get("key", None)
+        # return self._orig.raw_result.get("key", None)
+        return self._key
 
     @property
     def success(self) -> bool:
@@ -95,11 +102,16 @@ class Result:
         if self._transcoder is None:
             return
 
-        value = self._orig.raw_result.get('value', None)
-        if self._is_subdoc is False:
+        if self._is_scan_result is True:
+            value = self._orig.raw_result.get('scan_item', {}).get('body', {}).get('value', None)
+            flags = self._orig.raw_result.get('scan_item', {}).get('body', {}).get('flags', None)
+            self._decoded_value = self._transcoder.decode_value(value, flags)
+        elif self._is_subdoc is False:
+            value = self._orig.raw_result.get('value', None)
             flags = self._orig.raw_result.get('flags', None)
             self._decoded_value = self._transcoder.decode_value(value, flags)
         else:
+            value = self._orig.raw_result.get('fields', None)
             self._decoded_value = []
             for f in value:
                 if 'value' in f:
@@ -160,10 +172,10 @@ class DiagnosticsResult(Result):
 
     def __init__(
         self,
-        orig,  # type: result
+        orig,  # type: pycbc_result
     ):
         super().__init__(orig)
-        svc_endpoints = self._orig.raw_result.get("endpoints", None)
+        svc_endpoints = self._orig.raw_result.get('services', None)
         self._endpoints = {}
         if svc_endpoints:
             for service, endpoints in svc_endpoints.items():
@@ -243,10 +255,10 @@ class PingResult(Result):
 
     def __init__(
         self,
-        orig,  # type: result
+        orig,  # type: pycbc_result
     ):
         super().__init__(orig)
-        svc_endpoints = self._orig.raw_result.get("endpoints", None)
+        svc_endpoints = self._orig.raw_result.get('services', None)
         self._endpoints = {}
         if svc_endpoints:
             for service, endpoints in svc_endpoints.items():
@@ -312,14 +324,14 @@ class GetReplicaResult(Result):
 
         bool: True if the result is the active document, False otherwise.
         """
-        return not self._orig.raw_result.get('is_replica')
+        return not self._orig.raw_result.get('replica')
 
     @property
     def is_replica(self) -> bool:
         """
             bool: True if the result is a replica, False otherwise.
         """
-        return self._orig.raw_result.get('is_replica')
+        return self._orig.raw_result.get('replica')
 
     @property
     def content_as(self) -> Any:
@@ -382,7 +394,7 @@ class GetResult(Result):
 
 class MultiResult:
     def __init__(self,
-                 orig,  # type: result
+                 orig,  # type: pycbc_result
                  result_type,  # type: Union[GetReplicaResult, GetResult]
                  return_exceptions,  # type: bool
                  transcoders=None  # type: Optional[Dict[str, Transcoder]]
@@ -392,11 +404,15 @@ class MultiResult:
         self._results = {}
         self._result_type = result_type
         for k, v in self._orig.raw_result.items():
-            if isinstance(v, CouchbaseBaseException):
-                if not return_exceptions:
-                    raise ErrorMapper.build_exception(v)
+            if isinstance(v, (CouchbaseException, PycbcCoreException)):
+                if isinstance(v, PycbcCoreException):
+                    exc = ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapper.build_exception(v)
+                    exc = v
+                if not return_exceptions:
+                    raise exc
+                else:
+                    self._results[k] = exc
             else:
                 if isinstance(v, list):
                     self._results[k] = v
@@ -413,7 +429,7 @@ class MultiResult:
         return self._all_ok
 
     @property
-    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+    def exceptions(self) -> Dict[str, CouchbaseException]:
         """
             Dict[str, Exception]: Map of keys to their respective exceptions, if the
                 operation had an exception.
@@ -427,7 +443,7 @@ class MultiResult:
 
 class MultiGetReplicaResult(MultiResult):
     def __init__(self,
-                 orig,  # type: result
+                 orig,  # type: pycbc_result
                  return_exceptions,  # type: bool
                  transcoders=None  # type: Optional[Dict[str, Transcoder]]
                  ):
@@ -457,7 +473,7 @@ class MultiGetReplicaResult(MultiResult):
 
 class MultiGetResult(MultiResult):
     def __init__(self,
-                 orig,  # type: result
+                 orig,  # type: pycbc_result
                  return_exceptions,  # type: bool
                  transcoders  # type: Dict[str, Transcoder]
                  ):
@@ -490,7 +506,7 @@ class ExistsResult(Result):
         """
             bool: True if the document exists, false otherwise.
         """
-        return self._orig.raw_result.get("exists", False)
+        return self._orig.raw_result.get('document_exists', False)
 
     def __repr__(self):
         return "ExistsResult:{}".format(self._orig)
@@ -498,7 +514,7 @@ class ExistsResult(Result):
 
 class MultiExistsResult:
     def __init__(self,
-                 orig,  # type: result
+                 orig,  # type: pycbc_result
                  return_exceptions  # type: bool
                  ):
 
@@ -506,11 +522,15 @@ class MultiExistsResult:
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
         for k, v in self._orig.raw_result.items():
-            if isinstance(v, CouchbaseBaseException):
-                if not return_exceptions:
-                    raise ErrorMapper.build_exception(v)
+            if isinstance(v, (CouchbaseException, PycbcCoreException)):
+                if isinstance(v, PycbcCoreException):
+                    exc = ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapper.build_exception(v)
+                    exc = v
+                if not return_exceptions:
+                    raise exc
+                else:
+                    self._results[k] = exc
             else:
                 self._results[k] = ExistsResult(v)
 
@@ -522,7 +542,7 @@ class MultiExistsResult:
         return self._all_ok
 
     @property
-    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+    def exceptions(self) -> Dict[str, CouchbaseException]:
         """
             Dict[str, Exception]: Map of keys to their respective exceptions, if the
                 operation had an exception.
@@ -555,10 +575,11 @@ class MultiExistsResult:
 
 class MutationResult(Result):
     def __init__(self,
-                 orig,  # type: result
+                 orig,  # type: pycbc_result
+                 key=None,        # type: Optional[str]
                  ):
-        super().__init__(orig)
-        self._raw_mutation_token = self._orig.raw_result.get('mutation_token', None)
+        super().__init__(orig, key=key)
+        self._raw_mutation_token = self._orig.raw_result.get('token', None)
         self._mutation_token = None
 
     def mutation_token(self) -> Optional[MutationToken]:
@@ -568,7 +589,7 @@ class MutationResult(Result):
             Optional[:class:`.MutationToken`]: The operation's mutation token.
         """
         if self._raw_mutation_token is not None and self._mutation_token is None:
-            self._mutation_token = MutationToken(self._raw_mutation_token.get())
+            self._mutation_token = MutationToken(self._raw_mutation_token)
         return self._mutation_token
 
     def __repr__(self):
@@ -577,7 +598,7 @@ class MutationResult(Result):
 
 class MultiMutationResult:
     def __init__(self,
-                 orig,  # type: result
+                 orig,  # type: pycbc_result
                  return_exceptions  # type: bool
                  ):
 
@@ -585,13 +606,17 @@ class MultiMutationResult:
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
         for k, v in self._orig.raw_result.items():
-            if isinstance(v, CouchbaseBaseException):
-                if not return_exceptions:
-                    raise ErrorMapper.build_exception(v)
+            if isinstance(v, (CouchbaseException, PycbcCoreException)):
+                if isinstance(v, PycbcCoreException):
+                    exc = ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapper.build_exception(v)
+                    exc = v
+                if not return_exceptions:
+                    raise exc
+                else:
+                    self._results[k] = exc
             else:
-                self._results[k] = MutationResult(v)
+                self._results[k] = MutationResult(v, key=k)
 
     @property
     def all_ok(self) -> bool:
@@ -601,7 +626,7 @@ class MultiMutationResult:
         return self._all_ok
 
     @property
-    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+    def exceptions(self) -> Dict[str, CouchbaseException]:
         """
             Dict[str, Exception]: Map of keys to their respective exceptions, if the
                 operation had an exception.
@@ -807,7 +832,7 @@ class CounterResult(MutationResult):
 
 class MultiCounterResult:
     def __init__(self,
-                 orig,  # type: result
+                 orig,  # type: pycbc_result
                  return_exceptions  # type: bool
                  ):
 
@@ -815,11 +840,15 @@ class MultiCounterResult:
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
         for k, v in self._orig.raw_result.items():
-            if isinstance(v, CouchbaseBaseException):
-                if not return_exceptions:
-                    raise ErrorMapper.build_exception(v)
+            if isinstance(v, (CouchbaseException, PycbcCoreException)):
+                if isinstance(v, PycbcCoreException):
+                    exc = ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapper.build_exception(v)
+                    exc = v
+                if not return_exceptions:
+                    raise exc
+                else:
+                    self._results[k] = exc
             else:
                 self._results[k] = CounterResult(v)
 
@@ -831,7 +860,7 @@ class MultiCounterResult:
         return self._all_ok
 
     @property
-    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+    def exceptions(self) -> Dict[str, CouchbaseException]:
         """
             Dict[str, Exception]: Map of keys to their respective exceptions, if the
                 operation had an exception.
@@ -865,7 +894,7 @@ class MultiCounterResult:
 class ClusterInfoResult:
     def __init__(
         self,
-        orig  # type: result
+        orig  # type: pycbc_result
     ):
         self._orig = orig
         # version string should be X.Y.Z-XXXX-YYYY
@@ -876,8 +905,8 @@ class ClusterInfoResult:
         self._is_enterprise = None
 
     @property
-    def nodes(self):
-        return self._orig.raw_result.get("nodes", None)
+    def nodes(self) -> Optional[Dict[str, Any]]:
+        return self._orig.raw_result.get('info', {}).get('nodes', None)
 
     @property
     def server_version(self) -> Optional[str]:
@@ -977,7 +1006,7 @@ class ClusterInfoResult:
 class HttpResult:
     def __init__(
         self,
-        orig  # type: result
+        orig  # type: pycbc_result
     ):
         self._orig = orig
 
@@ -985,7 +1014,7 @@ class HttpResult:
 class ScanResult(Result):
 
     def __init__(self, orig, ids_only, transcoder):
-        super().__init__(orig, transcoder=transcoder)
+        super().__init__(orig, transcoder=transcoder, is_scan_result=True)
         self._ids_only = ids_only
 
     @property
@@ -993,7 +1022,7 @@ class ScanResult(Result):
         """
             Optional[str]: Id for the operation, if it exists.
         """
-        return self._orig.raw_result.get("key", None)
+        return self._orig.raw_result.get('scan_item', {}).get('key', None)
 
     @property
     def ids_only(self) -> bool:
@@ -1010,7 +1039,7 @@ class ScanResult(Result):
         if self.ids_only:
             raise InvalidArgumentException(("No cas available when scan is requested with "
                                             "`ScanOptions` ids_only set to True."))
-        return self._orig.raw_result.get("cas", 0)
+        return self._orig.raw_result.get('scan_item', {}).get('body', {}).get('cas', 0)
 
     @property
     def expiry_time(self) -> Optional[datetime]:
@@ -1020,7 +1049,7 @@ class ScanResult(Result):
         if self.ids_only:
             raise InvalidArgumentException(("No expiry_time available when scan is requested with "
                                             "`ScanOptions` ids_only set to True."))
-        time_ms = self._orig.raw_result.get("expiry", None)
+        time_ms = self._orig.raw_result.get('scan_item', {}).get('body', {}).get('cas', None)
         if time_ms:
             return datetime.fromtimestamp(time_ms)
         return None
@@ -1046,7 +1075,7 @@ class ScanResult(Result):
         return ContentProxy(self.value)
 
     def __repr__(self):
-        return "ScanResult:{}".format(self._orig)
+        return f"ScanResult:{self._orig.raw_result['scan_item']}"
 
 
 class ScanResultIterable:

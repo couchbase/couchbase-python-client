@@ -1,5 +1,5 @@
 /*
- *   Copyright 2016-2023. Couchbase, Inc.
+ *   Copyright 2016-2026. Couchbase, Inc.
  *   All Rights Reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +16,12 @@
  */
 
 #include "logger.hxx"
-
+#include "cpp_core_enums_autogen.hxx"
 #include "exceptions.hxx"
+#include "pytype_utils.hxx"
+
+namespace pycbc
+{
 
 static void
 pycbc_logger_dealloc(pycbc_logger* self)
@@ -35,21 +39,16 @@ pycbc_logger__configure_logging_sink__(PyObject* self, PyObject* args, PyObject*
   const char* kw_format = "OO";
   if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, kw_format, const_cast<char**>(kw_list), &pyObj_logger, &pyObj_level)) {
-    pycbc_set_python_exception(PycbcError::InvalidArgument,
-                               __FILE__,
-                               __LINE__,
-                               "Cannot set pycbc_logger sink.  Unable to parse args/kwargs.");
-    return nullptr;
+    return raise_invalid_argument(
+      "Cannot set pycbc_logger sink.  Unable to parse args/kwargs.", __FILE__, __LINE__);
   }
 
   if (couchbase::core::logger::is_initialized()) {
-    pycbc_set_python_exception(PycbcError::UnsuccessfulOperation,
-                               __FILE__,
-                               __LINE__,
-                               "Cannot create logger.  Another logger has already been "
-                               "initialized. Make sure the PYCBC_LOG_LEVEL env "
-                               "variable is not set if using configure_logging.");
-    return nullptr;
+    return raise_invalid_argument("Cannot create logger.  Another logger has already been "
+                                  "initialized. Make sure the PYCBC_LOG_LEVEL env "
+                                  "variable is not set if using configure_logging.",
+                                  __FILE__,
+                                  __LINE__);
   }
 
   if (pyObj_logger != nullptr) {
@@ -59,7 +58,7 @@ pycbc_logger__configure_logging_sink__(PyObject* self, PyObject* args, PyObject*
   couchbase::core::logger::configuration logger_settings;
   logger_settings.console = false;
   logger_settings.sink = logger->logger_sink_;
-  auto level = convert_python_log_level(pyObj_level);
+  auto level = pycbc::py_to_cbpp<couchbase::core::logger::level>(pyObj_level);
   logger_settings.log_level = level;
   couchbase::core::logger::create_file_logger(logger_settings);
   Py_RETURN_NONE;
@@ -81,28 +80,18 @@ pycbc_logger__create_logger__(PyObject* self, PyObject* args, PyObject* kwargs)
                                    &log_level,
                                    &log_filename,
                                    &enable_console)) {
-    pycbc_set_python_exception(PycbcError::InvalidArgument,
-                               __FILE__,
-                               __LINE__,
-                               "Cannot create logger.  Unable to parse args/kwargs.");
-    return nullptr;
+    return raise_invalid_argument(
+      "Cannot create logger.  Unable to parse args/kwargs.", __FILE__, __LINE__);
   }
 
   if (couchbase::core::logger::is_initialized()) {
-    pycbc_set_python_exception(
-      PycbcError::UnsuccessfulOperation,
-      __FILE__,
-      __LINE__,
-      "Cannot create logger.  Another logger has already been initialized.");
-    return nullptr;
+    return raise_invalid_argument(
+      "Cannot create logger.  Another logger has already been initialized.", __FILE__, __LINE__);
   }
 
   if (log_level == nullptr) {
-    pycbc_set_python_exception(PycbcError::InvalidArgument,
-                               __FILE__,
-                               __LINE__,
-                               "Cannot create logger.  Unable to determine log level.");
-    return nullptr;
+    return raise_invalid_argument(
+      "Cannot create logger.  Unable to determine log level.", __FILE__, __LINE__);
   }
   auto level = couchbase::core::logger::level_from_str(log_level);
   if (log_filename != nullptr) {
@@ -128,11 +117,8 @@ pycbc_logger__enable_protocol_logger__(PyObject* self, PyObject* args, PyObject*
   const char* kw_format = "s";
   if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, kw_format, const_cast<char**>(kw_list), &filename)) {
-    pycbc_set_python_exception(PycbcError::InvalidArgument,
-                               __FILE__,
-                               __LINE__,
-                               "Cannot enable the protocol logger.  Unable to parse args/kwargs.");
-    return nullptr;
+    return raise_invalid_argument(
+      "Cannot enable the protocol logger.  Unable to parse args/kwargs.", __FILE__, __LINE__);
   }
   couchbase::core::logger::configuration configuration{};
   configuration.filename = std::string{ filename };
@@ -166,6 +152,16 @@ pycbc_logger__is_file_logger__(PyObject* self, PyObject* Py_UNUSED(ignored))
   }
 }
 
+PyObject*
+pycbc_logger__shutdown_sink__(PyObject* self, PyObject* Py_UNUSED(ignored))
+{
+  auto logger = reinterpret_cast<pycbc_logger*>(self);
+  if (logger->logger_sink_) {
+    logger->logger_sink_->deactivate();
+  }
+  Py_RETURN_NONE;
+}
+
 static PyMethodDef pycbc_logger_methods[] = {
   { "configure_logging_sink",
     (PyCFunction)pycbc_logger__configure_logging_sink__,
@@ -187,6 +183,10 @@ static PyMethodDef pycbc_logger_methods[] = {
     (PyCFunction)pycbc_logger__is_file_logger__,
     METH_NOARGS,
     PyDoc_STR("Check if logger is file logger or not") },
+  { "shutdown_sink",
+    (PyCFunction)pycbc_logger__shutdown_sink__,
+    METH_NOARGS,
+    PyDoc_STR("Shutdown the logger sink before interpreter finalization") },
   { NULL }
 };
 
@@ -238,41 +238,13 @@ convert_spdlog_level(spdlog::level::level_enum lvl)
   }
 }
 
-couchbase::core::logger::level
-convert_python_log_level(PyObject* level)
-{
-  auto lvl = PyLong_AsSize_t(level);
-  switch (lvl) {
-    case 0:
-      return couchbase::core::logger::level::off;
-    case 5:
-      return couchbase::core::logger::level::trace;
-    case 10:
-      return couchbase::core::logger::level::debug;
-    case 20:
-      return couchbase::core::logger::level::info;
-    case 30:
-      return couchbase::core::logger::level::warn;
-    case 40:
-      return couchbase::core::logger::level::err;
-    case 50:
-      return couchbase::core::logger::level::critical;
-    default:
-      return couchbase::core::logger::level::off;
-  }
-}
-
 PyObject*
 add_logger_objects(PyObject* pyObj_module)
 {
-  if (PyType_Ready(&pycbc_logger_type) < 0) {
-    return nullptr;
-  }
-  Py_INCREF(&pycbc_logger_type);
-  if (PyModule_AddObject(
-        pyObj_module, "pycbc_logger", reinterpret_cast<PyObject*>(&pycbc_logger_type)) < 0) {
-    Py_DECREF(&pycbc_logger_type);
+  if (register_pytype(pyObj_module, &pycbc_logger_type, "pycbc_logger") < 0) {
     return nullptr;
   }
   return pyObj_module;
 }
+
+} // namespace pycbc

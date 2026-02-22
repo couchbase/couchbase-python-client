@@ -70,24 +70,19 @@ class QueryIndex:
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class QueryIndexMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
 
         if callback is not None:
@@ -95,15 +90,6 @@ class QueryIndexMgmtRequest(MgmtRequest):
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
-
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
 
         return mgmt_kwargs
 
@@ -124,7 +110,7 @@ class CreateIndexRequest(QueryIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return QueryIndexMgmtOperationType.CreateIndex.value
+        return QueryIndexMgmtOperationType.QueryIndexCreate.value
 
 
 @dataclass
@@ -139,7 +125,7 @@ class DropIndexRequest(QueryIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return QueryIndexMgmtOperationType.DropIndex.value
+        return QueryIndexMgmtOperationType.QueryIndexDrop.value
 
 
 @dataclass
@@ -151,7 +137,7 @@ class GetAllIndexesRequest(QueryIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return QueryIndexMgmtOperationType.GetAllIndexes.value
+        return QueryIndexMgmtOperationType.QueryIndexGetAll.value
 
 
 @dataclass
@@ -163,7 +149,7 @@ class BuildDeferredIndexesRequest(QueryIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return QueryIndexMgmtOperationType.BuildDeferredIndexes.value
+        return QueryIndexMgmtOperationType.QueryIndexBuildDeferred.value
 
 
 @dataclass
@@ -176,7 +162,7 @@ class WatchIndexesRequest(QueryIndexMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return QueryIndexMgmtOperationType.WatchIndexes.value
+        return 'watch_indexes'
 
 
 QUERY_INDEX_MGMT_ERROR_MAP: Dict[str, Exception] = {

@@ -68,11 +68,10 @@ class AsyncUserMgmtImpl:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
         groups = []
-        raw_groups = ret.raw_result.get('groups', None)
-        if raw_groups:
-            for g in raw_groups:
-                group = Group.create_group(g)
-                groups.append(group)
+        raw_groups = ret.raw_result['groups']
+        for g in raw_groups:
+            group = Group.create_group(g)
+            groups.append(group)
 
         return groups
 
@@ -80,45 +79,35 @@ class AsyncUserMgmtImpl:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
         users = []
-        raw_users = ret.raw_result.get('users', None)
-        if raw_users:
-            for u in raw_users:
-                user = UserAndMetadata.create_user_and_metadata(u)
-                users.append(user)
+        raw_users = ret.raw_result['users']
+        for u in raw_users:
+            user = UserAndMetadata.create_user_and_metadata(u)
+            users.append(user)
 
         return users
 
     async def get_group(self, req: GetGroupRequest) -> Group:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_group = ret.raw_result.get('group', None)
-        group = None
-        if raw_group:
-            group = Group.create_group(raw_group)
-
-        return group
+        raw_group = ret.raw_result['group']
+        return Group.create_group(raw_group)
 
     async def get_roles(self, req: GetRolesRequest) -> Iterable[RoleAndDescription]:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
         roles = []
-        raw_roles = ret.raw_result.get('roles', None)
-        if raw_roles:
-            for r in raw_roles:
-                role = RoleAndDescription.create_role_and_description(r)
-                roles.append(role)
+        raw_roles = ret.raw_result['roles']
+        for r in raw_roles:
+            role = RoleAndDescription.create_role_and_description(r)
+            roles.append(role)
 
         return roles
 
     async def get_user(self, req: GetUserRequest) -> UserAndMetadata:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_user = ret.raw_result.get('user_and_metadata', None)
-        user = None
-        if raw_user:
-            user = UserAndMetadata.create_user_and_metadata(raw_user)
-
-        return user
+        raw_user = ret.raw_result['user']
+        return UserAndMetadata.create_user_and_metadata(raw_user)
 
     async def upsert_group(self, req: UpsertGroupRequest) -> None:
         """**INTERNAL**"""

@@ -19,7 +19,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.search import DateFacet  # noqa: F401
 from couchbase.logic.search import Facet  # noqa: F401
 from couchbase.logic.search import HighlightStyle  # noqa: F401
@@ -117,7 +117,7 @@ class FullTextSearchRequest(FullTextSearchRequestLogic):
             # @TODO:  PYCBC-1524
             row = next(self._streaming_result)
 
-        if isinstance(row, CouchbaseBaseException):
+        if isinstance(row, PycbcCoreException):
             raise ErrorMapper.build_exception(row)
         # should only be None one query request is complete and _no_ errors found
         if row is None:

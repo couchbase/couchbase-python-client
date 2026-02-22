@@ -24,10 +24,9 @@ from typing import (Any,
 
 from couchbase._utils import to_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import AnalyticsOptionsBase
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.options import AnalyticsOptions, UnsignedInt64
-from couchbase.pycbc_core import analytics_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.tracing import CouchbaseSpan
 
@@ -122,7 +121,7 @@ class AnalyticsMetaData:
     def __init__(self, raw  # type: Dict[str, Any]
                  ) -> None:
         if raw is not None:
-            self._raw = raw.get('metadata', None)
+            self._raw = raw
             sig = self._raw.get('signature', None)
             if sig is not None:
                 self._raw['signature'] = json.loads(sig)
@@ -199,8 +198,8 @@ class AnalyticsQuery:
         # named_params = {}
         # for k in kv:
         #     named_params["${0}".format(k)] = json.dumps(kv[k])
-        # couchbase++ wants all args JSONified
-        named_params = {f'${k}': json.dumps(v) for k, v in kv.items()}
+        # C++ core wants all args JSONified bytes
+        named_params = {f'${k}': json.dumps(v).encode('utf-8') for k, v in kv.items()}
 
         self._params["named_parameters"] = named_params
         return self
@@ -212,8 +211,8 @@ class AnalyticsQuery:
         :param args: Values to be used
         """
         arg_array = self._params.setdefault("positional_parameters", [])
-        # couchbase++ wants all args JSONified
-        json_args = [json.dumps(arg) for arg in args]
+        # C++ core wants all args JSONified bytes
+        json_args = [json.dumps(arg).encode('utf-8') for arg in args]
         arg_array.extend(json_args)
 
     def set_option(self, name, value):
@@ -328,7 +327,7 @@ class AnalyticsQuery:
         for k in value.keys():
             if not isinstance(k, str):
                 raise TypeError("key for raw value must be str")
-        raw_params = {f'{k}': json.dumps(v) for k, v in value.items()}
+        raw_params = {f'{k}': json.dumps(v).encode('utf-8') for k, v in value.items()}
         self.set_option('raw', raw_params)
 
     @property
@@ -432,19 +431,17 @@ class AnalyticsRequestLogic:
         return self._metadata
 
     def _set_metadata(self, analytics_response):
-        if isinstance(analytics_response, CouchbaseBaseException):
+        if isinstance(analytics_response, PycbcCoreException):
             raise ErrorMapper.build_exception(analytics_response)
 
-        self._metadata = AnalyticsMetaData(analytics_response.raw_result.get('value', None))
+        self._metadata = AnalyticsMetaData(analytics_response.raw_result.get('metadata', None))
 
     def _submit_query(self, **kwargs):
         if self.done_streaming:
             return
 
         self._started_streaming = True
-        analytics_kwargs = {
-            'conn': self._connection,
-        }
+        analytics_kwargs = {}
         analytics_kwargs.update(self.params)
 
         streaming_timeout = self.params.get('timeout', self._streaming_timeout)
@@ -460,7 +457,7 @@ class AnalyticsRequestLogic:
         if errback:
             analytics_kwargs['errback'] = errback
 
-        self._streaming_result = analytics_query(**analytics_kwargs)
+        self._streaming_result = self._connection.pycbc_analytics_query(**analytics_kwargs)
 
     def __iter__(self):
         raise NotImplementedError(

@@ -32,7 +32,7 @@ from couchbase.exceptions import (AnalyticsLinkExistsException,
                                   DataverseAlreadyExistsException,
                                   DataverseNotFoundException,
                                   InvalidArgumentException)
-from couchbase.logic.operation_types import AnalyticsIndexMgmtOperationType
+from couchbase.logic.operation_types import AnalyticsMgmtOperationType
 from couchbase.management.logic.mgmt_req import MgmtRequest
 
 
@@ -60,6 +60,13 @@ class AnalyticsDataset:
     dataverse_name: str = None
     link_name: str = None
     bucket_name: str = None
+
+    @classmethod
+    def from_server(cls, json_data: Dict[str, str]) -> AnalyticsDataset:
+        return cls(json_data['name'],
+                   json_data['dataverse_name'],
+                   json_data['link_name'],
+                   json_data['bucket_name'])
 
 
 @dataclass
@@ -185,11 +192,11 @@ class CouchbaseAnalyticsEncryptionSettings:
     def from_server_json(cls, raw_data: Dict[str, Any]) -> CouchbaseAnalyticsEncryptionSettings:
 
         encryption_settings = CouchbaseAnalyticsEncryptionSettings()
-        if raw_data['encryption_level'] == AnalyticsEncryptionLevel.NONE.value:
+        if raw_data['encryption'] == AnalyticsEncryptionLevel.NONE.value:
             encryption_settings.encryption_level = AnalyticsEncryptionLevel.NONE
-        elif raw_data['encryption_level'] == AnalyticsEncryptionLevel.HALF.value:
+        elif raw_data['encryption'] == AnalyticsEncryptionLevel.HALF.value:
             encryption_settings.encryption_level = AnalyticsEncryptionLevel.HALF
-        elif raw_data['encryption_level'] == AnalyticsEncryptionLevel.FULL.value:
+        elif raw_data['encryption'] == AnalyticsEncryptionLevel.FULL.value:
             encryption_settings.encryption_level = AnalyticsEncryptionLevel.FULL
 
         if 'certificate' in raw_data and not is_null_or_empty(raw_data['certificate']):
@@ -313,7 +320,7 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
         link_name = raw_data['link_name']
         hostname = raw_data['hostname']
         encryption = CouchbaseAnalyticsEncryptionSettings.from_server_json(
-            raw_data['encryption_settings'])
+            raw_data['encryption'])
         username = raw_data.get('username', None)
 
         return CouchbaseRemoteAnalyticsLink(
@@ -429,7 +436,7 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
             account_key: Optional[str] = None,
             shared_access_signature: Optional[str] = None,
             blob_endpoint: Optional[str] = None,
-            endpiont_suffix: Optional[str] = None,
+            endpoint_suffix: Optional[str] = None,
     ) -> None:
         super().__init__()
         self._dataverse = dataverse
@@ -439,7 +446,7 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
         self._account_key = account_key
         self._shared_access_signature = shared_access_signature
         self._blob_endpoint = blob_endpoint
-        self._endpiont_suffix = endpiont_suffix
+        self._endpoint_suffix = endpoint_suffix
 
     def name(self) -> str:
         return self._link_name
@@ -499,7 +506,6 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
         link_dict = {
             'link_name': self.name(),
             'dataverse': self.dataverse_name(),
-            'link_type': AnalyticsLinkType.AzureBlobExternal.value
         }
         if self._connection_string:
             link_dict['connection_string'] = self._connection_string
@@ -511,8 +517,8 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
             link_dict['shared_access_signature'] = self._shared_access_signature
         if self._blob_endpoint:
             link_dict['blob_endpoint'] = self._blob_endpoint
-        if self._endpiont_suffix:
-            link_dict['endpiont_suffix'] = self._endpiont_suffix
+        if self._endpoint_suffix:
+            link_dict['endpoint_suffix'] = self._endpoint_suffix
 
         return link_dict
 
@@ -529,44 +535,29 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
                                               link_name,
                                               account_name=account_name,
                                               blob_endpoint=blob_endpoint,
-                                              endpiont_suffix=endpoint_suffix)
+                                              endpoint_suffix=endpoint_suffix)
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class AnalyticsMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
-
         if callback is not None:
             mgmt_kwargs['callback'] = callback
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
-
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
 
         return mgmt_kwargs
 
@@ -580,7 +571,7 @@ class ConnectLinkRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.ConnectLink.value
+        return AnalyticsMgmtOperationType.AnalyticsLinkConnect.value
 
 
 @dataclass
@@ -593,7 +584,7 @@ class CreateDatasetRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.CreateDataset.value
+        return AnalyticsMgmtOperationType.AnalyticsDatasetCreate.value
 
 
 @dataclass
@@ -604,7 +595,7 @@ class CreateDataverseRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.CreateDataverse.value
+        return AnalyticsMgmtOperationType.AnalyticsDataverseCreate.value
 
 
 @dataclass
@@ -618,18 +609,37 @@ class CreateIndexRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.CreateIndex.value
+        return AnalyticsMgmtOperationType.AnalyticsIndexCreate.value
 
 
 @dataclass
-class CreateLinkRequest(AnalyticsMgmtRequest):
+class CreateAzureBlobExternalLinkRequest(AnalyticsMgmtRequest):
     link: Dict[str, Any]
-    link_type: str
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.CreateLink.value
+        return AnalyticsMgmtOperationType.AnalyticsLinkCreateAzureBlobExternalLink.value
+
+
+@dataclass
+class CreateCouchbaseRemoteLinkRequest(AnalyticsMgmtRequest):
+    link: Dict[str, Any]
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return AnalyticsMgmtOperationType.AnalyticsLinkCreateCouchbaseRemoteLink.value
+
+
+@dataclass
+class CreateS3ExternalLinkRequest(AnalyticsMgmtRequest):
+    link: Dict[str, Any]
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return AnalyticsMgmtOperationType.AnalyticsLinkCreateS3ExternalLink.value
 
 
 @dataclass
@@ -640,7 +650,7 @@ class DisconnectLinkRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.DisconnectLink.value
+        return AnalyticsMgmtOperationType.AnalyticsLinkDisconnect.value
 
 
 @dataclass
@@ -652,7 +662,7 @@ class DropDatasetRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.DropDataset.value
+        return AnalyticsMgmtOperationType.AnalyticsDatasetDrop.value
 
 
 @dataclass
@@ -663,7 +673,7 @@ class DropDataverseRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.DropDataverse.value
+        return AnalyticsMgmtOperationType.AnalyticsDataverseDrop.value
 
 
 @dataclass
@@ -676,7 +686,7 @@ class DropIndexRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.DropIndex.value
+        return AnalyticsMgmtOperationType.AnalyticsIndexDrop.value
 
 
 @dataclass
@@ -687,7 +697,7 @@ class DropLinkRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.DropLink.value
+        return AnalyticsMgmtOperationType.AnalyticsLinkDrop.value
 
 
 @dataclass
@@ -696,7 +706,7 @@ class GetAllDatasetsRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.GetAllDatasets.value
+        return AnalyticsMgmtOperationType.AnalyticsDatasetGetAll.value
 
 
 @dataclass
@@ -705,7 +715,7 @@ class GetAllIndexesRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.GetAllIndexes.value
+        return AnalyticsMgmtOperationType.AnalyticsIndexGetAll.value
 
 
 @dataclass
@@ -717,7 +727,7 @@ class GetLinksRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.GetLinks.value
+        return AnalyticsMgmtOperationType.AnalyticsLinkGetAll.value
 
 
 @dataclass
@@ -726,18 +736,37 @@ class GetPendingMutationsRequest(AnalyticsMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.GetPendingMutations.value
+        return AnalyticsMgmtOperationType.AnalyticsGetPendingMutations.value
 
 
 @dataclass
-class ReplaceLinkRequest(AnalyticsMgmtRequest):
+class ReplaceAzureBlobExternalLinkRequest(AnalyticsMgmtRequest):
     link: Dict[str, Any]
-    link_type: str
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return AnalyticsIndexMgmtOperationType.ReplaceLink.value
+        return AnalyticsMgmtOperationType.AnalyticsLinkReplaceAzureBlobExternalLink.value
+
+
+@dataclass
+class ReplaceCouchbaseRemoteLinkRequest(AnalyticsMgmtRequest):
+    link: Dict[str, Any]
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return AnalyticsMgmtOperationType.AnalyticsLinkReplaceCouchbaseRemoteLink.value
+
+
+@dataclass
+class ReplaceS3ExternalLinkRequest(AnalyticsMgmtRequest):
+    link: Dict[str, Any]
+    timeout: Optional[int] = None
+
+    @property
+    def op_name(self) -> str:
+        return AnalyticsMgmtOperationType.AnalyticsLinkReplaceS3ExternalLink.value
 
 
 ANALYTICS_MGMT_ERROR_MAP: Dict[str, Exception] = {

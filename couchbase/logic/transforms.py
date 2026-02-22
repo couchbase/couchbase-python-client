@@ -16,13 +16,29 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import (Any,
                     Callable,
                     Optional,
                     Union)
 
 from couchbase.exceptions import InvalidArgumentException
+
+
+def enum_to_int(value: Enum, enum: Enum, conversion_fn: Optional[Callable[..., Any]] = None) -> int:
+    if isinstance(value, int) and value in map(lambda x: x.value, enum):
+        # TODO: use warning?
+        # warn("Using deprecated string parameter {}".format(value))
+        return value
+    if not isinstance(value, enum):
+        raise InvalidArgumentException(f"Argument must be of type {enum} but got {value}")
+    if conversion_fn:
+        try:
+            return conversion_fn(value)
+        except Exception:
+            raise InvalidArgumentException(f"Unable to convert enum value {value} to str.")
+
+    return value.value
 
 
 def enum_to_str(value: Enum, enum: Enum, conversion_fn: Optional[Callable[..., Any]] = None) -> str:
@@ -39,6 +55,17 @@ def enum_to_str(value: Enum, enum: Enum, conversion_fn: Optional[Callable[..., A
             raise InvalidArgumentException(f"Unable to convert enum value {value} to str.")
 
     return value.value
+
+
+def int_to_enum(value: int, enum: IntEnum, conversion_fn: Optional[Callable[..., Any]] = None) -> int:
+    if not isinstance(value, int):
+        raise InvalidArgumentException(f"Argument must be of type int but got {type(value)}.")
+    try:
+        if conversion_fn:
+            return conversion_fn(value)
+        return enum(value)
+    except Exception:
+        raise InvalidArgumentException(f"Unable to convert {value} to enum of type {enum}.")
 
 
 def seconds_to_timedelta(value: Union[float, int]) -> timedelta:
@@ -59,10 +86,10 @@ def str_to_enum(value: str, enum: Enum, conversion_fn: Optional[Callable[..., An
         raise InvalidArgumentException(f"Unable to convert {value} to enum of type {enum}.")
 
 
-def timedelta_as_microseconds(duration: timedelta) -> int:
+def timedelta_as_milliseconds(duration: timedelta) -> int:
     if duration and not isinstance(duration, timedelta):
-        raise InvalidArgumentException(message=f'Expected value to be of type timedelta instead of {duration}')
-    return int(duration.total_seconds() * 1e6 if duration else 0)
+        raise InvalidArgumentException(message=f'Expected value to be of type timedelta instead of {type(duration)}')
+    return int(duration.total_seconds() * 1e3 if duration else 0)
 
 
 def to_seconds(value: Union[timedelta, float, int]) -> int:

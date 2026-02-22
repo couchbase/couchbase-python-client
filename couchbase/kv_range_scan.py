@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-from typing import Any, Dict
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
@@ -28,12 +29,13 @@ from couchbase.logic.kv_range_scan import ScanTerm  # noqa: F401
 from couchbase.logic.kv_range_scan import ScanType  # noqa: F401
 from couchbase.logic.kv_range_scan import RangeScanRequestLogic
 
+if TYPE_CHECKING:
+    from couchbase.logic.pycbc_core import pycbc_connection
+
 
 class RangeScanRequest(RangeScanRequestLogic):
-    def __init__(self,
-                 **kwargs,  # type: Dict[str, Any]
-                 ):
-        super().__init__(**kwargs)
+    def __init__(self, connection: pycbc_connection, **kwargs: Any) -> None:
+        super().__init__(connection, **kwargs)
 
     def __iter__(self):
         if self.done_streaming:

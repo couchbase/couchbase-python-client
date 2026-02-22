@@ -36,8 +36,8 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   PathNotFoundException,
                                   QueueEmpty)
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.collection_impl import CollectionImpl
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.supportability import Supportability
 from couchbase.management.queries import CollectionQueryIndexManager
 from couchbase.options import (ExistsMultiOptions,
@@ -78,8 +78,8 @@ from couchbase.subdocument import upsert as subdoc_upsert
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from couchbase._utils import JSONType
     from couchbase.kv_range_scan import ScanType
-    from couchbase.logic.top_level_types import JSONType
     from couchbase.options import (ExistsOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
@@ -1059,7 +1059,7 @@ class Collection:
 
 
         """  # noqa: E501
-        req = self._impl.request_builder.build_range_scan_request(scan_type, *opts, **kwargs)
+        req = self._impl.request_builder.build_range_scan_request(self._impl.connection, scan_type, *opts, **kwargs)
         return self._impl.range_scan(req)
 
     def binary(self) -> BinaryCollection:
@@ -2336,7 +2336,7 @@ class Collection:
                      keys,  # type: Union[MultiResultType, Dict[str, int]]
                      *opts,  # type: UnlockMultiOptions
                      **kwargs,  # type: Dict[str, Any]
-                     ) -> Dict[str, Union[None, CouchbaseBaseException]]:
+                     ) -> Dict[str, Union[None, PycbcCoreException]]:
         """For each result in the provided :class:`~couchbase.result.MultiResultType` in the provided list,
         unlocks a previously locked document. This operation fails if the document does not exist.
 

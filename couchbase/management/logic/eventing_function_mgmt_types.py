@@ -24,7 +24,7 @@ from typing import (Any,
                     List,
                     Optional)
 
-from couchbase._utils import is_null_or_empty, timedelta_as_microseconds
+from couchbase._utils import is_null_or_empty, timedelta_as_milliseconds
 from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
                                   EventingFunctionCollectionNotFoundException,
                                   EventingFunctionCompilationFailureException,
@@ -687,7 +687,7 @@ class EventingFunctionSettings:
             output['sock_batch_size'] = self.sock_batch_size
 
         if self.tick_duration:
-            output['tick_duration'] = timedelta_as_microseconds(self.tick_duration)
+            output['tick_duration'] = timedelta_as_milliseconds(self.tick_duration)
 
         if self.timer_context_size:
             output['timer_context_size'] = self.timer_context_size
@@ -699,7 +699,7 @@ class EventingFunctionSettings:
             output['bucket_cache_size'] = self.bucket_cache_size
 
         if self.bucket_cache_age:
-            output['bucket_cache_age'] = timedelta_as_microseconds(self.bucket_cache_age)
+            output['bucket_cache_age'] = timedelta_as_milliseconds(self.bucket_cache_age)
 
         if self.curl_max_allowed_resp_size:
             output['curl_max_allowed_resp_size'] = self.curl_max_allowed_resp_size
@@ -1064,24 +1064,19 @@ class EventingFunctionsStatus:
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class EventingFunctionMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
 
         if callback is not None:
@@ -1089,15 +1084,6 @@ class EventingFunctionMgmtRequest(MgmtRequest):
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
-
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
 
         return mgmt_kwargs
 
@@ -1111,7 +1097,7 @@ class DeployFunctionRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.DeployFunction.value
+        return EventingFunctionMgmtOperationType.EventingDeployFunction.value
 
 
 @dataclass
@@ -1123,7 +1109,7 @@ class DropFunctionRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.DropFunction.value
+        return EventingFunctionMgmtOperationType.EventingDropFunction.value
 
 
 @dataclass
@@ -1134,7 +1120,7 @@ class GetAllFunctionsRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.GetAllFunctions.value
+        return EventingFunctionMgmtOperationType.EventingGetAllFunctions.value
 
 
 @dataclass
@@ -1146,7 +1132,7 @@ class GetFunctionRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.GetAllFunctions.value
+        return EventingFunctionMgmtOperationType.EventingGetFunction.value
 
 
 @dataclass
@@ -1157,7 +1143,7 @@ class GetFunctionsStatusRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.FunctionsStatus.value
+        return EventingFunctionMgmtOperationType.EventingGetStatus.value
 
 
 @dataclass
@@ -1169,7 +1155,7 @@ class PauseFunctionRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.PauseFunction.value
+        return EventingFunctionMgmtOperationType.EventingPauseFunction.value
 
 
 @dataclass
@@ -1181,7 +1167,7 @@ class ResumeFunctionRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.ResumeFunction.value
+        return EventingFunctionMgmtOperationType.EventingResumeFunction.value
 
 
 @dataclass
@@ -1193,19 +1179,19 @@ class UndeployFunctionRequest(EventingFunctionMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.UndeployFunction.value
+        return EventingFunctionMgmtOperationType.EventingUndeployFunction.value
 
 
 @dataclass
 class UpsertFunctionRequest(EventingFunctionMgmtRequest):
-    eventing_function: Dict[str, Any]
+    function: Dict[str, Any]
     bucket_name: Optional[str] = None
     scope_name: Optional[str] = None
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return EventingFunctionMgmtOperationType.UpsertFunction.value
+        return EventingFunctionMgmtOperationType.EventingUpsertFunction.value
 
 
 EVENTING_FUNCTION_MGMT_ERROR_MAP = {

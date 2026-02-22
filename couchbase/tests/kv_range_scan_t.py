@@ -126,6 +126,9 @@ class RangeScanTestSuite:
         if return_rows:
             return rows
 
+    # Initial test marked as flaky which helps when tests transition from default collection to named collection.
+    # Might be related to CXXCBC-492.
+    @pytest.mark.flaky(reruns=3, reruns_delay=1)
     @pytest.mark.usefixtures('check_range_scan_supported')
     def test_range_scan(self, cb_env, test_id, test_mutation_state):
         scan_type = RangeScan(ScanTerm(f'{test_id}-1'), ScanTerm(f'{test_id}-2'))

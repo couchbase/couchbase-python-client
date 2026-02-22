@@ -15,42 +15,45 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from dataclasses import dataclass, field
+from typing import (Any,
+                    Dict,
+                    List,
+                    Optional,
+                    Tuple,
+                    Union)
 
 from couchbase.logic.operation_types import KeyValueMultiOperationType
 from couchbase.transcoder import Transcoder
 
-if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import PyCapsuleType
-
 
 @dataclass
 class CollectionMultiRequest:
-    op_type: int
     bucket_name: str
     scope_name: str
     collection_name: str
+    doc_list: Union[List[str], List[Tuple[str, Tuple[bytes, int]]]]
     op_args: Dict[str, Dict[str, Any]]
+    return_exceptions: bool
+    per_key_args: Optional[Dict[str, Dict[str, Any]]] = None
 
-    def req_to_dict(self, conn: PyCapsuleType) -> Dict[str, Any]:
+    def req_to_dict(self) -> Dict[str, Any]:
         op_kwargs = {
-            'conn': conn,
             'bucket': self.bucket_name,
             'scope': self.scope_name,
-            'collection_name': self.collection_name,
-            'op_type': self.op_type,
+            'collection': self.collection_name,
+            'doc_list': self.doc_list,
             'op_args': self.op_args
         }
+
+        if self.per_key_args:
+            op_kwargs['per_key_args'] = self.per_key_args
 
         return op_kwargs
 
 
 @dataclass
 class AppendMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -58,8 +61,15 @@ class AppendMultiRequest(CollectionMultiRequest):
 
 
 @dataclass
+class AppendWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.AppendWithLegacyDurabilityMulti.value
+
+
+@dataclass
 class DecrementMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -67,9 +77,16 @@ class DecrementMultiRequest(CollectionMultiRequest):
 
 
 @dataclass
+class DecrementWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.DecrementWithLegacyDurabilityMulti.value
+
+
+@dataclass
 class ExistsMultiRequest(CollectionMultiRequest):
-    transcoders: Dict[str, Transcoder]
-    return_exceptions: bool
+    transcoders: Dict[str, Transcoder] = field(default_factory=dict)
 
     @property
     def op_name(self) -> str:
@@ -78,8 +95,7 @@ class ExistsMultiRequest(CollectionMultiRequest):
 
 @dataclass
 class GetAllReplicasMultiRequest(CollectionMultiRequest):
-    transcoders: Dict[str, Transcoder]
-    return_exceptions: bool
+    transcoders: Dict[str, Transcoder] = field(default_factory=dict)
 
     @property
     def op_name(self) -> str:
@@ -88,8 +104,7 @@ class GetAllReplicasMultiRequest(CollectionMultiRequest):
 
 @dataclass
 class GetAndLockMultiRequest(CollectionMultiRequest):
-    transcoders: Dict[str, Transcoder]
-    return_exceptions: bool
+    transcoders: Dict[str, Transcoder] = field(default_factory=dict)
 
     @property
     def op_name(self) -> str:
@@ -98,8 +113,7 @@ class GetAndLockMultiRequest(CollectionMultiRequest):
 
 @dataclass
 class GetAnyReplicaMultiRequest(CollectionMultiRequest):
-    transcoders: Dict[str, Transcoder]
-    return_exceptions: bool
+    transcoders: Dict[str, Transcoder] = field(default_factory=dict)
 
     @property
     def op_name(self) -> str:
@@ -108,8 +122,7 @@ class GetAnyReplicaMultiRequest(CollectionMultiRequest):
 
 @dataclass
 class GetMultiRequest(CollectionMultiRequest):
-    transcoders: Dict[str, Transcoder]
-    return_exceptions: bool
+    transcoders: Dict[str, Transcoder] = field(default_factory=dict)
 
     @property
     def op_name(self) -> str:
@@ -118,7 +131,6 @@ class GetMultiRequest(CollectionMultiRequest):
 
 @dataclass
 class IncrementMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -126,8 +138,15 @@ class IncrementMultiRequest(CollectionMultiRequest):
 
 
 @dataclass
+class IncrementWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.IncrementWithLegacyDurabilityMulti.value
+
+
+@dataclass
 class InsertMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -135,8 +154,15 @@ class InsertMultiRequest(CollectionMultiRequest):
 
 
 @dataclass
+class InsertWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.InsertWithLegacyDurabilityMulti.value
+
+
+@dataclass
 class PrependMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -144,8 +170,15 @@ class PrependMultiRequest(CollectionMultiRequest):
 
 
 @dataclass
+class PrependWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.PrependWithLegacyDurabilityMulti.value
+
+
+@dataclass
 class RemoveMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -153,8 +186,15 @@ class RemoveMultiRequest(CollectionMultiRequest):
 
 
 @dataclass
+class RemoveWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.RemoveWithLegacyDurabilityMulti.value
+
+
+@dataclass
 class ReplaceMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -162,8 +202,15 @@ class ReplaceMultiRequest(CollectionMultiRequest):
 
 
 @dataclass
+class ReplaceWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.ReplaceWithLegacyDurabilityMulti.value
+
+
+@dataclass
 class TouchMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -172,7 +219,6 @@ class TouchMultiRequest(CollectionMultiRequest):
 
 @dataclass
 class UnlockMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
@@ -181,8 +227,15 @@ class UnlockMultiRequest(CollectionMultiRequest):
 
 @dataclass
 class UpsertMultiRequest(CollectionMultiRequest):
-    return_exceptions: bool
 
     @property
     def op_name(self) -> str:
         return KeyValueMultiOperationType.UpsertMulti.value
+
+
+@dataclass
+class UpsertWithLegacyDurabilityMultiRequest(CollectionMultiRequest):
+
+    @property
+    def op_name(self) -> str:
+        return KeyValueMultiOperationType.UpsertWithLegacyDurabilityMulti.value

@@ -22,11 +22,15 @@ from couchbase.durability import (ClientDurability,
                                   PersistToExtended,
                                   ReplicateTo,
                                   ServerDurability)
-from couchbase.exceptions import DurabilityImpossibleException
+from couchbase.exceptions import DurabilityImpossibleException, InvalidArgumentException
 from couchbase.options import (InsertMultiOptions,
+                               InsertOptions,
                                RemoveMultiOptions,
+                               RemoveOptions,
                                ReplaceMultiOptions,
-                               UpsertMultiOptions)
+                               ReplaceOptions,
+                               UpsertMultiOptions,
+                               UpsertOptions)
 from couchbase.result import MultiMutationResult, MutationResult
 from tests.environments import CollectionType
 from tests.environments.collection_multi_environment import CollectionMultiTestEnvironment
@@ -46,6 +50,7 @@ class DurabilityTestSuite:
         'test_client_durable_replace_multi_fail',
         'test_client_durable_upsert_multi',
         'test_client_durable_upsert_multi_fail',
+        'test_multi_mixed_durability_fail',
         'test_server_durable_insert_multi',
         'test_server_durable_insert_multi_single_node',
         'test_server_durable_remove_multi',
@@ -231,6 +236,49 @@ class DurabilityTestSuite:
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.upsert_multi(keys_and_docs, UpsertMultiOptions(durability=durability,
                                                                              return_exceptions=False))
+
+    @pytest.mark.parametrize(
+        'op_info',
+        [
+            ('insert_multi', True, InsertMultiOptions, InsertOptions),
+            ('upsert_multi', True, UpsertMultiOptions, UpsertOptions),
+            ('replace_multi', True, ReplaceMultiOptions, ReplaceOptions),
+            ('remove_multi', False, RemoveMultiOptions, RemoveOptions),
+        ]
+    )
+    def test_multi_mixed_durability_fail(self, cb_env, op_info):
+        op_name, has_docs, multi_opts_type, key_opts_type = op_info
+        keys_and_docs = cb_env.get_new_docs(2)
+        keys = list(keys_and_docs.keys())
+        key1 = keys[0]
+
+        collection_op = getattr(cb_env.collection, op_name)
+
+        # Scenario 1: global client durability, per-key server durability
+        opts = multi_opts_type(
+            durability=ServerDurability(level=DurabilityLevel.MAJORITY),
+            per_key_options={key1: key_opts_type(durability=ClientDurability(replicate_to=ReplicateTo.ONE))}
+        )
+
+        err_msg = 'Durability must be either client or server for all operations.'
+        with pytest.raises(InvalidArgumentException, match=err_msg):
+            if has_docs:
+                collection_op(keys_and_docs, opts)
+            else:
+                collection_op(keys, opts)
+
+        # Scenario 2: global server durability, per-key client durability
+        opts = multi_opts_type(
+            durability=ClientDurability(persist_to=PersistTo.ONE),
+            per_key_options={key1: key_opts_type(durability=ServerDurability(
+                level=DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE))}
+        )
+
+        with pytest.raises(InvalidArgumentException, match=err_msg):
+            if has_docs:
+                collection_op(keys_and_docs, opts)
+            else:
+                collection_op(keys, opts)
 
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')

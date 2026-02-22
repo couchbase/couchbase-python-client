@@ -65,15 +65,12 @@ class AsyncSearchIndexMgmtImpl:
     async def analyze_document(self, req: AnalyzeDocumentRequest) -> Dict[str, Any]:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        output = {}
-        analysis = ret.raw_result.get('analysis', None)
-        if analysis:
-            output['analysis'] = json.loads(analysis)
-        status = ret.raw_result.get('status', None)
-        if status:
-            output['status'] = status
-
-        return output
+        analysis = ret.raw_result['analysis']
+        status = ret.raw_result['status']
+        return {
+            'analysis': json.loads(analysis),
+            'status': status
+        }
 
     async def drop_index(self, req: DropIndexRequest) -> None:
         """**INTERNAL**"""
@@ -90,47 +87,31 @@ class AsyncSearchIndexMgmtImpl:
     async def get_all_indexes(self, req: GetAllIndexesRequest) -> Iterable[SearchIndex]:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        indexes = []
-        raw_indexes = ret.raw_result.get('indexes', None)
-        if raw_indexes:
-            indexes = [SearchIndex.from_server(idx) for idx in raw_indexes]
-
-        return indexes
+        raw_indexes = ret.raw_result['indexes']
+        return [SearchIndex.from_server(idx) for idx in raw_indexes]
 
     async def get_all_index_stats(self, req: GetAllIndexStatsRequest) -> Dict[str, Any]:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_stats = ret.raw_result.get('stats', None)
-        stats = None
-        if raw_stats:
-            stats = json.loads(raw_stats)
-
-        return stats
+        raw_stats = ret.raw_result['stats']
+        return json.loads(raw_stats)
 
     async def get_indexed_documents_count(self, req: GetIndexedDocumentsCountRequest) -> int:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        return ret.raw_result.get('count', 0)
+        return ret.raw_result['count']
 
     async def get_index(self, req: GetIndexRequest) -> SearchIndex:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_index = ret.raw_result.get('index', None)
-        index = None
-        if raw_index:
-            index = SearchIndex.from_server(raw_index)
-
-        return index
+        raw_index = ret.raw_result['index']
+        return SearchIndex.from_server(raw_index)
 
     async def get_index_stats(self, req: GetIndexStatsRequest) -> Dict[str, Any]:
         """**INTERNAL**"""
         ret = await self._client_adapter.execute_mgmt_request(req)
-        raw_stats = ret.raw_result.get('stats', None)
-        stats = None
-        if raw_stats:
-            stats = json.loads(raw_stats)
-
-        return stats
+        raw_stats = ret.raw_result['stats']
+        return json.loads(raw_stats)
 
     async def pause_ingest(self, req: PauseIngestRequest) -> None:
         """**INTERNAL**"""

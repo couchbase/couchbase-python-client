@@ -1,5 +1,5 @@
 /*
- *   Copyright 2016-2022. Couchbase, Inc.
+ *   Copyright 2016-2026. Couchbase, Inc.
  *   All Rights Reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,11 +17,32 @@
 
 #pragma once
 
-#include "client.hxx"
-#include "utils.hxx"
+#include "Python.h"
+#include "cpp_core_types_autogen.hxx"
+#include "pytocbpp_defs.hxx"
+#include "structmember.h"
+#include <chrono>
+#include <condition_variable>
+#include <core/logger/logger.hxx>
 #include <core/scan_result.hxx>
+#include <memory>
+#include <mutex>
 #include <queue>
+#include <system_error>
 
+namespace pycbc
+{
+
+// ======================================================================
+// rows_queue - Thread-safe queue for streaming results
+// ======================================================================
+// Generic queue template for streaming operations (query, analytics, replicas, etc.)
+// Holds result objects that are yielded one-by-one via Python iterator protocol
+//
+// Note: The timeout in get() logs a message but does NOT actually timeout.
+// This matches the reference implementation behavior - we wait indefinitely
+// for C++ core results to ensure we always get proper error details.
+// ======================================================================
 template<class T>
 class rows_queue
 {
@@ -35,6 +56,13 @@ public:
 
   ~rows_queue()
   {
+    // Clean up any remaining PyObject* references in the queue
+    std::lock_guard<std::mutex> lock(mut_);
+    while (!rows_.empty()) {
+      T item = rows_.front();
+      rows_.pop();
+      Py_XDECREF(item); // XDECREF handles NULL safely
+    }
   }
 
   void put(T row)
@@ -57,12 +85,13 @@ public:
         //     so wait a little longer to get the C++ core timeout.
         //   - The result set is large and since we don't have streaming support yet, we have to
         //   wait for
-        //     the entire result set to be returned.  Again we should wait until we get the results.
-        // PYCBC-1685: Instead of trying to do some tricky error handling we instead wait for the
+        //     the entire result set to be returned. Again we should wait until we get the results.
+        // Instead of trying to do some tricky error handling we instead wait for the
         // C++ core results and log a message that can provide insight to users about the SDK
         // behavior.
+
         CB_LOG_DEBUG(
-          "PYCBC: No results received from C++ core after {}ms.  Continue to wait for results.",
+          "PYCBC: No results received from C++ core after {}ms. Continue to wait for results.",
           timeout_ms.count());
       }
     }
@@ -75,45 +104,41 @@ public:
   int size()
   {
     std::lock_guard<std::mutex> lock(mut_);
-    return rows_.size();
+    return static_cast<int>(rows_.size());
   }
 
 private:
   std::queue<T> rows_;
   std::mutex mut_;
-  bool cancel_streaming_{ false };
   std::condition_variable cv_;
 };
 
-struct result {
-  PyObject_HEAD PyObject* dict;
+struct pycbc_result {
+  PyObject_HEAD PyObject* raw_result;
+  PyObject* core_span; // For tracing support
 };
 
 PyObject*
-create_result_obj();
+create_pycbc_result(PyObject* raw_result_dict = nullptr);
 
-struct mutation_token {
-  PyObject_HEAD couchbase::mutation_token* token;
-};
-
-PyObject*
-create_mutation_token_obj(struct couchbase::mutation_token mt);
-
-struct streamed_result {
+struct pycbc_streamed_result {
   PyObject_HEAD std::error_code ec;
   std::shared_ptr<rows_queue<PyObject*>> rows;
   std::chrono::milliseconds timeout_ms{};
+  PyObject* core_span; // For tracing support
 };
 
-streamed_result*
-create_streamed_result_obj(std::chrono::milliseconds timeout_ms);
+pycbc_streamed_result*
+create_pycbc_streamed_result(std::chrono::milliseconds timeout_ms);
 
-struct scan_iterator {
+struct pycbc_scan_iterator {
   PyObject_HEAD std::shared_ptr<couchbase::core::scan_result> scan_result;
 };
 
-scan_iterator*
-create_scan_iterator_obj(couchbase::core::scan_result result);
+pycbc_scan_iterator*
+create_pycbc_scan_iterator(couchbase::core::scan_result result);
 
-PyObject*
-add_result_objects(PyObject* pyObj_module);
+int
+add_result_objects(PyObject* module);
+
+} // namespace pycbc

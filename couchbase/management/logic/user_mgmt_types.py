@@ -91,9 +91,9 @@ class Role:
     def create_role(cls, raw_data: Dict[str, str]) -> Role:
         return cls(
             name=raw_data.get("name", None),
-            bucket=raw_data.get("bucket_name", None),
-            scope=raw_data.get("scope_name", None),
-            collection=raw_data.get("collection_name", None)
+            bucket=raw_data.get("bucket", None),
+            scope=raw_data.get("scope", None),
+            collection=raw_data.get("collection", None)
         )
 
 
@@ -180,7 +180,7 @@ class RoleAndOrigins:
         origin_data = raw_data.get("origins", None)
 
         return cls(
-            role=Role.create_role(raw_data.get("role")),
+            role=Role.create_role(raw_data),
             origins=list(map(lambda o: Origin(**o), origin_data))
             if origin_data else []
         )
@@ -273,7 +273,7 @@ class User:
     def as_dict(self) -> Dict[str, Any]:
         output = {
             "username": self.username,
-            "name": self.display_name,
+            "display_name": self.display_name,
             "password": self._password
         }
 
@@ -281,7 +281,7 @@ class User:
             output["roles"] = list(self.roles)
 
         if self.groups:
-            output["groups"] = list(self.groups)
+            output["groups"] = set(self.groups)
 
         return output
 
@@ -387,7 +387,7 @@ class UserAndMetadata:
         return cls(
             domain=AuthDomain.from_str(raw_data.get("domain")),
             effective_roles=effective_roles,
-            user=User.create_user(raw_data.get("user"), roles=user_roles),
+            user=User.create_user(raw_data, roles=user_roles),
             password_changed=pw_changed,
             external_groups=set(ext_group_data) if ext_group_data else None,
             raw_data=raw_data
@@ -467,24 +467,19 @@ class Group:
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class UserMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
 
         if callback is not None:
@@ -492,15 +487,6 @@ class UserMgmtRequest(MgmtRequest):
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
-
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
 
         return mgmt_kwargs
 
@@ -514,6 +500,14 @@ class ChangePasswordRequest(UserMgmtRequest):
     def op_name(self) -> str:
         return UserMgmtOperationType.ChangePassword.value
 
+    def req_to_dict(self,
+                    callback: Optional[Callable[..., None]] = None,
+                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+        op_kwargs = super().req_to_dict(callback=callback, errback=errback)
+        pw = op_kwargs.pop('password')
+        op_kwargs['newPassword'] = pw
+        return op_kwargs
+
 
 @dataclass
 class DropGroupRequest(UserMgmtRequest):
@@ -522,7 +516,7 @@ class DropGroupRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.DropGroup.value
+        return UserMgmtOperationType.GroupDrop.value
 
 
 @dataclass
@@ -533,7 +527,7 @@ class DropUserRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.DropGroup.value
+        return UserMgmtOperationType.UserDrop.value
 
 
 @dataclass
@@ -542,7 +536,7 @@ class GetAllGroupsRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.GetAllGroups.value
+        return UserMgmtOperationType.GroupGetAll.value
 
 
 @dataclass
@@ -552,7 +546,7 @@ class GetAllUsersRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.GetAllUsers.value
+        return UserMgmtOperationType.UserGetAll.value
 
 
 @dataclass
@@ -562,7 +556,7 @@ class GetGroupRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.GetGroup.value
+        return UserMgmtOperationType.GroupGet.value
 
 
 @dataclass
@@ -571,7 +565,7 @@ class GetRolesRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.GetRoles.value
+        return UserMgmtOperationType.RoleGetAll.value
 
 
 @dataclass
@@ -582,7 +576,7 @@ class GetUserRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.GetUser.value
+        return UserMgmtOperationType.UserGet.value
 
 
 @dataclass
@@ -592,7 +586,7 @@ class UpsertGroupRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.UpsertGroup.value
+        return UserMgmtOperationType.GroupUpsert.value
 
 
 @dataclass
@@ -603,7 +597,7 @@ class UpsertUserRequest(UserMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return UserMgmtOperationType.UpsertUser.value
+        return UserMgmtOperationType.UserUpsert.value
 
 
 USER_MGMT_ERROR_MAP: Dict[str, Exception] = {

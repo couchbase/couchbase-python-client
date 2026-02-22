@@ -23,9 +23,9 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.n1ql import N1QLQuery  # noqa: F401
 from couchbase.logic.n1ql import QueryRequestLogic
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class AsyncN1QLRequest(QueryRequestLogic):
 
         # this is a blocking operation
         row = next(self._streaming_result)
-        if isinstance(row, CouchbaseBaseException):
+        if isinstance(row, PycbcCoreException):
             raise ErrorMapper.build_exception(row)
         # should only be None once query request is complete and _no_ errors found
         if row is None:

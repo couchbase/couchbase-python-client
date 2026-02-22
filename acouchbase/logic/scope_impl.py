@@ -15,17 +15,15 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING, Union
 
 from acouchbase.analytics import AsyncAnalyticsRequest
 from acouchbase.n1ql import AsyncN1QLRequest
 from acouchbase.search import AsyncFullTextSearchRequest
 from couchbase.logic.cluster_impl import ClusterSettings
 from couchbase.logic.cluster_settings import StreamingTimeouts
+from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.logic.scope_req_builder import ScopeRequestBuilder
-from couchbase.logic.top_level_types import PyCapsuleType
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
@@ -64,7 +62,7 @@ class AsyncScopeImpl:
         return self._bucket_impl.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         """
         **INTERNAL**
         """

@@ -98,8 +98,8 @@ class EventingFunctionManager:
                               *options,  # type: ResumeFunctionOptions
                               **kwargs  # type: Any
                               ) -> None:
-        req = self._impl.request_builder.build_pause_function_request(name, self._scope_context, *options, **kwargs)
-        await self._impl.pause_function(req)
+        req = self._impl.request_builder.build_resume_function_request(name, self._scope_context, *options, **kwargs)
+        await self._impl.resume_function(req)
 
     async def undeploy_function(self,
                                 name,  # type: str

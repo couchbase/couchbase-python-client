@@ -24,7 +24,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap,
                                   InternalSDKException)
-from couchbase.exceptions import exception as BaseCouchbaseException
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
 
 def call_async_fn(ft, self, fn, *args, **kwargs):
@@ -162,14 +162,14 @@ class AsyncUtilityTestSuite:
         assert isinstance(res, str)
         assert res == expected
 
-    @pytest.mark.parametrize('err, tester_class', [(BaseCouchbaseException, AsyncTester),
+    @pytest.mark.parametrize('err, tester_class', [(PycbcCoreException, AsyncTester),
                                                    (CouchbaseException, AsyncTester),
                                                    (SystemError, AsyncTester),
                                                    (BaseException, AsyncTester),
                                                    (KeyboardInterrupt, AsyncTester),
                                                    (SystemExit, AsyncTester),
                                                    (asyncio.CancelledError, AsyncTester),
-                                                   (BaseCouchbaseException, AsyncTxnTester),
+                                                   (PycbcCoreException, AsyncTxnTester),
                                                    (CouchbaseException, AsyncTxnTester),
                                                    (SystemError, AsyncTxnTester),
                                                    (BaseException, AsyncTxnTester),
@@ -187,7 +187,7 @@ class AsyncUtilityTestSuite:
         with pytest.raises(type(expected_error)):
             await tester.use_errback(expected_error)
 
-    @pytest.mark.parametrize('err', [BaseCouchbaseException,
+    @pytest.mark.parametrize('err', [PycbcCoreException,
                                      CouchbaseException,
                                      SystemError,
                                      BaseException,
@@ -220,7 +220,7 @@ class AsyncUtilityTestSuite:
             with pytest.raises(type(expected_error)):
                 await tester.fn_failure(expected_error)
 
-    @pytest.mark.parametrize('err', [BaseCouchbaseException,
+    @pytest.mark.parametrize('err', [PycbcCoreException,
                                      CouchbaseException,
                                      SystemError,
                                      BaseException,

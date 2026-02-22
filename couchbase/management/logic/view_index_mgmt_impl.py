@@ -51,7 +51,7 @@ class ViewIndexMgmtImpl:
     def get_design_document(self, req: GetDesignDocumentRequest) -> DesignDocument:
         """**INTERNAL**"""
         ret = self._client_adapter.execute_mgmt_request(req)
-        raw_ddoc = ret.raw_result['design_document']
+        raw_ddoc = ret.raw_result['document']
         return DesignDocument.from_json(raw_ddoc)
 
     def publish_design_document(self,

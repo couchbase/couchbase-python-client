@@ -20,21 +20,21 @@ from typing import (TYPE_CHECKING,
                     Optional)
 
 from couchbase.exceptions import ErrorMapper
-from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic.pycbc_core import create_new_attempt_context, create_transaction_context
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
+from couchbase.logic.pycbc_core import (transaction_commit,
+                                        transaction_get_multi_op,
+                                        transaction_op,
+                                        transaction_operations,
+                                        transaction_query_op,
+                                        transaction_rollback)
 from couchbase.options import TransactionOptions
-from couchbase.pycbc_core import (create_new_attempt_context,
-                                  create_transaction_context,
-                                  transaction_commit,
-                                  transaction_get_multi_op,
-                                  transaction_op,
-                                  transaction_operations,
-                                  transaction_query_op,
-                                  transaction_rollback)
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
-    from couchbase._utils import PyCapsuleType
+    from couchbase.logic.pycbc_core import transaction_options
+    from couchbase.logic.pycbc_core.pycbc_core_types import TransactionsCapsuleType
     from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)
@@ -42,10 +42,10 @@ log = logging.getLogger(__name__)
 
 class AttemptContextLogic:
     def __init__(self,
-                 txns,    # type: PyCapsuleType
+                 txns,    # type: TransactionsCapsuleType
                  transcoder,  # type: Transcoder
                  loop,    # type: Optional[AbstractEventLoop]
-                 opts    # type: Optional[PyCapsuleType]
+                 opts    # type: Optional[transaction_options]
                  ) -> None:
         if opts is None:
             opts = TransactionOptions()._base
@@ -56,7 +56,7 @@ class AttemptContextLogic:
     def _handle_exception(self, ex: Any) -> None:
         if isinstance(ex, Exception):
             raise ex
-        if isinstance(ex, CouchbaseBaseException):
+        if isinstance(ex, PycbcCoreException):
             raise ErrorMapper.build_exception(ex)
 
     def _new_attempt(self) -> None:

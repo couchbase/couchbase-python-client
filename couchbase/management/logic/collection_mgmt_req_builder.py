@@ -36,7 +36,6 @@ from couchbase.management.logic.collection_mgmt_req_types import (COLLECTION_MGM
                                                                   UpdateCollectionSettings)
 from couchbase.management.options import CreateCollectionOptions, DropCollectionOptions
 from couchbase.options import forward_args
-from couchbase.pycbc_core import collection_mgmt_operations, mgmt_operations
 
 
 class CollectionMgmtRequestBuilder:
@@ -146,7 +145,6 @@ class CollectionMgmtRequestBuilder:
         self._validate_scope_name(scope_name)
         self._validate_collection_name(collection_name)
 
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
@@ -162,11 +160,7 @@ class CollectionMgmtRequestBuilder:
             if settings.history is not None:
                 op_args["history"] = settings.history
 
-        req = CreateCollectionRequest(self._error_map,
-                                      mgmt_operations.COLLECTION.value,
-                                      collection_mgmt_operations.CREATE_COLLECTION.value,
-                                      **op_args)
-
+        req = CreateCollectionRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -179,8 +173,6 @@ class CollectionMgmtRequestBuilder:
                                    **kwargs: object) -> CreateScopeRequest:
         self._validate_bucket_name(bucket_name)
         self._validate_scope_name(scope_name)
-
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
@@ -189,11 +181,7 @@ class CollectionMgmtRequestBuilder:
             "scope_name": scope_name,
         }
 
-        req = CreateScopeRequest(self._error_map,
-                                 mgmt_operations.COLLECTION.value,
-                                 collection_mgmt_operations.CREATE_SCOPE.value,
-                                 **op_args)
-
+        req = CreateScopeRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -219,7 +207,6 @@ class CollectionMgmtRequestBuilder:
         self._validate_scope_name(scope_name)
         self._validate_collection_name(collection_name)
 
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
@@ -229,11 +216,7 @@ class CollectionMgmtRequestBuilder:
             "collection_name": collection_name,
         }
 
-        req = DropCollectionRequest(self._error_map,
-                                    mgmt_operations.COLLECTION.value,
-                                    collection_mgmt_operations.DROP_COLLECTION.value,
-                                    **op_args)
-
+        req = DropCollectionRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -247,7 +230,6 @@ class CollectionMgmtRequestBuilder:
         self._validate_bucket_name(bucket_name)
         self._validate_scope_name(scope_name)
 
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
@@ -256,10 +238,7 @@ class CollectionMgmtRequestBuilder:
             "scope_name": scope_name,
         }
 
-        req = DropScopeRequest(self._error_map,
-                               mgmt_operations.COLLECTION.value,
-                               collection_mgmt_operations.DROP_SCOPE.value,
-                               **op_args)
+        req = DropScopeRequest(self._error_map, **op_args)
 
         if timeout is not None:
             req.timeout = timeout
@@ -272,7 +251,6 @@ class CollectionMgmtRequestBuilder:
                                      **kwargs: object) -> GetAllScopesRequest:
         self._validate_bucket_name(bucket_name)
 
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
@@ -280,11 +258,7 @@ class CollectionMgmtRequestBuilder:
             "bucket_name": bucket_name,
         }
 
-        req = GetAllScopesRequest(self._error_map,
-                                  mgmt_operations.COLLECTION.value,
-                                  collection_mgmt_operations.GET_ALL_SCOPES.value,
-                                  **op_args)
-
+        req = GetAllScopesRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 
@@ -301,7 +275,6 @@ class CollectionMgmtRequestBuilder:
         self._validate_scope_name(scope_name)
         self._validate_collection_name(collection_name)
 
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
@@ -317,11 +290,7 @@ class CollectionMgmtRequestBuilder:
             if settings.history is not None:
                 op_args["history"] = settings.history
 
-        req = UpdateCollectionRequest(self._error_map,
-                                      mgmt_operations.COLLECTION.value,
-                                      collection_mgmt_operations.UPDATE_COLLECTION.value,
-                                      **op_args)
-
+        req = UpdateCollectionRequest(self._error_map, **op_args)
         if timeout is not None:
             req.timeout = timeout
 

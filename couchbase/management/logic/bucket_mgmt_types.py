@@ -35,7 +35,9 @@ from couchbase.exceptions import (BucketAlreadyExistsException,
                                   InvalidArgumentException,
                                   RateLimitedException)
 from couchbase.logic.operation_types import BucketMgmtOperationType
-from couchbase.logic.transforms import seconds_to_timedelta, str_to_enum
+from couchbase.logic.transforms import (int_to_enum,
+                                        seconds_to_timedelta,
+                                        str_to_enum)
 from couchbase.management.logic.mgmt_req import MgmtRequest
 
 
@@ -44,6 +46,32 @@ class EvictionPolicyType(Enum):
     NO_EVICTION = "noEviction"
     FULL = "fullEviction"
     VALUE_ONLY = "valueOnly"
+
+    @classmethod
+    def from_server_str(cls, value):
+        if value == 'not_recently_used':
+            return cls.NOT_RECENTLY_USED
+        elif value == 'no_eviction':
+            return cls.NO_EVICTION
+        elif value == 'value_only':
+            return cls.VALUE_ONLY
+        elif value == 'full':
+            return cls.FULL
+        else:
+            return cls.UNKNOWN
+
+    @classmethod
+    def to_server_str(cls, value):
+        if value == cls.NOT_RECENTLY_USED:
+            return 'not_recently_used'
+        elif value == cls.NO_EVICTION:
+            return 'no_eviction'
+        elif value == cls.VALUE_ONLY:
+            return 'value_only'
+        elif value == cls.FULL:
+            return 'full'
+        else:
+            return 'unknown'
 
 
 class EjectionMethod(Enum):
@@ -55,12 +83,38 @@ class BucketType(Enum):
     COUCHBASE = "membase"
     MEMCACHED = "memcached"
     EPHEMERAL = "ephemeral"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def from_server_str(cls, value):
+        if value == 'couchbase':
+            return cls.COUCHBASE
+        elif value == 'membase':
+            return cls.COUCHBASE
+        elif value == 'memcached':
+            return cls.MEMCACHED
+        elif value == 'ephemeral':
+            return cls.EPHEMERAL
+        else:
+            return cls.UNKNOWN
+
+    @classmethod
+    def to_server_str(cls, value):
+        if value == cls.COUCHBASE:
+            return 'couchbase'
+        elif value == cls.MEMCACHED:
+            return 'memcached'
+        elif value == cls.EPHEMERAL:
+            return 'ephemeral'
+        else:
+            return 'unknown'
 
 
 class CompressionMode(Enum):
     OFF = "off"
     PASSIVE = "passive"
     ACTIVE = "active"
+    UNKNOWN = "unknown"
 
 
 class ConflictResolutionType(Enum):
@@ -76,6 +130,29 @@ class ConflictResolutionType(Enum):
     TIMESTAMP = "lww"
     SEQUENCE_NUMBER = "seqno"
     CUSTOM = "custom"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def from_server_str(cls, value):
+        if value == 'timestamp':
+            return cls.TIMESTAMP
+        elif value == 'sequence_number':
+            return cls.SEQUENCE_NUMBER
+        elif value == 'custom':
+            return cls.CUSTOM
+        else:
+            return cls.UNKNOWN
+
+    @classmethod
+    def to_server_str(cls, value):
+        if value == cls.TIMESTAMP:
+            return 'timestamp'
+        elif value == cls.SEQUENCE_NUMBER:
+            return 'sequence_number'
+        elif value == cls.CUSTOM:
+            return 'custom'
+        else:
+            return 'unknown'
 
 
 class StorageBackend(Enum):
@@ -176,7 +253,7 @@ class BucketSettings(dict):
          **DEPRECATED** use max_expiry
             Value for the maxTTL of new documents created without a ttl.
         """
-        return self.get('max_ttl', None)
+        return self.get('max_expiry', None)
 
     @property
     def minimum_durability_level(self) -> Optional[DurabilityLevel]:
@@ -219,56 +296,60 @@ class BucketSettings(dict):
     def bucket_settings_from_server(cls, settings: Dict[str, Any]) -> BucketSettings:  # noqa: C901
         """**INTERNAL**"""
         output = dict()
-        bucket_type = settings.get('bucketType', None)
+        bucket_type = settings.get('bucket_type', None)
         if bucket_type:
-            output['bucket_type'] = str_to_enum(bucket_type, BucketType)
-        compression_mode = settings.get('compressionMode', None)
+            output['bucket_type'] = str_to_enum(bucket_type,
+                                                BucketType,
+                                                BucketType.from_server_str)
+        compression_mode = settings.get('compression_mode', None)
         if compression_mode:
-            output['compression_mode'] = str_to_enum(compression_mode, CompressionMode)
-        conflict_resolution_type = settings.get('conflictResolutionType', None)
+            output['compression_mode'] = str_to_enum(compression_mode,
+                                                     CompressionMode)
+        conflict_resolution_type = settings.get('conflict_resolution_type', None)
         if conflict_resolution_type:
-            output['conflict_resolution_type'] = str_to_enum(conflict_resolution_type, ConflictResolutionType)
-        eviction_policy = settings.get('evictionPolicy', None)
+            output['conflict_resolution_type'] = str_to_enum(conflict_resolution_type,
+                                                             ConflictResolutionType,
+                                                             ConflictResolutionType.from_server_str)
+        eviction_policy = settings.get('eviction_policy', None)
         if eviction_policy:
-            output['eviction_policy'] = str_to_enum(eviction_policy, EvictionPolicyType)
-        output['flush_enabled'] = settings.get('flushEnabled', None)
-        history_retention_collection_default = settings.get('historyRetentionCollectionDefault', None)
+            output['eviction_policy'] = str_to_enum(eviction_policy,
+                                                    EvictionPolicyType,
+                                                    EvictionPolicyType.from_server_str)
+        output['flush_enabled'] = settings.get('flush_enabled', None)
+        history_retention_collection_default = settings.get('history_retention_collection_default', None)
         if history_retention_collection_default is not None:
             output['history_retention_collection_default'] = history_retention_collection_default
-        history_retention_bytes = settings.get('historyRetentionBytes', None)
+        history_retention_bytes = settings.get('history_retention_bytes', None)
         if history_retention_bytes is not None:
             output['history_retention_bytes'] = history_retention_bytes
-        history_retention_duration = settings.get('historyRetentionDuration', None)
+        history_retention_duration = settings.get('history_retention_duration', None)
         if history_retention_duration is not None:
             output['history_retention_duration'] = seconds_to_timedelta(history_retention_duration)
-        max_expiry = settings.get('maxExpiry', None)
+        # maxTTL not a thing in C++ core; only when writing to server will we send max_expiry with the maxTTL value
+        max_expiry = settings.get('max_expiry', None)
         if max_expiry is not None:
             output['max_expiry'] = seconds_to_timedelta(max_expiry)
-        # @TODO:  maxTTL is depricated
-        max_ttl = settings.get('maxTTL', None)
-        if max_ttl is not None:
-            output['max_ttl'] = seconds_to_timedelta(max_ttl)
-        minimum_durability_level = settings.get('durabilityMinLevel', None)
+        minimum_durability_level = settings.get('minimum_durability_level', None)
         if minimum_durability_level is not None:
-            output['minimum_durability_level'] = str_to_enum(minimum_durability_level,
-                                                             DurabilityLevel,
-                                                             DurabilityLevel.from_server_str)
+            output['minimum_durability_level'] = int_to_enum(minimum_durability_level, DurabilityLevel)
         output['name'] = settings.get('name', None)
-        num_replicas = settings.get('numReplicas', None)
+        num_replicas = settings.get('num_replicas', None)
         if num_replicas is not None:
             output['num_replicas'] = num_replicas
-        num_vbuckets = settings.get('numVBuckets', None)
+        num_vbuckets = settings.get('num_vbuckets', None)
         if num_vbuckets is not None:
             output['num_vbuckets'] = num_vbuckets
-        ram_quota_mb = settings.get('ramQuotaMB', None)
+        ram_quota_mb = settings.get('ram_quota_mb', None)
         if ram_quota_mb is not None:
             output['ram_quota_mb'] = ram_quota_mb
-        output['replica_index'] = settings.get('replicaIndex', None)
-        replica_index = settings.get('replicaIndex', None)
+        # replica_indexes in C++ core struct
+        replica_index = settings.get('replica_indexes', None)
         if replica_index is not None:
             output['replica_index'] = replica_index
-        storage_backend = settings.get('storageBackend', None)
+        storage_backend = settings.get('storage_backend', None)
         if storage_backend:
+            if storage_backend == 'unknown':
+                storage_backend = 'undefined'
             output['storage_backend'] = str_to_enum(storage_backend, StorageBackend)
 
         return cls(**output)
@@ -325,27 +406,24 @@ class BucketDescribeResult:
     number_of_replicas: int = None
     bucket_capabilities: List[str] = None
     storage_backend: str = None
+    server_groups: Dict[str, Any] = None
 
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['mgmt_op', 'op_type', 'timeout', 'error_map']
+OPARG_SKIP_LIST = ['error_map']
 
 
 @dataclass
 class BucketMgmtRequest(MgmtRequest):
-    mgmt_op: str
-    op_type: str
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: Any,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+
         mgmt_kwargs = {
-            'conn': conn,
-            'mgmt_op': self.mgmt_op,
-            'op_type': self.op_type,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
         }
 
         if callback is not None:
@@ -354,21 +432,12 @@ class BucketMgmtRequest(MgmtRequest):
         if errback is not None:
             mgmt_kwargs['errback'] = errback
 
-        if self.timeout is not None:
-            mgmt_kwargs['timeout'] = self.timeout
-
-        mgmt_kwargs['op_args'] = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        }
-
         return mgmt_kwargs
 
 
 @dataclass
 class BucketDescribeRequest(BucketMgmtRequest):
-    bucket_name: str
+    name: str
     timeout: Optional[int] = None
 
     @property
@@ -378,32 +447,32 @@ class BucketDescribeRequest(BucketMgmtRequest):
 
 @dataclass
 class CreateBucketRequest(BucketMgmtRequest):
-    bucket_settings: Dict[str, Any]
+    bucket: Dict[str, Any]
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return BucketMgmtOperationType.CreateBucket.value
+        return BucketMgmtOperationType.BucketCreate.value
 
 
 @dataclass
 class DropBucketRequest(BucketMgmtRequest):
-    bucket_name: str
+    name: str
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return BucketMgmtOperationType.DropBucket.value
+        return BucketMgmtOperationType.BucketDrop.value
 
 
 @dataclass
 class FlushBucketRequest(BucketMgmtRequest):
-    bucket_name: str
+    name: str
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return BucketMgmtOperationType.FlushBucket.value
+        return BucketMgmtOperationType.BucketFlush.value
 
 
 @dataclass
@@ -412,27 +481,27 @@ class GetAllBucketsRequest(BucketMgmtRequest):
 
     @property
     def op_name(self) -> str:
-        return BucketMgmtOperationType.GetAllBuckets.value
+        return BucketMgmtOperationType.BucketGetAll.value
 
 
 @dataclass
 class GetBucketRequest(BucketMgmtRequest):
-    bucket_name: str
+    name: str
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return BucketMgmtOperationType.GetBucket.value
+        return BucketMgmtOperationType.BucketGet.value
 
 
 @dataclass
 class UpdateBucketRequest(BucketMgmtRequest):
-    bucket_settings: Dict[str, Any]
+    bucket: Dict[str, Any]
     timeout: Optional[int] = None
 
     @property
     def op_name(self) -> str:
-        return BucketMgmtOperationType.UpdateBucket.value
+        return BucketMgmtOperationType.BucketUpdate.value
 
 
 BUCKET_MGMT_ERROR_MAP: Dict[str, Exception] = {

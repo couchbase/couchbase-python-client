@@ -91,6 +91,7 @@ class EventingManagementTestSuite:
     @pytest.fixture()
     def create_eventing_function(self, cb_env):
         cb_env.efm.upsert_function(cb_env.BASIC_FUNC)
+        cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
 
     @pytest.fixture()
     def drop_eventing_functions(self, cb_env):
@@ -390,14 +391,7 @@ class EventingManagementTestSuite:
         cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
 
         with pytest.raises(EventingFunctionNotFoundException):
-            cb_env.efm.pause_function('not-a-function')
-
-        if cb_env.server_version_short >= 8.0:
-            with pytest.raises(InternalServerFailureException):
-                cb_env.efm.pause_function(cb_env.BASIC_FUNC.name)
-        else:
-            with pytest.raises(EventingFunctionNotBootstrappedException):
-                cb_env.efm.pause_function(cb_env.BASIC_FUNC.name)
+            cb_env.efm.resume_function('not-a-function')
 
     @pytest.mark.usefixtures('create_and_drop_eventing_function')
     def test_undeploy_function(self, cb_env):

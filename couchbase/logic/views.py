@@ -28,11 +28,10 @@ from typing import (TYPE_CHECKING,
 
 from couchbase._utils import to_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
-from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import ViewOptionsBase
+from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import UnsignedInt64, ViewOptions
-from couchbase.pycbc_core import view_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.tracing import CouchbaseSpan
 
@@ -45,22 +44,64 @@ class ViewScanConsistency(Enum):
     REQUEST_PLUS = 'false'
     UPDATE_AFTER = 'update_after'
 
+    def to_str(self) -> str:
+        if self.value == 'false':
+            return 'request_plus'
+        elif self.value == 'ok':
+            return 'not_bounded'
+        else:
+            return self.value
+
+    @classmethod
+    def from_str(cls, value: str) -> ViewScanConsistency:
+        if value in ['false', 'request_plus']:
+            return cls.REQUEST_PLUS
+        elif value in ['ok', 'not_bounded']:
+            return cls.NOT_BOUNDED
+        elif value == 'update_after':
+            return cls.UPDATE_AFTER
+
 
 class ViewOrdering(Enum):
     DESCENDING = 'true'
     ASCENDING = 'false'
+
+    def to_str(self) -> str:
+        if self.value == 'false':
+            return 'ascending'
+        else:
+            return 'descending'
+
+    @classmethod
+    def from_str(cls, value: str) -> ViewOrdering:
+        if value == 'descending':
+            return cls.DESCENDING
+        else:
+            return cls.ASCENDING
 
 
 class ViewErrorMode(Enum):
     CONTINUE = 'continue'
     STOP = 'stop'
 
+    def to_str(self) -> str:
+        return 'resume' if self.value == 'continue' else self.value
+
+    @classmethod
+    def from_str(cls, value: str) -> ViewErrorMode:
+        if value == 'resume':
+            return cls.CONTINUE
+        elif value == 'continue':
+            return cls.CONTINUE
+        else:
+            return cls.STOP
+
 
 class ViewMetaData:
     def __init__(self, raw  # type: Dict[str, Any]
                  ) -> None:
         if raw is not None:
-            self._raw = raw.get('metadata', None)
+            self._raw = raw
         else:
             self._raw = None
 
@@ -194,20 +235,15 @@ class ViewQuery:
         if value is None:
             return ViewScanConsistency.NOT_BOUNDED
         if isinstance(value, str):
-            if value == 'ok':
-                return ViewScanConsistency.NOT_BOUNDED
-            elif value == 'false':
-                return ViewScanConsistency.REQUEST_PLUS
-            else:
-                return ViewScanConsistency.UPDATE_AFTER
+            return ViewScanConsistency.from_str(value)
 
     @consistency.setter
     def consistency(self, value  # type: Union[ViewScanConsistency, str]
                     ) -> None:
         if isinstance(value, ViewScanConsistency):
-            self.set_option('scan_consistency', value.value)
+            self.set_option('scan_consistency', value.to_str())
         elif isinstance(value, str) and value in [sc.value for sc in ViewScanConsistency]:
-            self.set_option('scan_consistency', value)
+            self.set_option('scan_consistency', ViewScanConsistency(value).to_str())
         else:
             raise InvalidArgumentException(message=("Excepted consistency to be either of type "
                                                     "ViewScanConsistency or str representation "
@@ -314,18 +350,15 @@ class ViewQuery:
         if value is None:
             return ViewOrdering.DESCENDING
         if isinstance(value, str):
-            if value == 'false':
-                return ViewOrdering.ASCENDING
-            else:
-                return ViewOrdering.DESCENDING
+            return ViewOrdering.from_str(value)
 
     @order.setter
     def order(self, value  # type: Union[ViewOrdering, str]
               ) -> None:
         if isinstance(value, ViewOrdering):
-            self.set_option('order', value.value)
+            self.set_option('order', value.to_str())
         elif isinstance(value, str) and value in [sc.value for sc in ViewOrdering]:
-            self.set_option('order', value)
+            self.set_option('order', ViewOrdering(value).to_str())
         else:
             raise InvalidArgumentException(message=("Excepted order to be either of type "
                                                     "ViewOrdering or str representation "
@@ -339,18 +372,15 @@ class ViewQuery:
         if value is None:
             return ViewErrorMode.STOP
         if isinstance(value, str):
-            if value == 'continue':
-                return ViewErrorMode.CONTINUE
-            else:
-                return ViewErrorMode.STOP
+            return ViewErrorMode.from_str(value)
 
     @on_error.setter
     def on_error(self, value  # type: Union[ViewErrorMode, str]
                  ) -> None:
         if isinstance(value, ViewErrorMode):
-            self.set_option('on_error', value.value)
+            self.set_option('on_error', value.to_str())
         elif isinstance(value, str) and value in [sc.value for sc in ViewErrorMode]:
-            self.set_option('on_error', value)
+            self.set_option('on_error', ViewErrorMode(value).to_str())
         else:
             raise InvalidArgumentException(message=("Excepted on_error to be either of type "
                                                     "ViewErrorMode or str representation "
@@ -359,16 +389,13 @@ class ViewQuery:
     @property
     def namespace(self) -> DesignDocumentNamespace:
         value = self._params.get(
-            'namespace', None
+            'ns', None
         )
         if value is None:
             return DesignDocumentNamespace.DEVELOPMENT
 
         if isinstance(value, str):
-            if value == 'production':
-                return DesignDocumentNamespace.PRODUCTION
-            else:
-                return DesignDocumentNamespace.DEVELOPMENT
+            return DesignDocumentNamespace.from_str(value)
         if isinstance(value, bool):
             if not value:
                 return DesignDocumentNamespace.PRODUCTION
@@ -379,9 +406,9 @@ class ViewQuery:
     def namespace(self, value  # type: Union[DesignDocumentNamespace, str]
                   ) -> None:
         if isinstance(value, DesignDocumentNamespace):
-            self.set_option('namespace', value.value)
+            self.set_option('ns', value.to_str())
         elif isinstance(value, str) and value in [sc.value for sc in DesignDocumentNamespace]:
-            self.set_option('namespace', value)
+            self.set_option('ns', DesignDocumentNamespace(value).to_str())
         else:
             raise InvalidArgumentException(message=("Excepted namespace to be either of type "
                                                     "DesignDocumentNamespace or str representation "
@@ -533,10 +560,10 @@ class ViewRequestLogic:
         return self._metadata
 
     def _set_metadata(self, views_response):
-        if isinstance(views_response, CouchbaseBaseException):
+        if isinstance(views_response, PycbcCoreException):
             raise ErrorMapper.build_exception(views_response)
 
-        self._metadata = ViewMetaData(views_response.raw_result.get('value', None))
+        self._metadata = ViewMetaData(views_response.raw_result.get('metadata', None))
 
     def _submit_query(self, **kwargs):
         if self.done_streaming:
@@ -544,10 +571,8 @@ class ViewRequestLogic:
 
         self._started_streaming = True
         span = self.encoded_query.pop('span', None)
-        view_kwargs = {
-            'conn': self._connection,
-            'op_args': self.encoded_query
-        }
+        view_kwargs = {}
+        view_kwargs.update(self.encoded_query)
         if span:
             view_kwargs['span'] = span
 
@@ -564,7 +589,7 @@ class ViewRequestLogic:
         if errback:
             view_kwargs['errback'] = errback
 
-        self._streaming_result = view_query(**view_kwargs)
+        self._streaming_result = self._connection.pycbc_view_query(**view_kwargs)
 
     def __iter__(self):
         raise NotImplementedError(

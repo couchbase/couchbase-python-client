@@ -31,7 +31,7 @@ from typing import (TYPE_CHECKING,
                     Union,
                     overload)
 
-from couchbase._utils import (timedelta_as_microseconds,
+from couchbase._utils import (timedelta_as_milliseconds,
                               timedelta_as_timestamp,
                               validate_int)
 from couchbase.durability import DurabilityParser
@@ -85,10 +85,10 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      VectorSearchOptionsBase,
                                      ViewOptionsBase,
                                      WaitUntilReadyOptionsBase)
+from couchbase.logic.pycbc_core import (transaction_config,
+                                        transaction_options,
+                                        transaction_query_options)
 from couchbase.logic.supportability import Supportability
-from couchbase.pycbc_core import (transaction_config,
-                                  transaction_options,
-                                  transaction_query_options)
 from couchbase.serializer import DefaultJsonSerializer
 
 # allows for imports only during type checking and not during runtime -- :)
@@ -1727,7 +1727,7 @@ class TransactionConfig:
         if durability:
             kwargs["durability_level"] = durability.level.value
         if kwargs.get('cleanup_window', None):
-            kwargs['cleanup_window'] = int(kwargs['cleanup_window'].total_seconds() * 1000000)
+            kwargs['cleanup_window'] = int(kwargs['cleanup_window'].total_seconds() * 1e6)
         coll = kwargs.pop("metadata_collection", None)
         # CXXCBC-391: Adds support for ExtSDKIntegration which changes expiration_time -> timeout
         if 'expiration_time' in kwargs or 'timeout' in kwargs:
@@ -1737,7 +1737,7 @@ class TransactionConfig:
             if 'timeout' in kwargs:
                 timeout = kwargs.get('timeout', None)
             if timeout:
-                kwargs['timeout'] = int(timeout.total_seconds() * 1000000)
+                kwargs['timeout'] = int(timeout.total_seconds() * 1e6)
         if coll:
             kwargs["metadata_bucket"] = coll.bucket
             kwargs["metadata_scope"] = coll.scope
@@ -1799,7 +1799,7 @@ class TransactionOptions:
             if 'timeout' in kwargs:
                 timeout = kwargs.get('timeout', None)
             if timeout:
-                kwargs['timeout'] = int(timeout.total_seconds() * 1000000)
+                kwargs['timeout'] = int(timeout.total_seconds() * 1e6)
         if kwargs.get('scan_consistency', None):
             kwargs['scan_consistency'] = kwargs['scan_consistency'].value
             if kwargs["scan_consistency"] == "at_plus":
@@ -1862,7 +1862,7 @@ class DefaultForwarder(Forwarder):
         return {
             "spec": {"specs": lambda x: x},
             "id": {},
-            "timeout": {"timeout": timedelta_as_microseconds},
+            "timeout": {"timeout": timedelta_as_milliseconds},
             "expiry": {"expiry": timedelta_as_timestamp},
             "lock_time": {"lock_time": lambda x: int(x.total_seconds())},
             "self": {},
@@ -1972,7 +1972,7 @@ class TransactionQueryOptions:
             kwargs["readonly"] = readonly
         profile = kwargs.pop("profile", None)
         if profile:
-            kwargs["profile_mode"] = profile.value
+            kwargs["profile"] = profile.value
         positional = kwargs.pop("positional_parameters", None)
         if positional:
             kwargs["positional_parameters"] = list(

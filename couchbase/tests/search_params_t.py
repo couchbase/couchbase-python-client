@@ -1012,7 +1012,7 @@ class SearchParamTestSuite:
             cb_env.TEST_INDEX_NAME, q, opts
         )
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = int(timedelta(seconds=20).total_seconds() * 1e6)
+        exp_opts['timeout'] = int(timedelta(seconds=20).total_seconds() * 1e3)
         assert search_query.params == exp_opts
 
         opts = SearchOptions(timeout=20)
@@ -1021,7 +1021,7 @@ class SearchParamTestSuite:
         )
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 20000000
+        exp_opts['timeout'] = 20000
         assert search_query.params == exp_opts
 
         opts = SearchOptions(timeout=25.5)
@@ -1030,7 +1030,7 @@ class SearchParamTestSuite:
         )
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 25500000
+        exp_opts['timeout'] = 25500
         assert search_query.params == exp_opts
 
     def test_phrase_query(self, cb_env):

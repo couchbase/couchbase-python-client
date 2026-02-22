@@ -16,14 +16,12 @@
 from __future__ import annotations
 
 from asyncio import AbstractEventLoop, Future
-from typing import (TYPE_CHECKING,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING, Union
 
 from acouchbase.views import AsyncViewRequest
 from couchbase.logic.bucket_req_builder import BucketRequestBuilder
-from couchbase.logic.client_adapter import PyCapsuleType
 from couchbase.logic.cluster_settings import ClusterSettings, StreamingTimeouts
+from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.result import PingResult, ViewResult
 
 if TYPE_CHECKING:
@@ -68,7 +66,7 @@ class AsyncBucketImpl:
         return self._client_adapter.connected
 
     @property
-    def connection(self) -> Optional[PyCapsuleType]:
+    def connection(self) -> pycbc_connection:
         """**INTERNAL**"""
         return self._client_adapter.connection
 

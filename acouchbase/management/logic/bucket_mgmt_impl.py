@@ -16,9 +16,7 @@
 from __future__ import annotations
 
 from asyncio import AbstractEventLoop
-from typing import (TYPE_CHECKING,
-                    List,
-                    Optional)
+from typing import TYPE_CHECKING, List
 
 from couchbase.management.logic.bucket_mgmt_req_builder import BucketMgmtRequestBuilder
 from couchbase.management.logic.bucket_mgmt_types import BucketDescribeResult, BucketSettings
@@ -49,13 +47,11 @@ class AsyncBucketMgmtImpl:
         """**INTERNAL**"""
         return self._request_builder
 
-    async def bucket_describe(self, req: BucketDescribeRequest) -> Optional[BucketDescribeResult]:
+    async def bucket_describe(self, req: BucketDescribeRequest) -> BucketDescribeResult:
         """**INTERNAL**"""
         res = await self._client_adapter.execute_mgmt_request(req)
-        bucket_info = res.raw_result.get('bucket_info', None)
-        if bucket_info:
-            return BucketDescribeResult(**bucket_info)
-        return None
+        bucket_info = res.raw_result['info']
+        return BucketDescribeResult(**bucket_info)
 
     async def create_bucket(self, req: CreateBucketRequest) -> None:
         """**INTERNAL**"""
@@ -72,24 +68,19 @@ class AsyncBucketMgmtImpl:
     async def get_all_buckets(self, req: GetAllBucketsRequest) -> List[BucketSettings]:
         """**INTERNAL**"""
         res = await self._client_adapter.execute_mgmt_request(req)
-        raw_buckets = res.raw_result.get('buckets', None)
+        raw_buckets = res.raw_result['buckets']
         buckets = []
-        if raw_buckets:
-            for b in raw_buckets:
-                bucket_settings = BucketSettings.bucket_settings_from_server(b)
-                buckets.append(bucket_settings)
+        for b in raw_buckets:
+            bucket_settings = BucketSettings.bucket_settings_from_server(b)
+            buckets.append(bucket_settings)
 
         return buckets
 
     async def get_bucket(self, req: GetBucketRequest) -> BucketSettings:
         """**INTERNAL**"""
         res = await self._client_adapter.execute_mgmt_request(req)
-        raw_settings = res.raw_result.get('bucket_settings', None)
-        bucket_settings = None
-        if raw_settings:
-            bucket_settings = BucketSettings.bucket_settings_from_server(raw_settings)
-
-        return bucket_settings
+        raw_settings = res.raw_result['bucket']
+        return BucketSettings.bucket_settings_from_server(raw_settings)
 
     async def update_bucket(self, req: UpdateBucketRequest) -> None:
         """**INTERNAL**"""

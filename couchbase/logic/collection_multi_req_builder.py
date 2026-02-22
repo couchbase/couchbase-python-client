@@ -26,22 +26,31 @@ from typing import (TYPE_CHECKING,
                     TypeVar,
                     Union)
 
+from couchbase.constants import FMT_BYTES
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.collection_multi_types import (AppendMultiRequest,
+                                                    AppendWithLegacyDurabilityMultiRequest,
                                                     DecrementMultiRequest,
+                                                    DecrementWithLegacyDurabilityMultiRequest,
                                                     ExistsMultiRequest,
                                                     GetAllReplicasMultiRequest,
                                                     GetAndLockMultiRequest,
                                                     GetAnyReplicaMultiRequest,
                                                     GetMultiRequest,
                                                     IncrementMultiRequest,
+                                                    IncrementWithLegacyDurabilityMultiRequest,
                                                     InsertMultiRequest,
+                                                    InsertWithLegacyDurabilityMultiRequest,
                                                     PrependMultiRequest,
+                                                    PrependWithLegacyDurabilityMultiRequest,
                                                     RemoveMultiRequest,
+                                                    RemoveWithLegacyDurabilityMultiRequest,
                                                     ReplaceMultiRequest,
+                                                    ReplaceWithLegacyDurabilityMultiRequest,
                                                     TouchMultiRequest,
                                                     UnlockMultiRequest,
-                                                    UpsertMultiRequest)
+                                                    UpsertMultiRequest,
+                                                    UpsertWithLegacyDurabilityMultiRequest)
 from couchbase.logic.collection_types import CollectionDetails
 from couchbase.logic.options import DeltaValueBase, SignedInt64Base
 from couchbase.options import (AppendMultiOptions,
@@ -62,7 +71,6 @@ from couchbase.options import (AppendMultiOptions,
                                UnlockMultiOptions,
                                UpsertMultiOptions,
                                get_valid_multi_args)
-from couchbase.pycbc_core import operations
 from couchbase.result import MultiGetResult, MultiMutationResult
 
 if TYPE_CHECKING:
@@ -73,26 +81,20 @@ if TYPE_CHECKING:
 
 ReqT = TypeVar('T')
 
-OP_TYPE_LOOKUP = {
-    AppendMultiRequest: operations.APPEND.value,
-    DecrementMultiRequest: operations.DECREMENT.value,
-    ExistsMultiRequest: operations.EXISTS.value,
-    GetAllReplicasMultiRequest: operations.GET_ALL_REPLICAS.value,
-    GetAndLockMultiRequest: operations.GET_AND_LOCK.value,
-    GetAnyReplicaMultiRequest: operations.GET_ANY_REPLICA.value,
-    GetMultiRequest: operations.GET.value,
-    IncrementMultiRequest: operations.INCREMENT.value,
-    InsertMultiRequest: operations.INSERT.value,
-    PrependMultiRequest: operations.PREPEND.value,
-    RemoveMultiRequest: operations.REMOVE.value,
-    ReplaceMultiRequest: operations.REPLACE.value,
-    TouchMultiRequest: operations.TOUCH.value,
-    UnlockMultiRequest: operations.UNLOCK.value,
-    UpsertMultiRequest: operations.UPSERT.value
+LEGACY_DURABILITY_LOOKUP = {
+    AppendMultiRequest: AppendWithLegacyDurabilityMultiRequest,
+    DecrementMultiRequest: DecrementWithLegacyDurabilityMultiRequest,
+    IncrementMultiRequest: IncrementWithLegacyDurabilityMultiRequest,
+    InsertMultiRequest: InsertWithLegacyDurabilityMultiRequest,
+    PrependMultiRequest: PrependWithLegacyDurabilityMultiRequest,
+    RemoveMultiRequest: RemoveWithLegacyDurabilityMultiRequest,
+    ReplaceMultiRequest: ReplaceWithLegacyDurabilityMultiRequest,
+    UpsertMultiRequest: UpsertWithLegacyDurabilityMultiRequest
 }
 
 NON_TRANSCODER_OP_LOOKUP = {
     RemoveMultiRequest: True,
+    RemoveWithLegacyDurabilityMultiRequest: True,
     TouchMultiRequest: True,
     UnlockMultiRequest: True,
 }
@@ -146,23 +148,25 @@ class CollectionMultiRequestBuilder:
             if not isinstance(value, bytes):
                 raise ValueError('The value provided must of type str, bytes or bytearray.')
 
-            parsed_keys_and_docs[k] = value
+            # we don't use flags for binary ops, but passing the flags around helps reduce logic for request types
+            parsed_keys_and_docs[k] = value, FMT_BYTES
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
-        per_key_args = final_args.pop('per_key_options', None)
-        op_args = {}
-        for key, value in parsed_keys_and_docs.items():
-            op_args[key] = copy(final_args)
-            # per key args override global args
-            if per_key_args and key in per_key_args:
-                op_args[key].update(per_key_args[key])
-            op_args[key]['value'] = value
 
+        durability = final_args.pop('durability', None)
+        if isinstance(durability, dict):
+            final_args['persist_to'] = durability['persist_to']
+            final_args['replicate_to'] = durability['replicate_to']
+            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
+        else:
+            final_args['durability_level'] = durability
+
+        per_key_args = final_args.pop('per_key_options', None)
         return_exceptions = final_args.pop('return_exceptions', True)
-        op_type = OP_TYPE_LOOKUP.get(return_type)
-        return return_type(op_type,
-                           *self._collection_dtls.get_details(),
-                           op_args=op_args,
+        return return_type(*self._collection_dtls.get_details(),
+                           doc_list=list(parsed_keys_and_docs.items()),
+                           op_args=final_args,
+                           per_key_args=per_key_args,
                            return_exceptions=return_exceptions)
 
     def _get_multi_counter_op_req(self,
@@ -179,29 +183,33 @@ class CollectionMultiRequestBuilder:
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
 
+        durability = final_args.pop('durability', None)
+        if isinstance(durability, dict):
+            final_args['persist_to'] = durability['persist_to']
+            final_args['replicate_to'] = durability['replicate_to']
+            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
+        else:
+            final_args['durability_level'] = durability
+
         global_delta, global_initial = self._get_delta_and_initial(final_args)
         final_args['delta'] = int(global_delta)
         if global_initial is not None:
-            final_args['initial'] = int(global_initial)
+            final_args['initial_value'] = int(global_initial)
 
         per_key_args = final_args.pop('per_key_options', None)
-        op_args = {}
-        for key in keys:
-            op_args[key] = copy(final_args)
-            # per key args override global args
-            if per_key_args and key in per_key_args:
+        if per_key_args:
+            for key in per_key_args.keys():
                 delta, initial = self._get_delta_and_initial(per_key_args[key])
                 if delta is not None:
                     per_key_args[key]['delta'] = int(delta)
                 if initial is not None:
-                    per_key_args[key]['initial'] = int(initial)
-                op_args[key].update(per_key_args[key])
+                    per_key_args[key]['initial_value'] = int(initial)
 
         return_exceptions = final_args.pop('return_exceptions', True)
-        op_type = OP_TYPE_LOOKUP.get(return_type)
-        return return_type(op_type,
-                           *self._collection_dtls.get_details(),
-                           op_args=op_args,
+        return return_type(*self._collection_dtls.get_details(),
+                           doc_list=keys,
+                           op_args=final_args,
+                           per_key_args=per_key_args,
                            return_exceptions=return_exceptions)
 
     def _get_multi_op_mutation_req(self,
@@ -219,35 +227,51 @@ class CollectionMultiRequestBuilder:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+
+        durability = final_args.pop('durability', None)
+        if isinstance(durability, dict):
+            final_args['persist_to'] = durability['persist_to']
+            final_args['replicate_to'] = durability['replicate_to']
+            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
+        else:
+            final_args['durability_level'] = durability
+
         per_key_args = final_args.pop('per_key_options', None)
+
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
         return_exceptions = final_args.pop('return_exceptions', True)
-        op_args = {}
+
+        transcoded_keys_and_docs = {}
         for key, value in keys_and_docs.items():
-            op_args[key] = copy(final_args)
-            # per key args override global args
             if per_key_args and key in per_key_args:
                 key_transcoder = per_key_args[key].pop('transcoder', transcoder)
-                op_args[key].update(per_key_args[key])
                 transcoded_value = key_transcoder.encode_value(value)
             else:
                 transcoded_value = transcoder.encode_value(value)
-            op_args[key]['value'] = transcoded_value
+
+            transcoded_keys_and_docs[key] = transcoded_value
 
         if opts_type.__name__ == ReplaceMultiOptions.__name__:
-            for k, v in op_args.items():
-                expiry = v.get('expiry', None)
-                preserve_expiry = v.get('preserve_expiry', False)
+            global_expiry = final_args.get('expiry', None)
+            global_preserve_expiry = final_args.get('preserve_expiry', None)
+            if global_expiry and global_preserve_expiry is True:
+                raise InvalidArgumentException(
+                    'The expiry and preserve_expiry options cannot both be set for replace operations.'
+                )
+
+            for k, v in (per_key_args or {}).items():
+                expiry = v.get('expiry', global_expiry)
+                preserve_expiry = v.get('preserve_expiry', global_preserve_expiry)
                 if expiry and preserve_expiry is True:
                     raise InvalidArgumentException(
                         message=("The expiry and preserve_expiry options cannot "
                                  f"both be set for replace operations.  Multi-op key: {k}.")
                     )
 
-        op_type = OP_TYPE_LOOKUP.get(return_type)
-        return return_type(op_type,
-                           *self._collection_dtls.get_details(),
-                           op_args=op_args,
+        return return_type(*self._collection_dtls.get_details(),
+                           doc_list=list(transcoded_keys_and_docs.items()),
+                           op_args=final_args,
+                           per_key_args=per_key_args,
                            return_exceptions=return_exceptions)
 
     def _get_multi_op_non_value_req(self,
@@ -263,36 +287,41 @@ class CollectionMultiRequestBuilder:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
         op_keys_cas = kwargs.pop('op_keys_cas', None)
-
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+
+        durability = final_args.pop('durability', None)
+        if isinstance(durability, dict):
+            final_args['persist_to'] = durability['persist_to']
+            final_args['replicate_to'] = durability['replicate_to']
+            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
+        else:
+            final_args['durability_level'] = durability
+
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
         return_exceptions = final_args.pop('return_exceptions', True)
-        per_key_args = final_args.pop('per_key_options', None)
-        op_args = {}
+        # unlock_multi needs a cas per doc, so we don't want per_key_args to be None for a unlock multi-op
+        per_key_args = final_args.pop('per_key_options', None if op_keys_cas is None else {})
+        if op_keys_cas:
+            per_key_args.update({k: {'cas': v} for k, v in op_keys_cas.items()})
         key_transcoders = {}
         for key in keys:
-            op_args[key] = copy(final_args)
-            if op_keys_cas:
-                op_args[key]['cas'] = op_keys_cas[key]
-            # per key args override global args
             if per_key_args and key in per_key_args:
                 key_transcoder = per_key_args[key].pop('transcoder', transcoder)
                 key_transcoders[key] = key_transcoder
-                op_args[key].update(per_key_args[key])
             else:
                 key_transcoders[key] = transcoder
 
-        op_type = OP_TYPE_LOOKUP.get(return_type)
-
         if NON_TRANSCODER_OP_LOOKUP.get(return_type, False) is True:
-            return return_type(op_type,
-                               *self._collection_dtls.get_details(),
-                               op_args=op_args,
+            return return_type(*self._collection_dtls.get_details(),
+                               doc_list=keys,
+                               op_args=final_args,
+                               per_key_args=per_key_args,
                                return_exceptions=return_exceptions)
 
-        return return_type(op_type,
-                           *self._collection_dtls.get_details(),
-                           op_args=op_args,
+        return return_type(*self._collection_dtls.get_details(),
+                           doc_list=keys,
+                           op_args=final_args,
+                           per_key_args=per_key_args,
                            transcoders=key_transcoders,
                            return_exceptions=return_exceptions)
 

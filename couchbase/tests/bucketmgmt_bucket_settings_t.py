@@ -165,19 +165,19 @@ class BucketSettingsTestSuite:
         settings = CreateBucketSettings(name="test", num_replicas=0)
         result = request_builder._bucket_settings_to_server(settings)
 
-        assert result == {'name': 'test', 'numReplicas': 0}
+        assert result == {'name': 'test', 'num_replicas': 0}
 
     def test_false_flush_enabled_to_server(self, request_builder):
         settings = CreateBucketSettings(name="test", flush_enabled=False)
         result = request_builder._bucket_settings_to_server(settings)
 
-        assert result == {'name': 'test', 'flushEnabled': False}
+        assert result == {'name': 'test', 'flush_enabled': False}
 
     def test_false_replica_index_to_server(self, request_builder):
         settings = CreateBucketSettings(name="test", replica_index=False)
         result = request_builder._bucket_settings_to_server(settings)
 
-        assert result == {'name': 'test', 'replicaIndex': False}
+        assert result == {'name': 'test', 'replica_indexes': False}
 
     def test_zero_and_false_history_retention_to_server(self, request_builder):
         settings = CreateBucketSettings(
@@ -190,9 +190,9 @@ class BucketSettingsTestSuite:
 
         expected = {
             'name': 'test',
-            'historyRetentionCollectionDefault': False,
-            'historyRetentionBytes': 0,
-            'historyRetentionDuration': 0
+            'history_retention_collection_default': False,
+            'history_retention_bytes': 0,
+            'history_retention_duration': 0
         }
         assert result == expected
 
@@ -200,13 +200,13 @@ class BucketSettingsTestSuite:
         settings = CreateBucketSettings(name="test", minimum_durability_level=DurabilityLevel.NONE)
         result = request_builder._bucket_settings_to_server(settings)
 
-        assert result == {'name': 'test', 'durabilityMinLevel': 'none'}
+        assert result == {'name': 'test', 'minimum_durability_level': 0}
 
     def test_max_expiry_zero_to_server(self, request_builder):
         settings = CreateBucketSettings(name="test", max_expiry=timedelta(0))
         result = request_builder._bucket_settings_to_server(settings)
 
-        assert result == {'name': 'test', 'maxExpiry': 0}
+        assert result == {'name': 'test', 'max_expiry': 0}
 
     def test_all_fields_to_server_translation(self, request_builder):
         settings = CreateBucketSettings(
@@ -233,22 +233,21 @@ class BucketSettingsTestSuite:
 
         expected = {
             'name': 'test',
-            'bucketType': 'membase',
-            'compressionMode': 'active',
-            'conflictResolutionType': 'seqno',
-            'evictionPolicy': 'fullEviction',
-            'flushEnabled': True,
-            'historyRetentionCollectionDefault': True,
-            'historyRetentionBytes': 2048,
-            'historyRetentionDuration': 86400,
-            'maxExpiry': 43200,
-            'maxTTL': 3600,
-            'durabilityMinLevel': 'majority',
-            'numReplicas': 2,
-            'ramQuotaMB': 256,
-            'replicaIndex': True,
-            'storageBackend': 'magma',
-            'numVBuckets': 128
+            'bucket_type': 'couchbase',
+            'compression_mode': 'active',
+            'conflict_resolution_type': 'sequence_number',
+            'eviction_policy': 'full',
+            'flush_enabled': True,
+            'history_retention_collection_default': True,
+            'history_retention_bytes': 2048,
+            'history_retention_duration': 86400,
+            'max_expiry': 43200,
+            'minimum_durability_level': 1,
+            'num_replicas': 2,
+            'ram_quota_mb': 256,
+            'replica_indexes': True,
+            'storage_backend': 'magma',
+            'num_vbuckets': 128
         }
 
         assert result == expected
@@ -266,22 +265,21 @@ class BucketSettingsTestSuite:
     def test_all_fields_from_server_translation(self):
         server_dict = {
             'name': 'test',
-            'bucketType': 'membase',
-            'compressionMode': 'active',
-            'conflictResolutionType': 'seqno',
-            'evictionPolicy': 'fullEviction',
-            'flushEnabled': True,
-            'historyRetentionCollectionDefault': True,
-            'historyRetentionBytes': 2048,
-            'historyRetentionDuration': 86400,
-            'maxExpiry': 43200,
-            'maxTTL': 3600,
-            'durabilityMinLevel': 'majority',
-            'numReplicas': 2,
-            'ramQuotaMB': 256,
-            'replicaIndex': True,
-            'storageBackend': 'magma',
-            'numVBuckets': 128
+            'bucket_type': 'couchbase',
+            'compression_mode': 'active',
+            'conflict_resolution_type': 'sequence_number',
+            'eviction_policy': 'full',
+            'flush_enabled': True,
+            'history_retention_collection_default': True,
+            'history_retention_bytes': 2048,
+            'history_retention_duration': 86400,
+            'max_expiry': 43200,
+            'minimum_durability_level': 1,
+            'num_replicas': 2,
+            'ram_quota_mb': 256,
+            'replica_indexes': True,
+            'storage_backend': 'magma',
+            'num_vbuckets': 128
         }
 
         settings = BucketSettings.bucket_settings_from_server(server_dict)
@@ -295,7 +293,6 @@ class BucketSettingsTestSuite:
         assert settings.history_retention_bytes == 2048
         assert settings.history_retention_duration == timedelta(days=1)
         assert settings.max_expiry == timedelta(hours=12)
-        assert settings.max_ttl == timedelta(seconds=3600)
         assert settings.minimum_durability_level == DurabilityLevel.MAJORITY
         assert settings.num_replicas == 2
         assert settings.ram_quota_mb == 256
@@ -306,13 +303,13 @@ class BucketSettingsTestSuite:
     def test_zero_and_false_values_from_server(self):
         server_dict = {
             'name': 'test',
-            'numReplicas': 0,
-            'flushEnabled': False,
-            'replicaIndex': False,
-            'historyRetentionBytes': 0,
-            'historyRetentionDuration': 0,
-            'maxExpiry': 0,
-            'durabilityMinLevel': 'none'
+            'num_replicas': 0,
+            'flush_enabled': False,
+            'replica_indexes': False,
+            'history_retention_bytes': 0,
+            'history_retention_duration': 0,
+            'max_expiry': 0,
+            'minimum_durability_level': 0
         }
 
         settings = BucketSettings.bucket_settings_from_server(server_dict)
@@ -336,16 +333,16 @@ class BucketSettingsTestSuite:
     def test_round_trip_full(self, request_builder):
         original_server_dict = {
             'name': 'test',
-            'bucketType': 'membase',
-            'compressionMode': 'active',
-            'evictionPolicy': 'fullEviction',
-            'flushEnabled': True,
-            'numReplicas': 2,
-            'ramQuotaMB': 256,
-            'replicaIndex': True,
-            'storageBackend': 'magma',
-            'durabilityMinLevel': 'majority',
-            'maxExpiry': 3600,
+            'bucket_type': 'couchbase',
+            'compression_mode': 'active',
+            'eviction_policy': 'full',
+            'flush_enabled': True,
+            'num_replicas': 2,
+            'ram_quota_mb': 256,
+            'replica_indexes': True,
+            'storage_backend': 'magma',
+            'minimum_durability_level': 1,
+            'max_expiry': 3600,
         }
 
         settings = BucketSettings.bucket_settings_from_server(original_server_dict)
@@ -356,13 +353,13 @@ class BucketSettingsTestSuite:
     def test_round_trip_edge_cases(self, request_builder):
         original_server_dict = {
             'name': 'test',
-            'numReplicas': 0,
-            'flushEnabled': False,
-            'replicaIndex': False,
-            'historyRetentionBytes': 0,
-            'historyRetentionDuration': 0,
-            'maxExpiry': 0,
-            'durabilityMinLevel': 'none'
+            'num_replicas': 0,
+            'flush_enabled': False,
+            'replica_indexes': False,
+            'history_retention_bytes': 0,
+            'history_retention_duration': 0,
+            'max_expiry': 0,
+            'minimum_durability_level': 0
         }
 
         settings = BucketSettings.bucket_settings_from_server(original_server_dict)
@@ -371,28 +368,29 @@ class BucketSettingsTestSuite:
         assert result_server_dict == original_server_dict
 
     @pytest.mark.parametrize("enum_field,enum_value,server_key,expected_str", [
-        ('bucket_type', BucketType.COUCHBASE, 'bucketType', 'membase'),
-        ('bucket_type', BucketType.MEMCACHED, 'bucketType', 'memcached'),
-        ('bucket_type', BucketType.EPHEMERAL, 'bucketType', 'ephemeral'),
-        ('compression_mode', CompressionMode.OFF, 'compressionMode', 'off'),
-        ('compression_mode', CompressionMode.PASSIVE, 'compressionMode', 'passive'),
-        ('compression_mode', CompressionMode.ACTIVE, 'compressionMode', 'active'),
-        ('conflict_resolution_type', ConflictResolutionType.TIMESTAMP, 'conflictResolutionType', 'lww'),
-        ('conflict_resolution_type', ConflictResolutionType.SEQUENCE_NUMBER, 'conflictResolutionType', 'seqno'),
-        ('conflict_resolution_type', ConflictResolutionType.CUSTOM, 'conflictResolutionType', 'custom'),
-        ('eviction_policy', EvictionPolicyType.FULL, 'evictionPolicy', 'fullEviction'),
-        ('eviction_policy', EvictionPolicyType.VALUE_ONLY, 'evictionPolicy', 'valueOnly'),
-        ('eviction_policy', EvictionPolicyType.NOT_RECENTLY_USED, 'evictionPolicy', 'nruEviction'),
-        ('eviction_policy', EvictionPolicyType.NO_EVICTION, 'evictionPolicy', 'noEviction'),
-        ('storage_backend', StorageBackend.COUCHSTORE, 'storageBackend', 'couchstore'),
-        ('storage_backend', StorageBackend.MAGMA, 'storageBackend', 'magma'),
-        ('storage_backend', StorageBackend.UNDEFINED, 'storageBackend', 'undefined'),
-        ('minimum_durability_level', DurabilityLevel.NONE, 'durabilityMinLevel', 'none'),
-        ('minimum_durability_level', DurabilityLevel.MAJORITY, 'durabilityMinLevel', 'majority'),
+        ('bucket_type', BucketType.COUCHBASE, 'bucket_type', 'couchbase'),
+        ('bucket_type', BucketType.MEMCACHED, 'bucket_type', 'memcached'),
+        ('bucket_type', BucketType.EPHEMERAL, 'bucket_type', 'ephemeral'),
+        ('compression_mode', CompressionMode.OFF, 'compression_mode', 'off'),
+        ('compression_mode', CompressionMode.PASSIVE, 'compression_mode', 'passive'),
+        ('compression_mode', CompressionMode.ACTIVE, 'compression_mode', 'active'),
+        ('conflict_resolution_type', ConflictResolutionType.TIMESTAMP, 'conflict_resolution_type', 'timestamp'),
+        ('conflict_resolution_type', ConflictResolutionType.SEQUENCE_NUMBER,
+         'conflict_resolution_type', 'sequence_number'),
+        ('conflict_resolution_type', ConflictResolutionType.CUSTOM, 'conflict_resolution_type', 'custom'),
+        ('eviction_policy', EvictionPolicyType.FULL, 'eviction_policy', 'full'),
+        ('eviction_policy', EvictionPolicyType.VALUE_ONLY, 'eviction_policy', 'value_only'),
+        ('eviction_policy', EvictionPolicyType.NOT_RECENTLY_USED, 'eviction_policy', 'not_recently_used'),
+        ('eviction_policy', EvictionPolicyType.NO_EVICTION, 'eviction_policy', 'no_eviction'),
+        ('storage_backend', StorageBackend.COUCHSTORE, 'storage_backend', 'couchstore'),
+        ('storage_backend', StorageBackend.MAGMA, 'storage_backend', 'magma'),
+        ('storage_backend', StorageBackend.UNDEFINED, 'storage_backend', 'undefined'),
+        ('minimum_durability_level', DurabilityLevel.NONE, 'minimum_durability_level', 0),
+        ('minimum_durability_level', DurabilityLevel.MAJORITY, 'minimum_durability_level', 1),
         ('minimum_durability_level', DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE,
-         'durabilityMinLevel', 'majorityAndPersistActive'),
+         'minimum_durability_level', 2),
         ('minimum_durability_level', DurabilityLevel.PERSIST_TO_MAJORITY,
-         'durabilityMinLevel', 'persistToMajority'),
+         'minimum_durability_level', 3),
     ])
     def test_enum_conversions_to_server(self, request_builder, enum_field, enum_value, server_key, expected_str):
         settings = CreateBucketSettings(name="test", **{enum_field: enum_value})

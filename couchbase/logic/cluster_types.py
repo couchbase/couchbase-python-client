@@ -21,34 +21,33 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Callable,
                     Dict,
-                    List,
                     Optional,
                     Set)
 
-from couchbase.logic.operation_types import ClusterOperationType
+from couchbase.logic.operation_types import (ClusterMgmtOperationType,
+                                             ClusterOperationType,
+                                             StreamingOperationType)
 
 if TYPE_CHECKING:
     from couchbase.analytics import AnalyticsQuery
     from couchbase.diagnostics import ClusterState
-    from couchbase.logic.client_adapter import PyCapsuleType
     from couchbase.n1ql import N1QLQuery
     from couchbase.search import SearchQueryBuilder
 
 # we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['timeout']
+# OPARG_SKIP_LIST = ['timeout']
 
 
 @dataclass
 class ClusterRequest:
-    # TODO: maybe timeout isn't optional, but defaults to default timeout?
-    #       otherwise that makes inheritance tricky w/ child classes having required params
 
     def req_to_dict(self,
-                    conn: PyCapsuleType,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         op_kwargs = {
-            'conn': conn,
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if getattr(self, field.name) is not None
         }
 
         if callback is not None:
@@ -56,15 +55,6 @@ class ClusterRequest:
 
         if errback is not None:
             op_kwargs['errback'] = errback
-
-        if hasattr(self, 'timeout') and getattr(self, 'timeout') is not None:
-            op_kwargs['timeout'] = getattr(self, 'timeout')
-
-        op_kwargs.update(**{
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
-        })
 
         return op_kwargs
 
@@ -76,24 +66,21 @@ class AnalyticsQueryRequest:
 
     @property
     def op_name(self) -> str:
-        return ClusterOperationType.AnalyicsQuery
+        return StreamingOperationType.AnalyticsQuery.value
 
 
 @dataclass
 class CloseConnectionRequest(ClusterRequest):
     @property
     def op_name(self) -> str:
-        return ClusterOperationType.CloseConnection.value
+        return ClusterOperationType.Close.value
 
 
 @dataclass
 class ClusterInfoRequest(ClusterRequest):
-    mgmt_op: int
-    op_type: int
-
     @property
     def op_name(self) -> str:
-        return ClusterOperationType.GetClusterInfo.value
+        return ClusterMgmtOperationType.ClusterDescribe.value
 
 
 @dataclass
@@ -104,7 +91,7 @@ class CreateConnectionRequest:
 
     @property
     def op_name(self) -> str:
-        return ClusterOperationType.CreateConnection.value
+        return ClusterOperationType.Connect.value
 
     def req_to_dict(self,
                     callback: Optional[Callable[..., None]] = None,
@@ -126,7 +113,6 @@ class CreateConnectionRequest:
 
 @dataclass
 class DiagnosticsRequest(ClusterRequest):
-    op_type: int
     report_id: Optional[str] = None
     timeout: Optional[int] = None
 
@@ -144,8 +130,7 @@ class GetConnectionInfoRequest(ClusterRequest):
 
 @dataclass
 class PingRequest(ClusterRequest):
-    op_type: int
-    service_types: List[str]
+    services: Set[str]
     report_id: Optional[str] = None
     timeout: Optional[int] = None
 
@@ -161,7 +146,7 @@ class QueryRequest:
 
     @property
     def op_name(self) -> str:
-        return ClusterOperationType.Query
+        return StreamingOperationType.Query
 
 
 @dataclass
@@ -171,7 +156,7 @@ class SearchQueryRequest:
 
     @property
     def op_name(self) -> str:
-        return ClusterOperationType.SearchQuery
+        return StreamingOperationType.SearchQuery
 
 
 @dataclass
@@ -186,8 +171,8 @@ class UpdateCredentialsRequest(ClusterRequest):
 @dataclass
 class WaitUntilReadyRequest:
     timeout: timedelta
-    desired_state: ClusterState = None
-    service_types: Set[str] = None
+    desired_state: ClusterState
+    service_types: Set[str]
 
     @property
     def op_name(self) -> str:

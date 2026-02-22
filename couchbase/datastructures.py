@@ -49,8 +49,8 @@ from couchbase.subdocument import (remove,
                                    upsert)
 
 if TYPE_CHECKING:
+    from couchbase._utils import JSONType
     from couchbase.logic.collection_impl import CollectionImpl
-    from couchbase.logic.top_level_types import JSONType
     from couchbase.result import LookupInResult
 
 DataStructureRequest = Union[GetRequest, LookupInRequest, MutateInRequest]
