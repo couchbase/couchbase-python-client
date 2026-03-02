@@ -74,3 +74,4 @@ include deps/couchbase-cxx-client/third_party/expected/COPYING
 graft deps/couchbase-cxx-client/third_party/expected/include
 global-exclude *.py[cod] *.DS_Store
 exclude .git .gitignore .gitmodules gocaves* *.jar .clang* .cmake* .pre* .flake* MANIFEST.in
+prune tools

@@ -1,0 +1,41 @@
+    # ==========================================================================================
+    # Key-Value Operations
+    # ==========================================================================================
+    {% for op in key_value_operations %}
+    {% if op.is_streaming_op -%}
+    def pycbc_{{op.name}}(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_streamed_result[Any]:
+        ...
+    {% else -%}
+    def pycbc_{{op.name}}(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_result[CppTypes.{{op.response}}]:
+        ...
+    {% endif -%}
+    {% endfor %}
+    # ==========================================================================================
+    # Key-Value Multi Operations
+    # ==========================================================================================
+    {% for op in key_value_multi_operations %}
+    {% if op.is_streaming_op -%}
+    def pycbc_{{op.name}}_multi(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_result[Dict[str, pycbc_streamed_result[Any]]]:
+        ...
+    {% else -%}
+    def pycbc_{{op.name}}_multi(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_result[Dict[str, CppTypes.{{op.response}}]]:
+        ...
+    {% endif -%}
+    {% endfor %}
+    # ==========================================================================================
+    # Streaming Operations
+    # ==========================================================================================
+    {% for op in streaming_operations %}
+    def pycbc_{{op.streaming_op_name}}(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_streamed_result[Any]:
+        ...
+    {% endfor -%}
+
+    {% for mgmt_group in mgmt_groups %}
+    # ==========================================================================================
+    # {{mgmt_group.pretty_name}} Management Operations
+    # ==========================================================================================
+    {% for op in mgmt_group.operations %}
+    def pycbc_{{op.name}}(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_result[CppTypes.{{op.response}}]:
+        ...
+    {% endfor %}
+    {% endfor %}

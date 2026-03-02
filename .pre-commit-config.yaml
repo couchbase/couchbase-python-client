@@ -70,6 +70,7 @@ repos:
               txcouchbase/tests/|
               couchbase/tests/|
               tests/|
+              tools/|
               simple_acouchbase.py|
               simple_couchbase.py|
               simple_txcouchbase.py|

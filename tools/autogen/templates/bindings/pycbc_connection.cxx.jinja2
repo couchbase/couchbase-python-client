@@ -1,0 +1,92 @@
+
+// ==========================================================================================
+// Key-Value Operations
+// ==========================================================================================
+{% for op in key_value_operations %}
+static PyObject*
+pycbc_connection__{{op.name}}__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+    if (!validate_connection_and_args(self, args, kwargs, "{{op.name}}")) {
+        return nullptr;
+    }
+    return self->conn->execute_kv_op<{{op.request_struct_full}}>(kwargs);
+}
+{% endfor %}
+// ==========================================================================================
+// Key-Value Multi Operations
+// ==========================================================================================
+{% for op in key_value_operations if op.has_multi %}
+static PyObject*
+pycbc_connection__{{op.name}}_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+    return handle_multi_kv_op<{{op.request_struct_full}}>(self, args, kwargs, "{{op.name}}_multi");
+}
+{% endfor %}
+// ==========================================================================================
+// Streaming Operations
+// ==========================================================================================
+{% for op in streaming_operations %}
+static PyObject*
+pycbc_connection__{{op.streaming_op_name}}__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+    if (!validate_connection_and_args(self, args, kwargs, "{{op.name}}")) {
+        return nullptr;
+    }
+    return self->conn->execute_streaming_op<{{op.request_struct_full}}>(kwargs);
+}
+{% endfor %}
+{% for mgmt_group in mgmt_groups %}
+// ==========================================================================================
+// {{mgmt_group.pretty_name}} Management Operations
+// ==========================================================================================
+{% for op in mgmt_group.operations %}
+static PyObject*
+pycbc_connection__{{op.name}}__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+{
+    if (!validate_connection_and_args(self, args, kwargs, "{{op.name}}")) {
+        return nullptr;
+    }
+    return self->conn->execute_mgmt_op<{{op.request_struct_full}}>(kwargs);
+}
+{% endfor %}
+{% endfor %}
+static PyMethodDef pycbc_connection_methods[] = {
+    // Connection management
+    { "pycbc_connect", (PyCFunction)pycbc_connection__connect__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Connect to cluster") },
+    { "pycbc_close", (PyCFunction)pycbc_connection__close__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Close cluster connection") },
+    { "pycbc_open_bucket", (PyCFunction)pycbc_connection__open_bucket__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Open bucket") },
+    { "pycbc_close_bucket", (PyCFunction)pycbc_connection__close_bucket__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Close bucket") },
+    { "pycbc_update_credentials", (PyCFunction)pycbc_connection__update_credentials__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Update connection credentials") },
+    { "pycbc_get_default_timeouts", (PyCFunction)pycbc_connection__get_default_timeouts__, METH_NOARGS | METH_STATIC, PyDoc_STR("Get C++ core default timeouts") },
+
+    // Diagnostics
+    { "pycbc_diagnostics", (PyCFunction)pycbc_connection__diagnostics__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Diagnostics operation") },
+    { "pycbc_ping", (PyCFunction)pycbc_connection__ping__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Ping operation") },
+    { "pycbc_get_connection_info", (PyCFunction)pycbc_connection__get_connection_info__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Get connection info") },
+
+    // Key-Value Range Scan
+    { "pycbc_kv_range_scan", (PyCFunction)pycbc_connection__kv_range_scan__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("KV range scan operation") },
+
+    // Observability
+    { "pycbc_get_cluster_labels", (PyCFunction)pycbc_connection__get_cluster_labels__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Get cluster labels") },
+
+    // Key-Value Operations
+    {% for op in key_value_operations -%}
+    { "pycbc_{{op.name}}", (PyCFunction)pycbc_connection__{{op.name}}__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("KV {{op.name}} operation") },
+    {% endfor %}
+    // Key-Value Multi Operations
+    {% for op in key_value_operations if op.has_multi -%}
+    { "pycbc_{{op.name}}_multi", (PyCFunction)pycbc_connection__{{op.name}}_multi__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("KV {{op.name}}-multi operation") },
+    {% endfor %}
+    // Streaming Operations
+    {% for op in streaming_operations -%}
+    { "pycbc_{{op.streaming_op_name}}", (PyCFunction)pycbc_connection__{{op.streaming_op_name}}__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("HTTP {{op.name}} operation") },
+    {% endfor %}
+    {% for mgmt_group in mgmt_groups -%}
+    // {{mgmt_group.pretty_name}} Management Operations
+    {% for op in mgmt_group.operations -%}
+    { "pycbc_{{op.name}}", (PyCFunction)pycbc_connection__{{op.name}}__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("MGMT {{op.name}} operation") },
+    {% endfor %}
+    {% endfor -%}
+    { nullptr, nullptr, 0, nullptr }
+};

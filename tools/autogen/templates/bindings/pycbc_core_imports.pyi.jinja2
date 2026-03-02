@@ -1,0 +1,5 @@
+from .binding_types import (
+    {% for import in import_types -%}
+    {{import}}{% if not loop.last %},{% endif %}
+    {% endfor %}
+)

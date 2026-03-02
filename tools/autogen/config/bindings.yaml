@@ -1,0 +1,765 @@
+metadata:
+  version: "1.0.0"
+  description: "Programmatic generation of alignment between C++ core and Python C-API"
+  file_outputs:
+    - name: cpp_core_enums
+      filename: cpp_core_enums_autogen.hxx
+      templates: cpp_core_enums_autogen.hxx.jinja2
+      output_path: src
+    - name: cpp_core_types
+      filename: cpp_core_types_autogen.hxx
+      templates: cpp_core_types_autogen.hxx.jinja2
+      output_path: src
+    - name: pycbc_operations
+      filename: operations_autogen.hxx
+      templates: operations_autogen.hxx.jinja2
+      output_path: src
+    - name: pycbc_connection
+      filename: pycbc_connection.cxx
+      templates: pycbc_connection.cxx.jinja2
+      output_path: src
+    - name: _core
+      filename: _core.pyi
+      templates: pycbc_core.pyi.jinja2
+      output_path: "couchbase/logic/pycbc_core"
+    - name: binding_cpp_types
+      filename: binding_cpp_types.py
+      templates: binding_cpp_types.py.jinja2
+      output_path: "couchbase/logic/pycbc_core"
+    - name: binding_map_types
+      filename: binding_map_types.py
+      templates: binding_map_types.py.jinja2
+      output_path: "couchbase/logic/pycbc_core"
+    - name: operation_types
+      filename: operation_types.py
+      templates: operation_types.py.jinja2
+      output_path: "couchbase/logic"
+    - name: binding_map
+      filename: binding_map.py
+      templates: binding_map.py.jinja2
+      output_path: "couchbase/logic"
+
+
+operation_headers:
+ - Python.h
+ - pytocbpp_defs.hxx
+ - cpp_core_types.hxx
+ - cpp_types.hxx
+ - cpp_core_enums_autogen.hxx
+ - cpp_core_types_autogen.hxx
+ - utils.hxx
+ - result.hxx
+ - <core/operations.hxx>
+ - <core/operations/document_view.hxx>
+ - <core/operations/management/analytics.hxx>
+ - <core/operations/management/bucket.hxx>
+ - <core/operations/management/collections.hxx>
+ - <core/operations/management/cluster_developer_preview_enable.hxx>
+ - <core/operations/management/eventing.hxx>
+ - <core/operations/management/query.hxx>
+ - <core/operations/management/search.hxx>
+ - <core/operations/management/user.hxx>
+ - <core/operations/management/view.hxx>
+ - <core/tracing/wrapper_sdk_tracer.hxx>
+
+key_value:
+  header_path: "core/operations"
+  required_cpp_request_fields: [id]
+  ignored_cpp_request_fields: [partition, opaque, retries]
+  ignored_cpp_response_fields: [ctx]
+  with_legacy_durability:
+   - append
+   - decrement
+   - increment
+   - insert
+   - prepend
+   - mutate_in
+   - remove
+   - replace
+   - upsert
+  structs_prefix: "couchbase::core::operations::"
+  ops_prefix: "document_"
+  mutation_operation_headers:
+    - document_append.hxx
+    - document_insert.hxx
+    - document_mutate_in.hxx
+    - document_prepend.hxx
+    - document_replace.hxx
+    - document_upsert.hxx
+  operation_headers:
+    - document_decrement.hxx
+    - document_exists.hxx
+    - document_get_all_replicas.hxx
+    - document_get_and_lock.hxx
+    - document_get_and_touch.hxx
+    - document_get_any_replica.hxx
+    - document_get.hxx
+    - document_get_projected.hxx
+    - document_increment.hxx
+    - document_lookup_in_all_replicas.hxx
+    - document_lookup_in_any_replica.hxx
+    - document_lookup_in.hxx
+    - document_remove.hxx
+    - document_touch.hxx
+    - document_unlock.hxx
+  operation_overrides:
+    - op_name: get_all_replicas
+      is_streaming_op: true
+      response:
+        response_override: "Py_RETURN_NONE;"
+    - op_name: lookup_in_all_replicas
+      is_streaming_op: true
+      response:
+        response_override: "Py_RETURN_NONE;"
+
+streaming:
+  header_path: "core/operations"
+  ignored_cpp_request_fields: [send_to_node, ctx_, extract_encoded_plan_, body_str, row_callback]
+  structs_prefix: "couchbase::core::operations::"
+  ops_prefix: "document_"
+  operation_headers:
+    - document_query.hxx
+    - document_analytics.hxx
+    - document_search.hxx
+    - document_view.hxx
+  operation_overrides:
+    - op_name: analytics
+      streaming_op_name: analytics_query
+      request:
+        required_fields: [statement]
+    - op_name: query
+      request:
+        required_fields: [statement]
+    - op_name: search
+      streaming_op_name: search_query
+      request:
+        required_fields: [index_name, query]
+    - op_name: document_view
+      streaming_op_name: view_query
+      request:
+        required_fields: [bucket_name, document_name, view_name]
+
+management:
+  header_path: "core/operations/management"
+  ignored_cpp_response_fields: [ctx]
+  structs_prefix: "couchbase::core::operations::management::"
+  analytics:
+    operation_headers:
+      - analytics_dataset_create.hxx
+      - analytics_dataset_drop.hxx
+      - analytics_dataset_get_all.hxx
+      - analytics_dataverse_create.hxx
+      - analytics_dataverse_drop.hxx
+      - analytics_get_pending_mutations.hxx
+      - analytics_index_create.hxx
+      - analytics_index_drop.hxx
+      - analytics_index_get_all.hxx
+      - analytics_link_connect.hxx
+      - analytics_link_create.hxx
+      - analytics_link_disconnect.hxx
+      - analytics_link_drop.hxx
+      - analytics_link_get_all.hxx
+      - analytics_link_replace.hxx
+    operation_overrides:
+    - op_name: analytics_link_create
+      cpp_request_templates:
+        - couchbase::core::management::analytics::couchbase_remote_link
+        - couchbase::core::management::analytics::s3_external_link
+        - couchbase::core::management::analytics::azure_blob_external_link
+    - op_name: analytics_link_replace
+      cpp_request_templates:
+        - couchbase::core::management::analytics::couchbase_remote_link
+        - couchbase::core::management::analytics::s3_external_link
+        - couchbase::core::management::analytics::azure_blob_external_link
+  bucket:
+    operation_headers:
+      - bucket_create.hxx
+      - bucket_drop.hxx
+      - bucket_flush.hxx
+      - bucket_get.hxx
+      - bucket_get_all.hxx
+      - bucket_update.hxx
+      - bucket_describe.hxx
+  cluster:
+    operation_headers:
+      - cluster_describe.hxx
+      - cluster_developer_preview_enable.hxx
+  collection:
+    ignored_cpp_request_fields: [retries]
+    operation_headers:
+      - collection_create.hxx
+      - collections_manifest_get.hxx
+      - collection_drop.hxx
+      - collection_update.hxx
+      - scope_create.hxx
+      - scope_drop.hxx
+      - scope_get_all.hxx
+  eventing_function:
+    operation_headers:
+      - eventing_deploy_function.hxx
+      - eventing_drop_function.hxx
+      - eventing_get_all_functions.hxx
+      - eventing_get_function.hxx
+      - eventing_get_status.hxx
+      - eventing_pause_function.hxx
+      - eventing_resume_function.hxx
+      - eventing_undeploy_function.hxx
+      - eventing_upsert_function.hxx
+  query_index:
+    operation_headers:
+      - query_index_build.hxx
+      - query_index_build_deferred.hxx
+      - query_index_create.hxx
+      - query_index_drop.hxx
+      - query_index_get_all.hxx
+      - query_index_get_all_deferred.hxx
+  search_index:
+    operation_headers:
+      - search_get_stats.hxx
+      - search_index_analyze_document.hxx
+      - search_index_control_ingest.hxx
+      - search_index_control_plan_freeze.hxx
+      - search_index_control_query.hxx
+      - search_index_drop.hxx
+      - search_index_get.hxx
+      - search_index_get_all.hxx
+      - search_index_get_documents_count.hxx
+      - search_index_get_stats.hxx
+      - search_index_upsert.hxx
+  user:
+    operation_headers:
+      - change_password.hxx
+      - group_drop.hxx
+      - group_get.hxx
+      - group_get_all.hxx
+      - group_upsert.hxx
+      - role_get_all.hxx
+      - user_drop.hxx
+      - user_get.hxx
+      - user_get_all.hxx
+      - user_upsert.hxx
+  view_index:
+    operation_headers:
+      - view_index_drop.hxx
+      - view_index_get.hxx
+      - view_index_get_all.hxx
+      - view_index_upsert.hxx
+
+
+cpp_core_type_headers:
+ - Python.h
+ - pytocbpp_defs.hxx
+ - cpp_core_types.hxx
+ - cpp_types.hxx
+ - cpp_core_enums_autogen.hxx
+ - utils.hxx
+ - result.hxx
+ - <core/tracing/wrapper_sdk_tracer.hxx>
+
+cpp_core_types:
+  ignored_fields: [internal, retry_strategy]
+  types:
+    # cluster
+    - core_struct: couchbase::core::diag::endpoint_diag_info
+      header_file: "core/diagnostics.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::diag::diagnostics_result
+      header_file: "core/diagnostics.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::diag::endpoint_ping_info
+      header_file: "core/diagnostics.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::diag::ping_result
+      header_file: "core/diagnostics.hxx"
+      skip_request: true
+    # key-value
+    - core_struct: couchbase::core::operations::get_all_replicas_response::entry
+      header_file: "core/operations/document_get_all_replicas.hxx"
+      py_type: GetAllReplicasResponseEntry
+      skip_request: true
+    - core_struct: couchbase::core::impl::subdoc::command
+      header_file: "core/impl/subdoc/command.hxx"
+      py_type: SubdocCommand
+    - core_struct: couchbase::core::operations::lookup_in_all_replicas_response::entry::lookup_in_entry
+      header_file: "core/operations/document_lookup_in_all_replicas.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::lookup_in_all_replicas_response::entry
+      header_file: "core/operations/document_lookup_in_all_replicas.hxx"
+      py_type: LookupInAllReplicasResponseEntry
+      skip_request: true
+    - core_struct: couchbase::core::operations::lookup_in_any_replica_response::entry
+      header_file: "core/operations/document_lookup_in_any_replica.hxx"
+      py_type: LookupInAnyReplicaResponseEntry
+      skip_request: true
+    - core_struct: couchbase::core::operations::lookup_in_response::entry
+      header_file: "core/operations/document_lookup_in.hxx"
+      py_type: LookupInResponseEntry
+      skip_request: true
+    - core_struct: couchbase::core::operations::mutate_in_response::entry
+      header_file: "core/operations/document_mutate_in.hxx"
+      py_type: MutateInResponseEntry
+      skip_request: true
+    # range scan
+    - core_struct: couchbase::core::scan_term
+      header_file: "core/range_scan_options.hxx"
+      py_type: RangeScanScanTerm
+    - core_struct: couchbase::core::range_scan
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::prefix_scan
+      header_file: "core/range_scan_options.hxx"
+      py_type: RangeScanPrefixScan
+    - core_struct: couchbase::core::sampling_scan
+      header_file: "core/range_scan_options.hxx"
+      py_type: RangeScanSamplingScan
+    - core_struct: couchbase::core::range_snapshot_requirements
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::range_scan_create_options
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::range_scan_create_result
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::range_scan_continue_options
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::range_scan_continue_result
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::range_scan_cancel_options
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::range_scan_item_body
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::range_scan_item
+      header_file: "core/range_scan_options.hxx"
+    - core_struct: couchbase::core::mutation_state
+      header_file: "core/range_scan_orchestrator_options.hxx"
+      py_type: RangeScanMutationState
+    - core_struct: couchbase::core::range_scan_orchestrator_options
+      header_file: "core/range_scan_orchestrator_options.hxx"
+    # streaming
+    - core_struct: couchbase::core::operations::analytics_response::analytics_metrics
+      header_file: "core/operations/document_analytics.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::analytics_response::analytics_problem
+      header_file: "core/operations/document_analytics.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::analytics_response::analytics_meta_data
+      header_file: "core/operations/document_analytics.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::query_response::query_metrics
+      header_file: "core/operations/document_query.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::query_response::query_problem
+      header_file: "core/operations/document_query.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::query_response::query_meta_data
+      header_file: "core/operations/document_query.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_metrics
+      header_file: "core/operations/document_search.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_meta_data
+      header_file: "core/operations/document_search.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_location
+      header_file: "core/operations/document_search.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_row
+      header_file: "core/operations/document_search.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_facet::term_facet
+      header_file: "core/operations/document_search.hxx"
+      py_type: SearchTermFacet
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_facet::date_range_facet
+      header_file: "core/operations/document_search.hxx"
+      py_type: SearchDateRangeFacet
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_facet::numeric_range_facet
+      header_file: "core/operations/document_search.hxx"
+      py_type: SearchNumericRangeFacet
+      skip_request: true
+    - core_struct: couchbase::core::operations::search_response::search_facet
+      header_file: "core/operations/document_search.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::document_view_response::meta_data
+      header_file: "core/operations/document_view.hxx"
+      py_type: ViewMetadata
+      skip_request: true
+    - core_struct: couchbase::core::operations::document_view_response::row
+      header_file: "core/operations/document_view.hxx"
+      py_type: ViewRow
+      skip_request: true
+    - core_struct: couchbase::core::operations::document_view_response::problem
+      header_file: "core/operations/document_view.hxx"
+      py_type: ViewProblem
+      skip_request: true
+    # analytics mgmt
+    - core_struct: couchbase::core::operations::management::analytics_problem
+      header_file: "core/operations/management/analytics_problem.hxx"
+      py_type: AnalyticsManagementProblem
+      skip_request: true
+    - core_struct: couchbase::core::management::analytics::dataset
+      header_file: "core/management/analytics_dataset.hxx"
+      py_type: AnalyticsDataset
+      skip_request: true
+    - core_struct: couchbase::core::management::analytics::index
+      header_file: "core/management/analytics_index.hxx"
+      py_type: AnalyticsIndex
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::analytics_link_connect_response::problem
+      header_file: "core/operations/management/analytics_link_connect.hxx"
+      py_type: AnalyticsLinkConnectProblem
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::analytics_link_create_response::problem
+      header_file: "core/operations/management/analytics_link_create.hxx"
+      py_type: AnalyticsLinkCreateProblem
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::analytics_link_disconnect_response::problem
+      header_file: "core/operations/management/analytics_link_disconnect.hxx"
+      py_type: AnalyticsLinkDisconnectProblem
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::analytics_link_drop_response::problem
+      header_file: "core/operations/management/analytics_link_drop.hxx"
+      py_type: AnalyticsLinkDropProblem
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::analytics_link_get_all_response::problem
+      header_file: "core/operations/management/analytics_link_get_all.hxx"
+      py_type: AnalyticsLinkGetAllProblem
+      skip_request: true
+    - core_struct: couchbase::core::management::analytics::couchbase_link_encryption_settings
+      header_file: "core/management/analytics_link_couchbase_remote.hxx"
+      py_type: AnalyticsCouchbaseRemoteLinkEncryptionSettings
+    - core_struct: couchbase::core::management::analytics::couchbase_remote_link
+      header_file: "core/management/analytics_link_couchbase_remote.hxx"
+      py_type: AnalyticsCouchbaseRemoteLink
+    - core_struct: couchbase::core::management::analytics::s3_external_link
+      header_file: "core/management/analytics_link_s3_external.hxx"
+      py_type: AnalyticsS3ExternalLink
+    - core_struct: couchbase::core::management::analytics::azure_blob_external_link
+      header_file: "core/management/analytics_link_azure_blob_external.hxx"
+      py_type: AnalyticsAzureBlobExternalLink
+    - core_struct: couchbase::core::operations::management::analytics_link_replace_response::problem
+      header_file: "core/operations/management/analytics_link_replace.hxx"
+      py_type: AnalyticsLinkReplaceProblem
+      skip_request: true
+    # bucket mgmt
+    - core_struct: couchbase::core::operations::management::server_node_address
+      header_file: "core/operations/management/bucket_describe.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::server_node
+      header_file: "core/operations/management/bucket_describe.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::server_group
+      header_file: "core/operations/management/bucket_describe.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::bucket_describe_response::bucket_info
+      header_file: "core/operations/management/bucket_describe.hxx"
+      skip_request: true
+      ignored_fields: [config_json]
+    - core_struct: couchbase::core::management::cluster::bucket_settings::node
+      py_type: BucketSettingNode
+      header_file: "core/management/bucket_settings.hxx"
+    - core_struct: couchbase::core::management::cluster::bucket_settings
+      header_file: "core/management/bucket_settings.hxx"
+    # cluster mgmt
+    - core_struct: couchbase::core::operations::management::cluster_describe_response::cluster_info::bucket
+      header_file: "core/operations/management/cluster_describe.hxx"
+      py_type: ClusterInfoBucket
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::cluster_describe_response::cluster_info::node
+      header_file: "core/operations/management/cluster_describe.hxx"
+      py_type: ClusterInfoNode
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::cluster_describe_response::cluster_info
+      header_file: "core/operations/management/cluster_describe.hxx"
+      skip_request: true
+    # collection mgmt
+    - core_struct: couchbase::core::topology::collections_manifest::collection
+      header_file: "core/topology/collections_manifest.hxx"
+      py_type: CollectionsManifestCollection
+      skip_request: true
+    - core_struct: couchbase::core::topology::collections_manifest::scope
+      header_file: "core/topology/collections_manifest.hxx"
+      py_type: CollectionsManifestScope
+      skip_request: true
+    - core_struct: couchbase::core::topology::collections_manifest
+      header_file: "core/topology/collections_manifest.hxx"
+      skip_request: true
+    # eventing function mgmt
+    - core_struct: couchbase::core::operations::management::eventing_problem
+      header_file: "core/operations/management/eventing_problem.hxx"
+      skip_request: true
+    - core_struct: couchbase::core::management::eventing::function_keyspace
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionKeyspace
+    - core_struct: couchbase::core::management::eventing::function_settings
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionSettings
+    - core_struct: couchbase::core::management::eventing::function_bucket_binding
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionBucketBinding
+    - core_struct: couchbase::core::management::eventing::function_url_no_auth
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionUrlNoAuth
+    - core_struct: couchbase::core::management::eventing::function_url_auth_basic
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionUrlAuthBasic
+    - core_struct: couchbase::core::management::eventing::function_url_auth_digest
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionUrlAuthDigest
+    - core_struct: couchbase::core::management::eventing::function_url_auth_bearer
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionUrlAuthBearer
+    - core_struct: couchbase::core::management::eventing::function_url_binding
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionUrlBinding
+    - core_struct: couchbase::core::management::eventing::function_constant_binding
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunctionConstantBinding
+    - core_struct: couchbase::core::management::eventing::function
+      header_file: "core/management/eventing_function.hxx"
+      py_type: EventingFunction
+      ignored_fields: [internal]
+    - core_struct: couchbase::core::management::eventing::function_state
+      header_file: "core/management/eventing_status.hxx"
+      py_type: EventingFunctionState
+      skip_request: true
+      ignored_fields: [internal]
+    - core_struct: couchbase::core::management::eventing::status
+      header_file: "core/management/eventing_status.hxx"
+      py_type: EventingStatus
+      skip_request: true
+    # query index mgmt
+    - core_struct: couchbase::core::operations::management::query_index_create_response::query_problem
+      header_file: "core/operations/management/query_index_create.hxx"
+      py_type: QueryIndexCreateProblem
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::query_index_build_response::query_problem
+      header_file: "core/operations/management/query_index_build.hxx"
+      py_type: QueryIndexBuildProblem
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::query_index_build_deferred_response::query_problem
+      header_file: "core/operations/management/query_index_build_deferred.hxx"
+      py_type: QueryIndexBuildDeferredProblem
+      skip_request: true
+    - core_struct: couchbase::core::operations::management::query_index_drop_response::query_problem
+      header_file: "core/operations/management/query_index_drop.hxx"
+      py_type: QueryIndexDropProblem
+      skip_request: true
+    - core_struct: couchbase::management::query_index
+      header_file: "couchbase/management/query_index.hxx"
+      py_type: QueryIndex
+      skip_request: true
+    # search index mgmt
+    - core_struct: couchbase::core::management::search::index
+      header_file: "core/management/search_index.hxx"
+      py_type: SearchIndex
+    # user mgmt
+    - core_struct: couchbase::core::management::rbac::role
+      header_file: "core/management/rbac.hxx"
+      py_type: RbacRole
+    - core_struct: couchbase::core::management::rbac::role_and_description
+      header_file: "core/management/rbac.hxx"
+      py_type: RbacRoleAndDescription
+      skip_request: true
+    - core_struct: couchbase::core::management::rbac::origin
+      header_file: "core/management/rbac.hxx"
+      py_type: RbacOrigin
+      skip_request: true
+    - core_struct: couchbase::core::management::rbac::role_and_origins
+      header_file: "core/management/rbac.hxx"
+      py_type: RbacRoleAndOrigins
+      skip_request: true
+    - core_struct: couchbase::core::management::rbac::user
+      header_file: "core/management/rbac.hxx"
+      py_type: RbacUser
+    - core_struct: couchbase::core::management::rbac::user_and_metadata
+      header_file: "core/management/rbac.hxx"
+      py_type: RbacUserAndMetadata
+      skip_request: true
+    - core_struct: couchbase::core::management::rbac::group
+      header_file: "core/management/rbac.hxx"
+      py_type: RbacGroup
+    # view index mgmt
+    - core_struct: couchbase::core::management::views::design_document::view
+      header_file: "core/management/design_document.hxx"
+      py_type: ViewDesignDocumentView
+    - core_struct: couchbase::core::management::views::design_document
+      header_file: "core/management/design_document.hxx"
+      py_type: ViewDesignDocument
+
+cpp_core_enum_headers:
+ - Python.h
+ - cpp_core_enum_conversion_macros.hxx
+ - <string>
+
+cpp_core_enums:
+  # top-level
+  - core_enum: couchbase::core::io::ip_protocol
+    header_file: "core/io/ip_protocol.hxx"
+    default: any
+    enum_type: string
+  - core_enum: couchbase::core::tls_verify_mode
+    header_file: "core/tls_verify_mode.hxx"
+    default: none
+    enum_type: string
+  - core_enum: couchbase::retry_reason
+    header_file: "couchbase/retry_reason.hxx"
+    default: unknown
+    enum_type: string
+  - core_enum: couchbase::core::diag::cluster_state
+    header_file: "core/diagnostics.hxx"
+    default: online
+    enum_type: string
+  - core_enum: couchbase::core::service_type
+    header_file: "core/service_type.hxx"
+    default: key_value
+    enum_type: string
+  - core_enum: couchbase::core::diag::endpoint_state
+    header_file: "core/diagnostics.hxx"
+    default: disconnected
+    enum_type: string
+  - core_enum: couchbase::core::diag::ping_state
+    header_file: "core/diagnostics.hxx"
+    default: ok
+    enum_type: string
+  # key-value
+  - core_enum: couchbase::read_preference
+    header_file: "couchbase/read_preference.hxx"
+    default: no_preference
+    enum_type: int
+  - core_enum: couchbase::durability_level
+    header_file: "couchbase/durability_level.hxx"
+    default: none
+    enum_type: int
+  - core_enum: couchbase::persist_to
+    header_file: "couchbase/persist_to.hxx"
+    default: none
+    enum_type: int
+  - core_enum: couchbase::replicate_to
+    header_file: "couchbase/replicate_to.hxx"
+    default: none
+    enum_type: int
+  - core_enum: couchbase::core::key_value_status_code
+    header_file: "core/error_context/key_value_status_code.hxx"
+    default: success
+    enum_type: int16
+    use_hex: true
+  - core_enum: couchbase::core::impl::subdoc::opcode
+    header_file: "core/impl/subdoc/opcode.hxx"
+    default: get
+    enum_type: int
+    use_hex: true
+    mapping_name: "subdoc_opcode"
+  - core_enum: couchbase::core::protocol::subdoc_opcode
+    header_file: "core/protocol/client_opcode.hxx"
+    default: get
+    enum_type: int
+    use_hex: true
+    mapping_name: "protocol_subdoc_opcode"
+  - core_enum: couchbase::store_semantics
+    header_file: "couchbase/store_semantics.hxx"
+    default: upsert
+    enum_type: int
+  # streaming
+  - core_enum: couchbase::core::analytics_scan_consistency
+    header_file: "core/analytics_scan_consistency.hxx"
+    default: not_bounded
+    enum_type: string
+  - core_enum: couchbase::core::operations::analytics_response::analytics_status
+    header_file: "core/operations/document_analytics.hxx"
+    default: running
+    enum_type: string
+  - core_enum: couchbase::query_scan_consistency
+    header_file: "couchbase/query_scan_consistency.hxx"
+    default: not_bounded
+    enum_type: string
+  - core_enum: couchbase::query_profile
+    header_file: "couchbase/query_profile.hxx"
+    default: "off"
+    enum_type: string
+  - core_enum: couchbase::core::vector_query_combination
+    header_file: "core/vector_query_combination.hxx"
+    default: combination_and
+    enum_type: string
+  - core_enum: couchbase::core::search_highlight_style
+    header_file: "core/search_highlight_style.hxx"
+    default: html
+    enum_type: string
+  - core_enum: couchbase::core::search_scan_consistency
+    header_file: "core/search_scan_consistency.hxx"
+    default: not_bounded
+    enum_type: string
+  - core_enum: couchbase::core::design_document_namespace
+    header_file: "core/design_document_namespace.hxx"
+    default: production
+    enum_type: string
+  - core_enum: couchbase::core::view_scan_consistency
+    header_file: "core/view_scan_consistency.hxx"
+    default: not_bounded
+    enum_type: string
+  - core_enum: couchbase::core::view_sort_order
+    header_file: "core/view_sort_order.hxx"
+    default: ascending
+    enum_type: string
+  - core_enum: couchbase::core::view_on_error
+    header_file: "core/view_on_error.hxx"
+    default: resume
+    enum_type: string
+  # analytics mgmt
+  - core_enum: couchbase::core::management::analytics::couchbase_link_encryption_level
+    header_file: "core/management/analytics_link_couchbase_remote.hxx"
+    default: none
+    enum_type: string
+  # bucket mgmt
+  - core_enum: couchbase::core::management::cluster::bucket_type
+    header_file: "core/management/bucket_settings.hxx"
+    default: unknown
+    enum_type: string
+  - core_enum: couchbase::core::management::cluster::bucket_compression
+    header_file: "core/management/bucket_settings.hxx"
+    default: unknown
+    enum_type: string
+  - core_enum: couchbase::core::management::cluster::bucket_eviction_policy
+    header_file: "core/management/bucket_settings.hxx"
+    default: unknown
+    enum_type: string
+  - core_enum: couchbase::core::management::cluster::bucket_conflict_resolution
+    header_file: "core/management/bucket_settings.hxx"
+    default: unknown
+    enum_type: string
+  - core_enum: couchbase::core::management::cluster::bucket_storage_backend
+    header_file: "core/management/bucket_settings.hxx"
+    default: unknown
+    enum_type: string
+  # eventing function mgmt
+  - core_enum: couchbase::core::management::eventing::function_dcp_boundary
+    header_file: "core/management/eventing_function.hxx"
+    default: everything
+    enum_type: string
+  - core_enum: couchbase::core::management::eventing::function_language_compatibility
+    header_file: "core/management/eventing_function.hxx"
+    default: version_6_0_0
+    enum_type: string
+  - core_enum: couchbase::core::management::eventing::function_log_level
+    header_file: "core/management/eventing_function.hxx"
+    default: info
+    enum_type: string
+  - core_enum: couchbase::core::management::eventing::function_bucket_access
+    header_file: "core/management/eventing_function.hxx"
+    default: read_write
+    enum_type: string
+  - core_enum: couchbase::core::management::eventing::function_status
+    header_file: "core/management/eventing_status.hxx"
+    default: undeployed
+    enum_type: string
+  - core_enum: couchbase::core::management::eventing::function_deployment_status
+    header_file: "core/management/eventing_status.hxx"
+    default: undeployed
+    enum_type: string
+  - core_enum: couchbase::core::management::eventing::function_processing_status
+    header_file: "core/management/eventing_status.hxx"
+    default: paused
+    enum_type: string
+  # user mgmt
+  - core_enum: couchbase::core::management::rbac::auth_domain
+    header_file: "core/management/rbac.hxx"
+    default: local
+    enum_type: string

@@ -1,0 +1,30 @@
+# ==========================================================================================
+# Key-Value Operations
+# ==========================================================================================
+class KeyValueOperationType(Enum):
+    {% for op in key_value_operations -%}
+    {{op.pretty_name}} = '{{op.name}}'
+    {% endfor %}
+# ==========================================================================================
+# Key-Value Multi Operations
+# ==========================================================================================
+class KeyValueMultiOperationType(Enum):
+    {% for op in key_value_multi_operations -%}
+    {{op.pretty_name}}Multi = '{{op.name}}_multi'
+    {% endfor %}
+# ==========================================================================================
+# Streaming Operations
+# ==========================================================================================
+class StreamingOperationType(Enum):
+    {% for op in streaming_operations -%}
+    {{op.pretty_name}} = '{{op.name}}'
+    {% endfor %}
+{% for mgmt_group in mgmt_groups %}
+# ==========================================================================================
+# {{mgmt_group.pretty_name}} Management Operations
+# ==========================================================================================
+class {{mgmt_group.pretty_name}}MgmtOperationType(Enum):
+    {% for op in mgmt_group.operations -%}
+    {{op.pretty_name}} = '{{op.name}}'
+    {% endfor %}
+{% endfor %}

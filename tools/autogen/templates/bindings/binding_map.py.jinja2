@@ -1,0 +1,26 @@
+        # key-value operations
+        self._op_map.update({
+          {% for op in key_value_operations -%}
+            KeyValueOperationType.{{op.pretty_name}}.value: self._conn.pycbc_{{op.name}},
+          {% endfor %}
+        })
+        # key-value multi operations
+        self._op_map.update({
+          {% for op in key_value_multi_operations -%}
+            KeyValueMultiOperationType.{{op.pretty_name}}Multi.value: self._conn.pycbc_{{op.name}}_multi,
+          {% endfor %}
+        })
+        # streaming operations
+        self._op_map.update({
+          {% for op in streaming_operations -%}
+            StreamingOperationType.{{op.pretty_name}}.value: self._conn.pycbc_{{op.name}},
+          {% endfor %}
+        })
+        {% for mgmt_group in mgmt_groups %}
+        # {{mgmt_group.pretty_name}} management operations
+        self._op_map.update({
+          {% for op in mgmt_group.operations -%}
+            {{mgmt_group.pretty_name}}MgmtOperationType.{{op.pretty_name}}.value: self._conn.pycbc_{{op.name}},
+          {% endfor -%}
+        })
+        {% endfor %}

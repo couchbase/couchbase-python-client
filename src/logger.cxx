@@ -16,7 +16,7 @@
  */
 
 #include "logger.hxx"
-#include "cpp_core_enums_autogen.hxx"
+#include "cpp_core_enums.hxx"
 #include "exceptions.hxx"
 #include "pytype_utils.hxx"
 

@@ -1,0 +1,132 @@
+# ==========================================================================================
+# C++ Core Types
+# ==========================================================================================
+{% for type in cpp_types %}
+class {{type.py_type}}(TypedDict, total=False):
+    {% if not type.fields -%}
+    pass
+    {% else -%}
+    {% for field in type.fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+    {% endif -%}
+{% endfor %}
+
+# ==========================================================================================
+# Key-Value Operations
+# ==========================================================================================
+{% for op in key_value_operations %}
+class Cpp{{op.pretty_name}}Request(TypedDict, total=False):
+    {% for field in op.request_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+{% if not op.is_streaming_op %}
+class Cpp{{op.pretty_name}}Response(TypedDict, total=False):
+    {% if op.request_only -%}
+    pass
+    {% else -%}
+    {% for field in op.response_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+    {% endif -%}
+{% endif -%}
+{% endfor %}
+
+# ==========================================================================================
+# Key-Value Multi Operations
+# ==========================================================================================
+{% for op in key_value_multi_operations %}
+class {{op.options_name}}(TypedDict, total=False):
+    {% for field in op.option_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor %}
+class Cpp{{op.pretty_name}}MultiRequest(TypedDict, total=False):
+    {% for field in op.request_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+{% endfor %}
+
+# ==========================================================================================
+# Streaming Operations
+# ==========================================================================================
+{% for op in streaming_operations %}
+class Cpp{{op.pretty_name}}Request(TypedDict, total=False):
+    {% for field in op.request_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+
+
+{% if not op.request_only %}
+class Cpp{{op.pretty_name}}Response(TypedDict, total=False):
+    {% for field in op.response_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+{% endif -%}
+{% endfor %}
+
+{% for mgmt_group in mgmt_groups %}
+# ==========================================================================================
+# {{mgmt_group.pretty_name}} Management Operations
+# ==========================================================================================
+{% for op in mgmt_group.operations %}
+class Cpp{{op.pretty_name}}Request(TypedDict, total=False):
+    {% for field in op.request_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+{% if not op.is_templated %}
+class Cpp{{op.pretty_name}}Response(TypedDict, total=False):
+    {% if op.request_only -%}
+    pass
+    {% else -%}
+    {% for field in op.response_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+    {% endif -%}
+{% elif op.is_templated and not op.request_only %}
+class Cpp{{op.templated_pretty_name}}Response(TypedDict, total=False):
+    {% for field in op.response_fields -%}
+    {% if field.is_ignored -%}
+    # {{field.py_name}}
+    {% else -%}
+    {{field.py_name}}: {{field.py_type}}
+    {% endif -%}
+    {% endfor -%}
+{% endif -%}
+{% endfor %}
+{% endfor %}

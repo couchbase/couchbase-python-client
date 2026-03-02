@@ -1,0 +1,26 @@
+    # key-value operations
+    {% for op in key_value_operations -%}
+    {% if op.is_streaming_op -%}
+    {{op.name}}: Callable[[Unpack[CppTypes.{{op.request}}]], pycbc_streamed_result[Any]]
+    {% else -%}
+    {{op.name}}: Callable[[Unpack[CppTypes.{{op.request}}]], pycbc_result[CppTypes.{{op.response}}]]
+    {% endif -%}
+    {% endfor %}
+    # key-value multi operations
+    {% for op in key_value_multi_operations -%}
+    {% if op.is_streaming_op -%}
+    {{op.name}}: Callable[[Unpack[CppTypes.{{op.request}}]], pycbc_result[Dict[str, pycbc_streamed_result[Any]]]]
+    {% else -%}
+    {{op.name}}_multi: Callable[[Unpack[CppTypes.{{op.request}}]], pycbc_result[Dict[str, CppTypes.{{op.response}}]]]
+    {% endif -%}
+    {% endfor %}
+    # streaming operations
+    {% for op in streaming_operations -%}
+    {{op.streaming_op_name}}: Callable[[Unpack[CppTypes.{{op.request}}]], pycbc_streamed_result[Any]]
+    {% endfor -%}
+    {% for mgmt_group in mgmt_groups %}
+    # {{mgmt_group.pretty_name}} management operations
+    {% for op in mgmt_group.operations -%}
+    {{op.name}}: Callable[[Unpack[CppTypes.{{op.request}}]], pycbc_result[CppTypes.{{op.response}}]]
+    {% endfor -%}
+    {% endfor %}
