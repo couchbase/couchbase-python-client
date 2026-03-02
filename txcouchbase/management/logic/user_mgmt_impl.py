@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 
 class TxUserMgmtImpl(AsyncUserMgmtImpl):
-    def __init___(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
         super().__init__(client_adapter)
 
     def change_password_deferred(self, req: ChangePasswordRequest) -> Deferred[None]:

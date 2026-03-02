@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,8 +18,10 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass
 from typing import (Any,
+                    Callable,
                     Dict,
                     List,
+                    Mapping,
                     Optional,
                     Tuple,
                     TypedDict,
@@ -29,6 +31,10 @@ from urllib.parse import parse_qs, urlparse
 from couchbase import USER_AGENT_EXTRA
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic.observability import (LegacyTracerProtocol,
+                                           ObservabilityInstruments,
+                                           RequestTracerProtocol,
+                                           WrappedTracer)
 from couchbase.options import (ClusterMetricsOptions,
                                ClusterOptions,
                                ClusterOrphanReportingOptions,
@@ -212,6 +218,7 @@ def build_metrics_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
     if cluster_metrics_emit_interval and 'metrics_emit_interval' not in metrics_opts:
         metrics_opts['metrics_emit_interval'] = cluster_metrics_emit_interval
     cluster_enable_metrics = cluster_opts.pop('cluster_enable_metrics', None)
+    # NOTE: we disable metrics in the C++ core as metrics logic resides (for now) on the wrapper side
     if cluster_enable_metrics is not None and 'enable_metrics' not in metrics_opts:
         metrics_opts['enable_metrics'] = cluster_enable_metrics
     if metrics_opts:
@@ -232,7 +239,7 @@ def build_timeout_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def build_tracing_and_orphan_options(cluster_opts: Dict[str, Any]  # noqa: C901
-                                     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+                                     ) -> Tuple[Dict[str, Any], Dict[str, Any], WrappedTracer]:
     tracing_opts = {}
     for key in ClusterTracingOptions.get_allowed_option_keys(use_transform_keys=True):
         if key in cluster_opts:
@@ -243,7 +250,7 @@ def build_tracing_and_orphan_options(cluster_opts: Dict[str, Any]  # noqa: C901
         if key in cluster_opts:
             orphan_opts[key] = cluster_opts.pop(key)
 
-    # PYCBC-XXXX: C++ core split out orphan reporting from tracing, so we have separate options blocks now.
+    # PYCBC-1718: C++ core split out orphan reporting from tracing, so we have separate options blocks now.
     #           However, we have to check for the old options in the tracing block for backwards compatibility.
     if tracing_opts:
         sample_size = tracing_opts.pop('orphan_sample_size', None)
@@ -256,8 +263,6 @@ def build_tracing_and_orphan_options(cluster_opts: Dict[str, Any]  # noqa: C901
     cluster_enable_tracing = cluster_opts.pop('cluster_enable_tracing', None)
     if cluster_enable_tracing is not None and 'enable_tracing' not in tracing_opts:
         tracing_opts['enable_tracing'] = cluster_enable_tracing
-    if tracing_opts:
-        cluster_opts['tracing_options'] = tracing_opts
 
     cluster_enable_orphan_reporting = cluster_opts.pop('cluster_enable_orphan_reporting', None)
     if cluster_enable_orphan_reporting is not None and 'enable_orphan_reporting' not in orphan_opts:
@@ -265,7 +270,34 @@ def build_tracing_and_orphan_options(cluster_opts: Dict[str, Any]  # noqa: C901
     if orphan_opts:
         cluster_opts['orphan_reporting_options'] = orphan_opts
 
-    return tracing_opts, orphan_opts
+    tracer = cluster_opts.pop('tracer', None)
+    # We want to disble tracing if we don't have a tracer AND tracing is explicitly disabled
+    if tracer is None and tracing_opts.get('enable_tracing', None) is False:
+        enable_tracing = False
+    else:
+        enable_tracing = True
+
+    tracing_opts['enable_tracing'] = enable_tracing
+    if tracer is None and enable_tracing is True:
+        from couchbase.logic.observability import ThresholdLoggingTracer
+        tracer = ThresholdLoggingTracer(config=(tracing_opts if tracing_opts else None))
+
+    is_legacy = False
+    if tracer is None:
+        from couchbase.logic.observability import NoOpTracer
+        tracer = NoOpTracer()
+    else:  # if we have a tracer at this point, we need to enable tracing w/in the bindings
+        cluster_opts['setup_sdk_tracing'] = True
+        from couchbase.tracing import CouchbaseTracer
+        if isinstance(tracer, CouchbaseTracer):
+            cluster_opts['legacy_tracer'] = tracer
+            is_legacy = True
+
+    if not isinstance(tracer, (RequestTracerProtocol, LegacyTracerProtocol)):
+        msg = 'The tracer must implement the RequestTracerProtocol or LegacyTracerProtocol.'
+        raise InvalidArgumentException(message=msg)
+
+    return tracing_opts, orphan_opts, WrappedTracer(tracer, is_legacy)
 
 
 class StreamingTimeouts(TypedDict):
@@ -288,6 +320,10 @@ class ClusterSettings:
     timeout_options: Dict[str, Any]
     tracing_options: Dict[str, Any]
     transaction_config: TransactionConfig
+    observability_instruments: ObservabilityInstruments
+
+    def set_observability_cluster_labels_callable(self, callable: Callable[[], Mapping[str, str]]) -> None:
+        self.observability_instruments.get_cluster_labels_fn = callable
 
     @classmethod
     def build_cluster_settings(cls,
@@ -323,7 +359,7 @@ class ClusterSettings:
             'search_timeout': timeout_opts.get('search_timeout', None),
             'view_timeout': timeout_opts.get('view_timeout', None),
         }
-        tracing_opts, orphan_opts = build_tracing_and_orphan_options(cluster_opts)
+        tracing_opts, orphan_opts, tracer = build_tracing_and_orphan_options(cluster_opts)
         metrics_opts = build_metrics_options(cluster_opts)
         transaction_cfg = cluster_opts.pop('transaction_config', TransactionConfig())
         cluster_opts['user_agent_extra'] = USER_AGENT_EXTRA
@@ -337,4 +373,5 @@ class ClusterSettings:
                    streaming_timeouts,
                    timeout_opts,
                    tracing_opts,
-                   transaction_cfg)
+                   transaction_cfg,
+                   ObservabilityInstruments(tracer))

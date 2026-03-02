@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Dict,
-                    Union)
+from typing import TYPE_CHECKING, Dict
 
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.logic.analytics_mgmt_types import (ANALYTICS_MGMT_ERROR_MAP,
@@ -29,6 +27,7 @@ from couchbase.management.logic.analytics_mgmt_types import (ANALYTICS_MGMT_ERRO
                                                              CreateDatasetRequest,
                                                              CreateDataverseRequest,
                                                              CreateIndexRequest,
+                                                             CreateLinkRequest,
                                                              CreateS3ExternalLinkRequest,
                                                              DisconnectLinkRequest,
                                                              DropDatasetRequest,
@@ -41,6 +40,7 @@ from couchbase.management.logic.analytics_mgmt_types import (ANALYTICS_MGMT_ERRO
                                                              GetPendingMutationsRequest,
                                                              ReplaceAzureBlobExternalLinkRequest,
                                                              ReplaceCouchbaseRemoteLinkRequest,
+                                                             ReplaceLinkRequest,
                                                              ReplaceS3ExternalLinkRequest)
 from couchbase.options import forward_args
 
@@ -148,9 +148,7 @@ class AnalyticsMgmtRequestBuilder:
     def build_create_link_request(self,
                                   link: AnalyticsLink,
                                   *options: object,
-                                  **kwargs: object) -> Union[CreateAzureBlobExternalLinkRequest,
-                                                             CreateCouchbaseRemoteLinkRequest,
-                                                             CreateS3ExternalLinkRequest]:
+                                  **kwargs: object) -> CreateLinkRequest:
         final_args = forward_args(kwargs, *options)
         link.validate()
         link_dict = link.as_dict()
@@ -292,9 +290,7 @@ class AnalyticsMgmtRequestBuilder:
     def build_replace_link_request(self,
                                    link: AnalyticsLink,
                                    *options: object,
-                                   **kwargs: object) -> Union[ReplaceAzureBlobExternalLinkRequest,
-                                                              ReplaceCouchbaseRemoteLinkRequest,
-                                                              ReplaceS3ExternalLinkRequest]:
+                                   **kwargs: object) -> ReplaceLinkRequest:
         final_args = forward_args(kwargs, *options)
         link_dict = link.as_dict()
         timeout = final_args.pop('timeout', None)

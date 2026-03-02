@@ -29,6 +29,7 @@ from couchbase.exceptions import (ErrorMapper,
 from couchbase.logic.collection_multi_req_builder import CollectionMultiRequestBuilder
 from couchbase.logic.collection_req_builder import CollectionRequestBuilder
 from couchbase.logic.collection_types import CollectionDetails
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.result import (CounterResult,
                               ExistsResult,
@@ -144,32 +145,43 @@ class CollectionImpl:
         """
         return self._collection_details.scope_name
 
-    def append(self, req: Union[AppendRequest, AppendWithLegacyDurabilityRequest]) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._scope._impl.cluster_settings.observability_instruments
+
+    def append(self,
+               req: Union[AppendRequest, AppendWithLegacyDurabilityRequest],
+               obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def append_multi(self, req: AppendMultiRequest) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions)
+    def append_multi(self, req: AppendMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def decrement(self, req: Union[DecrementRequest, DecrementWithLegacyDurabilityRequest]) -> CounterResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def decrement(self,
+                  req: Union[DecrementRequest, DecrementWithLegacyDurabilityRequest],
+                  obs_handler: ObservableRequestHandler) -> CounterResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return CounterResult(ret, key=req.key)
 
-    def decrement_multi(self, req: DecrementMultiRequest) -> MultiCounterResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiCounterResult(ret, return_exceptions=req.return_exceptions)
+    def decrement_multi(self, req: DecrementMultiRequest, obs_handler: ObservableRequestHandler) -> MultiCounterResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiCounterResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def exists(self, req: ExistsRequest) -> ExistsResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def exists(self, req: ExistsRequest, obs_handler: ObservableRequestHandler) -> ExistsResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return ExistsResult(ret, key=req.key)
 
-    def exists_multi(self, req: ExistsMultiRequest) -> MultiExistsResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiExistsResult(ret, return_exceptions=req.return_exceptions)
+    def exists_multi(self, req: ExistsMultiRequest, obs_handler: ObservableRequestHandler) -> MultiExistsResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiExistsResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def get_all_replicas(self, req: GetAllReplicasRequest) -> Iterable[GetReplicaResult]:
-        ret = self._client_adapter.execute_collection_request(req)
+    def get_all_replicas(self,
+                         req: GetAllReplicasRequest,
+                         obs_handler: ObservableRequestHandler) -> Iterable[GetReplicaResult]:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
 
         def _decode_replicas() -> Iterator[GetReplicaResult]:
             while True:
@@ -189,8 +201,10 @@ class CollectionImpl:
 
         return _decode_replicas()
 
-    def get_all_replicas_multi(self, req: GetAllReplicasMultiRequest) -> MultiGetReplicaResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def get_all_replicas_multi(self,  # noqa: C901
+                               req: GetAllReplicasMultiRequest,
+                               obs_handler: ObservableRequestHandler) -> MultiGetReplicaResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
 
         def _decode_replicas(key: str, transcoder: Transcoder, value: Any) -> Iterator[GetReplicaResult]:
             while True:
@@ -212,6 +226,9 @@ class CollectionImpl:
         # the key back transformed into a List[GetReplicaResult]
         result_keys = []
         for k, v in ret.raw_result.items():
+            # pycbc_streamed_result and pycbc_exception have a core_span member
+            if obs_handler and hasattr(v, 'core_span'):
+                obs_handler.process_core_span(v.core_span)
             if k == 'all_okay' or isinstance(v, PycbcCoreException):
                 continue
             result_keys.append(k)
@@ -223,56 +240,77 @@ class CollectionImpl:
 
         return MultiGetReplicaResult(ret, return_exceptions=req.return_exceptions)
 
-    def get_and_lock(self, req: GetAndLockRequest) -> GetResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def get_and_lock(self, req: GetAndLockRequest, obs_handler: ObservableRequestHandler) -> GetResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
-    def get_and_lock_multi(self, req: GetAndLockMultiRequest) -> MultiGetResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiGetResult(ret, return_exceptions=req.return_exceptions, transcoders=req.transcoders)
+    def get_and_lock_multi(self,
+                           req: GetAndLockMultiRequest,
+                           obs_handler: ObservableRequestHandler) -> MultiGetResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiGetResult(ret,
+                              return_exceptions=req.return_exceptions,
+                              transcoders=req.transcoders,
+                              obs_handler=obs_handler)
 
-    def get_and_touch(self, req: GetAndTouchRequest) -> GetResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def get_and_touch(self, req: GetAndTouchRequest, obs_handler: ObservableRequestHandler) -> GetResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
-    def get_any_replica(self, req: GetAnyReplicaRequest) -> GetReplicaResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def get_any_replica(self, req: GetAnyReplicaRequest, obs_handler: ObservableRequestHandler) -> GetReplicaResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetReplicaResult(ret, transcoder=req.transcoder, key=req.key)
 
-    def get_any_replica_multi(self, req: GetAnyReplicaMultiRequest) -> MultiGetReplicaResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiGetReplicaResult(ret, return_exceptions=req.return_exceptions, transcoders=req.transcoders)
+    def get_any_replica_multi(self,
+                              req: GetAnyReplicaMultiRequest,
+                              obs_handler: ObservableRequestHandler) -> MultiGetReplicaResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiGetReplicaResult(ret,
+                                     return_exceptions=req.return_exceptions,
+                                     transcoders=req.transcoders,
+                                     obs_handler=obs_handler)
 
-    def get(self, req: GetRequest) -> GetResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def get(self, req: GetRequest, obs_handler: ObservableRequestHandler) -> GetResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
-    def get_multi(self, req: GetMultiRequest) -> MultiGetResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiGetResult(ret, return_exceptions=req.return_exceptions, transcoders=req.transcoders)
+    def get_multi(self, req: GetMultiRequest, obs_handler: ObservableRequestHandler) -> MultiGetResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiGetResult(ret,
+                              return_exceptions=req.return_exceptions,
+                              transcoders=req.transcoders,
+                              obs_handler=obs_handler)
 
-    def increment(self, req: Union[IncrementRequest, IncrementWithLegacyDurabilityRequest]) -> CounterResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def increment(self,
+                  req: Union[IncrementRequest, IncrementWithLegacyDurabilityRequest],
+                  obs_handler: ObservableRequestHandler) -> CounterResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return CounterResult(ret, key=req.key)
 
-    def increment_multi(self, req: IncrementMultiRequest) -> MultiCounterResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiCounterResult(ret, return_exceptions=req.return_exceptions)
+    def increment_multi(self,
+                        req: IncrementMultiRequest,
+                        obs_handler: ObservableRequestHandler) -> MultiCounterResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiCounterResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def insert(self, req: Union[InsertRequest, InsertWithLegacyDurabilityRequest]) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def insert(self,
+               req: Union[InsertRequest, InsertWithLegacyDurabilityRequest],
+               obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def insert_multi(self, req: InsertMultiRequest) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions)
+    def insert_multi(self, req: InsertMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def lookup_in(self, req: LookupInRequest) -> LookupInResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def lookup_in(self, req: LookupInRequest, obs_handler: ObservableRequestHandler) -> LookupInResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return LookupInResult(ret, transcoder=req.transcoder, is_subdoc=True, key=req.key)
 
-    def lookup_in_all_replicas(self, req: LookupInAllReplicasRequest) -> Iterable[LookupInReplicaResult]:
-        ret = self._client_adapter.execute_collection_request(req)
+    def lookup_in_all_replicas(self,
+                               req: LookupInAllReplicasRequest,
+                               obs_handler: ObservableRequestHandler) -> Iterable[LookupInReplicaResult]:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
 
         def _decode_replicas() -> Iterator[LookupInReplicaResult]:
             while True:
@@ -291,58 +329,73 @@ class CollectionImpl:
                     yield LookupInReplicaResult(res, transcoder=req.transcoder, is_subdoc=True, key=req.key)
         return _decode_replicas()
 
-    def lookup_in_any_replica(self, req: LookupInAnyReplicaRequest) -> LookupInReplicaResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def lookup_in_any_replica(self,
+                              req: LookupInAnyReplicaRequest,
+                              obs_handler: ObservableRequestHandler) -> LookupInReplicaResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return LookupInReplicaResult(ret, transcoder=req.transcoder, is_subdoc=True, key=req.key)
 
-    def mutate_in(self, req: Union[MutateInRequest, MutateInWithLegacyDurabilityRequest]) -> MutateInResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def mutate_in(self,
+                  req: Union[MutateInRequest, MutateInWithLegacyDurabilityRequest],
+                  obs_handler: ObservableRequestHandler) -> MutateInResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutateInResult(ret, key=req.key)
 
-    def prepend(self, req: Union[PrependRequest, PrependWithLegacyDurabilityRequest]) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def prepend(self,
+                req: Union[PrependRequest, PrependWithLegacyDurabilityRequest],
+                obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def prepend_multi(self, req: PrependMultiRequest) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions)
+    def prepend_multi(self, req: PrependMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
     def range_scan(self, req: RangeScanRequest) -> ScanResultIterable:
         return ScanResultIterable(req)
 
-    def remove(self, req: Union[RemoveRequest, RemoveWithLegacyDurabilityRequest]) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def remove(self,
+               req: Union[RemoveRequest, RemoveWithLegacyDurabilityRequest],
+               obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def remove_multi(self, req: RemoveMultiRequest) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions)
+    def remove_multi(self, req: RemoveMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def replace(self, req: Union[ReplaceRequest, ReplaceWithLegacyDurabilityRequest]) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def replace(self,
+                req: Union[ReplaceRequest, ReplaceWithLegacyDurabilityRequest],
+                obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def replace_multi(self, req: ReplaceMultiRequest) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions)
+    def replace_multi(self, req: ReplaceMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def touch(self, req: TouchRequest) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def touch(self, req: TouchRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def touch_multi(self, req: TouchMultiRequest) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions)
+    def touch_multi(self, req: TouchMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def unlock(self, req: UnlockRequest) -> None:
-        self._client_adapter.execute_collection_request(req)
+    def unlock(self, req: UnlockRequest, obs_handler: ObservableRequestHandler) -> None:
+        self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
 
-    def unlock_multi(self, req: UnlockMultiRequest) -> Dict[str, Optional[PycbcCoreException]]:
-        ret = self._client_adapter.execute_collection_request(req)
+    def unlock_multi(self,
+                     req: UnlockMultiRequest,
+                     obs_handler: ObservableRequestHandler) -> Dict[str, Optional[PycbcCoreException]]:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         output: Dict[str, Optional[PycbcCoreException]] = {}
         for k, v in ret.raw_result.items():
             if k == 'all_okay':
                 continue
+            # pycbc_streamed_result and pycbc_exception have a core_span member
+            if obs_handler and hasattr(v, 'core_span'):
+                obs_handler.process_core_span(v.core_span)
             if isinstance(v, PycbcCoreException):
                 ex = ErrorMapper.build_exception(v)
                 if not req.return_exceptions:
@@ -354,13 +407,17 @@ class CollectionImpl:
 
         return output
 
-    def upsert(self, req: Union[UpsertRequest, UpsertWithLegacyDurabilityRequest]) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
+    def upsert(self,
+               req: Union[UpsertRequest, UpsertWithLegacyDurabilityRequest],
+               obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def upsert_multi(self, req: UpsertMultiRequest) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions)
+    def upsert_multi(self,
+                     req: UpsertMultiRequest,
+                     obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
     def _set_default_transcoder(self, transcoder: Transcoder) -> None:
         if not issubclass(transcoder.__class__, Transcoder):

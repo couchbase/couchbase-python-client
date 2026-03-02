@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict)
+                    Dict,
+                    Optional)
 
 from couchbase.exceptions import (CouchbaseException,
                                   ErrorMapper,
@@ -25,6 +26,7 @@ from couchbase.exceptions import (CouchbaseException,
 from couchbase.logic.binding_map import BindingMap
 from couchbase.logic.bucket_types import CloseBucketRequest, OpenBucketRequest
 from couchbase.logic.cluster_types import CloseConnectionRequest
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
@@ -48,11 +50,18 @@ class ClientAdapter:
             self._execute_connect_request()
 
     @property
+    def binding_map(self) -> BindingMap:
+        """**INTERNAL**"""
+        return self._binding_map
+
+    @property
     def connected(self) -> bool:
+        """**INTERNAL**"""
         return self._connection is not None and self._connection.connected
 
     @property
     def connection(self) -> pycbc_connection:
+        """**INTERNAL**"""
         return self._connection
 
     def _ensure_not_closed(self) -> None:
@@ -65,11 +74,13 @@ class ClientAdapter:
             raise RuntimeError('Cannot perform operations without first establishing a connection.')
 
     def close_bucket(self, bucket_name: str) -> None:
+        """**INTERNAL**"""
         self._ensure_not_closed()
         self._ensure_connected()
         self.execute_bucket_request(CloseBucketRequest(bucket_name))
 
     def close_connection(self) -> None:
+        """**INTERNAL**"""
         if self._closed:
             return  # Already closed, idempotent behavior
 
@@ -83,6 +94,7 @@ class ClientAdapter:
         self._connection = None
 
     def execute_bucket_request(self, req: BucketRequest) -> Any:
+        """**INTERNAL**"""
         self._ensure_not_closed()
         req_dict = req.req_to_dict()
         ret = self._execute_req(req.op_name, req_dict)
@@ -90,15 +102,22 @@ class ClientAdapter:
             raise ErrorMapper.build_exception(ret)
         return ret
 
-    def execute_collection_request(self, req: CollectionRequest) -> Any:
+    def execute_collection_request(self,
+                                   req: CollectionRequest,
+                                   obs_handler: Optional[ObservableRequestHandler] = None) -> Any:
+        """**INTERNAL**"""
         self._ensure_not_closed()
-        req_dict = req.req_to_dict()
+        req_dict = req.req_to_dict(obs_handler=obs_handler)
         ret = self._execute_req(req.op_name, req_dict)
+        # pycbc_result and pycbc_exception have a core_span member
+        if obs_handler and hasattr(ret, 'core_span'):
+            obs_handler.process_core_span(ret.core_span)
         if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
 
     def execute_cluster_request(self, req: ClusterRequest) -> Any:
+        """**INTERNAL**"""
         self._ensure_not_closed()
         req_dict = req.req_to_dict()
         ret = self._execute_req(req.op_name, req_dict)
@@ -106,15 +125,22 @@ class ClientAdapter:
             raise ErrorMapper.build_exception(ret)
         return ret
 
-    def execute_mgmt_request(self, req: MgmtRequest) -> Any:
+    def execute_mgmt_request(self,
+                             req: MgmtRequest,
+                             obs_handler: Optional[ObservableRequestHandler] = None) -> Any:
+        """**INTERNAL**"""
         self._ensure_not_closed()
-        req_dict = req.req_to_dict()
+        req_dict = req.req_to_dict(obs_handler)
         ret = self._execute_req(req.op_name, req_dict)
+        # pycbc_result and pycbc_exception have a core_span member
+        if obs_handler and hasattr(ret, 'core_span'):
+            obs_handler.process_core_span(ret.core_span)
         if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret, mapping=req.error_map)
         return ret
 
     def open_bucket(self, bucket_name: str) -> None:
+        """**INTERNAL**"""
         self._ensure_not_closed()
         self._ensure_connected()
         self.execute_bucket_request(OpenBucketRequest(bucket_name))

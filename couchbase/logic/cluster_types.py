@@ -24,6 +24,7 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Set)
 
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import (ClusterMgmtOperationType,
                                              ClusterOperationType,
                                              StreamingOperationType)
@@ -33,9 +34,6 @@ if TYPE_CHECKING:
     from couchbase.diagnostics import ClusterState
     from couchbase.n1ql import N1QLQuery
     from couchbase.search import SearchQueryBuilder
-
-# we have these params on the top-level pycbc_core request
-# OPARG_SKIP_LIST = ['timeout']
 
 
 @dataclass
@@ -62,6 +60,7 @@ class ClusterRequest:
 @dataclass
 class AnalyticsQueryRequest:
     analytics_query: AnalyticsQuery
+    obs_handler: ObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property
@@ -142,6 +141,7 @@ class PingRequest(ClusterRequest):
 @dataclass
 class QueryRequest:
     n1ql_query: N1QLQuery
+    obs_handler: ObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property
@@ -152,6 +152,7 @@ class QueryRequest:
 @dataclass
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
+    obs_handler: ObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property

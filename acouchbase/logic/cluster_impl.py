@@ -31,6 +31,8 @@ from couchbase.exceptions import ServiceUnavailableException, UnAmbiguousTimeout
 from couchbase.logic.cluster_impl import ClusterSettings
 from couchbase.logic.cluster_req_builder import ClusterRequestBuilder
 from couchbase.logic.cluster_types import CreateConnectionRequest, GetConnectionInfoRequest
+from couchbase.logic.observability import ObservabilityInstruments
+from couchbase.logic.operation_types import ClusterOperationType
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.result import (AnalyticsResult,
                               ClusterInfoResult,
@@ -63,6 +65,8 @@ class AsyncClusterImpl:
         # b/c the call needs to happen when we initialize a cluster (new cluster -> new client adapter). We await
         # the create connection future in whichever operation comes next.
         self._client_adapter = AsyncClientAdapter(connect_request, loop=loop, loop_validator=loop_validator)
+        self._cluster_settings.set_observability_cluster_labels_callable(
+            self._client_adapter.binding_map.op_map[ClusterOperationType.GetClusterLabels.value])
         self._request_builder = ClusterRequestBuilder()
         self._cluster_info: Optional[ClusterInfoResult] = None
         self._transactions: Optional[Transactions] = None
@@ -137,6 +141,11 @@ class AsyncClusterImpl:
         return None
 
     @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._cluster_settings.observability_instruments
+
+    @property
     def transactions(self) -> Transactions:
         """**INTERNAL**"""
         if not self._transactions:
@@ -158,10 +167,20 @@ class AsyncClusterImpl:
                                                                                 req.analytics_query.params,
                                                                                 default_serializer=self.default_serializer,  # noqa: E501
                                                                                 streaming_timeout=streaming_timeout,
+                                                                                obs_handler=req.obs_handler,
                                                                                 num_workers=req.num_workers))
 
     async def close_connection(self) -> None:
         """**INTERNAL**"""
+        try:
+            from couchbase.logic.observability import ThresholdLoggingTracer
+            tracer = self._cluster_settings.tracer.tracer
+            if isinstance(tracer, ThresholdLoggingTracer):
+                # shutdown the tracer's reporter
+                tracer.close()
+        except Exception:  # nosec
+            # Don't raise exceptions during shutdown
+            pass
         await self._client_adapter.close_connection()
 
     async def diagnostics(self, req: DiagnosticsRequest) -> DiagnosticsResult:
@@ -209,6 +228,7 @@ class AsyncClusterImpl:
                                                                   req.n1ql_query.params,
                                                                   default_serializer=self.default_serializer,
                                                                   streaming_timeout=streaming_timeout,
+                                                                  obs_handler=req.obs_handler,
                                                                   num_workers=req.num_workers))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
@@ -226,6 +246,7 @@ class AsyncClusterImpl:
                                                                                req.query_builder.as_encodable(),
                                                                                default_serializer=self.default_serializer,  # noqa: E501
                                                                                streaming_timeout=streaming_timeout,
+                                                                               obs_handler=req.obs_handler,
                                                                                num_workers=req.num_workers))
 
     def update_credentials(self, req: UpdateCredentialsRequest) -> None:

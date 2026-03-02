@@ -213,6 +213,11 @@ class TestEnvironment(CouchbaseTestEnvironment):
         transcoder = kwargs.pop('transcoder', None)
         if transcoder:
             opts['transcoder'] = transcoder
+        tracer = kwargs.pop('tracer', None)
+        if tracer:
+            opts['tracer'] = tracer
+        else:
+            opts['enable_tracing'] = False
         okay = False
         cluster = None
         bucket = None

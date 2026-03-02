@@ -96,7 +96,7 @@ class CollectionManagementTestEnvironment(TestEnvironment):
                                                        self.cm.drop_scope,
                                                        s,
                                                        expected_exceptions=(ScopeNotFoundException, ))
-        self._collection_ids.clear()
+        self._scope_ids.clear()
         if EnvironmentFeatures.is_feature_supported('bucket_mgmt', self.server_version_short, self.mock_server_type):
             TestEnvironment.try_n_times_till_exception(10,
                                                        3,

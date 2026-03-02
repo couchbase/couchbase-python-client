@@ -22,11 +22,14 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import MgmtOperationType, QueryIndexMgmtOperationType
 from couchbase.management.logic.query_index_mgmt_req_types import QueryIndex
 from txcouchbase.management.logic.query_index_mgmt_impl import TxQueryIndexMgmtImpl
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                               CreatePrimaryQueryIndexOptions,
                                               CreateQueryIndexOptions,
@@ -38,8 +41,10 @@ if TYPE_CHECKING:
 
 class QueryIndexManager:
 
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        self._impl = TxQueryIndexMgmtImpl(client_adapter)
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments) -> None:
+        self._impl = TxQueryIndexMgmtImpl(client_adapter, observability_instruments)
         self._collection_ctx = None
 
     def create_index(self,
@@ -49,57 +54,107 @@ class QueryIndexManager:
                      *options,      # type: CreateQueryIndexOptions
                      **kwargs
                      ) -> Deferred[None]:
-        req = self._impl.request_builder.build_create_index_request(bucket_name,
-                                                                    index_name,
-                                                                    keys,
-                                                                    self._collection_ctx,
-                                                                    *options,
-                                                                    **kwargs)
-        return self._impl.create_index_deferred(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_create_index_request(bucket_name,
+                                                                        index_name,
+                                                                        keys,
+                                                                        obs_handler,
+                                                                        self._collection_ctx,
+                                                                        *options,
+                                                                        **kwargs)
+            d = self._impl.create_index_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def create_primary_index(self,
                              bucket_name,   # type: str
                              *options,      # type: CreatePrimaryQueryIndexOptions
                              **kwargs
                              ) -> Deferred[None]:
-        req = self._impl.request_builder.build_create_primary_index_request(bucket_name,
-                                                                            self._collection_ctx,
-                                                                            *options,
-                                                                            **kwargs)
-        return self._impl.create_primary_index_deferred(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_create_primary_index_request(bucket_name,
+                                                                                obs_handler,
+                                                                                self._collection_ctx,
+                                                                                *options,
+                                                                                **kwargs)
+            d = self._impl.create_primary_index_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def drop_index(self,
                    bucket_name,     # type: str
                    index_name,      # type: str
                    *options,        # type: DropQueryIndexOptions
                    **kwargs) -> Deferred[None]:
-        req = self._impl.request_builder.build_drop_index_request(bucket_name,
-                                                                  index_name,
-                                                                  self._collection_ctx,
-                                                                  *options,
-                                                                  **kwargs)
-        return self._impl.drop_index_deferred(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_drop_index_request(bucket_name,
+                                                                      index_name,
+                                                                      obs_handler,
+                                                                      self._collection_ctx,
+                                                                      *options,
+                                                                      **kwargs)
+            d = self._impl.drop_index_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def drop_primary_index(self,
                            bucket_name,     # type: str
                            *options,        # type: DropPrimaryQueryIndexOptions
                            **kwargs) -> Deferred[None]:
-        req = self._impl.request_builder.build_drop_primary_index_request(bucket_name,
-                                                                          self._collection_ctx,
-                                                                          *options,
-                                                                          **kwargs)
-        return self._impl.drop_primary_index_deferred(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_drop_primary_index_request(bucket_name,
+                                                                              obs_handler,
+                                                                              self._collection_ctx,
+                                                                              *options,
+                                                                              **kwargs)
+            d = self._impl.drop_primary_index_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def get_all_indexes(self,
                         bucket_name,    # type: str
                         *options,       # type: GetAllQueryIndexOptions
                         **kwargs        # type: Dict[str,Any]
                         ) -> Deferred[Iterable[QueryIndex]]:
-        req = self._impl.request_builder.build_get_all_indexes_request(bucket_name,
-                                                                       self._collection_ctx,
-                                                                       *options,
-                                                                       **kwargs)
-        return self._impl.get_all_indexes_deferred(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexGetAll
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_get_all_indexes_request(bucket_name,
+                                                                           obs_handler,
+                                                                           self._collection_ctx,
+                                                                           *options,
+                                                                           **kwargs)
+            d = self._impl.get_all_indexes_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def build_deferred_indexes(self,
                                bucket_name,     # type: str
@@ -115,11 +170,21 @@ class QueryIndexManager:
         :raise: InvalidArgumentsException
 
         """
-        req = self._impl.request_builder.build_build_deferred_indexes_request(bucket_name,
-                                                                              self._collection_ctx,
-                                                                              *options,
-                                                                              **kwargs)
-        return self._impl.build_deferred_indexes_deferred(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexBuildDeferred
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_build_deferred_indexes_request(bucket_name,
+                                                                                  obs_handler,
+                                                                                  self._collection_ctx,
+                                                                                  *options,
+                                                                                  **kwargs)
+            d = self._impl.build_deferred_indexes_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def watch_indexes(self,
                       bucket_name,  # type: str
@@ -137,9 +202,19 @@ class QueryIndexManager:
         :raises: QueryIndexNotFoundException
         :raises: WatchQueryIndexTimeoutException
         """
-        req = self._impl.request_builder.build_watch_indexes_request(bucket_name,
-                                                                     index_names,
-                                                                     self._collection_ctx,
-                                                                     *options,
-                                                                     **kwargs)
-        return self._impl.watch_indexes_deferred(req)
+        op_type = MgmtOperationType.QueryIndexWatchIndexes
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_watch_indexes_request(bucket_name,
+                                                                         index_names,
+                                                                         obs_handler,
+                                                                         self._collection_ctx,
+                                                                         *options,
+                                                                         **kwargs)
+            d = self._impl.watch_indexes_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise

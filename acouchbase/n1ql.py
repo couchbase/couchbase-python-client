@@ -88,25 +88,36 @@ class AsyncN1QLRequest(QueryRequestLogic):
         row = next(self._streaming_result)
         if isinstance(row, PycbcCoreException):
             raise ErrorMapper.build_exception(row)
+
         # should only be None once query request is complete and _no_ errors found
         if row is None:
             raise StopAsyncIteration
+
         return self.serializer.deserialize(row)
 
     async def __anext__(self):
         try:
-            return await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
+            row = await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
+            # We want to end the streaming op span once we have a response from the C++ core.
+            # Unfortunately right now, that means we need to wait until we have the first row (or we have an error).
+            # As this method is idempotent, it is safe to call for each row (it will only do work for the first call).
+            self._process_core_span()
+            return row
         except asyncio.QueueEmpty:
+            self._process_core_span(with_error=True)
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls('Unexpected QueueEmpty exception caught when doing N1QL query.')
             raise excptn
         except StopAsyncIteration:
             self._done_streaming = True
+            self._process_core_span()
             self._get_metadata()
             raise
         except CouchbaseException as ex:
+            self._process_core_span(with_error=True)
             raise ex
         except Exception as ex:
+            self._process_core_span(with_error=True)
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls(str(ex))
             raise excptn

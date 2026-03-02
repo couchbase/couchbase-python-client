@@ -22,12 +22,15 @@ from typing import (TYPE_CHECKING,
                     List)
 
 from acouchbase.management.logic.bucket_mgmt_impl import AsyncBucketMgmtImpl
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import BucketMgmtOperationType
 from couchbase.management.logic.bucket_mgmt_types import (BucketDescribeResult,
                                                           BucketSettings,
                                                           CreateBucketSettings)
 
 if TYPE_CHECKING:
     from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (BucketDescribeOptions,
                                               CreateBucketOptions,
                                               DropBucketOptions,
@@ -38,8 +41,10 @@ if TYPE_CHECKING:
 
 
 class BucketManager:
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
-        self._impl = AsyncBucketMgmtImpl(client_adapter)
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments) -> None:
+        self._impl = AsyncBucketMgmtImpl(client_adapter, observability_instruments)
 
     async def create_bucket(self,
                             settings,  # type: CreateBucketSettings
@@ -56,47 +61,59 @@ class BucketManager:
         :raises: BucketAlreadyExistsException
         :raises: InvalidArgumentsException
         """
-        req = self._impl.request_builder.build_create_bucket_request(settings, *options, **kwargs)
-        await self._impl.create_bucket(req)
+        op_type = BucketMgmtOperationType.BucketCreate
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_create_bucket_request(settings, obs_handler, *options, **kwargs)
+            await self._impl.create_bucket(req, obs_handler)
 
     async def update_bucket(self,
                             settings,  # type: BucketSettings
                             *options,  # type: UpdateBucketOptions
                             **kwargs  # type: Dict[str, Any]
                             ) -> None:
-        req = self._impl.request_builder.build_update_bucket_request(settings, *options, **kwargs)
-        await self._impl.update_bucket(req)
+        op_type = BucketMgmtOperationType.BucketUpdate
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_update_bucket_request(settings, obs_handler, *options, **kwargs)
+            await self._impl.update_bucket(req, obs_handler)
 
     async def drop_bucket(self,
                           bucket_name,  # type: str
                           *options,     # type: DropBucketOptions
                           **kwargs      # type: Dict[str, Any]
                           ) -> None:
-        req = self._impl.request_builder.build_drop_bucket_request(bucket_name, *options, **kwargs)
-        await self._impl.drop_bucket(req)
+        op_type = BucketMgmtOperationType.BucketDrop
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_bucket_request(bucket_name, obs_handler, *options, **kwargs)
+            await self._impl.drop_bucket(req, obs_handler)
 
     async def get_bucket(self,
                          bucket_name,   # type: str
                          *options,      # type: GetBucketOptions
                          **kwargs       # type: Dict[str, Any]
                          ) -> Awaitable[BucketSettings]:
-        req = self._impl.request_builder.build_get_bucket_request(bucket_name, *options, **kwargs)
-        return await self._impl.get_bucket(req)
+        op_type = BucketMgmtOperationType.BucketGet
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_bucket_request(bucket_name, obs_handler, *options, **kwargs)
+            return await self._impl.get_bucket(req, obs_handler)
 
     async def get_all_buckets(self,
                               *options,  # type: GetAllBucketOptions
                               **kwargs  # type: Dict[str, Any]
                               ) -> Awaitable[List[BucketSettings]]:
-        req = self._impl.request_builder.build_get_all_buckets_request(*options, **kwargs)
-        return await self._impl.get_all_buckets(req)
+        op_type = BucketMgmtOperationType.BucketGetAll
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_buckets_request(obs_handler, *options, **kwargs)
+            return await self._impl.get_all_buckets(req, obs_handler)
 
     async def flush_bucket(self,
                            bucket_name,   # type: str
                            *options,      # type: FlushBucketOptions
                            **kwargs       # type: Dict[str, Any]
                            ) -> Awaitable[None]:
-        req = self._impl.request_builder.build_flush_bucket_request(bucket_name, *options, **kwargs)
-        await self._impl.flush_bucket(req)
+        op_type = BucketMgmtOperationType.BucketFlush
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_flush_bucket_request(bucket_name, obs_handler, *options, **kwargs)
+            await self._impl.flush_bucket(req, obs_handler)
 
     async def bucket_describe(self,
                               bucket_name,   # type: str
@@ -118,5 +135,7 @@ class BucketManager:
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        req = self._impl.request_builder.build_bucket_describe_request(bucket_name, *options, **kwargs)
-        return await self._impl.bucket_describe(req)
+        op_type = BucketMgmtOperationType.BucketDescribe
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_bucket_describe_request(bucket_name, obs_handler, *options, **kwargs)
+            return await self._impl.bucket_describe(req, obs_handler)

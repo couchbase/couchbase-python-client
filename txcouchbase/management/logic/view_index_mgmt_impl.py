@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 class TxViewIndexMgmtImpl(AsyncViewIndexMgmtImpl):
-    def __init___(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
         super().__init__(client_adapter)
 
     def drop_design_document_deferred(self, req: DropDesignDocumentRequest) -> Deferred[None]:

@@ -83,6 +83,11 @@ class TestEnvironment:
         self._used_extras = set()
         self._doc_types = ['dealership', 'vehicle']
         self._consistency = ConsistencyChecker.from_test_environment(self)
+        if not self._config.is_mock_server:
+            cluster_name = self._consistency.fetch_cluster_name()
+            self._supports_cluster_labels = (cluster_name and not cluster_name.isspace())
+        else:
+            self._supports_cluster_labels = False
         self._use_scope_search_mgmt = False
         self._use_scope_eventing_mgmt = False
 
@@ -202,6 +207,10 @@ class TestEnvironment:
     def sixm(self) -> Optional[Any]:
         """Returns the default SearchIndexManager"""
         return self._sixm if hasattr(self, '_sixm') else None
+
+    @property
+    def supports_cluster_labels(self) -> bool:
+        return self._supports_cluster_labels
 
     @property
     def test_bucket(self) -> Optional[Any]:
@@ -537,21 +546,19 @@ class TestEnvironment:
         self._doc_types = ['vehicle']
 
     def purge_data(self):
-        for k in self._loaded_docs.keys():
-            try:
-                self.collection.remove(k)
-            except CouchbaseException:
-                pass
-            except Exception:
-                raise
+        try:
+            self.collection.remove_multi(list(self._loaded_docs.keys()))
+        except CouchbaseException:
+            pass
+        except Exception:
+            raise
 
-        for k in self._used_extras:
-            try:
-                self.collection.remove(k)
-            except CouchbaseException:
-                pass
-            except Exception:
-                raise
+        try:
+            self.collection.remove_multi(self._used_extras)
+        except CouchbaseException:
+            pass
+        except Exception:
+            raise
 
         self._loaded_docs.clear()
         self._used_docs.clear()
@@ -721,6 +728,8 @@ class TestEnvironment:
         tracer = kwargs.pop('tracer', None)
         if tracer:
             opts['tracer'] = tracer
+        else:
+            opts['enable_tracing'] = False
 
         transaction_config = kwargs.pop('transaction_config', None)
         if transaction_config:
@@ -906,7 +915,8 @@ class AsyncTestEnvironment(TestEnvironment):
 
     async def setup_collection_mgmt(self, bucket_name):
         await self.create_bucket(bucket_name)
-        self._test_bucket = await AsyncTestEnvironment.try_n_times(3, 5, self.cluster.bucket, bucket_name)
+        self._test_bucket = self.cluster.bucket(bucket_name)
+        await AsyncTestEnvironment.try_n_times(3, 5, self._test_bucket.on_connect)
         self._test_bucket_cm = self._test_bucket.collections()
 
     async def setup_named_collections(self):
@@ -1030,6 +1040,8 @@ class AsyncTestEnvironment(TestEnvironment):
         tracer = kwargs.pop('tracer', None)
         if tracer:
             opts['tracer'] = tracer
+        else:
+            opts['enable_tracing'] = False
 
         transaction_config = kwargs.pop('transaction_config', None)
         if transaction_config:

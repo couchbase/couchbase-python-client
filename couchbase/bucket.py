@@ -21,6 +21,8 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.collection import Collection
 from couchbase.logic.bucket_impl import BucketImpl
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.logic.supportability import Supportability
 from couchbase.management.collections import CollectionManager
 from couchbase.management.views import ViewIndexManager
@@ -178,7 +180,13 @@ class Bucket:
                     print(f'Found row: {row}')
 
         """
-        req = self._impl.request_builder.build_view_query_request(design_doc, view_name, *view_options, **kwargs)
+        op_type = StreamingOperationType.ViewQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_view_query_request(design_doc,
+                                                                  view_name,
+                                                                  obs_handler,
+                                                                  *view_options,
+                                                                  **kwargs)
         return self._impl.view_query(req)
 
     def collections(self) -> CollectionManager:
@@ -189,7 +197,7 @@ class Bucket:
         Returns:
             :class:`~couchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
         """  # noqa: E501
-        return CollectionManager(self._impl._client_adapter, self.name)
+        return CollectionManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
 
     def view_indexes(self) -> ViewIndexManager:
         """

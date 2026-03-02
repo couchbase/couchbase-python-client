@@ -23,6 +23,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
@@ -74,24 +76,51 @@ class Collection:
             *opts,  # type: GetOptions
             **kwargs,  # type: Dict[str, Any]
             ) -> Deferred[GetResult]:
-        req = self._impl.request_builder.build_get_request(key, *opts, **kwargs)
-        return self._impl.get_deferred(req)
+        op_type = KeyValueOperationType.Get
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.get_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def get_any_replica(self,
                         key,  # type: str
                         *opts,  # type: GetAnyReplicaOptions
                         **kwargs,  # type: Dict[str, Any]
                         ) -> Deferred[GetResult]:
-        req = self._impl.request_builder.build_get_any_replica_request(key, *opts, **kwargs)
-        return self._impl.get_any_replica_deferred(req)
+        op_type = KeyValueOperationType.GetAnyReplica
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_get_any_replica_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.get_any_replica_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def get_all_replicas(self,
                          key,  # type: str
                          *opts,  # type: GetAllReplicasOptions
                          **kwargs,  # type: Dict[str, Any]
                          ) -> Deferred[Iterable[GetReplicaResult]]:
-        req = self._impl.request_builder.build_get_all_replicas_request(key, *opts, **kwargs)
-        return self._impl.get_all_replicas_deferred(req)
+        op_type = KeyValueOperationType.GetAllReplicas
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_get_all_replicas_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.get_all_replicas_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def exists(
         self,
@@ -99,8 +128,17 @@ class Collection:
         *opts,  # type: ExistsOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[ExistsResult]:
-        req = self._impl.request_builder.build_exists_request(key, *opts, **kwargs)
-        return self._impl.exists_deferred(req)
+        op_type = KeyValueOperationType.Exists
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_exists_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.exists_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def insert(
         self,
@@ -109,8 +147,17 @@ class Collection:
         *opts,  # type: InsertOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[MutationResult]:
-        req = self._impl.request_builder.build_insert_request(key, value, *opts, **kwargs)
-        return self._impl.insert_deferred(req)
+        op_type = KeyValueOperationType.Insert
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_insert_request(key, value, obs_handler, *opts, **kwargs)
+            d = self._impl.insert_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def upsert(
         self,
@@ -119,8 +166,17 @@ class Collection:
         *opts,  # type: UpsertOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[MutationResult]:
-        req = self._impl.request_builder.build_upsert_request(key, value, *opts, **kwargs)
-        return self._impl.upsert_deferred(req)
+        op_type = KeyValueOperationType.Upsert
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_upsert_request(key, value, obs_handler, *opts, **kwargs)
+            d = self._impl.upsert_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def replace(self,
                 key,  # type: str
@@ -128,16 +184,34 @@ class Collection:
                 *opts,  # type: ReplaceOptions
                 **kwargs,  # type: Dict[str, Any]
                 ) -> Deferred[MutationResult]:
-        req = self._impl.request_builder.build_replace_request(key, value, *opts, **kwargs)
-        return self._impl.replace_deferred(req)
+        op_type = KeyValueOperationType.Replace
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_replace_request(key, value, obs_handler, *opts, **kwargs)
+            d = self._impl.replace_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def remove(self,
                key,  # type: str
                *opts,  # type: RemoveOptions
                **kwargs,  # type: Dict[str, Any]
                ) -> Deferred[MutationResult]:
-        req = self._impl.request_builder.build_remove_request(key, *opts, **kwargs)
-        return self._impl.remove_deferred(req)
+        op_type = KeyValueOperationType.Remove
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_remove_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.remove_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def touch(self,
               key,  # type: str
@@ -145,8 +219,17 @@ class Collection:
               *opts,  # type: TouchOptions
               **kwargs,  # type: Dict[str, Any]
               ) -> Deferred[MutationResult]:
-        req = self._impl.request_builder.build_touch_request(key, expiry, *opts, **kwargs)
-        return self._impl.touch_deferred(req)
+        op_type = KeyValueOperationType.Touch
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_touch_request(key, expiry, obs_handler, *opts, **kwargs)
+            d = self._impl.touch_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def get_and_touch(self,
                       key,  # type: str
@@ -154,8 +237,17 @@ class Collection:
                       *opts,  # type: GetAndTouchOptions
                       **kwargs,  # type: Dict[str, Any]
                       ) -> Deferred[GetResult]:
-        req = self._impl.request_builder.build_get_and_touch_request(key, expiry, *opts, **kwargs)
-        return self._impl.get_and_touch_deferred(req)
+        op_type = KeyValueOperationType.GetAndTouch
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_get_and_touch_request(key, expiry, obs_handler, *opts, **kwargs)
+            d = self._impl.get_and_touch_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def get_and_lock(
         self,
@@ -164,8 +256,17 @@ class Collection:
         *opts,  # type: GetAndLockOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[GetResult]:
-        req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, *opts, **kwargs)
-        return self._impl.get_and_lock_deferred(req)
+        op_type = KeyValueOperationType.GetAndLock
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, obs_handler, *opts, **kwargs)
+            d = self._impl.get_and_lock_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def unlock(self,
                key,  # type: str
@@ -173,8 +274,17 @@ class Collection:
                *opts,  # type: UnlockOptions
                **kwargs,  # type: Dict[str, Any]
                ) -> Deferred[None]:
-        req = self._impl.request_builder.build_unlock_request(key, cas, *opts, **kwargs)
-        self._impl.unlock_deferred(req)
+        op_type = KeyValueOperationType.Unlock
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_unlock_request(key, cas, obs_handler, *opts, **kwargs)
+            d = self._impl.unlock_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def lookup_in(
         self,
@@ -183,8 +293,17 @@ class Collection:
         *opts,  # type: LookupInOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[LookupInResult]:
-        req = self._impl.request_builder.build_lookup_in_request(key, spec, *opts, **kwargs)
-        return self._impl.lookup_in_deferred(req)
+        op_type = KeyValueOperationType.LookupIn
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_lookup_in_request(key, spec, obs_handler, *opts, **kwargs)
+            d = self._impl.lookup_in_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def lookup_in_any_replica(
         self,
@@ -193,8 +312,18 @@ class Collection:
         *opts,  # type: LookupInAnyReplicaOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[LookupInReplicaResult]:
-        req = self._impl.request_builder.build_lookup_in_any_replica_request(key, spec, *opts, **kwargs)
-        return self._impl.lookup_in_any_replica_deferred(req)
+        op_type = KeyValueOperationType.LookupInAnyReplica
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_lookup_in_any_replica_request(
+                key, spec, obs_handler, *opts, **kwargs)
+            d = self._impl.lookup_in_any_replica_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def lookup_in_all_replicas(
         self,
@@ -203,8 +332,18 @@ class Collection:
         *opts,  # type: LookupInAllReplicasOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[Iterable[LookupInReplicaResult]]:
-        req = self._impl.request_builder.build_lookup_in_all_replicas_request(key, spec, *opts, **kwargs)
-        return self._impl.lookup_in_all_replicas_deferred(req)
+        op_type = KeyValueOperationType.LookupInAllReplicas
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_lookup_in_all_replicas_request(
+                key, spec, obs_handler, *opts, **kwargs)
+            d = self._impl.lookup_in_all_replicas_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def mutate_in(
         self,
@@ -213,8 +352,17 @@ class Collection:
         *opts,  # type: MutateInOptions
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[MutateInResult]:
-        req = self._impl.request_builder.build_mutate_in_request(key, spec, *opts, **kwargs)
-        return self._impl.mutate_in_deferred(req)
+        op_type = KeyValueOperationType.MutateIn
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_mutate_in_request(key, spec, obs_handler, *opts, **kwargs)
+            d = self._impl.mutate_in_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def binary(self) -> BinaryCollection:
         return BinaryCollection(self._impl)

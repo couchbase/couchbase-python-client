@@ -20,6 +20,8 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Union)
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.result import CounterResult, MutationResult
 
 if TYPE_CHECKING:
@@ -80,8 +82,10 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        req = self._impl.request_builder.build_increment_request(key, *opts, **kwargs)
-        return await self._impl.increment(req)
+        op_type = KeyValueOperationType.Increment
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_increment_request(key, obs_handler, *opts, **kwargs)
+            return await self._impl.increment(req, obs_handler)
 
     async def decrement(self,
                         key,  # type: str
@@ -128,8 +132,10 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        req = self._impl.request_builder.build_decrement_request(key, *opts, **kwargs)
-        return await self._impl.decrement(req)
+        op_type = KeyValueOperationType.Decrement
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_decrement_request(key, obs_handler, *opts, **kwargs)
+            return await self._impl.decrement(req, obs_handler)
 
     async def append(self,
                      key,  # type: str
@@ -184,8 +190,10 @@ class BinaryCollection:
                                                         AppendOptions(timeout=timedelta(seconds=2)))
 
         """
-        req = self._impl.request_builder.build_append_request(key, value, *opts, **kwargs)
-        return await self._impl.append(req)
+        op_type = KeyValueOperationType.Append
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_append_request(key, value, obs_handler, *opts, **kwargs)
+            return await self._impl.append(req, obs_handler)
 
     async def prepend(self,
                       key,  # type: str
@@ -240,5 +248,7 @@ class BinaryCollection:
                                                         PrependOptions(timeout=timedelta(seconds=2)))
 
         """
-        req = self._impl.request_builder.build_prepend_request(key, value, *opts, **kwargs)
-        return await self._impl.prepend(req)
+        op_type = KeyValueOperationType.Prepend
+        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_prepend_request(key, value, obs_handler, *opts, **kwargs)
+            return await self._impl.prepend(req, obs_handler)

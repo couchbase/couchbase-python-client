@@ -19,10 +19,14 @@ from typing import Any
 
 class CouchbaseSpan(ABC):
     """
+    .. deprecated:: 4.7.0
+
+        This class is deprecated and will be removed in a future release.  Use :class:`~couchbase.observability.tracing.RequestSpan` instead.
+
     This is an abstract base class intended to wrap an external span implementation, to use withing the
     python client.  You will want to create a class deriving from this, which implements the :meth:`set_attribute`
     and :meth:`finish` methods.
-    """
+    """  # noqa: E501
 
     def __init__(self,
                  span   # type: Any
@@ -71,9 +75,13 @@ class CouchbaseSpan(ABC):
 
 class CouchbaseTracer(ABC):
     """
+    .. deprecated:: 4.7.0
+
+        This class is deprecated and will be removed in a future release.  Use :class:`~couchbase.observability.tracing.RequestTracer` instead.
+
     This is an abstract base class, intended to wrap a concrete tracer implementation.  There is a single method,
     :meth:`start_span`, which must be implemented in the derived class.
-    """
+    """  # noqa: E501
 
     def __init__(self,
                  external_tracer    # type: Any

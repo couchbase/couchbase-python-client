@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from couchbase.auth import Authenticator
     from couchbase.diagnostics import ClusterState, ServiceType
     from couchbase.durability import DurabilityType
+    from couchbase.logic.observability import SpanProtocol, TracerProtocol
     from couchbase.management.views import DesignDocumentNamespace
     from couchbase.metrics import CouchbaseMeter
     from couchbase.mutation_state import MutationState
@@ -54,7 +55,6 @@ if TYPE_CHECKING:
                                   Sort)
     from couchbase.serializer import Serializer
     from couchbase.subdocument import StoreSemantics
-    from couchbase.tracing import CouchbaseTracer
     from couchbase.transcoder import Transcoder
     from couchbase.vector_search import VectorQueryCombination
     from couchbase.views import (ViewErrorMode,
@@ -117,7 +117,8 @@ VALID_MULTI_OPTS = {
     'cas': validate_int,
     'durability': DurabilityParser.parse_durability,
     'transcoder': lambda x: x,
-    'span': lambda x: x,
+    'span': lambda x: x,  # kept b/c we previously had this in the allowed opts
+    'parent_span': lambda x: x,
     'project': lambda x: x,
     'delta': lambda x: x,
     'initial': lambda x: x,
@@ -720,7 +721,7 @@ class ClusterOptionsBase(dict):
         compression_min_size=None,  # type: Optional[int]
         compression_min_ratio=None,  # type: Optional[float]
         lockmode=None,  # type: Optional[LockMode]
-        tracer=None,  # type: Optional[CouchbaseTracer]
+        tracer=None,  # type: Optional[TracerProtocol]
         meter=None,  # type: Optional[CouchbaseMeter]
         dns_nameserver=None,  # type: Optional[str]
         dns_port=None,  # type: Optional[int]
@@ -822,7 +823,7 @@ Couchbase Python SDK Key-Value related Options
 class OptionsTimeoutBase(OptionsBase):
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[Any]
+                 span=None,  # type: Optional[SpanProtocol]
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
         """
@@ -831,28 +832,29 @@ class OptionsTimeoutBase(OptionsBase):
         :param span: Parent tracing span to use for this operation
         """
         if timeout:
-            kwargs["timeout"] = timeout
+            kwargs['timeout'] = timeout
 
         if span:
-            kwargs["span"] = span
+            kwargs['span'] = span
 
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
 
-    def timeout(self,
-                timeout,  # type: timedelta
-                ) -> OptionsTimeoutBase:
-        self["timeout"] = timeout
+    def timeout(self, timeout: timedelta) -> OptionsTimeoutBase:
+        self['timeout'] = timeout
         return self
 
-    def span(self,
-             span,  # type: Any
-             ) -> OptionsTimeoutBase:
-        self["span"] = span
+    def span(self, span: SpanProtocol) -> OptionsTimeoutBase:
+        """**DEPRECATED** use parent_span instead.  This method will be removed in a future version of the SDK."""
+        self['span'] = span
         return self
 
+    def parent_span(self, parent_span: SpanProtocol) -> OptionsTimeoutBase:
+        self['parent_span'] = parent_span
+        return self
 
 # Diagnostic Operations
+
 
 class PingOptionsBase(OptionsTimeoutBase):
     @overload
@@ -964,7 +966,8 @@ class ScanOptionsBase(OptionsTimeoutBase):
             batch_time_limit=None,  # type: Optional[timedelta]
             transcoder=None,  # type: Optional[Transcoder]
             concurrency=None,  # type: Optional[int]
-            span=None,  # type: Optional[Any]
+            span=None,  # type: Optional[SpanProtocol]
+            parent_span=None,  # type: Optional[SpanProtocol]
     ):
         pass
 
@@ -981,7 +984,8 @@ class ScanOptionsBase(OptionsTimeoutBase):
                 'batch_item_limit',
                 'concurrency',
                 'transcoder',
-                'span']
+                'span',
+                'parent_span']
 
 
 class ReplaceOptionsBase(DurabilityOptionBlockBase):
@@ -1149,7 +1153,8 @@ class LookupInAllReplicasOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[Any]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  serializer=None,  # type: Optional[Serializer]
                  read_preference=None,  # type: Optional[ReadPreference]
                  ) -> None:
@@ -1164,7 +1169,8 @@ class LookupInAnyReplicaOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[Any]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  serializer=None,  # type: Optional[Serializer]
                  read_preference=None,  # type: Optional[ReadPreference]
                  ) -> None:
@@ -1202,7 +1208,8 @@ class IncrementOptionsBase(DurabilityOptionBlockBase):
                  durability=None,   # type: Optional[DurabilityType]
                  delta=None,         # type: Optional[DeltaValueBase]
                  initial=None,      # type: Optional[SignedInt64Base]
-                 span=None         # type: Optional[Any]
+                 span=None,         # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1219,7 +1226,8 @@ class DecrementOptionsBase(DurabilityOptionBlockBase):
                  durability=None,   # type: Optional[DurabilityType]
                  delta=None,         # type: Optional[DeltaValueBase]
                  initial=None,      # type: Optional[SignedInt64Base]
-                 span=None         # type: Optional[Any]
+                 span=None,         # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1234,7 +1242,8 @@ class AppendOptionsBase(DurabilityOptionBlockBase):
                  timeout=None,      # type: Optional[timedelta]
                  durability=None,   # type: Optional[DurabilityType]
                  cas=None,          # type: Optional[int]
-                 span=None         # type: Optional[Any]
+                 span=None,         # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1249,7 +1258,8 @@ class PrependOptionsBase(DurabilityOptionBlockBase):
                  timeout=None,      # type: Optional[timedelta]
                  durability=None,   # type: Optional[DurabilityType]
                  cas=None,          # type: Optional[int]
-                 span=None         # type: Optional[Any]
+                 span=None,         # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1267,7 +1277,6 @@ Couchbase Python SDK N1QL related Options
 
 class QueryOptionsBase(dict):
 
-    # @TODO: span
     @overload
     def __init__(
         self,
@@ -1292,7 +1301,8 @@ class QueryOptionsBase(dict):
         consistent_with=None,  # type: Optional[MutationState]
         send_to_node=None,  # type: Optional[str]
         raw=None,  # type: Optional[Dict[str,Any]]
-        span=None,  # type: Optional[Any]
+        span=None,  # type: Optional[SpanProtocol]
+        parent_span=None,  # type: Optional[SpanProtocol]
         serializer=None  # type: Optional[Serializer]
     ):
         pass
@@ -1323,7 +1333,9 @@ class AnalyticsOptionsBase(OptionsTimeoutBase):
                  metrics=None,  # type: Optional[bool]
                  query_context=None,  # type: Optional[str]
                  raw=None,              # type: Optional[Dict[str, Any]]
-                 serializer=None  # type: Optional[Serializer]
+                 serializer=None,  # type: Optional[Serializer]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1363,6 +1375,8 @@ class SearchOptionsBase(OptionsTimeoutBase):
                  show_request=None,      # type: Optional[bool]
                  log_request=None,      # type: Optional[bool]
                  log_response=None,      # type: Optional[bool]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1418,6 +1432,8 @@ class ViewOptionsBase(OptionsTimeoutBase):
                  client_context_id=None,     # type: Optional[str]
                  raw=None,                   # type: Optional[Dict[str, str]]
                  full_set=None,              # type: Optional[bool]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 

@@ -17,15 +17,20 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Callable,
                     Dict,
                     Optional)
+
+if TYPE_CHECKING:
+    from couchbase.logic.observability import ObservableRequestHandler
 
 
 class MgmtBaseRequest(ABC):
     @abstractmethod
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
 

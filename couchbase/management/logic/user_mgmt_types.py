@@ -31,6 +31,7 @@ from couchbase.exceptions import (FeatureUnavailableException,
                                   InvalidArgumentException,
                                   RateLimitedException,
                                   UserNotFoundException)
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import UserMgmtOperationType
 from couchbase.management.logic.mgmt_req import MgmtRequest
 
@@ -474,6 +475,7 @@ OPARG_SKIP_LIST = ['error_map']
 class UserMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {

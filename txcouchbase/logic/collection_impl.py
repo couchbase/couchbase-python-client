@@ -19,6 +19,7 @@ import asyncio
 from typing import TYPE_CHECKING, Iterable
 
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 from acouchbase.logic.collection_impl import AsyncCollectionImpl
 from couchbase.result import (CounterResult,
@@ -59,123 +60,138 @@ class TxCollectionImpl(AsyncCollectionImpl):
     def __init__(self, collection_name: str, scope: TxScope) -> None:
         super().__init__(collection_name, scope)
 
-    def append_deferred(self, req: AppendRequest) -> Deferred[MutationResult]:
-        coro = super().append(req)
+    def _finish_span(self, result, obs_handler):
+        """Callback to properly end the span on success or failure."""
+        if isinstance(result, Failure):
+            exc = result.value
+            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
+            return result
+        else:
+            obs_handler.__exit__(None, None, None)
+            return result
+
+    def append_deferred(self, req: AppendRequest, obs_handler) -> Deferred[MutationResult]:
+        coro = super().append(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def decrement_deferred(self, req: DecrementRequest) -> Deferred[CounterResult]:
-        coro = super().decrement(req)
+    def decrement_deferred(self, req: DecrementRequest, obs_handler) -> Deferred[CounterResult]:
+        coro = super().decrement(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def exists_deferred(self, req: ExistsRequest) -> Deferred[ExistsResult]:
-        coro = super().exists(req)
+    def exists_deferred(self, req: ExistsRequest, obs_handler) -> Deferred[ExistsResult]:
+        coro = super().exists(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_all_replicas_deferred(self, req: GetAllReplicasRequest) -> Deferred[Iterable[GetReplicaResult]]:
-        coro = super().get_all_replicas(req)
+    def get_all_replicas_deferred(self,
+                                  req: GetAllReplicasRequest,
+                                  obs_handler) -> Deferred[Iterable[GetReplicaResult]]:
+        coro = super().get_all_replicas(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_and_lock_deferred(self, req: GetAndLockRequest) -> Deferred[GetResult]:
-        coro = super().get_and_lock(req)
+    def get_and_lock_deferred(self, req: GetAndLockRequest, obs_handler) -> Deferred[GetResult]:
+        coro = super().get_and_lock(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_and_touch_deferred(self, req: GetAndTouchRequest) -> Deferred[GetResult]:
-        coro = super().get_and_touch(req)
+    def get_and_touch_deferred(self, req: GetAndTouchRequest, obs_handler) -> Deferred[GetResult]:
+        coro = super().get_and_touch(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_any_replica_deferred(self, req: GetAnyReplicaRequest) -> Deferred[GetReplicaResult]:
-        coro = super().get_any_replica(req)
+    def get_any_replica_deferred(self, req: GetAnyReplicaRequest, obs_handler) -> Deferred[GetReplicaResult]:
+        coro = super().get_any_replica(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_deferred(self, req: GetRequest) -> Deferred[GetResult]:
-        coro = super().get(req)
+    def get_deferred(self, req: GetRequest, obs_handler) -> Deferred[GetResult]:
+        coro = super().get(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def increment_deferred(self, req: IncrementRequest) -> Deferred[CounterResult]:
-        coro = super().increment(req)
+    def increment_deferred(self, req: IncrementRequest, obs_handler) -> Deferred[CounterResult]:
+        coro = super().increment(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def insert_deferred(self, req: InsertRequest) -> Deferred[MutationResult]:
-        coro = super().insert(req)
+    def insert_deferred(self, req: InsertRequest, obs_handler) -> Deferred[MutationResult]:
+        coro = super().insert(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def lookup_in_deferred(self, req: LookupInRequest) -> Deferred[LookupInResult]:
-        coro = super().lookup_in(req)
+    def lookup_in_deferred(self, req: LookupInRequest, obs_handler) -> Deferred[LookupInResult]:
+        coro = super().lookup_in(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
     def lookup_in_all_replicas_deferred(self,
-                                        req: LookupInAllReplicasRequest) -> Deferred[Iterable[LookupInReplicaResult]]:
-        coro = super().lookup_in_all_replicas(req)
+                                        req: LookupInAllReplicasRequest,
+                                        obs_handler) -> Deferred[Iterable[LookupInReplicaResult]]:
+        coro = super().lookup_in_all_replicas(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def lookup_in_any_replica_deferred(self, req: LookupInAnyReplicaRequest) -> Deferred[LookupInReplicaResult]:
-        coro = super().lookup_in_any_replica(req)
+    def lookup_in_any_replica_deferred(self,
+                                       req: LookupInAnyReplicaRequest,
+                                       obs_handler) -> Deferred[LookupInReplicaResult]:
+        coro = super().lookup_in_any_replica(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def mutate_in_deferred(self, req: MutateInRequest) -> Deferred[MutateInResult]:
-        coro = super().mutate_in(req)
+    def mutate_in_deferred(self, req: MutateInRequest, obs_handler) -> Deferred[MutateInResult]:
+        coro = super().mutate_in(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def prepend_deferred(self, req: PrependRequest) -> Deferred[MutationResult]:
-        coro = super().prepend(req)
+    def prepend_deferred(self, req: PrependRequest, obs_handler) -> Deferred[MutationResult]:
+        coro = super().prepend(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def remove_deferred(self, req: RemoveRequest) -> Deferred[MutationResult]:
-        coro = super().remove(req)
+    def remove_deferred(self, req: RemoveRequest, obs_handler) -> Deferred[MutationResult]:
+        coro = super().remove(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def replace_deferred(self, req: ReplaceRequest) -> Deferred[MutationResult]:
-        coro = super().replace(req)
+    def replace_deferred(self, req: ReplaceRequest, obs_handler) -> Deferred[MutationResult]:
+        coro = super().replace(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def touch_deferred(self, req: TouchRequest) -> Deferred[MutationResult]:
-        coro = super().touch(req)
+    def touch_deferred(self, req: TouchRequest, obs_handler) -> Deferred[MutationResult]:
+        coro = super().touch(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def unlock_deferred(self, req: UnlockRequest) -> Deferred[None]:
-        coro = super().unlock(req)
+    def unlock_deferred(self, req: UnlockRequest, obs_handler) -> Deferred[None]:
+        coro = super().unlock(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def upsert_deferred(self, req: UpsertRequest) -> Deferred[MutationResult]:
-        coro = super().upsert(req)
+    def upsert_deferred(self, req: UpsertRequest, obs_handler) -> Deferred[MutationResult]:
+        coro = super().upsert(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d

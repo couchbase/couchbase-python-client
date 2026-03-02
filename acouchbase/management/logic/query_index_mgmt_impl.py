@@ -24,6 +24,8 @@ from typing import (TYPE_CHECKING,
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   QueryIndexNotFoundException,
                                   WatchQueryIndexTimeoutException)
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.logic.operation_types import QueryIndexMgmtOperationType
 from couchbase.management.logic.query_index_mgmt_req_builder import QueryIndexMgmtRequestBuilder
 from couchbase.management.logic.query_index_mgmt_req_types import (BuildDeferredIndexesRequest,
                                                                    CreateIndexRequest,
@@ -37,9 +39,12 @@ if TYPE_CHECKING:
 
 
 class AsyncQueryIndexMgmtImpl:
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = QueryIndexMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -51,33 +56,42 @@ class AsyncQueryIndexMgmtImpl:
         """**INTERNAL**"""
         return self._request_builder
 
-    async def create_index(self, req: CreateIndexRequest) -> None:
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        return self._observability_instruments
 
-    async def create_primary_index(self, req: CreateIndexRequest) -> None:
+    async def create_index(self, req: CreateIndexRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def drop_index(self, req: DropIndexRequest) -> None:
+    async def create_primary_index(self, req: CreateIndexRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def drop_primary_index(self, req: DropIndexRequest) -> None:
+    async def drop_index(self, req: DropIndexRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_all_indexes(self, req: GetAllIndexesRequest) -> List[QueryIndex]:
+    async def drop_primary_index(self, req: DropIndexRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        res = await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+
+    async def get_all_indexes(self,
+                              req: GetAllIndexesRequest,
+                              obs_handler: ObservableRequestHandler) -> List[QueryIndex]:
+        """**INTERNAL**"""
+        res = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_indexes = res.raw_result['indexes']
         return [QueryIndex.from_server(idx) for idx in raw_indexes]
 
-    async def build_deferred_indexes(self, req: BuildDeferredIndexesRequest) -> None:
+    async def build_deferred_indexes(self,
+                                     req: BuildDeferredIndexesRequest,
+                                     obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def watch_indexes(self, req: WatchIndexesRequest) -> None:
+    async def watch_indexes(self, req: WatchIndexesRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
         current_time = time.monotonic()
         # timeout is converted to millisecs via options processing
@@ -87,6 +101,7 @@ class AsyncQueryIndexMgmtImpl:
         # needs to be int b/c req.timeout expects int (this is what the bindings want)
         delay_ms = int(delay * 1e3)
 
+        op_type = QueryIndexMgmtOperationType.QueryIndexGetAll
         get_all_indexes_req = GetAllIndexesRequest(self._request_builder._error_map,
                                                    bucket_name=req.bucket_name,
                                                    scope_name=req.scope_name,
@@ -94,20 +109,23 @@ class AsyncQueryIndexMgmtImpl:
                                                    timeout=req.timeout)
 
         while True:
-            try:
-                indexes = await self.get_all_indexes(get_all_indexes_req)
-            except AmbiguousTimeoutException:
-                pass  # go ahead and move on, raise WatchQueryIndexTimeoutException later if needed
+            async with ObservableRequestHandler(op_type, self._observability_instruments) as sub_obs_handler:
+                sub_obs_handler.create_http_span(parent_span=obs_handler.wrapped_span)
+                try:
+                    indexes = await self.get_all_indexes(get_all_indexes_req, sub_obs_handler)
+                except AmbiguousTimeoutException:
+                    pass  # go ahead and move on, raise WatchQueryIndexTimeoutException later if needed
 
-            all_online = self._check_indexes(req.index_names, indexes)
-            if all_online:
-                break
+                all_online = self._check_indexes(req.index_names, indexes)
+                if all_online:
+                    break
 
-            current_time = time.monotonic()
-            if deadline < (current_time + delay):
-                raise WatchQueryIndexTimeoutException('Failed to find all indexes online within the alloted time.')
-            await asyncio.sleep(delay)
-            get_all_indexes_req.timeout -= delay_ms
+                current_time = time.monotonic()
+                if deadline < (current_time + delay):
+                    msg = 'Failed to find all indexes online within the alloted time.'
+                    raise WatchQueryIndexTimeoutException(msg)
+                await asyncio.sleep(delay)
+                get_all_indexes_req.timeout -= delay_ms
 
     def _check_indexes(self, index_names: Iterable[str], indexes: Iterable[QueryIndex]):
         for idx_name in index_names:

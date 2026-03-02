@@ -20,7 +20,7 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
-from acouchbase.management.logic.search_index_mgmt_imply import AsyncSearchIndexMgmtImpl
+from acouchbase.management.logic.search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
 from couchbase.management.logic.search_index_mgmt_types import SearchIndex
 
 if TYPE_CHECKING:

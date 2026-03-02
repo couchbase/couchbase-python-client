@@ -21,6 +21,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
@@ -57,7 +59,9 @@ class Scope:
         *options,  # type: QueryOptions
         **kwargs  # type: Dict[str, Any]
     ) -> Deferred[QueryResult]:
-        req = self._impl.request_builder.build_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.Query
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.query_deferred(req)
 
     def analytics_query(
@@ -66,7 +70,9 @@ class Scope:
         *options,  # type: AnalyticsOptions
         **kwargs  # type: Dict[str, Any]
     ) -> Deferred[AnalyticsResult]:
-        req = self._impl.request_builder.build_analytics_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.AnalyticsQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.analytics_query_deferred(req)
 
     def search_query(
@@ -76,7 +82,9 @@ class Scope:
         *options,  # type: SearchOptions
         **kwargs  # type: Dict[str, Any]
     ) -> Deferred[SearchResult]:
-        req = self._impl.request_builder.build_search_request(index, query, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, query, obs_handler, *options, **kwargs)
         return self._impl.search_deferred(req)
 
     def search(self,
@@ -85,7 +93,9 @@ class Scope:
                *options,  # type: SearchOptions
                **kwargs,  # type: Dict[str, Any]
                ) -> Deferred[SearchResult]:
-        req = self._impl.request_builder.build_search_request(index, request, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, request, obs_handler, *options, **kwargs)
         return self._impl.search_deferred(req)
 
     def search_indexes(self) -> ScopeSearchIndexManager:

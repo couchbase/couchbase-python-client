@@ -29,6 +29,7 @@ from couchbase.exceptions import (CollectionAlreadyExistsException,
                                   RateLimitedException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException)
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import CollectionMgmtOperationType
 from couchbase.logic.supportability import Supportability
 from couchbase.management.logic.mgmt_req import MgmtRequest
@@ -172,6 +173,7 @@ OPARG_SKIP_LIST = ['error_map']
 class CollectionMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
 
@@ -186,6 +188,15 @@ class CollectionMgmtRequest(MgmtRequest):
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
+
+        if obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if obs_handler.is_legacy_tracer:
+                legacy_request_span = obs_handler.legacy_request_span
+                if legacy_request_span:
+                    mgmt_kwargs['parent_span'] = legacy_request_span
+            else:
+                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
 
         return mgmt_kwargs
 

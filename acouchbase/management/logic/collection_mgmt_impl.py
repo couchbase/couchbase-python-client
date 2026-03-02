@@ -19,6 +19,7 @@ from asyncio import AbstractEventLoop
 from datetime import timedelta
 from typing import TYPE_CHECKING, List
 
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.management.logic.collection_mgmt_req_builder import CollectionMgmtRequestBuilder
 from couchbase.management.logic.collection_mgmt_req_types import (CollectionSpec,
                                                                   CreateCollectionRequest,
@@ -34,9 +35,12 @@ if TYPE_CHECKING:
 
 
 class AsyncCollectionMgmtImpl:
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = CollectionMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -48,25 +52,30 @@ class AsyncCollectionMgmtImpl:
         """**INTERNAL**"""
         return self._request_builder
 
-    async def create_collection(self, req: CreateCollectionRequest) -> None:
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        return self._observability_instruments
 
-    async def create_scope(self, req: CreateScopeRequest) -> None:
+    async def create_collection(self, req: CreateCollectionRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def drop_collection(self, req: DropCollectionRequest) -> None:
+    async def create_scope(self, req: CreateScopeRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def drop_scope(self, req: DropScopeRequest) -> None:
+    async def drop_collection(self, req: DropCollectionRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_all_scopes(self, req: GetAllScopesRequest) -> List[ScopeSpec]:
+    async def drop_scope(self, req: DropScopeRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        res = await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+
+    async def get_all_scopes(self, req: GetAllScopesRequest, obs_handler: ObservableRequestHandler) -> List[ScopeSpec]:
+        """**INTERNAL**"""
+        res = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         scopes = []
         raw_scopes = res.raw_result['manifest']['scopes']
         for s in raw_scopes:
@@ -81,6 +90,6 @@ class AsyncCollectionMgmtImpl:
 
         return scopes
 
-    async def update_collection(self, req: UpdateCollectionRequest) -> None:
+    async def update_collection(self, req: UpdateCollectionRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

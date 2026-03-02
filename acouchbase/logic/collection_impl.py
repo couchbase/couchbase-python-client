@@ -24,6 +24,7 @@ from acouchbase.logic.client_adapter import AsyncClientAdapter
 from couchbase.exceptions import ErrorMapper, UnAmbiguousTimeoutException
 from couchbase.logic.collection_req_builder import CollectionRequestBuilder
 from couchbase.logic.collection_types import CollectionDetails
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.result import (CounterResult,
@@ -119,24 +120,33 @@ class AsyncCollectionImpl:
         """
         return self._collection_details.scope_name
 
-    async def append(self, req: AppendRequest) -> MutationResult:
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """
+        **INTERNAL**
+        """
+        return self._scope._impl.cluster_settings.observability_instruments
+
+    async def append(self, req: AppendRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    async def decrement(self, req: DecrementRequest) -> CounterResult:
+    async def decrement(self, req: DecrementRequest, obs_handler: ObservableRequestHandler) -> CounterResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return CounterResult(ret, key=req.key)
 
-    async def exists(self, req: ExistsRequest) -> ExistsResult:
+    async def exists(self, req: ExistsRequest, obs_handler: ObservableRequestHandler) -> ExistsResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return ExistsResult(ret, key=req.key)
 
-    async def get_all_replicas(self, req: GetAllReplicasRequest) -> Iterable[GetReplicaResult]:
+    async def get_all_replicas(self,
+                               req: GetAllReplicasRequest,
+                               obs_handler: ObservableRequestHandler) -> Iterable[GetReplicaResult]:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
 
         def _decode_replicas() -> Iterator[GetReplicaResult]:
             while True:
@@ -156,44 +166,48 @@ class AsyncCollectionImpl:
 
         return _decode_replicas()
 
-    async def get_and_lock(self, req: GetAndLockRequest) -> GetResult:
+    async def get_and_lock(self, req: GetAndLockRequest, obs_handler: ObservableRequestHandler) -> GetResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
-    async def get_and_touch(self, req: GetAndTouchRequest) -> GetResult:
+    async def get_and_touch(self, req: GetAndTouchRequest, obs_handler: ObservableRequestHandler) -> GetResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
-    async def get_any_replica(self, req: GetAnyReplicaRequest) -> GetReplicaResult:
+    async def get_any_replica(self,
+                              req: GetAnyReplicaRequest,
+                              obs_handler: ObservableRequestHandler) -> GetReplicaResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetReplicaResult(ret, transcoder=req.transcoder, key=req.key)
 
-    async def get(self, req: GetRequest) -> GetResult:
+    async def get(self, req: GetRequest, obs_handler: ObservableRequestHandler) -> GetResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=req.transcoder, key=req.key)
 
-    async def increment(self, req: IncrementRequest) -> CounterResult:
+    async def increment(self, req: IncrementRequest, obs_handler: ObservableRequestHandler) -> CounterResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return CounterResult(ret, key=req.key)
 
-    async def insert(self, req: InsertRequest) -> MutationResult:
+    async def insert(self, req: InsertRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    async def lookup_in(self, req: LookupInRequest) -> LookupInResult:
+    async def lookup_in(self, req: LookupInRequest, obs_handler: ObservableRequestHandler) -> LookupInResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return LookupInResult(ret, transcoder=req.transcoder, is_subdoc=True, key=req.key)
 
-    async def lookup_in_all_replicas(self, req: LookupInAllReplicasRequest) -> Iterable[LookupInReplicaResult]:
+    async def lookup_in_all_replicas(self,
+                                     req: LookupInAllReplicasRequest,
+                                     obs_handler: ObservableRequestHandler) -> Iterable[LookupInReplicaResult]:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
 
         def _decode_replicas() -> Iterator[LookupInReplicaResult]:
             while True:
@@ -212,46 +226,48 @@ class AsyncCollectionImpl:
                     yield LookupInReplicaResult(res, transcoder=req.transcoder, is_subdoc=True, key=req.key)
         return _decode_replicas()
 
-    async def lookup_in_any_replica(self, req: LookupInAnyReplicaRequest) -> LookupInReplicaResult:
+    async def lookup_in_any_replica(self,
+                                    req: LookupInAnyReplicaRequest,
+                                    obs_handler: ObservableRequestHandler) -> LookupInReplicaResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return LookupInReplicaResult(ret, transcoder=req.transcoder, is_subdoc=True, key=req.key)
 
-    async def mutate_in(self, req: MutateInRequest) -> MutateInResult:
+    async def mutate_in(self, req: MutateInRequest, obs_handler: ObservableRequestHandler) -> MutateInResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutateInResult(ret, key=req.key)
 
-    async def prepend(self, req: PrependRequest) -> MutationResult:
+    async def prepend(self, req: PrependRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
     def range_scan(self, req: AsyncRangeScanRequest) -> ScanResultIterable:
         return ScanResultIterable(req)
 
-    async def remove(self, req: RemoveRequest) -> MutationResult:
+    async def remove(self, req: RemoveRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    async def replace(self, req: ReplaceRequest) -> MutationResult:
+    async def replace(self, req: ReplaceRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    async def touch(self, req: TouchRequest) -> MutationResult:
+    async def touch(self, req: TouchRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    async def unlock(self, req: UnlockRequest) -> None:
+    async def unlock(self, req: UnlockRequest, obs_handler: ObservableRequestHandler) -> None:
         await self.wait_until_bucket_connected()
-        await self.client_adapter.execute_collection_request(req)
+        await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
 
-    async def upsert(self, req: UpsertRequest) -> MutationResult:
+    async def upsert(self, req: UpsertRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req)
+        ret = await self.client_adapter.execute_collection_request(req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
     async def wait_until_bucket_connected(self) -> None:

@@ -31,6 +31,7 @@ markers = [
     "pycbc_streaming: marks a test as a streaming (query, search, analytics, or views) API test",
     "pycbc_mgmt: marks a test as a management API test",
     "pycbc_misc: marks a test as a miscellaneous (connect, rate_limit) API test",
+    "pycbc_tracing: marks a test as a tracing API test",
     "pycbc_txn: marks a test as a transactions API test",
     "pycbc_slow_mgmt: marks a test as a management API test that is slow",
 ]

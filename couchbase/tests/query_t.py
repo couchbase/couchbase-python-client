@@ -340,14 +340,19 @@ class QueryTestSuite:
             pytest.skip("Query used in test only available on server versions >= 7.1")
         from couchbase.auth import PasswordAuthenticator
         from couchbase.cluster import Cluster
-        from couchbase.options import ClusterOptions, ClusterTimeoutOptions
+        from couchbase.options import (ClusterOptions,
+                                       ClusterTimeoutOptions,
+                                       ClusterTracingOptions)
         conn_string = cb_env.config.get_connection_string()
         username, pw = cb_env.config.get_username_and_pw()
         auth = PasswordAuthenticator(username, pw)
         # Prior to PYCBC-1521, this test would fail as each request would override the cluster level query_timeout.
         # If a timeout was not provided in the request, the default 75s timeout would be used.
         timeout_opts = ClusterTimeoutOptions(query_timeout=timedelta(seconds=1.5))
-        cluster = Cluster.connect(f'{conn_string}', ClusterOptions(auth, timeout_options=timeout_opts))
+        cluster_opts = ClusterOptions(auth,
+                                      timeout_options=timeout_opts,
+                                      tracing_options=ClusterTracingOptions(enable_tracing=False))
+        cluster = Cluster.connect(f'{conn_string}', cluster_opts)
         # don't need to do this except for older server versions
         _ = cluster.bucket(f'{cb_env.bucket.name}')
         slow_query = ' '.join(['SELECT COUNT (1) AS c FROM',

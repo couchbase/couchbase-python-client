@@ -20,6 +20,11 @@ class ConsistencyChecker:
         resp = requests.get(path, auth=self._config.get_username_and_pw())
         self._hostnames = [node['configuredHostname'] for node in resp.json()['nodes']]
 
+    def fetch_cluster_name(self):
+        path = f'http://{self._config.host}:{self._config.port}/pools/default'
+        resp = requests.get(path, auth=self._config.get_username_and_pw())
+        return resp.json()['clusterName']
+
     def wait_until_user_present(self, name, domain='local', timeout=DEFAULT_TIMEOUT):
         path = f'settings/rbac/users/{domain}/{name}'
         error_msg = f'User {name} in the {domain} domain is not present in all nodes'

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Union
 from acouchbase.views import AsyncViewRequest
 from couchbase.logic.bucket_req_builder import BucketRequestBuilder
 from couchbase.logic.cluster_settings import ClusterSettings, StreamingTimeouts
+from couchbase.logic.observability import ObservabilityInstruments
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.result import PingResult, ViewResult
 
@@ -102,6 +103,11 @@ class AsyncBucketImpl:
         """**INTERNAL**"""
         return self._cluster_settings.streaming_timeouts
 
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._cluster_settings.observability_instruments
+
     async def close_bucket(self) -> None:
         """**INTERNAL**"""
         await self.wait_until_bucket_connected()
@@ -129,6 +135,7 @@ class AsyncBucketImpl:
                                                                  req.view_query.as_encodable(),
                                                                  default_serializer=self.default_serializer,
                                                                  streaming_timeout=streaming_timeout,
+                                                                 obs_handler=req.obs_handler,
                                                                  num_workers=req.num_workers))
 
     async def wait_until_bucket_connected(self) -> None:

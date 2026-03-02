@@ -20,6 +20,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     List)
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import BucketMgmtOperationType
 from couchbase.management.logic.bucket_mgmt_impl import BucketMgmtImpl
 from couchbase.management.logic.bucket_mgmt_types import BucketType  # noqa: F401
 from couchbase.management.logic.bucket_mgmt_types import CompressionMode  # noqa: F401
@@ -42,12 +44,13 @@ from couchbase.management.options import (BucketDescribeOptions,
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
 
 
 class BucketManager:
 
-    def __init__(self, client_adapter: ClientAdapter) -> None:
-        self._impl = BucketMgmtImpl(client_adapter)
+    def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
+        self._impl = BucketMgmtImpl(client_adapter, observability_instruments)
 
     def create_bucket(self,
                       settings,  # type: CreateBucketSettings
@@ -68,8 +71,10 @@ class BucketManager:
             :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
                 settings argument.
         """
-        req = self._impl.request_builder.build_create_bucket_request(settings, *options, **kwargs)
-        self._impl.create_bucket(req)
+        op_type = BucketMgmtOperationType.BucketCreate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_create_bucket_request(settings, obs_handler, *options, **kwargs)
+            self._impl.create_bucket(req, obs_handler)
 
     def update_bucket(self,
                       settings,  # type: BucketSettings
@@ -89,8 +94,10 @@ class BucketManager:
             :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
                 settings argument.
         """
-        req = self._impl.request_builder.build_update_bucket_request(settings, *options, **kwargs)
-        self._impl.update_bucket(req)
+        op_type = BucketMgmtOperationType.BucketUpdate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_update_bucket_request(settings, obs_handler, *options, **kwargs)
+            self._impl.update_bucket(req, obs_handler)
 
     def drop_bucket(self,
                     bucket_name,  # type: str
@@ -109,8 +116,10 @@ class BucketManager:
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        req = self._impl.request_builder.build_drop_bucket_request(bucket_name, *options, **kwargs)
-        self._impl.drop_bucket(req)
+        op_type = BucketMgmtOperationType.BucketDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_bucket_request(bucket_name, obs_handler, *options, **kwargs)
+            self._impl.drop_bucket(req, obs_handler)
 
     def get_bucket(self,
                    bucket_name,   # type: str
@@ -132,8 +141,10 @@ class BucketManager:
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        req = self._impl.request_builder.build_get_bucket_request(bucket_name, *options, **kwargs)
-        return self._impl.get_bucket(req)
+        op_type = BucketMgmtOperationType.BucketGet
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_bucket_request(bucket_name, obs_handler, *options, **kwargs)
+            return self._impl.get_bucket(req, obs_handler)
 
     def get_all_buckets(self,
                         *options,  # type: GetAllBucketOptions
@@ -150,8 +161,10 @@ class BucketManager:
         Returns:
             List[:class:`.BucketSettings`]: A list of existing buckets in the cluster.
         """
-        req = self._impl.request_builder.build_get_all_buckets_request(*options, **kwargs)
-        return self._impl.get_all_buckets(req)
+        op_type = BucketMgmtOperationType.BucketGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_buckets_request(obs_handler, *options, **kwargs)
+            return self._impl.get_all_buckets(req, obs_handler)
 
     def flush_bucket(self,
                      bucket_name,   # type: str
@@ -172,8 +185,10 @@ class BucketManager:
             :class:`~couchbase.exceptions.BucketNotFlushableException`: If the bucket's settings have
                 flushing disabled.
         """
-        req = self._impl.request_builder.build_flush_bucket_request(bucket_name, *options, **kwargs)
-        self._impl.flush_bucket(req)
+        op_type = BucketMgmtOperationType.BucketFlush
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_flush_bucket_request(bucket_name, obs_handler, *options, **kwargs)
+            self._impl.flush_bucket(req, obs_handler)
 
     def bucket_describe(self,
                         bucket_name,   # type: str
@@ -195,5 +210,7 @@ class BucketManager:
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        req = self._impl.request_builder.build_bucket_describe_request(bucket_name, *options, **kwargs)
-        return self._impl.bucket_describe(req)
+        op_type = BucketMgmtOperationType.BucketDescribe
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_bucket_describe_request(bucket_name, obs_handler, *options, **kwargs)
+            return self._impl.bucket_describe(req, obs_handler)

@@ -23,6 +23,8 @@ from acouchbase.collection import Collection
 from acouchbase.logic.scope_impl import AsyncScopeImpl
 from acouchbase.management.eventing import ScopeEventingFunctionManager
 from acouchbase.management.search import ScopeSearchIndexManager
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
@@ -155,7 +157,9 @@ class AsyncScope:
                 print(f'Query metrics: {q_res.metadata().metrics()}')
 
         """
-        req = self._impl.request_builder.build_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.Query
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.query(req)
 
     def analytics_query(self,
@@ -230,7 +234,9 @@ class AsyncScope:
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
         """  # noqa: E501
-        req = self._impl.request_builder.build_analytics_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.AnalyticsQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.analytics_query(req)
 
     def search_query(self,
@@ -326,7 +332,9 @@ class AsyncScope:
                     print(f'Locations: {row.locations}')
 
         """
-        req = self._impl.request_builder.build_search_request(index, query, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, query, obs_handler, *options, **kwargs)
         return self._impl.search(req)
 
     def search(self,
@@ -412,7 +420,9 @@ class AsyncScope:
                 async for row in q_res.rows():
                     print(f'Found row: {row}')
         """  # noqa: E501
-        req = self._impl.request_builder.build_search_request(index, request, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, request, obs_handler, *options, **kwargs)
         return self._impl.search(req)
 
     def search_indexes(self) -> ScopeSearchIndexManager:

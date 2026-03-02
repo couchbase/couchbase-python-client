@@ -54,7 +54,7 @@ from ._test_utils import (CollectionType,
                           TestEnvironment)
 
 
-@pytest.mark.flaky(reruns=5)
+@pytest.mark.flaky(reruns=1)
 class EventingManagementTests:
 
     EVT_SRC_BUCKET_NAME = "beer-sample"
@@ -165,6 +165,11 @@ class EventingManagementTests:
         yield
         try:
             await cb_env.efm.drop_function(self.BASIC_FUNC.name)
+        # except EventingFunctionNotUnDeployedException:
+        #     await cb_env.efm.undeploy_function(self.TEST_EVT_NAME)
+        #     await self._wait_until_status(
+        #         cb_env, 15, 2, EventingFunctionState.Undeployed, self.TEST_EVT_NAME
+        #     )
         except EventingFunctionNotFoundException:
             pass
 

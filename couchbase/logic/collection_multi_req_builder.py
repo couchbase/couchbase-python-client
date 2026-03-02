@@ -27,6 +27,7 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 from couchbase.constants import FMT_BYTES
+from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.collection_multi_types import (AppendMultiRequest,
                                                     AppendWithLegacyDurabilityMultiRequest,
@@ -52,6 +53,7 @@ from couchbase.logic.collection_multi_types import (AppendMultiRequest,
                                                     UpsertMultiRequest,
                                                     UpsertWithLegacyDurabilityMultiRequest)
 from couchbase.logic.collection_types import CollectionDetails
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.options import DeltaValueBase, SignedInt64Base
 from couchbase.options import (AppendMultiOptions,
                                DecrementMultiOptions,
@@ -127,8 +129,14 @@ class CollectionMultiRequestBuilder:
                                        keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
                                        opts_type: Type[Union[AppendMultiRequest, PrependMultiRequest]],
                                        return_type: Type[ReqT],
+                                       obs_handler: ObservableRequestHandler,
                                        *opts: object,
                                        **kwargs: object) -> ReqT:
+
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
         if not isinstance(keys_and_docs, dict):
             raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
@@ -151,14 +159,13 @@ class CollectionMultiRequestBuilder:
             # we don't use flags for binary ops, but passing the flags around helps reduce logic for request types
             parsed_keys_and_docs[k] = value, FMT_BYTES
 
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
-
-        durability = final_args.pop('durability', None)
         if isinstance(durability, dict):
             final_args['persist_to'] = durability['persist_to']
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 
         per_key_args = final_args.pop('per_key_options', None)
@@ -173,22 +180,27 @@ class CollectionMultiRequestBuilder:
                                   keys: List[str],
                                   opts_type: Type[Union[DecrementMultiRequest, IncrementMultiRequest]],
                                   return_type: Type[ReqT],
+                                  obs_handler: ObservableRequestHandler,
                                   *opts: object,
                                   **kwargs: object) -> ReqT:
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+
         if not isinstance(keys, list):
             raise InvalidArgumentException(message='Expected keys to be a list.')
 
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
-
-        durability = final_args.pop('durability', None)
         if isinstance(durability, dict):
             final_args['persist_to'] = durability['persist_to']
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 
         global_delta, global_initial = self._get_delta_and_initial(final_args)
@@ -212,13 +224,19 @@ class CollectionMultiRequestBuilder:
                            per_key_args=per_key_args,
                            return_exceptions=return_exceptions)
 
-    def _get_multi_op_mutation_req(self,
+    def _get_multi_op_mutation_req(self,  # noqa: C901
                                    keys_and_docs: Dict[str, JSONType],
                                    opts_type: Type[MutationMultiOptions],
                                    return_type: Type[ReqT],
+                                   obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object
                                    ) -> ReqT:
+
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
         if not isinstance(keys_and_docs, dict):
             raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
@@ -226,14 +244,13 @@ class CollectionMultiRequestBuilder:
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
-
-        durability = final_args.pop('durability', None)
         if isinstance(durability, dict):
             final_args['persist_to'] = durability['persist_to']
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 
         per_key_args = final_args.pop('per_key_options', None)
@@ -245,9 +262,9 @@ class CollectionMultiRequestBuilder:
         for key, value in keys_and_docs.items():
             if per_key_args and key in per_key_args:
                 key_transcoder = per_key_args[key].pop('transcoder', transcoder)
-                transcoded_value = key_transcoder.encode_value(value)
+                transcoded_value = obs_handler.maybe_add_encoding_span(lambda: key_transcoder.encode_value(value))
             else:
-                transcoded_value = transcoder.encode_value(value)
+                transcoded_value = obs_handler.maybe_add_encoding_span(lambda: transcoder.encode_value(value))
 
             transcoded_keys_and_docs[key] = transcoded_value
 
@@ -278,23 +295,28 @@ class CollectionMultiRequestBuilder:
                                     keys: List[str],
                                     opts_type: Type[NoValueMultiOptions],
                                     return_type: Type[ReqT],
+                                    obs_handler: ObservableRequestHandler,
                                     *opts: object,
                                     **kwargs: object) -> ReqT:
+        op_keys_cas = kwargs.pop('op_keys_cas', None)
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+
         if not isinstance(keys, list):
             raise InvalidArgumentException(message='Expected keys to be a list.')
 
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        op_keys_cas = kwargs.pop('op_keys_cas', None)
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
-
-        durability = final_args.pop('durability', None)
         if isinstance(durability, dict):
             final_args['persist_to'] = durability['persist_to']
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
@@ -339,98 +361,166 @@ class CollectionMultiRequestBuilder:
 
     def build_append_multi_request(self,
                                    keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
+                                   obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> AppendMultiRequest:
         return self._get_multi_binary_mutation_req(keys_and_docs,
                                                    AppendMultiOptions,
                                                    AppendMultiRequest,
+                                                   obs_handler,
                                                    *opts,
                                                    **kwargs)
 
-    def build_decrement_multi_request(self, keys: List[str], *opts: object, **kwargs: object) -> DecrementMultiRequest:
-        return self._get_multi_counter_op_req(keys, DecrementMultiOptions, DecrementMultiRequest, *opts, **kwargs)
+    def build_decrement_multi_request(self,
+                                      keys: List[str],
+                                      obs_handler: ObservableRequestHandler,
+                                      *opts: object,
+                                      **kwargs: object) -> DecrementMultiRequest:
+        return self._get_multi_counter_op_req(keys,
+                                              DecrementMultiOptions,
+                                              DecrementMultiRequest,
+                                              obs_handler,
+                                              *opts,
+                                              **kwargs)
 
-    def build_exists_multi_request(self, keys: List[str], *opts: object, **kwargs: object) -> ExistsMultiRequest:
-        return self._get_multi_op_non_value_req(keys, ExistsMultiOptions, ExistsMultiRequest, *opts, **kwargs)
+    def build_exists_multi_request(self,
+                                   keys: List[str],
+                                   obs_handler: ObservableRequestHandler,
+                                   *opts: object,
+                                   **kwargs: object) -> ExistsMultiRequest:
+        return self._get_multi_op_non_value_req(keys,
+                                                ExistsMultiOptions,
+                                                ExistsMultiRequest,
+                                                obs_handler,
+                                                *opts,
+                                                **kwargs)
 
     def build_get_all_replicas_multi_request(self,
                                              keys: List[str],
+                                             obs_handler: ObservableRequestHandler,
                                              *opts: object,
                                              **kwargs: object) -> GetAllReplicasMultiRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 GetAllReplicasMultiOptions,
                                                 GetAllReplicasMultiRequest,
+                                                obs_handler,
                                                 *opts,
                                                 **kwargs)
 
     def build_get_and_lock_multi_request(self,
                                          keys: List[str],
                                          lock_time: timedelta,
+                                         obs_handler: ObservableRequestHandler,
                                          *opts: object,
                                          **kwargs: object) -> GetAndLockMultiRequest:
         kwargs['lock_time'] = lock_time
         return self._get_multi_op_non_value_req(keys,
                                                 GetAndLockMultiOptions,
                                                 GetAndLockMultiRequest,
+                                                obs_handler,
                                                 *opts,
                                                 **kwargs)
 
     def build_get_any_replica_multi_request(self,
                                             keys: List[str],
+                                            obs_handler: ObservableRequestHandler,
                                             *opts: object,
                                             **kwargs: object) -> GetAnyReplicaMultiRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 GetAnyReplicaMultiOptions,
                                                 GetAnyReplicaMultiRequest,
+                                                obs_handler,
                                                 *opts,
                                                 **kwargs)
 
-    def build_get_multi_request(self, keys: List[str], *opts: object, **kwargs: object) -> GetMultiRequest:
-        return self._get_multi_op_non_value_req(keys, GetMultiOptions, GetMultiRequest, *opts, **kwargs)
+    def build_get_multi_request(self,
+                                keys: List[str],
+                                obs_handler: ObservableRequestHandler,
+                                *opts: object,
+                                **kwargs: object) -> GetMultiRequest:
+        return self._get_multi_op_non_value_req(keys, GetMultiOptions, GetMultiRequest, obs_handler, *opts, **kwargs)
 
-    def build_increment_multi_request(self, keys: List[str], *opts: object, **kwargs: object) -> IncrementMultiRequest:
-        return self._get_multi_counter_op_req(keys, IncrementMultiOptions, IncrementMultiRequest, *opts, **kwargs)
+    def build_increment_multi_request(self,
+                                      keys: List[str],
+                                      obs_handler: ObservableRequestHandler,
+                                      *opts: object,
+                                      **kwargs: object) -> IncrementMultiRequest:
+        return self._get_multi_counter_op_req(keys,
+                                              IncrementMultiOptions,
+                                              IncrementMultiRequest,
+                                              obs_handler,
+                                              *opts,
+                                              **kwargs)
 
     def build_insert_multi_request(self,
                                    keys_and_docs: Dict[str, JSONType],
+                                   obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> InsertMultiRequest:
-        return self._get_multi_op_mutation_req(keys_and_docs, InsertMultiOptions, InsertMultiRequest, *opts, **kwargs)
+        return self._get_multi_op_mutation_req(keys_and_docs,
+                                               InsertMultiOptions,
+                                               InsertMultiRequest,
+                                               obs_handler,
+                                               *opts,
+                                               **kwargs)
 
     def build_prepend_multi_request(self,
                                     keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
+                                    obs_handler: ObservableRequestHandler,
                                     *opts: object,
                                     **kwargs: object) -> PrependMultiRequest:
         return self._get_multi_binary_mutation_req(keys_and_docs,
                                                    PrependMultiOptions,
                                                    PrependMultiRequest,
+                                                   obs_handler,
                                                    *opts,
                                                    **kwargs)
 
-    def build_remove_multi_request(self, keys: List[str], *opts: object, **kwargs: object) -> RemoveMultiRequest:
+    def build_remove_multi_request(self,
+                                   keys: List[str],
+                                   obs_handler: ObservableRequestHandler,
+                                   *opts: object,
+                                   **kwargs: object) -> RemoveMultiRequest:
         # use the non-mutation logic even though remove is a mutation
-        return self._get_multi_op_non_value_req(keys, RemoveMultiOptions, RemoveMultiRequest, *opts, **kwargs)
+        return self._get_multi_op_non_value_req(keys,
+                                                RemoveMultiOptions,
+                                                RemoveMultiRequest,
+                                                obs_handler,
+                                                *opts,
+                                                **kwargs)
 
     def build_replace_multi_request(self,
                                     keys_and_docs: Dict[str, JSONType],
+                                    obs_handler: ObservableRequestHandler,
                                     *opts: object,
                                     **kwargs: object) -> ReplaceMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                ReplaceMultiOptions,
                                                ReplaceMultiRequest,
+                                               obs_handler,
                                                *opts,
                                                **kwargs)
 
     def build_touch_multi_request(self,
                                   keys: List[str],
                                   expiry: timedelta,
+                                  obs_handler: ObservableRequestHandler,
                                   *opts: object,
                                   **kwargs: object) -> TouchMultiRequest:
         kwargs['expiry'] = expiry
         # use the non-mutation logic even though touch is a mutation
-        return self._get_multi_op_non_value_req(keys, TouchMultiOptions, TouchMultiRequest, *opts, **kwargs)
+        return self._get_multi_op_non_value_req(keys,
+                                                TouchMultiOptions,
+                                                TouchMultiRequest,
+                                                obs_handler,
+                                                *opts,
+                                                **kwargs)
 
-    def build_unlock_multi_request(self, keys: List[str], *opts: object, **kwargs: object) -> UnlockMultiRequest:
+    def build_unlock_multi_request(self,
+                                   keys: List[str],
+                                   obs_handler: ObservableRequestHandler,
+                                   *opts: object,
+                                   **kwargs: object) -> UnlockMultiRequest:
         op_keys_cas = {}
         if isinstance(keys, dict):
             if not all(map(lambda k: isinstance(k, str), keys.keys())):
@@ -449,15 +539,18 @@ class CollectionMultiRequestBuilder:
         return self._get_multi_op_non_value_req(list(op_keys_cas.keys()),
                                                 UnlockMultiOptions,
                                                 UnlockMultiRequest,
+                                                obs_handler,
                                                 *opts,
                                                 **kwargs)
 
     def build_upsert_multi_request(self,
                                    keys_and_docs: Dict[str, JSONType],
+                                   obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> UpsertMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                UpsertMultiOptions,
                                                UpsertMultiRequest,
+                                               obs_handler,
                                                *opts,
                                                **kwargs)

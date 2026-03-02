@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 @dataclass
 class AnalyticsQueryRequest:
     analytics_query: AnalyticsQuery
+    obs_handler: ObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property
@@ -39,6 +41,7 @@ class AnalyticsQueryRequest:
 @dataclass
 class QueryRequest:
     n1ql_query: N1QLQuery
+    obs_handler: ObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property
@@ -49,6 +52,7 @@ class QueryRequest:
 @dataclass
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
+    obs_handler: ObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property

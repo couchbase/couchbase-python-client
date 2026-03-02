@@ -90,7 +90,7 @@ class AttemptContextLogic:
     def get(self, coll, key, **kwargs):
         # make sure we don't pass the transcoder along
         kwargs.pop('transcoder', None)
-        kwargs.update(coll._impl._collection_details.get_details_as_dict())
+        kwargs.update(coll._impl._collection_details.get_details_as_txn_dict())
         # kwargs.pop("conn")
         kwargs.update({
             'key': key,
@@ -102,7 +102,7 @@ class AttemptContextLogic:
 
     def get_replica_from_preferred_server_group(self, coll, key, **kwargs):
         kwargs.pop('transcoder', None)
-        kwargs.update(coll._impl._collection_details.get_details_as_dict())
+        kwargs.update(coll._impl._collection_details.get_details_as_txn_dict())
         # kwargs.pop("conn")
         kwargs["key"] = key
         kwargs["ctx"] = self._txnctx
@@ -150,7 +150,7 @@ class AttemptContextLogic:
 
     def insert(self, coll, key, value, **kwargs):
         transcoder = kwargs.pop('transcoder', self._transcoder)
-        kwargs.update(coll._impl._collection_details.get_details_as_dict())
+        kwargs.update(coll._impl._collection_details.get_details_as_txn_dict())
         # kwargs.pop("conn")
         kwargs.update({
             'key': key,

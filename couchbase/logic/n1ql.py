@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from datetime import timedelta
 from enum import Enum
@@ -29,11 +30,11 @@ from couchbase._utils import (JSONType,
                               timedelta_as_milliseconds,
                               to_milliseconds)
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
+from couchbase.logic.observability import ObservableRequestHandler, SpanProtocol
 from couchbase.logic.options import QueryOptionsBase
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.options import QueryOptions, UnsignedInt64
 from couchbase.serializer import DefaultJsonSerializer, Serializer
-from couchbase.tracing import CouchbaseSpan
 
 if TYPE_CHECKING:
     from couchbase.mutation_state import MutationState  # noqa: F401
@@ -336,7 +337,8 @@ class N1QLQuery:
         "serializer": {"serializer": lambda x: x},
         "positional_parameters": {},
         "named_parameters": {},
-        "span": {"span": lambda x: x}
+        "span": {"span": lambda x: x},
+        "parent_span": {"parent_span": lambda x: x},
     }
 
     def __init__(self, query, *args, **kwargs):
@@ -383,7 +385,7 @@ class N1QLQuery:
         """
         self._params[name] = value
 
-    @property
+    @functools.cached_property
     def params(self) -> Dict[str, Any]:
         params = self._params
 
@@ -668,15 +670,20 @@ class N1QLQuery:
         self.set_option('raw', value)
 
     @property
-    def span(self) -> Optional[CouchbaseSpan]:
+    def span(self) -> Optional[SpanProtocol]:
         return self._params.get('span', None)
 
     @span.setter
-    def span(self, value  # type CouchbaseSpan
-             ) -> None:
-        if not issubclass(value.__class__, CouchbaseSpan):
-            raise InvalidArgumentException(message='Span should implement CouchbaseSpan interface')
+    def span(self, value: SpanProtocol) -> None:
         self.set_option('span', value)
+
+    @property
+    def parent_span(self) -> Optional[SpanProtocol]:
+        return self._params.get('parent_span', None)
+
+    @parent_span.setter
+    def parent_span(self, value: SpanProtocol) -> None:
+        self.set_option('parent_span', value)
 
     @property
     def serializer(self) -> Optional[Serializer]:
@@ -749,6 +756,8 @@ class QueryRequestLogic:
         self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None
         self._streaming_timeout = kwargs.pop('streaming_timeout', None)
+        self._obs_handler: Optional[ObservableRequestHandler] = kwargs.pop('obs_handler', None)
+        self._processed_core_span = False
 
     @property
     def params(self) -> Dict[str, Any]:
@@ -778,6 +787,19 @@ class QueryRequestLogic:
         # @TODO:  raise if query isn't complete?
         return self._metadata
 
+    def _process_core_span(self, with_error: Optional[bool] = False) -> None:
+        if self._processed_core_span:
+            return
+        self._processed_core_span = True
+        if self._obs_handler and self._streaming_result:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if self._obs_handler.is_legacy_tracer:
+                # the handler knows how to handle this legacy situation (essentially just ends the span)
+                self._obs_handler.process_core_span(None)
+            elif hasattr(self._streaming_result, 'core_span'):
+                self._obs_handler.process_core_span(self._streaming_result.core_span,
+                                                    with_error=with_error)
+
     def _set_metadata(self, query_response):
         if isinstance(query_response, PycbcCoreException):
             raise ErrorMapper.build_exception(query_response)
@@ -789,6 +811,25 @@ class QueryRequestLogic:
             return
 
         self._started_streaming = True
+        # we don't need the spans in the kwargs, tracing is handled by the ObservableRequestHandler
+        span = self.params.pop('span', None)
+        parent_span = self.params.pop('parent_span', None)
+        if self._obs_handler:
+            # since query is lazy executed, we wait until we submit the query to create the span
+            parent_span = ObservableRequestHandler.maybe_get_parent_span(span=span, parent_span=parent_span)
+            q_context = self.params.get('query_context', None)
+            attr_opts = {
+                'statement': self.params.get('statement'),
+                'query_params': self.params,
+                'parent_span': parent_span,
+                'use_now_as_start_time': True
+            }
+            if q_context:
+                bname, sname = ObservableRequestHandler.get_query_context_components(q_context)
+                attr_opts['bucket_name'] = bname
+                attr_opts['scope_name'] = sname
+            self._obs_handler.create_http_span(**attr_opts)
+
         n1ql_kwargs = {}
         n1ql_kwargs.update(self.params)
 
@@ -804,5 +845,14 @@ class QueryRequestLogic:
         errback = kwargs.pop('errback', None)
         if errback:
             n1ql_kwargs['errback'] = errback
+
+        if self._obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if self._obs_handler.is_legacy_tracer:
+                legacy_request_span = self._obs_handler.legacy_request_span
+                if legacy_request_span:
+                    n1ql_kwargs['parent_span'] = legacy_request_span
+            else:
+                n1ql_kwargs['wrapper_span_name'] = self._obs_handler.wrapper_span_name
 
         self._streaming_result = self._connection.pycbc_query(**n1ql_kwargs)

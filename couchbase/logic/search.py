@@ -31,6 +31,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase._utils import is_null_or_empty, to_milliseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
+from couchbase.logic.observability import ObservableRequestHandler, SpanProtocol
 from couchbase.logic.options import SearchOptionsBase
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.supportability import Supportability
@@ -39,7 +40,6 @@ from couchbase.options import (SearchOptions,
                                UnsignedInt32,
                                UnsignedInt64)
 from couchbase.serializer import DefaultJsonSerializer, Serializer
-from couchbase.tracing import CouchbaseSpan
 
 if TYPE_CHECKING:
     from couchbase.logic.search_queries import SearchQuery
@@ -929,6 +929,7 @@ class SearchQueryBuilder:
         "sort": {},
         "show_request": {"show_request": lambda x: x},
         "span": {"span": lambda x: x},
+        "parent_span": {"parent_span": lambda x: x},
         "vector_query_combination": {"vector_query_combination": lambda x: x},
         "log_request": {"log_request": lambda x: x},
         "log_response": {"log_response": lambda x: x}
@@ -1290,15 +1291,20 @@ class SearchQueryBuilder:
         self.set_option('show_request', value)
 
     @property
-    def span(self) -> Optional[CouchbaseSpan]:
+    def span(self) -> Optional[SpanProtocol]:
         return self._params.get('span', None)
 
     @span.setter
-    def span(self, value  # type: CouchbaseSpan
-             ):
-        if not issubclass(value.__class__, CouchbaseSpan):
-            raise InvalidArgumentException(message='Span should implement CouchbaseSpan interface')
+    def span(self, value: SpanProtocol) -> None:
         self.set_option('span', value)
+
+    @property
+    def parent_span(self) -> Optional[SpanProtocol]:
+        return self._params.get('parent_span', None)
+
+    @parent_span.setter
+    def parent_span(self, value: SpanProtocol) -> None:
+        self.set_option('parent_span', value)
 
     @property
     def vector_query_combination(self) -> Optional[VectorQueryCombination]:
@@ -1441,6 +1447,8 @@ class FullTextSearchRequestLogic:
         self._result_facets = None
         self._bucket_name = kwargs.pop('bucket_name', None)
         self._scope_name = kwargs.pop('scope_name', None)
+        self._obs_handler: Optional[ObservableRequestHandler] = kwargs.pop('obs_handler', None)
+        self._processed_core_span = False
 
     @property
     def encoded_query(self) -> Dict[str, Any]:
@@ -1475,6 +1483,19 @@ class FullTextSearchRequestLogic:
 
     def result_facets(self):
         return self._result_facets
+
+    def _process_core_span(self, with_error: Optional[bool] = False) -> None:
+        if self._processed_core_span:
+            return
+        self._processed_core_span = True
+        if self._obs_handler and self._streaming_result:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if self._obs_handler.is_legacy_tracer:
+                # the handler knows how to handle this legacy situation (essentially just ends the span)
+                self._obs_handler.process_core_span(None)
+            elif hasattr(self._streaming_result, 'core_span'):
+                self._obs_handler.process_core_span(self._streaming_result.core_span,
+                                                    with_error=with_error)
 
     def _set_facets(self, facets  # type: List[Dict[str, Any]]
                     ) -> None:
@@ -1546,23 +1567,35 @@ class FullTextSearchRequestLogic:
 
         return self.row_factory(**deserialized_row)
 
-    def _submit_query(self, **kwargs):
+    def _submit_query(self, **kwargs):  # noqa: C901
         if self.done_streaming:
             return
 
         self._started_streaming = True
-        span = self.encoded_query.pop('span', None)
         op_args = self.encoded_query
         if self._bucket_name is not None and self._scope_name is not None:
             op_args['bucket_name'] = self._bucket_name
             op_args['scope_name'] = self._scope_name
 
+        # we don't need the spans in the kwargs, tracing is handled by the ObservableRequestHandler
+        span = op_args.pop('span', None)
+        parent_span = op_args.pop('parent_span', None)
+        if self._obs_handler:
+            # since search is lazy executed, we wait until we submit the query to create the span
+            parent_span = ObservableRequestHandler.maybe_get_parent_span(span=span, parent_span=parent_span)
+            attr_opts = {
+                'parent_span': parent_span,
+                'use_now_as_start_time': True
+            }
+            if 'bucket_name' in op_args and 'scope_name' in op_args:
+                attr_opts['bucket_name'] = op_args['bucket_name']
+                attr_opts['scope_name'] = op_args['scope_name']
+            self._obs_handler.create_http_span(**attr_opts)
+
         search_kwargs = {}
         search_kwargs.update(op_args)
-        if span:
-            search_kwargs['span'] = span
 
-        streaming_timeout = self.encoded_query.get('timeout', self._streaming_timeout)
+        streaming_timeout = op_args.get('timeout', self._streaming_timeout)
         if streaming_timeout:
             search_kwargs['streaming_timeout'] = streaming_timeout
 
@@ -1574,6 +1607,15 @@ class FullTextSearchRequestLogic:
         errback = kwargs.pop('errback', None)
         if errback:
             search_kwargs['errback'] = errback
+
+        if self._obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if self._obs_handler.is_legacy_tracer:
+                legacy_request_span = self._obs_handler.legacy_request_span
+                if legacy_request_span:
+                    search_kwargs['parent_span'] = legacy_request_span
+            else:
+                search_kwargs['wrapper_span_name'] = self._obs_handler.wrapper_span_name
 
         self._streaming_result = self._connection.pycbc_search_query(**search_kwargs)
 

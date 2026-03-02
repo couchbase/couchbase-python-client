@@ -686,14 +686,15 @@ class TransactionTestSuite:
     def test_metadata_collection_not_found(self, cb_env):
         from couchbase.auth import PasswordAuthenticator
         from couchbase.cluster import Cluster
-        from couchbase.options import ClusterOptions
+        from couchbase.options import ClusterOptions, ClusterTracingOptions
         conn_string = cb_env.config.get_connection_string()
         username, pw = cb_env.config.get_username_and_pw()
         auth = PasswordAuthenticator(username, pw)
         metadata = TransactionKeyspace(bucket='no-bucket', scope='_default', collection='_default')
-        cluster = Cluster.connect(f'{conn_string}',
-                                  ClusterOptions(auth,
-                                                 transaction_config=TransactionConfig(metadata_collection=metadata)))
+        cluster_opts = ClusterOptions(auth,
+                                      tracing_options=ClusterTracingOptions(enable_tracing=False),
+                                      transaction_config=TransactionConfig(metadata_collection=metadata))
+        cluster = Cluster.connect(f'{conn_string}', cluster_opts)
         collection = cluster.bucket(cb_env.bucket.name).default_collection()
 
         def txn_logic(ctx):

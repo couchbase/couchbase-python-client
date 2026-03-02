@@ -22,6 +22,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.result import CounterResult, MutationResult
 
 if TYPE_CHECKING:
@@ -43,8 +45,17 @@ class BinaryCollection:
         *opts,  # type: IncrementOptions
         **kwargs,  # type: Any
     ) -> Deferred[CounterResult]:
-        req = self._impl.request_builder.build_increment_request(key, *opts, **kwargs)
-        return self._impl.increment_deferred(req)
+        op_type = KeyValueOperationType.Increment
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_increment_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.increment_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def decrement(
         self,
@@ -52,8 +63,17 @@ class BinaryCollection:
         *opts,  # type: DecrementOptions
         **kwargs,  # type: Any
     ) -> Deferred[CounterResult]:
-        req = self._impl.request_builder.build_decrement_request(key, *opts, **kwargs)
-        return self._impl.decrement_deferred(req)
+        op_type = KeyValueOperationType.Decrement
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_decrement_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.decrement_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def append(
         self,
@@ -62,8 +82,17 @@ class BinaryCollection:
         *opts,  # type: AppendOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
-        req = self._impl.request_builder.build_append_request(key, value, *opts, **kwargs)
-        return self._impl.append_deferred(req)
+        op_type = KeyValueOperationType.Append
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_append_request(key, value, obs_handler, *opts, **kwargs)
+            d = self._impl.append_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise
 
     def prepend(
         self,
@@ -72,5 +101,14 @@ class BinaryCollection:
         *opts,  # type: PrependOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
-        req = self._impl.request_builder.build_prepend_request(key, value, *opts, **kwargs)
-        return self._impl.prepend_deferred(req)
+        op_type = KeyValueOperationType.Prepend
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        obs_handler.__enter__()
+        try:
+            req = self._impl.request_builder.build_prepend_request(key, value, obs_handler, *opts, **kwargs)
+            d = self._impl.prepend_deferred(req, obs_handler)
+            d.addBoth(self._impl._finish_span, obs_handler)
+            return d
+        except Exception as e:
+            obs_handler.__exit__(type(e), e, e.__traceback__)
+            raise

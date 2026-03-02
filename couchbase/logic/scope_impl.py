@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from couchbase.analytics import AnalyticsRequest
 from couchbase.logic.cluster_impl import ClusterSettings
 from couchbase.logic.cluster_settings import StreamingTimeouts
+from couchbase.logic.observability import ObservabilityInstruments
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.logic.scope_req_builder import ScopeRequestBuilder
 from couchbase.n1ql import N1QLRequest
@@ -85,6 +86,11 @@ class ScopeImpl:
         return self.cluster_settings.streaming_timeouts
 
     @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self.cluster_settings.observability_instruments
+
+    @property
     def name(self) -> str:
         return self._scope_name
 
@@ -100,7 +106,8 @@ class ScopeImpl:
         return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self.connection,
                                                                            req.analytics_query.params,
                                                                            default_serializer=self.default_serializer,
-                                                                           streaming_timeout=streaming_timeout))
+                                                                           streaming_timeout=streaming_timeout,
+                                                                           obs_handler=req.obs_handler))
 
     def query(self, req: QueryRequest) -> QueryResult:
         self._client_adapter._ensure_not_closed()
@@ -114,7 +121,8 @@ class ScopeImpl:
         return QueryResult(N1QLRequest.generate_n1ql_request(self.connection,
                                                              req.n1ql_query.params,
                                                              default_serializer=self.default_serializer,
-                                                             streaming_timeout=streaming_timeout))
+                                                             streaming_timeout=streaming_timeout,
+                                                             obs_handler=req.obs_handler))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
         self._client_adapter._ensure_not_closed()
@@ -128,4 +136,5 @@ class ScopeImpl:
         return SearchResult(FullTextSearchRequest.generate_search_request(self.connection,
                                                                           req.query_builder.as_encodable(),
                                                                           default_serializer=self.default_serializer,
-                                                                          streaming_timeout=streaming_timeout))
+                                                                          streaming_timeout=streaming_timeout,
+                                                                          obs_handler=req.obs_handler))

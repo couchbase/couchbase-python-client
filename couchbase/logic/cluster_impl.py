@@ -29,6 +29,8 @@ from couchbase.logic.client_adapter import ClientAdapter
 from couchbase.logic.cluster_req_builder import ClusterRequestBuilder
 from couchbase.logic.cluster_settings import ClusterSettings
 from couchbase.logic.cluster_types import CreateConnectionRequest, GetConnectionInfoRequest
+from couchbase.logic.observability import ObservabilityInstruments
+from couchbase.logic.operation_types import ClusterOperationType
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.n1ql import N1QLRequest
 from couchbase.result import (AnalyticsResult,
@@ -60,6 +62,8 @@ class ClusterImpl:
                                                   self._cluster_settings.auth,
                                                   self._cluster_settings.cluster_options)
         self._client_adapter = ClientAdapter(connect_request, skip_connect=skip_connect)
+        self._cluster_settings.set_observability_cluster_labels_callable(
+            self._client_adapter.binding_map.op_map[ClusterOperationType.GetClusterLabels.value])
         self._request_builder = ClusterRequestBuilder()
         self._cluster_info: Optional[ClusterInfoResult] = None
         self._transactions: Optional[Transactions] = None
@@ -131,6 +135,11 @@ class ClusterImpl:
         return None
 
     @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._cluster_settings.observability_instruments
+
+    @property
     def transactions(self) -> Transactions:
         """**INTERNAL**"""
         if not self._transactions:
@@ -150,10 +159,20 @@ class ClusterImpl:
         return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self._client_adapter.connection,
                                                                            req.analytics_query.params,
                                                                            default_serializer=self.default_serializer,
-                                                                           streaming_timeout=streaming_timeout))
+                                                                           streaming_timeout=streaming_timeout,
+                                                                           obs_handler=req.obs_handler))
 
     def close_connection(self) -> None:
         """**INTERNAL**"""
+        try:
+            from couchbase.logic.observability import ThresholdLoggingTracer
+            tracer = self._cluster_settings.observability_instruments.tracer.tracer
+            if isinstance(tracer, ThresholdLoggingTracer):
+                # shutdown the tracer's reporter
+                tracer.close()
+        except Exception:  # nosec
+            # Don't raise exceptions during shutdown
+            pass
         self._client_adapter.close_connection()
 
     def diagnostics(self, req: DiagnosticsRequest) -> DiagnosticsResult:
@@ -199,7 +218,8 @@ class ClusterImpl:
         return QueryResult(N1QLRequest.generate_n1ql_request(self._client_adapter.connection,
                                                              req.n1ql_query.params,
                                                              default_serializer=self.default_serializer,
-                                                             streaming_timeout=streaming_timeout))
+                                                             streaming_timeout=streaming_timeout,
+                                                             obs_handler=req.obs_handler))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
         """**INTERNAL**"""
@@ -214,7 +234,8 @@ class ClusterImpl:
         return SearchResult(FullTextSearchRequest.generate_search_request(self._client_adapter.connection,
                                                                           req.query_builder.as_encodable(),
                                                                           default_serializer=self.default_serializer,
-                                                                          streaming_timeout=streaming_timeout))
+                                                                          streaming_timeout=streaming_timeout,
+                                                                          obs_handler=req.obs_handler))
 
     def update_credentials(self, req: UpdateCredentialsRequest) -> None:
         """**INTERNAL**"""

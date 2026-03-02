@@ -23,6 +23,7 @@ from typing import (Any,
                     Union)
 
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.management.logic.query_index_mgmt_req_types import (QUERY_INDEX_MGMT_ERROR_MAP,
                                                                    BuildDeferredIndexesRequest,
                                                                    CreateIndexRequest,
@@ -145,14 +146,16 @@ class QueryIndexMgmtRequestBuilder:
                                    bucket_name: str,
                                    index_name: str,
                                    keys: Union[List[str], Tuple[str]],
+                                   obs_handler: ObservableRequestHandler,
                                    collection_context: Optional[Tuple[str, str]] = None,
                                    *options: object,
                                    **kwargs: object) -> CreateIndexRequest:
-
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
         self._validate_index_name(index_name)
         self._validate_index_keys(keys)
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
             self._valid_collection_context(final_args)
@@ -177,11 +180,14 @@ class QueryIndexMgmtRequestBuilder:
 
     def build_create_primary_index_request(self,
                                            bucket_name: str,
+                                           obs_handler: ObservableRequestHandler,
                                            collection_context: Optional[Tuple[str, str]] = None,
                                            *options: object,
                                            **kwargs: object) -> CreateIndexRequest:
-        self._validate_bucket_name(bucket_name)
         final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
+        self._validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
             self._valid_collection_context(final_args)
@@ -207,12 +213,15 @@ class QueryIndexMgmtRequestBuilder:
     def build_drop_index_request(self,
                                  bucket_name: str,
                                  index_name: str,
+                                 obs_handler: ObservableRequestHandler,
                                  collection_context: Optional[Tuple[str, str]] = None,
                                  *options: object,
                                  **kwargs: object) -> DropIndexRequest:
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
         self._validate_index_name(index_name)
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
             self._valid_collection_context(final_args)
@@ -236,11 +245,14 @@ class QueryIndexMgmtRequestBuilder:
 
     def build_drop_primary_index_request(self,
                                          bucket_name: str,
+                                         obs_handler: ObservableRequestHandler,
                                          collection_context: Optional[Tuple[str, str]] = None,
                                          *options: object,
                                          **kwargs: object) -> DropIndexRequest:
-        self._validate_bucket_name(bucket_name)
         final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
+        self._validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
             self._valid_collection_context(final_args)
@@ -265,11 +277,14 @@ class QueryIndexMgmtRequestBuilder:
 
     def build_get_all_indexes_request(self,
                                       bucket_name: str,
+                                      obs_handler: ObservableRequestHandler,
                                       collection_context: Optional[Tuple[str, str]] = None,
                                       *options: object,
                                       **kwargs: object) -> GetAllIndexesRequest:
-        self._validate_bucket_name(bucket_name)
         final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
+        self._validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
             self._valid_collection_context(final_args)
@@ -296,11 +311,14 @@ class QueryIndexMgmtRequestBuilder:
 
     def build_build_deferred_indexes_request(self,
                                              bucket_name: str,
+                                             obs_handler: ObservableRequestHandler,
                                              collection_context: Optional[Tuple[str, str]] = None,
                                              *options: object,
                                              **kwargs: object) -> BuildDeferredIndexesRequest:
-        self._validate_bucket_name(bucket_name)
         final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
+        self._validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
             self._valid_collection_context(final_args)
@@ -328,12 +346,15 @@ class QueryIndexMgmtRequestBuilder:
     def build_watch_indexes_request(self,
                                     bucket_name: str,
                                     index_names: Union[List[str], Tuple[str]],
+                                    obs_handler: ObservableRequestHandler,
                                     collection_context: Optional[Tuple[str, str]] = None,
                                     *options: object,
                                     **kwargs: object) -> WatchIndexesRequest:
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
         self._validate_index_names(index_names)
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
         if timeout is None:
             raise InvalidArgumentException('Must specify a timeout when watching indexes.')

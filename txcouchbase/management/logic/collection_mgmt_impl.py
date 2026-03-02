@@ -19,8 +19,10 @@ import asyncio
 from typing import TYPE_CHECKING, List
 
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 from acouchbase.management.logic.collection_mgmt_impl import AsyncCollectionMgmtImpl
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.management.logic.collection_mgmt_req_types import (CreateCollectionRequest,
                                                                   CreateScopeRequest,
                                                                   DropCollectionRequest,
@@ -34,47 +36,67 @@ if TYPE_CHECKING:
 
 
 class TxCollectionMgmtImpl(AsyncCollectionMgmtImpl):
-    def __init__(self, client_adapter: AsyncClientAdapter) -> Deferred[None]:
-        super().__init__(client_adapter)
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments) -> None:
+        super().__init__(client_adapter, observability_instruments)
 
-    def create_collection_deferred(self, req: CreateCollectionRequest) -> Deferred[None]:
+    def _finish_span(self, result, obs_handler):
+        """Callback to properly end the span on success or failure."""
+        if isinstance(result, Failure):
+            exc = result.value
+            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
+            return result
+        else:
+            obs_handler.__exit__(None, None, None)
+            return result
+
+    def create_collection_deferred(self,
+                                   req: CreateCollectionRequest,
+                                   obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().create_collection(req)
+        coro = super().create_collection(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def create_scope_deferred(self, req: CreateScopeRequest) -> Deferred[None]:
+    def create_scope_deferred(self, req: CreateScopeRequest, obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().create_scope(req)
+        coro = super().create_scope(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def drop_collection_deferred(self, req: DropCollectionRequest) -> Deferred[None]:
+    def drop_collection_deferred(self,
+                                 req: DropCollectionRequest,
+                                 obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().drop_collection(req)
+        coro = super().drop_collection(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def drop_scope_deferred(self, req: DropScopeRequest) -> Deferred[None]:
+    def drop_scope_deferred(self, req: DropScopeRequest, obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().drop_scope(req)
+        coro = super().drop_scope(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_all_scopes_deferred(self, req: GetAllScopesRequest) -> Deferred[List[ScopeSpec]]:
+    def get_all_scopes_deferred(self,
+                                req: GetAllScopesRequest,
+                                obs_handler: ObservableRequestHandler) -> Deferred[List[ScopeSpec]]:
         """**INTERNAL**"""
-        coro = super().get_all_scopes(req)
+        coro = super().get_all_scopes(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def update_collection_deferred(self, req: UpdateCollectionRequest) -> Deferred[None]:
+    def update_collection_deferred(self,
+                                   req: UpdateCollectionRequest,
+                                   obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().update_collection(req)
+        coro = super().update_collection(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d

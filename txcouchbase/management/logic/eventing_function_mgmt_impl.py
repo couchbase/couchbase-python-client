@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 
 class TxEventingFunctionMgmtImpl(AsyncEventingFunctionMgmtImpl):
-    def __init___(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
         super().__init__(client_adapter)
 
     def deploy_function_deferred(self, req: DeployFunctionRequest) -> Deferred[None]:

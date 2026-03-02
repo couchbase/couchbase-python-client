@@ -34,6 +34,7 @@ from couchbase.exceptions import (BucketAlreadyExistsException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException,
                                   RateLimitedException)
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import BucketMgmtOperationType
 from couchbase.logic.transforms import (int_to_enum,
                                         seconds_to_timedelta,
@@ -417,6 +418,7 @@ OPARG_SKIP_LIST = ['error_map']
 class BucketMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
 
@@ -431,6 +433,15 @@ class BucketMgmtRequest(MgmtRequest):
 
         if errback is not None:
             mgmt_kwargs['errback'] = errback
+
+        if obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if obs_handler.is_legacy_tracer:
+                legacy_request_span = obs_handler.legacy_request_span
+                if legacy_request_span:
+                    mgmt_kwargs['parent_span'] = legacy_request_span
+            else:
+                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
 
         return mgmt_kwargs
 

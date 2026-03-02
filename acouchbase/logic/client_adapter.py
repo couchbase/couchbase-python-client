@@ -32,6 +32,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
 from couchbase.logic.binding_map import BindingMap
 from couchbase.logic.bucket_types import CloseBucketRequest, OpenBucketRequest
 from couchbase.logic.cluster_types import CloseConnectionRequest
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
@@ -65,15 +66,23 @@ class AsyncClientAdapter:
         self._create_connection()
 
     @property
+    def binding_map(self) -> BindingMap:
+        """**INTERNAL**"""
+        return self._binding_map
+
+    @property
     def connected(self) -> bool:
+        """**INTERNAL**"""
         return self._connection is not None and self._connection.connected
 
     @property
     def connection(self) -> pycbc_connection:
+        """**INTERNAL**"""
         return self._connection
 
     @property
     def connect_ft(self) -> Optional[Future[None]]:
+        """**INTERNAL**"""
         return self._connect_ft
 
     @property
@@ -148,20 +157,26 @@ class AsyncClientAdapter:
             raise ErrorMapper.build_exception(ret)
         return ret
 
-    def execute_collection_request(self, req: CollectionRequest) -> Future[Any]:
+    def execute_collection_request(self,
+                                   req: CollectionRequest,
+                                   obs_handler: Optional[ObservableRequestHandler] = None) -> Future[Any]:
         self._ensure_not_closed()
         self._ensure_connected()
 
         ft = self.loop.create_future()
 
         def _callback(result) -> None:
+            if obs_handler and hasattr(result, 'core_span'):
+                obs_handler.process_core_span(result.core_span)
             self.loop.call_soon_threadsafe(ft.set_result, result)
 
         def _errback(exc) -> None:
+            if obs_handler and hasattr(exc, 'core_span'):
+                obs_handler.process_core_span(exc.core_span)
             excptn = ErrorMapper.build_exception(exc)
             self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(obs_handler=obs_handler, callback=_callback, errback=_errback)
         self._execute_req(ft, req.op_name, req_dict)
         return ft
 
@@ -188,21 +203,27 @@ class AsyncClientAdapter:
             self._execute_req(ft, req.op_name, req_dict)
         return ft
 
-    def execute_mgmt_request(self, req: MgmtRequest) -> Future[Any]:
+    def execute_mgmt_request(self,
+                             req: MgmtRequest,
+                             obs_handler: Optional[ObservableRequestHandler] = None) -> Future[Any]:
         self._ensure_not_closed()
 
         ft = self.loop.create_future()
 
         def _callback(ret: Any) -> None:
+            if obs_handler and hasattr(ret, 'core_span'):
+                obs_handler.process_core_span(ret.core_span)
             if not ft.done():
                 self.loop.call_soon_threadsafe(ft.set_result, ret)
 
         def _errback(ret: Any) -> None:
+            if obs_handler and hasattr(ret, 'core_span'):
+                obs_handler.process_core_span(ret.core_span)
             excptn = ErrorMapper.build_exception(ret, mapping=req.error_map)
             if not ft.done():
                 self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(callback=_callback, errback=_errback)
+        req_dict = req.req_to_dict(obs_handler=obs_handler, callback=_callback, errback=_errback)
         if not self.connected:
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
             chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))

@@ -23,6 +23,7 @@ from typing import (Any,
                     Tuple,
                     Union)
 
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import KeyValueMultiOperationType
 from couchbase.transcoder import Transcoder
 
@@ -37,7 +38,7 @@ class CollectionMultiRequest:
     return_exceptions: bool
     per_key_args: Optional[Dict[str, Dict[str, Any]]] = None
 
-    def req_to_dict(self) -> Dict[str, Any]:
+    def req_to_dict(self, obs_handler: Optional[ObservableRequestHandler] = None) -> Dict[str, Any]:
         op_kwargs = {
             'bucket': self.bucket_name,
             'scope': self.scope_name,
@@ -48,6 +49,15 @@ class CollectionMultiRequest:
 
         if self.per_key_args:
             op_kwargs['per_key_args'] = self.per_key_args
+
+        if obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if obs_handler.is_legacy_tracer:
+                legacy_request_span = obs_handler.legacy_request_span
+                if legacy_request_span:
+                    op_kwargs['op_args']['parent_span'] = legacy_request_span
+            else:
+                op_kwargs['op_args']['wrapper_span_name'] = obs_handler.wrapper_span_name
 
         return op_kwargs
 

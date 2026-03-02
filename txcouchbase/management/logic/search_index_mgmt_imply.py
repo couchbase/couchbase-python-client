@@ -23,7 +23,7 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
-from acouchbase.management.logic.search_index_mgmt_imply import AsyncSearchIndexMgmtImpl
+from acouchbase.management.logic.search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
 from couchbase.management.logic.search_index_mgmt_types import SearchIndex
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 
 class TxSearchIndexMgmtImpl(AsyncSearchIndexMgmtImpl):
-    def __init___(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
         super().__init__(client_adapter)
 
     def allow_querying_deferred(self, req: AllowQueryingRequest) -> Deferred[None]:

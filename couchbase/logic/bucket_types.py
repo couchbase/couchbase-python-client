@@ -23,6 +23,7 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Set)
 
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import BucketOperationType, StreamingOperationType
 
 if TYPE_CHECKING:
@@ -83,6 +84,7 @@ class PingRequest(BucketRequest):
 @dataclass
 class ViewQueryRequest:
     view_query: ViewQuery
+    obs_handler: ObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property

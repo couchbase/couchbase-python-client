@@ -24,6 +24,7 @@ from typing import (Any,
                     Optional)
 
 from couchbase.exceptions import DesignDocumentNotFoundException, RateLimitedException
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import ViewIndexMgmtOperationType
 from couchbase.management.logic.mgmt_req import MgmtRequest
 
@@ -153,6 +154,7 @@ OPARG_SKIP_LIST = ['error_map']
 class ViewIndexMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {

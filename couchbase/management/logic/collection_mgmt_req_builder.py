@@ -23,6 +23,7 @@ from typing import (Any,
 
 from couchbase._utils import is_null_or_empty
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.supportability import Supportability
 from couchbase.management.logic.collection_mgmt_req_types import (COLLECTION_MGMT_ERROR_MAP,
                                                                   CollectionSpec,
@@ -123,6 +124,8 @@ class CollectionMgmtRequestBuilder:
                                         bucket_name: str,
                                         *args: object,
                                         **kwargs: object) -> CreateCollectionRequest:
+        # the obs_handler is required, let pop fail if not provided
+        obs_handler: ObservableRequestHandler = kwargs.pop('obs_handler')
         settings = None
         if args and isinstance(args[0], CollectionSpec):
             collection_spec = args[0]
@@ -141,11 +144,17 @@ class CollectionMgmtRequestBuilder:
             scope_name = None
             collection_name = None
 
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span,
+                                     bucket_name=bucket_name,
+                                     scope_name=scope_name,
+                                     collection_name=collection_name)
+
         self._validate_bucket_name(bucket_name)
         self._validate_scope_name(scope_name)
         self._validate_collection_name(collection_name)
 
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
         op_args = {
@@ -169,11 +178,17 @@ class CollectionMgmtRequestBuilder:
     def build_create_scope_request(self,
                                    bucket_name: str,
                                    scope_name: str,
+                                   obs_handler: ObservableRequestHandler,
                                    *options: object,
                                    **kwargs: object) -> CreateScopeRequest:
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span,
+                                     bucket_name=bucket_name,
+                                     scope_name=scope_name)
         self._validate_bucket_name(bucket_name)
         self._validate_scope_name(scope_name)
-        final_args = forward_args(kwargs, *options)
+
         timeout = final_args.pop('timeout', None)
 
         op_args = {
@@ -191,6 +206,8 @@ class CollectionMgmtRequestBuilder:
                                       bucket_name: str,
                                       *args: object,
                                       **kwargs: object) -> CreateCollectionRequest:
+        # the obs_handler is required, let pop fail if not provided
+        obs_handler: ObservableRequestHandler = kwargs.pop('obs_handler')
         if args and isinstance(args[0], CollectionSpec):
             collection_spec = args[0]
             options = args[1:]
@@ -203,11 +220,17 @@ class CollectionMgmtRequestBuilder:
             scope_name = None
             collection_name = None
 
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span,
+                                     bucket_name=bucket_name,
+                                     scope_name=scope_name,
+                                     collection_name=collection_name)
+
         self._validate_bucket_name(bucket_name)
         self._validate_scope_name(scope_name)
         self._validate_collection_name(collection_name)
 
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
         op_args = {
@@ -225,12 +248,18 @@ class CollectionMgmtRequestBuilder:
     def build_drop_scope_request(self,
                                  bucket_name: str,
                                  scope_name: str,
+                                 obs_handler: ObservableRequestHandler,
                                  *options: object,
                                  **kwargs: object) -> DropScopeRequest:
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span,
+                                     bucket_name=bucket_name,
+                                     scope_name=scope_name)
+
         self._validate_bucket_name(bucket_name)
         self._validate_scope_name(scope_name)
 
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
         op_args = {
@@ -247,11 +276,14 @@ class CollectionMgmtRequestBuilder:
 
     def build_get_all_scopes_request(self,
                                      bucket_name: str,
+                                     obs_handler: ObservableRequestHandler,
                                      *options: object,
                                      **kwargs: object) -> GetAllScopesRequest:
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name)
         self._validate_bucket_name(bucket_name)
 
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
         op_args = {
@@ -269,13 +301,20 @@ class CollectionMgmtRequestBuilder:
                                         scope_name: str,
                                         collection_name: str,
                                         settings: UpdateCollectionSettings,
+                                        obs_handler: ObservableRequestHandler,
                                         *options: object,
                                         **kwargs: object) -> UpdateCollectionRequest:
+        final_args = forward_args(kwargs, *options)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_http_span(parent_span=parent_span,
+                                     bucket_name=bucket_name,
+                                     scope_name=scope_name,
+                                     collection_name=collection_name)
+
         self._validate_bucket_name(bucket_name)
         self._validate_scope_name(scope_name)
         self._validate_collection_name(collection_name)
 
-        final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 
         op_args = {

@@ -37,6 +37,8 @@ from couchbase.exceptions import (CasMismatchException,
 from couchbase.logic.collection_types import (GetRequest,
                                               LookupInRequest,
                                               MutateInRequest)
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import DatastructureOperationType, KeyValueOperationType
 from couchbase.options import MutateInOptions
 from couchbase.subdocument import (array_addunique,
                                    array_append,
@@ -51,6 +53,7 @@ from couchbase.subdocument import (remove,
 if TYPE_CHECKING:
     from couchbase._utils import JSONType
     from couchbase.logic.collection_impl import CollectionImpl
+    from couchbase.logic.observability import WrappedSpan
     from couchbase.result import LookupInResult
 
 DataStructureRequest = Union[GetRequest, LookupInRequest, MutateInRequest]
@@ -75,26 +78,42 @@ class CouchbaseList:
     def _execute_op(self,
                     fn: Callable[[DataStructureRequest], Any],
                     req: DataStructureRequest,
+                    obs_handler: ObservableRequestHandler,
+                    parent_span: WrappedSpan,
                     create_type: Optional[bool] = None) -> Any:
         try:
-            return fn(req)
+            return fn(req, obs_handler)
         except DocumentNotFoundException:
             if create_type is True:
+                orig_opt_type = obs_handler.op_type
+                obs_handler.reset(KeyValueOperationType.Insert, with_error=True)
                 try:
-                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
-                    self._impl.insert(ins_req)
+                    ins_req = self._impl.request_builder.build_insert_request(self._key,
+                                                                              list(),
+                                                                              obs_handler,
+                                                                              parent_span=parent_span)
+                    self._impl.insert(ins_req, obs_handler)
                 except DocumentExistsException:
                     pass
-                return fn(req)
+                obs_handler.reset(orig_opt_type)
+                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
+                                           parent_span=parent_span)
+                return fn(req, obs_handler)
             else:
                 raise
 
-    def _get(self) -> List[Any]:
+    def _get(self, parent_span: Optional[WrappedSpan] = None) -> List[Any]:
         """
         Get the entire list.
         """
-        req = self._impl.request_builder.build_get_request(self._key)
-        return self._execute_op(self._impl.get, req, create_type=True)
+        op_type = KeyValueOperationType.Get
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            return self._execute_op(self._impl.get,
+                                    req,
+                                    obs_handler,
+                                    parent_span=parent_span,
+                                    create_type=True)
 
     def append(self, value: JSONType) -> None:
         """Add an item to the end of the list.
@@ -103,9 +122,21 @@ class CouchbaseList:
             value (JSONType): The value to add.
 
         """
-        op = array_append('', value)
-        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-        self._execute_op(self._impl.mutate_in, req, create_type=True)
+        op_type = DatastructureOperationType.ListAppend
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = array_append('', value)
+                req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                self._execute_op(self._impl.mutate_in,
+                                 req,
+                                 obs_handler,
+                                 ds_obs_handler.wrapped_span,
+                                 create_type=True)
 
     def prepend(self, value: JSONType) -> None:
         """Add an item to the beginning of the list.
@@ -114,9 +145,21 @@ class CouchbaseList:
             value (JSONType): The value to add.
 
         """
-        op = array_prepend('', value)
-        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-        self._execute_op(self._impl.mutate_in, req, create_type=True)
+        op_type = DatastructureOperationType.ListPrepend
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = array_prepend('', value)
+                req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                self._execute_op(self._impl.mutate_in,
+                                 req,
+                                 obs_handler,
+                                 ds_obs_handler.wrapped_span,
+                                 create_type=True)
 
     def set_at(self, index: int, value: JSONType) -> None:
         """Sets an item within a list at a specified index.
@@ -129,12 +172,23 @@ class CouchbaseList:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index is out of range.
 
         """
-        try:
-            op = replace(f'[{index}]', value)
-            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-            self._execute_op(self._impl.mutate_in, req)
-        except PathNotFoundException:
-            raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
+        op_type = DatastructureOperationType.ListSetAt
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    op = replace(f'[{index}]', value)
+                    req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                             (op,),
+                                                                             obs_handler,
+                                                                             parent_span=ds_obs_handler.wrapped_span)
+                    self._execute_op(self._impl.mutate_in,
+                                     req,
+                                     obs_handler,
+                                     ds_obs_handler.wrapped_span)
+                except PathNotFoundException:
+                    raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
     def get_at(self, index: int) -> Any:
         """Retrieves the item at a specific index in the list.
@@ -149,13 +203,25 @@ class CouchbaseList:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index is out of range.
 
         """
-        try:
-            op = subdoc_get(f'[{index}]')
-            req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-            sdres: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
-            return sdres.value[0].get('value', None)
-        except PathNotFoundException:
-            raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
+        op_type = DatastructureOperationType.ListGetAt
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    op = subdoc_get(f'[{index}]')
+                    req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                             (op,),
+                                                                             obs_handler,
+                                                                             parent_span=ds_obs_handler.wrapped_span)
+                    sdres: LookupInResult = self._execute_op(self._impl.lookup_in,
+                                                             req,
+                                                             obs_handler,
+                                                             ds_obs_handler.wrapped_span,
+                                                             create_type=True)
+                    return sdres.value[0].get('value', None)
+                except PathNotFoundException:
+                    raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
     def remove_at(self, index: int) -> None:
         """Removes an item at a specific index from the list.
@@ -167,12 +233,23 @@ class CouchbaseList:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index is out of range.
 
         """
-        try:
-            op = remove(f'[{index}]')
-            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-            self._execute_op(self._impl.mutate_in, req)
-        except PathNotFoundException:
-            raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
+        op_type = DatastructureOperationType.ListRemoveAt
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    op = remove(f'[{index}]')
+                    req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                             (op,),
+                                                                             obs_handler,
+                                                                             parent_span=ds_obs_handler.wrapped_span)
+                    self._execute_op(self._impl.mutate_in,
+                                     req,
+                                     obs_handler,
+                                     ds_obs_handler.wrapped_span)
+                except PathNotFoundException:
+                    raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
     def size(self) -> int:
         """Returns the number of items in the list.
@@ -181,10 +258,22 @@ class CouchbaseList:
             int: The number of items in the list.
 
         """
-        op = count('')
-        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-        sdres: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
-        return sdres.value[0].get("value", None)
+        op_type = DatastructureOperationType.ListSize
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = count('')
+                req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                sdres: LookupInResult = self._execute_op(self._impl.lookup_in,
+                                                         req,
+                                                         obs_handler,
+                                                         ds_obs_handler.wrapped_span,
+                                                         create_type=True)
+                return sdres.value[0].get('value', None)
 
     def index_of(self, value: JSONType) -> int:
         """Returns the index of a specific value from the list.
@@ -196,12 +285,15 @@ class CouchbaseList:
             int: The index of the value in the list. Returns -1 if value is not found.
 
         """
-        list_ = self._get()
-        for idx, val in enumerate(list_.content_as[list]):
-            if val == value:
-                return idx
+        op_type = DatastructureOperationType.ListIndexOf
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            list_ = self._get(parent_span=ds_obs_handler.wrapped_span)
+            for idx, val in enumerate(list_.content_as[list]):
+                if val == value:
+                    return idx
 
-        return -1
+            return -1
 
     def get_all(self) -> List[Any]:
         """Returns the entire list of items in this list.
@@ -210,9 +302,11 @@ class CouchbaseList:
             int: The entire list.
 
         """
-
-        list_ = self._get()
-        return list_.content_as[list]
+        op_type = DatastructureOperationType.ListGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            list_ = self._get(parent_span=ds_obs_handler.wrapped_span)
+            return list_.content_as[list]
 
     def clear(self) -> None:
         """Clears the list.
@@ -220,11 +314,18 @@ class CouchbaseList:
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the list does not already exist.
         """
-        try:
-            req = self._impl.request_builder.build_remove_request(self._key)
-            self._impl.remove(req)
-        except DocumentNotFoundException:
-            pass
+        op_type = DatastructureOperationType.ListClear
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.Remove
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    req = self._impl.request_builder.build_remove_request(self._key,
+                                                                          obs_handler,
+                                                                          parent_span=ds_obs_handler.wrapped_span)
+                    self._impl.remove(req, obs_handler)
+                except DocumentNotFoundException:
+                    pass
 
     def __iter__(self):
         list_ = self._get()
@@ -254,26 +355,42 @@ class CouchbaseMap:
     def _execute_op(self,
                     fn: Callable[[DataStructureRequest], Any],
                     req: DataStructureRequest,
+                    obs_handler: ObservableRequestHandler,
+                    parent_span: WrappedSpan,
                     create_type: Optional[bool] = None) -> Any:
         try:
-            return fn(req)
+            return fn(req, obs_handler)
         except DocumentNotFoundException:
             if create_type is True:
+                orig_opt_type = obs_handler.op_type
+                obs_handler.reset(KeyValueOperationType.Insert, with_error=True)
                 try:
-                    ins_req = self._impl.request_builder.build_insert_request(self._key, dict())
-                    self._impl.insert(ins_req)
+                    ins_req = self._impl.request_builder.build_insert_request(self._key,
+                                                                              dict(),
+                                                                              obs_handler,
+                                                                              parent_span=parent_span)
+                    self._impl.insert(ins_req, obs_handler)
                 except DocumentExistsException:
                     pass
-                return fn(req)
+                obs_handler.reset(orig_opt_type)
+                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
+                                           parent_span=parent_span)
+                return fn(req, obs_handler)
             else:
                 raise
 
-    def _get(self) -> Dict[str, Any]:
+    def _get(self, parent_span: Optional[WrappedSpan] = None) -> Dict[str, Any]:
         """
         Get the entire map.
         """
-        req = self._impl.request_builder.build_get_request(self._key)
-        return self._execute_op(self._impl.get, req, create_type=True)
+        op_type = KeyValueOperationType.Get
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            return self._execute_op(self._impl.get,
+                                    req,
+                                    obs_handler,
+                                    parent_span=parent_span,
+                                    create_type=True)
 
     def add(self, mapkey: str, value: Any) -> None:
         """Sets a specific key to the specified value in the map.
@@ -283,9 +400,21 @@ class CouchbaseMap:
             value (JSONType): The value to set.
 
         """
-        op = upsert(mapkey, value)
-        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-        return self._execute_op(self._impl.mutate_in, req, create_type=True)
+        op_type = DatastructureOperationType.MapAdd
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = upsert(mapkey, value)
+                req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                return self._execute_op(self._impl.mutate_in,
+                                        req,
+                                        obs_handler,
+                                        ds_obs_handler.wrapped_span,
+                                        create_type=True)
 
     def get(self, mapkey: str) -> Any:
         """Fetches a specific key from the map.
@@ -297,10 +426,22 @@ class CouchbaseMap:
             Any: The value of the specified key.
 
         """
-        op = subdoc_get(mapkey)
-        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-        sd_res = self._execute_op(self._impl.lookup_in, req, create_type=True)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.MapGet
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = subdoc_get(mapkey)
+                req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                sd_res = self._execute_op(self._impl.lookup_in,
+                                          req,
+                                          obs_handler,
+                                          ds_obs_handler.wrapped_span,
+                                          create_type=True)
+                return sd_res.value[0].get('value', None)
 
     def remove(self, mapkey: str) -> None:
         """Removes a specific key from the map.
@@ -312,12 +453,20 @@ class CouchbaseMap:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the key is not in the map.
 
         """
-        try:
-            op = remove(mapkey)
-            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-            self._impl.mutate_in(req)
-        except PathNotFoundException:
-            raise InvalidArgumentException(message=f'Key: {mapkey} is not in the map.') from None
+        op_type = DatastructureOperationType.MapRemove
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    op = remove(mapkey)
+                    req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                             (op,),
+                                                                             obs_handler,
+                                                                             parent_span=ds_obs_handler.wrapped_span)
+                    self._impl.mutate_in(req, obs_handler)
+                except PathNotFoundException:
+                    raise InvalidArgumentException(message=f'Key: {mapkey} is not in the map.') from None
 
     def size(self) -> int:
         """Returns the number of items in the map.
@@ -326,10 +475,22 @@ class CouchbaseMap:
             int: The number of items in the map.
 
         """
-        op = count('')
-        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.MapSize
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = count('')
+                req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                sd_res: LookupInResult = self._execute_op(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          create_type=True)
+                return sd_res.value[0].get('value', None)
 
     def exists(self, key: str) -> bool:
         """Checks whether a specific key exists in the map.
@@ -341,10 +502,22 @@ class CouchbaseMap:
             bool: True if the key exists in the map, False otherwise.
 
         """
-        op = subdoc_exists(key)
-        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
-        return sd_res.exists(0)
+        op_type = DatastructureOperationType.MapExists
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = subdoc_exists(key)
+                req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                sd_res: LookupInResult = self._execute_op(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          create_type=True)
+                return sd_res.exists(0)
 
     def keys(self) -> List[str]:
         """Returns a list of all the keys which exist in the map.
@@ -352,8 +525,11 @@ class CouchbaseMap:
         Returns:
             List[str]: A list of all the keys that exist in the map.
         """
-        map_ = self._get()
-        return list(map_.content_as[dict].keys())
+        op_type = DatastructureOperationType.MapKeys
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            map_ = self._get(parent_span=ds_obs_handler.wrapped_span)
+            return list(map_.content_as[dict].keys())
 
     def values(self) -> List[Any]:
         """Returns a list of all the values which exist in the map.
@@ -361,8 +537,11 @@ class CouchbaseMap:
         Returns:
             List[Any]: A list of all the values that exist in the map.
         """
-        map_ = self._get()
-        return list(map_.content_as[dict].values())
+        op_type = DatastructureOperationType.MapValues
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            map_ = self._get(parent_span=ds_obs_handler.wrapped_span)
+            return list(map_.content_as[dict].values())
 
     def get_all(self) -> Dict[str, Any]:
         """Retrieves the entire map.
@@ -370,17 +549,27 @@ class CouchbaseMap:
         Returns:
             Dict[str, Any]: The entire CouchbaseMap.
         """
-        map_ = self._get()
-        return map_.content_as[dict]
+        op_type = DatastructureOperationType.MapGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            map_ = self._get(parent_span=ds_obs_handler.wrapped_span)
+            return map_.content_as[dict]
 
     def clear(self) -> None:
         """Clears the map.
         """
-        try:
-            req = self._impl.request_builder.build_remove_request(self._key)
-            self._impl.remove(req)
-        except DocumentNotFoundException:
-            pass
+        op_type = DatastructureOperationType.MapClear
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.Remove
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    req = self._impl.request_builder.build_remove_request(self._key,
+                                                                          obs_handler,
+                                                                          parent_span=ds_obs_handler.wrapped_span)
+                    self._impl.remove(req, obs_handler)
+                except DocumentNotFoundException:
+                    pass
 
     def items(self) -> Generator:
         """Provides mechanism to loop over the entire map.
@@ -388,9 +577,11 @@ class CouchbaseMap:
         Returns:
             Generator:  A generator expression for the map
         """
-
-        map_ = self._get()
-        return ((k, v) for k, v in map_.content_as[dict].items())
+        op_type = DatastructureOperationType.MapItems
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            map_ = self._get(parent_span=ds_obs_handler.wrapped_span)
+            return ((k, v) for k, v in map_.content_as[dict].items())
 
 
 class CouchbaseSet:
@@ -411,26 +602,42 @@ class CouchbaseSet:
     def _execute_op(self,
                     fn: Callable[[DataStructureRequest], Any],
                     req: DataStructureRequest,
+                    obs_handler: ObservableRequestHandler,
+                    parent_span: WrappedSpan,
                     create_type: Optional[bool] = None) -> Any:
         try:
-            return fn(req)
+            return fn(req, obs_handler)
         except DocumentNotFoundException:
             if create_type is True:
+                orig_opt_type = obs_handler.op_type
+                obs_handler.reset(KeyValueOperationType.Insert, with_error=True)
                 try:
-                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
-                    self._impl.insert(ins_req)
+                    ins_req = self._impl.request_builder.build_insert_request(self._key,
+                                                                              list(),
+                                                                              obs_handler,
+                                                                              parent_span=parent_span)
+                    self._impl.insert(ins_req, obs_handler)
                 except DocumentExistsException:
                     pass
-                return fn(req)
+                obs_handler.reset(orig_opt_type)
+                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
+                                           parent_span=parent_span)
+                return fn(req, obs_handler)
             else:
                 raise
 
-    def _get(self) -> List[Any]:
+    def _get(self, parent_span: Optional[WrappedSpan] = None) -> List[Any]:
         """
         Get the entire set.
         """
-        req = self._impl.request_builder.build_get_request(self._key)
-        return self._execute_op(self._impl.get, req, create_type=True)
+        op_type = KeyValueOperationType.Get
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            return self._execute_op(self._impl.get,
+                                    req,
+                                    obs_handler,
+                                    parent_span=parent_span,
+                                    create_type=True)
 
     def add(self, value: Any) -> bool:
         """Adds a new item to the set. Returning whether the item already existed in the set or not.
@@ -443,13 +650,25 @@ class CouchbaseSet:
                 exists in the set).
 
         """
-        try:
-            op = array_addunique('', value)
-            req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-            self._execute_op(self._impl.mutate_in, req, create_type=True)
-            return True
-        except PathExistsException:
-            return False
+        op_type = DatastructureOperationType.SetAdd
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    op = array_addunique('', value)
+                    req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                             (op,),
+                                                                             obs_handler,
+                                                                             parent_span=ds_obs_handler.wrapped_span)
+                    self._execute_op(self._impl.mutate_in,
+                                     req,
+                                     obs_handler,
+                                     ds_obs_handler.wrapped_span,
+                                     create_type=True)
+                    return True
+                except PathExistsException:
+                    return False
 
     def remove(self, value: Any, timeout: Optional[timedelta] = None) -> None:  # noqa: C901
         """Removes a specific value from the set.
@@ -460,48 +679,56 @@ class CouchbaseSet:
                 to remove the value.  Defaults to 10 seconds.
 
         """
-        if timeout is None:
-            timeout = timedelta(seconds=10)
+        op_type = DatastructureOperationType.SetRemove
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
 
-        timeout_millis = timeout.total_seconds() * 1000
+            if timeout is None:
+                timeout = timedelta(seconds=10)
 
-        interval_millis = float(50)
-        start = time.perf_counter()
-        time_left = timeout_millis
-        while True:
-            sd_res = self._get()
-            list_ = sd_res.content_as[list]
-            val_idx = -1
-            for idx, v in enumerate(list_):
-                if v == value:
-                    val_idx = idx
+            timeout_millis = timeout.total_seconds() * 1000
+
+            interval_millis = float(50)
+            start = time.perf_counter()
+            time_left = timeout_millis
+            while True:
+                sd_res = self._get(parent_span=ds_obs_handler.wrapped_span)
+                list_ = sd_res.content_as[list]
+                val_idx = -1
+                for idx, v in enumerate(list_):
+                    if v == value:
+                        val_idx = idx
+                        break
+
+                if val_idx >= 0:
+                    kv_op_type = KeyValueOperationType.MutateIn
+                    with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                        try:
+                            mut_opts = MutateInOptions(cas=sd_res.cas, parent_span=ds_obs_handler.wrapped_span)
+                            op = remove(f'[{val_idx}]')
+                            req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                                     (op,),
+                                                                                     obs_handler,
+                                                                                     mut_opts)
+                            self._impl.mutate_in(req, obs_handler)
+                            break
+                        except CasMismatchException:
+                            pass
+                else:
                     break
 
-            if val_idx >= 0:
-                try:
-                    op = remove(f'[{val_idx}]')
-                    req = self._impl.request_builder.build_mutate_in_request(self._key,
-                                                                             (op,),
-                                                                             MutateInOptions(cas=sd_res.cas))
-                    self._impl.mutate_in(req)
-                    break
-                except CasMismatchException:
-                    pass
-            else:
-                break
+                interval_millis += 500
+                if interval_millis > 1000:
+                    interval_millis = 1000
 
-            interval_millis += 500
-            if interval_millis > 1000:
-                interval_millis = 1000
+                time_left = timeout_millis - ((time.perf_counter() - start) * 1000)
+                if interval_millis > time_left:
+                    interval_millis = time_left
 
-            time_left = timeout_millis - ((time.perf_counter() - start) * 1000)
-            if interval_millis > time_left:
-                interval_millis = time_left
+                if time_left <= 0:
+                    raise UnAmbiguousTimeoutException(message=f"Unable to remove {value} from the CouchbaseSet.")
 
-            if time_left <= 0:
-                raise UnAmbiguousTimeoutException(message=f"Unable to remove {value} from the CouchbaseSet.")
-
-            time.sleep(interval_millis / 1000)
+                time.sleep(interval_millis / 1000)
 
     def contains(self, value: Any) -> bool:
         """Returns whether a specific value already exists in the set.
@@ -513,8 +740,11 @@ class CouchbaseSet:
             bool:  True if the specified value exists in the set.  False otherwise.
 
         """
-        list_ = self._get().content_as[list]
-        return value in list_
+        op_type = DatastructureOperationType.SetContains
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            list_ = self._get(parent_span=ds_obs_handler.wrapped_span).content_as[list]
+            return value in list_
 
     def size(self) -> int:
         """Returns the number of items in the set.
@@ -523,19 +753,38 @@ class CouchbaseSet:
             int: The number of items in the set.
 
         """
-        op = count('')
-        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.SetSize
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = count('')
+                req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                sd_res: LookupInResult = self._execute_op(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          create_type=True)
+                return sd_res.value[0].get('value', None)
 
     def clear(self) -> None:
         """Clears the set.
         """
-        try:
-            req = self._impl.request_builder.build_remove_request(self._key)
-            self._impl.remove(req)
-        except DocumentNotFoundException:
-            pass
+        op_type = DatastructureOperationType.SetClear
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.Remove
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    req = self._impl.request_builder.build_remove_request(self._key,
+                                                                          obs_handler,
+                                                                          parent_span=ds_obs_handler.wrapped_span)
+                    self._impl.remove(req, obs_handler)
+                except DocumentNotFoundException:
+                    pass
 
     def values(self) -> List[Any]:
         """Returns a list of all the values which exist in the set.
@@ -543,9 +792,11 @@ class CouchbaseSet:
         Returns:
             List[Any]: The values that exist in the set.
         """
-
-        list_ = self._get()
-        return list_.content_as[list]
+        op_type = DatastructureOperationType.SetValues
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            list_ = self._get(parent_span=ds_obs_handler.wrapped_span)
+            return list_.content_as[list]
 
 
 class CouchbaseQueue:
@@ -567,26 +818,42 @@ class CouchbaseQueue:
     def _execute_op(self,
                     fn: Callable[[DataStructureRequest], Any],
                     req: DataStructureRequest,
+                    obs_handler: ObservableRequestHandler,
+                    parent_span: WrappedSpan,
                     create_type: Optional[bool] = None) -> Any:
         try:
-            return fn(req)
+            return fn(req, obs_handler)
         except DocumentNotFoundException:
             if create_type is True:
+                orig_opt_type = obs_handler.op_type
+                obs_handler.reset(KeyValueOperationType.Insert, with_error=True)
                 try:
-                    ins_req = self._impl.request_builder.build_insert_request(self._key, list())
-                    self._impl.insert(ins_req)
+                    ins_req = self._impl.request_builder.build_insert_request(self._key,
+                                                                              list(),
+                                                                              obs_handler,
+                                                                              parent_span=parent_span)
+                    self._impl.insert(ins_req, obs_handler)
                 except DocumentExistsException:
                     pass
-                return fn(req)
+                obs_handler.reset(orig_opt_type)
+                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
+                                           parent_span=parent_span)
+                return fn(req, obs_handler)
             else:
                 raise
 
-    def _get(self) -> List:
+    def _get(self, parent_span: Optional[WrappedSpan] = None) -> List:
         """
         Get the entire queuee.
         """
-        req = self._impl.request_builder.build_get_request(self._key)
-        return self._execute_op(self._impl.get, req, create_type=True)
+        op_type = KeyValueOperationType.Get
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            return self._execute_op(self._impl.get,
+                                    req,
+                                    obs_handler,
+                                    parent_span=parent_span,
+                                    create_type=True)
 
     def push(self, value: JSONType) -> None:
         """Adds a new item to the back of the queue.
@@ -595,9 +862,21 @@ class CouchbaseQueue:
             value (JSONType): The value to push onto the queue.
 
         """
-        op = array_prepend('', value)
-        req = self._impl.request_builder.build_mutate_in_request(self._key, (op,))
-        self._execute_op(self._impl.mutate_in, req, create_type=True)
+        op_type = DatastructureOperationType.QueuePush
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = array_prepend('', value)
+                req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                self._execute_op(self._impl.mutate_in,
+                                 req,
+                                 obs_handler,
+                                 ds_obs_handler.wrapped_span,
+                                 create_type=True)
 
     def pop(self, timeout: Optional[timedelta] = None) -> Any:
         """Removes an item from the front of the queue.
@@ -610,47 +889,58 @@ class CouchbaseQueue:
         Returns:
             Any: The value that was removed from the front of the queue.
         """
+        op_type = DatastructureOperationType.QueuePop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            if timeout is None:
+                timeout = timedelta(seconds=10)
 
-        if timeout is None:
-            timeout = timedelta(seconds=10)
+            timeout_millis = timeout.total_seconds() * 1000
 
-        timeout_millis = timeout.total_seconds() * 1000
-
-        interval_millis = float(50)
-        start = time.perf_counter()
-        time_left = timeout_millis
-        while True:
-            try:
-                op = subdoc_get('[-1]')
-                lookup_in_req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-                sd_res = self._impl.lookup_in(lookup_in_req)
-                val = sd_res.value[0].get('value', None)
-
+            interval_millis = float(50)
+            start = time.perf_counter()
+            time_left = timeout_millis
+            parent_span = ds_obs_handler.wrapped_span
+            while True:
                 try:
-                    op = remove('[-1]')
-                    mutate_in_opts = MutateInOptions(cas=sd_res.cas)
-                    mutate_in_req = self._impl.request_builder.build_mutate_in_request(self._key,
-                                                                                       (op,),
-                                                                                       mutate_in_opts)
-                    self._impl.mutate_in(mutate_in_req)
-                    return val
-                except CasMismatchException:
-                    pass
+                    kv_op_type = KeyValueOperationType.LookupIn
+                    with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                        op = subdoc_get('[-1]')
+                        lookup_in_req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                           (op,),
+                                                                                           obs_handler,
+                                                                                           parent_span=parent_span)
+                        sd_res = self._impl.lookup_in(lookup_in_req, obs_handler)
+                        val = sd_res.value[0].get('value', None)
 
-                interval_millis += 500
-                if interval_millis > 1000:
-                    interval_millis = 1000
+                    kv_op_type = KeyValueOperationType.MutateIn
+                    with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                        try:
+                            op = remove('[-1]')
+                            mutate_in_opts = MutateInOptions(cas=sd_res.cas, parent_span=parent_span)
+                            mutate_in_req = self._impl.request_builder.build_mutate_in_request(self._key,
+                                                                                               (op,),
+                                                                                               obs_handler,
+                                                                                               mutate_in_opts)
+                            self._impl.mutate_in(mutate_in_req, obs_handler)
+                            return val
+                        except CasMismatchException:
+                            pass
 
-                time_left = timeout_millis - ((time.perf_counter() - start) * 1000)
-                if interval_millis > time_left:
-                    interval_millis = time_left
+                    interval_millis += 500
+                    if interval_millis > 1000:
+                        interval_millis = 1000
 
-                if time_left <= 0:
-                    raise UnAmbiguousTimeoutException(message="Unable to pop from the CouchbaseQueue.")
+                    time_left = timeout_millis - ((time.perf_counter() - start) * 1000)
+                    if interval_millis > time_left:
+                        interval_millis = time_left
 
-                time.sleep(interval_millis / 1000)
-            except PathNotFoundException:
-                raise QueueEmpty('No items to remove from the queue')
+                    if time_left <= 0:
+                        raise UnAmbiguousTimeoutException(message="Unable to pop from the CouchbaseQueue.")
+
+                    time.sleep(interval_millis / 1000)
+                except PathNotFoundException:
+                    raise QueueEmpty('No items to remove from the queue')
 
     def size(self) -> int:
         """Returns the number of items in the queue.
@@ -659,19 +949,38 @@ class CouchbaseQueue:
             int: The number of items in the queue.
 
         """
-        op = count('')
-        req = self._impl.request_builder.build_lookup_in_request(self._key, (op,))
-        sd_res: LookupInResult = self._execute_op(self._impl.lookup_in, req, create_type=True)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.QueueSize
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = count('')
+                req = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         parent_span=ds_obs_handler.wrapped_span)
+                sd_res: LookupInResult = self._execute_op(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          create_type=True)
+                return sd_res.value[0].get('value', None)
 
     def clear(self) -> None:
         """Clears the queue.
         """
-        try:
-            req = self._impl.request_builder.build_remove_request(self._key)
-            self._impl.remove(req)
-        except DocumentNotFoundException:
-            pass
+        op_type = DatastructureOperationType.QueueClear
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.Remove
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                try:
+                    req = self._impl.request_builder.build_remove_request(self._key,
+                                                                          obs_handler,
+                                                                          parent_span=ds_obs_handler.wrapped_span)
+                    self._impl.remove(req, obs_handler)
+                except DocumentNotFoundException:
+                    pass
 
     def __iter__(self):
         list_ = self._get()

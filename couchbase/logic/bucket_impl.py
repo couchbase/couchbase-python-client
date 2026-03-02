@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from couchbase.logic.bucket_req_builder import BucketRequestBuilder
 from couchbase.logic.cluster_settings import ClusterSettings, StreamingTimeouts
+from couchbase.logic.observability import ObservabilityInstruments
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.result import PingResult, ViewResult
 from couchbase.serializer import Serializer
@@ -78,6 +79,11 @@ class BucketImpl:
         """**INTERNAL**"""
         return self._cluster_settings.streaming_timeouts
 
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
+        """**INTERNAL**"""
+        return self._cluster_settings.observability_instruments
+
     def close_bucket(self) -> None:
         """**INTERNAL**"""
         self._client_adapter.close_bucket(self._bucket_name)
@@ -103,4 +109,5 @@ class BucketImpl:
         return ViewResult(ViewRequest.generate_view_request(self._client_adapter.connection,
                                                             req.view_query.as_encodable(),
                                                             default_serializer=self.default_serializer,
-                                                            streaming_timeout=streaming_timeout))
+                                                            streaming_timeout=streaming_timeout,
+                                                            obs_handler=req.obs_handler))

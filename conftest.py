@@ -110,6 +110,21 @@ _MISC_TESTS = [
     "couchbase/tests/rate_limit_t.py::ClassicRateLimitTests",
 ]
 
+_TRACING_TESTS = [
+    "acouchbase/tests/tracing_tests/binary_t.py::AsyncBinaryTracingTests",
+    "acouchbase/tests/tracing_tests/datastructures_t.py::AsyncDataStructuresTracingTests",
+    "acouchbase/tests/tracing_tests/kv_t.py::AsyncKeyValueTracingTests",
+    "acouchbase/tests/tracing_tests/management_t.py::AsyncManagementTracingTests",
+    "acouchbase/tests/tracing_tests/streaming_t.py::AsyncStreamingTracingTests",
+    "couchbase/tests/tracing_tests/datastructures_t.py::ClassicDataStructuresTracingTests",
+    "couchbase/tests/tracing_tests/kv_t.py::ClassicKeyValueTracingTests",
+    "couchbase/tests/tracing_tests/kv_multi_t.py::ClassicKeyValueMultiTracingTests",
+    "couchbase/tests/tracing_tests/binary_t.py::ClassicBinaryTracingTests",
+    "couchbase/tests/tracing_tests/binary_multi_t.py::ClassicBinaryMultiTracingTests",
+    "couchbase/tests/tracing_tests/streaming_t.py::ClassicStreamingTracingTests",
+    "couchbase/tests/tracing_tests/management_t.py::ClassicManagementTracingTests",
+]
+
 _TXNS_TESTS = [
     "acouchbase/tests/transactions_t.py::ClassicTransactionTests",
     "couchbase/tests/transactions_t.py:ClassicTransactionTests",
@@ -155,6 +170,8 @@ def pytest_collection_modifyitems(items):  # noqa: C901
             item.add_marker(pytest.mark.pycbc_mgmt)
         elif test_class_path in _MISC_TESTS:
             item.add_marker(pytest.mark.pycbc_misc)
+        elif test_class_path in _TRACING_TESTS:
+            item.add_marker(pytest.mark.pycbc_tracing)
         elif test_class_path in _TXNS_TESTS:
             item.add_marker(pytest.mark.pycbc_txn)
 

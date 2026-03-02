@@ -27,6 +27,8 @@ if sys.version_info >= (3, 13):
 else:
     from typing_extensions import deprecated
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import CollectionMgmtOperationType
 from couchbase.management.logic.collection_mgmt_impl import CollectionMgmtImpl
 from couchbase.management.logic.collection_mgmt_req_types import (CollectionSpec,
                                                                   CreateCollectionSettings,
@@ -43,13 +45,17 @@ from couchbase.management.options import (CreateCollectionOptions,
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
 
 
 class CollectionManager:
 
-    def __init__(self, client_adapter: ClientAdapter, bucket_name: str) -> None:
+    def __init__(self,
+                 client_adapter: ClientAdapter,
+                 bucket_name: str,
+                 observability_instruments: ObservabilityInstruments) -> None:
         self._bucket_name = bucket_name
-        self._impl = CollectionMgmtImpl(client_adapter)
+        self._impl = CollectionMgmtImpl(client_adapter, observability_instruments)
 
     def create_scope(self,
                      scope_name: str,
@@ -66,11 +72,14 @@ class CollectionManager:
         Raises:
             :class:`~couchbase.exceptions.ScopeAlreadyExistsException`: If the scope already exists.
         """  # noqa: E501
-        req = self._impl.request_builder.build_create_scope_request(self._bucket_name,
-                                                                    scope_name,
-                                                                    *options,
-                                                                    **kwargs)
-        self._impl.create_scope(req)
+        op_type = CollectionMgmtOperationType.ScopeCreate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_create_scope_request(self._bucket_name,
+                                                                        scope_name,
+                                                                        obs_handler,
+                                                                        *options,
+                                                                        **kwargs)
+            self._impl.create_scope(req, obs_handler)
 
     def drop_scope(self,
                    scope_name: str,
@@ -87,11 +96,14 @@ class CollectionManager:
         Raises:
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
         """  # noqa: E501
-        req = self._impl.request_builder.build_drop_scope_request(self._bucket_name,
-                                                                  scope_name,
-                                                                  *options,
-                                                                  **kwargs)
-        self._impl.drop_scope(req)
+        op_type = CollectionMgmtOperationType.ScopeDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_scope_request(self._bucket_name,
+                                                                      scope_name,
+                                                                      obs_handler,
+                                                                      *options,
+                                                                      **kwargs)
+            self._impl.drop_scope(req, obs_handler)
 
     def get_all_scopes(self,
                        *options: GetAllScopesOptions,
@@ -107,10 +119,13 @@ class CollectionManager:
         Returns:
             Iterable[:class:`.ScopeSpec`]: A list of all configured scopes.
         """  # noqa: E501
-        req = self._impl.request_builder.build_get_all_scopes_request(self._bucket_name,
-                                                                      *options,
-                                                                      **kwargs)
-        return self._impl.get_all_scopes(req)
+        op_type = CollectionMgmtOperationType.ScopeGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_scopes_request(self._bucket_name,
+                                                                          obs_handler,
+                                                                          *options,
+                                                                          **kwargs)
+            return self._impl.get_all_scopes(req, obs_handler)
 
     @overload
     @deprecated("Use ``create_collection(scope_name, collection_name, settings=None, *options, **kwargs)`` instead.")
@@ -149,8 +164,13 @@ class CollectionManager:
             :class:`~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
         """  # noqa: E501
-        req = self._impl.request_builder.build_create_collection_request(self._bucket_name, *args, **kwargs)
-        self._impl.create_collection(req)
+        op_type = CollectionMgmtOperationType.CollectionCreate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            kwargs['obs_handler'] = obs_handler
+            req = self._impl.request_builder.build_create_collection_request(self._bucket_name,
+                                                                             *args,
+                                                                             **kwargs)
+            self._impl.create_collection(req, obs_handler)
 
     @overload
     @deprecated("Use ``drop_collection(scope_name, collection_name, *options, **kwargs)`` instead.")
@@ -185,8 +205,13 @@ class CollectionManager:
         Raises:
             :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
         """  # noqa: E501
-        req = self._impl.request_builder.build_drop_collection_request(self._bucket_name, *args, **kwargs)
-        self._impl.drop_collection(req)
+        op_type = CollectionMgmtOperationType.CollectionDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            kwargs['obs_handler'] = obs_handler
+            req = self._impl.request_builder.build_drop_collection_request(self._bucket_name,
+                                                                           *args,
+                                                                           **kwargs)
+            self._impl.drop_collection(req, obs_handler)
 
     def update_collection(self,
                           scope_name: str,
@@ -208,10 +233,13 @@ class CollectionManager:
             :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
             :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
         """  # noqa: E501
-        req = self._impl.request_builder.build_update_collection_request(self._bucket_name,
-                                                                         scope_name,
-                                                                         collection_name,
-                                                                         settings,
-                                                                         *options,
-                                                                         **kwargs)
-        self._impl.update_collection(req)
+        op_type = CollectionMgmtOperationType.CollectionUpdate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_update_collection_request(self._bucket_name,
+                                                                             scope_name,
+                                                                             collection_name,
+                                                                             settings,
+                                                                             obs_handler,
+                                                                             *options,
+                                                                             **kwargs)
+            self._impl.update_collection(req, obs_handler)

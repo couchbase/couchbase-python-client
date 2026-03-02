@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 
 class TxAnalyticsMgmtImpl(AsyncAnalyticsMgmtImpl):
-    def __init___(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
         super().__init__(client_adapter)
 
     def connect_link_deferred(self, req: ConnectLinkRequest) -> Deferred[None]:

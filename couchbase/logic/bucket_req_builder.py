@@ -18,6 +18,7 @@ from __future__ import annotations
 from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.bucket_types import PingRequest, ViewQueryRequest
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.options import forward_args
 from couchbase.views import ViewQuery
 
@@ -51,6 +52,7 @@ class BucketRequestBuilder:
     def build_view_query_request(self,
                                  design_doc: str,
                                  view_name: str,
+                                 obs_handler: ObservableRequestHandler,
                                  *options: object,
                                  **kwargs: object) -> ViewQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
@@ -58,7 +60,8 @@ class BucketRequestBuilder:
                                                                   design_doc,
                                                                   view_name,
                                                                   *options,
-                                                                  **kwargs))
+                                                                  **kwargs), obs_handler)
+        # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers
         return req

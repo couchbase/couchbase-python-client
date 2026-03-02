@@ -37,6 +37,7 @@ from couchbase.diagnostics import (ClusterState,
 from couchbase.exceptions import (CouchbaseException,
                                   ErrorMapper,
                                   InvalidArgumentException)
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.pycbc_core import pycbc_result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
@@ -397,13 +398,17 @@ class MultiResult:
                  orig,  # type: pycbc_result
                  result_type,  # type: Union[GetReplicaResult, GetResult]
                  return_exceptions,  # type: bool
-                 transcoders=None  # type: Optional[Dict[str, Transcoder]]
+                 transcoders=None,  # type: Optional[Dict[str, Transcoder]]
+                 obs_handler=None  # type: Optional[ObservableRequestHandler]
                  ):
         self._orig = orig
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
         self._result_type = result_type
         for k, v in self._orig.raw_result.items():
+            # pycbc_result and pycbc_exception have a core_span member
+            if obs_handler and hasattr(v, 'core_span'):
+                obs_handler.process_core_span(v.core_span)
             if isinstance(v, (CouchbaseException, PycbcCoreException)):
                 if isinstance(v, PycbcCoreException):
                     exc = ErrorMapper.build_exception(v)
@@ -445,9 +450,10 @@ class MultiGetReplicaResult(MultiResult):
     def __init__(self,
                  orig,  # type: pycbc_result
                  return_exceptions,  # type: bool
-                 transcoders=None  # type: Optional[Dict[str, Transcoder]]
+                 transcoders=None,  # type: Optional[Dict[str, Transcoder]]
+                 obs_handler=None  # type: Optional[ObservableRequestHandler]
                  ):
-        super().__init__(orig, GetReplicaResult, return_exceptions, transcoders)
+        super().__init__(orig, GetReplicaResult, return_exceptions, transcoders, obs_handler=obs_handler)
 
     @property
     def results(self) -> Dict[str, GetReplicaResult]:
@@ -475,9 +481,10 @@ class MultiGetResult(MultiResult):
     def __init__(self,
                  orig,  # type: pycbc_result
                  return_exceptions,  # type: bool
-                 transcoders  # type: Dict[str, Transcoder]
+                 transcoders,  # type: Dict[str, Transcoder]
+                 obs_handler=None  # type: Optional[ObservableRequestHandler]
                  ):
-        super().__init__(orig, GetResult, return_exceptions, transcoders)
+        super().__init__(orig, GetResult, return_exceptions, transcoders, obs_handler=obs_handler)
 
     @property
     def results(self) -> Dict[str, GetResult]:
@@ -515,13 +522,17 @@ class ExistsResult(Result):
 class MultiExistsResult:
     def __init__(self,
                  orig,  # type: pycbc_result
-                 return_exceptions  # type: bool
-                 ):
+                 return_exceptions,  # type: bool
+                 obs_handler=None  # type: Optional[ObservableRequestHandler]
+                 ) -> None:
 
         self._orig = orig
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
         for k, v in self._orig.raw_result.items():
+            # pycbc_result and pycbc_exception have a core_span member
+            if obs_handler and hasattr(v, 'core_span'):
+                obs_handler.process_core_span(v.core_span)
             if isinstance(v, (CouchbaseException, PycbcCoreException)):
                 if isinstance(v, PycbcCoreException):
                     exc = ErrorMapper.build_exception(v)
@@ -599,13 +610,17 @@ class MutationResult(Result):
 class MultiMutationResult:
     def __init__(self,
                  orig,  # type: pycbc_result
-                 return_exceptions  # type: bool
-                 ):
+                 return_exceptions,  # type: bool
+                 obs_handler=None  # type: Optional[ObservableRequestHandler]
+                 ) -> None:
 
         self._orig = orig
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
         for k, v in self._orig.raw_result.items():
+            # pycbc_result and pycbc_exception have a core_span member
+            if obs_handler and hasattr(v, 'core_span'):
+                obs_handler.process_core_span(v.core_span)
             if isinstance(v, (CouchbaseException, PycbcCoreException)):
                 if isinstance(v, PycbcCoreException):
                     exc = ErrorMapper.build_exception(v)
@@ -833,13 +848,17 @@ class CounterResult(MutationResult):
 class MultiCounterResult:
     def __init__(self,
                  orig,  # type: pycbc_result
-                 return_exceptions  # type: bool
+                 return_exceptions,  # type: bool
+                 obs_handler=None  # type: Optional[ObservableRequestHandler]
                  ):
 
         self._orig = orig
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
         for k, v in self._orig.raw_result.items():
+            # pycbc_result and pycbc_exception have a core_span member
+            if obs_handler and hasattr(v, 'core_span'):
+                obs_handler.process_core_span(v.core_span)
             if isinstance(v, (CouchbaseException, PycbcCoreException)):
                 if isinstance(v, PycbcCoreException):
                     exc = ErrorMapper.build_exception(v)

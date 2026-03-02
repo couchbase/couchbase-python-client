@@ -35,6 +35,8 @@ from acouchbase.transactions import Transactions
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.result import (AnalyticsResult,
                               ClusterInfoResult,
                               DiagnosticsResult,
@@ -352,7 +354,9 @@ class AsyncCluster:
                 print(f'Query metrics: {q_res.metadata().metrics()}')
 
         """
-        req = self._impl.request_builder.build_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.Query
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.query(req)
 
     def analytics_query(self,  # type: Cluster
@@ -428,7 +432,9 @@ class AsyncCluster:
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
         """  # noqa: E501
-        req = self._impl.request_builder.build_analytics_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.AnalyticsQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.analytics_query(req)
 
     def search_query(self,
@@ -524,7 +530,9 @@ class AsyncCluster:
                     print(f'Locations: {row.locations}')
 
         """
-        req = self._impl.request_builder.build_search_request(index, query, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, query, obs_handler, *options, **kwargs)
         return self._impl.search(req)
 
     def search(self,
@@ -616,7 +624,9 @@ class AsyncCluster:
                 async for row in q_res.rows():
                     print(f'Found row: {row}')
         """  # noqa: E501
-        req = self._impl.request_builder.build_search_request(index, request, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, request, obs_handler, *options, **kwargs)
         return self._impl.search(req)
 
     def buckets(self) -> BucketManager:
@@ -627,7 +637,7 @@ class AsyncCluster:
         Returns:
             :class:`~acouchbase.management.buckets.BucketManager`: A :class:`~acouchbase.management.buckets.BucketManager` instance.
         """  # noqa: E501
-        return BucketManager(self._impl._client_adapter)
+        return BucketManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def users(self) -> UserManager:
         """
@@ -647,7 +657,7 @@ class AsyncCluster:
         Returns:
             :class:`~acouchbase.management.queries.QueryIndexManager`: A :class:`~acouchbase.management.queries.QueryIndexManager` instance.
         """  # noqa: E501
-        return QueryIndexManager(self._impl._client_adapter)
+        return QueryIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """

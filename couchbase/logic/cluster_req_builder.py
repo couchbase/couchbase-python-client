@@ -30,6 +30,7 @@ from couchbase.logic.cluster_types import (AnalyticsQueryRequest,
                                            SearchQueryRequest,
                                            UpdateCredentialsRequest,
                                            WaitUntilReadyRequest)
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.n1ql import N1QLQuery
 from couchbase.options import forward_args
 from couchbase.search import (SearchQuery,
@@ -49,10 +50,12 @@ class ClusterRequestBuilder:
 
     def build_analytics_query_request(self,
                                       statement: str,
+                                      obs_handler: ObservableRequestHandler,
                                       *options: object,
                                       **kwargs: object) -> AnalyticsQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
-        req = AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs))
+        req = AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs), obs_handler)
+        # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers
         return req
@@ -93,9 +96,14 @@ class ClusterRequestBuilder:
 
         return req
 
-    def build_query_request(self, statement: str, *options: object, **kwargs: object) -> QueryRequest:
+    def build_query_request(self,
+                            statement: str,
+                            obs_handler: ObservableRequestHandler,
+                            *options: object,
+                            **kwargs: object) -> QueryRequest:
         num_workers = kwargs.pop('num_workers', None)
-        req = QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs))
+        req = QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs), obs_handler)
+        # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers
         return req
@@ -103,14 +111,22 @@ class ClusterRequestBuilder:
     def build_search_request(self,
                              index: str,
                              query: Union[SearchQuery, SearchRequest],
+                             obs_handler: ObservableRequestHandler,
                              *options: object,
                              **kwargs: object) -> SearchQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
+
         if isinstance(query, SearchQuery):
-            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs))
+            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_object(index,
+                                                                                   query,
+                                                                                   *options,
+                                                                                   **kwargs), obs_handler)
         else:
-            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_from_request(
-                index, query, *options, **kwargs))
+            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_from_request(index,
+                                                                                         query,
+                                                                                         *options,
+                                                                                         **kwargs), obs_handler)
+        # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers
         return req

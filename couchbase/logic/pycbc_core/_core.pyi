@@ -19,7 +19,6 @@ import sys
 from typing import (Any,
                     Dict,
                     Generic,
-                    Iterable,
                     List,
                     Optional,
                     Tuple,

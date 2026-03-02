@@ -18,6 +18,7 @@ from __future__ import annotations
 from asyncio import AbstractEventLoop
 from typing import TYPE_CHECKING, List
 
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.management.logic.bucket_mgmt_req_builder import BucketMgmtRequestBuilder
 from couchbase.management.logic.bucket_mgmt_types import BucketDescribeResult, BucketSettings
 
@@ -33,9 +34,12 @@ if TYPE_CHECKING:
 
 
 class AsyncBucketMgmtImpl:
-    def __init__(self, client_adapter: AsyncClientAdapter) -> None:
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = BucketMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -47,27 +51,36 @@ class AsyncBucketMgmtImpl:
         """**INTERNAL**"""
         return self._request_builder
 
-    async def bucket_describe(self, req: BucketDescribeRequest) -> BucketDescribeResult:
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
         """**INTERNAL**"""
-        res = await self._client_adapter.execute_mgmt_request(req)
+        return self._observability_instruments
+
+    async def bucket_describe(self,
+                              req: BucketDescribeRequest,
+                              obs_handler: ObservableRequestHandler) -> BucketDescribeResult:
+        """**INTERNAL**"""
+        res = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         bucket_info = res.raw_result['info']
         return BucketDescribeResult(**bucket_info)
 
-    async def create_bucket(self, req: CreateBucketRequest) -> None:
+    async def create_bucket(self, req: CreateBucketRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def drop_bucket(self, req: DropBucketRequest) -> None:
+    async def drop_bucket(self, req: DropBucketRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def flush_bucket(self, req: FlushBucketRequest) -> None:
+    async def flush_bucket(self, req: FlushBucketRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_all_buckets(self, req: GetAllBucketsRequest) -> List[BucketSettings]:
+    async def get_all_buckets(self,
+                              req: GetAllBucketsRequest,
+                              obs_handler: ObservableRequestHandler) -> List[BucketSettings]:
         """**INTERNAL**"""
-        res = await self._client_adapter.execute_mgmt_request(req)
+        res = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_buckets = res.raw_result['buckets']
         buckets = []
         for b in raw_buckets:
@@ -76,12 +89,12 @@ class AsyncBucketMgmtImpl:
 
         return buckets
 
-    async def get_bucket(self, req: GetBucketRequest) -> BucketSettings:
+    async def get_bucket(self, req: GetBucketRequest, obs_handler: ObservableRequestHandler) -> BucketSettings:
         """**INTERNAL**"""
-        res = await self._client_adapter.execute_mgmt_request(req)
+        res = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_settings = res.raw_result['bucket']
         return BucketSettings.bucket_settings_from_server(raw_settings)
 
-    async def update_bucket(self, req: UpdateBucketRequest) -> None:
+    async def update_bucket(self, req: UpdateBucketRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req)
+        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

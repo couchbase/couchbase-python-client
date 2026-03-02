@@ -21,6 +21,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.result import PingResult, ViewResult
 from txcouchbase.collection import Collection
 from txcouchbase.logic.bucket_impl import TxBucketImpl
@@ -83,7 +85,13 @@ class Bucket:
             Index Service (GSI) and the Query Service (SQL++).
 
         """
-        req = self._impl.request_builder.build_view_query_request(design_doc, view_name, *view_options, **kwargs)
+        op_type = StreamingOperationType.ViewQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_view_query_request(design_doc,
+                                                                  view_name,
+                                                                  obs_handler,
+                                                                  *view_options,
+                                                                  **kwargs)
         return self._impl.view_query_deferred(req)
 
     def collections(self) -> CollectionManager:
@@ -92,7 +100,7 @@ class Bucket:
 
         :return: the :class:`.management.collections.CollectionManager` for this bucket.
         """
-        return CollectionManager(self._impl._client_adapter, self.name)
+        return CollectionManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
 
 
 TxBucket = Bucket

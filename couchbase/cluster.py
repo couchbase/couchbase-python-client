@@ -26,6 +26,8 @@ from couchbase.auth import (CertificateAuthenticator,
                             PasswordAuthenticator)
 from couchbase.bucket import Bucket
 from couchbase.logic.cluster_impl import ClusterImpl
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.logic.supportability import Supportability
 from couchbase.management.analytics import AnalyticsIndexManager
 from couchbase.management.buckets import BucketManager
@@ -333,7 +335,9 @@ class Cluster:
                 print(f'Query metrics: {q_res.metadata().metrics()}')
 
         """
-        req = self._impl.request_builder.build_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.Query
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.query(req)
 
     def analytics_query(self,
@@ -410,7 +414,9 @@ class Cluster:
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
         """  # noqa: E501
-        req = self._impl.request_builder.build_analytics_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.AnalyticsQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.analytics_query(req)
 
     def search_query(self,
@@ -505,7 +511,9 @@ class Cluster:
                     print(f'Locations: {row.locations}')
 
         """
-        req = self._impl.request_builder.build_search_request(index, query, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, query, obs_handler, *options, **kwargs)
         return self._impl.search(req)
 
     def search(self,
@@ -597,7 +605,9 @@ class Cluster:
                 for row in q_res.rows():
                     print(f'Found row: {row}')
         """  # noqa: E501
-        req = self._impl.request_builder.build_search_request(index, request, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, request, obs_handler, *options, **kwargs)
         return self._impl.search(req)
 
     def buckets(self) -> BucketManager:
@@ -608,7 +618,7 @@ class Cluster:
         Returns:
             :class:`~couchbase.management.buckets.BucketManager`: A :class:`~couchbase.management.buckets.BucketManager` instance.
         """  # noqa: E501
-        return BucketManager(self._impl._client_adapter)
+        return BucketManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def users(self) -> UserManager:
         """
@@ -628,7 +638,7 @@ class Cluster:
         Returns:
             :class:`~couchbase.management.queries.QueryIndexManager`: A :class:`~couchbase.management.queries.QueryIndexManager` instance.
         """  # noqa: E501
-        return QueryIndexManager(self._impl._client_adapter)
+        return QueryIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """

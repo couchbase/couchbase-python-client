@@ -21,6 +21,9 @@ from typing import (Any,
                     get_origin)
 
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic.observability import (LegacySpanProtocol,
+                                           RequestSpanProtocol,
+                                           SpanProtocol)
 
 
 def validate_bool(value: bool) -> bool:
@@ -33,6 +36,12 @@ def validate_int(value: int) -> int:
     if not isinstance(value, int):
         raise InvalidArgumentException(message='Expected value to be of type int.')
     return value
+
+
+def validate_span(span: SpanProtocol) -> None:
+    if not isinstance(span, (LegacySpanProtocol, RequestSpanProtocol)):
+        msg = 'Span should implement either the legacy (deprecated) CouchbaseSpan or RequestSpan interface.'
+        raise InvalidArgumentException(message=msg)
 
 
 def validate_str(value: str) -> str:

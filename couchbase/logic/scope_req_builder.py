@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Union
 
 from couchbase.analytics import AnalyticsQuery
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.scope_types import (AnalyticsQueryRequest,
                                          QueryRequest,
                                          SearchQueryRequest)
@@ -38,6 +39,7 @@ class ScopeRequestBuilder:
 
     def build_analytics_query_request(self,
                                       statement: str,
+                                      obs_handler: ObservableRequestHandler,
                                       *options: object,
                                       **kwargs: object) -> AnalyticsQueryRequest:
         opt = AnalyticsOptions()
@@ -52,12 +54,17 @@ class ScopeRequestBuilder:
             kwargs['query_context'] = 'default:`{}`.`{}`'.format(self._bucket_name, self._scope_name)
 
         num_workers = kwargs.pop('num_workers', None)
-        req = AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs))
+        req = AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs), obs_handler)
+        # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers
         return req
 
-    def build_query_request(self, statement: str, *options: object, **kwargs: object) -> QueryRequest:
+    def build_query_request(self,
+                            statement: str,
+                            obs_handler: ObservableRequestHandler,
+                            *options: object,
+                            **kwargs: object) -> QueryRequest:
         opt = QueryOptions()
         opts = list(options)
         for o in opts:
@@ -70,7 +77,8 @@ class ScopeRequestBuilder:
             kwargs['query_context'] = '`{}`.`{}`'.format(self._bucket_name, self._scope_name)
 
         num_workers = kwargs.pop('num_workers', None)
-        req = QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs))
+        req = QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs), obs_handler)
+        # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers
         return req
@@ -78,6 +86,7 @@ class ScopeRequestBuilder:
     def build_search_request(self,
                              index: str,
                              query: Union[SearchQuery, SearchRequest],
+                             obs_handler: ObservableRequestHandler,
                              *options: object,
                              **kwargs: object) -> SearchQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
@@ -92,10 +101,13 @@ class ScopeRequestBuilder:
             # set the scope_name as this scope if not provided
             if not ('scope_name' in opt or 'scope_name' in kwargs):
                 kwargs['scope_name'] = f'{self._scope_name}'
-            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs))
+            req = SearchQueryRequest(
+                SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs), obs_handler)
         else:
-            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_from_request(
-                index, query, *options, **kwargs))
+            req = SearchQueryRequest(
+                SearchQueryBuilder.create_search_query_from_request(index, query, *options, **kwargs), obs_handler)
+
+        # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers
         return req

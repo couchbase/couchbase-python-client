@@ -23,6 +23,8 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.options import (DiagnosticsOptions,
                                PingOptions,
                                WaitUntilReadyOptions)
@@ -108,7 +110,9 @@ class Cluster:
         *options,  # type: QueryOptions
         **kwargs  # type: Dict[str, Any]
     ) -> Deferred[QueryResult]:
-        req = self._impl.request_builder.build_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.Query
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.query_deferred(req)
 
     def analytics_query(
@@ -117,7 +121,9 @@ class Cluster:
         *options,  # type: AnalyticsOptions
         **kwargs  # type: Dict[str, Any]
     ) -> Deferred[AnalyticsResult]:
-        req = self._impl.request_builder.build_analytics_query_request(statement, *options, **kwargs)
+        op_type = StreamingOperationType.AnalyticsQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         return self._impl.analytics_query_deferred(req)
 
     def search_query(self,
@@ -126,7 +132,9 @@ class Cluster:
                      *options,  # type: SearchOptions
                      **kwargs  # type: Dict[str, Any]
                      ) -> Deferred[SearchResult]:
-        req = self._impl.request_builder.build_search_request(index, query, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, query, obs_handler, *options, **kwargs)
         return self._impl.search_deferred(req)
 
     def search(self,
@@ -135,7 +143,9 @@ class Cluster:
                *options,  # type: SearchOptions
                **kwargs,  # type: Dict[str, Any]
                ) -> Deferred[SearchResult]:
-        req = self._impl.request_builder.build_search_request(index, request, *options, **kwargs)
+        op_type = StreamingOperationType.SearchQuery
+        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        req = self._impl.request_builder.build_search_request(index, request, obs_handler, *options, **kwargs)
         return self._impl.search_deferred(req)
 
     def buckets(self) -> BucketManager:
@@ -145,7 +155,7 @@ class Cluster:
         :return: A :class:`~.management.BucketManager` with which you can create or
               modify buckets on the cluster.
         """
-        return BucketManager(self._impl._client_adapter)
+        return BucketManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def users(self) -> UserManager:
         """
@@ -162,7 +172,7 @@ class Cluster:
         :return:  A :class:`~.management.queries.QueryIndexManager` with which you can
               create or modify query indexes on the cluster.
         """
-        return QueryIndexManager(self._impl._client_adapter)
+        return QueryIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """

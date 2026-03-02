@@ -32,6 +32,7 @@ from couchbase.exceptions import (AnalyticsLinkExistsException,
                                   DataverseAlreadyExistsException,
                                   DataverseNotFoundException,
                                   InvalidArgumentException)
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import AnalyticsMgmtOperationType
 from couchbase.management.logic.mgmt_req import MgmtRequest
 
@@ -546,6 +547,7 @@ OPARG_SKIP_LIST = ['error_map']
 class AnalyticsMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {
@@ -777,3 +779,12 @@ ANALYTICS_MGMT_ERROR_MAP: Dict[str, Exception] = {
     r'.*24039.*An analytics\s+(scope)*.*already exists': DataverseAlreadyExistsException,
     r'.*24040.*An analytics\s+(collection)*.*already exists': DatasetAlreadyExistsException
 }
+
+
+CreateLinkRequest = Union[CreateAzureBlobExternalLinkRequest,
+                          CreateCouchbaseRemoteLinkRequest,
+                          CreateS3ExternalLinkRequest]
+
+ReplaceLinkRequest = Union[ReplaceAzureBlobExternalLinkRequest,
+                           ReplaceCouchbaseRemoteLinkRequest,
+                           ReplaceS3ExternalLinkRequest]

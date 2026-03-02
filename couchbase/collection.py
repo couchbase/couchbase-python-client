@@ -37,6 +37,10 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathNotFoundException,
                                   QueueEmpty)
 from couchbase.logic.collection_impl import CollectionImpl
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import (DatastructureOperationType,
+                                             KeyValueMultiOperationType,
+                                             KeyValueOperationType)
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.supportability import Supportability
 from couchbase.management.queries import CollectionQueryIndexManager
@@ -80,6 +84,7 @@ if TYPE_CHECKING:
 
     from couchbase._utils import JSONType
     from couchbase.kv_range_scan import ScanType
+    from couchbase.logic.observability import WrappedSpan
     from couchbase.options import (ExistsOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
@@ -154,8 +159,10 @@ class Collection:
                 print(f'Document value: {res.content_as[dict]}')
 
         """
-        req = self._impl.request_builder.build_get_request(key, *opts, **kwargs)
-        return self._impl.get(req)
+        op_type = KeyValueOperationType.Get
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
+            return self._impl.get(req, obs_handler)
 
     def get_any_replica(self,
                         key,  # type: str
@@ -202,8 +209,10 @@ class Collection:
                 print(f'Document value: {res.content_as[dict]}')
 
         """  # noqa: E501
-        req = self._impl.request_builder.build_get_any_replica_request(key, *opts, **kwargs)
-        return self._impl.get_any_replica(req)
+        op_type = KeyValueOperationType.GetAnyReplica
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_any_replica_request(key, obs_handler, *opts, **kwargs)
+            return self._impl.get_any_replica(req, obs_handler)
 
     def get_all_replicas(self,
                          key,  # type: str
@@ -269,8 +278,10 @@ class Collection:
                         break
 
         """
-        req = self._impl.request_builder.build_get_all_replicas_request(key, *opts, **kwargs)
-        return self._impl.get_all_replicas(req)
+        op_type = KeyValueOperationType.GetAllReplicas
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_replicas_request(key, obs_handler, *opts, **kwargs)
+            return self._impl.get_all_replicas(req, obs_handler)
 
     def exists(
         self,
@@ -313,8 +324,10 @@ class Collection:
                 print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
 
         """
-        req = self._impl.request_builder.build_exists_request(key, *opts, **kwargs)
-        return self._impl.exists(req)
+        op_type = KeyValueOperationType.Exists
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_exists_request(key, obs_handler, *opts, **kwargs)
+            return self._impl.exists(req, obs_handler)
 
     def insert(
         self,  # type: "Collection"
@@ -378,8 +391,10 @@ class Collection:
                 res = collection.insert(key, doc, InsertOptions(durability=durability))
 
         """
-        req = self._impl.request_builder.build_insert_request(key, value, *opts, **kwargs)
-        return self._impl.insert(req)
+        op_type = KeyValueOperationType.Insert
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_insert_request(key, value, obs_handler, *opts, **kwargs)
+            return self._impl.insert(req, obs_handler)
 
     def upsert(
         self,
@@ -439,8 +454,10 @@ class Collection:
                 res = collection.upsert(key, doc, InsertOptions(durability=durability))
 
         """
-        req = self._impl.request_builder.build_upsert_request(key, value, *opts, **kwargs)
-        return self._impl.upsert(req)
+        op_type = KeyValueOperationType.Upsert
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_upsert_request(key, value, obs_handler, *opts, **kwargs)
+            return self._impl.upsert(req, obs_handler)
 
     def replace(self,
                 key,  # type: str
@@ -493,8 +510,10 @@ class Collection:
                 res = collection.replace(key, doc, InsertOptions(durability=durability))
 
         """
-        req = self._impl.request_builder.build_replace_request(key, value, *opts, **kwargs)
-        return self._impl.replace(req)
+        op_type = KeyValueOperationType.Replace
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_replace_request(key, value, obs_handler, *opts, **kwargs)
+            return self._impl.replace(req, obs_handler)
 
     def remove(self,
                key,  # type: str
@@ -537,8 +556,10 @@ class Collection:
                 res = collection.remove('airline_10', RemoveOptions(durability=durability))
 
         """
-        req = self._impl.request_builder.build_remove_request(key, *opts, **kwargs)
-        return self._impl.remove(req)
+        op_type = KeyValueOperationType.Remove
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_remove_request(key, obs_handler, *opts, **kwargs)
+            return self._impl.remove(req, obs_handler)
 
     def touch(self,
               key,  # type: str
@@ -589,8 +610,10 @@ class Collection:
                                         TouchOptions(timeout=timedelta(seconds=2)))
 
         """
-        req = self._impl.request_builder.build_touch_request(key, expiry, *opts, **kwargs)
-        return self._impl.touch(req)
+        op_type = KeyValueOperationType.Touch
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_touch_request(key, expiry, obs_handler, *opts, **kwargs)
+            return self._impl.touch(req, obs_handler)
 
     def get_and_touch(self,
                       key,  # type: str
@@ -644,8 +667,10 @@ class Collection:
                 print(f'Document w/ updated expiry: {res.content_as[dict]}')
 
         """
-        req = self._impl.request_builder.build_get_and_touch_request(key, expiry, *opts, **kwargs)
-        return self._impl.get_and_touch(req)
+        op_type = KeyValueOperationType.GetAndTouch
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_and_touch_request(key, expiry, obs_handler, *opts, **kwargs)
+            return self._impl.get_and_touch(req, obs_handler)
 
     def get_and_lock(
         self,
@@ -700,8 +725,10 @@ class Collection:
                 print(f'Locked document: {res.content_as[dict]}')
 
         """
-        req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, *opts, **kwargs)
-        return self._impl.get_and_lock(req)
+        op_type = KeyValueOperationType.GetAndLock
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, obs_handler, *opts, **kwargs)
+            return self._impl.get_and_lock(req, obs_handler)
 
     def unlock(self,
                key,  # type: str
@@ -742,8 +769,10 @@ class Collection:
                 collection.upsert(key, res.content_as[dict])
 
         """
-        req = self._impl.request_builder.build_unlock_request(key, cas, *opts, **kwargs)
-        return self._impl.unlock(req)
+        op_type = KeyValueOperationType.Unlock
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_unlock_request(key, cas, obs_handler, *opts, **kwargs)
+            return self._impl.unlock(req, obs_handler)
 
     def lookup_in(
         self,
@@ -802,8 +831,10 @@ class Collection:
                 print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
 
         """
-        req = self._impl.request_builder.build_lookup_in_request(key, spec, *opts, **kwargs)
-        return self._impl.lookup_in(req)
+        op_type = KeyValueOperationType.LookupIn
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_lookup_in_request(key, spec, obs_handler, *opts, **kwargs)
+            return self._impl.lookup_in(req, obs_handler)
 
     def lookup_in_any_replica(
         self,
@@ -864,8 +895,14 @@ class Collection:
                 print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
 
         """  # noqa: E501
-        req = self._impl.request_builder.build_lookup_in_any_replica_request(key, spec, *opts, **kwargs)
-        return self._impl.lookup_in_any_replica(req)
+        op_type = KeyValueOperationType.LookupInAnyReplica
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_lookup_in_any_replica_request(key,
+                                                                                 spec,
+                                                                                 obs_handler,
+                                                                                 *opts,
+                                                                                 **kwargs)
+            return self._impl.lookup_in_any_replica(req, obs_handler)
 
     def lookup_in_all_replicas(
         self,
@@ -950,8 +987,14 @@ class Collection:
                         break
 
         """
-        req = self._impl.request_builder.build_lookup_in_all_replicas_request(key, spec, *opts, **kwargs)
-        return self._impl.lookup_in_all_replicas(req)
+        op_type = KeyValueOperationType.LookupInAllReplicas
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
+                                                                                  spec,
+                                                                                  obs_handler,
+                                                                                  *opts,
+                                                                                  **kwargs)
+            return self._impl.lookup_in_all_replicas(req, obs_handler)
 
     def mutate_in(
         self,
@@ -1008,9 +1051,10 @@ class Collection:
                                             MutateInOptions(timeout=timedelta(seconds=2)))
 
         """
-
-        req = self._impl.request_builder.build_mutate_in_request(key, spec, *opts, **kwargs)
-        return self._impl.mutate_in(req)
+        op_type = KeyValueOperationType.MutateIn
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_mutate_in_request(key, spec, obs_handler, *opts, **kwargs)
+            return self._impl.mutate_in(req, obs_handler)
 
     def scan(self,
              scan_type,  # type: ScanType
@@ -1091,20 +1135,30 @@ class Collection:
     def _execute_deprecated_ds_func(self,
                                     fn: Callable[[DataStructureRequest], Any],
                                     req: DataStructureRequest,
+                                    obs_handler: ObservableRequestHandler,
+                                    parent_span: WrappedSpan,
                                     create: Optional[bool] = False,
                                     create_type: Optional[Union[Type[dict], Type[list]]] = None,
                                     wrap_missing_path: Optional[bool] = True,
                                     path_value: Optional[Any] = None) -> Any:
         try:
-            return fn(req)
+            return fn(req, obs_handler)
         except DocumentNotFoundException:
             if create:
+                orig_opt_type = obs_handler.op_type
+                obs_handler.reset(KeyValueOperationType.Insert, with_error=True)
                 try:
-                    ins_req = self._impl.request_builder.build_insert_request(req.key, create_type())
-                    self._impl.insert(ins_req)
+                    ins_req = self._impl.request_builder.build_insert_request(req.key,
+                                                                              create_type(),
+                                                                              obs_handler,
+                                                                              span=parent_span)
+                    self._impl.insert(ins_req, obs_handler)
                 except DocumentExistsException:
                     pass
-                return fn(req)
+                obs_handler.reset(orig_opt_type)
+                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
+                                           parent_span=parent_span)
+                return fn(req, obs_handler)
             else:
                 raise
         except PathNotFoundException:
@@ -1137,14 +1191,24 @@ class Collection:
                 on the server.
 
         """
-        op = array_append('', value)
-        req = self._impl.request_builder.build_mutate_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                  req,
-                                                  create=create,
-                                                  create_type=list,
-                                                  path_value=value)
-        return OperationResult(sd_res.cas, sd_res.mutation_token())
+        op_type = DatastructureOperationType.ListAppend
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = array_append('', value)
+                req = self._impl.request_builder.build_mutate_in_request(key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          create=create,
+                                                          create_type=list,
+                                                          path_value=value)
+                return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     def list_prepend(self,
                      key: str,
@@ -1173,14 +1237,24 @@ class Collection:
                 on the server.
 
         """
-        op = array_prepend('', value)
-        req = self._impl.request_builder.build_mutate_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                  req,
-                                                  create=create,
-                                                  create_type=list,
-                                                  path_value=value)
-        return OperationResult(sd_res.cas, sd_res.mutation_token())
+        op_type = DatastructureOperationType.ListPrepend
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = array_prepend('', value)
+                req = self._impl.request_builder.build_mutate_in_request(key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          create=create,
+                                                          create_type=list,
+                                                          path_value=value)
+                return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     def list_set(self,
                  key: str,
@@ -1210,11 +1284,22 @@ class Collection:
             IndexError: If the index is out of bounds.
 
         """
-
-        op = replace(f'[{index}]', value)
-        req = self._impl.request_builder.build_mutate_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in, req, path_value=index)
-        return OperationResult(sd_res.cas, sd_res.mutation_token())
+        op_type = DatastructureOperationType.ListSetAt
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = replace(f'[{index}]', value)
+                req = self._impl.request_builder.build_mutate_in_request(key,
+                                                                         (op,),
+                                                                         obs_handler,
+                                                                         **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          path_value=index)
+                return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     def list_get(self, key: str, index: int, **kwargs: object) -> Any:
         """Get a specific element within a list.
@@ -1238,10 +1323,19 @@ class Collection:
             IndexError: If the index is out of bounds.
 
         """
-        op = subdoc_get(f'[{index}]')
-        req = self._impl.request_builder.build_lookup_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in, req, path_value=index)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.ListGetAt
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = subdoc_get(f'[{index}]')
+                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          path_value=index)
+                return sd_res.value[0].get('value', None)
 
     def list_remove(self, key: str, index: int, **kwargs: object) -> OperationResult:
         """Remove the element at a specific index from a list.
@@ -1265,11 +1359,19 @@ class Collection:
             IndexError: If the index is out of bounds.
 
         """
-
-        op = subdoc_remove(f'[{index}]')
-        req = self._impl.request_builder.build_mutate_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in, req, path_value=index)
-        return OperationResult(sd_res.cas, sd_res.mutation_token())
+        op_type = DatastructureOperationType.ListRemoveAt
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = subdoc_remove(f'[{index}]')
+                req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          path_value=index)
+                return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     def list_size(self, key: str, **kwargs: object) -> int:
         """Returns the number of items in the list.
@@ -1291,11 +1393,18 @@ class Collection:
                 on the server.
 
         """
-
-        op = count('')
-        req = self._impl.request_builder.build_lookup_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in, req)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.ListRemoveAt
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = count('')
+                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span)
+                return sd_res.value[0].get('value', None)
 
     def couchbase_map(self, key: str) -> CouchbaseMap:
         """Returns a CouchbaseMap permitting simple map storage in a document.
@@ -1338,14 +1447,21 @@ class Collection:
                 on the server.
 
         """
-        op = subdoc_upsert(mapkey, value)
-        req = self._impl.request_builder.build_mutate_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                  req,
-                                                  create=create,
-                                                  create_type=dict,
-                                                  path_value=mapkey)
-        return OperationResult(sd_res.cas, sd_res.mutation_token())
+        op_type = DatastructureOperationType.MapAdd
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = subdoc_upsert(mapkey, value)
+                req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          create=create,
+                                                          create_type=dict,
+                                                          path_value=mapkey)
+                return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     def map_get(self, key: str, mapkey: str, **kwargs: object) -> Any:
         """Retrieve a value from a map.
@@ -1368,10 +1484,19 @@ class Collection:
                 on the server.
 
         """
-        op = subdoc_get(mapkey)
-        req = self._impl.request_builder.build_lookup_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in, req, path_value=mapkey)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.MapGet
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = subdoc_get(mapkey)
+                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          path_value=mapkey)
+                return sd_res.value[0].get('value', None)
 
     def map_remove(self, key: str, mapkey: str, **kwargs: object) -> OperationResult:
         """Remove an item from a map.
@@ -1394,10 +1519,19 @@ class Collection:
                 on the server.
 
         """
-        op = subdoc_remove(mapkey)
-        req = self._impl.request_builder.build_mutate_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in, req, path_value=mapkey)
-        return OperationResult(sd_res.cas, sd_res.mutation_token())
+        op_type = DatastructureOperationType.MapRemove
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = subdoc_remove(mapkey)
+                req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span,
+                                                          path_value=mapkey)
+                return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     def map_size(self, key: str, **kwargs: object) -> int:
         """Get the number of items in the map.
@@ -1419,10 +1553,18 @@ class Collection:
                 on the server.
 
         """
-        op = count('')
-        req = self._impl.request_builder.build_lookup_in_request(key, (op,), **kwargs)
-        sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in, req)
-        return sd_res.value[0].get('value', None)
+        op_type = DatastructureOperationType.MapSize
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.LookupIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = count('')
+                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
+                                                          req,
+                                                          obs_handler,
+                                                          ds_obs_handler.wrapped_span)
+                return sd_res.value[0].get('value', None)
 
     def couchbase_set(self, key: str) -> CouchbaseSet:
         """Returns a CouchbaseSet permitting simple map storage in a document.
@@ -1462,17 +1604,24 @@ class Collection:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
         """
-        op = array_addunique('', value)
-        try:
-            req = self._impl.request_builder.build_mutate_in_request(key, (op,), **kwargs)
-            sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                      req,
-                                                      create=create,
-                                                      create_type=list,
-                                                      path_value=value)
-            return OperationResult(sd_res.cas, sd_res.mutation_token())
-        except PathExistsException:
-            pass
+        op_type = DatastructureOperationType.SetAdd
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
+            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
+            kv_op_type = KeyValueOperationType.MutateIn
+            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
+                op = array_addunique('', value)
+                try:
+                    req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
+                    sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
+                                                              req,
+                                                              obs_handler,
+                                                              ds_obs_handler.wrapped_span,
+                                                              create=create,
+                                                              create_type=list,
+                                                              path_value=value)
+                    return OperationResult(sd_res.cas, sd_res.mutation_token())
+                except PathExistsException:
+                    pass
 
     def set_remove(self, key: str, value: Any, **kwargs: object) -> Optional[OperationResult]:
         """Remove an item from a set.
@@ -1706,8 +1855,10 @@ class Collection:
 
 
         """
-        req = self._impl.multi_request_builder.build_get_multi_request(keys, *opts, **kwargs)
-        return self._impl.get_multi(req)
+        op_type = KeyValueMultiOperationType.GetMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_get_multi_request(keys, obs_handler, *opts, **kwargs)
+            return self._impl.get_multi(req, obs_handler)
 
     def get_any_replica_multi(self,
                               keys,  # type: List[str]
@@ -1781,8 +1932,13 @@ class Collection:
                         print(f'Active doc {k} has value: {v.content_as[dict]}')
 
         """
-        req = self._impl.multi_request_builder.build_get_any_replica_multi_request(keys, *opts, **kwargs)
-        return self._impl.get_any_replica_multi(req)
+        op_type = KeyValueMultiOperationType.GetAnyReplicaMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_get_any_replica_multi_request(keys,
+                                                                                       obs_handler,
+                                                                                       *opts,
+                                                                                       **kwargs)
+            return self._impl.get_any_replica_multi(req, obs_handler)
 
     def get_all_replicas_multi(self,
                                keys,  # type: List[str]
@@ -1859,8 +2015,13 @@ class Collection:
                             print(f'Active doc {k} has value: {doc.content_as[dict]}')
 
         """
-        req = self._impl.multi_request_builder.build_get_all_replicas_multi_request(keys, *opts, **kwargs)
-        return self._impl.get_all_replicas_multi(req)
+        op_type = KeyValueMultiOperationType.GetAllReplicasMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:  # noqa: E501
+            req = self._impl.multi_request_builder.build_get_all_replicas_multi_request(keys,
+                                                                                        obs_handler,
+                                                                                        *opts,
+                                                                                        **kwargs)
+            return self._impl.get_all_replicas_multi(req, obs_handler)
 
     def lock_multi(self,
                    keys,  # type: List[str]
@@ -1942,8 +2103,14 @@ class Collection:
                     print(f'Locked document: key={k}, content={v.content_as[str]}')
 
         """
-        req = self._impl.multi_request_builder.build_get_and_lock_multi_request(keys, lock_time, *opts, **kwargs)
-        return self._impl.get_and_lock_multi(req)
+        op_type = KeyValueMultiOperationType.GetAndLockMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_get_and_lock_multi_request(keys,
+                                                                                    lock_time,
+                                                                                    obs_handler,
+                                                                                    *opts,
+                                                                                    **kwargs)
+            return self._impl.get_and_lock_multi(req, obs_handler)
 
     def exists_multi(self,
                      keys,  # type: List[str]
@@ -2000,8 +2167,10 @@ class Collection:
                 for k, v in res.results.items():
                     print(f'Doc with key={k} {"exists" if v.exists else "does not exist"}')
         """  # noqa: E501
-        req = self._impl.multi_request_builder.build_exists_multi_request(keys, *opts, **kwargs)
-        return self._impl.exists_multi(req)
+        op_type = KeyValueMultiOperationType.ExistsMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_exists_multi_request(keys, obs_handler, *opts, **kwargs)
+            return self._impl.exists_multi(req, obs_handler)
 
     def insert_multi(self,
                      keys_and_docs,  # type: Dict[str, JSONType]
@@ -2080,8 +2249,13 @@ class Collection:
                     print(f'Doc inserted: key={k}, cas={v.cas}')
 
         """  # noqa: E501
-        req = self._impl.multi_request_builder.build_insert_multi_request(keys_and_docs, *opts, **kwargs)
-        return self._impl.insert_multi(req)
+        op_type = KeyValueMultiOperationType.InsertMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_insert_multi_request(keys_and_docs,
+                                                                              obs_handler,
+                                                                              *opts,
+                                                                              **kwargs)
+            return self._impl.insert_multi(req, obs_handler)
 
     def upsert_multi(self,
                      keys_and_docs,  # type: Dict[str, JSONType]
@@ -2155,8 +2329,13 @@ class Collection:
                     print(f'Doc upserted: key={k}, cas={v.cas}')
 
         """  # noqa: E501
-        req = self._impl.multi_request_builder.build_upsert_multi_request(keys_and_docs, *opts, **kwargs)
-        return self._impl.upsert_multi(req)
+        op_type = KeyValueMultiOperationType.UpsertMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_upsert_multi_request(keys_and_docs,
+                                                                              obs_handler,
+                                                                              *opts,
+                                                                              **kwargs)
+            return self._impl.upsert_multi(req, obs_handler)
 
     def replace_multi(self,
                       keys_and_docs,  # type: Dict[str, JSONType]
@@ -2241,8 +2420,13 @@ class Collection:
                     print(f'Doc replaced: key={k}, cas={v.cas}')
 
         """  # noqa: E501
-        req = self._impl.multi_request_builder.build_replace_multi_request(keys_and_docs, *opts, **kwargs)
-        return self._impl.replace_multi(req)
+        op_type = KeyValueMultiOperationType.ReplaceMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_replace_multi_request(keys_and_docs,
+                                                                               obs_handler,
+                                                                               *opts,
+                                                                               **kwargs)
+            return self._impl.replace_multi(req, obs_handler)
 
     def remove_multi(self,
                      keys,  # type: List[str]
@@ -2300,8 +2484,10 @@ class Collection:
                                               RemoveMultiOptions(per_key_options=per_key_opts))
 
         """  # noqa: E501
-        req = self._impl.multi_request_builder.build_remove_multi_request(keys, *opts, **kwargs)
-        return self._impl.remove_multi(req)
+        op_type = KeyValueMultiOperationType.RemoveMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_remove_multi_request(keys, obs_handler, *opts, **kwargs)
+            return self._impl.remove_multi(req, obs_handler)
 
     def touch_multi(self,
                     keys,  # type: List[str]
@@ -2329,8 +2515,14 @@ class Collection:
                 match to the key, but is not raised.
 
         """
-        req = self._impl.multi_request_builder.build_touch_multi_request(keys, expiry, *opts, **kwargs)
-        return self._impl.touch_multi(req)
+        op_type = KeyValueMultiOperationType.TouchMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_touch_multi_request(keys,
+                                                                             expiry,
+                                                                             obs_handler,
+                                                                             *opts,
+                                                                             **kwargs)
+            return self._impl.touch_multi(req, obs_handler)
 
     def unlock_multi(self,  # noqa: C901
                      keys,  # type: Union[MultiResultType, Dict[str, int]]
@@ -2360,8 +2552,10 @@ class Collection:
                 but is not raised.
 
         """
-        req = self._impl.multi_request_builder.build_unlock_multi_request(keys, *opts, **kwargs)
-        return self._impl.unlock_multi(req)
+        op_type = KeyValueMultiOperationType.UnlockMulti
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.multi_request_builder.build_unlock_multi_request(keys, obs_handler, *opts, **kwargs)
+            return self._impl.unlock_multi(req, obs_handler)
 
     def query_indexes(self) -> CollectionQueryIndexManager:
         """
@@ -2374,7 +2568,8 @@ class Collection:
         return CollectionQueryIndexManager(self._impl._client_adapter,
                                            self._impl.bucket_name,
                                            self._impl.scope_name,
-                                           self.name)
+                                           self.name,
+                                           self._impl.observability_instruments)
 
     @staticmethod
     def default_name():

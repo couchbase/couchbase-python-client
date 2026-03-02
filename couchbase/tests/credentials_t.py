@@ -22,7 +22,7 @@ from couchbase.auth import (CertificateAuthenticator,
                             PasswordAuthenticator)
 from couchbase.cluster import Cluster
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.options import ClusterOptions
+from couchbase.options import ClusterOptions, ClusterTracingOptions
 
 
 class JwtAuthenticatorUnitTests:
@@ -52,7 +52,9 @@ class ClassicCredentialsTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
 
-        cluster = Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
+        tracing_opts = ClusterTracingOptions(enable_tracing=False)
+        cluster = Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw),
+                                                              tracing_options=tracing_opts))
 
         # capture original
         info_before = cluster._impl.get_connection_info()
@@ -79,7 +81,9 @@ class ClassicCredentialsTests:
         username, pw = couchbase_config.get_username_and_pw()
 
         # Non-TLS connection (expected couchbase://)
-        cluster = Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
+        tracing_opts = ClusterTracingOptions(enable_tracing=False)
+        cluster = Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw),
+                                                              tracing_options=tracing_opts))
 
         # Core should reject this at validation step, surfacing as InvalidArgumentException
         with pytest.raises(InvalidArgumentException):
@@ -92,7 +96,9 @@ class ClassicCredentialsTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
 
-        cluster = Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
+        tracing_opts = ClusterTracingOptions(enable_tracing=False)
+        cluster = Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw),
+                                                              tracing_options=tracing_opts))
 
         # capture original
         info_before = cluster._impl.get_connection_info()

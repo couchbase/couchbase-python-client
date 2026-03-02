@@ -35,6 +35,7 @@ from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
                                   EventingFunctionNotUnDeployedException,
                                   InvalidArgumentException)
 from couchbase.logic.n1ql import QueryScanConsistency
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import EventingFunctionMgmtOperationType
 from couchbase.management.logic.mgmt_req import MgmtRequest
 
@@ -1071,6 +1072,7 @@ OPARG_SKIP_LIST = ['error_map']
 class EventingFunctionMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         mgmt_kwargs = {

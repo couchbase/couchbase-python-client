@@ -584,7 +584,7 @@ class CollectionMultiTestSuite:
 class ClassicCollectionMultiTests(CollectionMultiTestSuite):
 
     @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
+    def manifest_validated(self):
         def valid_test_method(meth):
             attr = getattr(ClassicCollectionMultiTests, meth)
             return callable(attr) and not meth.startswith('__') and meth.startswith('test')
@@ -593,9 +593,9 @@ class ClassicCollectionMultiTests(CollectionMultiTestSuite):
         return compare
 
     @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+    def couchbase_test_environment(self, cb_base_env, manifest_validated, request):
+        if manifest_validated:
+            pytest.fail(f'Test manifest not validated.  Missing tests: {manifest_validated}.')
 
         cb_env = CollectionMultiTestEnvironment.from_environment(cb_base_env)
         cb_env.enable_bucket_mgmt()

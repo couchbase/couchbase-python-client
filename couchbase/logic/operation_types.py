@@ -24,6 +24,44 @@ class ClusterOperationType(Enum):
 class CollectionOperationType(Enum):
     KeyValueRangeScan = 'kv_range_scan'
 
+
+class DatastructureOperationType(Enum):
+    ListAppend = 'list_append'
+    ListClear = 'list_clear'
+    ListGetAll = 'list_get_all'
+    ListGetAt = 'list_get_at'
+    ListIndexOf = 'list_index_of'
+    ListPrepend = 'list_prepend'
+    ListRemoveAt = 'list_remove_at'
+    ListSetAt = 'list_set_at'
+    ListSize = 'list_size'
+    MapAdd = 'map_add'
+    MapClear = 'map_clear'
+    MapExists = 'map_exists'
+    MapGet = 'map_get'
+    MapGetAll = 'map_get_all'
+    MapItems = 'map_items'
+    MapKeys = 'map_keys'
+    MapRemove = 'map_remove'
+    MapSize = 'map_size'
+    MapValues = 'map_values'
+    QueueClear = 'queue_clear'
+    QueuePop = 'queue_pop'
+    QueuePush = 'queue_push'
+    QueueSize = 'queue_size'
+    SetAdd = 'set_add'
+    SetClear = 'set_clear'
+    SetContains = 'set_contains'
+    SetRemove = 'set_remove'
+    SetSize = 'set_size'
+    SetValues = 'set_values'
+
+# For mgmt operations that do not have a C++ core request
+
+
+class MgmtOperationType(Enum):
+    QueryIndexWatchIndexes = 'query_index_watch_indexes'
+
 # TODO:  needed?  All scope operations are covered by StreamingOperationType.
 # class ScopeOperationType(Enum):
 #     AnalyicsQuery = 'analytics_query'

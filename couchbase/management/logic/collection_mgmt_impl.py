@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING, List
 
+from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.management.logic.collection_mgmt_req_builder import CollectionMgmtRequestBuilder
 from couchbase.management.logic.collection_mgmt_req_types import (CollectionSpec,
                                                                   CreateCollectionRequest,
@@ -33,34 +34,40 @@ if TYPE_CHECKING:
 
 
 class CollectionMgmtImpl:
-    def __init__(self, client_adapter: ClientAdapter) -> None:
+    def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
         self._request_builder = CollectionMgmtRequestBuilder()
+        self._observability_instruments = observability_instruments
 
     @property
     def request_builder(self) -> CollectionMgmtRequestBuilder:
         """**INTERNAL**"""
         return self._request_builder
 
-    def create_collection(self, req: CreateCollectionRequest) -> None:
+    @property
+    def observability_instruments(self) -> ObservabilityInstruments:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        return self._observability_instruments
 
-    def create_scope(self, req: CreateScopeRequest) -> None:
+    def create_collection(self, req: CreateCollectionRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def drop_collection(self, req: DropCollectionRequest) -> None:
+    def create_scope(self, req: CreateScopeRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def drop_scope(self, req: DropScopeRequest) -> None:
+    def drop_collection(self, req: DropCollectionRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    def get_all_scopes(self, req: GetAllScopesRequest) -> List[ScopeSpec]:
+    def drop_scope(self, req: DropScopeRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        res = self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+
+    def get_all_scopes(self, req: GetAllScopesRequest, obs_handler: ObservableRequestHandler) -> List[ScopeSpec]:
+        """**INTERNAL**"""
+        res = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         scopes = []
         raw_scopes = res.raw_result['manifest']['scopes']
         for s in raw_scopes:
@@ -75,6 +82,6 @@ class CollectionMgmtImpl:
 
         return scopes
 
-    def update_collection(self, req: UpdateCollectionRequest) -> None:
+    def update_collection(self, req: UpdateCollectionRequest, obs_handler: ObservableRequestHandler) -> None:
         """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req)
+        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

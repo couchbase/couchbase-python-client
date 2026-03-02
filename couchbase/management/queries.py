@@ -20,6 +20,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
+from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import MgmtOperationType, QueryIndexMgmtOperationType
 from couchbase.management.logic.query_index_mgmt_impl import QueryIndex, QueryIndexMgmtImpl
 
 # @TODO:  lets deprecate import of options from couchbase.management.queries
@@ -33,6 +35,7 @@ from couchbase.management.options import (BuildDeferredQueryIndexOptions,
 
 if TYPE_CHECKING:
     from couchbase.logic.client_adapter import ClientAdapter
+    from couchbase.logic.observability import ObservabilityInstruments
 
 
 class QueryIndexManager:
@@ -42,8 +45,8 @@ class QueryIndexManager:
     For managing query indexes at the collection level, :class:`.CollectionQueryIndexManager` should be used.
     """
 
-    def __init__(self, client_adapter: ClientAdapter) -> None:
-        self._impl = QueryIndexMgmtImpl(client_adapter)
+    def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
+        self._impl = QueryIndexMgmtImpl(client_adapter, observability_instruments)
         self._collection_ctx = None
 
     def create_index(self,
@@ -69,13 +72,16 @@ class QueryIndexManager:
                 are invalid types.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
-        req = self._impl.request_builder.build_create_index_request(bucket_name,
-                                                                    index_name,
-                                                                    keys,
-                                                                    self._collection_ctx,
-                                                                    *options,
-                                                                    **kwargs)
-        self._impl.create_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_create_index_request(bucket_name,
+                                                                        index_name,
+                                                                        keys,
+                                                                        obs_handler,
+                                                                        self._collection_ctx,
+                                                                        *options,
+                                                                        **kwargs)
+            self._impl.create_index(req, obs_handler)
 
     def create_primary_index(self,
                              bucket_name,   # type: str
@@ -95,11 +101,14 @@ class QueryIndexManager:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
-        req = self._impl.request_builder.build_create_primary_index_request(bucket_name,
-                                                                            self._collection_ctx,
-                                                                            *options,
-                                                                            **kwargs)
-        self._impl.create_primary_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_create_primary_index_request(bucket_name,
+                                                                                obs_handler,
+                                                                                self._collection_ctx,
+                                                                                *options,
+                                                                                **kwargs)
+            self._impl.create_primary_index(req, obs_handler)
 
     def drop_index(self,
                    bucket_name,     # type: str
@@ -122,12 +131,15 @@ class QueryIndexManager:
                 invalid types.
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
-        req = self._impl.request_builder.build_drop_index_request(bucket_name,
-                                                                  index_name,
-                                                                  self._collection_ctx,
-                                                                  *options,
-                                                                  **kwargs)
-        self._impl.drop_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_index_request(bucket_name,
+                                                                      index_name,
+                                                                      obs_handler,
+                                                                      self._collection_ctx,
+                                                                      *options,
+                                                                      **kwargs)
+            self._impl.drop_index(req, obs_handler)
 
     def drop_primary_index(self,
                            bucket_name,     # type: str
@@ -147,11 +159,14 @@ class QueryIndexManager:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
-        req = self._impl.request_builder.build_drop_primary_index_request(bucket_name,
-                                                                          self._collection_ctx,
-                                                                          *options,
-                                                                          **kwargs)
-        self._impl.drop_primary_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_primary_index_request(bucket_name,
+                                                                              obs_handler,
+                                                                              self._collection_ctx,
+                                                                              *options,
+                                                                              **kwargs)
+            self._impl.drop_primary_index(req, obs_handler)
 
     def get_all_indexes(self,
                         bucket_name,    # type: str
@@ -173,11 +188,14 @@ class QueryIndexManager:
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
         """
-        req = self._impl.request_builder.build_get_all_indexes_request(bucket_name,
-                                                                       self._collection_ctx,
-                                                                       *options,
-                                                                       **kwargs)
-        return self._impl.get_all_indexes(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_indexes_request(bucket_name,
+                                                                           obs_handler,
+                                                                           self._collection_ctx,
+                                                                           *options,
+                                                                           **kwargs)
+            return self._impl.get_all_indexes(req, obs_handler)
 
     def build_deferred_indexes(self,
                                bucket_name,     # type: str
@@ -196,11 +214,14 @@ class QueryIndexManager:
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
         """
-        req = self._impl.request_builder.build_build_deferred_indexes_request(bucket_name,
-                                                                              self._collection_ctx,
-                                                                              *options,
-                                                                              **kwargs)
-        self._impl.build_deferred_indexes(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexBuildDeferred
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_build_deferred_indexes_request(bucket_name,
+                                                                                  obs_handler,
+                                                                                  self._collection_ctx,
+                                                                                  *options,
+                                                                                  **kwargs)
+            self._impl.build_deferred_indexes(req, obs_handler)
 
     def watch_indexes(self,   # noqa: C901
                       bucket_name,  # type: str
@@ -224,12 +245,15 @@ class QueryIndexManager:
             :class:`~couchbase.exceptions.WatchQueryIndexTimeoutException`: If the specified timeout is reached
                 before all the specified indexes are ready to use.
         """
-        req = self._impl.request_builder.build_watch_indexes_request(bucket_name,
-                                                                     index_names,
-                                                                     self._collection_ctx,
-                                                                     *options,
-                                                                     **kwargs)
-        self._impl.watch_indexes(req)
+        op_type = MgmtOperationType.QueryIndexWatchIndexes
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_watch_indexes_request(bucket_name,
+                                                                         index_names,
+                                                                         obs_handler,
+                                                                         self._collection_ctx,
+                                                                         *options,
+                                                                         **kwargs)
+            self._impl.watch_indexes(req, obs_handler)
 
 
 class CollectionQueryIndexManager:
@@ -237,9 +261,14 @@ class CollectionQueryIndexManager:
     Performs management operations on query indexes at the collection level.
     """
 
-    def __init__(self, client_adapter: ClientAdapter, bucket_name: str, scope_name: str, collection_name: str) -> None:
+    def __init__(self,
+                 client_adapter: ClientAdapter,
+                 bucket_name: str,
+                 scope_name: str,
+                 collection_name: str,
+                 observability_instruments: ObservabilityInstruments) -> None:
         self._bucket_name = bucket_name
-        self._impl = QueryIndexMgmtImpl(client_adapter)
+        self._impl = QueryIndexMgmtImpl(client_adapter, observability_instruments)
         self._collection_ctx = (collection_name, scope_name)
 
     def create_index(self,
@@ -262,13 +291,16 @@ class CollectionQueryIndexManager:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or keys are invalid types.
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
-        req = self._impl.request_builder.build_create_index_request(self._bucket_name,
-                                                                    index_name,
-                                                                    keys,
-                                                                    self._collection_ctx,
-                                                                    *options,
-                                                                    **kwargs)
-        self._impl.create_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_create_index_request(self._bucket_name,
+                                                                        index_name,
+                                                                        keys,
+                                                                        obs_handler,
+                                                                        self._collection_ctx,
+                                                                        *options,
+                                                                        **kwargs)
+            self._impl.create_index(req, obs_handler)
 
     def create_primary_index(self,
                              *options,      # type: CreatePrimaryQueryIndexOptions
@@ -285,11 +317,14 @@ class CollectionQueryIndexManager:
         Raises:
             :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
         """
-        req = self._impl.request_builder.build_create_primary_index_request(self._bucket_name,
-                                                                            self._collection_ctx,
-                                                                            *options,
-                                                                            **kwargs)
-        self._impl.create_primary_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_create_primary_index_request(self._bucket_name,
+                                                                                obs_handler,
+                                                                                self._collection_ctx,
+                                                                                *options,
+                                                                                **kwargs)
+            self._impl.create_primary_index(req, obs_handler)
 
     def drop_index(self,
                    index_name,      # type: str
@@ -309,12 +344,15 @@ class CollectionQueryIndexManager:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name is an invalid types.
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
-        req = self._impl.request_builder.build_drop_index_request(self._bucket_name,
-                                                                  index_name,
-                                                                  self._collection_ctx,
-                                                                  *options,
-                                                                  **kwargs)
-        self._impl.drop_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_index_request(self._bucket_name,
+                                                                      index_name,
+                                                                      obs_handler,
+                                                                      self._collection_ctx,
+                                                                      *options,
+                                                                      **kwargs)
+            self._impl.drop_index(req, obs_handler)
 
     def drop_primary_index(self,
                            *options,        # type: DropPrimaryQueryIndexOptions
@@ -331,11 +369,14 @@ class CollectionQueryIndexManager:
         Raises:
             :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
         """
-        req = self._impl.request_builder.build_drop_primary_index_request(self._bucket_name,
-                                                                          self._collection_ctx,
-                                                                          *options,
-                                                                          **kwargs)
-        self._impl.drop_primary_index(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_drop_primary_index_request(self._bucket_name,
+                                                                              obs_handler,
+                                                                              self._collection_ctx,
+                                                                              *options,
+                                                                              **kwargs)
+            self._impl.drop_primary_index(req, obs_handler)
 
     def get_all_indexes(self,
                         *options,       # type: GetAllQueryIndexOptions
@@ -353,11 +394,14 @@ class CollectionQueryIndexManager:
             Iterable[:class:`.QueryIndex`]: A list of indexes.
 
         """
-        req = self._impl.request_builder.build_get_all_indexes_request(self._bucket_name,
-                                                                       self._collection_ctx,
-                                                                       *options,
-                                                                       **kwargs)
-        return self._impl.get_all_indexes(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexGetAll
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_get_all_indexes_request(self._bucket_name,
+                                                                           obs_handler,
+                                                                           self._collection_ctx,
+                                                                           *options,
+                                                                           **kwargs)
+            return self._impl.get_all_indexes(req, obs_handler)
 
     def build_deferred_indexes(self,
                                *options,        # type: BuildDeferredQueryIndexOptions
@@ -372,11 +416,14 @@ class CollectionQueryIndexManager:
                 for this operation.
 
         """
-        req = self._impl.request_builder.build_build_deferred_indexes_request(self._bucket_name,
-                                                                              self._collection_ctx,
-                                                                              *options,
-                                                                              **kwargs)
-        self._impl.build_deferred_indexes(req)
+        op_type = QueryIndexMgmtOperationType.QueryIndexBuildDeferred
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_build_deferred_indexes_request(self._bucket_name,
+                                                                                  obs_handler,
+                                                                                  self._collection_ctx,
+                                                                                  *options,
+                                                                                  **kwargs)
+            self._impl.build_deferred_indexes(req, obs_handler)
 
     def watch_indexes(self,
                       index_names,  # type: Iterable[str]
@@ -397,9 +444,12 @@ class CollectionQueryIndexManager:
             :class:`~couchbase.exceptions.WatchQueryIndexTimeoutException`: If the specified timeout is reached
                 before all the specified indexes are ready to use.
         """
-        req = self._impl.request_builder.build_watch_indexes_request(self._bucket_name,
-                                                                     index_names,
-                                                                     self._collection_ctx,
-                                                                     *options,
-                                                                     **kwargs)
-        self._impl.watch_indexes(req)
+        op_type = MgmtOperationType.QueryIndexWatchIndexes
+        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
+            req = self._impl.request_builder.build_watch_indexes_request(self._bucket_name,
+                                                                         index_names,
+                                                                         obs_handler,
+                                                                         self._collection_ctx,
+                                                                         *options,
+                                                                         **kwargs)
+            self._impl.watch_indexes(req, obs_handler)

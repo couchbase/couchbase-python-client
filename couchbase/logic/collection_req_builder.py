@@ -28,6 +28,7 @@ from typing import (TYPE_CHECKING,
 
 from acouchbase.kv_range_scan import AsyncRangeScanRequest
 from couchbase.constants import FMT_BYTES
+from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.kv_range_scan import (PrefixScan,
                                      RangeScan,
@@ -65,6 +66,7 @@ from couchbase.logic.collection_types import (AppendRequest,
                                               UnlockRequest,
                                               UpsertRequest,
                                               UpsertWithLegacyDurabilityRequest)
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.options import DeltaValueBase, SignedInt64Base
 from couchbase.logic.transforms import timedelta_as_milliseconds
 from couchbase.mutation_state import MutationState
@@ -110,9 +112,8 @@ class CollectionRequestBuilder:
         if 'durability' in op_args and isinstance(op_args['durability'], int) and 'timeout' not in op_args:
             op_args['timeout'] = timedelta_as_milliseconds(timedelta(seconds=10))
 
-    def _process_counter_options(self, *opts: object, **kwargs: object) -> Dict[str, Any]:
+    def _process_counter_options(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """**INTERNAL**"""
-        args = forward_args(kwargs, *opts)
         initial = args.pop('initial', None)
         delta = args.pop('delta', None)
         if not initial:
@@ -133,8 +134,6 @@ class CollectionRequestBuilder:
         # Negative 'initial' means no initial value
         if initial >= 0:
             args['initial_value'] = initial  # C++ expects initial_value
-
-        return args
 
     def _process_binary_value(self, value: Union[str, bytes, bytearray]) -> Tuple[bytes, int]:
         if isinstance(value, str):
@@ -183,12 +182,16 @@ class CollectionRequestBuilder:
     def build_append_request(self,
                              key: str,
                              value: Union[str, bytes, bytearray],
+                             obs_handler: ObservableRequestHandler,
                              *opts: object,
                              **kwargs: object) -> Union[AppendRequest, AppendWithLegacyDurabilityRequest]:
         final_args = forward_args(kwargs, *opts)
         self._maybe_update_durable_timeout(final_args)
-        value_bytes, flags = self._process_binary_value(value)
         durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        value_bytes, flags = self._process_binary_value(value)
         if isinstance(durability, dict):
             req = AppendWithLegacyDurabilityRequest(key,
                                                     *self._collection_dtls.get_details(),
@@ -198,6 +201,8 @@ class CollectionRequestBuilder:
                                                     replicate_to=durability['replicate_to'],
                                                     **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = AppendRequest(key,
                                 *self._collection_dtls.get_details(),
                                 value=value_bytes,
@@ -208,10 +213,15 @@ class CollectionRequestBuilder:
 
     def build_decrement_request(self,
                                 key: str,
+                                obs_handler: ObservableRequestHandler,
                                 *opts: object,
                                 **kwargs: object) -> Union[DecrementRequest, DecrementWithLegacyDurabilityRequest]:
-        final_args = self._process_counter_options(*opts, **kwargs)
+        final_args = forward_args(kwargs, *opts)
         durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        self._process_counter_options(final_args)
         if isinstance(durability, dict):
             req = DecrementWithLegacyDurabilityRequest(key,
                                                        *self._collection_dtls.get_details(),
@@ -219,22 +229,38 @@ class CollectionRequestBuilder:
                                                        replicate_to=durability['replicate_to'],
                                                        **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = DecrementRequest(key,
                                    *self._collection_dtls.get_details(),
                                    durability_level=durability,
                                    **final_args)
         return req
 
-    def build_exists_request(self, key: str, *opts: object, **kwargs: object) -> ExistsRequest:
+    def build_exists_request(self,
+                             key: str,
+                             obs_handler: ObservableRequestHandler,
+                             *opts: object,
+                             **kwargs: object) -> ExistsRequest:
         final_args = forward_args(kwargs, *opts)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = ExistsRequest(key,
                             *self._collection_dtls.get_details(),
                             **final_args)
         return req
 
-    def build_get_all_replicas_request(self, key: str, *opts: object, **kwargs: object) -> GetAllReplicasRequest:
+    def build_get_all_replicas_request(self,
+                                       key: str,
+                                       obs_handler: ObservableRequestHandler,
+                                       *opts: object,
+                                       **kwargs: object) -> GetAllReplicasRequest:
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = GetAllReplicasRequest(key,
                                     *self._collection_dtls.get_details(),
                                     transcoder=transcoder,
@@ -244,12 +270,16 @@ class CollectionRequestBuilder:
     def build_get_and_lock_request(self,
                                    key: str,
                                    lock_time: timedelta,
+                                   obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> GetAndLockRequest:
         # add to kwargs for conversion to int
         kwargs['lock_time'] = lock_time
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = GetAndLockRequest(key,
                                 *self._collection_dtls.get_details(),
                                 transcoder=transcoder,
@@ -259,30 +289,48 @@ class CollectionRequestBuilder:
     def build_get_and_touch_request(self,
                                     key: str,
                                     expiry: timedelta,
+                                    obs_handler: ObservableRequestHandler,
                                     *opts: object,
                                     **kwargs: object) -> GetAndTouchRequest:
         # add to kwargs for conversion to int
         kwargs['expiry'] = expiry
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = GetAndTouchRequest(key,
                                  *self._collection_dtls.get_details(),
                                  transcoder=transcoder,
                                  **final_args)
         return req
 
-    def build_get_any_replica_request(self, key: str, *opts: object, **kwargs: object) -> GetAnyReplicaRequest:
+    def build_get_any_replica_request(self,
+                                      key: str,
+                                      obs_handler: ObservableRequestHandler,
+                                      *opts: object,
+                                      **kwargs: object) -> GetAnyReplicaRequest:
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = GetAnyReplicaRequest(key,
                                    *self._collection_dtls.get_details(),
                                    transcoder=transcoder,
                                    **final_args)
         return req
 
-    def build_get_request(self, key: str, *opts: object, **kwargs: object) -> Union[GetProjectedRequest, GetRequest]:
+    def build_get_request(self,
+                          key: str,
+                          obs_handler: ObservableRequestHandler,
+                          *opts: object,
+                          **kwargs: object) -> Union[GetProjectedRequest, GetRequest]:
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         if final_args.get('with_expiry') or 'project' in final_args:
             projections = final_args.pop('project', None)
             if projections:
@@ -303,10 +351,15 @@ class CollectionRequestBuilder:
 
     def build_increment_request(self,
                                 key: str,
+                                obs_handler: ObservableRequestHandler,
                                 *opts: object,
                                 **kwargs: object) -> Union[IncrementRequest, IncrementWithLegacyDurabilityRequest]:
-        final_args = self._process_counter_options(*opts, **kwargs)
+        final_args = forward_args(kwargs, *opts)
         durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        self._process_counter_options(final_args)
         if isinstance(durability, dict):
             req = IncrementWithLegacyDurabilityRequest(key,
                                                        *self._collection_dtls.get_details(),
@@ -314,6 +367,8 @@ class CollectionRequestBuilder:
                                                        replicate_to=durability['replicate_to'],
                                                        **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = IncrementRequest(key,
                                    *self._collection_dtls.get_details(),
                                    durability_level=durability,
@@ -323,13 +378,17 @@ class CollectionRequestBuilder:
     def build_insert_request(self,
                              key: str,
                              value: JSONType,
+                             obs_handler: ObservableRequestHandler,
                              *opts: object,
                              **kwargs: object) -> Union[InsertRequest, InsertWithLegacyDurabilityRequest]:
         final_args = forward_args(kwargs, *opts)
         self._maybe_update_durable_timeout(final_args)
-        transcoder = self._collection_dtls.get_request_transcoder(final_args)
-        transcoded_value, flags = transcoder.encode_value(value)
         durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        transcoded_value, flags = obs_handler.maybe_create_encoding_span(lambda: transcoder.encode_value(value))
         if isinstance(durability, dict):
             req = InsertWithLegacyDurabilityRequest(key,
                                                     *self._collection_dtls.get_details(),
@@ -339,6 +398,8 @@ class CollectionRequestBuilder:
                                                     replicate_to=durability['replicate_to'],
                                                     **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = InsertRequest(key,
                                 *self._collection_dtls.get_details(),
                                 value=transcoded_value,
@@ -350,10 +411,14 @@ class CollectionRequestBuilder:
     def build_lookup_in_all_replicas_request(self,
                                              key: str,
                                              specs: Union[List[Spec], Tuple[Spec]],
+                                             obs_handler: ObservableRequestHandler,
                                              *opts: object,
                                              **kwargs: object) -> LookupInAllReplicasRequest:
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         final_specs = []
         for idx, spec in enumerate(specs):
             final_specs.append(self._spec_as_dict(spec, idx))
@@ -367,10 +432,14 @@ class CollectionRequestBuilder:
     def build_lookup_in_any_replica_request(self,
                                             key: str,
                                             specs: Union[List[Spec], Tuple[Spec]],
+                                            obs_handler: ObservableRequestHandler,
                                             *opts: object,
                                             **kwargs: object) -> LookupInAnyReplicaRequest:
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         final_specs = []
         for idx, spec in enumerate(specs):
             final_specs.append(self._spec_as_dict(spec, idx))
@@ -384,10 +453,14 @@ class CollectionRequestBuilder:
     def build_lookup_in_request(self,
                                 key: str,
                                 specs: Union[List[Spec], Tuple[Spec]],
+                                obs_handler: ObservableRequestHandler,
                                 *opts: object,
                                 **kwargs: object) -> LookupInRequest:
         final_args = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         final_specs = []
         for idx, spec in enumerate(specs):
             final_specs.append(self._spec_as_dict(spec, idx))
@@ -398,13 +471,18 @@ class CollectionRequestBuilder:
                               **final_args)
         return req
 
-    def build_mutate_in_request(self,
+    def build_mutate_in_request(self,  # noqa: C901
                                 key: str,
                                 specs: Union[List[Spec], Tuple[Spec]],
+                                obs_handler: ObservableRequestHandler,
                                 *opts: object,
                                 **kwargs: object) -> Union[MutateInRequest, MutateInWithLegacyDurabilityRequest]:
         final_args = forward_args(kwargs, *opts)
         self._maybe_update_durable_timeout(final_args)
+        durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         expiry = final_args.get('expiry', None)
         preserve_expiry = final_args.get('preserve_expiry', False)
         spec_ops = [s[0] for s in specs]
@@ -423,23 +501,25 @@ class CollectionRequestBuilder:
 
         final_specs = []
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
+
+        def _json_encode(value) -> Tuple[bytes, int]:
+            new_value = json.dumps(value, ensure_ascii=False)
+            # this is an array, need to remove brackets
+            return new_value[1:len(new_value)-1].encode('utf-8'), FMT_BYTES  # flags are not used
+
         for idx, spec in enumerate(specs):
             if len(spec) == 6:
                 tmp = list(spec[:5])
+                # no need to propagate the flags for mutate_in specs
                 if ALLOWED_MULTI_OP_LOOKUP.get(spec[0], False) is True:
-                    new_value = json.dumps(spec[5], ensure_ascii=False)
-                    # this is an array, need to remove brackets
-                    tmp.append(new_value[1:len(new_value)-1].encode('utf-8'))
+                    transcoded_value, _ = obs_handler.maybe_add_encoding_span(lambda: _json_encode(spec[5]))
                 else:
-                    # no need to propagate the flags
-                    tmp.append(transcoder.encode_value(spec[5])[0])
+                    transcoded_value, _ = obs_handler.maybe_add_encoding_span(lambda: transcoder.encode_value(spec[5]))
+                tmp.append(transcoded_value)
                 final_specs.append(self._spec_as_dict(tmp, idx))
-                # final_specs.append(tuple(tmp))
             else:
                 final_specs.append(self._spec_as_dict(spec, idx))
-                # final_specs.append(s)
 
-        durability = final_args.pop('durability', None)
         if isinstance(durability, dict):
             req = MutateInWithLegacyDurabilityRequest(key,
                                                       *self._collection_dtls.get_details(),
@@ -448,6 +528,8 @@ class CollectionRequestBuilder:
                                                       replicate_to=durability['replicate_to'],
                                                       **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = MutateInRequest(key,
                                   *self._collection_dtls.get_details(),
                                   specs=final_specs,
@@ -458,12 +540,16 @@ class CollectionRequestBuilder:
     def build_prepend_request(self,
                               key: str,
                               value: Union[str, bytes, bytearray],
+                              obs_handler: ObservableRequestHandler,
                               *opts: object,
                               **kwargs: object) -> Union[PrependRequest, PrependWithLegacyDurabilityRequest]:
         final_args = forward_args(kwargs, *opts)
         self._maybe_update_durable_timeout(final_args)
-        value_bytes, flags = self._process_binary_value(value)
         durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        value_bytes, flags = self._process_binary_value(value)
         if isinstance(durability, dict):
             req = PrependWithLegacyDurabilityRequest(key,
                                                      *self._collection_dtls.get_details(),
@@ -473,6 +559,8 @@ class CollectionRequestBuilder:
                                                      replicate_to=durability['replicate_to'],
                                                      **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = PrependRequest(key,
                                  *self._collection_dtls.get_details(),
                                  value=value_bytes,
@@ -528,7 +616,7 @@ class CollectionRequestBuilder:
         scan_type = scan_config.pop('scan_type', None)
         if not scan_type:
             raise InvalidArgumentException('Cannot complete range scan operation with scan_type.')
-        scan_args = self._collection_dtls.get_details_as_dict()
+        scan_args = self._collection_dtls.get_details_as_txn_dict()
         scan_args.update({
             'transcoder': transcoder,
             'scan_type': scan_type,
@@ -551,7 +639,7 @@ class CollectionRequestBuilder:
         scan_type = scan_config.pop('scan_type', None)
         if not scan_type:
             raise InvalidArgumentException('Cannot complete range scan operation with scan_type.')
-        scan_args = self._collection_dtls.get_details_as_dict()
+        scan_args = self._collection_dtls.get_details_as_txn_dict()
         scan_args.update({
             'transcoder': transcoder,
             'scan_type': scan_type,
@@ -562,11 +650,15 @@ class CollectionRequestBuilder:
 
     def build_remove_request(self,
                              key: str,
+                             obs_handler: ObservableRequestHandler,
                              *opts: object,
                              **kwargs: object) -> Union[RemoveRequest, RemoveWithLegacyDurabilityRequest]:
         final_args = forward_args(kwargs, *opts)
         self._maybe_update_durable_timeout(final_args)
         durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         if isinstance(durability, dict):
             req = RemoveWithLegacyDurabilityRequest(key,
                                                     *self._collection_dtls.get_details(),
@@ -574,6 +666,8 @@ class CollectionRequestBuilder:
                                                     replicate_to=durability['replicate_to'],
                                                     **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = RemoveRequest(key,
                                 *self._collection_dtls.get_details(),
                                 durability_level=durability,
@@ -583,9 +677,14 @@ class CollectionRequestBuilder:
     def build_replace_request(self,
                               key: str,
                               value: JSONType,
+                              obs_handler: ObservableRequestHandler,
                               *opts: object,
                               **kwargs: object) -> Union[ReplaceRequest, ReplaceWithLegacyDurabilityRequest]:
         final_args = forward_args(kwargs, *opts)
+        durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         expiry = final_args.get('expiry', None)
         preserve_expiry = final_args.get('preserve_expiry', False)
         if expiry and preserve_expiry is True:
@@ -594,8 +693,7 @@ class CollectionRequestBuilder:
             )
         self._maybe_update_durable_timeout(final_args)
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
-        transcoded_value, flags = transcoder.encode_value(value)
-        durability = final_args.pop('durability', None)
+        transcoded_value, flags = obs_handler.maybe_create_encoding_span(lambda: transcoder.encode_value(value))
         if isinstance(durability, dict):
             req = ReplaceWithLegacyDurabilityRequest(key,
                                                      *self._collection_dtls.get_details(),
@@ -605,6 +703,8 @@ class CollectionRequestBuilder:
                                                      replicate_to=durability['replicate_to'],
                                                      **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = ReplaceRequest(key,
                                  *self._collection_dtls.get_details(),
                                  value=transcoded_value,
@@ -616,10 +716,14 @@ class CollectionRequestBuilder:
     def build_touch_request(self,
                             key: str,
                             expiry: timedelta,
+                            obs_handler: ObservableRequestHandler,
                             *opts: object,
                             **kwargs: object) -> TouchRequest:
         kwargs['expiry'] = expiry
         final_args = forward_args(kwargs, *opts)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = TouchRequest(key,
                            *self._collection_dtls.get_details(),
                            **final_args)
@@ -628,10 +732,14 @@ class CollectionRequestBuilder:
     def build_unlock_request(self,
                              key: str,
                              cas: int,
+                             obs_handler: ObservableRequestHandler,
                              *opts: object,
                              **kwargs: object) -> UnlockRequest:
         kwargs['cas'] = cas
         final_args = forward_args(kwargs, *opts)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = UnlockRequest(key,
                             *self._collection_dtls.get_details(),
                             **final_args)
@@ -640,13 +748,17 @@ class CollectionRequestBuilder:
     def build_upsert_request(self,
                              key: str,
                              value: JSONType,
+                             obs_handler: ObservableRequestHandler,
                              *opts: object,
                              **kwargs: object) -> Union[UpsertRequest, UpsertWithLegacyDurabilityRequest]:
         final_args = forward_args(kwargs, *opts)
         self._maybe_update_durable_timeout(final_args)
-        transcoder = self._collection_dtls.get_request_transcoder(final_args)
-        transcoded_value, flags = transcoder.encode_value(value)
         durability = final_args.pop('durability', None)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(span=final_args.pop('span', None),
+                                                                     parent_span=final_args.pop('parent_span', None))
+        obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        transcoded_value, flags = obs_handler.maybe_create_encoding_span(lambda: transcoder.encode_value(value))
         if isinstance(durability, dict):
             req = UpsertWithLegacyDurabilityRequest(key,
                                                     *self._collection_dtls.get_details(),
@@ -656,6 +768,8 @@ class CollectionRequestBuilder:
                                                     replicate_to=durability['replicate_to'],
                                                     **final_args)
         else:
+            if durability:
+                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             req = UpsertRequest(key,
                                 *self._collection_dtls.get_details(),
                                 value=transcoded_value,

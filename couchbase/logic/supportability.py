@@ -153,6 +153,26 @@ class Supportability:
 
         warnings.warn(msg, CouchbaseDeprecationWarning, stacklevel=2)
 
+    @staticmethod
+    def type_deprecated(type_,  # type: str
+                        use_instead=None,  # type: Optional[str]
+                        message=None,  # type: Optional[str]
+                        ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the provided type is deprecated.
+
+        Args:
+            param (str): The name of the deprecated type
+            use_instead (Optional, str): The name of the type to use instead of the deprecated type.
+            message (Optional, str): A message to have in the warning to add context.
+        """
+        msg = f"SDK type {type_} is deprecated and will be removed in a future release. "
+        if use_instead:
+            msg += f"Use {use_instead} instead. "
+        if message:
+            msg += message
+
+        warnings.warn(msg, CouchbaseDeprecationWarning, stacklevel=2)
+
 
 class RemoveProperty:
     """Used to override a get descriptor for a class property and raise an AttributeError to prevent access.

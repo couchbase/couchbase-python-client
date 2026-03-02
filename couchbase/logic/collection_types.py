@@ -24,6 +24,7 @@ from typing import (Any,
                     Optional,
                     Tuple)
 
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
@@ -51,6 +52,13 @@ class CollectionDetails:
 
     def get_details_as_dict(self) -> Dict[str, str]:
         return {
+            'bucket_name': self.bucket_name,
+            'scope_name': self.scope_name,
+            'collection_name': self.collection_name
+        }
+
+    def get_details_as_txn_dict(self) -> Dict[str, str]:
+        return {
             'bucket': self.bucket_name,
             'scope': self.scope_name,
             'collection_name': self.collection_name
@@ -68,6 +76,7 @@ class CollectionRequest:
     collection_name: str
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
         op_kwargs = {
@@ -94,6 +103,15 @@ class CollectionRequest:
         if hasattr(self, 'timeout') and getattr(self, 'timeout') is not None:
             op_kwargs['timeout'] = getattr(self, 'timeout')
 
+        if obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if obs_handler.is_legacy_tracer:
+                legacy_request_span = obs_handler.legacy_request_span
+                if legacy_request_span:
+                    op_kwargs['parent_span'] = legacy_request_span
+            else:
+                op_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
+
         return op_kwargs
 
 
@@ -103,9 +121,10 @@ class CollectionRequestWithEncoding(CollectionRequest):
     flags: int
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        op_kwargs = super().req_to_dict(callback=callback, errback=errback)
+        op_kwargs = super().req_to_dict(obs_handler=obs_handler, callback=callback, errback=errback)
         op_kwargs['value'] = self.value
         op_kwargs['flags'] = self.flags
         return op_kwargs
@@ -116,9 +135,10 @@ class SubdocumentRequest(CollectionRequest):
     specs: List[Dict[str, Any]]
 
     def req_to_dict(self,
+                    obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        op_kwargs = super().req_to_dict(callback=callback, errback=errback)
+        op_kwargs = super().req_to_dict(obs_handler=obs_handler, callback=callback, errback=errback)
         op_kwargs['specs'] = self.specs
         return op_kwargs
 

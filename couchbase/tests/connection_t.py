@@ -353,7 +353,7 @@ class ConnectionTestSuite:
         expected_opts.pop('enable_orphan_reporting')
         expected_opts['orphan_reporting_options'] = {'enable_orphan_reporting': True}
         expected_opts.pop('enable_tracing')
-        expected_opts['tracing_options'] = {'enable_tracing': True}
+        expected_opts['setup_sdk_tracing'] = True
 
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
@@ -925,16 +925,18 @@ class ConnectionTestSuite:
         cluster_opts = ClusterOptions(auth, tracing_options=ClusterTracingOptions(**opts))
         cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT')
         cluster_opts = cluster._get_connection_opts(conn_only=True)
-        tracing_options = cluster_opts.get('tracing_options', None)
+        conn_tracing_options = cluster_opts.get('tracing_options', None)
         orphan_reporting_options = cluster_opts.get('orphan_reporting_options', None)
         if 'orphan_sample_size' in expected_opts or 'orphan_emit_interval' in expected_opts:
             assert orphan_reporting_options is not None
-            assert tracing_options is None
+            assert conn_tracing_options is None
             assert isinstance(orphan_reporting_options, dict)
             assert orphan_reporting_options == expected_opts
         else:
             assert orphan_reporting_options is None
-            assert tracing_options is not None
+            assert conn_tracing_options is None
+            tracing_options = cluster._cluster_settings.tracing_options
+            expected_opts['enable_tracing'] = True
             assert isinstance(tracing_options, dict)
             assert tracing_options == expected_opts
 
@@ -1011,42 +1013,46 @@ class ConnectionTestSuite:
         cluster_opts = ClusterOptions(auth)
         cluster = ClusterImpl(conn_string, cluster_opts, skip_connect='TEST_SKIP_CONNECT', **opts)
         cluster_opts = cluster._get_connection_opts(conn_only=True)
-        tracing_options = cluster_opts.get('tracing_options', None)
+        conn_tracing_options = cluster_opts.get('tracing_options', None)
         orphan_reporting_options = cluster_opts.get('orphan_reporting_options', None)
         if 'orphan_sample_size' in expected_opts or 'orphan_emit_interval' in expected_opts:
             assert orphan_reporting_options is not None
-            assert tracing_options is None
+            assert conn_tracing_options is None
             assert isinstance(orphan_reporting_options, dict)
             assert orphan_reporting_options == expected_opts
         else:
             assert orphan_reporting_options is None
-            assert tracing_options is not None
+            assert conn_tracing_options is None
+            tracing_options = cluster._cluster_settings.tracing_options
+            expected_opts['enable_tracing'] = True
             assert isinstance(tracing_options, dict)
             assert tracing_options == expected_opts
 
-    @pytest.mark.parametrize('opts, cluster_opts, expected_opts',
+    @pytest.mark.parametrize('tracing_opts, cluster_opts, expected_opts',
                              [(None,
                                {'enable_tracing': False},
-                               {'enable_tracing': False, }),
+                               {'enable_tracing': False}),
                               ({'enable_tracing': True},
                                {'enable_tracing': False},
                                {'enable_tracing': True}),
                               ])
-    def test_cluster_tracing_options_override(self, couchbase_config, opts, cluster_opts, expected_opts):
+    def test_cluster_tracing_options_override(self, couchbase_config, tracing_opts, cluster_opts, expected_opts):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
 
         auth = PasswordAuthenticator(username, pw)
-        tracing_options = ClusterTracingOptions(**opts) if opts else None
+        tracing_options = ClusterTracingOptions(**tracing_opts) if tracing_opts else None
         cluster_options = ClusterOptions(auth,
                                          tracing_options=tracing_options,
                                          **cluster_opts)
         cluster = ClusterImpl(conn_string, cluster_options, skip_connect='TEST_SKIP_CONNECT')
         conn_cluster_opts = cluster._get_connection_opts(conn_only=True)
-        tracing_opts = conn_cluster_opts.get('tracing_options', None)
-        assert tracing_opts is not None
-        assert isinstance(tracing_opts, dict)
-        assert tracing_opts == expected_opts
+        conn_tracing_opts = conn_cluster_opts.get('tracing_options', None)
+        cluster_tracing_opts = cluster._cluster_settings.tracing_options
+        assert conn_tracing_opts is None
+        assert cluster_tracing_opts is not None
+        assert isinstance(cluster_tracing_opts, dict)
+        assert cluster_tracing_opts == expected_opts
 
     def test_config_profile_fail(self, couchbase_config):
         username, pw = couchbase_config.get_username_and_pw()
@@ -1153,7 +1159,7 @@ class ConnectionTestSuite:
                                           'couchbases://fqdn'
                                           ])
     def test_valid_connection_strings(self, conn_str):
-        expected_opts = {'timeout_options': {'bootstrap_timeout': 1000}}
+        expected_opts = {'timeout_options': {'bootstrap_timeout': 1000}, 'setup_sdk_tracing': True}
         try:
             if conn_str == '10.0.0.1:8091':
                 with warnings.catch_warnings(record=True) as w:
@@ -1200,6 +1206,7 @@ class ConnectionTestSuite:
                              skip_connect='TEST_SKIP_CONNECT')
 
             user_agent = cl.cluster_settings.cluster_options.pop('user_agent_extra', None)
+            expected_opts['setup_sdk_tracing'] = True
             assert expected_opts == cl.cluster_settings.cluster_options
             assert user_agent == f'python/{platform.python_version()}'
             expected_conn_str = conn_str.split('?')[0]

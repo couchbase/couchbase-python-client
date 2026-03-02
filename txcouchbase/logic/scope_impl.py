@@ -53,7 +53,8 @@ class TxScopeImpl(AsyncScopeImpl):
                                                             self.loop,
                                                             req.analytics_query.params,
                                                             default_serializer=self.default_serializer,
-                                                            streaming_timeout=streaming_timeout)
+                                                            streaming_timeout=streaming_timeout,
+                                                            obs_handler=req.obs_handler)
         d = Deferred()
 
         def _on_ok(_):
@@ -81,7 +82,8 @@ class TxScopeImpl(AsyncScopeImpl):
                                                   self.loop,
                                                   req.n1ql_query.params,
                                                   default_serializer=self.default_serializer,
-                                                  streaming_timeout=streaming_timeout)
+                                                  streaming_timeout=streaming_timeout,
+                                                  obs_handler=req.obs_handler)
 
         d = Deferred()
 
@@ -109,7 +111,8 @@ class TxScopeImpl(AsyncScopeImpl):
                                                               self.loop,
                                                               req.query_builder.as_encodable(),
                                                               default_serializer=self.default_serializer,
-                                                              streaming_timeout=streaming_timeout)
+                                                              streaming_timeout=streaming_timeout,
+                                                              obs_handler=req.obs_handler)
         d = Deferred()
 
         def _on_ok(_):
