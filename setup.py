@@ -49,6 +49,15 @@ if not CMAKE_EXE:
 
 print(f'Python SDK version: {PYCBC_VERSION}')
 
+# Optional dependencies
+extras_require = {
+    'otel': [
+        'opentelemetry-api~=1.22',
+        'opentelemetry-sdk~=1.22',
+    ],
+}
+
+
 setup(name='couchbase',
       version=PYCBC_VERSION,
       ext_modules=[CMakeExtension('couchbase.logic.pycbc_core._core')],
@@ -57,6 +66,7 @@ setup(name='couchbase',
                 'configure_ext': CMakeConfigureExt},
       python_requires='>=3.7',
       setup_requires=setup_requires,
+      extras_require=extras_require,
       packages=find_packages(
           include=['acouchbase', 'couchbase', 'txcouchbase', 'couchbase.*', 'acouchbase.*', 'txcouchbase.*'],
           exclude=['acouchbase.tests', 'couchbase.tests', 'txcouchbase.tests']),

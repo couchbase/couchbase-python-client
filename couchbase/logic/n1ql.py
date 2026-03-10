@@ -295,8 +295,9 @@ class QueryMetaData:
         Returns:
             Optional[:class:`.QueryMetrics`]: A :class:`.QueryMetrics` instance.
         """
-        if "metrics" in self._raw:
-            return QueryMetrics(self._raw.get("metrics", {}))
+        raw_metrics = self._raw.get('metrics', None)
+        if raw_metrics:
+            return QueryMetrics(raw_metrics)
         return None
 
     def profile(self) -> Optional[JSONType]:

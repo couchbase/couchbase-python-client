@@ -54,7 +54,7 @@ class TestMeter:
         return recorder
 
     def get_value_recorder_by_op_name(self, op_name: OpName) -> Optional[TestValueRecorder]:
-        name_recorders = self.recorders.get(OpAttributeName.MeterOperationDuration, [])
+        name_recorders = self.recorders.get(OpAttributeName.MeterOperationDuration.value, [])
         return next((r for r in name_recorders if r.op_name == op_name.value), None)
 
     def clear(self) -> None:

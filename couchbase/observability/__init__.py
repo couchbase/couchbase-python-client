@@ -12,3 +12,26 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+"""
+Observability integrations for the Couchbase Python SDK.
+
+This package provides integrations with observability platforms:
+- OpenTelemetry tracing (otel_tracing)
+- OpenTelemetry metrics (otel_metrics)
+"""
+
+__all__ = []
+
+# OpenTelemetry integrations (optional - only available if otel installed)
+try:
+    from couchbase.observability.otel_tracing import get_otel_tracer  # noqa: F401
+    __all__.append('get_otel_tracer')
+except ImportError:
+    pass  # OTel not installed
+
+try:
+    from couchbase.observability.otel_metrics import get_otel_meter  # noqa: F401
+    __all__.append('get_otel_meter')
+except ImportError:
+    pass  # OTel not installed

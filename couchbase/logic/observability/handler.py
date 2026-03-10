@@ -124,6 +124,10 @@ def get_attributes_for_http_op(op_name: str,
     return attrs
 
 
+def get_latest_time(time_a_ns: int, time_b_ns: int) -> int:
+    return max(time_a_ns, time_b_ns)
+
+
 class ObservableRequestHandler:
 
     def __init__(self,
@@ -486,7 +490,7 @@ class ObservableRequestHandlerMeterImpl:
         if exc_val is not None:
             self._handle_error(attrs, exc_val)
 
-        self._meter.value_recorder(OpAttributeName.MeterOperationDuration,
+        self._meter.value_recorder(OpAttributeName.MeterOperationDuration.value,
                                    tags=attrs).record_value(self._to_microseconds(req_duration_ns))
 
     def _to_microseconds(self, duration_ns: int) -> int:
@@ -642,6 +646,7 @@ class WrappedSpan:
         self._op_name = op_name
         self._wrapped_tracer = wrapped_tracer
         self._collection_details = options.get('collection_details', None)
+        self._start_time = start_time or time.time_ns()
         # The request_span should _only_ take a SpanProtocol for the parent
         self._parent_span = options.get('parent_span', None)
         if isinstance(self._parent_span, WrappedSpan):
@@ -650,13 +655,14 @@ class WrappedSpan:
             p_span = self._parent_span
         self._request_span = self._create_request_span(self._op_name.value,
                                                        parent_span=p_span,
-                                                       start_time=start_time)
+                                                       start_time=self._start_time)
         self._has_multiple_encoding_spans = (self._op_name.is_multi_op() or self._op_name is OpName.MutateIn)
         self._encoding_spans_ended = False
         self._encoding_spans: Optional[Union[WrappedEncodingSpan, List[WrappedEncodingSpan]]] = None
         self._set_span_attrs(**options)
         self._cluster_name: Optional[str] = None
         self._cluster_uuid: Optional[str] = None
+        self._end_time_watermark = time.time_ns()
 
     @property
     def cluster_name(self) -> Optional[str]:
@@ -717,6 +723,9 @@ class WrappedSpan:
             # core span so that we can add the cluster_[name|uuid] attributes
             self._encoding_spans = WrappedEncodingSpan(encoding_span, time.time_ns())
 
+    def maybe_update_end_time_watermark(self, end_time: int) -> None:
+        self._end_time_watermark = get_latest_time(self._end_time_watermark, end_time)
+
     def process_core_span(self, core_span: CppWrapperSdkSpan) -> None:
         self._maybe_set_attribute_from_core_span(core_span, CppOpAttributeName.ClusterName)
         self._maybe_set_attribute_from_core_span(core_span, CppOpAttributeName.ClusterUUID)
@@ -749,12 +758,16 @@ class WrappedSpan:
         self._status = status
         self._request_span.set_status(status)
 
-    def end(self, end_time: Optional[int]) -> None:
+    def end(self, end_time: int) -> None:
         self._end_encoding_spans()
         if self._wrapped_tracer.is_legacy:
             self._request_span.finish()
-        else:
-            self._request_span.end(end_time)
+            return
+
+        self._end_time_watermark = get_latest_time(self._end_time_watermark, end_time)
+        if self._parent_span and isinstance(self._parent_span, WrappedSpan):
+            self._parent_span.maybe_update_end_time_watermark(self._end_time_watermark)
+        self._request_span.end(self._end_time_watermark)
 
     def _build_core_spans(self,
                           core_spans: List[CppWrapperSdkChildSpan],
@@ -768,12 +781,12 @@ class WrappedSpan:
     def _build_dispatch_core_span(self,
                                   core_span: CppWrapperSdkChildSpan,
                                   parent_span: Optional[Union[SpanProtocol, WrappedSpan]] = None) -> None:
-        # TODO: handle parent span as WrappedSpan
         if isinstance(parent_span, WrappedSpan):
             p_span = parent_span.request_span
         else:
             p_span = parent_span
-        new_span = self._create_request_span(core_span['name'], parent_span=p_span, start_time=core_span['start'])
+        latest_start_time = get_latest_time(self._start_time, core_span['start'])
+        new_span = self._create_request_span(core_span['name'], parent_span=p_span, start_time=latest_start_time)
         children = core_span.get('children', None)
         if children:
             self._build_core_spans(children, parent_span=new_span)
@@ -781,23 +794,25 @@ class WrappedSpan:
         for attr_name, attr_val in core_span.get('attributes', {}).items():
             new_span.set_attribute(attr_name, attr_val)
 
-        new_span.end(core_span['end'])
+        core_span_end_time = core_span['end']
+        self._end_time_watermark = get_latest_time(self._end_time_watermark, core_span_end_time)
+        new_span.end(core_span_end_time)
 
     def _build_non_dispatch_core_span(self,
                                       core_span: CppWrapperSdkChildSpan,
                                       parent_span: Optional[Union[SpanProtocol, WrappedSpan]] = None) -> None:
-        # TODO: handle parent span as WrappedSpan
         if isinstance(parent_span, WrappedSpan):
             p_span = parent_span.request_span
         else:
             p_span = parent_span
 
+        latest_start_time = get_latest_time(self._start_time, core_span['start'])
         new_span = WrappedSpan(self._service_type,
                                OpName(core_span['name']),
                                self._wrapped_tracer,
                                collection_details=self._collection_details,
                                parent_span=p_span,
-                               start_time=core_span['start'])
+                               start_time=latest_start_time)
         children = core_span.get('children', None)
         if children:
             self._build_core_spans(children, parent_span=new_span)
@@ -805,7 +820,9 @@ class WrappedSpan:
         for attr_name, attr_val in core_span.get('attributes', {}).items():
             new_span.set_attribute(attr_name, attr_val)
 
-        new_span.end(core_span['end'])
+        core_span_end_time = core_span['end']
+        self._end_time_watermark = get_latest_time(self._end_time_watermark, core_span_end_time)
+        new_span.end(core_span_end_time)
 
     def _create_request_span(self,
                              name: str,

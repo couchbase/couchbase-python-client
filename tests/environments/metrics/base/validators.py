@@ -108,7 +108,7 @@ def _get_recorder_from_meter(meter: TestMeterType,
     ctx = _ctx(op_name=op_str, extra=f'meter_recorders={available}')
     _assert_len(meter.recorders or [], expected=1, what='meter.recorders count', ctx=ctx)
     if recorder_idx is not None:
-        recorder = meter.recorders.get(OpAttributeName.MeterOperationDuration, [None])[recorder_idx]
+        recorder = meter.recorders.get(OpAttributeName.MeterOperationDuration.value, [None])[recorder_idx]
     else:
         recorder = meter.get_value_recorder_by_op_name(op_name)
     if is_ds_op is True:
@@ -130,7 +130,7 @@ def _validate_base_metrics(recorder: TestValueRecorderType,
 
     ctx = _ctx(op_name=op_name.value, recorder=recorder)
     _assert_isinstance(recorder, recorder_type, what='recorder type', ctx=ctx)
-    _assert_eq(recorder.name, OpAttributeName.MeterOperationDuration, what='recorder.name', ctx=ctx)
+    _assert_eq(recorder.name, OpAttributeName.MeterOperationDuration.value, what='recorder.name', ctx=ctx)
     _assert_eq(recorder.op_name, op_name.value, what='recorder.op_name', ctx=ctx)
     _assert_isinstance(recorder.attributes, dict, what='recorder.attributes type', ctx=ctx)
     _assert_has(recorder.attributes, OpAttributeName.SystemName.value, ctx=ctx)
@@ -279,7 +279,7 @@ class KeyValueMeterValidatorImpl:
 
         value_recorder = _get_recorder_from_meter(self._meter, self._op_name, is_multi_op=True)
         assert value_recorder is None, f'Expected no top-level recorder for multi-op, but found one. {ctx}'
-        recorder_count = len(self._meter.recorders.get(OpAttributeName.MeterOperationDuration, []))
+        recorder_count = len(self._meter.recorders.get(OpAttributeName.MeterOperationDuration.value, []))
         expected_count = len(self._nested_ops) if self._nested_ops else 0
         _assert_eq(recorder_count, expected_count,
                    what=f'meter.recorders count expected to be {expected_count}', ctx=ctx)
