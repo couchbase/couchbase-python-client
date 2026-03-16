@@ -100,10 +100,10 @@ class N1QLRequest(QueryRequestLogic):
             self._get_metadata()
             raise
         except CouchbaseException as ex:
-            self._process_core_span(with_error=True)
+            self._process_core_span(exc_val=ex)
             raise ex
         except Exception as ex:
-            self._process_core_span(with_error=True)
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls(str(ex))
+            self._process_core_span(exc_val=excptn)
             raise excptn

@@ -225,12 +225,24 @@ class CollectionImpl:
         # all the successful results will be streamed_results, so lets pop those off the main result dict and re-add
         # the key back transformed into a List[GetReplicaResult]
         result_keys = []
+        pass_obs_handler = False
         for k, v in ret.raw_result.items():
+            if k == 'all_okay':
+                continue
             # pycbc_streamed_result and pycbc_exception have a core_span member
             if obs_handler and hasattr(v, 'core_span'):
-                obs_handler.process_core_span(v.core_span)
-            if k == 'all_okay' or isinstance(v, PycbcCoreException):
+                obs_handler.process_core_span(v.core_span, from_kv_get_all_replicas=True)
+            # we don't need to process metrics here for exceptions, that will be handled when we process the
+            # exceptions in the MultiResult class
+            if isinstance(v, PycbcCoreException):
+                pass_obs_handler = True if obs_handler else False
                 continue
+
+            # we do have to process metrics here for successful operations b/c the start and end time
+            # are on the pycbc_streamed_result
+            if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                obs_handler.process_multi_sub_op((v.end_time - v.start_time))
+
             result_keys.append(k)
 
         for k in result_keys:
@@ -238,6 +250,8 @@ class CollectionImpl:
             tc = req.transcoders[k]
             ret.raw_result[k] = list(r for r in _decode_replicas(k, tc, value))
 
+        if pass_obs_handler:
+            return MultiGetReplicaResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
         return MultiGetReplicaResult(ret, return_exceptions=req.return_exceptions)
 
     def get_and_lock(self, req: GetAndLockRequest, obs_handler: ObservableRequestHandler) -> GetResult:
@@ -398,11 +412,15 @@ class CollectionImpl:
                 obs_handler.process_core_span(v.core_span)
             if isinstance(v, PycbcCoreException):
                 ex = ErrorMapper.build_exception(v)
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=ex)
                 if not req.return_exceptions:
                     raise ex
                 else:
                     output[k] = ex
             else:
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time))
                 output[k] = None
 
         return output

@@ -89,6 +89,19 @@ class RequestTracerProtocol(Protocol):
 SpanProtocol = Union[LegacySpanProtocol, RequestSpanProtocol]
 TracerProtocol = Union[LegacyTracerProtocol, RequestTracerProtocol]
 
+
+@runtime_checkable
+class ValueRecorderProtocol(Protocol):
+
+    def record_value(self, value: int) -> None: ...
+
+
+@runtime_checkable
+class MeterProtocol(Protocol):
+
+    def value_recorder(self, name: str, tags: Mapping[str, str]) -> ValueRecorderProtocol: ...
+
+
 OpType = Union[AnalyticsMgmtOperationType,
                BucketMgmtOperationType,
                CollectionMgmtOperationType,
@@ -113,7 +126,7 @@ class WrappedTracer:
 @dataclass
 class ObservabilityInstruments:
     tracer: WrappedTracer
-    meter: Optional[Any] = None  # TODO: this will change when we implement metrics
+    meter: MeterProtocol
     get_cluster_labels_fn: Optional[Callable[[], Mapping[str, str]]] = None
 
 
@@ -192,8 +205,12 @@ class OpAttributeName(Enum):
     DispatchSpanName = 'dispatch_to_server'
     DurabilityLevel = 'couchbase.durability'
     EncodingSpanName = 'request_encoding'
+    ErrorType = 'error.type'
+    MeterOperationDuration = 'db.client.operation.duration'
     OperationName = 'db.operation.name'
     QueryStatement = 'db.query.text'
+    ReservedUnit = '__unit'
+    ReservedUnitSeconds = 's'
     RetryCount = 'couchbase.retries'
     ScopeName = 'couchbase.scope.name'
     Service = 'couchbase.service'
@@ -439,3 +456,92 @@ class OpName(Enum):
             return OpName[op_type.name]
 
         raise InvalidArgumentException(f'Unsupported operation type {op_type}')
+
+
+class ExceptionName(Enum):
+    AmbiguousTimeoutException = 'AmbiguousTimeout'
+    AnalyticsLinkExistsException = 'LinkExists'
+    AnalyticsLinkNotFoundException = 'LinkNotFound'
+    AuthenticationException = 'AuthenticationFailure'
+    BucketAlreadyExistsException = 'BucketExists'
+    BucketDoesNotExistException = 'BucketNotFound'
+    BucketNotFlushableException = 'BucketNotFlushable'
+    BucketNotFoundException = 'BucketNotFound'
+    CASMismatchException = 'CasMismatch'
+    CasMismatchException = 'CasMismatch'
+    CollectionAlreadyExistsException = 'CollectionExists'
+    CollectionNotFoundException = 'CollectionNotFound'
+    CryptoException = 'Crypto'
+    CryptoKeyNotFoundException = 'CryptoKeyNotFound'
+    DatasetAlreadyExistsException = 'DatasetExists'
+    DatasetNotFoundException = 'DatasetNotFound'
+    DataverseAlreadyExistsException = 'DataverseExists'
+    DataverseNotFoundException = 'DataverseNotFound'
+    DecrypterAlreadyExistsException = 'DecrypterExists'
+    DecrypterNotFoundException = 'DecrypterNotFound'
+    DecryptionFailureException = 'DecryptionFailure'
+    DeltaInvalidException = 'DeltaInvalid'
+    DesignDocumentNotFoundException = 'DesignDocumentNotFound'
+    DocumentExistsException = 'DocumentExists'
+    DocumentLockedException = 'DocumentLocked'
+    DocumentNotFoundException = 'DocumentNotFound'
+    DocumentNotJsonException = 'DocumentNotJson'
+    DocumentNotLockedException = 'DocumentNotLocked'
+    DocumentUnretrievableException = 'DocumentUnretrievable'
+    DurabilityImpossibleException = 'DurabilityImpossible'
+    DurabilityInvalidLevelException = 'DurabilityLevelNotAvailable'
+    DurabilitySyncWriteAmbiguousException = 'DurabilityAmbiguous'
+    DurabilitySyncWriteInProgressException = 'DurableWriteInProgress'
+    EncrypterAlreadyExistsException = 'EncrypterExists'
+    EncrypterNotFoundException = 'EncrypterNotFound'
+    EncryptionFailureException = 'EncryptionFailure'
+    EventingFunctionAlreadyDeployedException = 'EventingFunctionDeployed'
+    EventingFunctionCollectionNotFoundException = 'CollectionNotFound'
+    EventingFunctionCompilationFailureException = 'EventingFunctionCompilationFailure'
+    EventingFunctionIdenticalKeyspaceException = 'EventingFunctionIdenticalKeyspace'
+    EventingFunctionNotBootstrappedException = 'EventingFunctionNotBootstrapped'
+    EventingFunctionNotDeployedException = 'EventingFunctionNotDeployed'
+    EventingFunctionNotFoundException = 'EventingFunctionNotFound'
+    EventingFunctionNotUnDeployedException = 'EventingFunctionDeployed'
+    FeatureNotFoundException = 'FeatureNotAvailable'
+    FeatureUnavailableException = 'FeatureNotAvailable'
+    GroupNotFoundException = 'GroupNotFound'
+    InternalServerFailureException = 'InternalServerFailure'
+    InvalidArgumentException = 'InvalidArgument'
+    InvalidCipherTextException = 'InvalidCiphertext'
+    InvalidCryptoKeyException = 'InvalidCryptoKey'
+    InvalidIndexException = 'InvalidIndex'
+    InvalidValueException = 'InvalidValue'
+    KeyspaceNotFoundException = 'KeyspaceNotFound'
+    NumberTooBigException = 'NumberTooBig'
+    ParsingFailedException = 'ParsingFailure'
+    PathExistsException = 'PathExists'
+    PathInvalidException = 'PathInvalid'
+    PathMismatchException = 'PathMismatch'
+    PathNotFoundException = 'PathNotFound'
+    PathTooBigException = 'PathTooBig'
+    PathTooDeepException = 'PathTooDeep'
+    QueryIndexAlreadyExistsException = 'IndexExists'
+    QueryIndexNotFoundException = 'IndexNotFound'
+    QuotaLimitedException = 'QuotaLimited'
+    RateLimitedException = 'RateLimited'
+    RequestCanceledException = 'RequestCanceled'
+    ScopeAlreadyExistsException = 'ScopeExists'
+    ScopeNotFoundException = 'ScopeNotFound'
+    SearchIndexNotFoundException = 'IndexNotFound'
+    ServiceUnavailableException = 'ServiceNotAvailable'
+    SubdocCantInsertValueException = 'ValueInvalid'
+    SubdocPathMismatchException = 'PathMismatch'
+    TemporaryFailException = 'TemporaryFailure'
+    TimeoutException = 'Timeout'
+    UnAmbiguousTimeoutException = 'UnambiguousTimeout'
+    UserNotFoundException = 'UserNotFound'
+    ValueFormatException = 'ValueFormat'
+    ValueTooDeepException = 'ValueTooDeep'
+
+    @staticmethod
+    def from_exception(exception: Exception) -> Optional[ExceptionName]:
+        try:
+            return ExceptionName[exception.__class__.__name__]
+        except KeyError:
+            return None

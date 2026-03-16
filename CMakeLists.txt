@@ -271,7 +271,8 @@ if(WIN32)
     asio
     Microsoft.GSL::GSL
     taocpp::json
-    spdlog::spdlog)
+    spdlog::spdlog
+    hdr_histogram_static)
 else()
   target_link_libraries(
     pycbc_core PRIVATE
@@ -279,7 +280,8 @@ else()
     asio
     Microsoft.GSL::GSL
     taocpp::json
-    spdlog::spdlog)
+    spdlog::spdlog
+    hdr_histogram_static)
   if(APPLE)
     target_link_options(
       pycbc_core

@@ -42,7 +42,9 @@ struct pycbc_exception {
   PyObject* error_context; // Python dict containing error context
   PyObject* exc_info;      // Python dict exception info
   PyObject* inner_exception;
-  PyObject* core_span; // For tracing support
+  PyObject* core_span;  // For tracing support
+  PyObject* start_time; // For metrics support
+  PyObject* end_time;   // For metrics support
 };
 
 extern PyTypeObject pycbc_exception_type;

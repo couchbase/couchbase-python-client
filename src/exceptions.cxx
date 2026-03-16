@@ -127,6 +127,8 @@ pycbc_exception__dealloc__(pycbc_exception* self)
   Py_XDECREF(self->exc_info);
   Py_XDECREF(self->inner_exception);
   Py_XDECREF(self->core_span);
+  Py_XDECREF(self->start_time);
+  Py_XDECREF(self->end_time);
   self->ec.~error_code();
   self->message.~basic_string();
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -173,6 +175,10 @@ pycbc_exception__init__(pycbc_exception* self, PyObject* args, PyObject* kwargs)
   }
   Py_INCREF(Py_None);
   self->core_span = Py_None;
+  Py_INCREF(Py_None);
+  self->start_time = Py_None;
+  Py_INCREF(Py_None);
+  self->end_time = Py_None;
 
   return 0;
 }
@@ -198,6 +204,16 @@ static PyMemberDef pycbc_exception_members[] = {
     offsetof(pycbc_exception, core_span),
     READONLY,
     PyDoc_STR("Internal dictionary C++ core span information") },
+  { "start_time",
+    T_OBJECT_EX,
+    offsetof(pycbc_exception, start_time),
+    READONLY,
+    PyDoc_STR("Internal dictionary op start time") },
+  { "end_time",
+    T_OBJECT_EX,
+    offsetof(pycbc_exception, end_time),
+    READONLY,
+    PyDoc_STR("Internal dictionary op end time") },
   { "inner_exception",
     T_OBJECT_EX,
     offsetof(pycbc_exception, inner_exception),

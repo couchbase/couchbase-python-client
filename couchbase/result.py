@@ -407,18 +407,24 @@ class MultiResult:
         self._result_type = result_type
         for k, v in self._orig.raw_result.items():
             # pycbc_result and pycbc_exception have a core_span member
-            if obs_handler and hasattr(v, 'core_span'):
+            # need to check if the tracer has already processed the core span (scenario for GetAllReplicasMulti)
+            if (obs_handler and hasattr(v, 'core_span')
+                    and not obs_handler.tracer_processed_kv_get_all_replicas_core_span):
                 obs_handler.process_core_span(v.core_span)
             if isinstance(v, (CouchbaseException, PycbcCoreException)):
                 if isinstance(v, PycbcCoreException):
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op(v.end_time - v.start_time)
                 if isinstance(v, list):
                     self._results[k] = v
                 else:
@@ -538,11 +544,15 @@ class MultiExistsResult:
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time))
                 self._results[k] = ExistsResult(v)
 
     @property
@@ -626,11 +636,15 @@ class MultiMutationResult:
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time))
                 self._results[k] = MutationResult(v, key=k)
 
     @property
@@ -864,11 +878,15 @@ class MultiCounterResult:
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
+                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
+                    obs_handler.process_multi_sub_op((v.end_time - v.start_time))
                 self._results[k] = CounterResult(v)
 
     @property

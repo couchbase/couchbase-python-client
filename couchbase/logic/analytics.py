@@ -435,18 +435,19 @@ class AnalyticsRequestLogic:
         # @TODO:  raise if query isn't complete?
         return self._metadata
 
-    def _process_core_span(self, with_error: Optional[bool] = False) -> None:
+    def _process_core_span(self, exc_val: Optional[BaseException] = None) -> None:
         if self._processed_core_span:
             return
         self._processed_core_span = True
         if self._obs_handler and self._streaming_result:
+            self._obs_handler.process_meter_end(exc_val=exc_val)
             # TODO(PYCBC-1746): Update once legacy tracing logic is removed
             if self._obs_handler.is_legacy_tracer:
                 # the handler knows how to handle this legacy situation (essentially just ends the span)
                 self._obs_handler.process_core_span(None)
             elif hasattr(self._streaming_result, 'core_span'):
                 self._obs_handler.process_core_span(self._streaming_result.core_span,
-                                                    with_error=with_error)
+                                                    with_error=(exc_val is not None))
 
     def _set_metadata(self, analytics_response):
         if isinstance(analytics_response, PycbcCoreException):

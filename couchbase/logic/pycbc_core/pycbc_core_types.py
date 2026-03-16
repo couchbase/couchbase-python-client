@@ -19,6 +19,7 @@ from typing import (TYPE_CHECKING,
                     Callable,
                     Dict,
                     Iterable,
+                    List,
                     Optional,
                     Tuple,
                     TypedDict,
@@ -113,3 +114,8 @@ class TransactionRollbackRequest(TypedDict):
     ctx: TransactionContextCapsuleType
     callback: Optional[Callable[..., None]]
     errback: Optional[Callable[..., None]]
+
+
+class HdrPercentileReport(TypedDict):
+    total_count: int
+    percentiles: List[int]

@@ -115,7 +115,9 @@ private:
 
 struct pycbc_result {
   PyObject_HEAD PyObject* raw_result;
-  PyObject* core_span; // For tracing support
+  PyObject* core_span;  // For tracing support
+  PyObject* start_time; // For metrics support
+  PyObject* end_time;   // For metrics support
 };
 
 PyObject*
@@ -125,7 +127,9 @@ struct pycbc_streamed_result {
   PyObject_HEAD std::error_code ec;
   std::shared_ptr<rows_queue<PyObject*>> rows;
   std::chrono::milliseconds timeout_ms{};
-  PyObject* core_span; // For tracing support
+  PyObject* core_span;  // For tracing support
+  PyObject* start_time; // For metrics support
+  PyObject* end_time;   // For metrics support
 };
 
 pycbc_streamed_result*

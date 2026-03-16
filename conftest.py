@@ -125,6 +125,21 @@ _TRACING_TESTS = [
     "couchbase/tests/tracing_tests/management_t.py::ClassicManagementTracingTests",
 ]
 
+_METRICS_TESTS = [
+    "acouchbase/tests/metrics_tests/binary_t.py::AsyncBinaryMetricsTests",
+    "acouchbase/tests/metrics_tests/datastructures_t.py::AsyncDataStructuresMetricsTests",
+    "acouchbase/tests/metrics_tests/kv_t.py::AsyncKeyValueMetricsTests",
+    "acouchbase/tests/metrics_tests/management_t.py::AsyncManagementMetricsTests",
+    "acouchbase/tests/metrics_tests/streaming_t.py::AsyncStreamingMetricsTests",
+    "couchbase/tests/metrics_tests/datastructures_t.py::ClassicDataStructuresMetricsTests",
+    "couchbase/tests/metrics_tests/kv_t.py::ClassicKeyValueMetricsTests",
+    "couchbase/tests/metrics_tests/kv_multi_t.py::ClassicKeyValueMultiMetricsTests",
+    "couchbase/tests/metrics_tests/binary_t.py::ClassicBinaryMetricsTests",
+    "couchbase/tests/metrics_tests/binary_multi_t.py::ClassicBinaryMultiMetricsTests",
+    "couchbase/tests/metrics_tests/streaming_t.py::ClassicStreamingMetricsTests",
+    "couchbase/tests/metrics_tests/management_t.py::ClassicManagementMetricsTests",
+]
+
 _TXNS_TESTS = [
     "acouchbase/tests/transactions_t.py::ClassicTransactionTests",
     "couchbase/tests/transactions_t.py:ClassicTransactionTests",
@@ -166,6 +181,8 @@ def pytest_collection_modifyitems(items):  # noqa: C901
             item.add_marker(pytest.mark.pycbc_kv)
         elif test_class_path in _STREAMING_TESTS:
             item.add_marker(pytest.mark.pycbc_streaming)
+        elif test_class_path in _METRICS_TESTS:
+            item.add_marker(pytest.mark.pycbc_metrics)
         elif test_class_path in _MGMT_TESTS:
             item.add_marker(pytest.mark.pycbc_mgmt)
         elif test_class_path in _MISC_TESTS:

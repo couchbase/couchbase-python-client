@@ -18,6 +18,7 @@ from __future__ import annotations
 import sys
 import time
 from dataclasses import dataclass
+from types import TracebackType
 from typing import (TYPE_CHECKING,
                     Any,
                     Callable,
@@ -26,6 +27,7 @@ from typing import (TYPE_CHECKING,
                     Mapping,
                     Optional,
                     Tuple,
+                    Type,
                     TypedDict,
                     Union)
 
@@ -35,9 +37,10 @@ else:
     from typing_extensions import Unpack
 
 from couchbase.durability import DurabilityLevel
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability.no_op import NoOpTracer
+from couchbase.exceptions import CouchbaseException, InvalidArgumentException
+from couchbase.logic.observability.no_op import NoOpMeter, NoOpTracer
 from couchbase.logic.observability.observability_types import (CppOpAttributeName,
+                                                               ExceptionName,
                                                                LegacySpanProtocol,
                                                                ObservabilityInstruments,
                                                                OpAttributeName,
@@ -47,6 +50,7 @@ from couchbase.logic.observability.observability_types import (CppOpAttributeNam
                                                                ServiceType,
                                                                SpanProtocol,
                                                                WrappedTracer)
+from couchbase.logic.operation_types import DatastructureOperationType, KeyValueMultiOperationType
 from couchbase.logic.supportability import Supportability
 from couchbase.observability.tracing import SpanAttributeValue, SpanStatusCode
 
@@ -127,12 +131,20 @@ class ObservableRequestHandler:
                  observability_instruments: ObservabilityInstruments,
                  op_type_toggle: Optional[bool] = None) -> None:
         self._op_type = op_type
+        self._processed_kv_get_all_replicas_core_span = False
         if isinstance(observability_instruments.tracer.tracer, NoOpTracer):
             self._tracer_impl = ObservableRequestHandlerNoOpTracerImpl(op_type, observability_instruments)
         else:
             self._tracer_impl = ObservableRequestHandlerTracerImpl(op_type,
                                                                    observability_instruments,
                                                                    op_type_toggle=op_type_toggle)
+
+        if isinstance(observability_instruments.meter, NoOpMeter):
+            self._meter_impl = ObservableRequestHandlerNoOpMeterImpl(op_type, observability_instruments)
+        else:
+            self._meter_impl = ObservableRequestHandlerMeterImpl(op_type,
+                                                                 observability_instruments,
+                                                                 op_type_toggle=op_type_toggle)
 
     @property
     def is_legacy_tracer(self) -> bool:
@@ -145,6 +157,10 @@ class ObservableRequestHandler:
     @property
     def op_type(self) -> OpType:
         return self._op_type
+
+    @property
+    def tracer_processed_kv_get_all_replicas_core_span(self) -> bool:
+        return self._processed_kv_get_all_replicas_core_span
 
     @property
     def wrapper_span_name(self) -> str:
@@ -160,15 +176,18 @@ class ObservableRequestHandler:
     def create_kv_span(self,
                        collection_details: CollectionDetails,
                        parent_span: Optional[Union[SpanProtocol, WrappedSpan]] = None) -> None:
+        self._meter_impl.add_kv_attributes(collection_details)
         self._tracer_impl.create_kv_span(collection_details, parent_span=parent_span)
 
     def create_kv_multi_span(self,
                              collection_details: CollectionDetails,
                              parent_span: Optional[Union[SpanProtocol, WrappedSpan]] = None) -> None:
+        self._meter_impl.add_kv_attributes(collection_details)
         self._tracer_impl.create_kv_span(collection_details, parent_span=parent_span)
 
     def create_http_span(self, **options: Unpack[OpAttributeOptions]) -> None:
         self._tracer_impl.create_http_span(**options)
+        self._meter_impl.add_http_attributes(**options)
 
     def maybe_add_encoding_span(self, encoding_fn: Callable[..., Tuple[bytes, int]]) -> Tuple[bytes, int]:
         return self._tracer_impl.maybe_add_encoding_span(encoding_fn)
@@ -178,11 +197,29 @@ class ObservableRequestHandler:
 
     def process_core_span(self,
                           core_span: Optional[CppWrapperSdkSpan] = None,
-                          with_error: Optional[bool] = False) -> None:
+                          with_error: Optional[bool] = False,
+                          from_kv_get_all_replicas: Optional[bool] = None) -> None:
+        if from_kv_get_all_replicas is True:
+            self._processed_kv_get_all_replicas_core_span = True
         self._tracer_impl.process_core_span(core_span=core_span, with_error=with_error)
 
-    def reset(self, op_type: OpType, with_error: Optional[bool] = False) -> None:
-        self._tracer_impl.reset(op_type, with_error=with_error)
+    def process_meter_end(self, exc_val: Optional[BaseException] = None) -> None:
+        self._meter_impl.process_end(cluster_name=self._tracer_impl.cluster_name,
+                                     cluster_uuid=self._tracer_impl.cluster_uuid,
+                                     exc_val=exc_val)
+
+    def process_multi_sub_op(self, req_duration_ns: int, exc_val: Optional[BaseException] = None) -> None:
+        self._meter_impl.process_multi_sub_op(req_duration_ns,
+                                              cluster_name=self._tracer_impl.cluster_name,
+                                              cluster_uuid=self._tracer_impl.cluster_uuid,
+                                              exc_val=exc_val)
+
+    def reset(self, op_type: OpType, exc_val: Optional[BaseException] = None) -> None:
+        self._tracer_impl.reset(op_type, with_error=(exc_val is not None))
+        self._meter_impl.reset(op_type,
+                               cluster_name=self._tracer_impl.cluster_name,
+                               cluster_uuid=self._tracer_impl.cluster_uuid,
+                               exc_val=exc_val)
 
     @staticmethod
     def get_query_context_components(query_context: str,
@@ -224,17 +261,60 @@ class ObservableRequestHandler:
     def __enter__(self) -> ObservableRequestHandler:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> Optional[bool]:
+    def __exit__(self,
+                 exc_type: Optional[Type[BaseException]],
+                 exc_val: Optional[BaseException],
+                 exc_tb: Optional[TracebackType]) -> Optional[bool]:
         self._tracer_impl.process_end(with_error=exc_type is not None)
+        self._meter_impl.process_end(cluster_name=self._tracer_impl.cluster_name,
+                                     cluster_uuid=self._tracer_impl.cluster_uuid,
+                                     exc_val=exc_val)
         return False
 
     # --- Async Context Manager Protocol ---
     async def __aenter__(self) -> ObservableRequestHandler:
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> Optional[bool]:
+    async def __aexit__(self,
+                        exc_type: Optional[Type[BaseException]],
+                        exc_val: Optional[BaseException],
+                        exc_tb: Optional[TracebackType]) -> Optional[bool]:
         # Delegate the teardown and exception handling to the _impl
         return self.__exit__(exc_type, exc_val, exc_tb)
+
+
+class ObservableRequestHandlerNoOpMeterImpl:
+    def __init__(self,
+                 op_type: OpType,
+                 observability_instruments: ObservabilityInstruments) -> None:
+        self._op_type = op_type
+        self._wrapped_meter = observability_instruments.meter
+
+    def add_kv_attributes(self, collection_details: CollectionDetails) -> None:
+        pass
+
+    def add_http_attributes(self, **options: Unpack[OpAttributeOptions]) -> None:
+        pass
+
+    def process_end(self,
+                    cluster_name: Optional[str] = None,
+                    cluster_uuid: Optional[str] = None,
+                    exc_val: Optional[BaseException] = None) -> None:
+        pass
+
+    def process_multi_sub_op(self,
+                             req_duration_ns: int,
+                             cluster_name: Optional[str] = None,
+                             cluster_uuid: Optional[str] = None,
+                             exc_val: Optional[BaseException] = None) -> None:
+        pass
+
+    def reset(self,
+              op_type: OpType,
+              cluster_name: Optional[str] = None,
+              cluster_uuid: Optional[str] = None,
+              exc_val: Optional[BaseException] = None) -> None:
+        pass
 
 
 class ObservableRequestHandlerNoOpTracerImpl:
@@ -259,6 +339,10 @@ class ObservableRequestHandlerNoOpTracerImpl:
     @property
     def legacy_request_span(self) -> Optional[LegacySpanProtocol]:
         return None
+
+    @property
+    def processed_core_span(self) -> bool:
+        return False
 
     @property
     def wrapper_span_name(self) -> str:
@@ -302,6 +386,113 @@ class ObservableRequestHandlerNoOpTracerImpl:
         pass
 
 
+class ObservableRequestHandlerMeterImpl:
+    def __init__(self,
+                 op_type: OpType,
+                 observability_instruments: ObservabilityInstruments,
+                 op_type_toggle: Optional[bool] = None) -> None:
+        self._op_type = op_type
+        self._op_name = OpName.from_op_type(self._op_type, toggle=op_type_toggle)
+        self._service_type = ServiceType.from_op_type(self._op_type)
+        self._meter = observability_instruments.meter
+        self._get_cluster_labels_fn = observability_instruments.get_cluster_labels_fn
+        self._start_time = time.time_ns()
+        # we need to only  worry about sub operations for DS and KV multi-ops
+        self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
+        self._attrs: Mapping[str, str] = {}
+
+    def add_kv_attributes(self, collection_details: CollectionDetails) -> None:
+        self._attrs = get_attributes_for_kv_op(self._get_op_name(), collection_details)
+
+    def add_http_attributes(self, **options: Unpack[OpAttributeOptions]) -> None:
+        self._attrs = get_attributes_for_http_op(self._get_op_name(), self._service_type, **options)
+
+    def process_end(self,
+                    cluster_name: Optional[str] = None,
+                    cluster_uuid: Optional[str] = None,
+                    exc_val: Optional[BaseException] = None) -> None:
+        end_time = time.time_ns()
+        if self._ignore_top_level_op:
+            return
+        self._process_end((end_time - self._start_time),
+                          attrs=self._attrs,
+                          cluster_name=cluster_name,
+                          cluster_uuid=cluster_uuid,
+                          exc_val=exc_val)
+
+    def process_multi_sub_op(self,
+                             req_duration_ns: int,
+                             cluster_name: Optional[str] = None,
+                             cluster_uuid: Optional[str] = None,
+                             exc_val: Optional[BaseException] = None) -> None:
+        self._process_end(req_duration_ns,
+                          attrs=self._attrs,
+                          cluster_name=cluster_name,
+                          cluster_uuid=cluster_uuid,
+                          exc_val=exc_val)
+
+    def reset(self,
+              op_type: OpType,
+              cluster_name: Optional[str] = None,
+              cluster_uuid: Optional[str] = None,
+              exc_val: Optional[BaseException] = None) -> None:
+        self.process_end(cluster_name=cluster_name, cluster_uuid=cluster_uuid, exc_val=exc_val)
+        self._op_type = op_type
+        self._op_name = OpName.from_op_type(self._op_type)
+        self._service_type = ServiceType.from_op_type(self._op_type)
+        self._start_time = time.time_ns()
+        # we need to only  worry about sub operations for DS and KV multi-ops
+        self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
+        self._attrs: Mapping[str, str] = {}
+
+    def _get_op_name(self) -> str:
+        if self._op_name.value.endswith('_multi'):
+            return self._op_name.value[:-6]
+        return self._op_name.value
+
+    def _handle_error(self, attrs: Mapping[str, str], exc_val: BaseException) -> None:
+        exc_name = None
+        if isinstance(exc_val, CouchbaseException):
+            exc_name = ExceptionName.from_exception(exc_val)
+        attrs[OpAttributeName.ErrorType.value] = exc_name.value if exc_name is not None else '_OTHER'
+
+    def _process_end(self,
+                     req_duration_ns: int,
+                     attrs: Mapping[str, str] = None,
+                     cluster_name: Optional[str] = None,
+                     cluster_uuid: Optional[str] = None,
+                     exc_val: Optional[BaseException] = None) -> None:
+        if self._get_cluster_labels_fn and (cluster_name is None or cluster_uuid is None):
+            cluster_labels = self._get_cluster_labels_fn()
+            cluster_name = cluster_name or cluster_labels.get('clusterName', None)
+            cluster_uuid = cluster_uuid or cluster_labels.get('clusterUUID', None)
+
+        # if the op failed prior to the ObservableRequestHandler creating a span, we won't have attributes yet
+        if not attrs:
+            attrs = {
+                OpAttributeName.SystemName.value: 'couchbase',
+                OpAttributeName.Service.value: self._service_type.value,
+                OpAttributeName.OperationName.value: self._get_op_name(),
+                OpAttributeName.ReservedUnit.value: OpAttributeName.ReservedUnitSeconds.value
+            }
+        else:
+            attrs[OpAttributeName.ReservedUnit.value] = OpAttributeName.ReservedUnitSeconds.value
+
+        if cluster_name:
+            attrs[OpAttributeName.ClusterName.value] = cluster_name
+        if cluster_uuid:
+            attrs[OpAttributeName.ClusterUUID.value] = cluster_uuid
+
+        if exc_val is not None:
+            self._handle_error(attrs, exc_val)
+
+        self._meter.value_recorder(OpAttributeName.MeterOperationDuration,
+                                   tags=attrs).record_value(self._to_microseconds(req_duration_ns))
+
+    def _to_microseconds(self, duration_ns: int) -> int:
+        return round(duration_ns / 1_000)
+
+
 class ObservableRequestHandlerTracerImpl:
 
     def __init__(self,
@@ -335,6 +526,10 @@ class ObservableRequestHandlerTracerImpl:
         if self._wrapped_span:
             return self._wrapped_span.legacy_request_span
         return None
+
+    @property
+    def processed_core_span(self) -> bool:
+        return self._processed_core_span
 
     @property
     def wrapper_span_name(self) -> str:

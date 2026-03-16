@@ -1143,10 +1143,10 @@ class Collection:
                                     path_value: Optional[Any] = None) -> Any:
         try:
             return fn(req, obs_handler)
-        except DocumentNotFoundException:
+        except DocumentNotFoundException as ex:
             if create:
                 orig_opt_type = obs_handler.op_type
-                obs_handler.reset(KeyValueOperationType.Insert, with_error=True)
+                obs_handler.reset(KeyValueOperationType.Insert, exc_val=ex)
                 try:
                     ins_req = self._impl.request_builder.build_insert_request(req.key,
                                                                               create_type(),

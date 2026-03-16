@@ -207,13 +207,16 @@ private:
     PyObject* pyObj_callback,
     PyObject* pyObj_errback,
     std::shared_ptr<std::promise<PyObject*>> barrier = nullptr,
-    std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span = nullptr)
+    std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span = nullptr,
+    std::optional<std::chrono::system_clock::time_point> start_time = std::nullopt)
   {
     using response_type = typename Request::response_type;
     Py_BEGIN_ALLOW_THREADS
     {
       cluster_.execute(
-        req, [pyObj_callback, pyObj_errback, barrier, wrapper_span, this](response_type resp) {
+        req,
+        [pyObj_callback, pyObj_errback, barrier, wrapper_span, start_time, this](
+          response_type resp) {
           if (wrapper_span != nullptr) {
             wrapper_span->end();
             if (auto retries = get_cbpp_retries(resp.ctx); retries > 0 && wrapper_span) {
@@ -229,6 +232,10 @@ private:
           if (error) {
             result = error;
             add_core_span<pycbc_exception>(result, wrapper_span);
+            if (start_time.has_value()) {
+              std::chrono::system_clock::time_point end_time{ std::chrono::system_clock::now() };
+              maybe_add_start_and_end_time<pycbc_exception>(result, start_time, end_time);
+            }
             if (pyObj_errback != nullptr) {
               PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_errback, result, nullptr);
               Py_XDECREF(ret);
@@ -245,6 +252,12 @@ private:
               if (is_error) {
                 result = result_obj;
                 add_core_span<pycbc_exception>(result, wrapper_span);
+                if (start_time.has_value()) {
+                  std::chrono::system_clock::time_point end_time{
+                    std::chrono::system_clock::now()
+                  };
+                  maybe_add_start_and_end_time<pycbc_exception>(result, start_time, end_time);
+                }
                 if (pyObj_errback != nullptr) {
                   PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_errback, result, nullptr);
                   Py_XDECREF(ret);
@@ -261,9 +274,17 @@ private:
               }
               result = result_obj;
               add_core_span<pycbc_streamed_result>(result, wrapper_span);
+              if (start_time.has_value()) {
+                std::chrono::system_clock::time_point end_time{ std::chrono::system_clock::now() };
+                maybe_add_start_and_end_time<pycbc_streamed_result>(result, start_time, end_time);
+              }
             } else {
               result = cbpp_to_py(resp);
               add_core_span<pycbc_result>(result, wrapper_span);
+              if (start_time.has_value()) {
+                std::chrono::system_clock::time_point end_time{ std::chrono::system_clock::now() };
+                maybe_add_start_and_end_time<pycbc_result>(result, start_time, end_time);
+              }
             }
 
             if (pyObj_callback != nullptr) {
@@ -306,6 +327,34 @@ private:
       pyObj_ptr->core_span = pyObj_core_span;
       // might be nice to use Py_SETREF, but if we want the limited API it is not available
       Py_XDECREF(pyObj_old_core_span);
+    }
+  }
+
+  template<typename PyType>
+  void maybe_add_start_and_end_time(
+    PyObject* pyObj,
+    std::optional<std::chrono::system_clock::time_point> start_time = std::nullopt,
+    std::optional<std::chrono::system_clock::time_point> end_time = std::nullopt)
+  {
+    if (start_time.has_value() && end_time.has_value()) {
+      PyType* pyObj_ptr = reinterpret_cast<PyType*>(pyObj);
+      PyObject* pyObj_start_time =
+        cbpp_to_py<std::chrono::system_clock::time_point>(start_time.value());
+      if (pyObj_start_time) {
+
+        PyObject* pyObj_old_start_time = pyObj_ptr->start_time;
+        pyObj_ptr->start_time = pyObj_start_time;
+        // might be nice to use Py_SETREF, but if we want the limited API it is not available
+        Py_XDECREF(pyObj_old_start_time);
+      }
+      PyObject* pyObj_end_time =
+        cbpp_to_py<std::chrono::system_clock::time_point>(end_time.value());
+      if (pyObj_end_time) {
+        PyObject* pyObj_old_end_time = pyObj_ptr->end_time;
+        pyObj_ptr->end_time = pyObj_end_time;
+        // might be nice to use Py_SETREF, but if we want the limited API it is not available
+        Py_XDECREF(pyObj_old_end_time);
+      }
     }
   }
 
@@ -422,6 +471,7 @@ Connection::execute_multi_op(PyObject* doc_list,
     PyObject* value_bytes = nullptr;
     PyObject* flags = nullptr;
 
+    std::chrono::system_clock::time_point start_time{ std::chrono::system_clock::now() };
     if constexpr (is_mutation_op<Request>::value) {
       // Mutation ops expect (key, (value_bytes, flags)) tuple
       // NOTE: binary [ap|pre]pend will have FMT_BYTES as flags, but the flags are not used
@@ -534,7 +584,7 @@ Connection::execute_multi_op(PyObject* doc_list,
       } else {
         auto barrier = std::make_shared<std::promise<PyObject*>>();
         // multi-ops are only synchronous (e.g. callback/errback = nullptr)
-        execute_op(req, nullptr, nullptr, barrier, wrapper_span);
+        execute_op(req, nullptr, nullptr, barrier, wrapper_span, start_time);
         operations.emplace_back(key, barrier);
       }
     } catch (const std::exception& e) {

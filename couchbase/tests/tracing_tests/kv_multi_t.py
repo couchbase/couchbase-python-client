@@ -80,7 +80,6 @@ class KeyValueMultiTracingTestsSuite:
             if res.all_ok:
                 break
             cb_env.sleep(1)
-        print('hmmm')
 
     @pytest.mark.parametrize('op_name, keys_as_list', [
         (OpName.ExistsMulti, True),
@@ -149,7 +148,6 @@ class KeyValueMultiTracingTestsSuite:
         operation = getattr(cb_env.collection, op_name.value)
         operation(keys)
         validator.validate_kv_op()
-        # validator.reset(clear_nested_ops=True)
 
     @pytest.mark.parametrize('op_name, nested_ops', [
         (OpName.GetMulti, None),

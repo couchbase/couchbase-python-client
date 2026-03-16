@@ -724,6 +724,8 @@ class TestEnvironment:
         meter = kwargs.pop('meter', None)
         if meter:
             opts['meter'] = meter
+        else:
+            opts['enable_metrics'] = False
 
         tracer = kwargs.pop('tracer', None)
         if tracer:
@@ -1036,6 +1038,8 @@ class AsyncTestEnvironment(TestEnvironment):
         meter = kwargs.pop('meter', None)
         if meter:
             opts['meter'] = meter
+        else:
+            opts['enable_metrics'] = False
 
         tracer = kwargs.pop('tracer', None)
         if tracer:

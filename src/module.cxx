@@ -18,6 +18,7 @@
 #include "Python.h"
 #include "constants.hxx"
 #include "exceptions.hxx"
+#include "hdr_histogram.hxx"
 #include "logger.hxx"
 #include "pycbc_connection.hxx"
 #include "result.hxx"
@@ -159,6 +160,11 @@ PyInit__core(void)
   }
 
   if (pycbc::txns::add_transaction_objects(module) == nullptr) {
+    Py_DECREF(module);
+    return nullptr;
+  }
+
+  if (pycbc::add_histogram_objects(module) < 0) {
     Py_DECREF(module);
     return nullptr;
   }

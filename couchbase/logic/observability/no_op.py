@@ -18,10 +18,29 @@ from __future__ import annotations
 
 from typing import Mapping, Optional
 
+from couchbase.observability.metrics import Meter, ValueRecorder
 from couchbase.observability.tracing import (RequestSpan,
                                              RequestTracer,
                                              SpanAttributeValue,
                                              SpanStatusCode)
+
+
+class NoOpValueRecorder(ValueRecorder):
+    """
+    **INTERNAL**
+    """
+
+    def record_value(self, value: int) -> None:
+        pass
+
+
+class NoOpMeter(Meter):
+    """
+    **INTERNAL**
+    """
+
+    def value_recorder(self, name: str, tags: Mapping[str, str]) -> ValueRecorder:
+        return NoOpValueRecorder()
 
 
 class NoOpSpan(RequestSpan):

@@ -44,6 +44,10 @@ pycbc_result__init__(pycbc_result* self, PyObject* args, PyObject* kwargs)
   }
   Py_INCREF(Py_None);
   self->core_span = Py_None;
+  Py_INCREF(Py_None);
+  self->start_time = Py_None;
+  Py_INCREF(Py_None);
+  self->end_time = Py_None;
   return 0;
 }
 
@@ -59,6 +63,8 @@ pycbc_result__dealloc__(pycbc_result* self)
 {
   Py_XDECREF(self->raw_result);
   Py_XDECREF(self->core_span);
+  Py_XDECREF(self->start_time);
+  Py_XDECREF(self->end_time);
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -73,6 +79,16 @@ static PyMemberDef pycbc_result_members[] = {
     offsetof(pycbc_result, core_span),
     READONLY,
     PyDoc_STR("Internal dictionary C++ core span information") },
+  { "start_time",
+    T_OBJECT_EX,
+    offsetof(pycbc_result, start_time),
+    READONLY,
+    PyDoc_STR("Internal dictionary op start time") },
+  { "end_time",
+    T_OBJECT_EX,
+    offsetof(pycbc_result, end_time),
+    READONLY,
+    PyDoc_STR("Internal dictionary op end time") },
   { nullptr }
 };
 
@@ -143,6 +159,10 @@ pycbc_streamed_result__new__(PyTypeObject* type, PyObject* args, PyObject* kwarg
     self->timeout_ms = std::chrono::milliseconds{ 0 };
     Py_INCREF(Py_None);
     self->core_span = Py_None;
+    Py_INCREF(Py_None);
+    self->start_time = Py_None;
+    Py_INCREF(Py_None);
+    self->end_time = Py_None;
   }
   return (PyObject*)self;
 }
@@ -151,6 +171,8 @@ static void
 pycbc_streamed_result__dealloc__(pycbc_streamed_result* self)
 {
   Py_XDECREF(self->core_span);
+  Py_XDECREF(self->start_time);
+  Py_XDECREF(self->end_time);
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -179,6 +201,16 @@ static PyMemberDef pycbc_streamed_result_members[] = {
     offsetof(pycbc_streamed_result, core_span),
     0,
     PyDoc_STR("Get the streamed results core_span, if it exists.") },
+  { "start_time",
+    T_OBJECT_EX,
+    offsetof(pycbc_streamed_result, start_time),
+    READONLY,
+    PyDoc_STR("Internal dictionary op start time") },
+  { "end_time",
+    T_OBJECT_EX,
+    offsetof(pycbc_streamed_result, end_time),
+    READONLY,
+    PyDoc_STR("Internal dictionary op end time") },
   { nullptr } // Sentinel
 };
 

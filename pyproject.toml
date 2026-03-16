@@ -29,6 +29,7 @@ markers = [
     "pycbc_diag: marks a test as a diagnostic API test",
     "pycbc_kv: marks a test as a Key-Value API test",
     "pycbc_streaming: marks a test as a streaming (query, search, analytics, or views) API test",
+    "pycbc_metrics: marks a test as a metrics API test",
     "pycbc_mgmt: marks a test as a management API test",
     "pycbc_misc: marks a test as a miscellaneous (connect, rate_limit) API test",
     "pycbc_tracing: marks a test as a tracing API test",

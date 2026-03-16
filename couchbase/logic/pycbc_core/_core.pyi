@@ -35,6 +35,7 @@ from couchbase.logic.pycbc_core.pycbc_core_types import (CreateNewAttemptContext
                                                          CreateTransactionContextRequest,
                                                          CreateTransactionsRequest,
                                                          DestroyTransactionsRequest,
+                                                         HdrPercentileReport,
                                                          ParsedTransactionsQueryOptions,
                                                          TransactionCommitRequest,
                                                          TransactionContextCapsuleType,
@@ -63,12 +64,18 @@ def shutdown_logger() -> None:
 class pycbc_result(Generic[T]):
 
     raw_result: T
+    core_span: Optional[Any]
+    start_time: Optional[int]
+    end_time: Optional[int]
 
     def __init__(self) -> None: ...
 
 
 class pycbc_streamed_result(Generic[T]):
-    core_span: Any
+
+    core_span: Optional[Any]
+    start_time: Optional[int]
+    end_time: Optional[int]
 
     def __iter__(self) -> pycbc_streamed_result[T]: ...
 
@@ -83,6 +90,10 @@ class pycbc_scan_iterator(Generic[T]):
 
 
 class pycbc_exception:
+
+    core_span: Optional[Any]
+    start_time: Optional[int]
+    end_time: Optional[int]
 
     def err(self) -> int: ...
 
@@ -183,6 +194,68 @@ def transaction_query_op(**kwargs: Unpack[TransactionQueryOpRequest]) -> Any:
 
 def transaction_rollback(**kwargs: Unpack[TransactionRollbackRequest]) -> None:
     ...
+
+# ==========================================================================================
+# HDR Histogram type
+# ==========================================================================================
+
+class pycbc_hdr_histogram:
+    """HDR (High Dynamic Range) Histogram for recording and analyzing value distributions."""
+
+    def __init__(self,
+                 lowest_discernible_value: int,
+                 highest_trackable_value: int,
+                 significant_figures: int) -> None:
+        """Initialize HDR histogram.
+
+        Args:
+            lowest_discernible_value: Smallest distinguishable value (>= 1)
+            highest_trackable_value: Largest trackable value
+            significant_figures: Precision level (1-5)
+
+        Raises:
+            ValueError: If parameters are invalid
+            MemoryError: If allocation fails
+        """
+        ...
+
+    def close(self) -> None:
+        """Close and free the histogram."""
+        ...
+
+    def record_value(self, value: int) -> None:
+        """Record a value atomically.
+
+        Args:
+            value: The value to record
+        """
+        ...
+
+    def value_at_percentile(self, percentile: float) -> int:
+        """Get value at given percentile.
+
+        Args:
+            percentile: Percentile (0.0-100.0)
+
+        Returns:
+            Value at the percentile
+        """
+        ...
+
+    def get_percentiles_and_reset(self, percentiles: List[float]) -> HdrPercentileReport:
+        """Get multiple percentiles and reset histogram.
+
+        Args:
+            percentiles: List of percentiles to query
+
+        Returns:
+            Dict with 'total_count' and 'percentiles' list
+        """
+        ...
+
+    def reset(self) -> None:
+        """Reset histogram to zero."""
+        ...
 
 # ==========================================================================================
 # pycbc Connection

@@ -32,6 +32,7 @@ from couchbase import USER_AGENT_EXTRA
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability import (LegacyTracerProtocol,
+                                           MeterProtocol,
                                            ObservabilityInstruments,
                                            RequestTracerProtocol,
                                            WrappedTracer)
@@ -208,7 +209,7 @@ def build_authenticator(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:  # noqa
     return auth
 
 
-def build_metrics_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
+def build_metrics_options(cluster_opts: Dict[str, Any]) -> Tuple[Dict[str, Any], MeterProtocol]:
     metrics_opts = {}
     for key in ClusterMetricsOptions.get_allowed_option_keys(use_transform_keys=True):
         if key in cluster_opts:
@@ -218,13 +219,33 @@ def build_metrics_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
     if cluster_metrics_emit_interval and 'metrics_emit_interval' not in metrics_opts:
         metrics_opts['metrics_emit_interval'] = cluster_metrics_emit_interval
     cluster_enable_metrics = cluster_opts.pop('cluster_enable_metrics', None)
+
     # NOTE: we disable metrics in the C++ core as metrics logic resides (for now) on the wrapper side
     if cluster_enable_metrics is not None and 'enable_metrics' not in metrics_opts:
         metrics_opts['enable_metrics'] = cluster_enable_metrics
     if metrics_opts:
         cluster_opts['metrics_options'] = metrics_opts
 
-    return metrics_opts
+    meter = cluster_opts.pop('meter', None)
+    # We want to disble metrics if we don't have a meter AND metrics is explicitly disabled
+    if meter is None and metrics_opts.get('enable_metrics', None) is False:
+        enable_metrics = False
+    else:
+        enable_metrics = True
+
+    metrics_opts['enable_metrics'] = enable_metrics
+    if meter is None and enable_metrics is True:
+        from couchbase.logic.observability import LoggingMeter
+        meter = LoggingMeter(emit_interval_ms=metrics_opts.get('metrics_emit_interval', None))
+
+    if meter is None:
+        from couchbase.logic.observability import NoOpMeter
+        meter = NoOpMeter()
+
+    if meter and not isinstance(meter, MeterProtocol):
+        raise InvalidArgumentException(message='Provided meter does not follow the MeterProtocol.')
+
+    return metrics_opts, meter
 
 
 def build_timeout_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
@@ -360,7 +381,7 @@ class ClusterSettings:
             'view_timeout': timeout_opts.get('view_timeout', None),
         }
         tracing_opts, orphan_opts, tracer = build_tracing_and_orphan_options(cluster_opts)
-        metrics_opts = build_metrics_options(cluster_opts)
+        metrics_opts, meter = build_metrics_options(cluster_opts)
         transaction_cfg = cluster_opts.pop('transaction_config', TransactionConfig())
         cluster_opts['user_agent_extra'] = USER_AGENT_EXTRA
         return cls(connection_str,
@@ -374,4 +395,4 @@ class ClusterSettings:
                    timeout_opts,
                    tracing_opts,
                    transaction_cfg,
-                   ObservabilityInstruments(tracer))
+                   ObservabilityInstruments(tracer, meter))

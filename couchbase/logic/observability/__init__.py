@@ -16,10 +16,15 @@
 from .handler import (CollectionDetails,
                       ObservableRequestHandler,
                       WrappedSpan)
-from .no_op import NoOpSpan, NoOpTracer
+from .logging_meter import LoggingMeter
+from .no_op import (NoOpMeter,
+                    NoOpSpan,
+                    NoOpTracer,
+                    NoOpValueRecorder)
 from .observability_types import (DispatchAttributeName,
                                   LegacySpanProtocol,
                                   LegacyTracerProtocol,
+                                  MeterProtocol,
                                   ObservabilityInstruments,
                                   OpAttributeName,
                                   OpName,
@@ -36,8 +41,12 @@ __all__ = [
     'DispatchAttributeName',
     'LegacySpanProtocol',
     'LegacyTracerProtocol',
+    'LoggingMeter',
+    'MeterProtocol',
+    'NoOpMeter',
     'NoOpSpan',
     'NoOpTracer',
+    'NoOpValueRecorder',
     'ObservabilityInstruments',
     'ObservableRequestHandler',
     'OpAttributeName',
