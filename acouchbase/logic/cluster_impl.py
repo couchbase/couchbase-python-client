@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 
 class AsyncClusterImpl:
     def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
-        loop = kwargs.pop('loop', None)
+        loop: Optional[AbstractEventLoop] = kwargs.pop('loop', None)
         loop_validator = kwargs.pop('loop_validator', None)
         self._cluster_settings = ClusterSettings.build_cluster_settings(connstr, *options, **kwargs)
         connect_request = CreateConnectionRequest(self._cluster_settings.connstr,
@@ -62,7 +62,7 @@ class AsyncClusterImpl:
         # A connection is made when we create the client adapter, but it is an async operation that we cannot await
         # b/c the call needs to happen when we initialize a cluster (new cluster -> new client adapter). We await
         # the create connection future in whichever operation comes next.
-        self._client_adapter = AsyncClientAdapter(loop, connect_request, loop_validator=loop_validator)
+        self._client_adapter = AsyncClientAdapter(connect_request, loop=loop, loop_validator=loop_validator)
         self._request_builder = ClusterRequestBuilder()
         self._cluster_info: Optional[ClusterInfoResult] = None
         self._transactions: Optional[Transactions] = None

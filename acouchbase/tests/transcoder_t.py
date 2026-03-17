@@ -78,6 +78,7 @@ class DefaultTranscoderTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
+        await cb_env.cluster.close()
 
     @pytest_asyncio.fixture(name="new_kvp")
     async def new_key_and_value_with_reset(self, cb_env) -> KVPair:
@@ -241,6 +242,7 @@ class RawJsonTranscoderTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
+        await cb_env.cluster.close()
 
     @pytest_asyncio.fixture(name="str_kvp")
     async def str_value_with_reset(self, cb_env) -> KVPair:
@@ -386,6 +388,7 @@ class RawStringTranscoderTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
+        await cb_env.cluster.close()
 
     @pytest_asyncio.fixture(name="str_kvp")
     async def str_value_with_reset(self, cb_env) -> KVPair:
@@ -513,6 +516,7 @@ class RawBinaryTranscoderTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
+        await cb_env.cluster.close()
 
     @pytest_asyncio.fixture(name="str_kvp")
     async def str_value_with_reset(self, cb_env) -> KVPair:
@@ -682,6 +686,7 @@ class LegacyTranscoderTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
+        await cb_env.cluster.close()
 
     @pytest_asyncio.fixture(name="str_kvp")
     async def str_value_with_reset(self, cb_env) -> KVPair:
@@ -865,6 +870,7 @@ class KeyValueOpTranscoderTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
+        await cb_env.cluster.close()
 
     @pytest_asyncio.fixture(name="str_kvp")
     async def str_value_with_reset(self, cb_env) -> KVPair:
@@ -895,10 +901,9 @@ class KeyValueOpTranscoderTests:
         key, value = bytes_kvp
         # use RawBinaryTranscoder() so that get() fails as expected
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
-        await cb_env.collection.upsert(key, value, UpsertOptions(
-            transcoder=RawBinaryTranscoder()))
+        await cb_env.collection.upsert(key, value, UpsertOptions(transcoder=RawBinaryTranscoder()))
         with pytest.raises(ValueFormatException):
-            await cb_env.collection.get(key)
+            (await cb_env.collection.get(key)).content_as[bytes]
 
     @pytest.mark.asyncio
     async def test_insert(self, cb_env, str_kvp):
@@ -907,7 +912,7 @@ class KeyValueOpTranscoderTests:
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
         await cb_env.collection.upsert(key, value, InsertOptions(transcoder=RawStringTranscoder()))
         with pytest.raises(ValueFormatException):
-            await cb_env.collection.get(key)
+            (await cb_env.collection.get(key)).content_as[bytes]
 
     @pytest.mark.asyncio
     async def test_replace(self, cb_env, bytes_kvp):
@@ -919,7 +924,7 @@ class KeyValueOpTranscoderTests:
         new_content = 'some new bytes content'.encode('utf-8')
         await cb_env.collection.replace(key, new_content, ReplaceOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            await cb_env.collection.get(key)
+            (await cb_env.collection.get(key)).content_as[bytes]
 
     @pytest.mark.asyncio
     async def test_get(self, cb_env, bytes_kvp):
@@ -927,7 +932,7 @@ class KeyValueOpTranscoderTests:
         tc = RawBinaryTranscoder()
         await cb_env.collection.upsert(key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            await cb_env.collection.get(key)
+            (await cb_env.collection.get(key)).content_as[bytes]
         res = await cb_env.collection.get(key, GetOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
@@ -938,10 +943,11 @@ class KeyValueOpTranscoderTests:
         tc = RawBinaryTranscoder()
         await cb_env.collection.upsert(key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            await cb_env.collection.get_and_touch(key, timedelta(seconds=30))
+            (await cb_env.collection.get_and_touch(key, timedelta(seconds=30))).content_as[bytes]
 
-        res = await cb_env.collection.get_and_touch(key, timedelta(
-            seconds=3), GetAndTouchOptions(transcoder=tc))
+        res = await cb_env.collection.get_and_touch(key,
+                                                    timedelta(seconds=3),
+                                                    GetAndTouchOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
         await cb_env.try_n_times_till_exception(
@@ -953,12 +959,13 @@ class KeyValueOpTranscoderTests:
         tc = RawBinaryTranscoder()
         await cb_env.collection.upsert(key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            await cb_env.collection.get_and_lock(key, timedelta(seconds=1))
+            (await cb_env.collection.get_and_lock(key, timedelta(seconds=1))).content_as[bytes]
 
         await cb_env.try_n_times(10, 1, cb_env.collection.upsert, key,
                                  value, UpsertOptions(transcoder=tc))
-        res = await cb_env.collection.get_and_lock(key, timedelta(
-            seconds=3), GetAndLockOptions(transcoder=tc))
+        res = await cb_env.collection.get_and_lock(key,
+                                                   timedelta(seconds=3),
+                                                   GetAndLockOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
         # upsert should definitely fail

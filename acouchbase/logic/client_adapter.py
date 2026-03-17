@@ -47,16 +47,16 @@ if TYPE_CHECKING:
 class AsyncClientAdapter:
 
     def __init__(self,
-                 loop: AbstractEventLoop,
                  connect_req: CreateConnectionRequest,
+                 loop: Optional[AbstractEventLoop] = None,
                  loop_validator: Optional[Callable[[Optional[AbstractEventLoop]], AbstractEventLoop]] = None
                  ) -> None:
         num_io_threads = connect_req.options.get('num_io_threads', None)
         self._connection = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
-        if loop_validator:
-            self._loop = loop_validator(loop)
-        else:
-            self._loop = self._get_loop(loop)
+        # The loop will be setup prior to running the first async op.
+        # This is the preferred mechanism to handling the event loop.
+        self._loop: Optional[AbstractEventLoop] = loop
+        self._loop_validator = loop_validator
         self._connect_req = connect_req
         self._binding_map = BindingMap(self._connection)
         self._close_ft: Optional[Future[None]] = None
@@ -78,6 +78,8 @@ class AsyncClientAdapter:
 
     @property
     def loop(self) -> AbstractEventLoop:
+        if not self._loop:
+            self._loop = self._get_loop()
         return self._loop
 
     def _ensure_not_closed(self) -> None:
@@ -101,14 +103,14 @@ class AsyncClientAdapter:
         self._ensure_not_closed()
         self._ensure_connected()
 
-        ft = self._loop.create_future()
+        ft = self.loop.create_future()
 
         def _callback(result) -> None:
-            self._loop.call_soon_threadsafe(ft.set_result, result)
+            self.loop.call_soon_threadsafe(ft.set_result, result)
 
         def _errback(exc) -> None:
             excptn = ErrorMapper.build_exception(exc)
-            self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+            self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         self._execute_req(ft, req.op_name, req_dict)
@@ -121,14 +123,14 @@ class AsyncClientAdapter:
     def execute_cluster_request(self, req: ClusterRequest) -> Future[Any]:
         self._ensure_not_closed()
 
-        ft = self._loop.create_future()
+        ft = self.loop.create_future()
 
         def _callback(result) -> None:
-            self._loop.call_soon_threadsafe(ft.set_result, result)
+            self.loop.call_soon_threadsafe(ft.set_result, result)
 
         def _errback(exc) -> None:
             excptn = ErrorMapper.build_exception(exc)
-            self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+            self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
@@ -150,14 +152,14 @@ class AsyncClientAdapter:
         self._ensure_not_closed()
         self._ensure_connected()
 
-        ft = self._loop.create_future()
+        ft = self.loop.create_future()
 
         def _callback(result) -> None:
-            self._loop.call_soon_threadsafe(ft.set_result, result)
+            self.loop.call_soon_threadsafe(ft.set_result, result)
 
         def _errback(exc) -> None:
             excptn = ErrorMapper.build_exception(exc)
-            self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+            self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         self._execute_req(ft, req.op_name, req_dict)
@@ -167,16 +169,16 @@ class AsyncClientAdapter:
         self._ensure_not_closed()
 
         req = OpenBucketRequest(bucket_name)
-        ft = self._loop.create_future()
+        ft = self.loop.create_future()
 
         def _callback(_) -> None:
             if not ft.done():
-                self._loop.call_soon_threadsafe(ft.set_result, None)
+                self.loop.call_soon_threadsafe(ft.set_result, None)
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret)
             if not ft.done():
-                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
@@ -189,16 +191,16 @@ class AsyncClientAdapter:
     def execute_mgmt_request(self, req: MgmtRequest) -> Future[Any]:
         self._ensure_not_closed()
 
-        ft = self._loop.create_future()
+        ft = self.loop.create_future()
 
         def _callback(ret: Any) -> None:
             if not ft.done():
-                self._loop.call_soon_threadsafe(ft.set_result, ret)
+                self.loop.call_soon_threadsafe(ft.set_result, ret)
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret, mapping=req.error_map)
             if not ft.done():
-                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
@@ -244,17 +246,17 @@ class AsyncClientAdapter:
 
     def _execute_close_connection_request(self) -> Future[None]:
         req = CloseConnectionRequest()
-        ft = self._loop.create_future()
+        ft = self.loop.create_future()
 
         def _callback(_) -> None:
             if not ft.done():
                 self._reset_connection()
-                self._loop.call_soon_threadsafe(ft.set_result, None)
+                self.loop.call_soon_threadsafe(ft.set_result, None)
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret)
             if not ft.done():
-                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
@@ -270,16 +272,16 @@ class AsyncClientAdapter:
         return ft
 
     def _execute_connect_request(self) -> Future[None]:
-        ft = self._loop.create_future()
+        ft = self.loop.create_future()
 
         def _callback(_) -> None:
             if not ft.done():
-                self._loop.call_soon_threadsafe(ft.set_result, None)
+                self.loop.call_soon_threadsafe(ft.set_result, None)
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret)
             if not ft.done():
-                self._loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = self._connect_req.req_to_dict(callback=_callback, errback=_errback)
         self._execute_req(ft, self._connect_req.op_name, req_dict)
@@ -316,7 +318,10 @@ class AsyncClientAdapter:
 
     def _get_loop(self, loop: Optional[AbstractEventLoop] = None) -> AbstractEventLoop:
         if not loop:
-            loop = get_event_loop()
+            if self._loop_validator:
+                loop = self._loop_validator(loop)
+            else:
+                loop = get_event_loop()
 
         if not loop.is_running():
             raise RuntimeError('Event loop is not running.')

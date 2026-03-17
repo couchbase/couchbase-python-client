@@ -15,6 +15,7 @@
 
 import json
 from datetime import timedelta
+from typing import Generator
 
 import pytest
 
@@ -54,9 +55,10 @@ class DefaultTranscoderTests:
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False,
                                               is_deferred=False)
+        run_in_reactor_thread(cb_env.cluster.close)
 
     @pytest.fixture(name="new_kvp")
-    def new_key_and_value_with_reset(self, cb_env) -> KVPair:
+    def new_key_and_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -68,7 +70,7 @@ class DefaultTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="str_kvp")
-    def str_value_with_reset(self, cb_env) -> KVPair:
+    def str_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_str'
         yield KVPair(key, 'some string content')
         cb_env.try_n_times_till_exception(10,
@@ -80,7 +82,7 @@ class DefaultTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="bytes_kvp")
-    def bytes_value_with_reset(self, cb_env) -> KVPair:
+    def bytes_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_bytes'
         yield KVPair(key, 'some bytes content'.encode('utf-8'),)
         cb_env.try_n_times_till_exception(10,
@@ -92,7 +94,7 @@ class DefaultTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="json_kvp")
-    def json_value_with_reset(self, cb_env) -> KVPair:
+    def json_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -203,9 +205,10 @@ class RawJsonTranscoderTests:
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False,
                                               is_deferred=False)
+        run_in_reactor_thread(cb_env.cluster.close)
 
     @pytest.fixture(name="str_kvp")
-    def str_value_with_reset(self, cb_env) -> KVPair:
+    def str_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_str'
         yield KVPair(key, 'some string content')
         cb_env.try_n_times_till_exception(10,
@@ -217,7 +220,7 @@ class RawJsonTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="bytes_kvp")
-    def bytes_value_with_reset(self, cb_env) -> KVPair:
+    def bytes_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_bytes'
         yield KVPair(key, 'some bytes content'.encode('utf-8'),)
         cb_env.try_n_times_till_exception(10,
@@ -229,7 +232,7 @@ class RawJsonTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="json_kvp")
-    def json_value_with_reset(self, cb_env) -> KVPair:
+    def json_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -331,9 +334,10 @@ class RawStringTranscoderTests:
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False,
                                               is_deferred=False)
+        run_in_reactor_thread(cb_env.cluster.close)
 
     @pytest.fixture(name="str_kvp")
-    def str_value_with_reset(self, cb_env) -> KVPair:
+    def str_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_str'
         yield KVPair(key, 'some string content')
         cb_env.try_n_times_till_exception(10,
@@ -345,7 +349,7 @@ class RawStringTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="bytes_kvp")
-    def bytes_value_with_reset(self, cb_env) -> KVPair:
+    def bytes_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_bytes'
         yield KVPair(key, 'some bytes content'.encode('utf-8'),)
         cb_env.try_n_times_till_exception(10,
@@ -357,7 +361,7 @@ class RawStringTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="json_kvp")
-    def json_value_with_reset(self, cb_env) -> KVPair:
+    def json_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -442,9 +446,10 @@ class RawBinaryTranscoderTests:
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False,
                                               is_deferred=False)
+        run_in_reactor_thread(cb_env.cluster.close)
 
     @pytest.fixture(name="str_kvp")
-    def str_value_with_reset(self, cb_env) -> KVPair:
+    def str_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_str'
         yield KVPair(key, 'some string content')
         cb_env.try_n_times_till_exception(10,
@@ -456,7 +461,7 @@ class RawBinaryTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="bytes_kvp")
-    def bytes_value_with_reset(self, cb_env) -> KVPair:
+    def bytes_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_bytes'
         yield KVPair(key, 'some bytes content'.encode('utf-8'),)
         cb_env.try_n_times_till_exception(10,
@@ -468,7 +473,7 @@ class RawBinaryTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="hex_kvp")
-    def hex_value_with_reset(self, cb_env) -> KVPair:
+    def hex_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_hex_bytes'
         hex_arr = ['ff0102030405060708090a0b0c0d0e0f',
                    '101112131415161718191a1b1c1d1e1f',
@@ -485,7 +490,7 @@ class RawBinaryTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="json_kvp")
-    def json_value_with_reset(self, cb_env) -> KVPair:
+    def json_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -592,9 +597,10 @@ class LegacyTranscoderTests:
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False,
                                               is_deferred=False)
+        run_in_reactor_thread(cb_env.cluster.close)
 
     @pytest.fixture(name="str_kvp")
-    def str_value_with_reset(self, cb_env) -> KVPair:
+    def str_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_str'
         yield KVPair(key, 'some string content')
         cb_env.try_n_times_till_exception(10,
@@ -606,7 +612,7 @@ class LegacyTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="bytes_kvp")
-    def bytes_value_with_reset(self, cb_env) -> KVPair:
+    def bytes_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_bytes'
         yield KVPair(key, 'some bytes content'.encode('utf-8'),)
         cb_env.try_n_times_till_exception(10,
@@ -618,7 +624,7 @@ class LegacyTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="json_kvp")
-    def json_value_with_reset(self, cb_env) -> KVPair:
+    def json_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -630,7 +636,7 @@ class LegacyTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="obj_kvp")
-    def obj_value_with_reset(self, cb_env) -> KVPair:
+    def obj_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_obj'
         yield KVPair(key, FakeTestObj())
         cb_env.try_n_times_till_exception(10,
@@ -750,10 +756,11 @@ class KeyValueOpTranscoderTests:
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False,
                                               is_deferred=False)
+        run_in_reactor_thread(cb_env.cluster.close)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.fixture(name="str_kvp")
-    def str_value_with_reset(self, cb_env) -> KVPair:
+    def str_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_str'
         yield KVPair(key, 'some string content')
         cb_env.try_n_times_till_exception(10,
@@ -765,7 +772,7 @@ class KeyValueOpTranscoderTests:
                                           reset_num_times=3)
 
     @pytest.fixture(name="bytes_kvp")
-    def bytes_value_with_reset(self, cb_env) -> KVPair:
+    def bytes_value_with_reset(self, cb_env) -> Generator[KVPair, None, None]:
         key = 'key_tc_bytes'
         yield KVPair(key, 'some bytes content'.encode('utf-8'),)
         cb_env.try_n_times_till_exception(10,
@@ -785,7 +792,7 @@ class KeyValueOpTranscoderTests:
                               value,
                               UpsertOptions(transcoder=RawBinaryTranscoder()))
         with pytest.raises(ValueFormatException):
-            run_in_reactor_thread(cb_env.collection.get, key)
+            run_in_reactor_thread(cb_env.collection.get, key).content_as[bytes]
 
     def test_insert(self, cb_env, str_kvp):
         key, value = str_kvp
@@ -793,7 +800,7 @@ class KeyValueOpTranscoderTests:
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
         run_in_reactor_thread(cb_env.collection.upsert, key, value, InsertOptions(transcoder=RawStringTranscoder()))
         with pytest.raises(ValueFormatException):
-            run_in_reactor_thread(cb_env.collection.get, key)
+            run_in_reactor_thread(cb_env.collection.get, key).content_as[bytes]
 
     def test_replace(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
@@ -804,14 +811,14 @@ class KeyValueOpTranscoderTests:
         new_content = 'some new bytes content'.encode('utf-8')
         run_in_reactor_thread(cb_env.collection.replace, key, new_content, ReplaceOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            run_in_reactor_thread(cb_env.collection.get, key)
+            run_in_reactor_thread(cb_env.collection.get, key).content_as[bytes]
 
     def test_get(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         tc = RawBinaryTranscoder()
         run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            run_in_reactor_thread(cb_env.collection.get, key)
+            run_in_reactor_thread(cb_env.collection.get, key).content_as[bytes]
         res = run_in_reactor_thread(cb_env.collection.get, key, GetOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
@@ -821,7 +828,7 @@ class KeyValueOpTranscoderTests:
         tc = RawBinaryTranscoder()
         run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            run_in_reactor_thread(cb_env.collection.get_and_touch, key, timedelta(seconds=30))
+            run_in_reactor_thread(cb_env.collection.get_and_touch, key, timedelta(seconds=30)).content_as[bytes]
 
         res = run_in_reactor_thread(cb_env.collection.get_and_touch,
                                     key,
@@ -837,7 +844,7 @@ class KeyValueOpTranscoderTests:
         tc = RawBinaryTranscoder()
         run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            run_in_reactor_thread(cb_env.collection.get_and_lock, key, timedelta(seconds=1))
+            run_in_reactor_thread(cb_env.collection.get_and_lock, key, timedelta(seconds=1)).content_as[bytes]
 
         cb_env.try_n_times(10, 1, cb_env.collection.upsert, key,
                            value, UpsertOptions(transcoder=tc))

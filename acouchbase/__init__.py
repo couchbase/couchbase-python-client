@@ -15,6 +15,7 @@
 
 import asyncio
 import selectors
+from typing import Optional
 
 
 class LoopValidator:
@@ -22,11 +23,21 @@ class LoopValidator:
                         'add_writer', 'remove_writer'}
 
     @staticmethod
-    def _get_working_loop():
-        evloop = asyncio.get_event_loop()
+    def _get_working_loop() -> asyncio.AbstractEventLoop:
+        try:
+            # Python <= 3.13: Returns existing or auto-creates a new loop.
+            # Python 3.14+: Returns existing or raises RuntimeError.
+            evloop = asyncio.get_event_loop()
+        except RuntimeError:
+            # No event loop exists in the current thread.
+            evloop = None
+
         gen_new_loop = not LoopValidator._is_valid_loop(evloop)
         if gen_new_loop:
-            evloop.close()
+            # Only attempt to close the loop if it actually exists
+            if evloop is not None and not evloop.is_closed():
+                evloop.close()
+
             selector = selectors.SelectSelector()
             new_loop = asyncio.SelectorEventLoop(selector)
             asyncio.set_event_loop(new_loop)
@@ -35,7 +46,7 @@ class LoopValidator:
         return evloop
 
     @staticmethod
-    def _is_valid_loop(evloop):
+    def _is_valid_loop(evloop: asyncio.AbstractEventLoop) -> bool:
         if not evloop:
             return False
         for meth in LoopValidator.REQUIRED_METHODS:
@@ -46,28 +57,44 @@ class LoopValidator:
         return True
 
     @staticmethod
-    def get_event_loop(evloop):
+    def get_event_loop(evloop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
         if LoopValidator._is_valid_loop(evloop):
             return evloop
         return LoopValidator._get_working_loop()
 
     @staticmethod
-    def close_loop():
-        evloop = asyncio.get_event_loop()
-        evloop.close()
+    def close_loop() -> None:
+        try:
+            evloop = asyncio.get_event_loop()
+            if not evloop.is_closed():
+                evloop.close()
+        except RuntimeError:
+            # If there is no loop to get, there is no loop to close.
+            pass  # nosec
 
 
-def get_event_loop(
-    evloop=None,  # type: asyncio.AbstractEventLoop
-):
+def couchbase_loop_factory() -> asyncio.AbstractEventLoop:
+    """
+    Dumb factory that simply builds a SelectorEventLoop.
+
+    Returns:
+        A SelectorEventLoop instance.
+    """
+    selector = selectors.SelectSelector()
+    return asyncio.SelectorEventLoop(selector)
+
+
+def get_event_loop(evloop: Optional[asyncio.AbstractEventLoop] = None) -> asyncio.AbstractEventLoop:
     """
     Get an event loop compatible with acouchbase.
-    Some Event loops, such as ProactorEventLoop (the default asyncio event
-    loop for Python 3.8 on Windows) are not compatible with acouchbase as
-    they don't implement all members in the abstract base class.
 
-    :param evloop: preferred event loop
-    :return: The preferred event loop, if compatible, otherwise, a compatible
-    alternative event loop.
-    """
+    Some Event loops, such as ProactorEventLoop (the default asyncio event loop for Python 3.8 on Windows)
+    are not compatible with acouchbase as they don't implement all members in the abstract base class.
+
+    Args:
+        evloop (asyncio.AbstractEventLoop, optional): An optional event loop to validate. If not provided, the default event loop will be used.
+
+    Returns:
+        The preferred event loop, if compatible, otherwise, a compatible alternative event loop.
+    """  # noqa: E501
     return LoopValidator.get_event_loop(evloop)
