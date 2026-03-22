@@ -8,6 +8,7 @@ Python client for [Couchbase](https://couchbase.com)
 - [Installing](#installing)
 - [Building](#building)
 - [Using the SDK](#using-the-sdk)
+- [Logging](#logging)
 - [Building Documentation](#building-documentation)
 - [Testing](#testing)
 - [Contributing](#contributing)
@@ -450,6 +451,36 @@ d.addCallback(get_document)
 
 reactor.run()
 ```
+
+# Logging<a id="logging"></a>
+[Back to Contents](#contents)
+
+The Couchbase Python SDK provides comprehensive logging for debugging and monitoring.
+
+## Quick Start
+
+Enable logging via environment variable:
+```console
+$ export PYCBC_LOG_LEVEL=info
+$ python your_app.py
+```
+
+Or configure programmatically:
+```python
+import logging
+from couchbase import configure_logging
+
+configure_logging('my_app', level=logging.DEBUG)
+```
+
+## Documentation
+
+For complete logging documentation including configuration options, examples,
+troubleshooting, and best practices, see **[LOGGING.md](LOGGING.md)**.
+
+For working example scripts demonstrating various logging configurations, see
+**[examples/logging/](examples/logging/)**.
+
 # Building Documentation<a id="building-documentation"></a>
 [Back to Contents](#contents)
 

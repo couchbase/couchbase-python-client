@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,10 +14,6 @@
 #  limitations under the License.
 
 import platform
-from functools import partial, partialmethod
-from typing import (List,
-                    Optional,
-                    Tuple)
 
 try:
     # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
@@ -58,130 +54,16 @@ except Exception:  # nosec
     pass
 
 
-""" Add support for logging, adding a TRACE level to logging """
-import json  # nopep8 # isort:skip # noqa: E402
-import logging  # nopep8 # isort:skip # noqa: E402
+# Import logging configuration - auto-configures on import
+import couchbase.logic.logging_config  # nopep8 # isort:skip # noqa: F401, E402
 
-from couchbase.logic.pycbc_core import CXXCBC_METADATA, pycbc_logger, shutdown_logger  # nopep8 # isort:skip # noqa: E402, E501
+# Import public API functions
+from couchbase.logic.logging_config import (  # nopep8 # isort:skip # noqa: F401, E402
+    configure_logging,
+    enable_protocol_logger_to_save_network_traffic_to_file,
+)
 
-_PYCBC_LOGGER = pycbc_logger()
-_CXXCBC_METADATA_JSON = json.loads(CXXCBC_METADATA)
-logging.TRACE = 5
-logging.addLevelName(logging.TRACE, 'TRACE')
-logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
-logging.trace = partial(logging.log, logging.TRACE)
-
-
-"""
-
-pycbc teardown methods
-
-"""
-import atexit  # nopep8 # isort:skip # noqa: E402
-
-
-def _pycbc_teardown(**kwargs):
-    """**INTERNAL**"""
-    global _PYCBC_LOGGER
-    # if using a console logger we let the natural course of shutdown happen, if using Python logging
-    # we need a cleaner mechanism to shutdown the C++ logger prior to the Python interpreter starting to finalize
-    if (_PYCBC_LOGGER
-        and isinstance(_PYCBC_LOGGER, pycbc_logger)
-            and not (_PYCBC_LOGGER.is_console_logger() or _PYCBC_LOGGER.is_file_logger())):
-        shutdown_logger()
-        _PYCBC_LOGGER = None
-
-
-atexit.register(_pycbc_teardown)
-
-"""
-
-Metadata + version methods
-
-"""
-_METADATA_KEYS = ['openssl_default_cert_dir',
-                  'openssl_default_cert_file',
-                  'openssl_headers',
-                  'openssl_runtime',
-                  'txns_forward_compat_extensions',
-                  'txns_forward_compat_protocol_version',
-                  'version']
-
-
-def get_metadata(as_str=False, detailed=False):
-    metadata = _CXXCBC_METADATA_JSON if detailed is True else {
-        k: v for k, v in _CXXCBC_METADATA_JSON.items() if k in _METADATA_KEYS}
-    return json.dumps(metadata) if as_str is True else metadata
-
-
-def get_transactions_protocol() -> Optional[Tuple[Optional[float], Optional[List[str]]]]:
-    """Get the transactions protocol version and supported extensions.
-
-    Returns:
-        Optional[Tuple[Optional[float], Optional[List[str]]]]: The transactions protocol version and
-        support extensions, if found in the cxx client's metadata.
-    """
-    if not _CXXCBC_METADATA_JSON:
-        return None
-
-    version = _CXXCBC_METADATA_JSON.get('txns_forward_compat_protocol_version', None)
-    if version:
-        version = float(version)
-    extensions = _CXXCBC_METADATA_JSON.get('txns_forward_compat_extensions', None)
-    if extensions:
-        extensions = extensions.split(',')
-    return version, extensions
-
-
-"""
-
-Logging methods
-
-"""
-
-
-def configure_console_logger():
-    import os
-    log_level = os.getenv('PYCBC_LOG_LEVEL', None)
-    if log_level:
-        log_file = os.getenv('PYCBC_LOG_FILE', None)
-        if log_file:
-            enable_console_logging = 0 if os.getenv('PYCBC_ENABLE_CONSOLE', None) is None else 1
-            _PYCBC_LOGGER.create_logger(level=log_level.lower(),
-                                        filename=log_file,
-                                        enable_console=enable_console_logging)
-        else:
-            _PYCBC_LOGGER.create_logger(level=log_level.lower())
-        logging.getLogger().debug(get_metadata(as_str=True))
-
-
-def configure_logging(name, level=logging.INFO, parent_logger=None):
-    if parent_logger:
-        name = f'{parent_logger.name}.{name}'
-    logger = logging.getLogger(name)
-    if _PYCBC_LOGGER.is_console_logger() or _PYCBC_LOGGER.is_file_logger():
-        raise RuntimeError(('Cannot create logger.  Another logger has already been '
-                            'initialized. Make sure the PYCBC_LOG_LEVEL and PYCBC_LOG_FILE env '
-                            'variable are not set if using configure_logging.'))
-    _PYCBC_LOGGER.configure_logging_sink(logger, level)
-    logger.debug(get_metadata(as_str=True))
-
-
-def enable_protocol_logger_to_save_network_traffic_to_file(filename  # type: str
-                                                           ):
-    """
-    **VOLATILE** This API is subject to change at any time.
-
-    Exposes the underlying couchbase++ library protocol logger.  This method is for logging/debugging
-    purposes and must be used with caution as network details will be logged to the provided file.
-
-    Args:
-        filename (str): The name of the file the protocol logger will write to.
-
-    Raises:
-        InvalidArgumentException: If a filename is not provided.
-    """
-    _PYCBC_LOGGER.enable_protocol_logger(filename)
-
-
-configure_console_logger()
+from couchbase.logic.pycbc_core.core_metadata import (  # nopep8 # isort:skip # noqa: F401, E402
+    get_metadata,
+    get_transactions_protocol,
+)
