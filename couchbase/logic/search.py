@@ -366,8 +366,9 @@ class SearchMetaData:
         return self._raw.get('errors', {})
 
     def metrics(self) -> Optional[SearchMetrics]:
-        if 'metrics' in self._raw:
-            return SearchMetrics(self._raw.get('metrics', {}))
+        raw_metrics = self._raw.get('metrics', None)
+        if raw_metrics:
+            return SearchMetrics(raw_metrics)
         return None
 
     def client_context_id(self) -> Optional[str]:

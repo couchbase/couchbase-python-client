@@ -335,6 +335,7 @@ class ClusterSettings:
     cluster_options: Dict[str, Any]
     default_transcoder: Transcoder
     default_serializer: Serializer
+    default_timeouts: Dict[str, int]
     metrics_options: Dict[str, Any]
     orphan_options: Dict[str, Any]
     streaming_timeouts: StreamingTimeouts
@@ -352,6 +353,7 @@ class ClusterSettings:
                                *options,  # type: ClusterOptions
                                **kwargs  # type: Dict[str, Any]
                                ) -> ClusterSettings:
+        default_timeouts = kwargs.pop('_default_timeouts', {})
         # parse query string prior to parsing ClusterOptions
         connection_str, query_opts, legacy_opts = parse_connection_string(connstr)
 
@@ -375,10 +377,11 @@ class ClusterSettings:
 
         timeout_opts = build_timeout_options(cluster_opts)
         streaming_timeouts: StreamingTimeouts = {
-            'analytics_timeout': timeout_opts.get('analytics_timeout', None),
-            'query_timeout': timeout_opts.get('query_timeout', None),
-            'search_timeout': timeout_opts.get('search_timeout', None),
-            'view_timeout': timeout_opts.get('view_timeout', None),
+            'analytics_timeout': timeout_opts.get('analytics_timeout',
+                                                  default_timeouts.get('analytics_timeout', None)),
+            'query_timeout': timeout_opts.get('query_timeout', default_timeouts.get('query_timeout', None)),
+            'search_timeout': timeout_opts.get('search_timeout', default_timeouts.get('search_timeout', None)),
+            'view_timeout': timeout_opts.get('view_timeout', default_timeouts.get('view_timeout', None)),
         }
         tracing_opts, orphan_opts, tracer = build_tracing_and_orphan_options(cluster_opts)
         metrics_opts, meter = build_metrics_options(cluster_opts)
@@ -389,6 +392,7 @@ class ClusterSettings:
                    cluster_opts,
                    default_transcoder,
                    default_serializer,
+                   default_timeouts,
                    metrics_opts,
                    orphan_opts,
                    streaming_timeouts,

@@ -57,6 +57,7 @@ if TYPE_CHECKING:
 class ClusterImpl:
     def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
         skip_connect = kwargs.pop('skip_connect', None)
+        kwargs['_default_timeouts'] = pycbc_connection.pycbc_get_default_timeouts()
         self._cluster_settings = ClusterSettings.build_cluster_settings(connstr, *options, **kwargs)
         connect_request = CreateConnectionRequest(self._cluster_settings.connstr,
                                                   self._cluster_settings.auth,

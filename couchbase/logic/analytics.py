@@ -151,8 +151,9 @@ class AnalyticsMetaData:
         )
 
     def metrics(self) -> Optional[AnalyticsMetrics]:
-        if "metrics" in self._raw:
-            return AnalyticsMetrics(self._raw.get("metrics", {}))
+        raw_metrics = self._raw.get('metrics', None)
+        if raw_metrics:
+            return AnalyticsMetrics(raw_metrics)
         return None
 
     def __repr__(self):
@@ -166,6 +167,7 @@ class AnalyticsQuery:
         'read_only': {'readonly': lambda x: x},
         'scan_consistency': {'consistency': lambda x: x.value},
         'client_context_id': {'client_context_id': lambda x: x},
+        'metrics': {'metrics': lambda x: x},
         'priority': {'priority': lambda x: x},
         'query_context': {'query_context': lambda x: x},
         'serializer': {'serializer': lambda x: x},
@@ -196,10 +198,10 @@ class AnalyticsQuery:
             `$` identifier.
 
         """
+        arg_dict = self._params.setdefault("named_parameters", {})
         # C++ core wants all args JSONified bytes
         named_params = {f'${k}': json.dumps(v).encode('utf-8') for k, v in kv.items()}
-
-        self._params["named_parameters"] = named_params
+        arg_dict.update(named_params)
         return self
 
     def _add_pos_args(self, *args):

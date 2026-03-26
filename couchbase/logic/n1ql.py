@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import functools
 import json
 from datetime import timedelta
 from enum import Enum
@@ -363,7 +362,10 @@ class N1QLQuery:
 
         """
         arg_dict = self._params.setdefault("named_parameters", {})
-        arg_dict.update(kv)
+        # C++ core wants all args JSONified bytes
+        named_params = {f'${k}': json.dumps(v).encode('utf-8') for k, v in kv.items()}
+        arg_dict.update(named_params)
+        return self
 
     def _add_pos_args(self, *args):
         """
@@ -372,7 +374,9 @@ class N1QLQuery:
         :param args: Values to be used
         """
         arg_array = self._params.setdefault("positional_parameters", [])
-        arg_array.extend(args)
+        # C++ core wants all args JSONified bytes
+        json_args = [json.dumps(arg).encode('utf-8') for arg in args]
+        arg_array.extend(json_args)
 
     def set_option(self, name, value):
         """
@@ -386,24 +390,9 @@ class N1QLQuery:
         """
         self._params[name] = value
 
-    @functools.cached_property
-    def params(self) -> Dict[str, Any]:
-        params = self._params
-
-        # couchbase++ wants all args JSONified,
-        # For now encode to bytes to make couchbase::json_string <--> std::vector<std::byte> easier
-        raw = params.pop('raw', None)
-        if raw:
-            params['raw'] = {f'{k}': self._serializer.serialize(v) for k, v in raw.items()}
-
-        positional_args = params.pop('positional_parameters', None)
-        if positional_args:
-            params['positional_parameters'] = [self._serializer.serialize(arg) for arg in positional_args]
-
-        named_params = params.pop('named_parameters', None)
-        if named_params:
-            params['named_parameters'] = {f'${k}': self._serializer.serialize(v) for k, v in named_params.items()}
-        return params
+    @property
+    def params(self):
+        return self._params
 
     @property
     def metrics(self) -> bool:
@@ -668,7 +657,8 @@ class N1QLQuery:
         for k in value.keys():
             if not isinstance(k, str):
                 raise TypeError("key for raw value must be str")
-        self.set_option('raw', value)
+        raw_params = {f'{k}': json.dumps(v).encode('utf-8') for k, v in value.items()}
+        self.set_option('raw', raw_params)
 
     @property
     def span(self) -> Optional[SpanProtocol]:

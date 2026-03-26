@@ -57,6 +57,7 @@ class AsyncClusterImpl:
     def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
         loop: Optional[AbstractEventLoop] = kwargs.pop('loop', None)
         loop_validator = kwargs.pop('loop_validator', None)
+        kwargs['_default_timeouts'] = pycbc_connection.pycbc_get_default_timeouts()
         self._cluster_settings = ClusterSettings.build_cluster_settings(connstr, *options, **kwargs)
         connect_request = CreateConnectionRequest(self._cluster_settings.connstr,
                                                   self._cluster_settings.auth,
