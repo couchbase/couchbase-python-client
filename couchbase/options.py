@@ -405,6 +405,7 @@ class ClusterOptions(ClusterOptionsBase):
         app_telemetry_backoff (timedelta, optional): Specifies the time to wait before attempting a websocket reconnection. Defaults to 5 seconds.
         app_telemetry_ping_interval (timedelta, optional): Specifies the time to wait between sending consecutive websocket PING commands to the server. Defaults to 30 seconds.
         app_telemetry_ping_timeout (timedelta, optional): Specifies the time allowed for the server to respond to websocket PING command. Defaults to 2 seconds.
+        enable_lazy_connections (bool, optional): Set to True to enable the C++ core to lazily establish bucket connections. Defaults to False (disabled).
     """  # noqa: E501
 
     def apply_profile(self,

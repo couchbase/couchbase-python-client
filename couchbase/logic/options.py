@@ -683,6 +683,7 @@ class ClusterOptionsBase(dict):
         "app_telemetry_ping_interval": {"app_telemetry_ping_interval": timedelta_as_milliseconds},
         "app_telemetry_ping_timeout": {"app_telemetry_ping_timeout": timedelta_as_milliseconds},
         "allow_enterprise_analytics": {"allow_enterprise_analytics": validate_bool},
+        "enable_lazy_connections": {"enable_lazy_connections": validate_bool}
     }
 
     @overload
@@ -734,6 +735,7 @@ class ClusterOptionsBase(dict):
         app_telemetry_ping_interval=None,  # type: Optional[timedelta]
         app_telemetry_ping_timeout=None,  # type: Optional[timedelta]
         allow_enterprise_analytics=None,  # type: Optional[bool]
+        enable_lazy_connections=None  # type: Optional[bool]
     ):
         """ClusterOptions instance."""
 

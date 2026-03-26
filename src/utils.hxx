@@ -236,6 +236,7 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
   extract_bool_field(pyObj_options, "enable_compression", options.enable_compression);
   extract_bool_field(
     pyObj_options, "disable_mozilla_ca_certificates", options.disable_mozilla_ca_certificates);
+  extract_bool_field(pyObj_options, "enable_lazy_connections", options.enable_lazy_connections);
 
   // Always disable metrics for now
   options.enable_metrics = false;
@@ -361,6 +362,7 @@ cluster_options_to_py(const couchbase::core::cluster_options& opts,
   add_bool_field(dict, "disable_mozilla_ca_certificates", opts.disable_mozilla_ca_certificates);
   add_bool_field(dict, "enable_metrics", opts.enable_metrics);
   add_bool_field(dict, "enable_tracing", opts.enable_tracing);
+  add_bool_field(dict, "enable_lazy_connections", opts.enable_lazy_connections);
 
   // Other
   add_field<std::chrono::milliseconds>(dict, "config_poll_interval", opts.config_poll_interval);
