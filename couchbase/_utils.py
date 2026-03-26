@@ -23,6 +23,8 @@ from typing import (Any,
                     Callable,
                     Dict,
                     List,
+                    Mapping,
+                    Sequence,
                     Tuple,
                     Type,
                     TypeVar,
@@ -33,7 +35,7 @@ from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.pycbc_core import pycbc_exception
 
 JSONType = Union[str, int, float, bool,
-                 None, Dict[str, Any], List[Any]]
+                 None, Mapping[str, Any], Sequence[Any]]
 
 
 def is_null_or_empty(
