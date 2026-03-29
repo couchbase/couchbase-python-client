@@ -440,14 +440,17 @@ class TestEnvironment:
             self._sixm = self.cluster.search_indexes()
         return self
 
-    def enable_views_mgmt(self) -> TestEnvironment:
+    def enable_views_mgmt(self, test_bucket=None) -> TestEnvironment:
         EnvironmentFeatures.check_if_feature_supported('view_index_mgmt',
                                                        self.server_version_short,
                                                        self.mock_server_type)
         if not hasattr(self.bucket, 'view_indexes'):
             pytest.skip('View index not available on bucket.')
 
-        self._vixm = self.bucket.view_indexes()
+        if test_bucket and hasattr(test_bucket, 'view_indexes'):
+            self._vixm = test_bucket.view_indexes()
+        else:
+            self._vixm = self.bucket.view_indexes()
         return self
 
     def enable_user_mgmt(self) -> TestEnvironment:

@@ -326,7 +326,7 @@ class ManagementMetricsTestsSuite:
         try:
             await acb_env.qixm.create_primary_index(acb_env.bucket.name, deferred=True)
         except Exception:
-            pass
+            validator.reset(op_name=OpName.QueryIndexCreate, validate_error=True, do_not_clear_meter=True)
         validator.validate_http_op()
 
         validator.reset(op_name=OpName.QueryIndexGetAll)
@@ -507,7 +507,7 @@ class ManagementMetricsTestsSuite:
     @pytest.mark.asyncio
     async def test_view_index_mgmt(self, acb_env: AsyncManagementMetricsEnvironment) -> None:
         validator = acb_env.http_meter_validator
-        validator.reset(op_name=OpName.ViewIndexGetAll)
+        validator.reset(op_name=OpName.ViewIndexGetAll, bucket_name=acb_env.bucket.name)
         await acb_env.vixm.get_all_design_documents(DesignDocumentNamespace.PRODUCTION)
         validator.validate_http_op()
 

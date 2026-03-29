@@ -87,8 +87,10 @@ class StreamingMetricsTestsSuite:
             pass
         validator.validate_http_op()
 
-        if cb_env.server_version_short <= 6.6:
-            return  # scope-level query support added in server 7.0, so skip rest of test if not supported
+        if not EnvironmentFeatures.is_feature_supported('collections',
+                                                        cb_env.server_version_short,
+                                                        cb_env.mock_server_type):
+            return  # skip rest of test if collections not supported
 
         # dunno why we have this on analytics_query...buuuut we do...
         validator.reset(op_name=OpName.AnalyticsQuery,
@@ -125,8 +127,10 @@ class StreamingMetricsTestsSuite:
             pass
         validator.validate_http_op()
 
-        if cb_env.server_version_short <= 6.6:
-            return  # scope-level query support added in server 7.0, so skip rest of test if not supported
+        if not EnvironmentFeatures.is_feature_supported('collections',
+                                                        cb_env.server_version_short,
+                                                        cb_env.mock_server_type):
+            return  # skip rest of test if collections not supported
 
         validator.reset(op_name=OpName.Query,
                         bucket_name=cb_env.bucket.name,
@@ -169,8 +173,10 @@ class StreamingMetricsTestsSuite:
             pass
         validator.validate_http_op()
 
-        if cb_env.server_version_short <= 6.6:
-            return  # scope-level query support added in server 7.0, so skip rest of test if not supported
+        if not EnvironmentFeatures.is_feature_supported('collections',
+                                                        cb_env.server_version_short,
+                                                        cb_env.mock_server_type):
+            return  # skip rest of test if collections not supported
 
         # TODO(PYCBC-1753): The bucket and scope name are not passed when doing scope-level search queries.
         #                   This means we cannot validate the span attributes have db.namespace and couchbase.scope.name

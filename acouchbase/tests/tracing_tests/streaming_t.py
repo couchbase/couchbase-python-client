@@ -103,9 +103,9 @@ class AsyncTracingTestsSuite:
             pass
         validator.validate_http_op()
 
-        if EnvironmentFeatures.is_feature_supported('collections',
-                                                    acb_env.server_version_short,
-                                                    acb_env.mock_server_type):
+        if not EnvironmentFeatures.is_feature_supported('collections',
+                                                        acb_env.server_version_short,
+                                                        acb_env.mock_server_type):
             return  # skip rest of test if collections not supported
 
         # dunno why we have this on analytics_query...buuuut we do...
@@ -169,9 +169,9 @@ class AsyncTracingTestsSuite:
             pass
         validator.validate_http_op()
 
-        if EnvironmentFeatures.is_feature_supported('collections',
-                                                    acb_env.server_version_short,
-                                                    acb_env.mock_server_type):
+        if not EnvironmentFeatures.is_feature_supported('collections',
+                                                        acb_env.server_version_short,
+                                                        acb_env.mock_server_type):
             return  # skip rest of test if collections not supported
 
         validator = acb_env.http_span_validator
@@ -247,9 +247,9 @@ class AsyncTracingTestsSuite:
             pass
         validator.validate_http_op(end_parent=True)
 
-        if EnvironmentFeatures.is_feature_supported('collections',
-                                                    acb_env.server_version_short,
-                                                    acb_env.mock_server_type):
+        if not EnvironmentFeatures.is_feature_supported('collections',
+                                                        acb_env.server_version_short,
+                                                        acb_env.mock_server_type):
             return  # skip rest of test if collections not supported
 
         # TODO(PYCBC-1753): The bucket and scope name are not passed when doing scope-level search queries.

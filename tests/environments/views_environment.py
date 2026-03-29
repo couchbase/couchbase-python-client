@@ -22,7 +22,10 @@ from os import path
 from textwrap import wrap
 from typing import List, Optional
 
-from couchbase.exceptions import DesignDocumentNotFoundException
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  DesignDocumentNotFoundException,
+                                  UnAmbiguousTimeoutException)
+from couchbase.management.buckets import CreateBucketSettings, StorageBackend
 from couchbase.management.views import (DesignDocument,
                                         DesignDocumentNamespace,
                                         View)
@@ -39,6 +42,14 @@ class ViewsTestEnvironment(TestEnvironment):
                                f'{TEST_VIEW_NAME}-new.txt')
 
     DOCNAME = 'test-ddoc'
+
+    @property
+    def view_bucket(self):
+        return self._view_bucket
+
+    @property
+    def view_collection(self):
+        return self._view_collection
 
     @property
     def test_ddoc(self):
@@ -115,6 +126,24 @@ class ViewsTestEnvironment(TestEnvironment):
         else:
             return [f'{self._batch_id}::{i}' for i in range(30, self.num_docs)]
 
+    def load_view_data(self, num_docs=50):
+
+        for v in self.data_provider.get_vehicles()[:num_docs]:
+            for _ in range(3):
+                try:
+                    key = f'{v["id"]}'
+                    _ = self.view_collection.upsert(key, v)
+                    self._loaded_docs[key] = v
+                    break
+                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                    time.sleep(3)
+                    continue
+                except Exception as ex:
+                    print(ex)
+                    raise
+
+        self._doc_types = ['vehicle']
+
     def setup(self,
               collection_type,  # type: CollectionType
               test_suite=None,  # type: Optional[str]
@@ -131,7 +160,7 @@ class ViewsTestEnvironment(TestEnvironment):
         else:
             self.create_test_ddoc()
             self.add_test_ddoc()
-            TestEnvironment.try_n_times(5, 3, self.load_data, num_docs=num_docs)
+            TestEnvironment.try_n_times(5, 3, self.load_view_data, num_docs=num_docs)
 
             for _ in range(5):
                 try:
@@ -143,6 +172,16 @@ class ViewsTestEnvironment(TestEnvironment):
                 print('Waiting for view to load, sleeping a bit...')
                 time.sleep(5)
 
+    def setup_view_bucket(self):
+        self._view_bucket_name = 'test-view-bucket'
+        self.bm.create_bucket(CreateBucketSettings(name=self._view_bucket_name,
+                                                   ram_quota_mb=100,
+                                                   flush_enabled=False,
+                                                   storage_backend=StorageBackend.COUCHSTORE))
+        self.consistency.wait_until_bucket_present(self._view_bucket_name)
+        self._view_bucket = self.cluster.bucket(self._view_bucket_name)
+        self._view_collection = self._view_bucket.default_collection()
+
     def teardown(self,
                  collection_type,  # type: CollectionType
                  test_suite=None,  # type: Optional[str]
@@ -153,16 +192,17 @@ class ViewsTestEnvironment(TestEnvironment):
             self.disable_views_mgmt()
             TestEnvironment.try_n_times(5, 3, self.purge_data)
         else:
-            TestEnvironment.try_n_times(5, 3, self.purge_data)
+            self.bm.drop_bucket(self._view_bucket_name)
+            self.consistency.wait_until_bucket_dropped(self._view_bucket_name)
             self.drop_ddoc()
 
     def _check_row_count(self,
                          min_count  # type: int
                          ) -> bool:
-        view_result = self.bucket.view_query(self.DOCNAME,
-                                             self.TEST_VIEW_NAME,
-                                             limit=min_count,
-                                             namespace=DesignDocumentNamespace.DEVELOPMENT)
+        view_result = self.view_bucket.view_query(self.DOCNAME,
+                                                  self.TEST_VIEW_NAME,
+                                                  limit=min_count,
+                                                  namespace=DesignDocumentNamespace.DEVELOPMENT)
         count = 0
         for _ in view_result:
             count += 1
@@ -193,6 +233,14 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
                                f'{TEST_VIEW_NAME}-new.txt')
 
     DOCNAME = 'test-ddoc'
+
+    @property
+    def view_bucket(self):
+        return self._view_bucket
+
+    @property
+    def view_collection(self):
+        return self._view_collection
 
     @property
     def test_ddoc(self):
@@ -269,6 +317,24 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
         else:
             return [f'{self._batch_id}::{i}' for i in range(30, self.num_docs)]
 
+    async def load_view_data(self, num_docs=50):
+
+        for v in self.data_provider.get_vehicles()[:num_docs]:
+            for _ in range(3):
+                try:
+                    key = f'{v["id"]}'
+                    _ = await self.view_collection.upsert(key, v)
+                    self._loaded_docs[key] = v
+                    break
+                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                    await self.sleep(3)
+                    continue
+                except Exception as ex:
+                    print(ex)
+                    raise
+
+        self._doc_types = ['vehicle']
+
     async def setup(self,
                     collection_type,  # type: CollectionType
                     test_suite=None,  # type: Optional[str]
@@ -284,7 +350,7 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
         else:
             self.create_test_ddoc()
             await self.add_test_ddoc()
-            await AsyncTestEnvironment.try_n_times(5, 3, self.load_data, num_docs=num_docs)
+            await AsyncTestEnvironment.try_n_times(5, 3, self.load_view_data, num_docs=num_docs)
 
             for _ in range(5):
                 row_count_good = await self._check_row_count(5)
@@ -292,6 +358,17 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
                     break
                 print('Waiting for view to load, sleeping a bit...')
                 await AsyncTestEnvironment.sleep(5)
+
+    async def setup_view_bucket(self):
+        self._view_bucket_name = 'test-view-bucket'
+        await self.bm.create_bucket(CreateBucketSettings(name=self._view_bucket_name,
+                                                         ram_quota_mb=100,
+                                                         flush_enabled=False,
+                                                         storage_backend=StorageBackend.COUCHSTORE))
+        self.consistency.wait_until_bucket_present(self._view_bucket_name)
+        self._view_bucket = self.cluster.bucket(self._view_bucket_name)
+        await self._view_bucket.on_connect()
+        self._view_collection = self._view_bucket.default_collection()
 
     async def teardown(self,
                        collection_type,  # type: CollectionType
@@ -303,17 +380,18 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
             self.disable_views_mgmt()
             await AsyncTestEnvironment.try_n_times(5, 3, self.purge_data)
         else:
-            await AsyncTestEnvironment.try_n_times(5, 3, self.purge_data)
+            await self.bm.drop_bucket(self._view_bucket_name)
+            self.consistency.wait_until_bucket_dropped(self._view_bucket_name)
             await self.drop_ddoc()
 
     async def _check_row_count(self,
                                min_count  # type: int
                                ) -> bool:
 
-        view_result = self.bucket.view_query(self.DOCNAME,
-                                             self.TEST_VIEW_NAME,
-                                             limit=min_count,
-                                             namespace=DesignDocumentNamespace.DEVELOPMENT)
+        view_result = self.view_bucket.view_query(self.DOCNAME,
+                                                  self.TEST_VIEW_NAME,
+                                                  limit=min_count,
+                                                  namespace=DesignDocumentNamespace.DEVELOPMENT)
         count = 0
         async for _ in view_result:
             count += 1

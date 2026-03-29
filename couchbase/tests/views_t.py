@@ -44,20 +44,20 @@ class ViewsTestSuite:
     ]
 
     def test_bad_view_query(self, cb_env):
-        view_result = cb_env.bucket.view_query('fake-ddoc',
-                                               'fake-view',
-                                               limit=10,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
+        view_result = cb_env.view_bucket.view_query('fake-ddoc',
+                                                    'fake-view',
+                                                    limit=10,
+                                                    namespace=DesignDocumentNamespace.DEVELOPMENT)
 
         with pytest.raises(DesignDocumentNotFoundException):
             [r for r in view_result]
 
     def test_view_query(self, cb_env):
         expected_count = 10
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               full_set=True,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    full_set=True,
+                                                    namespace=DesignDocumentNamespace.DEVELOPMENT)
 
         cb_env.assert_rows(view_result, expected_count)
 
@@ -71,10 +71,10 @@ class ViewsTestSuite:
         keys = cb_env.get_keys()
         expected_docids = [i for k in sorted(keys)
                            for i in sorted(cb_env.get_docids_by_key(k))]
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
-                                               order=ViewOrdering.ASCENDING)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                                    order=ViewOrdering.ASCENDING)
 
         rows = cb_env.assert_rows(view_result, cb_env.num_docs, return_rows=True)
         row_ids = list(map(lambda r: r.id, rows))
@@ -90,10 +90,10 @@ class ViewsTestSuite:
         keys = cb_env.get_keys()
         expected_docids = [i for k in sorted(keys, reverse=True)
                            for i in sorted(cb_env.get_docids_by_key(k), reverse=True)]
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
-                                               order=ViewOrdering.DESCENDING)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                                    order=ViewOrdering.DESCENDING)
 
         rows = cb_env.assert_rows(view_result, cb_env.num_docs, return_rows=True)
         row_ids = list(map(lambda r: r.id, rows))
@@ -116,9 +116,9 @@ class ViewsTestSuite:
         opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
                            endkey=key,
                            endkey_docid=endkey_docid)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
         # all docs w/in first key (10 docs) + half of docs w/in next key (5 docs)
         expected_count = 15
         rows = cb_env.assert_rows(view_result, expected_count, True)
@@ -149,7 +149,7 @@ class ViewsTestSuite:
         opts = ViewOptions(limit=expected_count,
                            namespace=DesignDocumentNamespace.DEVELOPMENT)
         t = threading.Thread(target=run_test,
-                             args=(cb_env.bucket,
+                             args=(cb_env.view_bucket,
                                    cb_env.DOCNAME,
                                    cb_env.TEST_VIEW_NAME,
                                    opts,
@@ -169,9 +169,9 @@ class ViewsTestSuite:
         docids = cb_env.get_docids_by_key(key)
         opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
                            key=key)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
 
         rows = cb_env.assert_rows(view_result, expected_count, True)
         for row in rows:
@@ -192,9 +192,9 @@ class ViewsTestSuite:
         expected_count = 20
         opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
                            keys=expected_keys)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
 
         rows = cb_env.assert_rows(view_result, expected_count, True)
         assert all(map(lambda r: r.key in expected_keys, rows)) is True
@@ -216,9 +216,9 @@ class ViewsTestSuite:
         # execute a query so we can have pagination
         opts = ViewOptions(limit=5,
                            namespace=DesignDocumentNamespace.DEVELOPMENT)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
         # need to iterate over the result to execute the query
         [r for r in view_result]
         raw = {
@@ -228,9 +228,9 @@ class ViewsTestSuite:
             'full_set': 'true'
         }
         opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT, raw=raw)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
         # expect only a single record to be returned
         expected_count = 1
         rows = cb_env.assert_rows(view_result, expected_count, True)
@@ -249,9 +249,9 @@ class ViewsTestSuite:
             'startkey_docid': 'fake-doc-id'
         }
         opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT, raw=raw)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
         with pytest.raises(InvalidArgumentException):
             [r for r in view_result]
 
@@ -268,18 +268,18 @@ class ViewsTestSuite:
         # execute a query so we can have pagination
         opts = ViewOptions(limit=5,
                            namespace=DesignDocumentNamespace.DEVELOPMENT)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
         # need to iterate over the result to execute the query
         [r for r in view_result]
         opts = ViewOptions(limit=5,
                            namespace=DesignDocumentNamespace.DEVELOPMENT,
                            startkey=key,
                            startkey_docid=startkey_docid)
-        view_result = cb_env.bucket.view_query(cb_env.DOCNAME,
-                                               cb_env.TEST_VIEW_NAME,
-                                               opts)
+        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
+                                                    cb_env.TEST_VIEW_NAME,
+                                                    opts)
         # expect only a single record to be returned
         expected_count = 1
         rows = cb_env.assert_rows(view_result, expected_count, True)
@@ -307,7 +307,9 @@ class ClassicViewsTests(ViewsTestSuite):
             pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
 
         cb_env = ViewsTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_views_mgmt()
+        cb_env.enable_bucket_mgmt()
+        cb_env.setup_view_bucket()
+        cb_env.enable_views_mgmt(cb_env.view_bucket)
         cb_env.setup(request.param)
         yield cb_env
         cb_env.teardown(request.param)

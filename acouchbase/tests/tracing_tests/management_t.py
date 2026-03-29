@@ -602,7 +602,7 @@ class AsyncManagementTracingTestsSuite:
         try:
             await acb_env.qixm.create_primary_index(acb_env.bucket.name, deferred=True)
         except Exception:
-            pass
+            validator.reset(op_name=OpName.QueryIndexCreate, do_not_clear_spans=True, validate_error=True)
         validator.validate_http_op()
 
         validator.reset(op_name=OpName.QueryIndexGetAll)
@@ -712,7 +712,7 @@ class AsyncManagementTracingTestsSuite:
         try:
             await acb_env.qixm.create_primary_index(acb_env.bucket.name, deferred=True, parent_span=parent_span)
         except Exception:
-            pass
+            validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span, validate_error=True)
         validator.validate_http_op(end_parent=True)
 
         op_name = OpName.QueryIndexGetAll

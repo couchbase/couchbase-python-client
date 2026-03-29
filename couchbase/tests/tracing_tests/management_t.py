@@ -591,7 +591,7 @@ class ManagementTracingTestsSuite:
         try:
             cb_env.qixm.create_primary_index(cb_env.bucket.name, deferred=True)
         except Exception:
-            pass
+            validator.reset(op_name=OpName.QueryIndexCreate, do_not_clear_spans=True, validate_error=True)
         validator.validate_http_op()
 
         validator.reset(op_name=OpName.QueryIndexGetAll)
@@ -696,7 +696,7 @@ class ManagementTracingTestsSuite:
         try:
             cb_env.qixm.create_primary_index(cb_env.bucket.name, deferred=True, parent_span=parent_span)
         except Exception:
-            pass
+            validator.reset(op_name=op_name, do_not_clear_spans=True, parent_span=parent_span, validate_error=True)
         validator.validate_http_op(end_parent=True)
 
         op_name = OpName.QueryIndexGetAll
@@ -986,8 +986,10 @@ class ManagementTracingTestsSuite:
         op_name = OpName.ViewIndexGetAll
         cb_env.tracer.clear_spans()
         parent_span = cb_env.tracer.request_span(f'parent_{op_name.value}_span')
-        validator.reset(op_name=op_name, do_not_clear_spans=True,
-                        bucket_name=cb_env.bucket.name, parent_span=parent_span)
+        validator.reset(op_name=op_name,
+                        do_not_clear_spans=True,
+                        bucket_name=cb_env.bucket.name,
+                        parent_span=parent_span)
         cb_env.vixm.get_all_design_documents(DesignDocumentNamespace.PRODUCTION,
                                              GetAllDesignDocumentsOptions(parent_span=parent_span))
         validator.validate_http_op(end_parent=True)

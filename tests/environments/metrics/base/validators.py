@@ -49,6 +49,7 @@ class ResetParams(TypedDict, total=False):
     scope_name: Optional[str]
     collection_name: Optional[str]
     sub_op_names: Optional[List[Tuple[OpName, bool]]]
+    do_not_clear_meter: Optional[bool]
 
 # ---------------------------------------------------------------------------
 # Assertion helpers
@@ -375,7 +376,9 @@ class HttpMeterValidatorImpl:
             _assert_not_has(recorder.attributes, OpAttributeName.CollectionName.value, ctx=ctx)
 
     def reset(self, **kwargs: Unpack[ResetParams]) -> None:
-        self._meter.clear()
+        do_not_clear = kwargs.get('do_not_clear_meter', False)
+        if not do_not_clear:
+            self._meter.clear()
         self._reset_to_defaults()
 
         op_name = kwargs.get('op_name')

@@ -320,7 +320,7 @@ class ManagementMetricsTestsSuite:
         try:
             cb_env.qixm.create_primary_index(cb_env.bucket.name, deferred=True)
         except Exception:
-            pass
+            validator.reset(op_name=OpName.QueryIndexCreate, validate_error=True, do_not_clear_meter=True)
         validator.validate_http_op()
 
         validator.reset(op_name=OpName.QueryIndexGetAll)
@@ -492,7 +492,7 @@ class ManagementMetricsTestsSuite:
     @pytest.mark.usefixtures('enable_views_mgmt')
     def test_view_index_mgmt(self, cb_env: ManagementMetricsEnvironment) -> None:
         validator = cb_env.http_meter_validator
-        validator.reset(op_name=OpName.ViewIndexGetAll)
+        validator.reset(op_name=OpName.ViewIndexGetAll, bucket_name=cb_env.bucket.name)
         cb_env.vixm.get_all_design_documents(DesignDocumentNamespace.PRODUCTION)
         validator.validate_http_op()
 
