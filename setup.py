@@ -65,6 +65,9 @@ setup(name='couchbase',
                 'build_ext': CMakeBuildExt,
                 'configure_ext': CMakeConfigureExt},
       python_requires='>=3.7',
+      install_requires=[
+          'typing-extensions>=4.14; python_version<"3.13"',
+      ],
       setup_requires=setup_requires,
       extras_require=extras_require,
       packages=find_packages(
