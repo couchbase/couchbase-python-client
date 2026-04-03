@@ -237,6 +237,13 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
   extract_bool_field(
     pyObj_options, "disable_mozilla_ca_certificates", options.disable_mozilla_ca_certificates);
   extract_bool_field(pyObj_options, "enable_lazy_connections", options.enable_lazy_connections);
+  extract_bool_field(pyObj_options, "show_queries", options.show_queries);
+  extract_bool_field(
+    pyObj_options, "enable_unordered_execution", options.enable_unordered_execution);
+  extract_bool_field(
+    pyObj_options, "enable_clustermap_notification", options.enable_clustermap_notification);
+  extract_bool_field(
+    pyObj_options, "allow_enterprise_analytics", options.allow_enterprise_analytics);
 
   // Always disable metrics for now
   options.enable_metrics = false;
@@ -255,6 +262,32 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
   // Other
   extract_field<std::chrono::milliseconds>(
     pyObj_options, "config_poll_interval", options.config_poll_interval);
+  extract_field<std::chrono::milliseconds>(
+    pyObj_options, "config_poll_floor", options.config_poll_floor);
+  extract_field_if_not_empty<std::string>(
+    pyObj_options, "user_agent_extra", options.user_agent_extra);
+  extract_field<std::size_t>(pyObj_options, "max_http_connections", options.max_http_connections);
+  extract_bool_field(pyObj_options, "dump_configuration", options.dump_configuration);
+
+  // Preferred server group (Python key "preferred_server_group" -> C++ field "server_group")
+  {
+    PyObject* pyObj_server_group = PyDict_GetItemString(pyObj_options, "preferred_server_group");
+    if (pyObj_server_group && PyUnicode_Check(pyObj_server_group)) {
+      options.server_group = std::string(PyUnicode_AsUTF8(pyObj_server_group));
+    }
+  }
+
+  // App telemetry options (Python key "app_telemetry_backoff" -> C++ field
+  // "app_telemetry_backoff_interval")
+  extract_bool_field(pyObj_options, "enable_app_telemetry", options.enable_app_telemetry);
+  extract_field_if_not_empty<std::string>(
+    pyObj_options, "app_telemetry_endpoint", options.app_telemetry_endpoint);
+  extract_field<std::chrono::milliseconds>(
+    pyObj_options, "app_telemetry_backoff", options.app_telemetry_backoff_interval);
+  extract_field<std::chrono::milliseconds>(
+    pyObj_options, "app_telemetry_ping_interval", options.app_telemetry_ping_interval);
+  extract_field<std::chrono::milliseconds>(
+    pyObj_options, "app_telemetry_ping_timeout", options.app_telemetry_ping_timeout);
 
   // Timeout options (nested dict with durations in microseconds)
   PyObject* pyObj_timeout_opts = PyDict_GetItemString(pyObj_options, "timeout_options");
@@ -363,9 +396,26 @@ cluster_options_to_py(const couchbase::core::cluster_options& opts,
   add_bool_field(dict, "enable_metrics", opts.enable_metrics);
   add_bool_field(dict, "enable_tracing", opts.enable_tracing);
   add_bool_field(dict, "enable_lazy_connections", opts.enable_lazy_connections);
+  add_bool_field(dict, "show_queries", opts.show_queries);
+  add_bool_field(dict, "enable_unordered_execution", opts.enable_unordered_execution);
+  add_bool_field(dict, "enable_clustermap_notification", opts.enable_clustermap_notification);
+  add_bool_field(dict, "allow_enterprise_analytics", opts.allow_enterprise_analytics);
+  add_bool_field(dict, "dump_configuration", opts.dump_configuration);
+  add_bool_field(dict, "enable_app_telemetry", opts.enable_app_telemetry);
 
   // Other
   add_field<std::chrono::milliseconds>(dict, "config_poll_interval", opts.config_poll_interval);
+  add_field<std::chrono::milliseconds>(dict, "config_poll_floor", opts.config_poll_floor);
+  add_string_field_if_not_empty(dict, "user_agent_extra", opts.user_agent_extra);
+  add_field<std::size_t>(dict, "max_http_connections", opts.max_http_connections);
+  add_string_field_if_not_empty(dict, "preferred_server_group", opts.server_group);
+  add_string_field_if_not_empty(dict, "app_telemetry_endpoint", opts.app_telemetry_endpoint);
+  add_field<std::chrono::milliseconds>(
+    dict, "app_telemetry_backoff", opts.app_telemetry_backoff_interval);
+  add_field<std::chrono::milliseconds>(
+    dict, "app_telemetry_ping_interval", opts.app_telemetry_ping_interval);
+  add_field<std::chrono::milliseconds>(
+    dict, "app_telemetry_ping_timeout", opts.app_telemetry_ping_timeout);
 
   // Credentials
   PyObject* creds_dict = cbpp_to_py(creds);

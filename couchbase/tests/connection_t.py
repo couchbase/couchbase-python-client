@@ -87,6 +87,7 @@ class ConnectionTestSuite:
         'test_valid_connection_strings',
         'test_wan_config_profile',
         'test_wan_config_profile_with_auth',
+        'test_cluster_options_core_round_trip',
     ]
 
     def test_cluster_auth_fail(self, couchbase_config):
@@ -380,6 +381,80 @@ class ConnectionTestSuite:
         assert isinstance(cluster_opts, dict)
         assert cluster_opts == expected_opts
         assert user_agent == f'python/{platform.python_version()}'
+
+    # creating a new connection, allow retries
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_cluster_options_core_round_trip(self, couchbase_config):
+        # Validates that ClusterOptions are correctly propagated into the C++ core by
+        # creating a real connection and checking get_connection_info().
+        #
+        # Options intentionally excluded from this test (validated at Python layer only
+        # in test_cluster_options via skip_connect):
+        #   - trust_store_path: requires a TLS-capable server and a valid cert file on disk
+        #   - network ('external'): may route to unreachable endpoints in test environments
+        #   - enable_tracing / enable_metrics / enable_orphan_reporting: tracing/metrics options
+        #     are validated in test_cluster_tracing_options* and test_cluster_metrics_options*
+        #   - app_telemetry_endpoint: omitted because enable_app_telemetry is disabled here
+        #   - num_io_threads: not a cluster_options field; passed as a connection-level parameter
+        opts = {
+            'enable_tls': False,
+            'tls_verify': TLSVerifyMode.NO_VERIFY,
+            'ip_protocol': IpProtocol.Any,
+            'enable_dns_srv': False,
+            'enable_mutation_tokens': True,
+            'enable_tcp_keep_alive': True,
+            'enable_compression': True,
+            'show_queries': True,
+            'enable_unordered_execution': False,
+            'enable_clustermap_notification': False,
+            'disable_mozilla_ca_certificates': False,
+            'tcp_keep_alive_interval': timedelta(seconds=30),
+            'config_poll_interval': timedelta(seconds=30),
+            'config_poll_floor': timedelta(seconds=5),
+            'max_http_connections': 5,
+            'dump_configuration': True,
+            'preferred_server_group': 'test_group',
+            'enable_app_telemetry': False,
+            'allow_enterprise_analytics': True,
+            'app_telemetry_backoff': timedelta(seconds=10),
+            'app_telemetry_ping_interval': timedelta(seconds=60),
+            'app_telemetry_ping_timeout': timedelta(seconds=5),
+        }
+
+        expected = {
+            'enable_tls': False,
+            'tls_verify': 'none',
+            'use_ip_protocol': 'any',
+            'enable_dns_srv': False,
+            'enable_mutation_tokens': True,
+            'enable_tcp_keep_alive': True,
+            'enable_compression': True,
+            'show_queries': True,
+            'enable_unordered_execution': False,
+            'enable_clustermap_notification': False,
+            'disable_mozilla_ca_certificates': False,
+            'tcp_keep_alive_interval': 30000,
+            'config_poll_interval': 30000,
+            'config_poll_floor': 5000,
+            'max_http_connections': 5,
+            'dump_configuration': True,
+            'preferred_server_group': 'test_group',
+            'enable_app_telemetry': False,
+            'allow_enterprise_analytics': True,
+            'app_telemetry_backoff': 10000,
+            'app_telemetry_ping_interval': 60000,
+            'app_telemetry_ping_timeout': 5000,
+        }
+
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        auth = PasswordAuthenticator(username, pw)
+        cluster = Cluster.connect(conn_string, ClusterOptions(auth, **opts))
+        client_opts = cluster._impl.get_connection_info()
+        for key, expected_value in expected.items():
+            assert client_opts.get(key) == expected_value, (
+                f'Expected {key}={expected_value!r}, got {client_opts.get(key)!r}'
+            )
 
     def test_cluster_pw_auth(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
