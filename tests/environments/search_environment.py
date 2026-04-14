@@ -141,12 +141,14 @@ class SearchTestEnvironment(TestEnvironment):
         if collection_type == CollectionType.NAMED:
             self.enable_collection_mgmt().enable_named_collections()
             TestEnvironment.try_n_times(5, 3, self.setup_named_collections)
+            self.enable_scope_search_mgmt().enable_search_mgmt()
             TestEnvironment.try_n_times(5, 3, self.load_data)
             self.create_and_load_other_collection()
             self.load_search_index(self.sixm, collection_type)
             # make sure the index loads...
             num_docs = self._check_doc_count(self.sixm, self.TEST_COLLECTION_INDEX_NAME, 20, retries=10, delay=3)
         else:
+            self.enable_search_mgmt()
             TestEnvironment.try_n_times(5, 3, self.load_data)
             self.load_search_index(self.sixm, collection_type)
             # make sure the index loads...
@@ -345,11 +347,13 @@ class AsyncSearchTestEnvironment(AsyncTestEnvironment):
             self.enable_collection_mgmt().enable_named_collections()
             await AsyncTestEnvironment.try_n_times(5, 3, self.setup_named_collections)
             await AsyncTestEnvironment.try_n_times(5, 3, self.load_data)
+            self.enable_scope_search_mgmt().enable_search_mgmt()
             await self.create_and_load_other_collection()
             await self.load_search_index(self.sixm, collection_type)
             # make sure the index loads...
             num_docs = await self._check_doc_count(self.sixm, self.TEST_COLLECTION_INDEX_NAME, 20, retries=10, delay=3)
         else:
+            self.enable_search_mgmt()
             await AsyncTestEnvironment.try_n_times(5, 3, self.load_data)
             await self.load_search_index(self.sixm, collection_type)
             # make sure the index loads...

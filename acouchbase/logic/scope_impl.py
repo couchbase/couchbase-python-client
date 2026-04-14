@@ -155,6 +155,8 @@ class AsyncScopeImpl:
                                                                                default_serializer=self.default_serializer,  # noqa: E501
                                                                                streaming_timeout=streaming_timeout,
                                                                                obs_handler=req.obs_handler,
+                                                                               bucket_name=req.bucket_name,
+                                                                               scope_name=req.scope_name,
                                                                                num_workers=req.num_workers))
 
     async def wait_until_bucket_connected(self) -> None:

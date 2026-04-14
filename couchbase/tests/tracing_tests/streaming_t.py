@@ -245,9 +245,11 @@ class StreamingTracingTestsSuite:
                                                         cb_env.mock_server_type):
             return  # skip rest of test if collections not supported
 
-        # TODO(PYCBC-1753): The bucket and scope name are not passed when doing scope-level search queries.
-        #                   This means we cannot validate the span attributes have db.namespace and couchbase.scope.name
-        validator.reset(op_name=OpName.SearchQuery, clear_statement=True, validate_error=True)
+        validator.reset(op_name=OpName.SearchQuery,
+                        clear_statement=True,
+                        bucket_name=cb_env.bucket.name,
+                        scope_name=cb_env.scope.name,
+                        validate_error=True)
         try:
             [r for r in cb_env.scope.search('not-an-index', TermQuery('auto')).rows()]
         except Exception:
@@ -256,12 +258,12 @@ class StreamingTracingTestsSuite:
 
         cb_env.tracer.clear_spans()
         parent_span = cb_env.tracer.request_span(f'parent_{OpName.SearchQuery.value}_span')
-        # TODO(PYCBC-1753): The bucket and scope name are not passed when doing scope-level search queries.
-        #                   This means we cannot validate the span attributes have db.namespace and couchbase.scope.name
         validator.reset(do_not_clear_spans=True,
                         op_name=OpName.SearchQuery,
                         parent_span=parent_span,
                         clear_statement=True,
+                        bucket_name=cb_env.bucket.name,
+                        scope_name=cb_env.scope.name,
                         validate_error=True)
         try:
             [r for r in cb_env.scope.search('not-an-index', TermQuery('auto'), SearchOptions(span=parent_span)).rows()]

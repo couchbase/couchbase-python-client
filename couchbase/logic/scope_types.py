@@ -53,6 +53,8 @@ class QueryRequest:
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
     obs_handler: ObservableRequestHandler
+    bucket_name: str
+    scope_name: str
     num_workers: Optional[int] = None
 
     @property

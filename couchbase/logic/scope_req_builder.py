@@ -23,9 +23,7 @@ from couchbase.logic.scope_types import (AnalyticsQueryRequest,
                                          QueryRequest,
                                          SearchQueryRequest)
 from couchbase.n1ql import N1QLQuery
-from couchbase.options import (AnalyticsOptions,
-                               QueryOptions,
-                               SearchOptions)
+from couchbase.options import AnalyticsOptions, QueryOptions
 from couchbase.search import (SearchQuery,
                               SearchQueryBuilder,
                               SearchRequest)
@@ -90,22 +88,14 @@ class ScopeRequestBuilder:
                              *options: object,
                              **kwargs: object) -> SearchQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
-        if isinstance(query, SearchQuery):
-            opt = SearchOptions()
-            opts = list(options)
-            for o in opts:
-                if isinstance(o, SearchOptions):
-                    opt = o
-                    opts.remove(o)
 
-            # set the scope_name as this scope if not provided
-            if not ('scope_name' in opt or 'scope_name' in kwargs):
-                kwargs['scope_name'] = f'{self._scope_name}'
-            req = SearchQueryRequest(
-                SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs), obs_handler)
+        if isinstance(query, SearchQuery):
+            query_builder = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
         else:
-            req = SearchQueryRequest(
-                SearchQueryBuilder.create_search_query_from_request(index, query, *options, **kwargs), obs_handler)
+            query_builder = SearchQueryBuilder.create_search_query_from_request(index, query, *options, **kwargs)
+
+        scope_name = query_builder.scope_name if query_builder.scope_name else self._scope_name
+        req = SearchQueryRequest(query_builder, obs_handler, self._bucket_name, scope_name)
 
         # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:

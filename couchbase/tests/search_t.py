@@ -38,50 +38,41 @@ from tests.test_features import EnvironmentFeatures
 
 class SearchCollectionTestSuite:
     TEST_MANIFEST = [
-        'test_cluster_query_collections',
         'test_scope_query_collections',
         'test_scope_search_fields',
         'test_scope_search_highlight',
         'test_search_query_in_thread',
     ]
 
-    def test_cluster_query_collections(self, cb_env):
+    @pytest.mark.parametrize('query_op', ['search_query', 'search'])
+    def test_scope_query_collections(self, cb_env, query_op):
         q = search.TermQuery('auto')
-        res = cb_env.cluster.search_query(cb_env.TEST_COLLECTION_INDEX_NAME,
-                                          q,
-                                          SearchOptions(limit=10,
-                                                        scope_name=cb_env.scope.name,
-                                                        collections=[cb_env.collection.name]))
+        operation = getattr(cb_env.scope, query_op)
+        res = operation(cb_env.TEST_COLLECTION_INDEX_NAME,
+                        q,
+                        SearchOptions(limit=10, collections=[cb_env.collection.name]))
         rows = cb_env.assert_rows(res, 2, return_rows=True)
 
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c == cb_env.collection.name]) is True
 
-    def test_scope_query_collections(self, cb_env):
-        q = search.TermQuery('auto')
-        res = cb_env.scope.search_query(cb_env.TEST_COLLECTION_INDEX_NAME,
-                                        q,
-                                        SearchOptions(limit=10, collections=[cb_env.collection.name]))
-        rows = cb_env.assert_rows(res, 2, return_rows=True)
-
-        collections = list(map(lambda r: r.fields['_$c'], rows))
-        assert all([c for c in collections if c == cb_env.collection.name]) is True
-
-        res = cb_env.scope.search_query(cb_env.TEST_COLLECTION_INDEX_NAME, q, SearchOptions(limit=10))
+        res = operation(cb_env.TEST_COLLECTION_INDEX_NAME, q, SearchOptions(limit=10))
         rows = cb_env.assert_rows(res, 2, return_rows=True)
 
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c in [cb_env.collection.name, cb_env.OTHER_COLLECTION]]) is True
 
-    def test_scope_search_fields(self, cb_env):
+    @pytest.mark.parametrize('query_op', ['search_query', 'search'])
+    def test_scope_search_fields(self, cb_env, query_op):
         test_fields = ['make', 'model']
         q = search.TermQuery('auto')
+        operation = getattr(cb_env.scope, query_op)
         # verify fields works w/in kwargs
-        res = cb_env.scope.search_query(cb_env.TEST_COLLECTION_INDEX_NAME,
-                                        q,
-                                        SearchOptions(limit=10),
-                                        fields=test_fields,
-                                        collections=[cb_env.collection.name])
+        res = operation(cb_env.TEST_COLLECTION_INDEX_NAME,
+                        q,
+                        SearchOptions(limit=10),
+                        fields=test_fields,
+                        collections=[cb_env.collection.name])
 
         fields_with_col = copy(test_fields)
         fields_with_col.append('_$c')
@@ -95,11 +86,11 @@ class SearchCollectionTestSuite:
         assert all([c for c in collections if c == cb_env.collection.name]) is True
 
         # verify fields works w/in options
-        res = cb_env.scope.search_query(cb_env.TEST_COLLECTION_INDEX_NAME,
-                                        q,
-                                        SearchOptions(limit=10,
-                                                      fields=test_fields,
-                                                      collections=[cb_env.collection.name]))
+        res = operation(cb_env.TEST_COLLECTION_INDEX_NAME,
+                        q,
+                        SearchOptions(limit=10,
+                                      fields=test_fields,
+                                      collections=[cb_env.collection.name]))
 
         rows = cb_env.assert_rows(res, 1, return_rows=True)
         first_entry = rows[0]
@@ -110,13 +101,14 @@ class SearchCollectionTestSuite:
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c == cb_env.collection.name]) is True
 
-    def test_scope_search_highlight(self, cb_env):
-
+    @pytest.mark.parametrize('query_op', ['search_query', 'search'])
+    def test_scope_search_highlight(self, cb_env, query_op):
         q = search.TermQuery('auto')
+        operation = getattr(cb_env.scope, query_op)
         # check w/in options
-        res = cb_env.scope.search_query(cb_env.TEST_COLLECTION_INDEX_NAME,
-                                        q,
-                                        SearchOptions(limit=10, highlight_style=HighlightStyle.Html))
+        res = operation(cb_env.TEST_COLLECTION_INDEX_NAME,
+                        q,
+                        SearchOptions(limit=10, highlight_style=HighlightStyle.Html))
         rows = cb_env.assert_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         fragments = rows[0].fragments
@@ -127,8 +119,11 @@ class SearchCollectionTestSuite:
         assert all([c for c in collections if c == cb_env.collection.name]) is True
 
         # check w/in kwargs
-        res = cb_env.scope.search_query(cb_env.TEST_COLLECTION_INDEX_NAME, q, SearchOptions(
-            limit=10), highlight_style=HighlightStyle.Html, collections=[cb_env.collection.name])
+        res = operation(cb_env.TEST_COLLECTION_INDEX_NAME,
+                        q,
+                        SearchOptions(limit=10),
+                        highlight_style=HighlightStyle.Html,
+                        collections=[cb_env.collection.name])
         rows = cb_env.assert_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         fragments = rows[0].fragments
@@ -138,13 +133,15 @@ class SearchCollectionTestSuite:
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c == cb_env.collection.name]) is True
 
-    def test_search_query_in_thread(self, cb_env):
+    @pytest.mark.parametrize('query_op', ['search_query', 'search'])
+    def test_search_query_in_thread(self, cb_env, query_op):
         results = [None]
 
         def run_test(scope, search_idx, assert_fn, results):
             try:
                 q = search.TermQuery('auto')
-                result = scope.search_query(search_idx, q, SearchOptions(limit=10))
+                operation = getattr(scope, query_op)
+                result = operation(search_idx, q, SearchOptions(limit=10))
                 assert_fn(result, 2)
                 assert result.metadata() is not None
             except AssertionError:
@@ -785,7 +782,6 @@ class ClassicSearchCollectionTests(SearchCollectionTestSuite):
             pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
 
         cb_env = SearchTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_search_mgmt()
         cb_env.setup(request.param)
         yield cb_env
         cb_env.teardown(request.param)
@@ -807,7 +803,6 @@ class ClassicSearchTests(SearchTestSuite):
             pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
 
         cb_env = SearchTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_search_mgmt()
         cb_env.setup(request.param)
         yield cb_env
         cb_env.teardown(request.param)

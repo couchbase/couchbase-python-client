@@ -112,7 +112,9 @@ class TxScopeImpl(AsyncScopeImpl):
                                                               req.query_builder.as_encodable(),
                                                               default_serializer=self.default_serializer,
                                                               streaming_timeout=streaming_timeout,
-                                                              obs_handler=req.obs_handler)
+                                                              obs_handler=req.obs_handler,
+                                                              bucket_name=req.bucket_name,
+                                                              scope_name=req.scope_name)
         d = Deferred()
 
         def _on_ok(_):

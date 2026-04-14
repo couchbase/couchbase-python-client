@@ -435,7 +435,8 @@ class AsyncScope:
 
         """  # noqa: E501
         return ScopeSearchIndexManager(self._impl._client_adapter,
-                                       self.bucket_name, self.name,
+                                       self.bucket_name,
+                                       self.name,
                                        self._impl.observability_instruments)
 
     def eventing_functions(self) -> ScopeEventingFunctionManager:

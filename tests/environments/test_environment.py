@@ -367,6 +367,7 @@ class TestEnvironment:
 
     def enable_named_collections(self) -> None:
         self._use_named_collections = True
+        return self
 
     def enable_collection_mgmt(self) -> TestEnvironment:
         EnvironmentFeatures.check_if_feature_supported('collections',

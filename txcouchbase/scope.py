@@ -107,7 +107,9 @@ class Scope:
             :class:`~txcouchbase.management.search.ScopeSearchIndexManager`: A :class:`~txcouchbase.management.search.ScopeSearchIndexManager` instance.
 
         """  # noqa: E501
-        return ScopeSearchIndexManager(self._impl._client_adapter, self.bucket_name, self.name,
+        return ScopeSearchIndexManager(self._impl._client_adapter,
+                                       self.bucket_name,
+                                       self.name,
                                        self._impl.observability_instruments)
 
     @staticmethod
