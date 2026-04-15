@@ -875,7 +875,11 @@ class WrappedSpan:
         if isinstance(self._parent_span, WrappedSpan):
             self._parent_span.set_attribute(key, value)
 
-        if skip_encoding_span is True:
+        # For multi-mutation ops (insert/upsert/replace multi), process_core_span is called once per result
+        # in the batch. The first call ends all encoding spans (setting _encoding_spans_ended=True) and
+        # propagates cluster labels to them at that point. Subsequent calls have nothing left to update on
+        # the already-ended encoding spans, so skip the iteration to avoid O(N²) attribute propagation.
+        if skip_encoding_span is True or self._encoding_spans_ended:
             return
 
         if isinstance(self._encoding_spans, list):

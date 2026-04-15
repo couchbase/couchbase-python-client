@@ -121,6 +121,19 @@ class IgnoredParentSpan(Enum):
 
 IGNORED_PARENT_SPAN_VALUES = frozenset(span.value for span in IgnoredParentSpan)
 
+# Only these attribute keys are actually processed in ThresholdLoggingSpan.set_attribute.
+# We ignore all other attributes, so lets skip the lock acquisition for them.
+PROCESSED_ATTRIBUTE_KEYS = frozenset({
+    OpAttributeName.Service.value,
+    DispatchAttributeName.ServerDuration.value,
+    DispatchAttributeName.LocalId.value,
+    DispatchAttributeName.OperationId.value,
+    DispatchAttributeName.PeerAddress.value,
+    DispatchAttributeName.PeerPort.value,
+    DispatchAttributeName.ServerAddress.value,
+    DispatchAttributeName.ServerPort.value,
+})
+
 
 @dataclass(frozen=True)
 class ThresholdLoggingSpanSnapshot:
@@ -387,7 +400,9 @@ class ThresholdLoggingSpan(RequestSpan):
         return self._total_server_duration_ns
 
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:  # noqa: C901
-        propagate_to_parent = True
+        if key not in PROCESSED_ATTRIBUTE_KEYS:
+            return
+
         parent_to_update = None
 
         with self._lock:
@@ -408,12 +423,9 @@ class ThresholdLoggingSpan(RequestSpan):
                 self._remote_address = str(value)
             elif key == DispatchAttributeName.ServerPort.value:
                 self._remote_port = int(value)
-            else:
-                propagate_to_parent = False
 
             # Capture parent reference inside lock to avoid race condition
-            if propagate_to_parent:
-                parent_to_update = self._parent_span
+            parent_to_update = self._parent_span
 
         # Propagate to parent outside lock to avoid potential deadlock
         if parent_to_update:
@@ -432,46 +444,50 @@ class ThresholdLoggingSpan(RequestSpan):
             self._status = status
 
     def end(self, end_time: Optional[int] = None) -> None:
-        # Idempotent end with lock and snapshot building
+        # Idempotent end; only compute total duration under the lock.
         with self._lock:
             if self._end_time_ns is not None:
-                # Already ended, do nothing
                 return
-
             self._end_time_ns = end_time if end_time is not None else time_ns()
             self._total_duration_ns = self._end_time_ns - self._start_time_ns
 
-            # Build snapshot of span state for threshold logging
-            self._span_snapshot = ThresholdLoggingSpanSnapshot(
-                name=self._name,
-                service_type=self._service_type,
-                total_duration_ns=self._total_duration_ns,
-                encode_duration_ns=self._total_encode_duration_ns,
-                dispatch_duration_ns=self._dispatch_duration_ns,
-                total_dispatch_duration_ns=self._total_dispatch_duration_ns,
-                server_duration_ns=self._server_duration_ns,
-                total_server_duration_ns=self._total_server_duration_ns,
-                local_id=self._local_id,
-                operation_id=self._operation_id,
-                local_socket=self.local_socket,
-                remote_socket=self.remote_socket,
-            )
-
-        # Handle encoding and dispatch duration updates (outside lock to avoid deadlock)
+        # Encoding/dispatch spans only propagate duration to parent; no snapshot needed.
         if self._name == OpAttributeName.EncodingSpanName.value:
             self.encode_duration_ns = self._total_duration_ns
+            return
         elif self._name == OpAttributeName.DispatchSpanName.value:
             self.dispatch_duration_ns = self._total_duration_ns
-        elif (self._name in IGNORED_MULTI_OP_SPAN_VALUES  # for now multi-op spans are ignored for threshold logging
-              or (self._parent_span and self._parent_span.name in IGNORED_MULTI_OP_SPAN_VALUES)):
             return
-        elif self._parent_span is not None and self._parent_span.name in IGNORED_PARENT_SPAN_VALUES:
+
+        # Multi-op wrapper spans and their direct children are not threshold-checked.
+        if (self._name in IGNORED_MULTI_OP_SPAN_VALUES
+                or (self._parent_span and self._parent_span.name in IGNORED_MULTI_OP_SPAN_VALUES)):
+            return
+
+        # Build snapshot only for spans that require threshold evaluation.
+        snapshot = ThresholdLoggingSpanSnapshot(
+            name=self._name,
+            service_type=self._service_type,
+            total_duration_ns=self._total_duration_ns,
+            encode_duration_ns=self._total_encode_duration_ns,
+            dispatch_duration_ns=self._dispatch_duration_ns,
+            total_dispatch_duration_ns=self._total_dispatch_duration_ns,
+            server_duration_ns=self._server_duration_ns,
+            total_server_duration_ns=self._total_server_duration_ns,
+            local_id=self._local_id,
+            operation_id=self._operation_id,
+            local_socket=self.local_socket,
+            remote_socket=self.remote_socket,
+        )
+        self._span_snapshot = snapshot
+
+        if self._parent_span is not None and self._parent_span.name in IGNORED_PARENT_SPAN_VALUES:
             if self._tracer:
-                self._tracer.check_threshold(self._span_snapshot)
+                self._tracer.check_threshold(snapshot)
         elif (self._parent_span is None
               and self._tracer
               and self._name not in IGNORED_PARENT_SPAN_VALUES):
-            self._tracer.check_threshold(self._span_snapshot)
+            self._tracer.check_threshold(snapshot)
 
 
 class ThresholdLoggingTracer(RequestTracer):
