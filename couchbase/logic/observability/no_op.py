@@ -55,6 +55,10 @@ class NoOpSpan(RequestSpan):
         pass
 
     @property
+    def is_recording(self) -> bool:
+        return False
+
+    @property
     def name(self) -> str:
         return ''
 

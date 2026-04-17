@@ -736,13 +736,25 @@ class WrappedSpan:
             _is_multi_op
             and getattr(self._request_span, '_supports_multi_op_fast_dispatch', False)
         )
-        self._has_multiple_encoding_spans = (self._op_name.is_multi_op() or self._op_name is OpName.MutateIn)
-        self._encoding_spans_ended = False
-        self._encoding_spans: Optional[Union[WrappedEncodingSpan, List[WrappedEncodingSpan]]] = None
-        self._set_span_attrs(**options)
-        self._cluster_name: Optional[str] = None
-        self._cluster_uuid: Optional[str] = None
-        self._end_time_watermark = time.time_ns()
+        # When OTel sampler drops a span, is_recording is False and we skip
+        # all expensive attribute setting, encoding spans, and dispatch span building.
+        self._is_recording = getattr(self._request_span, 'is_recording', True)
+        if self._is_recording:
+            self._has_multiple_encoding_spans = (_is_multi_op or self._op_name is OpName.MutateIn)
+            self._encoding_spans_ended = False
+            self._encoding_spans: Optional[Union[WrappedEncodingSpan, List[WrappedEncodingSpan]]] = None
+            self._set_span_attrs(**options)
+            self._cluster_name: Optional[str] = None
+            self._cluster_uuid: Optional[str] = None
+            self._end_time_watermark = time.time_ns()
+        else:
+            # T10: Minimal init — skip all attribute work for non-recording spans
+            self._has_multiple_encoding_spans = False
+            self._encoding_spans_ended = True
+            self._encoding_spans = None
+            self._cluster_name = None
+            self._cluster_uuid = None
+            self._end_time_watermark = self._start_time
 
     @property
     def cluster_name(self) -> Optional[str]:
@@ -751,6 +763,10 @@ class WrappedSpan:
     @property
     def cluster_uuid(self) -> Optional[str]:
         return self._cluster_uuid
+
+    @property
+    def is_recording(self) -> bool:
+        return self._is_recording
 
     @property
     def request_span(self) -> SpanProtocol:
@@ -763,7 +779,7 @@ class WrappedSpan:
     def maybe_add_encoding_span(self, encoding_fn: Callable[..., Tuple[bytes, int]]) -> Tuple[bytes, int]:
         # legacy operations did not create an encoding span; not support now
         # we only expect certain ops to have multiple encoding spans
-        if self._wrapped_tracer.is_legacy or not self._has_multiple_encoding_spans:
+        if not self._is_recording or self._wrapped_tracer.is_legacy or not self._has_multiple_encoding_spans:
             return encoding_fn()
 
         if not self._encoding_spans:
@@ -786,7 +802,7 @@ class WrappedSpan:
     def maybe_create_encoding_span(self, encoding_fn: Callable[..., Tuple[bytes, int]]) -> Tuple[bytes, int]:
         # legacy operations did not create an encoding span; not support now
         # if the op is expected to have multiple encoding spans, maybe_add_encoding_span() should be used instead
-        if self._wrapped_tracer.is_legacy or self._has_multiple_encoding_spans:
+        if not self._is_recording or self._wrapped_tracer.is_legacy or self._has_multiple_encoding_spans:
             return encoding_fn()
 
         encoding_span = self._wrapped_tracer.tracer.request_span(_ATTR_ENCODING_SPAN_NAME,
@@ -807,6 +823,10 @@ class WrappedSpan:
         self._end_time_watermark = self._end_time_watermark if self._end_time_watermark > end_time else end_time
 
     def process_core_span(self, core_span: CppWrapperSdkSpan) -> None:
+        # Skip all core span processing if the span is not recording
+        if not self._is_recording:
+            return
+
         # Guard cluster_[name|uuid] propagation — for multi-op batches, process_core_span
         # is called once per sub-op on the same WrappedSpan. cluster_name/uuid are
         # identical for every sub-op, so only set them on the first call.
@@ -842,6 +862,10 @@ class WrappedSpan:
             self._request_span.set_attribute(attr_name, attr_val)
 
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
+        # Skip setting any attribute if the span is not recording
+        if not self._is_recording:
+            return
+
         if key == _ATTR_CLUSTER_NAME:
             self._cluster_name = value
         elif key == _ATTR_CLUSTER_UUID:
@@ -862,6 +886,12 @@ class WrappedSpan:
         self._request_span.set_status(status)
 
     def end(self, end_time: int) -> None:
+        # For non-recording spans, still call end() for OTel context cleanup
+        # but skip all the heavy processing (encoding spans, watermark, etc.)
+        if not self._is_recording:
+            self._request_span.end(end_time)
+            return
+
         self._end_encoding_spans()
         if self._wrapped_tracer.is_legacy:
             self._request_span.finish()

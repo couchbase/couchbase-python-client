@@ -53,6 +53,19 @@ class RequestSpan(ABC):
     """
 
     @property
+    def is_recording(self) -> bool:
+        """Whether this span is recording trace data.
+
+        Returns True by default for backward compatibility with existing
+        RequestSpan implementations. Subclasses may override to return
+        False when the span is not being sampled (e.g., OTel NonRecordingSpan).
+
+        When False, the SDK will skip expensive span attribute setting,
+        encoding span creation, and dispatch span tree building.
+        """
+        return True
+
+    @property
     @abstractmethod
     def name(self) -> str:
         """

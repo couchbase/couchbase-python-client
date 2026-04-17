@@ -57,6 +57,10 @@ if HAS_OTEL:  # noqa: C901
         def name(self) -> str:
             return self._name
 
+        @property
+        def is_recording(self) -> bool:
+            return self._otel_span.is_recording()
+
         def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
             self._otel_span.set_attribute(key, value)
 
