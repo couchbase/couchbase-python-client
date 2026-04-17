@@ -45,8 +45,13 @@ class BinaryCollection:
         *opts,  # type: IncrementOptions
         **kwargs,  # type: Any
     ) -> Deferred[CounterResult]:
-        op_type = KeyValueOperationType.Increment
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        instruments = self._impl.observability_instruments
+        if instruments.is_noop:
+            req = self._impl.request_builder.build_increment_request(key, None, *opts, **kwargs)
+            d = self._impl.increment_deferred(req, None)
+            d.addBoth(self._impl._finish_span, None)
+            return d
+        obs_handler = ObservableRequestHandler(KeyValueOperationType.Increment, instruments)
         obs_handler.__enter__()
         try:
             req = self._impl.request_builder.build_increment_request(key, obs_handler, *opts, **kwargs)
@@ -63,8 +68,13 @@ class BinaryCollection:
         *opts,  # type: DecrementOptions
         **kwargs,  # type: Any
     ) -> Deferred[CounterResult]:
-        op_type = KeyValueOperationType.Decrement
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        instruments = self._impl.observability_instruments
+        if instruments.is_noop:
+            req = self._impl.request_builder.build_decrement_request(key, None, *opts, **kwargs)
+            d = self._impl.decrement_deferred(req, None)
+            d.addBoth(self._impl._finish_span, None)
+            return d
+        obs_handler = ObservableRequestHandler(KeyValueOperationType.Decrement, instruments)
         obs_handler.__enter__()
         try:
             req = self._impl.request_builder.build_decrement_request(key, obs_handler, *opts, **kwargs)
@@ -82,8 +92,13 @@ class BinaryCollection:
         *opts,  # type: AppendOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
-        op_type = KeyValueOperationType.Append
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        instruments = self._impl.observability_instruments
+        if instruments.is_noop:
+            req = self._impl.request_builder.build_append_request(key, value, None, *opts, **kwargs)
+            d = self._impl.append_deferred(req, None)
+            d.addBoth(self._impl._finish_span, None)
+            return d
+        obs_handler = ObservableRequestHandler(KeyValueOperationType.Append, instruments)
         obs_handler.__enter__()
         try:
             req = self._impl.request_builder.build_append_request(key, value, obs_handler, *opts, **kwargs)
@@ -101,8 +116,13 @@ class BinaryCollection:
         *opts,  # type: PrependOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
-        op_type = KeyValueOperationType.Prepend
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
+        instruments = self._impl.observability_instruments
+        if instruments.is_noop:
+            req = self._impl.request_builder.build_prepend_request(key, value, None, *opts, **kwargs)
+            d = self._impl.prepend_deferred(req, None)
+            d.addBoth(self._impl._finish_span, None)
+            return d
+        obs_handler = ObservableRequestHandler(KeyValueOperationType.Prepend, instruments)
         obs_handler.__enter__()
         try:
             req = self._impl.request_builder.build_prepend_request(key, value, obs_handler, *opts, **kwargs)

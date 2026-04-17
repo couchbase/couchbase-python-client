@@ -62,6 +62,8 @@ class TxCollectionImpl(AsyncCollectionImpl):
 
     def _finish_span(self, result, obs_handler):
         """Callback to properly end the span on success or failure."""
+        if obs_handler is None:
+            return result
         if isinstance(result, Failure):
             exc = result.value
             obs_handler.__exit__(type(exc), exc, exc.__traceback__)

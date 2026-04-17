@@ -20,6 +20,7 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Callable,
                     Dict,
+                    List,
                     Optional,
                     Set)
 
@@ -29,6 +30,8 @@ from couchbase.logic.operation_types import BucketOperationType, StreamingOperat
 if TYPE_CHECKING:
     from couchbase.views import ViewQuery
 
+_FIELDS_CACHE: Dict[type, List] = {}
+
 
 @dataclass
 class BucketRequest:
@@ -36,10 +39,16 @@ class BucketRequest:
     def req_to_dict(self,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+        cls = type(self)
+        cached_fields = _FIELDS_CACHE.get(cls)
+        if cached_fields is None:
+            cached_fields = list(fields(cls))
+            _FIELDS_CACHE[cls] = cached_fields
+
         op_kwargs = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if getattr(self, field.name) is not None
+            f.name: getattr(self, f.name)
+            for f in cached_fields
+            if getattr(self, f.name) is not None
         }
 
         if callback is not None:

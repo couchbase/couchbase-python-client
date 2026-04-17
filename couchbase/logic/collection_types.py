@@ -39,6 +39,12 @@ OPARG_SKIP_LIST = ['bucket_name',
                    'transcoder',
                    'value']
 
+# frozenset for O(1) membership checks (vs O(n) list); module-level dict caches the
+# filtered field list per request class so dataclasses.fields() is called only once per
+# class for the lifetime of the process.
+_OPARG_SKIP_SET: frozenset = frozenset(OPARG_SKIP_LIST)
+_FIELDS_CACHE: Dict[type, list] = {}
+
 
 @dataclass
 class CollectionDetails:
@@ -88,10 +94,18 @@ class CollectionRequest:
             }
         }
 
-        op_kwargs.update(**{
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
+        # P3: Look up (or populate) the per-class filtered field list once; subsequent
+        # calls skip the dataclasses.fields() reflection entirely.
+        cls = type(self)
+        cached_fields = _FIELDS_CACHE.get(cls)
+        if cached_fields is None:
+            cached_fields = [f for f in fields(cls) if f.name not in _OPARG_SKIP_SET]
+            _FIELDS_CACHE[cls] = cached_fields
+
+        op_kwargs.update({
+            f.name: getattr(self, f.name)
+            for f in cached_fields
+            if getattr(self, f.name) is not None
         })
 
         if callback is not None:

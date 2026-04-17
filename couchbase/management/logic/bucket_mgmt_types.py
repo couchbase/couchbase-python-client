@@ -412,6 +412,8 @@ class BucketDescribeResult:
 
 # we have these params on the top-level pycbc_core request
 OPARG_SKIP_LIST = ['error_map']
+_OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
+_FIELDS_CACHE: Dict[type, list] = {}
 
 
 @dataclass
@@ -421,11 +423,16 @@ class BucketMgmtRequest(MgmtRequest):
                     obs_handler: Optional[ObservableRequestHandler] = None,
                     callback: Optional[Callable[..., None]] = None,
                     errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+        cls = type(self)
+        cached_fields = _FIELDS_CACHE.get(cls)
+        if cached_fields is None:
+            cached_fields = [f for f in fields(cls) if f.name not in _OPARG_SKIP_SET]
+            _FIELDS_CACHE[cls] = cached_fields
 
         mgmt_kwargs = {
-            field.name: getattr(self, field.name)
-            for field in fields(self)
-            if field.name not in OPARG_SKIP_LIST and getattr(self, field.name) is not None
+            f.name: getattr(self, f.name)
+            for f in cached_fields
+            if getattr(self, f.name) is not None
         }
 
         if callback is not None:
