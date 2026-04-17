@@ -25,10 +25,12 @@ from typing import (Callable,
                     Generic,
                     Mapping,
                     Optional,
+                    Tuple,
                     TypedDict,
                     TypeVar)
 
-from couchbase.logic.observability.observability_types import (OpAttributeName,
+from couchbase.logic.observability.observability_types import (_ATTR_OPERATION_NAME,
+                                                               _ATTR_SERVICE,
                                                                OpName,
                                                                ServiceType)
 from couchbase.logic.pycbc_core import pycbc_hdr_histogram
@@ -216,13 +218,28 @@ class LoggingMeter(Meter):
             ConcurrentMap[OpName, LoggingValueRecorder]
         ] = ConcurrentMap(recorded_services)
 
+        # (service_str, op_str) -> recorder cache. Avoids OpName() and
+        # ServiceType() enum construction on every value_recorder() call. There
+        # are only ~8 KV op combinations so this fills up after the first ops.
+        self._recorder_cache: Dict[Tuple[str, str], LoggingValueRecorder] = {}
         self._reporter = LoggingMeterReporter(logging_meter=self, interval=self._emit_interval_s)
         self._reporter.start()
 
     def value_recorder(self, name: str, tags: Dict[str, str]) -> ValueRecorder:
-        op_name = OpName(tags.get(OpAttributeName.OperationName.value, None))
-        service_type = ServiceType(tags.get(OpAttributeName.Service.value, None))
-        lvr = self._recorders[service_type].get_or_create(op_name)
+        # Use cached string constants instead of Enum.value on every call,
+        # and cache the recorder by (service_str, op_str) to avoid OpName() and
+        # ServiceType() enum construction.
+        op_str = tags.get(_ATTR_OPERATION_NAME, None)
+        svc_str = tags.get(_ATTR_SERVICE, None)
+        lvr = self._recorder_cache.get((svc_str, op_str))
+        if lvr is None:
+            # Slow path: first encounter of this combination (~8 total for KV).
+            # No lock needed — worst case two threads both miss and write the
+            # same value; the result is identical and the assignment is atomic.
+            op_name = OpName(op_str)
+            service_type = ServiceType(svc_str)
+            lvr = self._recorders[service_type].get_or_create(op_name)
+            self._recorder_cache[(svc_str, op_str)] = lvr
         return lvr
 
     def create_report(self) -> LoggingMeterReport:

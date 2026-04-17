@@ -382,3 +382,7 @@ class AsyncDataStructuresTracingTests(AsyncDataStructuresTracingTestsSuite):
         await acb_env.setup(num_docs=50)
         yield acb_env
         await acb_env.teardown()
+        # TODO(PYCBC-1746): Update once legacy tracing logic is removed.
+        #                   See PYCBC-1748 for details on issue, this seems to mainly impact the error scenarios.
+        if request.param == TracingType.Legacy:
+            await acb_env.cluster.close()

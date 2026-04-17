@@ -34,8 +34,16 @@ from typing import (Generic,
                     TypeVar,
                     Union)
 
-from couchbase.logic.observability.observability_types import (DispatchAttributeName,
-                                                               OpAttributeName,
+from couchbase.logic.observability.observability_types import (_ATTR_DISPATCH_SPAN_NAME,
+                                                               _ATTR_ENCODING_SPAN_NAME,
+                                                               _ATTR_SERVICE,
+                                                               _DISP_LOCAL_ID,
+                                                               _DISP_OPERATION_ID,
+                                                               _DISP_PEER_ADDRESS,
+                                                               _DISP_PEER_PORT,
+                                                               _DISP_SERVER_ADDRESS,
+                                                               _DISP_SERVER_DURATION,
+                                                               _DISP_SERVER_PORT,
                                                                ServiceType)
 from couchbase.logic.options import ClusterTracingOptionsBase
 from couchbase.observability.tracing import (RequestSpan,
@@ -84,7 +92,7 @@ class IgnoredMultiOpSpan(Enum):
     UpsertMulti = 'upsert_multi'
 
 
-IGNORED_MULTI_OP_SPAN_VALUES = frozenset(span.value for span in IgnoredMultiOpSpan)
+_IGNORED_MULTI_OP_SPAN_VALUES = frozenset(span.value for span in IgnoredMultiOpSpan)
 
 
 class IgnoredParentSpan(Enum):
@@ -119,19 +127,19 @@ class IgnoredParentSpan(Enum):
     SetValues = 'set_values'
 
 
-IGNORED_PARENT_SPAN_VALUES = frozenset(span.value for span in IgnoredParentSpan)
+_IGNORED_PARENT_SPAN_VALUES = frozenset(span.value for span in IgnoredParentSpan)
 
 # Only these attribute keys are actually processed in ThresholdLoggingSpan.set_attribute.
 # We ignore all other attributes, so lets skip the lock acquisition for them.
-PROCESSED_ATTRIBUTE_KEYS = frozenset({
-    OpAttributeName.Service.value,
-    DispatchAttributeName.ServerDuration.value,
-    DispatchAttributeName.LocalId.value,
-    DispatchAttributeName.OperationId.value,
-    DispatchAttributeName.PeerAddress.value,
-    DispatchAttributeName.PeerPort.value,
-    DispatchAttributeName.ServerAddress.value,
-    DispatchAttributeName.ServerPort.value,
+_PROCESSED_ATTRIBUTE_KEYS = frozenset({
+    _ATTR_SERVICE,
+    _DISP_SERVER_DURATION,
+    _DISP_LOCAL_ID,
+    _DISP_OPERATION_ID,
+    _DISP_PEER_ADDRESS,
+    _DISP_PEER_PORT,
+    _DISP_SERVER_ADDRESS,
+    _DISP_SERVER_PORT,
 })
 
 
@@ -276,6 +284,24 @@ class ThresholdLoggingReporter(Thread):
 
 class ThresholdLoggingSpan(RequestSpan):
 
+    # Use __slots__ to elimiate per-instance __dict__, making attribute access
+    # faster (C-level slot lookup) and reducing memory allocation.
+    __slots__ = (
+        '_name', '_parent_span', '_start_time_ns', '_tracer', '_lock',
+        '_events', '_status', '_end_time_ns',
+        '_service_type', '_local_id', '_operation_id',
+        '_peer_address', '_peer_port', '_remote_address', '_remote_port',
+        '_encode_duration_ns', '_dispatch_duration_ns', '_server_duration_ns',
+        '_total_dispatch_duration_ns', '_total_encode_duration_ns',
+        '_total_server_duration_ns', '_total_duration_ns', '_span_snapshot',
+    )
+
+    # Class-level flag allowing WrappedSpan to detect that this span type
+    # supports the fast multi-op dispatch path (bypassing child span creation).
+    # __slots__ only covers instance attributes; class attributes sit on the
+    # class and are visible via getattr/instance lookup without a slot entry.
+    _supports_multi_op_fast_dispatch: bool = True
+
     def __init__(
         self,
         name: str,
@@ -288,8 +314,6 @@ class ThresholdLoggingSpan(RequestSpan):
         self._start_time_ns = start_time if start_time is not None else time_ns()
         self._tracer = tracer
         self._lock = Lock()
-        # TODO:  attributes/events make noop?
-        self._attributes = {}
         self._events = {}
         self._status = SpanStatusCode.UNSET
         self._end_time_ns: Optional[int] = None
@@ -314,62 +338,12 @@ class ThresholdLoggingSpan(RequestSpan):
         return self._name
 
     @property
-    def service_type(self) -> Optional[ServiceType]:
-        return self._service_type
-
-    @property
-    def span_snapshot(self) -> Optional[ThresholdLoggingSpanSnapshot]:
-        return self._span_snapshot
-
-    @property
-    def dispatch_duration_ns(self) -> Optional[int]:
-        return self._dispatch_duration_ns
-
-    @dispatch_duration_ns.setter
-    def dispatch_duration_ns(self, value: int) -> None:
-        # Capture parent reference inside lock to avoid race condition
-        parent_to_update = None
-        with self._lock:
-            self._dispatch_duration_ns = value
-            self._total_dispatch_duration_ns += self._dispatch_duration_ns
-            parent_to_update = self._parent_span
-
-        # Propagate to parent outside lock to avoid potential deadlock
-        if parent_to_update:
-            parent_to_update.dispatch_duration_ns = value
-
-    @property
-    def encode_duration_ns(self) -> Optional[int]:
-        return self._encode_duration_ns
-
-    @encode_duration_ns.setter
-    def encode_duration_ns(self, value: int) -> None:
-        # Capture parent reference inside lock to avoid race condition
-        parent_to_update = None
-        with self._lock:
-            self._encode_duration_ns = value
-            self._total_encode_duration_ns += self._encode_duration_ns
-            parent_to_update = self._parent_span
-
-        # Propagate to parent outside lock to avoid potential deadlock
-        if parent_to_update:
-            parent_to_update.encode_duration_ns = value
-
-    @property
-    def local_id(self) -> Optional[str]:
-        return self._local_id
-
-    @property
     def local_socket(self) -> Optional[str]:
         if self._peer_address is not None or self._peer_port is not None:
             address = self._peer_address or ''
             port = self._peer_port or ''
             return f'{address}:{port}'
         return None
-
-    @property
-    def operation_id(self) -> Optional[str]:
-        return self._operation_id
 
     @property
     def remote_socket(self) -> Optional[str]:
@@ -379,57 +353,57 @@ class ThresholdLoggingSpan(RequestSpan):
             return f'{address}:{port}'
         return None
 
-    @property
-    def server_duration_ns(self) -> Optional[int]:
-        return self._server_duration_ns
+    def _propagate_dispatch_duration(self, value: int) -> None:
+        """Set dispatch duration on this span and propagate to parent (non-recursive)."""
+        # We walk the parent chain iteratively instead of recursing.
+        span = self
+        while span is not None:
+            with span._lock:
+                span._dispatch_duration_ns = value
+                span._total_dispatch_duration_ns += value
+                next_span = span._parent_span
+            span = next_span
 
-    @property
-    def total_dispatch_duration_ns(self) -> int:
-        return self._total_dispatch_duration_ns
-
-    @property
-    def total_encode_duration_ns(self) -> int:
-        return self._total_encode_duration_ns
-
-    @property
-    def total_duration_ns(self) -> int:
-        return self._total_duration_ns
-
-    @property
-    def total_server_duration_ns(self) -> int:
-        return self._total_server_duration_ns
+    def _propagate_encode_duration(self, value: int) -> None:
+        """Set encode duration on this span and propagate to parent (non-recursive)."""
+        # We walk the parent chain iteratively instead of recursing.
+        span = self
+        while span is not None:
+            with span._lock:
+                span._encode_duration_ns = value
+                span._total_encode_duration_ns += value
+                next_span = span._parent_span
+            span = next_span
 
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:  # noqa: C901
-        if key not in PROCESSED_ATTRIBUTE_KEYS:
+        if key not in _PROCESSED_ATTRIBUTE_KEYS:
             return
 
-        parent_to_update = None
-
-        with self._lock:
-            if key == OpAttributeName.Service.value:
-                self._service_type = ServiceType.from_str(value)
-            elif key == DispatchAttributeName.ServerDuration.value:
-                self._server_duration_ns = int(value)
-                self._total_server_duration_ns += self._server_duration_ns
-            elif key == DispatchAttributeName.LocalId.value:
-                self._local_id = str(value)
-            elif key == DispatchAttributeName.OperationId.value:
-                self._operation_id = str(value)
-            elif key == DispatchAttributeName.PeerAddress.value:
-                self._peer_address = str(value)
-            elif key == DispatchAttributeName.PeerPort.value:
-                self._peer_port = int(value)
-            elif key == DispatchAttributeName.ServerAddress.value:
-                self._remote_address = str(value)
-            elif key == DispatchAttributeName.ServerPort.value:
-                self._remote_port = int(value)
-
-            # Capture parent reference inside lock to avoid race condition
-            parent_to_update = self._parent_span
-
-        # Propagate to parent outside lock to avoid potential deadlock
-        if parent_to_update:
-            parent_to_update.set_attribute(key, value)
+        # Set on this span under lock, then walk parent chain iteratively
+        # instead of recursing via parent_to_update.set_attribute(key, value).
+        span = self
+        while span is not None:
+            with span._lock:
+                if key == _ATTR_SERVICE:
+                    span._service_type = ServiceType.from_str(value)
+                elif key == _DISP_SERVER_DURATION:
+                    int_val = int(value)
+                    span._server_duration_ns = int_val
+                    span._total_server_duration_ns += int_val
+                elif key == _DISP_LOCAL_ID:
+                    span._local_id = str(value)
+                elif key == _DISP_OPERATION_ID:
+                    span._operation_id = str(value)
+                elif key == _DISP_PEER_ADDRESS:
+                    span._peer_address = str(value)
+                elif key == _DISP_PEER_PORT:
+                    span._peer_port = int(value)
+                elif key == _DISP_SERVER_ADDRESS:
+                    span._remote_address = str(value)
+                elif key == _DISP_SERVER_PORT:
+                    span._remote_port = int(value)
+                next_span = span._parent_span
+            span = next_span
 
     def set_attributes(self, attributes: Mapping[str, SpanAttributeValue]) -> None:
         for k, v in attributes.items():
@@ -448,20 +422,21 @@ class ThresholdLoggingSpan(RequestSpan):
         with self._lock:
             if self._end_time_ns is not None:
                 return
+
             self._end_time_ns = end_time if end_time is not None else time_ns()
             self._total_duration_ns = self._end_time_ns - self._start_time_ns
 
         # Encoding/dispatch spans only propagate duration to parent; no snapshot needed.
-        if self._name == OpAttributeName.EncodingSpanName.value:
-            self.encode_duration_ns = self._total_duration_ns
+        if self._name == _ATTR_ENCODING_SPAN_NAME:
+            self._propagate_encode_duration(self._total_duration_ns)
             return
-        elif self._name == OpAttributeName.DispatchSpanName.value:
-            self.dispatch_duration_ns = self._total_duration_ns
+        elif self._name == _ATTR_DISPATCH_SPAN_NAME:
+            self._propagate_dispatch_duration(self._total_duration_ns)
             return
 
         # Multi-op wrapper spans and their direct children are not threshold-checked.
-        if (self._name in IGNORED_MULTI_OP_SPAN_VALUES
-                or (self._parent_span and self._parent_span.name in IGNORED_MULTI_OP_SPAN_VALUES)):
+        if (self._name in _IGNORED_MULTI_OP_SPAN_VALUES
+                or (self._parent_span and self._parent_span._name in _IGNORED_MULTI_OP_SPAN_VALUES)):
             return
 
         # Build snapshot only for spans that require threshold evaluation.
@@ -481,12 +456,12 @@ class ThresholdLoggingSpan(RequestSpan):
         )
         self._span_snapshot = snapshot
 
-        if self._parent_span is not None and self._parent_span.name in IGNORED_PARENT_SPAN_VALUES:
+        if self._parent_span is not None and self._parent_span._name in _IGNORED_PARENT_SPAN_VALUES:
             if self._tracer:
                 self._tracer.check_threshold(snapshot)
         elif (self._parent_span is None
               and self._tracer
-              and self._name not in IGNORED_PARENT_SPAN_VALUES):
+              and self._name not in _IGNORED_PARENT_SPAN_VALUES):
             self._tracer.check_threshold(snapshot)
 
 

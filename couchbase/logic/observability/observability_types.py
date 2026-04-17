@@ -128,6 +128,8 @@ class ObservabilityInstruments:
     tracer: WrappedTracer
     meter: MeterProtocol
     get_cluster_labels_fn: Optional[Callable[[], Mapping[str, str]]] = None
+    # set to True when both tracer and meter or no-op
+    is_noop: bool = False
 
 
 class ServiceType(Enum):
@@ -217,10 +219,36 @@ class OpAttributeName(Enum):
     SystemName = 'db.system.name'
 
 
+# OpAttributeName cached values
+_ATTR_BUCKET_NAME = OpAttributeName.BucketName.value
+_ATTR_CLUSTER_NAME = OpAttributeName.ClusterName.value
+_ATTR_CLUSTER_UUID = OpAttributeName.ClusterUUID.value
+_ATTR_COLLECTION_NAME = OpAttributeName.CollectionName.value
+_ATTR_DISPATCH_SPAN_NAME = OpAttributeName.DispatchSpanName.value
+_ATTR_DURABILITY_LEVEL = OpAttributeName.DurabilityLevel.value
+_ATTR_ENCODING_SPAN_NAME = OpAttributeName.EncodingSpanName.value
+_ATTR_ERROR_TYPE = OpAttributeName.ErrorType.value
+_ATTR_METER_OP_DURATION = OpAttributeName.MeterOperationDuration.value
+_ATTR_OPERATION_NAME = OpAttributeName.OperationName.value
+_ATTR_QUERY_STATEMENT = OpAttributeName.QueryStatement.value
+_ATTR_RESERVED_UNIT = OpAttributeName.ReservedUnit.value
+_ATTR_RESERVED_UNIT_SECONDS = OpAttributeName.ReservedUnitSeconds.value
+_ATTR_RETRY_COUNT = OpAttributeName.RetryCount.value
+_ATTR_SCOPE_NAME = OpAttributeName.ScopeName.value
+_ATTR_SERVICE = OpAttributeName.Service.value
+_ATTR_SYSTEM_NAME = OpAttributeName.SystemName.value
+
+
 class CppOpAttributeName(Enum):
     ClusterName = 'cluster_name'
     ClusterUUID = 'cluster_uuid'
     RetryCount = 'retries'
+
+
+# CppOpAttributeName cached values
+_CPP_ATTR_CLUSTER_NAME = CppOpAttributeName.ClusterName.value
+_CPP_ATTR_CLUSTER_UUID = CppOpAttributeName.ClusterUUID.value
+_CPP_ATTR_RETRY_COUNT = CppOpAttributeName.RetryCount.value
 
 
 class DispatchAttributeName(Enum):
@@ -232,6 +260,16 @@ class DispatchAttributeName(Enum):
     ServerAddress = 'server.address'
     ServerDuration = 'couchbase.server_duration'
     ServerPort = 'server.port'
+
+
+# DispatchAttributeName cached values
+_DISP_LOCAL_ID = DispatchAttributeName.LocalId.value
+_DISP_OPERATION_ID = DispatchAttributeName.OperationId.value
+_DISP_PEER_ADDRESS = DispatchAttributeName.PeerAddress.value
+_DISP_PEER_PORT = DispatchAttributeName.PeerPort.value
+_DISP_SERVER_ADDRESS = DispatchAttributeName.ServerAddress.value
+_DISP_SERVER_DURATION = DispatchAttributeName.ServerDuration.value
+_DISP_SERVER_PORT = DispatchAttributeName.ServerPort.value
 
 
 class OpName(Enum):
@@ -456,6 +494,30 @@ class OpName(Enum):
             return OpName[op_type.name]
 
         raise InvalidArgumentException(f'Unsupported operation type {op_type}')
+
+
+# ---------------------------------------------------------------------------
+# Precomputed lookup dicts for from_op_type() — the hot KV path.
+#
+# OpName.from_op_type() and ServiceType.from_op_type() are called on every KV
+# op (twice each — TracerImpl + MeterImpl __init__). Pre-computing the results
+# at module load time turns all of those calls into a single O(1) dict lookup.
+#
+# Non-KV types (streaming, management, etc.) fall back to the original
+# from_op_type() method.
+# ----------------------------------------------------------------------------
+_OP_NAME_FROM_OP_TYPE = {}
+_SERVICE_TYPE_FROM_OP_TYPE = {}
+for _grp in (KeyValueOperationType, KeyValueMultiOperationType, DatastructureOperationType):
+    for _op in _grp:
+        # WithLegacyDurability variants have no OpName entry — skip them.
+        # They're never passed directly to ObservableRequestHandler; only the
+        # base op types (without durability suffix) are used with the handler.
+        _op_name = OpName._value2member_map_.get(_op.value)
+        if _op_name is not None:
+            _OP_NAME_FROM_OP_TYPE[_op] = _op_name
+            _SERVICE_TYPE_FROM_OP_TYPE[_op] = ServiceType.KeyValue
+del _grp, _op, _op_name
 
 
 class ExceptionName(Enum):

@@ -33,6 +33,8 @@ from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability import (LegacyTracerProtocol,
                                            MeterProtocol,
+                                           NoOpMeter,
+                                           NoOpTracer,
                                            ObservabilityInstruments,
                                            RequestTracerProtocol,
                                            WrappedTracer)
@@ -399,4 +401,8 @@ class ClusterSettings:
                    timeout_opts,
                    tracing_opts,
                    transaction_cfg,
-                   ObservabilityInstruments(tracer, meter))
+                   ObservabilityInstruments(
+                       tracer,
+                       meter,
+                       # allow ops can skip handler construction in no-op case
+                       is_noop=isinstance(tracer.tracer, NoOpTracer) and isinstance(meter, NoOpMeter)))

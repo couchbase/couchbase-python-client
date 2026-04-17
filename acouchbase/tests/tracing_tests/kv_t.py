@@ -600,3 +600,7 @@ class AsyncKeyValueTracingTests(AsyncKeyValueTracingTestsSuite):
         yield acb_env
         acb_env.disable_bucket_mgmt()
         await acb_env.teardown()
+        # TODO(PYCBC-1746): Update once legacy tracing logic is removed.
+        #                   See PYCBC-1748 for details on issue, this seems to mainly impact the error scenarios.
+        if request.param == TracingType.Legacy:
+            await acb_env.cluster.close()

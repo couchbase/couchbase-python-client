@@ -74,6 +74,7 @@ from couchbase.options import (AppendMultiOptions,
                                UpsertMultiOptions,
                                get_valid_multi_args)
 from couchbase.result import MultiGetResult, MultiMutationResult
+from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -129,14 +130,17 @@ class CollectionMultiRequestBuilder:
                                        keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
                                        opts_type: Type[Union[AppendMultiRequest, PrependMultiRequest]],
                                        return_type: Type[ReqT],
-                                       obs_handler: ObservableRequestHandler,
+                                       obs_handler: Optional[ObservableRequestHandler],
                                        *opts: object,
                                        **kwargs: object) -> ReqT:
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
-        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
-        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(
+            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
+        )
+        if obs_handler:
+            obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
         if not isinstance(keys_and_docs, dict):
             raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
@@ -164,7 +168,7 @@ class CollectionMultiRequestBuilder:
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
-            if durability:
+            if durability and obs_handler:
                 obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 
@@ -176,17 +180,20 @@ class CollectionMultiRequestBuilder:
                            per_key_args=per_key_args,
                            return_exceptions=return_exceptions)
 
-    def _get_multi_counter_op_req(self,
+    def _get_multi_counter_op_req(self,  # noqa: C901
                                   keys: List[str],
                                   opts_type: Type[Union[DecrementMultiRequest, IncrementMultiRequest]],
                                   return_type: Type[ReqT],
-                                  obs_handler: ObservableRequestHandler,
+                                  obs_handler: Optional[ObservableRequestHandler],
                                   *opts: object,
                                   **kwargs: object) -> ReqT:
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
-        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
-        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(
+            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
+        )
+        if obs_handler:
+            obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
         if not isinstance(keys, list):
             raise InvalidArgumentException(message='Expected keys to be a list.')
@@ -199,7 +206,7 @@ class CollectionMultiRequestBuilder:
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
-            if durability:
+            if durability and obs_handler:
                 obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 
@@ -228,15 +235,18 @@ class CollectionMultiRequestBuilder:
                                    keys_and_docs: Dict[str, JSONType],
                                    opts_type: Type[MutationMultiOptions],
                                    return_type: Type[ReqT],
-                                   obs_handler: ObservableRequestHandler,
+                                   obs_handler: Optional[ObservableRequestHandler],
                                    *opts: object,
                                    **kwargs: object
                                    ) -> ReqT:
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
-        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
-        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(
+            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
+        )
+        if obs_handler:
+            obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
         if not isinstance(keys_and_docs, dict):
             raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
@@ -249,7 +259,7 @@ class CollectionMultiRequestBuilder:
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
-            if durability:
+            if durability and obs_handler:
                 obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 
@@ -261,10 +271,22 @@ class CollectionMultiRequestBuilder:
         transcoded_keys_and_docs = {}
         for key, value in keys_and_docs.items():
             if per_key_args and key in per_key_args:
-                key_transcoder = per_key_args[key].pop('transcoder', transcoder)
-                transcoded_value = obs_handler.maybe_add_encoding_span(lambda: key_transcoder.encode_value(value))
+                key_transcoder: Transcoder = per_key_args[key].pop('transcoder', transcoder)
+                # directly call the transcoder if we are not using observability
+                if not obs_handler or obs_handler.is_noop:
+                    transcoded_value = key_transcoder.encode_value(value)
+                else:
+                    transcoded_value = obs_handler.maybe_add_encoding_span(
+                        lambda v=value, tc=key_transcoder: tc.encode_value(v)
+                    )
             else:
-                transcoded_value = obs_handler.maybe_add_encoding_span(lambda: transcoder.encode_value(value))
+                # directly call the transcoder if we are not using observability
+                if not obs_handler or obs_handler.is_noop:
+                    transcoded_value = transcoder.encode_value(value)
+                else:
+                    transcoded_value = obs_handler.maybe_add_encoding_span(
+                        lambda v=value, tc=transcoder: tc.encode_value(v)
+                    )
 
             transcoded_keys_and_docs[key] = transcoded_value
 
@@ -295,14 +317,17 @@ class CollectionMultiRequestBuilder:
                                     keys: List[str],
                                     opts_type: Type[NoValueMultiOptions],
                                     return_type: Type[ReqT],
-                                    obs_handler: ObservableRequestHandler,
+                                    obs_handler: Optional[ObservableRequestHandler],
                                     *opts: object,
                                     **kwargs: object) -> ReqT:
         op_keys_cas = kwargs.pop('op_keys_cas', None)
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
-        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
-        obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(
+            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
+        )
+        if obs_handler:
+            obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
         if not isinstance(keys, list):
             raise InvalidArgumentException(message='Expected keys to be a list.')
@@ -315,7 +340,7 @@ class CollectionMultiRequestBuilder:
             final_args['replicate_to'] = durability['replicate_to']
             return_type = LEGACY_DURABILITY_LOOKUP[return_type]
         else:
-            if durability:
+            if durability and obs_handler:
                 obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
             final_args['durability_level'] = durability
 

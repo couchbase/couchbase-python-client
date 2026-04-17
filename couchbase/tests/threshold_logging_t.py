@@ -524,10 +524,10 @@ class ThresholdLoggingTestSuite:
 
         # Verify that both spans completed successfully
         # Parent should have the propagated attributes
-        assert parent_span.span_snapshot is not None
-        assert parent_span.span_snapshot.server_duration_ns == 300_000
-        assert parent_span.span_snapshot.local_id == 'local123'
-        assert parent_span.span_snapshot.operation_id == 'op456'
+        assert parent_span._span_snapshot is not None
+        assert parent_span._span_snapshot.server_duration_ns == 300_000
+        assert parent_span._span_snapshot.local_id == 'local123'
+        assert parent_span._span_snapshot.operation_id == 'op456'
 
         # Clean up
         tracer.close()
@@ -621,11 +621,11 @@ class ThresholdLoggingTestSuite:
         parent_span.end(end_time=parent_end_ns)
 
         # Verify that durations were propagated correctly to parent
-        assert parent_span.span_snapshot is not None
+        assert parent_span._span_snapshot is not None
         # Total encode duration should include the encoding span (150us)
-        assert parent_span.span_snapshot.encode_duration_ns == 150_000
+        assert parent_span._span_snapshot.encode_duration_ns == 150_000
         # Total dispatch duration should include both dispatch spans (400us + 350us = 750us)
-        assert parent_span.span_snapshot.total_dispatch_duration_ns == 750_000
+        assert parent_span._span_snapshot.total_dispatch_duration_ns == 750_000
 
         # Clean up
         tracer.close()
@@ -698,9 +698,9 @@ class ThresholdLoggingTestSuite:
         assert not exceptions, f"Exceptions occurred: {exceptions}"
 
         # Verify all spans ended successfully
-        assert parent_span.span_snapshot is not None
+        assert parent_span._span_snapshot is not None
         for child_span, _ in child_spans:
-            assert child_span.span_snapshot is not None
+            assert child_span._span_snapshot is not None
 
         # Clean up
         tracer.close()

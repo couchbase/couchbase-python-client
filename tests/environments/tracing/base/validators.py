@@ -773,7 +773,7 @@ class KeyValueThresholdSpanValidatorImpl:
         if self._parent_span is not None:
             self._parent_span.end()
 
-    def _validate_dispatch_spans(self, span: TestThresholdLoggingSpan) -> ThresholdLoggingSpanSnapshot:
+    def _validate_dispatch_spans(self, span: TestThresholdLoggingSpan) -> None:
         ctx = _ctx(op_name=self._op_name.value if self._op_name else None, span=span)
         dispatch_spans = self._collect_spans_by_name(OpAttributeName.DispatchSpanName.value, span)
 
@@ -802,16 +802,16 @@ class KeyValueThresholdSpanValidatorImpl:
             port = last_dspan_server_port or ''
             last_local_socket = f'{address}:{port}'
 
-        _assert_eq(dispatch_total_time, span.total_dispatch_duration_ns,
+        _assert_eq(dispatch_total_time, span._total_dispatch_duration_ns,
                    what='total_dispatch_duration_ns', ctx=ctx)
-        _assert_eq(dispatch_total_server_duration, span.total_server_duration_ns,
+        _assert_eq(dispatch_total_server_duration, span._total_server_duration_ns,
                    what='total_server_duration_ns', ctx=ctx)
-        _assert_eq(last_dspan_duration, span.dispatch_duration_ns,
+        _assert_eq(last_dspan_duration, span._dispatch_duration_ns,
                    what='dispatch_duration_ns', ctx=ctx)
-        _assert_eq(last_dspan_server_duration, span.server_duration_ns,
+        _assert_eq(last_dspan_server_duration, span._server_duration_ns,
                    what='server_duration_ns', ctx=ctx)
-        _assert_eq(last_dspan_local_id, span.local_id, what='local_id', ctx=ctx)
-        _assert_eq(last_dspan_operation_id, span.operation_id, what='operation_id', ctx=ctx)
+        _assert_eq(last_dspan_local_id, span._local_id, what='local_id', ctx=ctx)
+        _assert_eq(last_dspan_operation_id, span._operation_id, what='operation_id', ctx=ctx)
         _assert_eq(last_remote_socket, span.remote_socket, what='remote_socket', ctx=ctx)
         _assert_eq(last_local_socket, span.local_socket, what='local_socket', ctx=ctx)
 
@@ -819,8 +819,19 @@ class KeyValueThresholdSpanValidatorImpl:
         ctx = _ctx(op_name=self._op_name.value if self._op_name else None, span=span)
         encoding_spans = self._collect_spans_by_name(OpAttributeName.EncodingSpanName.value, span)
         encoding_total_time = sum((s._end_time_ns - s._start_time_ns) for s in encoding_spans)
-        _assert_eq(encoding_total_time, span.total_encode_duration_ns,
+        _assert_eq(encoding_total_time, span._total_encode_duration_ns,
                    what='total_encode_duration_ns', ctx=ctx)
+
+    def _validate_multi_op_dispatch_span(self, span: TestThresholdLoggingSpan) -> None:
+        ctx = _ctx(op_name=self._op_name.value if self._op_name else None, span=span)
+        _assert_isinstance(span._total_dispatch_duration_ns, int, what='total_dispatch_duration_ns', ctx=ctx)
+        _assert_isinstance(span._total_server_duration_ns, int, what='total_server_duration_ns', ctx=ctx)
+        _assert_isinstance(span._dispatch_duration_ns, int, what='dispatch_duration_ns', ctx=ctx)
+        _assert_isinstance(span._server_duration_ns, int, what='server_duration_ns', ctx=ctx)
+        _assert_isinstance(span._local_id, str, what='local_id', ctx=ctx)
+        _assert_isinstance(span._operation_id, str, what='operation_id', ctx=ctx)
+        _assert_isinstance(span.remote_socket, str, what='remote_socket', ctx=ctx)
+        _assert_isinstance(span.local_socket, str, what='local_socket', ctx=ctx)
 
     def _maybe_get_initial_span(self) -> Optional[TestThresholdLoggingSpan]:
         _assert_isinstance(self._tracer, ThresholdLoggingTracer, what='tracer type')
@@ -860,20 +871,24 @@ class KeyValueThresholdSpanValidatorImpl:
     def _validate(self, span: TestThresholdLoggingSpan) -> None:
         ctx = _ctx(op_name=self._op_name.value if self._op_name else None, span=span)
         total_duration_ns = span._end_time_ns - span._start_time_ns
-        _assert_eq(total_duration_ns, span.total_duration_ns, what='total_duration_ns', ctx=ctx)
+        _assert_eq(total_duration_ns, span._total_duration_ns, what='total_duration_ns', ctx=ctx)
         if self._error_before_dispatch is not True:
-            self._validate_dispatch_spans(span)
+            # PYCBC-1761 as a multi-op perf improvement, we short circuit dispatch span creation for threshold logging
+            if self._multi_op_key_count is not None:
+                self._validate_multi_op_dispatch_span(span)
+            else:
+                self._validate_dispatch_spans(span)
         if self._op_name in ENCODING_OPS:
             self._validate_encoding_spans(span)
         # we don't check thresholds for multi ops
         if self._multi_op_key_count is None:
             threshold_us = self._tracer._get_service_type_threshold(span._service_type)
             if total_duration_ns / 1000 > threshold_us:
-                assert span.span_snapshot in self._tracer._over_threshold_spans, (
+                assert span._span_snapshot in self._tracer._over_threshold_spans, (
                     f'span expected in over_threshold_spans but not found. {ctx}'
                 )
             else:
-                assert span.span_snapshot in self._tracer._under_threshold_spans, (
+                assert span._span_snapshot in self._tracer._under_threshold_spans, (
                     f'span expected in under_threshold_spans but not found. {ctx}'
                 )
 
@@ -1358,12 +1373,12 @@ class HttpThresholdSpanValidatorImpl:
             port = last_dspan_server_port or ''
             last_local_socket = f'{address}:{port}'
 
-        _assert_eq(dispatch_total_time, span.total_dispatch_duration_ns,
+        _assert_eq(dispatch_total_time, span._total_dispatch_duration_ns,
                    what='total_dispatch_duration_ns', ctx=ctx)
-        _assert_eq(last_dspan_duration, span.dispatch_duration_ns,
+        _assert_eq(last_dspan_duration, span._dispatch_duration_ns,
                    what='dispatch_duration_ns', ctx=ctx)
-        _assert_eq(last_dspan_local_id, span.local_id, what='local_id', ctx=ctx)
-        _assert_eq(last_dspan_operation_id, span.operation_id, what='operation_id', ctx=ctx)
+        _assert_eq(last_dspan_local_id, span._local_id, what='local_id', ctx=ctx)
+        _assert_eq(last_dspan_operation_id, span._operation_id, what='operation_id', ctx=ctx)
         _assert_eq(last_remote_socket, span.remote_socket, what='remote_socket', ctx=ctx)
         _assert_eq(last_local_socket, span.local_socket, what='local_socket', ctx=ctx)
 
@@ -1373,17 +1388,17 @@ class HttpThresholdSpanValidatorImpl:
         span = _get_span_from_tracer(self._tracer, self._op_name, self._parent_span)
         ctx = _ctx(op_name=self._op_name.value if self._op_name else None, span=span)
         total_duration_ns = span._end_time_ns - span._start_time_ns
-        _assert_eq(total_duration_ns, span.total_duration_ns, what='total_duration_ns', ctx=ctx)
+        _assert_eq(total_duration_ns, span._total_duration_ns, what='total_duration_ns', ctx=ctx)
         if self._error_before_dispatch is not True:
             self._validate_dispatch_spans(span)
 
         threshold_us = self._tracer._get_service_type_threshold(span._service_type)
         if total_duration_ns / 1000 > threshold_us:
-            assert span.span_snapshot in self._tracer._over_threshold_spans, (
+            assert span._span_snapshot in self._tracer._over_threshold_spans, (
                 f'span expected in over_threshold_spans but not found. {ctx}'
             )
         else:
-            assert span.span_snapshot in self._tracer._under_threshold_spans, (
+            assert span._span_snapshot in self._tracer._under_threshold_spans, (
                 f'span expected in under_threshold_spans but not found. {ctx}'
             )
 

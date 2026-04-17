@@ -39,11 +39,31 @@ else:
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import CouchbaseException, InvalidArgumentException
 from couchbase.logic.observability.no_op import NoOpMeter, NoOpTracer
-from couchbase.logic.observability.observability_types import (CppOpAttributeName,
+from couchbase.logic.observability.observability_types import (_ATTR_BUCKET_NAME,
+                                                               _ATTR_CLUSTER_NAME,
+                                                               _ATTR_CLUSTER_UUID,
+                                                               _ATTR_COLLECTION_NAME,
+                                                               _ATTR_DISPATCH_SPAN_NAME,
+                                                               _ATTR_DURABILITY_LEVEL,
+                                                               _ATTR_ENCODING_SPAN_NAME,
+                                                               _ATTR_ERROR_TYPE,
+                                                               _ATTR_METER_OP_DURATION,
+                                                               _ATTR_OPERATION_NAME,
+                                                               _ATTR_QUERY_STATEMENT,
+                                                               _ATTR_RESERVED_UNIT,
+                                                               _ATTR_RESERVED_UNIT_SECONDS,
+                                                               _ATTR_RETRY_COUNT,
+                                                               _ATTR_SCOPE_NAME,
+                                                               _ATTR_SERVICE,
+                                                               _ATTR_SYSTEM_NAME,
+                                                               _CPP_ATTR_CLUSTER_NAME,
+                                                               _CPP_ATTR_CLUSTER_UUID,
+                                                               _CPP_ATTR_RETRY_COUNT,
+                                                               _OP_NAME_FROM_OP_TYPE,
+                                                               _SERVICE_TYPE_FROM_OP_TYPE,
                                                                ExceptionName,
                                                                LegacySpanProtocol,
                                                                ObservabilityInstruments,
-                                                               OpAttributeName,
                                                                OpName,
                                                                OpType,
                                                                RequestSpanProtocol,
@@ -81,15 +101,18 @@ class OpAttributeOptions(TypedDict, total=False):
     use_now_as_start_time: Optional[bool]
 
 
+_KV_SERVICE_VALUE = ServiceType.KeyValue.value
+
+
 def get_attributes_for_kv_op(op_name: str,
                              collection_details: CollectionDetails) -> Mapping[str, str]:
     return {
-        OpAttributeName.SystemName.value: 'couchbase',
-        OpAttributeName.Service.value: ServiceType.KeyValue.value,
-        OpAttributeName.OperationName.value: op_name,
-        OpAttributeName.BucketName.value: collection_details['bucket_name'],
-        OpAttributeName.ScopeName.value: collection_details['scope_name'],
-        OpAttributeName.CollectionName.value: collection_details['collection_name'],
+        _ATTR_SYSTEM_NAME: 'couchbase',
+        _ATTR_SERVICE: _KV_SERVICE_VALUE,
+        _ATTR_OPERATION_NAME: op_name,
+        _ATTR_BUCKET_NAME: collection_details['bucket_name'],
+        _ATTR_SCOPE_NAME: collection_details['scope_name'],
+        _ATTR_COLLECTION_NAME: collection_details['collection_name'],
     }
 
 
@@ -97,9 +120,9 @@ def get_attributes_for_http_op(op_name: str,
                                service_type: ServiceType,
                                **options: Unpack[OpAttributeOptions]) -> Mapping[str, str]:
     attrs = {
-        OpAttributeName.SystemName.value: 'couchbase',
-        OpAttributeName.Service.value: service_type.value,
-        OpAttributeName.OperationName.value: op_name,
+        _ATTR_SYSTEM_NAME: 'couchbase',
+        _ATTR_SERVICE: service_type.value,
+        _ATTR_OPERATION_NAME: op_name,
     }
 
     statement = options.get('statement', None)
@@ -107,25 +130,21 @@ def get_attributes_for_http_op(op_name: str,
 
     if (statement is not None and query_params
             and ('positional_parameters' in query_params or 'named_parameters' in query_params)):
-        attrs[OpAttributeName.QueryStatement.value] = statement
+        attrs[_ATTR_QUERY_STATEMENT] = statement
 
     bucket_name = options.get('bucket_name', None)
     if bucket_name:
-        attrs[OpAttributeName.BucketName.value] = bucket_name
+        attrs[_ATTR_BUCKET_NAME] = bucket_name
 
     scope_name = options.get('scope_name', None)
     if scope_name:
-        attrs[OpAttributeName.ScopeName.value] = scope_name
+        attrs[_ATTR_SCOPE_NAME] = scope_name
 
     collection_name = options.get('collection_name', None)
     if collection_name:
-        attrs[OpAttributeName.CollectionName.value] = collection_name
+        attrs[_ATTR_COLLECTION_NAME] = collection_name
 
     return attrs
-
-
-def get_latest_time(time_a_ns: int, time_b_ns: int) -> int:
-    return max(time_a_ns, time_b_ns)
 
 
 class ObservableRequestHandler:
@@ -136,19 +155,49 @@ class ObservableRequestHandler:
                  op_type_toggle: Optional[bool] = None) -> None:
         self._op_type = op_type
         self._processed_kv_get_all_replicas_core_span = False
-        if isinstance(observability_instruments.tracer.tracer, NoOpTracer):
-            self._tracer_impl = ObservableRequestHandlerNoOpTracerImpl(op_type, observability_instruments)
+
+        # Capture a single timestamp and share it between tracer and meter impls,
+        # eliminating redundant time.time_ns() calls.
+        now = time.time_ns()
+
+        # cache NoOp tracer & meter impl on the ObservabilityInstruments instance to avoid
+        # a fresh allocation on every KV operation.
+        #   None    -> not yet checked (first call for this ObservabilityInstruments)
+        #   False   -> real tracer/meter (not NoOp)
+        #   <inst>  -> cached NoOp impl, ready to reuse
+        _cached_tracer = getattr(observability_instruments, '_cached_noop_tracer_impl', None)
+        if _cached_tracer is None:
+            if isinstance(observability_instruments.tracer.tracer, NoOpTracer):
+                _cached_tracer = ObservableRequestHandlerNoOpTracerImpl(op_type, observability_instruments)
+            else:
+                _cached_tracer = False
+            observability_instruments._cached_noop_tracer_impl = _cached_tracer
+
+        if _cached_tracer is not False:
+            self._tracer_impl = _cached_tracer
+            self.is_noop = True
         else:
             self._tracer_impl = ObservableRequestHandlerTracerImpl(op_type,
                                                                    observability_instruments,
-                                                                   op_type_toggle=op_type_toggle)
+                                                                   op_type_toggle=op_type_toggle,
+                                                                   start_time=now)
+            self.is_noop = False
 
-        if isinstance(observability_instruments.meter, NoOpMeter):
-            self._meter_impl = ObservableRequestHandlerNoOpMeterImpl(op_type, observability_instruments)
+        _cached_meter = getattr(observability_instruments, '_cached_noop_meter_impl', None)
+        if _cached_meter is None:
+            if isinstance(observability_instruments.meter, NoOpMeter):
+                _cached_meter = ObservableRequestHandlerNoOpMeterImpl(op_type, observability_instruments)
+            else:
+                _cached_meter = False
+            observability_instruments._cached_noop_meter_impl = _cached_meter
+
+        if _cached_meter is not False:
+            self._meter_impl = _cached_meter
         else:
             self._meter_impl = ObservableRequestHandlerMeterImpl(op_type,
                                                                  observability_instruments,
-                                                                 op_type_toggle=op_type_toggle)
+                                                                 op_type_toggle=op_type_toggle,
+                                                                 start_time=now)
 
     @property
     def is_legacy_tracer(self) -> bool:
@@ -394,22 +443,28 @@ class ObservableRequestHandlerMeterImpl:
     def __init__(self,
                  op_type: OpType,
                  observability_instruments: ObservabilityInstruments,
-                 op_type_toggle: Optional[bool] = None) -> None:
+                 op_type_toggle: Optional[bool] = None,
+                 start_time: Optional[int] = None) -> None:
         self._op_type = op_type
-        self._op_name = OpName.from_op_type(self._op_type, toggle=op_type_toggle)
-        self._service_type = ServiceType.from_op_type(self._op_type)
+        # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
+        # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
+        self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type, toggle=op_type_toggle)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
         self._meter = observability_instruments.meter
         self._get_cluster_labels_fn = observability_instruments.get_cluster_labels_fn
-        self._start_time = time.time_ns()
+        self._start_time = start_time if start_time is not None else time.time_ns()
         # we need to only  worry about sub operations for DS and KV multi-ops
         self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
         self._attrs: Mapping[str, str] = {}
+        # Cache the op name string to eliminate _get_op_name()'s per-call .value descriptor access
+        _raw = self._op_name.value
+        self._op_name_str: str = _raw[:-6] if _raw.endswith('_multi') else _raw
 
     def add_kv_attributes(self, collection_details: CollectionDetails) -> None:
-        self._attrs = get_attributes_for_kv_op(self._get_op_name(), collection_details)
+        self._attrs = get_attributes_for_kv_op(self._op_name_str, collection_details)
 
     def add_http_attributes(self, **options: Unpack[OpAttributeOptions]) -> None:
-        self._attrs = get_attributes_for_http_op(self._get_op_name(), self._service_type, **options)
+        self._attrs = get_attributes_for_http_op(self._op_name_str, self._service_type, **options)
 
     def process_end(self,
                     cluster_name: Optional[str] = None,
@@ -442,8 +497,12 @@ class ObservableRequestHandlerMeterImpl:
               exc_val: Optional[BaseException] = None) -> None:
         self.process_end(cluster_name=cluster_name, cluster_uuid=cluster_uuid, exc_val=exc_val)
         self._op_type = op_type
-        self._op_name = OpName.from_op_type(self._op_type)
-        self._service_type = ServiceType.from_op_type(self._op_type)
+        # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
+        # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
+        self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
+        _raw = self._op_name.value
+        self._op_name_str = _raw[:-6] if _raw.endswith('_multi') else _raw
         self._start_time = time.time_ns()
         # we need to only  worry about sub operations for DS and KV multi-ops
         self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
@@ -458,7 +517,7 @@ class ObservableRequestHandlerMeterImpl:
         exc_name = None
         if isinstance(exc_val, CouchbaseException):
             exc_name = ExceptionName.from_exception(exc_val)
-        attrs[OpAttributeName.ErrorType.value] = exc_name.value if exc_name is not None else '_OTHER'
+        attrs[_ATTR_ERROR_TYPE] = exc_name.value if exc_name is not None else '_OTHER'
 
     def _process_end(self,
                      req_duration_ns: int,
@@ -474,23 +533,23 @@ class ObservableRequestHandlerMeterImpl:
         # if the op failed prior to the ObservableRequestHandler creating a span, we won't have attributes yet
         if not attrs:
             attrs = {
-                OpAttributeName.SystemName.value: 'couchbase',
-                OpAttributeName.Service.value: self._service_type.value,
-                OpAttributeName.OperationName.value: self._get_op_name(),
-                OpAttributeName.ReservedUnit.value: OpAttributeName.ReservedUnitSeconds.value
+                _ATTR_SYSTEM_NAME: 'couchbase',
+                _ATTR_SERVICE: self._service_type.value,
+                _ATTR_OPERATION_NAME: self._op_name_str,
+                _ATTR_RESERVED_UNIT: _ATTR_RESERVED_UNIT_SECONDS
             }
         else:
-            attrs[OpAttributeName.ReservedUnit.value] = OpAttributeName.ReservedUnitSeconds.value
+            attrs[_ATTR_RESERVED_UNIT] = _ATTR_RESERVED_UNIT_SECONDS
 
         if cluster_name:
-            attrs[OpAttributeName.ClusterName.value] = cluster_name
+            attrs[_ATTR_CLUSTER_NAME] = cluster_name
         if cluster_uuid:
-            attrs[OpAttributeName.ClusterUUID.value] = cluster_uuid
+            attrs[_ATTR_CLUSTER_UUID] = cluster_uuid
 
         if exc_val is not None:
             self._handle_error(attrs, exc_val)
 
-        self._meter.value_recorder(OpAttributeName.MeterOperationDuration.value,
+        self._meter.value_recorder(_ATTR_METER_OP_DURATION,
                                    tags=attrs).record_value(self._to_microseconds(req_duration_ns))
 
     def _to_microseconds(self, duration_ns: int) -> int:
@@ -502,16 +561,20 @@ class ObservableRequestHandlerTracerImpl:
     def __init__(self,
                  op_type: OpType,
                  observability_instruments: ObservabilityInstruments,
-                 op_type_toggle: Optional[bool] = None) -> None:
-        self._start_time = time.time_ns()
+                 op_type_toggle: Optional[bool] = None,
+                 start_time: Optional[int] = None) -> None:
+        self._start_time = start_time if start_time is not None else time.time_ns()
         self._op_type = op_type
-        self._op_name = OpName.from_op_type(self._op_type, toggle=op_type_toggle)
-        self._service_type = ServiceType.from_op_type(self._op_type)
+        # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
+        # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
+        self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type, toggle=op_type_toggle)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
         self._wrapped_tracer = observability_instruments.tracer
         self._get_cluster_labels_fn = observability_instruments.get_cluster_labels_fn
         self._wrapped_span: Optional[WrappedSpan] = None
         self._end_time: Optional[int] = None
         self._processed_core_span = False
+        self._is_streaming_op = self._op_name.is_streaming_op()
 
     @property
     def cluster_name(self) -> Optional[str]:
@@ -589,7 +652,7 @@ class ObservableRequestHandlerTracerImpl:
         self._processed_core_span = True
 
         # we don't use a context manager for streaming (e.g. query) requests
-        if self._op_name.is_streaming_op():
+        if self._is_streaming_op:
             self.process_end(with_error=with_error)
 
     def process_end(self, with_error: Optional[bool] = False) -> None:
@@ -615,8 +678,11 @@ class ObservableRequestHandlerTracerImpl:
         self.process_end(with_error=with_error)
         self._start_time = time.time_ns()
         self._op_type = op_type
-        self._op_name = OpName.from_op_type(self._op_type)
-        self._service_type = ServiceType.from_op_type(self._op_type)
+        # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
+        # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
+        self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
+        self._is_streaming_op = self._op_name.is_streaming_op()
         self._wrapped_span: Optional[WrappedSpan] = None
         self._end_time: Optional[int] = None
 
@@ -653,9 +719,23 @@ class WrappedSpan:
             p_span = self._parent_span.request_span
         else:
             p_span = self._parent_span
+        self._op_name_str = self._op_name.value
         self._request_span = self._create_request_span(self._op_name.value,
                                                        parent_span=p_span,
                                                        start_time=self._start_time)
+
+        self._parent_is_wrapped_span = isinstance(self._parent_span, WrappedSpan)
+        _is_multi_op = self._op_name.is_multi_op()
+        # PERF improvement for multi-ops: True only when BOTH conditions hold:
+        #   1. The request span type supports direct dispatch recording
+        #      (ThresholdLoggingSpan sets _supports_multi_op_fast_dispatch=True).
+        #   2. This WrappedSpan is for a multi-op (upsert_multi, get_multi, …).
+        # Single-op dispatch spans must still be created as proper child spans
+        # so that threshold log records contain the correct dispatch structure.
+        self._supports_multi_op_fast_dispatch = (
+            _is_multi_op
+            and getattr(self._request_span, '_supports_multi_op_fast_dispatch', False)
+        )
         self._has_multiple_encoding_spans = (self._op_name.is_multi_op() or self._op_name is OpName.MutateIn)
         self._encoding_spans_ended = False
         self._encoding_spans: Optional[Union[WrappedEncodingSpan, List[WrappedEncodingSpan]]] = None
@@ -677,7 +757,7 @@ class WrappedSpan:
         return self._request_span
 
     def add_kv_durability_attribute(self, durability: DurabilityLevel) -> None:
-        self._request_span.set_attribute(OpAttributeName.DurabilityLevel.value,
+        self._request_span.set_attribute(_ATTR_DURABILITY_LEVEL,
                                          DurabilityLevel.to_server_str(durability))
 
     def maybe_add_encoding_span(self, encoding_fn: Callable[..., Tuple[bytes, int]]) -> Tuple[bytes, int]:
@@ -689,9 +769,9 @@ class WrappedSpan:
         if not self._encoding_spans:
             self._encoding_spans = []
 
-        encoding_span = self._wrapped_tracer.tracer.request_span(OpAttributeName.EncodingSpanName.value,
+        encoding_span = self._wrapped_tracer.tracer.request_span(_ATTR_ENCODING_SPAN_NAME,
                                                                  self._request_span)
-        encoding_span.set_attribute(OpAttributeName.SystemName.value, 'couchbase')
+        encoding_span.set_attribute(_ATTR_SYSTEM_NAME, 'couchbase')
         try:
             encoded_output = encoding_fn()
             return encoded_output
@@ -709,9 +789,9 @@ class WrappedSpan:
         if self._wrapped_tracer.is_legacy or self._has_multiple_encoding_spans:
             return encoding_fn()
 
-        encoding_span = self._wrapped_tracer.tracer.request_span(OpAttributeName.EncodingSpanName.value,
+        encoding_span = self._wrapped_tracer.tracer.request_span(_ATTR_ENCODING_SPAN_NAME,
                                                                  self._request_span)
-        encoding_span.set_attribute(OpAttributeName.SystemName.value, 'couchbase')
+        encoding_span.set_attribute(_ATTR_SYSTEM_NAME, 'couchbase')
         try:
             encoded_output = encoding_fn()
             return encoded_output
@@ -724,12 +804,24 @@ class WrappedSpan:
             self._encoding_spans = WrappedEncodingSpan(encoding_span, time.time_ns())
 
     def maybe_update_end_time_watermark(self, end_time: int) -> None:
-        self._end_time_watermark = get_latest_time(self._end_time_watermark, end_time)
+        self._end_time_watermark = self._end_time_watermark if self._end_time_watermark > end_time else end_time
 
     def process_core_span(self, core_span: CppWrapperSdkSpan) -> None:
-        self._maybe_set_attribute_from_core_span(core_span, CppOpAttributeName.ClusterName)
-        self._maybe_set_attribute_from_core_span(core_span, CppOpAttributeName.ClusterUUID)
-        self._maybe_set_attribute_from_core_span(core_span, CppOpAttributeName.RetryCount, skip_encoding_span=True)
+        # Guard cluster_[name|uuid] propagation — for multi-op batches, process_core_span
+        # is called once per sub-op on the same WrappedSpan. cluster_name/uuid are
+        # identical for every sub-op, so only set them on the first call.
+        core_attrs = core_span.get('attributes', {})
+        if self._cluster_name is None:
+            cluster_name = core_attrs.get(_CPP_ATTR_CLUSTER_NAME, None)
+            if cluster_name is not None:
+                self._set_attribute_on_all_spans(_ATTR_CLUSTER_NAME, cluster_name)
+        if self._cluster_uuid is None:
+            cluster_uuid = core_attrs.get(_CPP_ATTR_CLUSTER_UUID, None)
+            if cluster_uuid is not None:
+                self._set_attribute_on_all_spans(_ATTR_CLUSTER_UUID, cluster_uuid)
+        retry_count = core_attrs.get(_CPP_ATTR_RETRY_COUNT, 0)
+        self._set_attribute_on_all_spans(_ATTR_RETRY_COUNT, retry_count, skip_encoding_span=True)
+
         # now that we have the cluster_[name|uuid] attributes from the core span, we can end the encoding span(s)
         self._end_encoding_spans()
         children = core_span.get('children', None)
@@ -738,21 +830,32 @@ class WrappedSpan:
 
         self._build_core_spans(children, parent_span=self)
 
+    def record_multi_op_dispatch_span(self, duration: int, attributes: Dict[str, Any]) -> None:
+        # Bypasses ThresholdLoggingSpan child creation entirely by propagating
+        # dispatch duration and attributes directly onto the request span.
+        # Only called when self._supports_multi_op_fast_dispatch is True (i.e.
+        # the request span is a ThresholdLoggingSpan) and the dispatch span has
+        # no child spans to recurse into.
+
+        self._request_span._propagate_dispatch_duration(duration)
+        for attr_name, attr_val in attributes.items():
+            self._request_span.set_attribute(attr_name, attr_val)
+
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
-        if key == OpAttributeName.ClusterName.value:
+        if key == _ATTR_CLUSTER_NAME:
             self._cluster_name = value
-        elif key == OpAttributeName.ClusterUUID.value:
+        elif key == _ATTR_CLUSTER_UUID:
             self._cluster_uuid = value
         self._request_span.set_attribute(key, value)
 
     def set_cluster_labels(self, cluster_name: Optional[str] = None, cluster_uuid: Optional[str] = None) -> None:
         if cluster_name:
-            self._set_attribute_on_all_spans(OpAttributeName.ClusterName.value, cluster_name)
+            self._set_attribute_on_all_spans(_ATTR_CLUSTER_NAME, cluster_name)
         if cluster_uuid:
-            self._set_attribute_on_all_spans(OpAttributeName.ClusterUUID.value, cluster_uuid)
+            self._set_attribute_on_all_spans(_ATTR_CLUSTER_UUID, cluster_uuid)
 
     def set_retry_attribute(self, retry_count: int = 0) -> None:
-        self._set_attribute_on_all_spans(OpAttributeName.RetryCount.value, retry_count, skip_encoding_span=True)
+        self._set_attribute_on_all_spans(_ATTR_RETRY_COUNT, retry_count, skip_encoding_span=True)
 
     def set_status(self, status: SpanStatusCode) -> None:
         self._status = status
@@ -764,8 +867,8 @@ class WrappedSpan:
             self._request_span.finish()
             return
 
-        self._end_time_watermark = get_latest_time(self._end_time_watermark, end_time)
-        if self._parent_span and isinstance(self._parent_span, WrappedSpan):
+        self._end_time_watermark = self._end_time_watermark if self._end_time_watermark > end_time else end_time
+        if self._parent_span and self._parent_is_wrapped_span:
             self._parent_span.maybe_update_end_time_watermark(self._end_time_watermark)
         self._request_span.end(self._end_time_watermark)
 
@@ -773,7 +876,7 @@ class WrappedSpan:
                           core_spans: List[CppWrapperSdkChildSpan],
                           parent_span: Optional[Union[SpanProtocol, WrappedSpan]] = None) -> None:
         for span in core_spans:
-            if span['name'] == OpAttributeName.DispatchSpanName.value:
+            if span['name'] == _ATTR_DISPATCH_SPAN_NAME:
                 self._build_dispatch_core_span(span, parent_span=parent_span)
             else:
                 self._build_non_dispatch_core_span(span, parent_span=parent_span)
@@ -785,17 +888,33 @@ class WrappedSpan:
             p_span = parent_span.request_span
         else:
             p_span = parent_span
-        latest_start_time = get_latest_time(self._start_time, core_span['start'])
-        new_span = self._create_request_span(core_span['name'], parent_span=p_span, start_time=latest_start_time)
+
+        core_span_start_time = core_span['start']
+        latest_start_time = self._start_time if self._start_time > core_span_start_time else core_span_start_time
+        core_span_end_time = core_span['end']
         children = core_span.get('children', None)
+
+        # Fast path for multi-op sub-op dispatch spans. When the parent is
+        # this WrappedSpan (direct child, not a recursed nested span) and the
+        # dispatch span has no children of its own, skip ThresholdLoggingSpan
+        # child creation entirely. Propagates duration and attributes straight
+        # onto the request span via record_multi_op_dispatch_span().
+        if not children and parent_span is self and self._supports_multi_op_fast_dispatch:
+            dispatch_duration = core_span_end_time - latest_start_time
+            self.record_multi_op_dispatch_span(dispatch_duration, core_span.get('attributes', {}))
+            end_watermark = self._end_time_watermark
+            self._end_time_watermark = end_watermark if end_watermark > core_span_end_time else core_span_end_time
+            return
+
+        new_span = self._create_request_span(core_span['name'], parent_span=p_span, start_time=latest_start_time)
         if children:
             self._build_core_spans(children, parent_span=new_span)
 
         for attr_name, attr_val in core_span.get('attributes', {}).items():
             new_span.set_attribute(attr_name, attr_val)
 
-        core_span_end_time = core_span['end']
-        self._end_time_watermark = get_latest_time(self._end_time_watermark, core_span_end_time)
+        end_watermark = self._end_time_watermark
+        self._end_time_watermark = end_watermark if end_watermark > core_span_end_time else core_span_end_time
         new_span.end(core_span_end_time)
 
     def _build_non_dispatch_core_span(self,
@@ -806,7 +925,8 @@ class WrappedSpan:
         else:
             p_span = parent_span
 
-        latest_start_time = get_latest_time(self._start_time, core_span['start'])
+        core_span_start_time = core_span['start']
+        latest_start_time = self._start_time if self._start_time > core_span_start_time else core_span_start_time
         new_span = WrappedSpan(self._service_type,
                                OpName(core_span['name']),
                                self._wrapped_tracer,
@@ -821,7 +941,8 @@ class WrappedSpan:
             new_span.set_attribute(attr_name, attr_val)
 
         core_span_end_time = core_span['end']
-        self._end_time_watermark = get_latest_time(self._end_time_watermark, core_span_end_time)
+        end_watermark = self._end_time_watermark
+        self._end_time_watermark = end_watermark if end_watermark > core_span_end_time else core_span_end_time
         new_span.end(core_span_end_time)
 
     def _create_request_span(self,
@@ -846,33 +967,12 @@ class WrappedSpan:
         elif self._encoding_spans is not None:
             self._encoding_spans.span.end(self._encoding_spans.end_time)
 
-    def _maybe_set_attribute_from_core_span(self,
-                                            core_span: CppWrapperSdkSpan,
-                                            attr_name: Union[CppOpAttributeName, OpAttributeName],
-                                            skip_encoding_span: Optional[bool] = None) -> None:
-        attr_val = None
-        core_span_attr = core_span.get('attributes', {}).get(attr_name.value, None)
-        if core_span_attr:
-            attr_val = core_span_attr
-
-        if attr_val is None and attr_name.value == 'retries':
-            attr_val = 0
-
-        if attr_val is not None:
-            if isinstance(attr_name, CppOpAttributeName):
-                filtered_attr_name = OpAttributeName[attr_name.name]
-            else:
-                filtered_attr_name = attr_name
-            self._set_attribute_on_all_spans(filtered_attr_name.value,
-                                             attr_val,
-                                             skip_encoding_span=skip_encoding_span)
-
     def _set_attribute_on_all_spans(self,
                                     key: str,
                                     value: SpanAttributeValue,
                                     skip_encoding_span: Optional[bool] = None) -> None:
         self.set_attribute(key, value)
-        if isinstance(self._parent_span, WrappedSpan):
+        if self._parent_is_wrapped_span:
             self._parent_span.set_attribute(key, value)
 
         # For multi-mutation ops (insert/upsert/replace multi), process_core_span is called once per result
@@ -890,9 +990,9 @@ class WrappedSpan:
 
     def _set_span_attrs(self, **options: Unpack[OpAttributeOptions]) -> None:
         if self._service_type.is_key_value_service_type():
-            attrs = get_attributes_for_kv_op(self._op_name.value, options.get('collection_details', {}))
+            attrs = get_attributes_for_kv_op(self._op_name_str, options.get('collection_details', {}))
         elif self._service_type.is_http_service_type():
-            attrs = get_attributes_for_http_op(self._op_name.value, self._service_type, **options)
+            attrs = get_attributes_for_http_op(self._op_name_str, self._service_type, **options)
 
         for k, v in attrs.items():
             self.set_attribute(k, v)
@@ -901,7 +1001,7 @@ class WrappedSpan:
     def name(self) -> str:
         if not self._wrapped_tracer.is_legacy:
             return self._request_span.name
-        return self._op_name.value
+        return self._op_name_str
 
     @property
     def legacy_request_span(self) -> Optional[LegacySpanProtocol]:

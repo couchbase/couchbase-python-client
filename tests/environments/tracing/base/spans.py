@@ -26,8 +26,8 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.logic.observability.no_op import NoOpSpan
 from couchbase.logic.observability.observability_types import OpAttributeName
-from couchbase.logic.observability.threshold_logging import (IGNORED_MULTI_OP_SPAN_VALUES,
-                                                             IGNORED_PARENT_SPAN_VALUES,
+from couchbase.logic.observability.threshold_logging import (_IGNORED_MULTI_OP_SPAN_VALUES,
+                                                             _IGNORED_PARENT_SPAN_VALUES,
                                                              ThresholdLoggingSpan)
 from couchbase.observability.tracing import (RequestSpan,
                                              SpanAttributeValue,
@@ -37,8 +37,8 @@ from couchbase.tracing import CouchbaseSpan
 if TYPE_CHECKING:
     from tests.environments.tracing.base.tracers import TestThresholdLoggingTracer
 
-IGNORED_TEST_THRESHOLD_LOGGING_SPAN_VALUES = set([OpAttributeName.DispatchSpanName.value,
-                                                 OpAttributeName.EncodingSpanName.value])
+_IGNORED_TEST_THRESHOLD_LOGGING_SPAN_VALUES = set([OpAttributeName.DispatchSpanName.value,
+                                                   OpAttributeName.EncodingSpanName.value])
 
 
 class LegacyTestSpan(CouchbaseSpan):
@@ -103,12 +103,12 @@ class TestThresholdLoggingSpan(ThresholdLoggingSpan):
         super().end(end_time=end_time)
         # we need this logic so that we only check non-parent spans for tests that create a parent span.
         if not self._name.startswith('parent_') and self._parent_span is not None:
-            dont_check = (self._name in IGNORED_MULTI_OP_SPAN_VALUES
-                          or (self._parent_span and self._parent_span.name in IGNORED_MULTI_OP_SPAN_VALUES)
-                          or (self._name in IGNORED_TEST_THRESHOLD_LOGGING_SPAN_VALUES)
-                          or (self._parent_span.name in IGNORED_PARENT_SPAN_VALUES))
+            dont_check = (self._name in _IGNORED_MULTI_OP_SPAN_VALUES
+                          or (self._parent_span and self._parent_span.name in _IGNORED_MULTI_OP_SPAN_VALUES)
+                          or (self._name in _IGNORED_TEST_THRESHOLD_LOGGING_SPAN_VALUES)
+                          or (self._parent_span.name in _IGNORED_PARENT_SPAN_VALUES))
             if not dont_check:
-                self._tracer.check_threshold(self.span_snapshot)
+                self._tracer.check_threshold(self._span_snapshot)
 
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
         super().set_attribute(key, value)
