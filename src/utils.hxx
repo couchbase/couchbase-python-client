@@ -60,6 +60,26 @@ validate_and_incref_callbacks(PyObject*& pyObj_callback, PyObject*& pyObj_errbac
 
 template<typename T>
 inline void
+extract_field(PyObject* source_obj, T& dest)
+{
+  if (source_obj != nullptr && source_obj != Py_None) {
+    dest = py_to_cbpp<T>(source_obj);
+  }
+}
+
+// Extract boolean field directly (specialized - checks Py_True/Py_False directly)
+inline void
+extract_bool_field(PyObject* source_obj, bool& dest)
+{
+  if (source_obj == Py_True) {
+    dest = true;
+  } else if (source_obj == Py_False) {
+    dest = false;
+  }
+}
+
+template<typename T>
+inline void
 extract_field(PyObject* kwargs, const char* key, T& dest)
 {
   PyObject* pyObj = PyDict_GetItemString(kwargs, key);
@@ -70,9 +90,29 @@ extract_field(PyObject* kwargs, const char* key, T& dest)
 
 template<typename T>
 inline void
+extract_field(PyObject* dict, PyObject* interned_key, T& dest)
+{
+  PyObject* pyObj = PyDict_GetItem(dict, interned_key);
+  if (pyObj != nullptr && pyObj != Py_None) {
+    dest = py_to_cbpp<T>(pyObj);
+  }
+}
+
+template<typename T>
+inline void
 extract_field_if_not_empty(PyObject* dict, const char* key, T& dest)
 {
   PyObject* pyObj = PyDict_GetItemString(dict, key);
+  if (pyObj != nullptr && pyObj != Py_None) {
+    dest = py_to_cbpp<T>(pyObj);
+  }
+}
+
+template<typename T>
+inline void
+extract_field_if_not_empty(PyObject* dict, PyObject* interned_key, T& dest)
+{
+  PyObject* pyObj = PyDict_GetItem(dict, interned_key);
   if (pyObj != nullptr && pyObj != Py_None) {
     dest = py_to_cbpp<T>(pyObj);
   }
@@ -127,6 +167,42 @@ extract_required_field(PyObject* kwargs,
   return true;
 }
 
+template<typename T>
+inline bool
+extract_required_field(PyObject* dict,
+                       PyObject* interned_key,
+                       T& dest,
+                       const char* context,
+                       const char* file,
+                       int line)
+{
+  PyObject* pyObj = PyDict_GetItem(dict, interned_key);
+  if (pyObj == nullptr || pyObj == Py_None) {
+    raise_required_field_missing(interned_key, context, file, line);
+    return false;
+  }
+
+  dest = py_to_cbpp<T>(pyObj);
+
+  if constexpr (std::is_same_v<T, std::string>) {
+    if (dest.empty()) {
+      raise_required_field_empty(interned_key, context, file, line);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+inline void
+extract_legacy_span_field(PyObject* source_obj,
+                          std::shared_ptr<couchbase::tracing::request_span>& dest)
+{
+  if (source_obj != nullptr && source_obj != Py_None) {
+    dest = std::make_shared<pycbc::deprecated_request_span>(source_obj);
+  }
+}
+
 // TODO(PYCBC-1746): Delete w/ removal of legacy tracing logic
 inline void
 extract_legacy_span_field(PyObject* dict,
@@ -141,6 +217,17 @@ extract_legacy_span_field(PyObject* dict,
   }
 }
 
+inline void
+extract_legacy_span_field(PyObject* dict,
+                          PyObject* interned_key,
+                          std::shared_ptr<couchbase::tracing::request_span>& dest)
+{
+  PyObject* pyObj = PyDict_GetItem(dict, interned_key);
+  if (pyObj != nullptr && pyObj != Py_None) {
+    dest = std::make_shared<pycbc::deprecated_request_span>(pyObj);
+  }
+}
+
 // Add a field to result dict (auto-converts C++ value to Python)
 template<typename T>
 inline void
@@ -148,6 +235,15 @@ add_field(PyObject* dict, const char* key, const T& value)
 {
   PyObject* pyObj = cbpp_to_py(value);
   PyDict_SetItemString(dict, key, pyObj);
+  Py_DECREF(pyObj);
+}
+
+template<typename T>
+inline void
+add_field(PyObject* dict, PyObject* interned_key, const T& value)
+{
+  PyObject* pyObj = cbpp_to_py(value);
+  PyDict_SetItem(dict, interned_key, pyObj);
   Py_DECREF(pyObj);
 }
 

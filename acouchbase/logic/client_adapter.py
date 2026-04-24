@@ -41,7 +41,8 @@ if TYPE_CHECKING:
 
     from couchbase.logic.bucket_types import BucketRequest
     from couchbase.logic.cluster_types import ClusterRequest, CreateConnectionRequest
-    from couchbase.logic.collection_types import CollectionRequest
+    from couchbase.logic.operation_types import KeyValueOperationCode
+    from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.management.logic.mgmt_req import MgmtRequest
 
 
@@ -158,7 +159,8 @@ class AsyncClientAdapter:
         return ret
 
     def execute_collection_request(self,
-                                   req: CollectionRequest,
+                                   opcode: KeyValueOperationCode,
+                                   req: PycbcCoreKeyValueRequest,
                                    obs_handler: Optional[ObservableRequestHandler] = None) -> Future[Any]:
         self._ensure_not_closed()
         self._ensure_connected()
@@ -176,8 +178,21 @@ class AsyncClientAdapter:
             excptn = ErrorMapper.build_exception(exc)
             self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
-        req_dict = req.req_to_dict(obs_handler=obs_handler, callback=_callback, errback=_errback)
-        self._execute_req(ft, req.op_name, req_dict)
+        req.callback = _callback
+        req.errback = _errback
+
+        try:
+            self._binding_map.kv_ops[opcode](req)
+        except CouchbaseException as e:
+            ft.set_exception(e)
+        except Exception as e:
+            if isinstance(e, (TypeError, ValueError)):
+                ft.set_exception(e)
+            else:
+                exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+                excptn = exc_cls(str(e))
+                ft.set_exception(excptn)
+
         return ft
 
     def execute_connect_bucket_request(self, bucket_name: str) -> Future[None]:

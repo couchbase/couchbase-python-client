@@ -20,8 +20,8 @@ import time
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
+                    Awaitable,
                     Callable,
-                    Coroutine,
                     Dict,
                     Generator,
                     List,
@@ -36,11 +36,9 @@ from couchbase.exceptions import (CasMismatchException,
                                   PathNotFoundException,
                                   QueueEmpty,
                                   UnAmbiguousTimeoutException)
-from couchbase.logic.collection_types import (GetRequest,
-                                              LookupInRequest,
-                                              MutateInRequest)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import DatastructureOperationType, KeyValueOperationType
+from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.options import MutateInOptions
 from couchbase.result import LookupInResult
 from couchbase.subdocument import (array_addunique,
@@ -52,13 +50,16 @@ from couchbase.subdocument import get as subdoc_get
 from couchbase.subdocument import (remove,
                                    replace,
                                    upsert)
+from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from acouchbase.logic.collection_impl import AsyncCollectionImpl
     from couchbase._utils import JSONType
     from couchbase.logic.observability import WrappedSpan
 
-DataStructureRequest = Union[GetRequest, LookupInRequest, MutateInRequest]
+DatastructureCallable = Union[Callable[[PycbcCoreKeyValueRequest, ObservableRequestHandler], Awaitable[Any]],
+                              Callable[[PycbcCoreKeyValueRequest, Transcoder, ObservableRequestHandler],
+                                       Awaitable[Any]]]
 
 
 class CouchbaseList:
@@ -69,13 +70,18 @@ class CouchbaseList:
         self._full_list = None
 
     async def _execute_op(self,
-                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
-                          req: DataStructureRequest,
+                          fn: DatastructureCallable,
+                          req: PycbcCoreKeyValueRequest,
                           obs_handler: ObservableRequestHandler,
                           parent_span: WrappedSpan,
-                          create_type: Optional[bool] = None) -> Any:
+                          create_type: Optional[bool] = None,
+                          transcoder: Optional[Transcoder] = None) -> Any:
         try:
-            return await fn(req, obs_handler)
+            fn_args = [req]
+            if transcoder:
+                fn_args.append(transcoder)
+            fn_args.append(obs_handler)
+            return await fn(*fn_args)
         except DocumentNotFoundException as ex:
             if create_type is True:
                 orig_opt_type = obs_handler.op_type
@@ -91,7 +97,18 @@ class CouchbaseList:
                 obs_handler.reset(orig_opt_type)
                 obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
                                            parent_span=parent_span)
-                return await fn(req, obs_handler)
+
+                # Legacy tracing relies on passing the actual span in w/ the request. Since we are re-using the
+                # request object, we need to set the request parent span to the newly created span if we are in
+                # legacy tracing mode.
+                if obs_handler.is_legacy_tracer:
+                    req.parent_span = obs_handler.legacy_request_span
+
+                fn_args = [req]
+                if transcoder:
+                    fn_args.append(transcoder)
+                fn_args.append(obs_handler)
+                return await fn(*fn_args)
             else:
                 raise
 
@@ -101,12 +118,14 @@ class CouchbaseList:
         """
         op_type = KeyValueOperationType.Get
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            req, transcoder = self._impl.request_builder.build_get_request(
+                self._key, obs_handler, parent_span=parent_span)
             return await self._execute_op(self._impl.get,
                                           req,
                                           obs_handler,
                                           parent_span,
-                                          create_type=True)
+                                          create_type=True,
+                                          transcoder=transcoder)
 
     async def append(self, value: JSONType) -> None:
         """
@@ -216,15 +235,16 @@ class CouchbaseList:
             async with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 try:
                     op = subdoc_get(f'[{index}]')
-                    req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                             (op,),
-                                                                             obs_handler,
-                                                                             parent_span=ds_obs_handler.wrapped_span)
+                    req, transcoder = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                         (op,),
+                                                                                         obs_handler,
+                                                                                         parent_span=ds_obs_handler.wrapped_span)  # noqa: E501
                     sdres: LookupInResult = await self._execute_op(self._impl.lookup_in,
                                                                    req,
                                                                    obs_handler,
                                                                    ds_obs_handler.wrapped_span,
-                                                                   create_type=True)
+                                                                   create_type=True,
+                                                                   transcoder=transcoder)
                     return sdres.value[0].get('value', None)
                 except PathNotFoundException:
                     raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
@@ -269,15 +289,16 @@ class CouchbaseList:
             kv_op_type = KeyValueOperationType.LookupIn
             async with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = count('')
-                req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         parent_span=ds_obs_handler.wrapped_span)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                     (op,),
+                                                                                     obs_handler,
+                                                                                     parent_span=ds_obs_handler.wrapped_span)  # noqa: E501
                 sdres: LookupInResult = await self._execute_op(self._impl.lookup_in,
                                                                req,
                                                                obs_handler,
                                                                ds_obs_handler.wrapped_span,
-                                                               create_type=True)
+                                                               create_type=True,
+                                                               transcoder=transcoder)
                 return sdres.value[0].get("value", None)
 
     async def index_of(self, value: Any) -> int:
@@ -354,13 +375,18 @@ class CouchbaseMap:
         self._full_map = None
 
     async def _execute_op(self,
-                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
-                          req: DataStructureRequest,
+                          fn: DatastructureCallable,
+                          req: PycbcCoreKeyValueRequest,
                           obs_handler: ObservableRequestHandler,
                           parent_span: WrappedSpan,
-                          create_type: Optional[bool] = None) -> Any:
+                          create_type: Optional[bool] = None,
+                          transcoder: Optional[Transcoder] = None) -> Any:
         try:
-            return await fn(req, obs_handler)
+            fn_args = [req]
+            if transcoder:
+                fn_args.append(transcoder)
+            fn_args.append(obs_handler)
+            return await fn(*fn_args)
         except DocumentNotFoundException as ex:
             if create_type is True:
                 orig_opt_type = obs_handler.op_type
@@ -376,7 +402,18 @@ class CouchbaseMap:
                 obs_handler.reset(orig_opt_type)
                 obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
                                            parent_span=parent_span)
-                return await fn(req, obs_handler)
+
+                # Legacy tracing relies on passing the actual span in w/ the request. Since we are re-using the
+                # request object, we need to set the request parent span to the newly created span if we are in
+                # legacy tracing mode.
+                if obs_handler.is_legacy_tracer:
+                    req.parent_span = obs_handler.legacy_request_span
+
+                fn_args = [req]
+                if transcoder:
+                    fn_args.append(transcoder)
+                fn_args.append(obs_handler)
+                return await fn(*fn_args)
             else:
                 raise
 
@@ -386,12 +423,14 @@ class CouchbaseMap:
         """
         op_type = KeyValueOperationType.Get
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            req, transcoder = self._impl.request_builder.build_get_request(
+                self._key, obs_handler, parent_span=parent_span)
             return await self._execute_op(self._impl.get,
                                           req,
                                           obs_handler,
                                           parent_span,
-                                          create_type=True)
+                                          create_type=True,
+                                          transcoder=transcoder)
 
     async def add(self, mapkey: str, value: Any) -> None:
         """
@@ -443,15 +482,16 @@ class CouchbaseMap:
             kv_op_type = KeyValueOperationType.LookupIn
             async with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = subdoc_get(mapkey)
-                req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         parent_span=ds_obs_handler.wrapped_span)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                     (op,),
+                                                                                     obs_handler,
+                                                                                     parent_span=ds_obs_handler.wrapped_span)  # noqa: E501
                 sd_res = await self._execute_op(self._impl.lookup_in,
                                                 req,
                                                 obs_handler,
                                                 ds_obs_handler.wrapped_span,
-                                                create_type=True)
+                                                create_type=True,
+                                                transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     async def remove(self, mapkey: str) -> None:
@@ -500,15 +540,16 @@ class CouchbaseMap:
             kv_op_type = KeyValueOperationType.LookupIn
             async with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = count('')
-                req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         parent_span=ds_obs_handler.wrapped_span)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                     (op,),
+                                                                                     obs_handler,
+                                                                                     parent_span=ds_obs_handler.wrapped_span)  # noqa: E501
                 sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in,
                                                                 req,
                                                                 obs_handler,
                                                                 ds_obs_handler.wrapped_span,
-                                                                create_type=True)
+                                                                create_type=True,
+                                                                transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     async def exists(self, key: str) -> bool:
@@ -526,15 +567,16 @@ class CouchbaseMap:
             kv_op_type = KeyValueOperationType.LookupIn
             async with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = subdoc_exists(key)
-                req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         parent_span=ds_obs_handler.wrapped_span)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                     (op,),
+                                                                                     obs_handler,
+                                                                                     parent_span=ds_obs_handler.wrapped_span)  # noqa: E501
                 sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in,
                                                                 req,
                                                                 obs_handler,
                                                                 ds_obs_handler.wrapped_span,
-                                                                create_type=True)
+                                                                create_type=True,
+                                                                transcoder=transcoder)
                 return sd_res.exists(0)
 
     async def keys(self) -> List[str]:
@@ -611,13 +653,18 @@ class CouchbaseSet:
         self._impl = collection_impl
 
     async def _execute_op(self,
-                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
-                          req: DataStructureRequest,
+                          fn: DatastructureCallable,
+                          req: PycbcCoreKeyValueRequest,
                           obs_handler: ObservableRequestHandler,
                           parent_span: WrappedSpan,
-                          create_type: Optional[bool] = None) -> Any:
+                          create_type: Optional[bool] = None,
+                          transcoder: Optional[Transcoder] = None) -> Any:
         try:
-            return await fn(req, obs_handler)
+            fn_args = [req]
+            if transcoder:
+                fn_args.append(transcoder)
+            fn_args.append(obs_handler)
+            return await fn(*fn_args)
         except DocumentNotFoundException as ex:
             if create_type is True:
                 orig_opt_type = obs_handler.op_type
@@ -633,7 +680,18 @@ class CouchbaseSet:
                 obs_handler.reset(orig_opt_type)
                 obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
                                            parent_span=parent_span)
-                return await fn(req, obs_handler)
+
+                # Legacy tracing relies on passing the actual span in w/ the request. Since we are re-using the
+                # request object, we need to set the request parent span to the newly created span if we are in
+                # legacy tracing mode.
+                if obs_handler.is_legacy_tracer:
+                    req.parent_span = obs_handler.legacy_request_span
+
+                fn_args = [req]
+                if transcoder:
+                    fn_args.append(transcoder)
+                fn_args.append(obs_handler)
+                return await fn(*fn_args)
             else:
                 raise
 
@@ -643,12 +701,15 @@ class CouchbaseSet:
         """
         op_type = KeyValueOperationType.Get
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            req, transcoder = self._impl.request_builder.build_get_request(self._key,
+                                                                           obs_handler,
+                                                                           parent_span=parent_span)
             return await self._execute_op(self._impl.get,
                                           req,
                                           obs_handler,
                                           parent_span,
-                                          create_type=True)
+                                          create_type=True,
+                                          transcoder=transcoder)
 
     async def add(self, value: Any) -> bool:
         """
@@ -769,15 +830,16 @@ class CouchbaseSet:
             kv_op_type = KeyValueOperationType.LookupIn
             async with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = count('')
-                req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         parent_span=ds_obs_handler.wrapped_span)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                     (op,),
+                                                                                     obs_handler,
+                                                                                     parent_span=ds_obs_handler.wrapped_span)  # noqa: E501
                 sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in,
                                                                 req,
                                                                 obs_handler,
                                                                 ds_obs_handler.wrapped_span,
-                                                                create_type=True)
+                                                                create_type=True,
+                                                                transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     async def clear(self) -> None:
@@ -820,13 +882,18 @@ class CouchbaseQueue:
         self._iter = False
 
     async def _execute_op(self,
-                          fn: Callable[[DataStructureRequest], Coroutine[Any, Any, Any]],
-                          req: DataStructureRequest,
+                          fn: DatastructureCallable,
+                          req: PycbcCoreKeyValueRequest,
                           obs_handler: ObservableRequestHandler,
                           parent_span: WrappedSpan,
-                          create_type: Optional[bool] = None) -> Any:
+                          create_type: Optional[bool] = None,
+                          transcoder: Optional[Transcoder] = None) -> Any:
         try:
-            return await fn(req, obs_handler)
+            fn_args = [req]
+            if transcoder:
+                fn_args.append(transcoder)
+            fn_args.append(obs_handler)
+            return await fn(*fn_args)
         except DocumentNotFoundException as ex:
             if create_type is True:
                 orig_opt_type = obs_handler.op_type
@@ -842,7 +909,18 @@ class CouchbaseQueue:
                 obs_handler.reset(orig_opt_type)
                 obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
                                            parent_span=parent_span)
-                return await fn(req, obs_handler)
+
+                # Legacy tracing relies on passing the actual span in w/ the request. Since we are re-using the
+                # request object, we need to set the request parent span to the newly created span if we are in
+                # legacy tracing mode.
+                if obs_handler.is_legacy_tracer:
+                    req.parent_span = obs_handler.legacy_request_span
+
+                fn_args = [req]
+                if transcoder:
+                    fn_args.append(transcoder)
+                fn_args.append(obs_handler)
+                return await fn(*fn_args)
             else:
                 raise
 
@@ -852,12 +930,15 @@ class CouchbaseQueue:
         """
         op_type = KeyValueOperationType.Get
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_request(self._key, obs_handler, parent_span=parent_span)
+            req, transcoder = self._impl.request_builder.build_get_request(self._key,
+                                                                           obs_handler,
+                                                                           parent_span=parent_span)
             return await self._execute_op(self._impl.get,
                                           req,
                                           obs_handler,
                                           parent_span,
-                                          create_type=True)
+                                          create_type=True,
+                                          transcoder=transcoder)
 
     async def push(self, value: JSONType) -> None:
         """
@@ -910,11 +991,11 @@ class CouchbaseQueue:
                     async with ObservableRequestHandler(lookup_in_op_type,
                                                         self._impl.observability_instruments) as obs_handler:
                         op = subdoc_get('[-1]')
-                        lookup_in_req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                                           (op,),
-                                                                                           obs_handler,
-                                                                                           parent_span=parent_span)
-                        sd_res = await self._impl.lookup_in(lookup_in_req, obs_handler)
+                        lookup_in_req, tc = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                               (op,),
+                                                                                               obs_handler,
+                                                                                               parent_span=parent_span)
+                        sd_res = await self._impl.lookup_in(lookup_in_req, tc, obs_handler)
                         val = sd_res.value[0].get('value', None)
 
                     async with ObservableRequestHandler(mutate_in_op_type,
@@ -960,15 +1041,16 @@ class CouchbaseQueue:
             kv_op_type = KeyValueOperationType.LookupIn
             async with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = count('')
-                req = self._impl.request_builder.build_lookup_in_request(self._key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         parent_span=ds_obs_handler.wrapped_span)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(self._key,
+                                                                                     (op,),
+                                                                                     obs_handler,
+                                                                                     parent_span=ds_obs_handler.wrapped_span)  # noqa: E501
                 sd_res: LookupInResult = await self._execute_op(self._impl.lookup_in,
                                                                 req,
                                                                 obs_handler,
                                                                 ds_obs_handler.wrapped_span,
-                                                                create_type=True)
+                                                                create_type=True,
+                                                                transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     async def clear(self) -> None:

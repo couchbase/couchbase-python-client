@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Callable,
                     Dict,
                     Iterable,
                     List,
@@ -30,7 +29,7 @@ from couchbase.datastructures import (CouchbaseList,
                                       CouchbaseMap,
                                       CouchbaseQueue,
                                       CouchbaseSet,
-                                      DataStructureRequest)
+                                      DatastructureCallable)
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
                                   PathExistsException,
@@ -85,6 +84,7 @@ if TYPE_CHECKING:
     from couchbase._utils import JSONType
     from couchbase.kv_range_scan import ScanType
     from couchbase.logic.observability import WrappedSpan
+    from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.options import (ExistsOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
@@ -103,6 +103,7 @@ if TYPE_CHECKING:
     from couchbase.result import MultiResultType
     from couchbase.scope import Scope
     from couchbase.subdocument import Spec
+    from couchbase.transcoder import Transcoder
 
 
 class Collection:
@@ -161,11 +162,11 @@ class Collection:
         """
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_request(key, None, *opts, **kwargs)
-            return self._impl.get(req, None)
+            req, transcoder = self._impl.request_builder.build_get_request(key, None, *opts, **kwargs)
+            return self._impl.get(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.Get, instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.get(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
+            return self._impl.get(req, transcoder, obs_handler)
 
     def get_any_replica(self,
                         key,  # type: str
@@ -214,11 +215,12 @@ class Collection:
         """  # noqa: E501
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_any_replica_request(key, None, *opts, **kwargs)
-            return self._impl.get_any_replica(req, None)
+            req, transcoder = self._impl.request_builder.build_get_any_replica_request(key, None, *opts, **kwargs)
+            return self._impl.get_any_replica(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.GetAnyReplica, instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_any_replica_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.get_any_replica(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_any_replica_request(
+                key, obs_handler, *opts, **kwargs)
+            return self._impl.get_any_replica(req, transcoder, obs_handler)
 
     def get_all_replicas(self,
                          key,  # type: str
@@ -286,11 +288,12 @@ class Collection:
         """
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_all_replicas_request(key, None, *opts, **kwargs)
-            return self._impl.get_all_replicas(req, None)
+            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(key, None, *opts, **kwargs)
+            return self._impl.get_all_replicas(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.GetAllReplicas, instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_all_replicas_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.get_all_replicas(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(
+                key, obs_handler, *opts, **kwargs)
+            return self._impl.get_all_replicas(req, transcoder, obs_handler)
 
     def exists(
         self,
@@ -696,11 +699,12 @@ class Collection:
         """
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_and_touch_request(key, expiry, None, *opts, **kwargs)
-            return self._impl.get_and_touch(req, None)
+            req, transcoder = self._impl.request_builder.build_get_and_touch_request(key, expiry, None, *opts, **kwargs)
+            return self._impl.get_and_touch(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.GetAndTouch, instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_and_touch_request(key, expiry, obs_handler, *opts, **kwargs)
-            return self._impl.get_and_touch(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_and_touch_request(
+                key, expiry, obs_handler, *opts, **kwargs)
+            return self._impl.get_and_touch(req, transcoder, obs_handler)
 
     def get_and_lock(
         self,
@@ -757,11 +761,13 @@ class Collection:
         """
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, None, *opts, **kwargs)
-            return self._impl.get_and_lock(req, None)
+            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
+                key, lock_time, None, *opts, **kwargs)
+            return self._impl.get_and_lock(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.GetAndLock, instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, obs_handler, *opts, **kwargs)
-            return self._impl.get_and_lock(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
+                key, lock_time, obs_handler, *opts, **kwargs)
+            return self._impl.get_and_lock(req, transcoder, obs_handler)
 
     def unlock(self,
                key,  # type: str
@@ -869,11 +875,12 @@ class Collection:
         """
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_lookup_in_request(key, spec, None, *opts, **kwargs)
-            return self._impl.lookup_in(req, None)
+            req, transcoder = self._impl.request_builder.build_lookup_in_request(key, spec, None, *opts, **kwargs)
+            return self._impl.lookup_in(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.LookupIn, instruments) as obs_handler:
-            req = self._impl.request_builder.build_lookup_in_request(key, spec, obs_handler, *opts, **kwargs)
-            return self._impl.lookup_in(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_lookup_in_request(
+                key, spec, obs_handler, *opts, **kwargs)
+            return self._impl.lookup_in(req, transcoder, obs_handler)
 
     def lookup_in_any_replica(
         self,
@@ -936,19 +943,19 @@ class Collection:
         """  # noqa: E501
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_lookup_in_any_replica_request(key,
-                                                                                 spec,
-                                                                                 None,
-                                                                                 *opts,
-                                                                                 **kwargs)
-            return self._impl.lookup_in_any_replica(req, None)
+            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(key,
+                                                                                             spec,
+                                                                                             None,
+                                                                                             *opts,
+                                                                                             **kwargs)
+            return self._impl.lookup_in_any_replica(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.LookupInAnyReplica, instruments) as obs_handler:
-            req = self._impl.request_builder.build_lookup_in_any_replica_request(key,
-                                                                                 spec,
-                                                                                 obs_handler,
-                                                                                 *opts,
-                                                                                 **kwargs)
-            return self._impl.lookup_in_any_replica(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(key,
+                                                                                             spec,
+                                                                                             obs_handler,
+                                                                                             *opts,
+                                                                                             **kwargs)
+            return self._impl.lookup_in_any_replica(req, transcoder, obs_handler)
 
     def lookup_in_all_replicas(
         self,
@@ -1035,19 +1042,19 @@ class Collection:
         """
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
-                                                                                  spec,
-                                                                                  None,
-                                                                                  *opts,
-                                                                                  **kwargs)
-            return self._impl.lookup_in_all_replicas(req, None)
+            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
+                                                                                              spec,
+                                                                                              None,
+                                                                                              *opts,
+                                                                                              **kwargs)
+            return self._impl.lookup_in_all_replicas(req, transcoder, None)
         with ObservableRequestHandler(KeyValueOperationType.LookupInAllReplicas, instruments) as obs_handler:
-            req = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
-                                                                                  spec,
-                                                                                  obs_handler,
-                                                                                  *opts,
-                                                                                  **kwargs)
-            return self._impl.lookup_in_all_replicas(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
+                                                                                              spec,
+                                                                                              obs_handler,
+                                                                                              *opts,
+                                                                                              **kwargs)
+            return self._impl.lookup_in_all_replicas(req, transcoder, obs_handler)
 
     def mutate_in(
         self,
@@ -1189,16 +1196,21 @@ class Collection:
 
     # @TODO(PYCBC-1732) - remove in 4.7 dot-minor
     def _execute_deprecated_ds_func(self,
-                                    fn: Callable[[DataStructureRequest], Any],
-                                    req: DataStructureRequest,
+                                    fn: DatastructureCallable,
+                                    req: PycbcCoreKeyValueRequest,
                                     obs_handler: ObservableRequestHandler,
                                     parent_span: WrappedSpan,
                                     create: Optional[bool] = False,
                                     create_type: Optional[Union[Type[dict], Type[list]]] = None,
                                     wrap_missing_path: Optional[bool] = True,
-                                    path_value: Optional[Any] = None) -> Any:
+                                    path_value: Optional[Any] = None,
+                                    transcoder: Optional[Transcoder] = None) -> Any:
         try:
-            return fn(req, obs_handler)
+            fn_args = [req]
+            if transcoder:
+                fn_args.append(transcoder)
+            fn_args.append(obs_handler)
+            return fn(*fn_args)
         except DocumentNotFoundException as ex:
             if create:
                 orig_opt_type = obs_handler.op_type
@@ -1214,7 +1226,11 @@ class Collection:
                 obs_handler.reset(orig_opt_type)
                 obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
                                            parent_span=parent_span)
-                return fn(req, obs_handler)
+                fn_args = [req]
+                if transcoder:
+                    fn_args.append(transcoder)
+                fn_args.append(obs_handler)
+                return fn(*fn_args)
             else:
                 raise
         except PathNotFoundException:
@@ -1385,12 +1401,13 @@ class Collection:
             kv_op_type = KeyValueOperationType.LookupIn
             with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = subdoc_get(f'[{index}]')
-                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
                 sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
                                                           req,
                                                           obs_handler,
                                                           ds_obs_handler.wrapped_span,
-                                                          path_value=index)
+                                                          path_value=index,
+                                                          transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     def list_remove(self, key: str, index: int, **kwargs: object) -> OperationResult:
@@ -1455,11 +1472,12 @@ class Collection:
             kv_op_type = KeyValueOperationType.LookupIn
             with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = count('')
-                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
                 sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
                                                           req,
                                                           obs_handler,
-                                                          ds_obs_handler.wrapped_span)
+                                                          ds_obs_handler.wrapped_span,
+                                                          transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     def couchbase_map(self, key: str) -> CouchbaseMap:
@@ -1546,12 +1564,13 @@ class Collection:
             kv_op_type = KeyValueOperationType.LookupIn
             with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = subdoc_get(mapkey)
-                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
                 sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
                                                           req,
                                                           obs_handler,
                                                           ds_obs_handler.wrapped_span,
-                                                          path_value=mapkey)
+                                                          path_value=mapkey,
+                                                          transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     def map_remove(self, key: str, mapkey: str, **kwargs: object) -> OperationResult:
@@ -1615,11 +1634,12 @@ class Collection:
             kv_op_type = KeyValueOperationType.LookupIn
             with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
                 op = count('')
-                req = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
+                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
                 sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
                                                           req,
                                                           obs_handler,
-                                                          ds_obs_handler.wrapped_span)
+                                                          ds_obs_handler.wrapped_span,
+                                                          transcoder=transcoder)
                 return sd_res.value[0].get('value', None)
 
     def couchbase_set(self, key: str) -> CouchbaseSet:

@@ -20,6 +20,7 @@
 #include "Python.h"
 #include "connection.hxx"
 #include "exceptions.hxx"
+#include "pycbc_kv_request.hxx"
 #include <memory>
 #include <string>
 
@@ -60,6 +61,40 @@ validate_connection_and_args(pycbc_connection* self,
 
   if (!kwargs || !PyDict_Check(kwargs)) {
     std::string err_msg = std::string(op_name) + " requires keyword arguments";
+    raise_invalid_argument(err_msg.c_str(), __FILE__, __LINE__);
+    return false;
+  }
+
+  return true;
+}
+
+inline bool
+validate_connection_and_request(pycbc_connection* self, PyObject* arg, const char* op_name)
+{
+  if (self->conn == nullptr) {
+    PyErr_SetString(PyExc_RuntimeError, "Connection not initialized");
+    return false;
+  }
+
+  if (!PyObject_TypeCheck(arg, &pycbc_kv_request_type)) {
+    std::string err_msg = std::string(op_name) + " requires a pycbc_kv_request argument";
+    raise_invalid_argument(err_msg.c_str(), __FILE__, __LINE__);
+    return false;
+  }
+
+  return true;
+}
+
+inline bool
+validate_connection_and_multi_request(pycbc_connection* self, PyObject* arg, const char* op_name)
+{
+  if (self->conn == nullptr) {
+    PyErr_SetString(PyExc_RuntimeError, "Connection not initialized");
+    return false;
+  }
+
+  if (!PyList_Check(arg)) {
+    std::string err_msg = std::string(op_name) + " requires a list of pycbc_kv_request objects";
     raise_invalid_argument(err_msg.c_str(), __FILE__, __LINE__);
     return false;
   }

@@ -32,26 +32,9 @@ from couchbase.result import (CounterResult,
                               MutationResult)
 
 if TYPE_CHECKING:
-    from couchbase.logic.collection_types import (AppendRequest,
-                                                  DecrementRequest,
-                                                  ExistsRequest,
-                                                  GetAllReplicasRequest,
-                                                  GetAndLockRequest,
-                                                  GetAndTouchRequest,
-                                                  GetAnyReplicaRequest,
-                                                  GetRequest,
-                                                  IncrementRequest,
-                                                  InsertRequest,
-                                                  LookupInAllReplicasRequest,
-                                                  LookupInAnyReplicaRequest,
-                                                  LookupInRequest,
-                                                  MutateInRequest,
-                                                  PrependRequest,
-                                                  RemoveRequest,
-                                                  ReplaceRequest,
-                                                  TouchRequest,
-                                                  UnlockRequest,
-                                                  UpsertRequest)
+    from couchbase.logic.observability.handler import ObservableRequestHandler
+    from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
+    from couchbase.transcoder import Transcoder
     from txcouchbase.scope import TxScope
 
 
@@ -72,127 +55,170 @@ class TxCollectionImpl(AsyncCollectionImpl):
             obs_handler.__exit__(None, None, None)
             return result
 
-    def append_deferred(self, req: AppendRequest, obs_handler) -> Deferred[MutationResult]:
+    def append_deferred(self,
+                        req: PycbcCoreKeyValueRequest,
+                        obs_handler: ObservableRequestHandler) -> Deferred[MutationResult]:
         coro = super().append(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def decrement_deferred(self, req: DecrementRequest, obs_handler) -> Deferred[CounterResult]:
+    def decrement_deferred(self,
+                           req: PycbcCoreKeyValueRequest,
+                           obs_handler: ObservableRequestHandler) -> Deferred[CounterResult]:
         coro = super().decrement(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def exists_deferred(self, req: ExistsRequest, obs_handler) -> Deferred[ExistsResult]:
+    def exists_deferred(self,
+                        req: PycbcCoreKeyValueRequest,
+                        obs_handler: ObservableRequestHandler) -> Deferred[ExistsResult]:
         coro = super().exists(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
     def get_all_replicas_deferred(self,
-                                  req: GetAllReplicasRequest,
-                                  obs_handler) -> Deferred[Iterable[GetReplicaResult]]:
-        coro = super().get_all_replicas(req, obs_handler)
+                                  req: PycbcCoreKeyValueRequest,
+                                  transcoder: Transcoder,
+                                  obs_handler: ObservableRequestHandler) -> Deferred[Iterable[GetReplicaResult]]:
+        coro = super().get_all_replicas(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_and_lock_deferred(self, req: GetAndLockRequest, obs_handler) -> Deferred[GetResult]:
-        coro = super().get_and_lock(req, obs_handler)
+    def get_and_lock_deferred(self,
+                              req: PycbcCoreKeyValueRequest,
+                              transcoder: Transcoder,
+                              obs_handler: ObservableRequestHandler) -> Deferred[GetResult]:
+        coro = super().get_and_lock(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_and_touch_deferred(self, req: GetAndTouchRequest, obs_handler) -> Deferred[GetResult]:
-        coro = super().get_and_touch(req, obs_handler)
+    def get_and_touch_deferred(self,
+                               req: PycbcCoreKeyValueRequest,
+                               transcoder: Transcoder,
+                               obs_handler: ObservableRequestHandler) -> Deferred[GetResult]:
+        coro = super().get_and_touch(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_any_replica_deferred(self, req: GetAnyReplicaRequest, obs_handler) -> Deferred[GetReplicaResult]:
-        coro = super().get_any_replica(req, obs_handler)
+    def get_any_replica_deferred(self,
+                                 req: PycbcCoreKeyValueRequest,
+                                 transcoder: Transcoder,
+                                 obs_handler: ObservableRequestHandler) -> Deferred[GetReplicaResult]:
+        coro = super().get_any_replica(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def get_deferred(self, req: GetRequest, obs_handler) -> Deferred[GetResult]:
-        coro = super().get(req, obs_handler)
+    def get_deferred(self,
+                     req: PycbcCoreKeyValueRequest,
+                     transcoder: Transcoder,
+                     obs_handler: ObservableRequestHandler) -> Deferred[GetResult]:
+        coro = super().get(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def increment_deferred(self, req: IncrementRequest, obs_handler) -> Deferred[CounterResult]:
+    def increment_deferred(self,
+                           req: PycbcCoreKeyValueRequest,
+                           obs_handler: ObservableRequestHandler) -> Deferred[CounterResult]:
         coro = super().increment(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def insert_deferred(self, req: InsertRequest, obs_handler) -> Deferred[MutationResult]:
+    def insert_deferred(self,
+                        req: PycbcCoreKeyValueRequest,
+                        obs_handler: ObservableRequestHandler) -> Deferred[MutationResult]:
         coro = super().insert(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def lookup_in_deferred(self, req: LookupInRequest, obs_handler) -> Deferred[LookupInResult]:
-        coro = super().lookup_in(req, obs_handler)
+    def lookup_in_deferred(self,
+                           req: PycbcCoreKeyValueRequest,
+                           transcoder: Transcoder,
+                           obs_handler: ObservableRequestHandler) -> Deferred[LookupInResult]:
+        coro = super().lookup_in(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
     def lookup_in_all_replicas_deferred(self,
-                                        req: LookupInAllReplicasRequest,
-                                        obs_handler) -> Deferred[Iterable[LookupInReplicaResult]]:
-        coro = super().lookup_in_all_replicas(req, obs_handler)
+                                        req: PycbcCoreKeyValueRequest,
+                                        transcoder: Transcoder,
+                                        obs_handler: ObservableRequestHandler
+                                        ) -> Deferred[Iterable[LookupInReplicaResult]]:
+        coro = super().lookup_in_all_replicas(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
     def lookup_in_any_replica_deferred(self,
-                                       req: LookupInAnyReplicaRequest,
-                                       obs_handler) -> Deferred[LookupInReplicaResult]:
-        coro = super().lookup_in_any_replica(req, obs_handler)
+                                       req: PycbcCoreKeyValueRequest,
+                                       transcoder: Transcoder,
+                                       obs_handler: ObservableRequestHandler) -> Deferred[LookupInReplicaResult]:
+        coro = super().lookup_in_any_replica(req, transcoder, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def mutate_in_deferred(self, req: MutateInRequest, obs_handler) -> Deferred[MutateInResult]:
+    def mutate_in_deferred(self,
+                           req: PycbcCoreKeyValueRequest,
+                           obs_handler: ObservableRequestHandler) -> Deferred[MutateInResult]:
         coro = super().mutate_in(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def prepend_deferred(self, req: PrependRequest, obs_handler) -> Deferred[MutationResult]:
+    def prepend_deferred(self,
+                         req: PycbcCoreKeyValueRequest,
+                         obs_handler: ObservableRequestHandler) -> Deferred[MutationResult]:
         coro = super().prepend(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def remove_deferred(self, req: RemoveRequest, obs_handler) -> Deferred[MutationResult]:
+    def remove_deferred(self,
+                        req: PycbcCoreKeyValueRequest,
+                        obs_handler: ObservableRequestHandler) -> Deferred[MutationResult]:
         coro = super().remove(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def replace_deferred(self, req: ReplaceRequest, obs_handler) -> Deferred[MutationResult]:
+    def replace_deferred(self,
+                         req: PycbcCoreKeyValueRequest,
+                         obs_handler: ObservableRequestHandler) -> Deferred[MutationResult]:
         coro = super().replace(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def touch_deferred(self, req: TouchRequest, obs_handler) -> Deferred[MutationResult]:
+    def touch_deferred(self,
+                       req: PycbcCoreKeyValueRequest,
+                       obs_handler: ObservableRequestHandler) -> Deferred[MutationResult]:
         coro = super().touch(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def unlock_deferred(self, req: UnlockRequest, obs_handler) -> Deferred[None]:
+    def unlock_deferred(self,
+                        req: PycbcCoreKeyValueRequest,
+                        obs_handler: ObservableRequestHandler) -> Deferred[None]:
         coro = super().unlock(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
 
-    def upsert_deferred(self, req: UpsertRequest, obs_handler) -> Deferred[MutationResult]:
+    def upsert_deferred(self,
+                        req: PycbcCoreKeyValueRequest,
+                        obs_handler: ObservableRequestHandler) -> Deferred[MutationResult]:
         coro = super().upsert(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)

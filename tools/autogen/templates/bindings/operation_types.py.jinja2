@@ -1,6 +1,11 @@
 # ==========================================================================================
 # Key-Value Operations
 # ==========================================================================================
+class KeyValueOperationCode(IntEnum):
+    {% for op in key_value_operations -%}
+    {{op.pretty_name}} = {{loop.index0}}
+    {% endfor %}
+
 class KeyValueOperationType(Enum):
     {% for op in key_value_operations -%}
     {{op.pretty_name}} = '{{op.name}}'
@@ -8,6 +13,15 @@ class KeyValueOperationType(Enum):
 # ==========================================================================================
 # Key-Value Multi Operations
 # ==========================================================================================
+class KeyValueMultiOperationCode(IntEnum):
+    {% for op in key_value_multi_operations -%}
+    {{op.pretty_name}}Multi = {{loop.index0 + key_value_operations|length}}
+    {% endfor %}
+
+    def get_single_op_code(self) -> KeyValueOperationCode:
+        # Subtract the offset ({{key_value_operations|length}}) and cast to KeyValueOperationCode
+        return KeyValueOperationCode(self.value - {{key_value_operations|length}})
+
 class KeyValueMultiOperationType(Enum):
     {% for op in key_value_multi_operations -%}
     {{op.pretty_name}}Multi = '{{op.name}}_multi'

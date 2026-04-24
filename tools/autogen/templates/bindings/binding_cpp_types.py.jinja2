@@ -20,14 +20,6 @@ class {{type.py_type}}(TypedDict, total=False):
 # Key-Value Operations
 # ==========================================================================================
 {% for op in key_value_operations %}
-class Cpp{{op.pretty_name}}Request(TypedDict, total=False):
-    {% for field in op.request_fields -%}
-    {% if field.is_ignored -%}
-    # {{field.py_name}}
-    {% else -%}
-    {{field.py_name}}: {{field.py_type}}
-    {% endif -%}
-    {% endfor -%}
 {% if not op.is_streaming_op %}
 class Cpp{{op.pretty_name}}Response(TypedDict, total=False):
     {% if op.request_only -%}
@@ -42,28 +34,6 @@ class Cpp{{op.pretty_name}}Response(TypedDict, total=False):
     {% endfor -%}
     {% endif -%}
 {% endif -%}
-{% endfor %}
-
-# ==========================================================================================
-# Key-Value Multi Operations
-# ==========================================================================================
-{% for op in key_value_multi_operations %}
-class {{op.options_name}}(TypedDict, total=False):
-    {% for field in op.option_fields -%}
-    {% if field.is_ignored -%}
-    # {{field.py_name}}
-    {% else -%}
-    {{field.py_name}}: {{field.py_type}}
-    {% endif -%}
-    {% endfor %}
-class Cpp{{op.pretty_name}}MultiRequest(TypedDict, total=False):
-    {% for field in op.request_fields -%}
-    {% if field.is_ignored -%}
-    # {{field.py_name}}
-    {% else -%}
-    {{field.py_name}}: {{field.py_type}}
-    {% endif -%}
-    {% endfor -%}
 {% endfor %}
 
 # ==========================================================================================

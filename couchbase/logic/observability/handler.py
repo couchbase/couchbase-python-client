@@ -75,6 +75,9 @@ from couchbase.logic.supportability import Supportability
 from couchbase.observability.tracing import SpanAttributeValue, SpanStatusCode
 
 if TYPE_CHECKING:
+    from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
+    from couchbase.logic.pycbc_core import pycbc_result as PycbcCoreResult
+    from couchbase.logic.pycbc_core import pycbc_streamed_result as PycbcCoreStreamedResult
     from couchbase.logic.pycbc_core.binding_cpp_types import CppWrapperSdkChildSpan, CppWrapperSdkSpan
 
 
@@ -199,6 +202,8 @@ class ObservableRequestHandler:
                                                                  op_type_toggle=op_type_toggle,
                                                                  start_time=now)
 
+        self._with_metrics = isinstance(self._meter_impl, ObservableRequestHandlerNoOpMeterImpl) is False
+
     @property
     def is_legacy_tracer(self) -> bool:
         return self._tracer_impl.is_legacy
@@ -214,6 +219,10 @@ class ObservableRequestHandler:
     @property
     def tracer_processed_kv_get_all_replicas_core_span(self) -> bool:
         return self._processed_kv_get_all_replicas_core_span
+
+    @property
+    def with_metrics(self) -> bool:
+        return self._with_metrics
 
     @property
     def wrapper_span_name(self) -> str:
@@ -261,7 +270,19 @@ class ObservableRequestHandler:
                                      cluster_uuid=self._tracer_impl.cluster_uuid,
                                      exc_val=exc_val)
 
-    def process_multi_sub_op(self, req_duration_ns: int, exc_val: Optional[BaseException] = None) -> None:
+    def process_multi_sub_op(self,
+                             result: Union[PycbcCoreException, PycbcCoreResult, PycbcCoreStreamedResult],
+                             exc_val: Optional[BaseException] = None) -> None:
+        if not self._with_metrics:
+            return
+
+        start_time = getattr(result, 'start_time', None)
+        end_time = getattr(result, 'end_time', None)
+
+        if start_time is None or end_time is None:
+            return
+
+        req_duration_ns: int = end_time - start_time
         self._meter_impl.process_multi_sub_op(req_duration_ns,
                                               cluster_name=self._tracer_impl.cluster_name,
                                               cluster_uuid=self._tracer_impl.cluster_uuid,

@@ -23,38 +23,17 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Tuple,
                     Type,
-                    TypeVar,
                     Union)
 
 from couchbase.constants import FMT_BYTES
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.collection_multi_types import (AppendMultiRequest,
-                                                    AppendWithLegacyDurabilityMultiRequest,
-                                                    DecrementMultiRequest,
-                                                    DecrementWithLegacyDurabilityMultiRequest,
-                                                    ExistsMultiRequest,
-                                                    GetAllReplicasMultiRequest,
-                                                    GetAndLockMultiRequest,
-                                                    GetAnyReplicaMultiRequest,
-                                                    GetMultiRequest,
-                                                    IncrementMultiRequest,
-                                                    IncrementWithLegacyDurabilityMultiRequest,
-                                                    InsertMultiRequest,
-                                                    InsertWithLegacyDurabilityMultiRequest,
-                                                    PrependMultiRequest,
-                                                    PrependWithLegacyDurabilityMultiRequest,
-                                                    RemoveMultiRequest,
-                                                    RemoveWithLegacyDurabilityMultiRequest,
-                                                    ReplaceMultiRequest,
-                                                    ReplaceWithLegacyDurabilityMultiRequest,
-                                                    TouchMultiRequest,
-                                                    UnlockMultiRequest,
-                                                    UpsertMultiRequest,
-                                                    UpsertWithLegacyDurabilityMultiRequest)
+from couchbase.logic.collection_multi_types import KeyValueMultiRequest, KeyValueMultiWithTranscoderRequest
 from couchbase.logic.collection_types import CollectionDetails
 from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import KeyValueMultiOperationCode
 from couchbase.logic.options import DeltaValueBase, SignedInt64Base
+from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.options import (AppendMultiOptions,
                                DecrementMultiOptions,
                                ExistsMultiOptions,
@@ -82,24 +61,22 @@ if TYPE_CHECKING:
     from couchbase._utils import JSONType
 
 
-ReqT = TypeVar('T')
-
-LEGACY_DURABILITY_LOOKUP = {
-    AppendMultiRequest: AppendWithLegacyDurabilityMultiRequest,
-    DecrementMultiRequest: DecrementWithLegacyDurabilityMultiRequest,
-    IncrementMultiRequest: IncrementWithLegacyDurabilityMultiRequest,
-    InsertMultiRequest: InsertWithLegacyDurabilityMultiRequest,
-    PrependMultiRequest: PrependWithLegacyDurabilityMultiRequest,
-    RemoveMultiRequest: RemoveWithLegacyDurabilityMultiRequest,
-    ReplaceMultiRequest: ReplaceWithLegacyDurabilityMultiRequest,
-    UpsertMultiRequest: UpsertWithLegacyDurabilityMultiRequest
+_LEGACY_DURABILITY_LOOKUP = {
+    KeyValueMultiOperationCode.AppendMulti: KeyValueMultiOperationCode.AppendWithLegacyDurabilityMulti,
+    KeyValueMultiOperationCode.DecrementMulti: KeyValueMultiOperationCode.DecrementWithLegacyDurabilityMulti,
+    KeyValueMultiOperationCode.IncrementMulti: KeyValueMultiOperationCode.IncrementWithLegacyDurabilityMulti,
+    KeyValueMultiOperationCode.InsertMulti: KeyValueMultiOperationCode.InsertWithLegacyDurabilityMulti,
+    KeyValueMultiOperationCode.PrependMulti: KeyValueMultiOperationCode.PrependWithLegacyDurabilityMulti,
+    KeyValueMultiOperationCode.RemoveMulti: KeyValueMultiOperationCode.RemoveWithLegacyDurabilityMulti,
+    KeyValueMultiOperationCode.ReplaceMulti: KeyValueMultiOperationCode.ReplaceWithLegacyDurabilityMulti,
+    KeyValueMultiOperationCode.UpsertMulti: KeyValueMultiOperationCode.UpsertWithLegacyDurabilityMulti,
 }
 
-NON_TRANSCODER_OP_LOOKUP = {
-    RemoveMultiRequest: True,
-    RemoveWithLegacyDurabilityMultiRequest: True,
-    TouchMultiRequest: True,
-    UnlockMultiRequest: True,
+_NON_TRANSCODER_OP_LOOKUP = {
+    KeyValueMultiOperationCode.RemoveMulti: True,
+    KeyValueMultiOperationCode.RemoveWithLegacyDurabilityMulti: True,
+    KeyValueMultiOperationCode.TouchMulti: True,
+    KeyValueMultiOperationCode.UnlockMulti: True,
 }
 
 
@@ -108,10 +85,32 @@ class CollectionMultiRequestBuilder:
     def __init__(self, collection_details: CollectionDetails) -> None:
         self._collection_dtls = collection_details
 
+    def _create_kv_request(self,
+                           opcode: int,
+                           key: str,
+                           obs_handler: Optional[ObservableRequestHandler]) -> PycbcCoreKeyValueRequest:
+        req = PycbcCoreKeyValueRequest()
+        req.opcode = opcode
+        req.bucket = self._collection_dtls.bucket_name
+        req.scope = self._collection_dtls.scope_name
+        req.collection = self._collection_dtls.collection_name
+        req.key = key
+
+        if obs_handler:
+            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
+            if obs_handler.is_legacy_tracer:
+                legacy_request_span = obs_handler.legacy_request_span
+                if legacy_request_span:
+                    req.parent_span = legacy_request_span
+            else:
+                req.wrapper_span_name = obs_handler.wrapper_span_name
+            req.with_metrics = obs_handler.with_metrics
+        return req
+
     def _get_delta_and_initial(self, args: Dict[str, Any]) -> Tuple[int, Optional[int]]:
         """**INTERNAL**"""
-        initial = args.get('initial', None)
-        delta = args.get('delta', None)
+        initial = args.pop('initial', None)
+        delta = args.pop('delta', None)
         if not initial:
             initial = SignedInt64Base(0)
         if not delta:
@@ -126,13 +125,13 @@ class CollectionMultiRequestBuilder:
         else:
             return delta, None
 
-    def _get_multi_binary_mutation_req(self,
+    def _get_multi_binary_mutation_req(self,  # noqa: C901
                                        keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
-                                       opts_type: Type[Union[AppendMultiRequest, PrependMultiRequest]],
-                                       return_type: Type[ReqT],
+                                       opts_type: Type[Union[AppendMultiOptions, PrependMultiOptions]],
+                                       opcode: KeyValueMultiOperationCode,
                                        obs_handler: Optional[ObservableRequestHandler],
                                        *opts: object,
-                                       **kwargs: object) -> ReqT:
+                                       **kwargs: object) -> KeyValueMultiRequest:
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
@@ -148,7 +147,14 @@ class CollectionMultiRequestBuilder:
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        parsed_keys_and_docs = {}
+        if isinstance(durability, dict):
+            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
+
+        per_key_args = final_args.pop('per_key_options', None)
+        return_exceptions = final_args.pop('return_exceptions', True)
+        req_opcode = opcode.get_single_op_code()
+
+        requests = []
         for k, v in keys_and_docs.items():
             if isinstance(v, str):
                 value = v.encode('utf-8')
@@ -160,33 +166,36 @@ class CollectionMultiRequestBuilder:
             if not isinstance(value, bytes):
                 raise ValueError('The value provided must of type str, bytes or bytearray.')
 
-            # we don't use flags for binary ops, but passing the flags around helps reduce logic for request types
-            parsed_keys_and_docs[k] = value, FMT_BYTES
+            req = self._create_kv_request(req_opcode, k, obs_handler)
+            req.value = value
+            req.flags = FMT_BYTES
 
-        if isinstance(durability, dict):
-            final_args['persist_to'] = durability['persist_to']
-            final_args['replicate_to'] = durability['replicate_to']
-            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
-        else:
-            if durability and obs_handler:
-                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
-            final_args['durability_level'] = durability
+            if isinstance(durability, dict):
+                req.persist_to = durability['persist_to']
+                req.replicate_to = durability['replicate_to']
+            else:
+                if durability and obs_handler:
+                    obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
+                req.durability_level = durability
 
-        per_key_args = final_args.pop('per_key_options', None)
-        return_exceptions = final_args.pop('return_exceptions', True)
-        return return_type(*self._collection_dtls.get_details(),
-                           doc_list=list(parsed_keys_and_docs.items()),
-                           op_args=final_args,
-                           per_key_args=per_key_args,
-                           return_exceptions=return_exceptions)
+            for arg_k, arg_v in final_args.items():
+                if arg_v is not None:
+                    setattr(req, arg_k, arg_v)
+            if per_key_args and k in per_key_args:
+                for arg_k, arg_v in per_key_args[k].items():
+                    if arg_v is not None:
+                        setattr(req, arg_k, arg_v)
+            requests.append(req)
+
+        return KeyValueMultiRequest(opcode, requests, return_exceptions)
 
     def _get_multi_counter_op_req(self,  # noqa: C901
                                   keys: List[str],
-                                  opts_type: Type[Union[DecrementMultiRequest, IncrementMultiRequest]],
-                                  return_type: Type[ReqT],
+                                  opts_type: Type[Union[DecrementMultiOptions, IncrementMultiOptions]],
+                                  opcode: KeyValueMultiOperationCode,
                                   obs_handler: Optional[ObservableRequestHandler],
                                   *opts: object,
-                                  **kwargs: object) -> ReqT:
+                                  **kwargs: object) -> KeyValueMultiRequest:
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
@@ -202,43 +211,51 @@ class CollectionMultiRequestBuilder:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
         if isinstance(durability, dict):
-            final_args['persist_to'] = durability['persist_to']
-            final_args['replicate_to'] = durability['replicate_to']
-            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
-        else:
-            if durability and obs_handler:
-                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
-            final_args['durability_level'] = durability
+            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
+
+        per_key_args = final_args.pop('per_key_options', None)
+        return_exceptions = final_args.pop('return_exceptions', True)
+        req_opcode = opcode.get_single_op_code()
 
         global_delta, global_initial = self._get_delta_and_initial(final_args)
         final_args['delta'] = int(global_delta)
         if global_initial is not None:
             final_args['initial_value'] = int(global_initial)
 
-        per_key_args = final_args.pop('per_key_options', None)
-        if per_key_args:
-            for key in per_key_args.keys():
-                delta, initial = self._get_delta_and_initial(per_key_args[key])
-                if delta is not None:
-                    per_key_args[key]['delta'] = int(delta)
-                if initial is not None:
-                    per_key_args[key]['initial_value'] = int(initial)
+        requests = []
+        for k in keys:
+            req = self._create_kv_request(req_opcode, k, obs_handler)
+            if isinstance(durability, dict):
+                req.persist_to = durability['persist_to']
+                req.replicate_to = durability['replicate_to']
+            else:
+                if durability and obs_handler:
+                    obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
+                req.durability_level = durability
 
-        return_exceptions = final_args.pop('return_exceptions', True)
-        return return_type(*self._collection_dtls.get_details(),
-                           doc_list=keys,
-                           op_args=final_args,
-                           per_key_args=per_key_args,
-                           return_exceptions=return_exceptions)
+            for arg_k, arg_v in final_args.items():
+                if arg_v is not None:
+                    setattr(req, arg_k, arg_v)
+            if per_key_args and k in per_key_args:
+                pk_delta, pk_initial = self._get_delta_and_initial(per_key_args[k])
+                per_key_args[k]['delta'] = int(pk_delta)
+                if pk_initial is not None:
+                    per_key_args[k]['initial_value'] = int(pk_initial)
+                for arg_k, arg_v in per_key_args[k].items():
+                    if arg_v is not None:
+                        setattr(req, arg_k, arg_v)
+            requests.append(req)
+
+        return KeyValueMultiRequest(opcode, requests, return_exceptions)
 
     def _get_multi_op_mutation_req(self,  # noqa: C901
                                    keys_and_docs: Dict[str, JSONType],
                                    opts_type: Type[MutationMultiOptions],
-                                   return_type: Type[ReqT],
+                                   opcode: KeyValueMultiOperationCode,
                                    obs_handler: Optional[ObservableRequestHandler],
                                    *opts: object,
                                    **kwargs: object
-                                   ) -> ReqT:
+                                   ) -> KeyValueMultiRequest:
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
@@ -255,71 +272,63 @@ class CollectionMultiRequestBuilder:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
         if isinstance(durability, dict):
-            final_args['persist_to'] = durability['persist_to']
-            final_args['replicate_to'] = durability['replicate_to']
-            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
-        else:
-            if durability and obs_handler:
-                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
-            final_args['durability_level'] = durability
+            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
 
         per_key_args = final_args.pop('per_key_options', None)
+        return_exceptions = final_args.pop('return_exceptions', True)
+        req_opcode = opcode.get_single_op_code()
 
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
-        return_exceptions = final_args.pop('return_exceptions', True)
 
-        transcoded_keys_and_docs = {}
+        requests = []
         for key, value in keys_and_docs.items():
+            req = self._create_kv_request(req_opcode, key, obs_handler)
+            if isinstance(durability, dict):
+                req.persist_to = durability['persist_to']
+                req.replicate_to = durability['replicate_to']
+            else:
+                if durability and obs_handler:
+                    obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
+                req.durability_level = durability
+
             if per_key_args and key in per_key_args:
                 key_transcoder: Transcoder = per_key_args[key].pop('transcoder', transcoder)
-                # directly call the transcoder if we are not using observability
                 if not obs_handler or obs_handler.is_noop:
-                    transcoded_value = key_transcoder.encode_value(value)
+                    transcoded_value, flags = key_transcoder.encode_value(value)
                 else:
-                    transcoded_value = obs_handler.maybe_add_encoding_span(
-                        lambda v=value, tc=key_transcoder: tc.encode_value(v)
+                    transcoded_value, flags = obs_handler.maybe_create_encoding_span(
+                        lambda tc=key_transcoder, v=value: tc.encode_value(v)
                     )
             else:
-                # directly call the transcoder if we are not using observability
                 if not obs_handler or obs_handler.is_noop:
-                    transcoded_value = transcoder.encode_value(value)
+                    transcoded_value, flags = transcoder.encode_value(value)
                 else:
-                    transcoded_value = obs_handler.maybe_add_encoding_span(
-                        lambda v=value, tc=transcoder: tc.encode_value(v)
+                    transcoded_value, flags = obs_handler.maybe_create_encoding_span(
+                        lambda tc=transcoder, v=value: tc.encode_value(v)
                     )
 
-            transcoded_keys_and_docs[key] = transcoded_value
+            req.value = transcoded_value
+            req.flags = flags
 
-        if opts_type.__name__ == ReplaceMultiOptions.__name__:
-            global_expiry = final_args.get('expiry', None)
-            global_preserve_expiry = final_args.get('preserve_expiry', None)
-            if global_expiry and global_preserve_expiry is True:
-                raise InvalidArgumentException(
-                    'The expiry and preserve_expiry options cannot both be set for replace operations.'
-                )
+            for arg_k, arg_v in final_args.items():
+                if arg_v is not None:
+                    setattr(req, arg_k, arg_v)
+            if per_key_args and key in per_key_args:
+                for arg_k, arg_v in per_key_args[key].items():
+                    if arg_v is not None:
+                        setattr(req, arg_k, arg_v)
+            requests.append(req)
 
-            for k, v in (per_key_args or {}).items():
-                expiry = v.get('expiry', global_expiry)
-                preserve_expiry = v.get('preserve_expiry', global_preserve_expiry)
-                if expiry and preserve_expiry is True:
-                    raise InvalidArgumentException(
-                        message=("The expiry and preserve_expiry options cannot "
-                                 f"both be set for replace operations.  Multi-op key: {k}.")
-                    )
+        return KeyValueMultiRequest(opcode, requests, return_exceptions)
 
-        return return_type(*self._collection_dtls.get_details(),
-                           doc_list=list(transcoded_keys_and_docs.items()),
-                           op_args=final_args,
-                           per_key_args=per_key_args,
-                           return_exceptions=return_exceptions)
-
-    def _get_multi_op_non_value_req(self,
+    def _get_multi_op_non_value_req(self,  # noqa: C901
                                     keys: List[str],
                                     opts_type: Type[NoValueMultiOptions],
-                                    return_type: Type[ReqT],
+                                    opcode: KeyValueMultiOperationCode,
                                     obs_handler: Optional[ObservableRequestHandler],
                                     *opts: object,
-                                    **kwargs: object) -> ReqT:
+                                    **kwargs: object) -> Union[KeyValueMultiRequest,
+                                                               KeyValueMultiWithTranscoderRequest]:
         op_keys_cas = kwargs.pop('op_keys_cas', None)
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         durability = final_args.pop('durability', None)
@@ -336,41 +345,45 @@ class CollectionMultiRequestBuilder:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
         if isinstance(durability, dict):
-            final_args['persist_to'] = durability['persist_to']
-            final_args['replicate_to'] = durability['replicate_to']
-            return_type = LEGACY_DURABILITY_LOOKUP[return_type]
-        else:
-            if durability and obs_handler:
-                obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
-            final_args['durability_level'] = durability
+            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
 
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
-        return_exceptions = final_args.pop('return_exceptions', True)
-        # unlock_multi needs a cas per doc, so we don't want per_key_args to be None for a unlock multi-op
         per_key_args = final_args.pop('per_key_options', None if op_keys_cas is None else {})
         if op_keys_cas:
             per_key_args.update({k: {'cas': v} for k, v in op_keys_cas.items()})
+        return_exceptions = final_args.pop('return_exceptions', True)
+        req_opcode = opcode.get_single_op_code()
+
+        requests = []
         key_transcoders = {}
-        for key in keys:
-            if per_key_args and key in per_key_args:
-                key_transcoder = per_key_args[key].pop('transcoder', transcoder)
-                key_transcoders[key] = key_transcoder
+        for k in keys:
+            req = self._create_kv_request(req_opcode, k, obs_handler)
+            if isinstance(durability, dict):
+                req.persist_to = durability['persist_to']
+                req.replicate_to = durability['replicate_to']
             else:
-                key_transcoders[key] = transcoder
+                if durability and obs_handler:
+                    obs_handler.add_kv_durability_attribute(DurabilityLevel(durability))
+                req.durability_level = durability
 
-        if NON_TRANSCODER_OP_LOOKUP.get(return_type, False) is True:
-            return return_type(*self._collection_dtls.get_details(),
-                               doc_list=keys,
-                               op_args=final_args,
-                               per_key_args=per_key_args,
-                               return_exceptions=return_exceptions)
+            for arg_k, arg_v in final_args.items():
+                if arg_v is not None:
+                    setattr(req, arg_k, arg_v)
+            if per_key_args and k in per_key_args:
+                key_transcoder = per_key_args[k].pop('transcoder', transcoder)
+                key_transcoders[k] = key_transcoder
+                for arg_k, arg_v in per_key_args[k].items():
+                    if arg_v is not None:
+                        setattr(req, arg_k, arg_v)
+            else:
+                key_transcoders[k] = transcoder
 
-        return return_type(*self._collection_dtls.get_details(),
-                           doc_list=keys,
-                           op_args=final_args,
-                           per_key_args=per_key_args,
-                           transcoders=key_transcoders,
-                           return_exceptions=return_exceptions)
+            requests.append(req)
+
+        if _NON_TRANSCODER_OP_LOOKUP.get(opcode, False) is True:
+            return KeyValueMultiRequest(opcode, requests, return_exceptions)
+
+        return KeyValueMultiWithTranscoderRequest(opcode, requests, return_exceptions, key_transcoders)
 
     def _validate_delta_initial(self,
                                 delta: Optional[DeltaValueBase] = None,
@@ -388,10 +401,10 @@ class CollectionMultiRequestBuilder:
                                    keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
-                                   **kwargs: object) -> AppendMultiRequest:
+                                   **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_binary_mutation_req(keys_and_docs,
                                                    AppendMultiOptions,
-                                                   AppendMultiRequest,
+                                                   KeyValueMultiOperationCode.AppendMulti,
                                                    obs_handler,
                                                    *opts,
                                                    **kwargs)
@@ -400,10 +413,10 @@ class CollectionMultiRequestBuilder:
                                       keys: List[str],
                                       obs_handler: ObservableRequestHandler,
                                       *opts: object,
-                                      **kwargs: object) -> DecrementMultiRequest:
+                                      **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_counter_op_req(keys,
                                               DecrementMultiOptions,
-                                              DecrementMultiRequest,
+                                              KeyValueMultiOperationCode.DecrementMulti,
                                               obs_handler,
                                               *opts,
                                               **kwargs)
@@ -412,10 +425,10 @@ class CollectionMultiRequestBuilder:
                                    keys: List[str],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
-                                   **kwargs: object) -> ExistsMultiRequest:
+                                   **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 ExistsMultiOptions,
-                                                ExistsMultiRequest,
+                                                KeyValueMultiOperationCode.ExistsMulti,
                                                 obs_handler,
                                                 *opts,
                                                 **kwargs)
@@ -424,10 +437,10 @@ class CollectionMultiRequestBuilder:
                                              keys: List[str],
                                              obs_handler: ObservableRequestHandler,
                                              *opts: object,
-                                             **kwargs: object) -> GetAllReplicasMultiRequest:
+                                             **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 GetAllReplicasMultiOptions,
-                                                GetAllReplicasMultiRequest,
+                                                KeyValueMultiOperationCode.GetAllReplicasMulti,
                                                 obs_handler,
                                                 *opts,
                                                 **kwargs)
@@ -437,11 +450,11 @@ class CollectionMultiRequestBuilder:
                                          lock_time: timedelta,
                                          obs_handler: ObservableRequestHandler,
                                          *opts: object,
-                                         **kwargs: object) -> GetAndLockMultiRequest:
+                                         **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
         kwargs['lock_time'] = lock_time
         return self._get_multi_op_non_value_req(keys,
                                                 GetAndLockMultiOptions,
-                                                GetAndLockMultiRequest,
+                                                KeyValueMultiOperationCode.GetAndLockMulti,
                                                 obs_handler,
                                                 *opts,
                                                 **kwargs)
@@ -450,10 +463,10 @@ class CollectionMultiRequestBuilder:
                                             keys: List[str],
                                             obs_handler: ObservableRequestHandler,
                                             *opts: object,
-                                            **kwargs: object) -> GetAnyReplicaMultiRequest:
+                                            **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 GetAnyReplicaMultiOptions,
-                                                GetAnyReplicaMultiRequest,
+                                                KeyValueMultiOperationCode.GetAnyReplicaMulti,
                                                 obs_handler,
                                                 *opts,
                                                 **kwargs)
@@ -462,17 +475,22 @@ class CollectionMultiRequestBuilder:
                                 keys: List[str],
                                 obs_handler: ObservableRequestHandler,
                                 *opts: object,
-                                **kwargs: object) -> GetMultiRequest:
-        return self._get_multi_op_non_value_req(keys, GetMultiOptions, GetMultiRequest, obs_handler, *opts, **kwargs)
+                                **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
+        return self._get_multi_op_non_value_req(keys,
+                                                GetMultiOptions,
+                                                KeyValueMultiOperationCode.GetMulti,
+                                                obs_handler,
+                                                *opts,
+                                                **kwargs)
 
     def build_increment_multi_request(self,
                                       keys: List[str],
                                       obs_handler: ObservableRequestHandler,
                                       *opts: object,
-                                      **kwargs: object) -> IncrementMultiRequest:
+                                      **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_counter_op_req(keys,
                                               IncrementMultiOptions,
-                                              IncrementMultiRequest,
+                                              KeyValueMultiOperationCode.IncrementMulti,
                                               obs_handler,
                                               *opts,
                                               **kwargs)
@@ -481,10 +499,10 @@ class CollectionMultiRequestBuilder:
                                    keys_and_docs: Dict[str, JSONType],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
-                                   **kwargs: object) -> InsertMultiRequest:
+                                   **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                InsertMultiOptions,
-                                               InsertMultiRequest,
+                                               KeyValueMultiOperationCode.InsertMulti,
                                                obs_handler,
                                                *opts,
                                                **kwargs)
@@ -493,10 +511,10 @@ class CollectionMultiRequestBuilder:
                                     keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
                                     obs_handler: ObservableRequestHandler,
                                     *opts: object,
-                                    **kwargs: object) -> PrependMultiRequest:
+                                    **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_binary_mutation_req(keys_and_docs,
                                                    PrependMultiOptions,
-                                                   PrependMultiRequest,
+                                                   KeyValueMultiOperationCode.PrependMulti,
                                                    obs_handler,
                                                    *opts,
                                                    **kwargs)
@@ -505,11 +523,11 @@ class CollectionMultiRequestBuilder:
                                    keys: List[str],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
-                                   **kwargs: object) -> RemoveMultiRequest:
+                                   **kwargs: object) -> KeyValueMultiRequest:
         # use the non-mutation logic even though remove is a mutation
         return self._get_multi_op_non_value_req(keys,
                                                 RemoveMultiOptions,
-                                                RemoveMultiRequest,
+                                                KeyValueMultiOperationCode.RemoveMulti,
                                                 obs_handler,
                                                 *opts,
                                                 **kwargs)
@@ -518,10 +536,10 @@ class CollectionMultiRequestBuilder:
                                     keys_and_docs: Dict[str, JSONType],
                                     obs_handler: ObservableRequestHandler,
                                     *opts: object,
-                                    **kwargs: object) -> ReplaceMultiRequest:
+                                    **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                ReplaceMultiOptions,
-                                               ReplaceMultiRequest,
+                                               KeyValueMultiOperationCode.ReplaceMulti,
                                                obs_handler,
                                                *opts,
                                                **kwargs)
@@ -531,12 +549,12 @@ class CollectionMultiRequestBuilder:
                                   expiry: timedelta,
                                   obs_handler: ObservableRequestHandler,
                                   *opts: object,
-                                  **kwargs: object) -> TouchMultiRequest:
+                                  **kwargs: object) -> KeyValueMultiRequest:
         kwargs['expiry'] = expiry
         # use the non-mutation logic even though touch is a mutation
         return self._get_multi_op_non_value_req(keys,
                                                 TouchMultiOptions,
-                                                TouchMultiRequest,
+                                                KeyValueMultiOperationCode.TouchMulti,
                                                 obs_handler,
                                                 *opts,
                                                 **kwargs)
@@ -545,7 +563,7 @@ class CollectionMultiRequestBuilder:
                                    keys: List[str],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
-                                   **kwargs: object) -> UnlockMultiRequest:
+                                   **kwargs: object) -> KeyValueMultiRequest:
         op_keys_cas = {}
         if isinstance(keys, dict):
             if not all(map(lambda k: isinstance(k, str), keys.keys())):
@@ -563,7 +581,7 @@ class CollectionMultiRequestBuilder:
         # use the non-mutation logic even though unlock is a mutation
         return self._get_multi_op_non_value_req(list(op_keys_cas.keys()),
                                                 UnlockMultiOptions,
-                                                UnlockMultiRequest,
+                                                KeyValueMultiOperationCode.UnlockMulti,
                                                 obs_handler,
                                                 *opts,
                                                 **kwargs)
@@ -572,10 +590,10 @@ class CollectionMultiRequestBuilder:
                                    keys_and_docs: Dict[str, JSONType],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
-                                   **kwargs: object) -> UpsertMultiRequest:
+                                   **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                UpsertMultiOptions,
-                                               UpsertMultiRequest,
+                                               KeyValueMultiOperationCode.UpsertMulti,
                                                obs_handler,
                                                *opts,
                                                **kwargs)

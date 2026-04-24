@@ -98,6 +98,24 @@ PyObject*
 raise_invalid_argument(const char* message, const char* file = __FILE__, int line = __LINE__);
 
 /**
+ * Raise InvalidArgumentException for missing required field.
+ */
+PyObject*
+raise_required_field_missing(PyObject* interned_key,
+                             const char* context,
+                             const char* file = __FILE__,
+                             int line = __LINE__);
+
+/**
+ * Raise InvalidArgumentException for empty required field.
+ */
+PyObject*
+raise_required_field_empty(PyObject* interned_key,
+                           const char* context,
+                           const char* file = __FILE__,
+                           int line = __LINE__);
+
+/**
  * Raise FeatureUnavailableException with the given message.
  * Sets the Python error indicator and returns nullptr for convenient error propagation.
  *

@@ -1,15 +1,14 @@
-
 // ==========================================================================================
 // Key-Value Operations
 // ==========================================================================================
 {% for op in key_value_operations %}
 static PyObject*
-pycbc_connection__{{op.name}}__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+pycbc_connection__{{op.name}}__(pycbc_connection* self, PyObject* arg)
 {
-    if (!validate_connection_and_args(self, args, kwargs, "{{op.name}}")) {
+    if (!validate_connection_and_request(self, arg, "{{op.name}}")) {
         return nullptr;
     }
-    return self->conn->execute_kv_op<{{op.request_struct_full}}>(kwargs);
+    return self->conn->execute_kv_op<{{op.request_struct_full}}>(reinterpret_cast<pycbc_kv_request*>(arg));
 }
 {% endfor %}
 // ==========================================================================================
@@ -17,9 +16,12 @@ pycbc_connection__{{op.name}}__(pycbc_connection* self, PyObject* args, PyObject
 // ==========================================================================================
 {% for op in key_value_operations if op.has_multi %}
 static PyObject*
-pycbc_connection__{{op.name}}_multi__(pycbc_connection* self, PyObject* args, PyObject* kwargs)
+pycbc_connection__{{op.name}}_multi__(pycbc_connection* self, PyObject* arg)
 {
-    return handle_multi_kv_op<{{op.request_struct_full}}>(self, args, kwargs, "{{op.name}}_multi");
+    if (!validate_connection_and_multi_request(self, arg, "{{op.name}}_multi")) {
+        return nullptr;
+    }
+    return self->conn->execute_multi_op<{{op.request_struct_full}}>(arg);
 }
 {% endfor %}
 // ==========================================================================================
@@ -72,11 +74,11 @@ static PyMethodDef pycbc_connection_methods[] = {
 
     // Key-Value Operations
     {% for op in key_value_operations -%}
-    { "pycbc_{{op.name}}", (PyCFunction)pycbc_connection__{{op.name}}__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("KV {{op.name}} operation") },
+    { "pycbc_{{op.name}}", (PyCFunction)pycbc_connection__{{op.name}}__, METH_O, PyDoc_STR("KV {{op.name}} operation") },
     {% endfor %}
     // Key-Value Multi Operations
     {% for op in key_value_operations if op.has_multi -%}
-    { "pycbc_{{op.name}}_multi", (PyCFunction)pycbc_connection__{{op.name}}_multi__, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("KV {{op.name}}-multi operation") },
+    { "pycbc_{{op.name}}_multi", (PyCFunction)pycbc_connection__{{op.name}}_multi__, METH_O, PyDoc_STR("KV {{op.name}}-multi operation") },
     {% endfor %}
     // Streaming Operations
     {% for op in streaming_operations -%}

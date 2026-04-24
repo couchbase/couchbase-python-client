@@ -18,7 +18,9 @@ from __future__ import annotations
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
-                    Optional)
+                    List,
+                    Optional,
+                    Union)
 
 from couchbase.exceptions import (CouchbaseException,
                                   ErrorMapper,
@@ -27,13 +29,14 @@ from couchbase.logic.binding_map import BindingMap
 from couchbase.logic.bucket_types import CloseBucketRequest, OpenBucketRequest
 from couchbase.logic.cluster_types import CloseConnectionRequest
 from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.operation_types import KeyValueMultiOperationCode, KeyValueOperationCode
 from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 
 if TYPE_CHECKING:
     from couchbase.logic.bucket_types import BucketRequest
     from couchbase.logic.cluster_types import ClusterRequest, CreateConnectionRequest
-    from couchbase.logic.collection_types import CollectionRequest
+    from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.management.logic.mgmt_req import MgmtRequest
 
 
@@ -103,18 +106,23 @@ class ClientAdapter:
         return ret
 
     def execute_collection_request(self,
-                                   req: CollectionRequest,
+                                   opcode: Union[KeyValueOperationCode, KeyValueMultiOperationCode],
+                                   req: Union[List[PycbcCoreKeyValueRequest], PycbcCoreKeyValueRequest],
                                    obs_handler: Optional[ObservableRequestHandler] = None) -> Any:
         """**INTERNAL**"""
         self._ensure_not_closed()
-        req_dict = req.req_to_dict(obs_handler=obs_handler)
-        ret = self._execute_req(req.op_name, req_dict)
-        # pycbc_result and pycbc_exception have a core_span member
-        if obs_handler and hasattr(ret, 'core_span'):
-            obs_handler.process_core_span(ret.core_span)
-        if isinstance(ret, PycbcCoreException):
-            raise ErrorMapper.build_exception(ret)
-        return ret
+        try:
+            ret = self._binding_map.kv_ops[opcode](req)
+            # pycbc_result and pycbc_exception have a core_span member
+            if obs_handler and hasattr(ret, 'core_span'):
+                obs_handler.process_core_span(ret.core_span)
+            if isinstance(ret, PycbcCoreException):
+                raise ErrorMapper.build_exception(ret)
+            return ret
+        except CouchbaseException:
+            raise
+        except Exception as ex:
+            raise InternalSDKException(message=str(ex)) from None
 
     def execute_cluster_request(self, req: ClusterRequest) -> Any:
         """**INTERNAL**"""

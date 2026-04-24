@@ -3,10 +3,10 @@
     # ==========================================================================================
     {% for op in key_value_operations %}
     {% if op.is_streaming_op -%}
-    def pycbc_{{op.name}}(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_streamed_result[Any]:
+    def pycbc_{{op.name}}(self, request: pycbc_kv_request) -> pycbc_streamed_result[Any]:
         ...
     {% else -%}
-    def pycbc_{{op.name}}(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_result[CppTypes.{{op.response}}]:
+    def pycbc_{{op.name}}(self, request: pycbc_kv_request) -> pycbc_result[CppTypes.{{op.response}}]:
         ...
     {% endif -%}
     {% endfor %}
@@ -15,10 +15,14 @@
     # ==========================================================================================
     {% for op in key_value_multi_operations %}
     {% if op.is_streaming_op -%}
-    def pycbc_{{op.name}}_multi(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_result[Dict[str, pycbc_streamed_result[Any]]]:
+    def pycbc_{{op.name}}_multi(
+        self, request_list: List[pycbc_kv_request]
+    ) -> pycbc_result[Dict[str, pycbc_streamed_result[Any]]]:
         ...
     {% else -%}
-    def pycbc_{{op.name}}_multi(self, **kwargs: Unpack[CppTypes.{{op.request}}]) -> pycbc_result[Dict[str, CppTypes.{{op.response}}]]:
+    def pycbc_{{op.name}}_multi(
+        self, request_list: List[pycbc_kv_request]
+    ) -> pycbc_result[Dict[str, CppTypes.{{op.response}}]]:
         ...
     {% endif -%}
     {% endfor %}

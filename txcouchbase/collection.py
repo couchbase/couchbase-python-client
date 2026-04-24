@@ -78,15 +78,15 @@ class Collection:
             ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_request(key, None, *opts, **kwargs)
-            d = self._impl.get_deferred(req, None)
+            req, transcoder = self._impl.request_builder.build_get_request(key, None, *opts, **kwargs)
+            d = self._impl.get_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.Get, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
-            d = self._impl.get_deferred(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
+            d = self._impl.get_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:
@@ -100,15 +100,16 @@ class Collection:
                         ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_any_replica_request(key, None, *opts, **kwargs)
-            d = self._impl.get_any_replica_deferred(req, None)
+            req, transcoder = self._impl.request_builder.build_get_any_replica_request(key, None, *opts, **kwargs)
+            d = self._impl.get_any_replica_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.GetAnyReplica, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_get_any_replica_request(key, obs_handler, *opts, **kwargs)
-            d = self._impl.get_any_replica_deferred(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_any_replica_request(
+                key, obs_handler, *opts, **kwargs)
+            d = self._impl.get_any_replica_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:
@@ -122,15 +123,16 @@ class Collection:
                          ) -> Deferred[Iterable[GetReplicaResult]]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_all_replicas_request(key, None, *opts, **kwargs)
-            d = self._impl.get_all_replicas_deferred(req, None)
+            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(key, None, *opts, **kwargs)
+            d = self._impl.get_all_replicas_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.GetAllReplicas, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_get_all_replicas_request(key, obs_handler, *opts, **kwargs)
-            d = self._impl.get_all_replicas_deferred(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(
+                key, obs_handler, *opts, **kwargs)
+            d = self._impl.get_all_replicas_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:
@@ -284,15 +286,16 @@ class Collection:
                       ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_and_touch_request(key, expiry, None, *opts, **kwargs)
-            d = self._impl.get_and_touch_deferred(req, None)
+            req, transcoder = self._impl.request_builder.build_get_and_touch_request(key, expiry, None, *opts, **kwargs)
+            d = self._impl.get_and_touch_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.GetAndTouch, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_get_and_touch_request(key, expiry, obs_handler, *opts, **kwargs)
-            d = self._impl.get_and_touch_deferred(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_and_touch_request(
+                key, expiry, obs_handler, *opts, **kwargs)
+            d = self._impl.get_and_touch_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:
@@ -308,15 +311,17 @@ class Collection:
     ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, None, *opts, **kwargs)
-            d = self._impl.get_and_lock_deferred(req, None)
+            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
+                key, lock_time, None, *opts, **kwargs)
+            d = self._impl.get_and_lock_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.GetAndLock, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_get_and_lock_request(key, lock_time, obs_handler, *opts, **kwargs)
-            d = self._impl.get_and_lock_deferred(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
+                key, lock_time, obs_handler, *opts, **kwargs)
+            d = self._impl.get_and_lock_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:
@@ -355,15 +360,16 @@ class Collection:
     ) -> Deferred[LookupInResult]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_lookup_in_request(key, spec, None, *opts, **kwargs)
-            d = self._impl.lookup_in_deferred(req, None)
+            req, transcoder = self._impl.request_builder.build_lookup_in_request(key, spec, None, *opts, **kwargs)
+            d = self._impl.lookup_in_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.LookupIn, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_lookup_in_request(key, spec, obs_handler, *opts, **kwargs)
-            d = self._impl.lookup_in_deferred(req, obs_handler)
+            req, transcoder = self._impl.request_builder.build_lookup_in_request(
+                key, spec, obs_handler, *opts, **kwargs)
+            d = self._impl.lookup_in_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:
@@ -379,17 +385,17 @@ class Collection:
     ) -> Deferred[LookupInReplicaResult]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_lookup_in_any_replica_request(
+            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(
                 key, spec, None, *opts, **kwargs)
-            d = self._impl.lookup_in_any_replica_deferred(req, None)
+            d = self._impl.lookup_in_any_replica_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.LookupInAnyReplica, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_lookup_in_any_replica_request(
+            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(
                 key, spec, obs_handler, *opts, **kwargs)
-            d = self._impl.lookup_in_any_replica_deferred(req, obs_handler)
+            d = self._impl.lookup_in_any_replica_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:
@@ -405,17 +411,17 @@ class Collection:
     ) -> Deferred[Iterable[LookupInReplicaResult]]:
         instruments = self._impl.observability_instruments
         if instruments.is_noop:
-            req = self._impl.request_builder.build_lookup_in_all_replicas_request(
+            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(
                 key, spec, None, *opts, **kwargs)
-            d = self._impl.lookup_in_all_replicas_deferred(req, None)
+            d = self._impl.lookup_in_all_replicas_deferred(req, transcoder, None)
             d.addBoth(self._impl._finish_span, None)
             return d
         obs_handler = ObservableRequestHandler(KeyValueOperationType.LookupInAllReplicas, instruments)
         obs_handler.__enter__()
         try:
-            req = self._impl.request_builder.build_lookup_in_all_replicas_request(
+            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(
                 key, spec, obs_handler, *opts, **kwargs)
-            d = self._impl.lookup_in_all_replicas_deferred(req, obs_handler)
+            d = self._impl.lookup_in_all_replicas_deferred(req, transcoder, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:

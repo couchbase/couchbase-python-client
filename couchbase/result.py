@@ -416,15 +416,15 @@ class MultiResult:
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v, exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op(v.end_time - v.start_time)
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v)
                 if isinstance(v, list):
                     self._results[k] = v
                 else:
@@ -544,15 +544,15 @@ class MultiExistsResult:
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v, exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op((v.end_time - v.start_time))
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v)
                 self._results[k] = ExistsResult(v)
 
     @property
@@ -636,15 +636,15 @@ class MultiMutationResult:
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v, exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op((v.end_time - v.start_time))
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v)
                 self._results[k] = MutationResult(v, key=k)
 
     @property
@@ -878,15 +878,15 @@ class MultiCounterResult:
                     exc = ErrorMapper.build_exception(v)
                 else:
                     exc = v
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op((v.end_time - v.start_time), exc_val=exc)
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v, exc_val=exc)
                 if not return_exceptions:
                     raise exc
                 else:
                     self._results[k] = exc
             else:
-                if obs_handler and hasattr(v, 'start_time') and hasattr(v, 'end_time'):
-                    obs_handler.process_multi_sub_op((v.end_time - v.start_time))
+                if obs_handler:
+                    obs_handler.process_multi_sub_op(v)
                 self._results[k] = CounterResult(v)
 
     @property

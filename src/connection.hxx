@@ -21,6 +21,7 @@
 #include "error_contexts.hxx"
 #include "exceptions.hxx"
 #include "operations_autogen.hxx"
+#include "pycbc_kv_request.hxx"
 #include "pytocbpp_defs.hxx"
 #include "result.hxx"
 #include "utils.hxx"
@@ -71,22 +72,26 @@ public:
   PyObject* get_cluster_labels_as_py_object();
 
   template<typename Request>
-  PyObject* execute_kv_op(PyObject* kwargs);
+  PyObject* execute_streaming_op(PyObject* kwargs);
 
   template<typename Request>
   PyObject* execute_mgmt_op(PyObject* kwargs);
 
   template<typename Request>
-  PyObject* execute_streaming_op(PyObject* kwargs);
+  PyObject* execute_kv_op(pycbc_kv_request* request);
 
   // execute_multi_op is public so it can be called by handle_multi_op() in pycbc_connection.hxx
   template<typename Request>
-  PyObject* execute_multi_op(PyObject* doc_list,
-                             PyObject* op_args,
-                             PyObject* per_key_args,
-                             PyObject* bucket,
-                             PyObject* scope,
-                             PyObject* collection);
+  PyObject* execute_multi_op(PyObject* arg);
+
+  template<typename Request>
+  typename Request::response_type dispatch_sync(Request&& req);
+
+  template<typename Request, typename Response>
+  PyObject* finalize_kv_result(
+    Response resp,
+    std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span,
+    std::optional<std::chrono::system_clock::time_point> start_time);
 
 private:
   enum class connection_state_action {
@@ -217,86 +222,21 @@ private:
         req,
         [pyObj_callback, pyObj_errback, barrier, wrapper_span, start_time, this](
           response_type resp) {
-          if (wrapper_span != nullptr) {
-            wrapper_span->end();
-            if (auto retries = get_cbpp_retries(resp.ctx); retries > 0 && wrapper_span) {
-              wrapper_span->add_tag("retries", retries);
-            }
-          }
           PyGILState_STATE state = PyGILState_Ensure();
-          PyObject* result = nullptr;
+          PyObject* result = finalize_kv_result<Request>(
+            std::move(resp), std::move(wrapper_span), std::move(start_time));
 
-          PyObject* error =
-            build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Operation failed");
+          PyObject* target_handler =
+            PyObject_TypeCheck(result, &pycbc_exception_type) ? pyObj_errback : pyObj_callback;
 
-          if (error) {
-            result = error;
-            add_core_span<pycbc_exception>(result, wrapper_span);
-            if (start_time.has_value()) {
-              std::chrono::system_clock::time_point end_time{ std::chrono::system_clock::now() };
-              maybe_add_start_and_end_time<pycbc_exception>(result, start_time, end_time);
-            }
-            if (pyObj_errback != nullptr) {
-              PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_errback, result, nullptr);
-              Py_XDECREF(ret);
-              Py_XDECREF(result);
-            } else if (barrier) {
-              barrier->set_value(result);
-            } else {
-              Py_XDECREF(result);
-            }
-          } else {
-            if constexpr (is_streaming_kv_op<Request>::value) {
-              auto [is_error, result_obj] = process_streaming_kv_result(resp);
-
-              if (is_error) {
-                result = result_obj;
-                add_core_span<pycbc_exception>(result, wrapper_span);
-                if (start_time.has_value()) {
-                  std::chrono::system_clock::time_point end_time{
-                    std::chrono::system_clock::now()
-                  };
-                  maybe_add_start_and_end_time<pycbc_exception>(result, start_time, end_time);
-                }
-                if (pyObj_errback != nullptr) {
-                  PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_errback, result, nullptr);
-                  Py_XDECREF(ret);
-                  Py_XDECREF(result);
-                } else if (barrier) {
-                  barrier->set_value(result);
-                } else {
-                  Py_XDECREF(result);
-                }
-                Py_XDECREF(pyObj_callback);
-                Py_XDECREF(pyObj_errback);
-                PyGILState_Release(state);
-                return;
-              }
-              result = result_obj;
-              add_core_span<pycbc_streamed_result>(result, wrapper_span);
-              if (start_time.has_value()) {
-                std::chrono::system_clock::time_point end_time{ std::chrono::system_clock::now() };
-                maybe_add_start_and_end_time<pycbc_streamed_result>(result, start_time, end_time);
-              }
-            } else {
-              result = cbpp_to_py(resp);
-              add_core_span<pycbc_result>(result, wrapper_span);
-              if (start_time.has_value()) {
-                std::chrono::system_clock::time_point end_time{ std::chrono::system_clock::now() };
-                maybe_add_start_and_end_time<pycbc_result>(result, start_time, end_time);
-              }
-            }
-
-            if (pyObj_callback != nullptr) {
-              PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_callback, result, nullptr);
-              Py_XDECREF(ret);
-              Py_XDECREF(result);
-            } else if (barrier) {
-              barrier->set_value(result);
-            } else {
-              Py_XDECREF(result);
-            }
+          if (target_handler != nullptr) {
+            Py_XDECREF(PyObject_CallFunctionObjArgs(target_handler, result, nullptr));
+          } else if (barrier != nullptr) {
+            barrier->set_value(result);
+            result = nullptr; // Reference transferred to barrier
           }
+
+          Py_XDECREF(result);
           Py_XDECREF(pyObj_callback);
           Py_XDECREF(pyObj_errback);
           PyGILState_Release(state);
@@ -376,38 +316,85 @@ private:
 };
 
 template<typename Request>
-PyObject*
-Connection::execute_kv_op(PyObject* kwargs)
+typename Request::response_type
+Connection::dispatch_sync(Request&& req)
 {
-  PyObject* pyObj_callback = PyDict_GetItemString(kwargs, "callback");
-  PyObject* pyObj_errback = PyDict_GetItemString(kwargs, "errback");
+  using Response = typename Request::response_type;
+  auto barrier = std::make_shared<std::promise<Response>>();
+  auto fut = barrier->get_future();
+  Py_BEGIN_ALLOW_THREADS cluster_.execute(std::forward<Request>(req), [barrier](Response resp) {
+    barrier->set_value(std::move(resp));
+  });
+  fut.wait();
+  Py_END_ALLOW_THREADS return fut.get();
+}
 
-  if (!validate_and_incref_callbacks(pyObj_callback, pyObj_errback)) {
-    return nullptr;
+template<typename Request, typename Response>
+PyObject*
+Connection::finalize_kv_result(
+  Response resp,
+  std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span,
+  std::optional<std::chrono::system_clock::time_point> start_time)
+{
+  if (wrapper_span != nullptr) {
+    wrapper_span->end();
+    if (auto retries = get_cbpp_retries(resp.ctx); retries > 0 && wrapper_span) {
+      wrapper_span->add_tag("retries", retries);
+    }
   }
 
-  std::string span_name;
+  PyObject* error = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Operation failed");
+  if (error) {
+    add_core_span<pycbc_exception>(error, wrapper_span);
+    if (start_time.has_value()) {
+      maybe_add_start_and_end_time<pycbc_exception>(
+        error, start_time, std::chrono::system_clock::now());
+    }
+    return error;
+  }
+
+  PyObject* result = nullptr;
+  if constexpr (is_streaming_kv_op<Request>::value) {
+    auto [is_error, result_obj] = process_streaming_kv_result(resp);
+    result = result_obj;
+    if (is_error) {
+      add_core_span<pycbc_exception>(result, wrapper_span);
+      if (start_time.has_value()) {
+        maybe_add_start_and_end_time<pycbc_exception>(
+          result, start_time, std::chrono::system_clock::now());
+      }
+    } else {
+      add_core_span<pycbc_streamed_result>(result, wrapper_span);
+      if (start_time.has_value()) {
+        maybe_add_start_and_end_time<pycbc_streamed_result>(
+          result, start_time, std::chrono::system_clock::now());
+      }
+    }
+  } else {
+    result = cbpp_to_py(resp);
+    add_core_span<pycbc_result>(result, wrapper_span);
+    if (start_time.has_value()) {
+      maybe_add_start_and_end_time<pycbc_result>(
+        result, start_time, std::chrono::system_clock::now());
+    }
+  }
+  return result;
+}
+
+template<typename Request>
+PyObject*
+Connection::execute_kv_op(pycbc_kv_request* request)
+{
   std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span;
-  extract_field(kwargs, "wrapper_span_name", span_name);
+  std::string span_name;
+  extract_field(request->wrapper_span_name, span_name);
   if (!span_name.empty()) {
     wrapper_span = std::make_shared<couchbase::core::tracing::wrapper_sdk_span>(span_name);
   }
 
-  std::shared_ptr<std::promise<PyObject*>> barrier = nullptr;
-  std::future<PyObject*> fut;
-  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
-    barrier = std::make_shared<std::promise<PyObject*>>();
-    fut = barrier->get_future();
-  }
-
   try {
-    auto req = py_to_cbpp<Request>(kwargs, wrapper_span);
+    auto req = py_to_cbpp<Request>(request, wrapper_span);
     if (PyErr_Occurred()) {
-      Py_XDECREF(pyObj_callback);
-      Py_XDECREF(pyObj_errback);
-      if (barrier) {
-        barrier->set_value(nullptr);
-      }
       return nullptr;
     }
 
@@ -416,240 +403,100 @@ Connection::execute_kv_op(PyObject* kwargs)
       add_cluster_labels(req);
     }
 
-    execute_op(req, pyObj_callback, pyObj_errback, barrier, wrapper_span);
-    if (barrier) {
-      PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+    std::optional<std::chrono::system_clock::time_point> start_time;
+    if (request->with_metrics == Py_True) {
+      start_time = std::chrono::system_clock::now();
     }
-    Py_RETURN_NONE;
+
+    if (request->callback == nullptr && request->errback == nullptr) {
+      auto resp = dispatch_sync(std::move(req));
+      return finalize_kv_result<Request>(
+        std::move(resp), std::move(wrapper_span), std::move(start_time));
+    } else {
+      Py_INCREF(request->callback);
+      Py_XINCREF(request->errback);
+      execute_op(req, request->callback, request->errback, nullptr, wrapper_span, start_time);
+      Py_RETURN_NONE;
+    }
   } catch (const std::exception& e) {
-    if (barrier) {
-      barrier->set_value(nullptr);
-    }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    Py_XDECREF(pyObj_callback);
-    Py_XDECREF(pyObj_errback);
-    return nullptr;
+    return raise_invalid_argument(e.what());
   }
 }
 
 template<typename Request>
 PyObject*
-Connection::execute_multi_op(PyObject* doc_list,
-                             PyObject* op_args,
-                             PyObject* per_key_args,
-                             PyObject* pyObj_bucket,
-                             PyObject* pyObj_scope,
-                             PyObject* pyObj_collection)
+Connection::execute_multi_op(PyObject* arg)
 {
-  if (!PyList_Check(doc_list)) {
-    raise_invalid_argument("doc_list must be a list", __FILE__, __LINE__);
-    return nullptr;
-  }
+  using Response = typename Request::response_type;
+  using Staging = typename kv_staging_trait<Request>::staging_type;
 
-  std::string span_name;
-  std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span;
-  extract_field(op_args, "wrapper_span_name", span_name);
-
-  size_t num_docs = static_cast<size_t>(PyList_Size(doc_list));
-  std::vector<std::pair<std::string, std::shared_ptr<std::promise<PyObject*>>>> operations;
-  operations.reserve(num_docs);
+  size_t num_docs = static_cast<size_t>(PyList_Size(arg));
+  std::vector<Staging> staging;
+  staging.reserve(num_docs);
 
   PyObject* pyObj_multi_result = create_pycbc_result();
   pycbc_result* multi_result = reinterpret_cast<pycbc_result*>(pyObj_multi_result);
 
-  // INCREF bucket/scope/collection PyObjects (already PyUnicode from caller) so we can reuse
-  Py_INCREF(pyObj_bucket);
-  Py_INCREF(pyObj_scope);
-  Py_INCREF(pyObj_collection);
-
   for (size_t i = 0; i < num_docs; ++i) {
-    PyObject* doc_item = PyList_GetItem(doc_list, i); // Borrowed ref
-
-    std::string key;
-    PyObject* value_bytes = nullptr;
-    PyObject* flags = nullptr;
-
-    std::chrono::system_clock::time_point start_time{ std::chrono::system_clock::now() };
-    if constexpr (is_mutation_op<Request>::value) {
-      // Mutation ops expect (key, (value_bytes, flags)) tuple
-      // NOTE: binary [ap|pre]pend will have FMT_BYTES as flags, but the flags are not used
-      if (!PyTuple_Check(doc_item) || PyTuple_Size(doc_item) != 2) {
-        raise_invalid_argument(
-          "Mutation doc_item must be a (key, (value, flags)) tuple", __FILE__, __LINE__);
-        Py_DECREF(pyObj_multi_result);
-        return nullptr;
-      }
-
-      PyObject* pyObj_key = PyTuple_GetItem(doc_item, 0);   // Borrowed ref
-      PyObject* value_tuple = PyTuple_GetItem(doc_item, 1); // Borrowed ref
-
-      if (!PyUnicode_Check(pyObj_key)) {
-        raise_invalid_argument("key must be a string", __FILE__, __LINE__);
-        Py_DECREF(pyObj_multi_result);
-        return nullptr;
-      }
-
-      if (!PyTuple_Check(value_tuple) || PyTuple_Size(value_tuple) != 2) {
-        raise_invalid_argument("value must be a (bytes, flags) tuple", __FILE__, __LINE__);
-        Py_DECREF(pyObj_multi_result);
-        return nullptr;
-      }
-
-      key = std::string(PyUnicode_AsUTF8(pyObj_key));
-      value_bytes = PyTuple_GetItem(value_tuple, 0); // Borrowed ref
-      flags = PyTuple_GetItem(value_tuple, 1);       // Borrowed ref
-
-    } else {
-      // Read ops expect key as string
-      if (!PyUnicode_Check(doc_item)) {
-        raise_invalid_argument("read doc_item must be a string (key)", __FILE__, __LINE__);
-        Py_DECREF(pyObj_multi_result);
-        return nullptr;
-      }
-
-      key = std::string(PyUnicode_AsUTF8(doc_item));
-    }
-
-    PyObject* request_kwargs = PyDict_New();
-    if (!request_kwargs) {
-      Py_DECREF(pyObj_bucket);
-      Py_DECREF(pyObj_scope);
-      Py_DECREF(pyObj_collection);
-      Py_DECREF(pyObj_multi_result);
-      return nullptr;
-    }
-
-    PyObject* pyObj_doc_id = PyDict_New();
-    if (!pyObj_doc_id) {
-      Py_DECREF(pyObj_bucket);
-      Py_DECREF(pyObj_scope);
-      Py_DECREF(pyObj_collection);
-      Py_DECREF(pyObj_multi_result);
-      Py_DECREF(request_kwargs);
-      return nullptr;
-    }
-
-    PyDict_SetItemString(pyObj_doc_id, "bucket", pyObj_bucket);
-    PyDict_SetItemString(pyObj_doc_id, "scope", pyObj_scope);
-    PyDict_SetItemString(pyObj_doc_id, "collection", pyObj_collection);
-    PyObject* pyObj_key = PyUnicode_FromString(key.c_str());
-    PyDict_SetItemString(pyObj_doc_id, "key", pyObj_key);
-    Py_DECREF(pyObj_key);
-    PyDict_SetItemString(request_kwargs, "id", pyObj_doc_id);
-    Py_DECREF(pyObj_doc_id);
-
-    if constexpr (is_mutation_op<Request>::value) {
-      if (value_bytes == nullptr || flags == nullptr) {
-        raise_invalid_argument("missing value or flags for mutation operation", __FILE__, __LINE__);
-        Py_DECREF(request_kwargs);
-        Py_DECREF(pyObj_multi_result);
-        return nullptr;
-      }
-      PyDict_SetItemString(request_kwargs, "value", value_bytes);
-      PyDict_SetItemString(request_kwargs, "flags", flags);
-    }
-
-    // Merge base options (op_args)
-    PyDict_Update(request_kwargs, op_args);
-
-    // Check for per-key overrides and merge
-    PyObject* pyObj_key_str = PyUnicode_FromString(key.c_str());
-    if (per_key_args != nullptr && PyDict_Check(per_key_args)) {
-      if (PyDict_Contains(per_key_args, pyObj_key_str)) {
-        PyObject* key_specific_args = PyDict_GetItem(per_key_args, pyObj_key_str); // Borrowed ref
-        PyDict_Update(request_kwargs, key_specific_args); // Merge, overriding base args
-      }
-    }
-    Py_DECREF(pyObj_key_str);
-
+    PyObject* pyObj_binding = PyList_GetItem(arg, i); // Borrowed ref
+    pycbc_kv_request* request = reinterpret_cast<pycbc_kv_request*>(pyObj_binding);
+    std::string key_str = py_to_cbpp<std::string>(request->key);
+    std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span;
+    std::string span_name;
+    extract_field(request->wrapper_span_name, span_name);
     if (!span_name.empty()) {
       wrapper_span = std::make_shared<couchbase::core::tracing::wrapper_sdk_span>(span_name);
     }
-    try {
-      auto req = py_to_cbpp<Request>(request_kwargs, wrapper_span);
-      if (PyErr_Occurred()) {
-        if (wrapper_span != nullptr) {
-          wrapper_span->end();
-        }
-        std::string err_msg = "Failed to create request for multi-op for key '" + key + "'";
-        PyObject* pycbc_exc =
-          build_pycbc_exception_from_python_exc(err_msg.c_str(), __FILE__, __LINE__);
-        if (pycbc_exc != nullptr) {
-          add_core_span<pycbc_exception>(pycbc_exc, wrapper_span);
-          PyDict_SetItemString(multi_result->raw_result, key.c_str(), pycbc_exc);
-          Py_DECREF(pycbc_exc);
-        }
-      } else {
-        auto barrier = std::make_shared<std::promise<PyObject*>>();
-        // multi-ops are only synchronous (e.g. callback/errback = nullptr)
-        execute_op(req, nullptr, nullptr, barrier, wrapper_span, start_time);
-        operations.emplace_back(key, barrier);
-      }
-    } catch (const std::exception& e) {
-      if (wrapper_span != nullptr) {
-        wrapper_span->end();
-      }
-      // Create a Python RuntimeError from the std::exception
-      PyObject* exc_msg =
-        PyUnicode_FromFormat("Failed to execute operation for key '%s': %s", key.c_str(), e.what());
-      PyObject* exc_args = PyTuple_Pack(1, exc_msg);
-      PyObject* runtime_error = PyObject_CallObject((PyObject*)&PyExc_RuntimeError, exc_args);
-      Py_DECREF(exc_msg);
-      Py_DECREF(exc_args);
 
-      if (runtime_error) {
-        // Set this new Python exception as the current error
-        PyErr_SetObject((PyObject*)&PyExc_RuntimeError, runtime_error);
-        // PyErr_SetObject INCREFs runtime_error, so we DECREF it.
-        Py_DECREF(runtime_error);
-
-        // Reuse the existing function to build the pycbc_exception with an inner_exception
-        std::string err_msg = "Failed to execute operation for key '" + key + "'";
-        PyObject* pycbc_exc =
-          build_pycbc_exception_from_python_exc(err_msg.c_str(), __FILE__, __LINE__);
-        if (pycbc_exc) {
-          add_core_span<pycbc_exception>(pycbc_exc, wrapper_span);
-          PyDict_SetItemString(multi_result->raw_result, key.c_str(), pycbc_exc);
-          Py_DECREF(pycbc_exc);
-        }
-      }
+    auto req = py_to_cbpp<Request>(request, wrapper_span);
+    if (PyErr_Occurred()) {
+      Py_DECREF(pyObj_multi_result);
+      return nullptr;
     }
-    Py_DECREF(request_kwargs);
+
+    // TODO(PYCBC-1746): Delete w/ removal of legacy tracing logic
+    if (wrapper_span == nullptr) {
+      add_cluster_labels(req);
+    }
+
+    std::optional<std::chrono::system_clock::time_point> start_time;
+    if (request->with_metrics == Py_True) {
+      start_time = std::chrono::system_clock::now();
+    }
+
+    auto barrier = std::make_shared<std::promise<Response>>();
+    auto fut = barrier->get_future();
+
+    staging.push_back({ std::move(req),
+                        std::move(key_str),
+                        std::move(wrapper_span),
+                        start_time,
+                        std::move(barrier),
+                        std::move(fut) });
   }
 
-  // we INCREF'd these, don't forget to DECREF!
-  Py_DECREF(pyObj_bucket);
-  Py_DECREF(pyObj_scope);
-  Py_DECREF(pyObj_collection);
+  Py_BEGIN_ALLOW_THREADS for (auto& s : staging)
+  {
+    auto barrier = s.barrier;
+    cluster_.execute(s.req, [barrier](Response resp) {
+      barrier->set_value(std::move(resp));
+    });
+  }
 
-  bool all_okay = true;
-  for (auto& [key, barrier] : operations) {
-    PyObject* op_result = nullptr;
+  for (auto& s : staging) {
+    s.fut.wait();
+  }
+  Py_END_ALLOW_THREADS
 
-    Py_BEGIN_ALLOW_THREADS op_result = barrier->get_future().get();
-    Py_END_ALLOW_THREADS
-
-      if (op_result != nullptr)
-    {
-      if (PyExceptionInstance_Check(op_result) ||
-          PyObject_TypeCheck(op_result, &pycbc_exception_type)) {
-        all_okay = false;
-      }
-      PyDict_SetItemString(multi_result->raw_result, key.c_str(), op_result);
-      Py_DECREF(op_result);
-    }
-    else
-    {
-      // This is a bad state and ideally users never run into this situation.  If we do run into
-      // this situation we try to preserve the operations that provided results and set others to
-      // None.
+    bool all_okay = true;
+  for (auto& s : staging) {
+    PyObject* res =
+      finalize_kv_result<Request>(s.fut.get(), std::move(s.wrapper_span), std::move(s.start_time));
+    if (PyObject_TypeCheck(res, &pycbc_exception_type)) {
       all_okay = false;
-      // Try to give some sort of diagnostic info (also clear the error indicator)
-      PyErr_Print();
-      PyDict_SetItemString(multi_result->raw_result, key.c_str(), Py_None);
     }
+    PyDict_SetItemString(multi_result->raw_result, s.key_str.c_str(), res);
+    Py_DECREF(res);
   }
   PyDict_SetItemString(multi_result->raw_result, "all_okay", all_okay ? Py_True : Py_False);
 

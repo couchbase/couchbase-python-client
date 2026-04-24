@@ -24,6 +24,8 @@
 namespace pycbc
 {
 
+struct pycbc_kv_request;
+
 template<typename T, typename Enabled = void>
 struct py_to_cbpp_t;
 
@@ -40,6 +42,21 @@ py_to_cbpp(PyObject* pyObj,
            std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span)
 {
   return py_to_cbpp_t<T>::from_py(pyObj, wrapper_span);
+}
+
+template<typename T>
+static inline T
+py_to_cbpp(pycbc_kv_request* request)
+{
+  return py_to_cbpp_t<T>::from_py(request);
+}
+
+template<typename T>
+static inline T
+py_to_cbpp(pycbc_kv_request* request,
+           std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span)
+{
+  return py_to_cbpp_t<T>::from_py(request, wrapper_span);
 }
 
 template<typename T>

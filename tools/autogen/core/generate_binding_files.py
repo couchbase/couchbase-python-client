@@ -31,6 +31,24 @@ class BindingFileType(Enum):
     BindingMapTypes = 'binding_map_types'
     OperationTypes = 'operation_types'
     BindingMap = 'binding_map'
+    PycbcDictKeysHxx = 'pycbc_dict_keys_hxx'
+    PycbcDictKeysCxx = 'pycbc_dict_keys_cxx'
+    PycbcKvRequestHxx = 'pycbc_kv_request_hxx'
+    PycbcKvRequestCxx = 'pycbc_kv_request_cxx'
+
+
+# Header prefixes that identify KV-related cpp_types
+_KV_TYPE_HEADER_PREFIXES = (
+    'core/operations/document_',
+    'core/range_scan',
+    'core/impl/subdoc/',
+)
+
+# Hard-coded strings from connection.hxx & operations_autogen.hxx not covered by field names above
+_KV_EXTRA_KEYS = {
+    'all_okay', 'callback', 'errback', 'wrapper_span_name',
+    'bucket', 'scope', 'collection', 'key', 'parent_span'
+}
 
 
 class BindingGenerator:
@@ -47,6 +65,9 @@ class BindingGenerator:
         self._output_root = output_root
         self._dry_run = dry_run
         self._jinja_env = Environment(loader=FileSystemLoader(templates_dir))
+        self._jinja_env.filters['is_kv_type'] = lambda header: any(
+            header.startswith(p) for p in _KV_TYPE_HEADER_PREFIXES
+        )
 
     @staticmethod
     def load_binding_schema_yaml(schema_file: Path) -> BindingConfigSchema:
@@ -58,11 +79,36 @@ class BindingGenerator:
 
         return schema
 
+    def _get_kv_binding_fields(self) -> List[Dict[str, Any]]:
+        field_map: dict[str, dict[str, Any]] = {}
+        for op in self._binding_builder.kv_ops:
+            for f in op.request_fields:
+                is_ignored = 'is_ignored' in f and f['is_ignored']
+                py_name = f['py_name']
+                if is_ignored or py_name == 'id':
+                    continue
+                if py_name not in field_map:
+                    field_map[py_name] = {
+                        'py_name': py_name,
+                        'cpp_type': f['cpp_type'],
+                        'py_type': f['py_type'],
+                        'used_by': set()
+                    }
+                field_map[py_name]['used_by'].add(op.name)
+
+        # Convert sets to sorted lists for Jinja
+        kv_binding_fields = []
+        for py_name in sorted(field_map.keys()):
+            field_map[py_name]['used_by'] = sorted(list(field_map[py_name]['used_by']))
+            kv_binding_fields.append(field_map[py_name])
+        return kv_binding_fields
+
     def _build_operations_context(self) -> Dict[str, Any]:
         kv_ops = []
         for op in self._binding_builder.kv_ops:
             new_op = {
                 'name': op.name,
+                'pretty_name': op.pretty_name,
                 'request': f'Cpp{op.pretty_name}Request',
                 'response': f'Cpp{op.pretty_name}Response',
                 'is_streaming_op': True if op.is_streaming_op else False
@@ -70,6 +116,8 @@ class BindingGenerator:
             if 'WithLegacyDurability' in op.pretty_name:
                 new_op['response'] = new_op['response'].replace('WithLegacyDurability', '')
             kv_ops.append(new_op)
+
+        # ... rest of the method ...
 
         kv_multi_ops = []
         for op in self._binding_builder.kv_multi_ops:
@@ -119,7 +167,8 @@ class BindingGenerator:
             'key_value_operations': sorted(kv_ops, key=lambda o: o['name']),
             'key_value_multi_operations': sorted(kv_multi_ops, key=lambda o: o['name']),
             'streaming_operations': sorted(streaming_ops, key=lambda o: o['streaming_op_name']),
-            'mgmt_groups': sorted(mgmt_groups, key=lambda g: g['pretty_name'])
+            'mgmt_groups': sorted(mgmt_groups, key=lambda g: g['pretty_name']),
+            'kv_binding_fields': self._get_kv_binding_fields()
         }
 
     def _build_operations_context_simple(self) -> Dict[str, Any]:
@@ -571,6 +620,66 @@ class BindingGenerator:
                                  end_marker,
                                  use_rstrip=True)
 
+    def generate_pycbc_dict_keys_template(self) -> None:  # noqa: C901
+        keys: set[str] = set(_KV_EXTRA_KEYS)
+
+        # All request + response field py_names from KV ops
+        for op in self._binding_builder.kv_ops:
+            for f in op.request_fields:
+                if 'is_ignored' in f and f['is_ignored']:
+                    continue
+                keys.add(f['py_name'])
+            for f in op.response_fields:
+                if 'is_ignored' in f and f['is_ignored']:
+                    continue
+                keys.add(f['py_name'])
+
+        # KV-related cpp_types
+        for t in self._binding_builder.cpp_types:
+            if any(t.header.startswith(p) for p in _KV_TYPE_HEADER_PREFIXES):
+                for f in t.fields:
+                    if 'is_ignored' in f and f['is_ignored']:
+                        continue
+                    keys.add(f['py_name'])
+
+        timestamp = datetime.now()
+        context = {
+            'current_year': timestamp.year,
+            'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'kv_dict_keys': sorted(keys)
+        }
+
+        for file_type in (BindingFileType.PycbcDictKeysHxx, BindingFileType.PycbcDictKeysCxx):
+            template_name = self._get_template(file_type)
+            code = self._get_rendered_content(template_name, context)
+            output_file = self._get_output_file(file_type)
+            self._write_file(output_file, code)
+
+    def generate_pycbc_kv_request_template(self) -> None:
+        kv_binding_fields = self._get_kv_binding_fields()
+
+        kv_ops = [asdict(op) for op in sorted(self._binding_builder.kv_ops, key=lambda o: o.name)]
+        for op in kv_ops:
+            if op['name'].endswith('_with_legacy_durability'):
+                match_name = op['name'][:-len('_with_legacy_durability')]
+                op_match = next((o for o in kv_ops if o['name'] == match_name), None)
+                if op_match:
+                    op['response_struct_full'] = op_match['response_struct_full']
+
+        timestamp = datetime.now()
+        context = {
+            'current_year': timestamp.year,
+            'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'kv_binding_fields': kv_binding_fields,
+            'key_value_operations': kv_ops
+        }
+
+        for file_type in (BindingFileType.PycbcKvRequestHxx, BindingFileType.PycbcKvRequestCxx):
+            template_name = self._get_template(file_type)
+            code = self._get_rendered_content(template_name, context)
+            output_file = self._get_output_file(file_type)
+            self._write_file(output_file, code)
+
     def run(self) -> None:
         self.build_types()
         self.build_operations()
@@ -583,3 +692,5 @@ class BindingGenerator:
         self.generate_operation_types_template()
         self.generate_binding_map_types_template()
         self.generate_binding_map_template()
+        self.generate_pycbc_dict_keys_template()
+        self.generate_pycbc_kv_request_template()

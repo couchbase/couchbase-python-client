@@ -32,6 +32,14 @@
 
 namespace pycbc {
 
+{% macro field_key(field, type) %}
+    {%- if type.header | is_kv_type -%}
+        pycbc::keys::{{field.py_name}}
+    {%- else -%}
+        "{{field.py_name}}"
+    {%- endif -%}
+{% endmacro %}
+
 {% for type in cpp_types %}
 // ==========================================================================================
 // {{type.full_name}}
@@ -55,15 +63,15 @@ struct py_to_cbpp_t<{{type.full_name}}> {
         {% endif -%}
         {% for field in type.fields -%}
         {% if field.is_required -%}
-        if (!extract_required_field<{{field.cpp_type}}>(pyObj, "{{field.py_name}}", cppObj.{{field.cpp_name}}, "{{type.full_name}}", __FILE__, __LINE__)) {
+        if (!extract_required_field<{{field.cpp_type}}>(pyObj, {{field_key(field, type)}}, cppObj.{{field.cpp_name}}, "{{type.full_name}}", __FILE__, __LINE__)) {
             return cppObj;
         }
         {% elif field.ignore_if_empty -%}
-        extract_field_if_not_empty<{{field.cpp_type}}>(pyObj, "{{field.py_name}}", cppObj.{{field.cpp_name}});
+        extract_field_if_not_empty<{{field.cpp_type}}>(pyObj, {{field_key(field, type)}}, cppObj.{{field.cpp_name}});
         {% elif field.is_ignored -%}
         // {{field.cpp_name}}
         {% else -%}
-        extract_field<{{field.cpp_type}}>(pyObj, "{{field.py_name}}", cppObj.{{field.cpp_name}});
+        extract_field<{{field.cpp_type}}>(pyObj, {{field_key(field, type)}}, cppObj.{{field.cpp_name}});
         {% endif -%}
         {% endfor -%}
         return cppObj;
@@ -81,7 +89,7 @@ struct py_to_cbpp_t<{{type.full_name}}> {
         {% if field.is_ignored -%}
         // {{field.cpp_name}}
         {% else -%}
-        add_field<{{field.cpp_type}}>(pyObj, "{{field.py_name}}", cppObj.{{field.cpp_name}});
+        add_field<{{field.cpp_type}}>(pyObj, {{field_key(field, type)}}, cppObj.{{field.cpp_name}});
         {% endif -%}
         {% endfor %}
         return pyObj;

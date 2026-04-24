@@ -21,6 +21,8 @@
 #include "hdr_histogram.hxx"
 #include "logger.hxx"
 #include "pycbc_connection.hxx"
+#include "pycbc_dict_keys.hxx"
+#include "pycbc_kv_request.hxx"
 #include "result.hxx"
 #include "transactions/transactions.hxx"
 #include <core/logger/logger.hxx>
@@ -139,6 +141,11 @@ PyInit__core(void)
     return nullptr;
   }
 
+  if (pycbc::add_kv_request_type(module) < 0) {
+    Py_DECREF(module);
+    return nullptr;
+  }
+
   if (pycbc::add_result_objects(module) < 0) {
     Py_DECREF(module);
     return nullptr;
@@ -171,6 +178,8 @@ PyInit__core(void)
 
   // Cache exception classes for efficient access
   pycbc::cache_exception_classes();
+
+  init_pycbc_dict_keys();
 
   return module;
 }

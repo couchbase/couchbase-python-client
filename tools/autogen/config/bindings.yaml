@@ -38,11 +38,29 @@ metadata:
       filename: binding_map.py
       templates: binding_map.py.jinja2
       output_path: "couchbase/logic"
+    - name: pycbc_dict_keys_hxx
+      filename: pycbc_dict_keys.hxx
+      templates: pycbc_dict_keys.hxx.jinja2
+      output_path: src
+    - name: pycbc_dict_keys_cxx
+      filename: pycbc_dict_keys.cxx
+      templates: pycbc_dict_keys.cxx.jinja2
+      output_path: src
+    - name: pycbc_kv_request_hxx
+      filename: pycbc_kv_request.hxx
+      templates: pycbc_kv_request.hxx.jinja2
+      output_path: src
+    - name: pycbc_kv_request_cxx
+      filename: pycbc_kv_request.cxx
+      templates: pycbc_kv_request.cxx.jinja2
+      output_path: src
+
 
 
 operation_headers:
  - Python.h
  - pytocbpp_defs.hxx
+ - pycbc_dict_keys.hxx
  - cpp_core_types.hxx
  - cpp_types.hxx
  - cpp_core_enums_autogen.hxx
@@ -249,6 +267,7 @@ management:
 cpp_core_type_headers:
  - Python.h
  - pytocbpp_defs.hxx
+ - pycbc_dict_keys.hxx
  - cpp_core_types.hxx
  - cpp_types.hxx
  - cpp_core_enums_autogen.hxx

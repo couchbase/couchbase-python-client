@@ -369,6 +369,32 @@ raise_invalid_argument(const char* message, const char* file, int line)
 }
 
 PyObject*
+raise_required_field_missing(PyObject* interned_key,
+                             const char* context,
+                             const char* file,
+                             int line)
+{
+  const char* key_name = PyUnicode_AsUTF8(interned_key);
+  std::string msg = "Missing required '";
+  msg += (key_name ? key_name : "unknown");
+  msg += "' field in ";
+  msg += context;
+  return raise_invalid_argument(msg.c_str(), file, line);
+}
+
+PyObject*
+raise_required_field_empty(PyObject* interned_key, const char* context, const char* file, int line)
+{
+  const char* key_name = PyUnicode_AsUTF8(interned_key);
+  std::string msg = "Required '";
+  msg += (key_name ? key_name : "unknown");
+  msg += "' field in ";
+  msg += context;
+  msg += " cannot be empty";
+  return raise_invalid_argument(msg.c_str(), file, line);
+}
+
+PyObject*
 raise_feature_unavailable(const char* message, const char* file, int line)
 {
   // TODO:  is this possible?

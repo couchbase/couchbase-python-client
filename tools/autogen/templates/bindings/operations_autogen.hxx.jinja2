@@ -35,6 +35,7 @@ namespace pycbc {
 // ==========================================================================================
 // Key-Value Operations
 // ==========================================================================================
+
 {% for op in key_value_operations %}
 // ==========================================================================================
 // {{op.name}} request/response
@@ -43,33 +44,27 @@ template <>
 struct py_to_cbpp_t<{{op.request_struct_full}}> {
     using {{op.request_struct}} = {{op.request_struct_full}};
 
-    static inline {{op.request_struct}} from_py(PyObject* pyObj, std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span)
+    static inline {{op.request_struct}} from_py(pycbc_kv_request* request, std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span)
     {
         {% if op.requires_doc_id -%}
-        couchbase::core::document_id id;
-        if(!extract_required_field(pyObj, "id", id, "{{op.request_struct}}", __FILE__, __LINE__)) {
-            return {};
-        }
-        {{op.request_struct}} req{std::move(id)};
+        {{op.request_struct}} req{py_to_cbpp<couchbase::core::document_id>(request)};
         {% else %}
         {{op.request_struct}} req;
         {% endif %}
         {% for field in op.request_fields if not field.cpp_name == "id" -%}
         {% if field.is_required -%}
-        if (!extract_required_field<{{field.cpp_type}}>(pyObj, "{{field.py_name}}", req.{{field.cpp_name}}, "{{op.request_struct}}", __FILE__, __LINE__)) {
-            return {};
-        }
+        req.{{field.cpp_name}} = py_to_cbpp<{{field.cpp_type}}>(request->{{field.py_name}});
         {% elif field.is_ignored -%}
         // {{field.cpp_name}}
         {% else -%}
-        extract_field<{{field.cpp_type}}>(pyObj, "{{field.py_name}}", req.{{field.cpp_name}});
+        extract_field<{{field.cpp_type}}>(request->{{field.py_name}}, req.{{field.cpp_name}});
         {% endif -%}
         {% endfor -%}
         // TODO(PYCBC-1746): Update once legacy tracing logic is removed
         if (wrapper_span != nullptr) {
             req.parent_span = wrapper_span;
         } else {
-            extract_legacy_span_field(pyObj, "parent_span", req.parent_span);
+            extract_legacy_span_field(request->parent_span, req.parent_span);
         }
         return req;
     }
@@ -99,7 +94,7 @@ struct py_to_cbpp_t<{{op.response_struct_full}}> {
         {% if field.is_ignored -%}
         // {{field.cpp_name}}
         {% else -%}
-        add_field<{{field.cpp_type}}>(res->raw_result, "{{field.py_name}}", cppObj.{{field.cpp_name}});
+        add_field<{{field.cpp_type}}>(res->raw_result, pycbc::keys::{{field.py_name}}, cppObj.{{field.cpp_name}});
         {% endif -%}
         {% endfor -%}
         return reinterpret_cast<PyObject*>(res);
@@ -230,6 +225,19 @@ struct py_to_cbpp_t<{{op.response_struct_full}}> {
 };
 {% endif -%}
 {% endfor %}
+{% endfor %}
+
+// ==========================================================================================
+// Key-Value Operations Staging Traits
+// ==========================================================================================
+template<typename Request>
+struct kv_staging_trait;
+
+{% for op in key_value_operations %}
+template<>
+struct kv_staging_trait<{{op.request_struct_full}}> {
+    using staging_type = {{op.name}}_staging;
+};
 {% endfor %}
 
 {% if have_mutation_ops -%}

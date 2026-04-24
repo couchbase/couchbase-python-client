@@ -19,6 +19,7 @@
 
 #include "Python.h"
 #include "cpp_types.hxx"
+#include "pycbc_kv_request.hxx"
 #include "pytocbpp_defs.hxx"
 #include "result.hxx"
 #include "utils.hxx"
@@ -39,6 +40,14 @@ namespace pycbc
 // ==========================================================================================
 template<>
 struct py_to_cbpp_t<couchbase::core::document_id> {
+  static inline couchbase::core::document_id from_py(pycbc_kv_request* request)
+  {
+    return { PyUnicode_AsUTF8(request->bucket),
+             PyUnicode_AsUTF8(request->scope),
+             PyUnicode_AsUTF8(request->collection),
+             PyUnicode_AsUTF8(request->key) };
+  }
+
   static inline couchbase::core::document_id from_py(PyObject* pyObj)
   {
     std::string bucket;

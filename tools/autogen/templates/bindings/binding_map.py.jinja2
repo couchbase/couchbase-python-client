@@ -1,15 +1,3 @@
-        # key-value operations
-        self._op_map.update({
-          {% for op in key_value_operations -%}
-            KeyValueOperationType.{{op.pretty_name}}.value: self._conn.pycbc_{{op.name}},
-          {% endfor %}
-        })
-        # key-value multi operations
-        self._op_map.update({
-          {% for op in key_value_multi_operations -%}
-            KeyValueMultiOperationType.{{op.pretty_name}}Multi.value: self._conn.pycbc_{{op.name}}_multi,
-          {% endfor %}
-        })
         # streaming operations
         self._op_map.update({
           {% for op in streaming_operations -%}
@@ -24,3 +12,16 @@
           {% endfor -%}
         })
         {% endfor %}
+
+    def _load_kv_ops(self) -> PycbcConnectionKVOps:
+        """**INTERNAL**"""
+        return PycbcConnectionKVOps(
+          # key-value operations
+          {% for op in key_value_operations -%}
+            {{op.name}} = self._conn.pycbc_{{op.name}},
+          {% endfor -%}
+          # key-value multi operations
+          {% for op in key_value_multi_operations -%}
+            {{op.name}}_multi = self._conn.pycbc_{{op.name}}_multi,
+          {% endfor -%}
+        )
