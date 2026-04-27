@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import sys
 import threading
 from time import time_ns
 
@@ -48,15 +49,14 @@ class ThresholdLoggingTestSuite:
     TEST_MANIFEST = [
         'test_enqueue_only_above_threshold',
         'test_ignore_below_threshold',
-        'test_threaded_end_idempotency',
         'test_children_span_with_duration',
         'test_exceeding_sample_size',
         'test_multiple_services',
         'test_span_conversion_with_all_attributes',
-        'test_concurrent_attribute_setting_with_parent',
-        'test_concurrent_duration_propagation',
-        'test_concurrent_parent_child_span_end',
-        'test_high_concurrency_mixed_operations'
+        'test_high_concurrency_mixed_operations',
+        'test_span_end_is_idempotent',
+        'test_sequential_multi_dispatch_accumulation',
+        'test_async_callback_lifecycle',
     ]
 
     def test_enqueue_only_above_threshold(self):
@@ -171,55 +171,30 @@ class ThresholdLoggingTestSuite:
         assert 'last_dispatch_duration_us' in record
         assert record['last_dispatch_duration_us'] == 200.0  # Exactly the dispatch span's duration
 
-    def test_threaded_end_idempotency(self):
-        """Concurrent end() calls should be safe and result in at most one record."""
+    def test_span_end_is_idempotent(self):
+        """Sequential double-end produces exactly one record; second call is a no-op."""
         config = {
-            'key_value_threshold': 0.5,  # 0.5ms threshold => 500us after conversion
+            'key_value_threshold': 0.5,
             'threshold_sample_size': 10,
         }
 
         tracer = ThresholdLoggingTracer(config)
         fake_reporter = FakeReporter()
-        original_reporter = tracer._reporter
-        original_reporter.stop()  # we don't need the orig report to be running
-
-        # Replace with fake reporter for deterministic testing
+        tracer._reporter.stop()
         tracer._reporter = fake_reporter
 
-        # Use explicit timestamps for deterministic duration above threshold
-        start_ns = time_ns() - 10_000_000  # Fixed start time
-        end_ns = start_ns + 1_000_000  # Exactly 1ms later => 1000us (above 500us threshold)
+        start_ns = time_ns() - 10_000_000
+        end_ns = start_ns + 1_000_000  # 1ms => 1000us, above threshold
 
-        # Create a span with explicit start_time
         span = tracer.request_span('test_operation', start_time=start_ns)
-
-        # Set service type to KV
         span.set_attribute(OpAttributeName.Service.value, ServiceType.KeyValue.value)
 
-        # Call end() from multiple threads concurrently
-        exceptions = []
+        span.end(end_time=end_ns)
+        span.end(end_time=end_ns + 500_000)  # second call must be silently ignored
 
-        def end_span():
-            try:
-                span.end(end_time=end_ns)
-            except Exception as e:
-                exceptions.append(e)
-
-        threads = []
-        for _ in range(10):
-            t = threading.Thread(target=end_span)
-            threads.append(t)
-            t.start()
-
-        # Wait for all threads to complete
-        for t in threads:
-            t.join()
-
-        # Verify no exceptions occurred
-        assert not exceptions, f"Exceptions occurred: {exceptions}"
-
-        # Verify that at most one record was added (due to idempotent end)
-        assert len(fake_reporter.records) <= 1, "Should have at most one record due to idempotent end"
+        assert len(fake_reporter.records) == 1
+        _, record, _ = fake_reporter.records[0]
+        assert record['total_duration_us'] == 1000.0
 
     def test_exceeding_sample_size(self):
         """Test that when sample size is exceeded, only top N items are kept."""
@@ -442,267 +417,122 @@ class ThresholdLoggingTestSuite:
         # Clean up reporter
         tracer.close()
 
-    def test_concurrent_attribute_setting_with_parent(self):  # noqa: C901
-        """
-        Multiple threads setting attributes on child spans with parent propagation.
-        Tests that the fix for set_attribute race condition works correctly.
+    def test_sequential_multi_dispatch_accumulation(self):
+        """Sequential encoding/dispatch children accumulate totals correctly on the parent.
+
+        This models the real _build_core_spans pattern where children are built
+        one at a time by the C++ I/O callback thread.
         """
         config = {
-            'key_value_threshold': 0.5,  # 0.5ms threshold => 500us after conversion
+            'key_value_threshold': 0.5,
             'threshold_sample_size': 10,
+            'threshold_emit_interval': 100_000,
         }
 
         tracer = ThresholdLoggingTracer(config)
-        fake_reporter = FakeReporter()
-        original_reporter = tracer._reporter
-        original_reporter.stop()
+        tracer._reporter.stop()
 
-        tracer._reporter = fake_reporter
-
-        # Create parent and child spans
-        now = time_ns()
-        parent_start_ns = now - 2_000_000
-        parent_end_ns = parent_start_ns + 2_000_000  # 2ms total duration
-
-        parent_span = tracer.request_span('parent_operation', start_time=parent_start_ns)
-        parent_span.set_attribute(OpAttributeName.Service.value, ServiceType.KeyValue.value)
-
-        child_start_ns = parent_start_ns + 100_000
-        child_end_ns = child_start_ns + 1_500_000  # 1.5ms child duration
-
-        child_span = tracer.request_span('child_operation', parent_span=parent_span, start_time=child_start_ns)
-
-        exceptions = []
-
-        # Thread functions for concurrent attribute setting
-        def set_server_duration():
-            try:
-                child_span.set_attribute(DispatchAttributeName.ServerDuration.value, 300_000)
-            except Exception as e:
-                exceptions.append(e)
-
-        def set_local_id():
-            try:
-                child_span.set_attribute(DispatchAttributeName.LocalId.value, 'local123')
-            except Exception as e:
-                exceptions.append(e)
-
-        def set_operation_id():
-            try:
-                child_span.set_attribute(DispatchAttributeName.OperationId.value, 'op456')
-            except Exception as e:
-                exceptions.append(e)
-
-        def set_peer_address():
-            try:
-                child_span.set_attribute(DispatchAttributeName.PeerAddress.value, '192.168.1.1')
-            except Exception as e:
-                exceptions.append(e)
-
-        # Create threads that set attributes concurrently
-        threads = [
-            threading.Thread(target=set_server_duration),
-            threading.Thread(target=set_local_id),
-            threading.Thread(target=set_operation_id),
-            threading.Thread(target=set_peer_address),
-        ]
-
-        # Start all threads
-        for t in threads:
-            t.start()
-
-        # Wait for all threads to complete
-        for t in threads:
-            t.join()
-
-        # Verify no exceptions occurred
-        assert not exceptions, f"Exceptions occurred: {exceptions}"
-
-        # End child and parent spans
-        child_span.end(end_time=child_end_ns)
-        parent_span.end(end_time=parent_end_ns)
-
-        # Verify that both spans completed successfully
-        # Parent should have the propagated attributes
-        assert parent_span._span_snapshot is not None
-        assert parent_span._span_snapshot.server_duration_ns == 300_000
-        assert parent_span._span_snapshot.local_id == 'local123'
-        assert parent_span._span_snapshot.operation_id == 'op456'
-
-        # Clean up
-        tracer.close()
-
-    def test_concurrent_duration_propagation(self):  # noqa: C901
-        """
-        Concurrent setting of encode_duration_ns and dispatch_duration_ns on child spans.
-        Tests that the deadlock fix in property setters works correctly.
-        """
-        config = {
-            'key_value_threshold': 0.5,  # 0.5ms threshold => 500us after conversion
-            'threshold_sample_size': 10,
-        }
-
-        tracer = ThresholdLoggingTracer(config)
-        fake_reporter = FakeReporter()
-        original_reporter = tracer._reporter
-        original_reporter.stop()
-
-        tracer._reporter = fake_reporter
-
-        # Create parent span
         now = time_ns()
         parent_start_ns = now - 3_000_000
-        parent_end_ns = parent_start_ns + 3_000_000  # 3ms total duration
+        parent_end_ns = parent_start_ns + 3_000_000
 
-        parent_span = tracer.request_span('parent_operation', start_time=parent_start_ns)
-        parent_span.set_attribute(OpAttributeName.Service.value, ServiceType.KeyValue.value)
+        parent = tracer.request_span('upsert', start_time=parent_start_ns)
+        parent.set_attribute(OpAttributeName.Service.value, ServiceType.KeyValue.value)
 
-        exceptions = []
+        # Encoding child: 150us
+        enc = tracer.request_span(
+            OpAttributeName.EncodingSpanName.value,
+            parent_span=parent,
+            start_time=parent_start_ns + 100_000
+        )
+        enc.end(end_time=parent_start_ns + 250_000)
 
-        # Create multiple child spans that will set durations concurrently
-        def create_and_end_encoding_span():
-            try:
-                encode_start = parent_start_ns + 100_000
-                encode_end = encode_start + 150_000  # 150us
-                encoding_span = tracer.request_span(
-                    OpAttributeName.EncodingSpanName.value,
-                    parent_span=parent_span,
-                    start_time=encode_start
-                )
-                encoding_span.end(end_time=encode_end)
-            except Exception as e:
-                exceptions.append(e)
+        # Dispatch child 1: 400us
+        d1 = tracer.request_span(
+            OpAttributeName.DispatchSpanName.value,
+            parent_span=parent,
+            start_time=parent_start_ns + 500_000
+        )
+        d1.end(end_time=parent_start_ns + 900_000)
 
-        def create_and_end_dispatch_span():
-            try:
-                dispatch_start = parent_start_ns + 500_000
-                dispatch_end = dispatch_start + 400_000  # 400us
-                dispatch_span = tracer.request_span(
-                    OpAttributeName.DispatchSpanName.value,
-                    parent_span=parent_span,
-                    start_time=dispatch_start
-                )
-                dispatch_span.end(end_time=dispatch_end)
-            except Exception as e:
-                exceptions.append(e)
+        # Dispatch child 2: 350us
+        d2 = tracer.request_span(
+            OpAttributeName.DispatchSpanName.value,
+            parent_span=parent,
+            start_time=parent_start_ns + 1_200_000
+        )
+        d2.end(end_time=parent_start_ns + 1_550_000)
 
-        def create_and_end_second_dispatch_span():
-            try:
-                dispatch_start = parent_start_ns + 1_200_000
-                dispatch_end = dispatch_start + 350_000  # 350us
-                dispatch_span = tracer.request_span(
-                    OpAttributeName.DispatchSpanName.value,
-                    parent_span=parent_span,
-                    start_time=dispatch_start
-                )
-                dispatch_span.end(end_time=dispatch_end)
-            except Exception as e:
-                exceptions.append(e)
+        parent.end(end_time=parent_end_ns)
 
-        # Create threads that will trigger concurrent duration propagation
-        threads = [
-            threading.Thread(target=create_and_end_encoding_span),
-            threading.Thread(target=create_and_end_dispatch_span),
-            threading.Thread(target=create_and_end_second_dispatch_span),
-        ]
+        assert parent._total_encode_duration_ns == 150_000
+        assert parent._total_dispatch_duration_ns == 750_000
+        assert parent._span_snapshot is not None
+        assert parent._span_snapshot.total_dispatch_duration_ns == 750_000
 
-        # Start all threads
-        for t in threads:
-            t.start()
-
-        # Wait for all threads to complete
-        for t in threads:
-            t.join()
-
-        # Verify no exceptions occurred (no deadlock)
-        assert not exceptions, f"Exceptions occurred: {exceptions}"
-
-        # End parent span
-        parent_span.end(end_time=parent_end_ns)
-
-        # Verify that durations were propagated correctly to parent
-        assert parent_span._span_snapshot is not None
-        # Total encode duration should include the encoding span (150us)
-        assert parent_span._span_snapshot.encode_duration_ns == 150_000
-        # Total dispatch duration should include both dispatch spans (400us + 350us = 750us)
-        assert parent_span._span_snapshot.total_dispatch_duration_ns == 750_000
-
-        # Clean up
         tracer.close()
 
-    def test_concurrent_parent_child_span_end(self):  # noqa: C901
-        """
-        Parent and child spans ending concurrently from different threads.
-        Tests that spans can be safely ended in any order without deadlock.
+    def test_async_callback_lifecycle(self):
+        """Simulate the async hand-off: event loop thread → C++ I/O thread → event loop thread.
+
+        Uses threading.Event to enforce the same exclusive-access ordering that
+        AsyncClientAdapter._callback / call_soon_threadsafe enforces in production.
+        Runs many iterations under maximum context-switch pressure to catch any ordering
+        issues that would have been prevented by the removed lock.
         """
         config = {
-            'key_value_threshold': 0.5,  # 0.5ms threshold => 500us after conversion
-            'threshold_sample_size': 10,
+            'key_value_threshold': 0.5,
+            'threshold_sample_size': 200,
         }
 
         tracer = ThresholdLoggingTracer(config)
         fake_reporter = FakeReporter()
-        original_reporter = tracer._reporter
-        original_reporter.stop()
-
+        tracer._reporter.stop()
         tracer._reporter = fake_reporter
 
-        # Create parent and multiple child spans
-        now = time_ns()
-        parent_start_ns = now - 2_000_000
-        parent_end_ns = parent_start_ns + 2_000_000
+        N = 200
+        original_interval = sys.getswitchinterval()
+        sys.setswitchinterval(1e-6)
 
-        parent_span = tracer.request_span('parent_operation', start_time=parent_start_ns)
-        parent_span.set_attribute(OpAttributeName.Service.value, ServiceType.KeyValue.value)
+        try:
+            for _ in range(N):
+                now = time_ns()
+                root = tracer.request_span('upsert', start_time=now - 2_000_000)
+                root.set_attribute(OpAttributeName.Service.value, ServiceType.KeyValue.value)
 
-        # Create 5 child spans
-        child_spans = []
-        for i in range(5):
-            child_start = parent_start_ns + (i * 200_000)
-            child_span = tracer.request_span(
-                f'child_{i}',
-                parent_span=parent_span,
-                start_time=child_start
-            )
-            child_span.set_attribute(OpAttributeName.Service.value, ServiceType.KeyValue.value)
-            child_spans.append((child_span, child_start + 100_000))  # 100us duration
+                callback_may_proceed = threading.Event()
+                callback_done = threading.Event()
 
-        exceptions = []
+                def simulate_io_callback(root=root):
+                    callback_may_proceed.wait()
+                    # C++ I/O thread exclusively owns root here; event loop is at 'await future'
+                    dispatch = tracer.request_span(
+                        OpAttributeName.DispatchSpanName.value,
+                        parent_span=root,
+                        start_time=time_ns() - 500_000
+                    )
+                    dispatch.set_attribute(DispatchAttributeName.ServerDuration.value, 1_000)
+                    dispatch.set_attribute(DispatchAttributeName.PeerAddress.value, '127.0.0.1')
+                    dispatch.set_attribute(DispatchAttributeName.PeerPort.value, 11210)
+                    dispatch.end(end_time=time_ns())
+                    callback_done.set()  # equivalent to call_soon_threadsafe(ft.set_result, result)
 
-        def end_parent():
-            try:
-                parent_span.end(end_time=parent_end_ns)
-            except Exception as e:
-                exceptions.append(e)
+                t = threading.Thread(target=simulate_io_callback)
+                t.start()
+                callback_may_proceed.set()   # fire the C++ op; event loop "suspends at await"
+                callback_done.wait()          # "future resolved" — event loop resumes
+                t.join()
 
-        def end_child(span, end_time):
-            try:
-                span.end(end_time=end_time)
-            except Exception as e:
-                exceptions.append(e)
+                root.end(end_time=time_ns())  # event loop thread ends the span
 
-        # Create threads to end parent and all children concurrently
-        threads = [threading.Thread(target=end_parent)]
-        for child_span, end_time in child_spans:
-            threads.append(threading.Thread(target=end_child, args=(child_span, end_time)))
+                assert root._total_dispatch_duration_ns > 0
+                assert root._total_server_duration_ns == 1_000
+                assert root._span_snapshot is not None
+        finally:
+            sys.setswitchinterval(original_interval)
 
-        # Start all threads (parent and children will end concurrently)
-        for t in threads:
-            t.start()
+        assert len(fake_reporter.records) == N
 
-        # Wait for all threads to complete
-        for t in threads:
-            t.join()
-
-        # Verify no exceptions occurred (no deadlock)
-        assert not exceptions, f"Exceptions occurred: {exceptions}"
-
-        # Verify all spans ended successfully
-        assert parent_span._span_snapshot is not None
-        for child_span, _ in child_spans:
-            assert child_span._span_snapshot is not None
-
-        # Clean up
         tracer.close()
 
     def test_high_concurrency_mixed_operations(self):
@@ -784,23 +614,20 @@ class ThresholdLoggingTestSuite:
         # Verify all operations completed
         assert len(completed_operations) == 20, f"Only {len(completed_operations)} operations completed"
 
-        # Verify records were added to the reporter
         # We should have 20 parent spans recorded (all above threshold)
         assert len(fake_reporter.records) == 20, f"Expected 20 records, got {len(fake_reporter.records)}"
 
-        # Verify all records have correct attributes from concurrent operations
         for service_type, record, duration in fake_reporter.records:
             assert service_type == ServiceType.KeyValue
-            assert 'operation_name' in record
-            assert 'total_duration_us' in record
-            # Verify attributes were propagated correctly
-            assert 'encode_duration_us' in record
-            assert 'last_dispatch_duration_us' in record
-            assert 'last_server_duration_us' in record
-            assert 'last_local_id' in record
-            assert 'operation_id' in record
+            assert record['encode_duration_us'] == 150.0
+            assert record['last_dispatch_duration_us'] == 400.0
+            assert record['total_dispatch_duration_us'] == 400.0
+            assert record['last_server_duration_us'] == 300.0
+            assert record['total_server_duration_us'] == 300.0
+            thread_id = record['operation_name'].removeprefix('parent_')
+            assert record['last_local_id'] == f'local_{thread_id}'
+            assert record['operation_id'] == f'op_{thread_id}'
 
-        # Clean up
         tracer.close()
 
 

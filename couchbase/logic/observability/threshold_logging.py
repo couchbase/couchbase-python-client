@@ -25,7 +25,8 @@ from threading import (Event,
                        Lock,
                        Thread)
 from time import time_ns
-from typing import (Generic,
+from typing import (Any,
+                    Generic,
                     List,
                     Mapping,
                     Optional,
@@ -130,7 +131,6 @@ class IgnoredParentSpan(Enum):
 _IGNORED_PARENT_SPAN_VALUES = frozenset(span.value for span in IgnoredParentSpan)
 
 # Only these attribute keys are actually processed in ThresholdLoggingSpan.set_attribute.
-# We ignore all other attributes, so lets skip the lock acquisition for them.
 _PROCESSED_ATTRIBUTE_KEYS = frozenset({
     _ATTR_SERVICE,
     _DISP_SERVER_DURATION,
@@ -287,7 +287,7 @@ class ThresholdLoggingSpan(RequestSpan):
     # Use __slots__ to elimiate per-instance __dict__, making attribute access
     # faster (C-level slot lookup) and reducing memory allocation.
     __slots__ = (
-        '_name', '_parent_span', '_start_time_ns', '_tracer', '_lock',
+        '_name', '_parent_span', '_start_time_ns', '_tracer',
         '_events', '_status', '_end_time_ns',
         '_service_type', '_local_id', '_operation_id',
         '_peer_address', '_peer_port', '_remote_address', '_remote_port',
@@ -301,6 +301,9 @@ class ThresholdLoggingSpan(RequestSpan):
     # __slots__ only covers instance attributes; class attributes sit on the
     # class and are visible via getattr/instance lookup without a slot entry.
     _supports_multi_op_fast_dispatch: bool = True
+    # Advertise the set of keys this span actually processes so callers can
+    # skip set_attribute() for keys that would be no-ops.
+    _processed_attribute_keys: frozenset = _PROCESSED_ATTRIBUTE_KEYS
 
     def __init__(
         self,
@@ -313,7 +316,6 @@ class ThresholdLoggingSpan(RequestSpan):
         self._parent_span = parent_span
         self._start_time_ns = start_time if start_time is not None else time_ns()
         self._tracer = tracer
-        self._lock = Lock()
         self._events = {}
         self._status = SpanStatusCode.UNSET
         self._end_time_ns: Optional[int] = None
@@ -355,41 +357,63 @@ class ThresholdLoggingSpan(RequestSpan):
 
     def _propagate_dispatch_duration(self, value: int) -> None:
         """Set dispatch duration on this span and propagate to parent (non-recursive)."""
-        # We walk the parent chain iteratively instead of recursing.
         span = self
         while span is not None:
-            with span._lock:
-                span._dispatch_duration_ns = value
-                span._total_dispatch_duration_ns += value
-                next_span = span._parent_span
-            span = next_span
+            span._dispatch_duration_ns = value
+            span._total_dispatch_duration_ns += value
+            span = span._parent_span
 
     def _propagate_encode_duration(self, value: int) -> None:
         """Set encode duration on this span and propagate to parent (non-recursive)."""
-        # We walk the parent chain iteratively instead of recursing.
         span = self
         while span is not None:
-            with span._lock:
-                span._encode_duration_ns = value
-                span._total_encode_duration_ns += value
-                next_span = span._parent_span
-            span = next_span
+            span._encode_duration_ns = value
+            span._total_encode_duration_ns += value
+            span = span._parent_span
 
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:  # noqa: C901
         if key not in _PROCESSED_ATTRIBUTE_KEYS:
             return
 
-        # Set on this span under lock, then walk parent chain iteratively
-        # instead of recursing via parent_to_update.set_attribute(key, value).
         span = self
         while span is not None:
-            with span._lock:
-                if key == _ATTR_SERVICE:
-                    span._service_type = ServiceType.from_str(value)
-                elif key == _DISP_SERVER_DURATION:
-                    int_val = int(value)
-                    span._server_duration_ns = int_val
-                    span._total_server_duration_ns += int_val
+            if key == _ATTR_SERVICE:
+                span._service_type = ServiceType.from_str(value)
+            elif key == _DISP_SERVER_DURATION:
+                int_val = int(value)
+                span._server_duration_ns = int_val
+                span._total_server_duration_ns += int_val
+            elif key == _DISP_LOCAL_ID:
+                span._local_id = str(value)
+            elif key == _DISP_OPERATION_ID:
+                span._operation_id = str(value)
+            elif key == _DISP_PEER_ADDRESS:
+                span._peer_address = str(value)
+            elif key == _DISP_PEER_PORT:
+                span._peer_port = int(value)
+            elif key == _DISP_SERVER_ADDRESS:
+                span._remote_address = str(value)
+            elif key == _DISP_SERVER_PORT:
+                span._remote_port = int(value)
+            span = span._parent_span
+
+    def set_attributes(self, attributes: Mapping[str, SpanAttributeValue]) -> None:
+        for k, v in attributes.items():
+            self.set_attribute(k, v)
+
+    def apply_core_span_attributes(self, attributes: Mapping[str, Any]) -> None:  # noqa: C901
+        """Apply a dict of dispatch-span attributes in a single parent-chain walk.
+
+        Replaces N separate set_attribute() calls (each walking the parent chain)
+        with one pass that processes all keys at every level in one traversal.
+        """
+        span = self
+        while span is not None:
+            server_duration: Optional[int] = None
+            for key, value in attributes.items():
+                if key == _DISP_SERVER_DURATION:
+                    server_duration = int(value)
+                    span._server_duration_ns = server_duration
                 elif key == _DISP_LOCAL_ID:
                     span._local_id = str(value)
                 elif key == _DISP_OPERATION_ID:
@@ -402,29 +426,24 @@ class ThresholdLoggingSpan(RequestSpan):
                     span._remote_address = str(value)
                 elif key == _DISP_SERVER_PORT:
                     span._remote_port = int(value)
-                next_span = span._parent_span
-            span = next_span
-
-    def set_attributes(self, attributes: Mapping[str, SpanAttributeValue]) -> None:
-        for k, v in attributes.items():
-            self.set_attribute(k, v)
+                elif key == _ATTR_SERVICE:
+                    span._service_type = ServiceType.from_str(value)
+            if server_duration is not None:
+                span._total_server_duration_ns += server_duration
+            span = span._parent_span
 
     def add_event(self, name: str, value: SpanAttributeValue) -> None:
-        with self._lock:
-            self._events[name] = value
+        self._events[name] = value
 
     def set_status(self, status: SpanStatusCode) -> None:
-        with self._lock:
-            self._status = status
+        self._status = status
 
     def end(self, end_time: Optional[int] = None) -> None:
-        # Idempotent end; only compute total duration under the lock.
-        with self._lock:
-            if self._end_time_ns is not None:
-                return
+        if self._end_time_ns is not None:
+            return
 
-            self._end_time_ns = end_time if end_time is not None else time_ns()
-            self._total_duration_ns = self._end_time_ns - self._start_time_ns
+        self._end_time_ns = end_time if end_time is not None else time_ns()
+        self._total_duration_ns = self._end_time_ns - self._start_time_ns
 
         # Encoding/dispatch spans only propagate duration to parent; no snapshot needed.
         if self._name == _ATTR_ENCODING_SPAN_NAME:

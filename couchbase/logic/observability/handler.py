@@ -477,15 +477,18 @@ class ObservableRequestHandlerMeterImpl:
         # we need to only  worry about sub operations for DS and KV multi-ops
         self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
         self._attrs: Mapping[str, str] = {}
+        self._resolved_cluster_labels: bool = False
         # Cache the op name string to eliminate _get_op_name()'s per-call .value descriptor access
         _raw = self._op_name.value
         self._op_name_str: str = _raw[:-6] if _raw.endswith('_multi') else _raw
 
     def add_kv_attributes(self, collection_details: CollectionDetails) -> None:
         self._attrs = get_attributes_for_kv_op(self._op_name_str, collection_details)
+        self._attrs[_ATTR_RESERVED_UNIT] = _ATTR_RESERVED_UNIT_SECONDS
 
     def add_http_attributes(self, **options: Unpack[OpAttributeOptions]) -> None:
         self._attrs = get_attributes_for_http_op(self._op_name_str, self._service_type, **options)
+        self._attrs[_ATTR_RESERVED_UNIT] = _ATTR_RESERVED_UNIT_SECONDS
 
     def process_end(self,
                     cluster_name: Optional[str] = None,
@@ -528,6 +531,7 @@ class ObservableRequestHandlerMeterImpl:
         # we need to only  worry about sub operations for DS and KV multi-ops
         self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
         self._attrs: Mapping[str, str] = {}
+        self._resolved_cluster_labels = False
 
     def _get_op_name(self) -> str:
         if self._op_name.value.endswith('_multi'):
@@ -546,32 +550,37 @@ class ObservableRequestHandlerMeterImpl:
                      cluster_name: Optional[str] = None,
                      cluster_uuid: Optional[str] = None,
                      exc_val: Optional[BaseException] = None) -> None:
-        if self._get_cluster_labels_fn and (cluster_name is None or cluster_uuid is None):
-            cluster_labels = self._get_cluster_labels_fn()
-            cluster_name = cluster_name or cluster_labels.get('clusterName', None)
-            cluster_uuid = cluster_uuid or cluster_labels.get('clusterUUID', None)
+        if not self._resolved_cluster_labels:
+            if self._get_cluster_labels_fn and (cluster_name is None or cluster_uuid is None):
+                cluster_labels = self._get_cluster_labels_fn()
+                cluster_name = cluster_name or cluster_labels.get('clusterName', None)
+                cluster_uuid = cluster_uuid or cluster_labels.get('clusterUUID', None)
 
-        # if the op failed prior to the ObservableRequestHandler creating a span, we won't have attributes yet
-        if not attrs:
-            attrs = {
-                _ATTR_SYSTEM_NAME: 'couchbase',
-                _ATTR_SERVICE: self._service_type.value,
-                _ATTR_OPERATION_NAME: self._op_name_str,
-                _ATTR_RESERVED_UNIT: _ATTR_RESERVED_UNIT_SECONDS
-            }
-        else:
-            attrs[_ATTR_RESERVED_UNIT] = _ATTR_RESERVED_UNIT_SECONDS
+            # if the op failed prior to the ObservableRequestHandler creating a span, we won't have attributes yet
+            if not attrs:
+                self._attrs = {
+                    _ATTR_SYSTEM_NAME: 'couchbase',
+                    _ATTR_SERVICE: self._service_type.value,
+                    _ATTR_OPERATION_NAME: self._op_name_str,
+                    _ATTR_RESERVED_UNIT: _ATTR_RESERVED_UNIT_SECONDS
+                }
 
-        if cluster_name:
-            attrs[_ATTR_CLUSTER_NAME] = cluster_name
-        if cluster_uuid:
-            attrs[_ATTR_CLUSTER_UUID] = cluster_uuid
+            if cluster_name:
+                self._attrs[_ATTR_CLUSTER_NAME] = cluster_name
+            if cluster_uuid:
+                self._attrs[_ATTR_CLUSTER_UUID] = cluster_uuid
+            if cluster_name and cluster_uuid:
+                self._resolved_cluster_labels = True
 
         if exc_val is not None:
-            self._handle_error(attrs, exc_val)
-
-        self._meter.value_recorder(_ATTR_METER_OP_DURATION,
-                                   tags=attrs).record_value(self._to_microseconds(req_duration_ns))
+            # Copy to avoid contaminating self._attrs with the error type across batch items
+            record_attrs = {**self._attrs}
+            self._handle_error(record_attrs, exc_val)
+            self._meter.value_recorder(_ATTR_METER_OP_DURATION,
+                                       tags=record_attrs).record_value(self._to_microseconds(req_duration_ns))
+        else:
+            self._meter.value_recorder(_ATTR_METER_OP_DURATION,
+                                       tags=self._attrs).record_value(self._to_microseconds(req_duration_ns))
 
     def _to_microseconds(self, duration_ns: int) -> int:
         return round(duration_ns / 1_000)
@@ -757,6 +766,9 @@ class WrappedSpan:
             _is_multi_op
             and getattr(self._request_span, '_supports_multi_op_fast_dispatch', False)
         )
+        # Cache the set of attribute keys the underlying span actually processes.
+        # None means the span type has no filter (e.g. OTel) — pass everything through.
+        self._span_relevant_keys = getattr(self._request_span, '_processed_attribute_keys', None)
         # When OTel sampler drops a span, is_recording is False and we skip
         # all expensive attribute setting, encoding spans, and dispatch span building.
         self._is_recording = getattr(self._request_span, 'is_recording', True)
@@ -879,8 +891,8 @@ class WrappedSpan:
         # no child spans to recurse into.
 
         self._request_span._propagate_dispatch_duration(duration)
-        for attr_name, attr_val in attributes.items():
-            self._request_span.set_attribute(attr_name, attr_val)
+        if attributes:
+            self._request_span.apply_core_span_attributes(attributes)
 
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
         # Skip setting any attribute if the span is not recording
@@ -891,6 +903,8 @@ class WrappedSpan:
             self._cluster_name = value
         elif key == _ATTR_CLUSTER_UUID:
             self._cluster_uuid = value
+        if self._span_relevant_keys is not None and key not in self._span_relevant_keys:
+            return
         self._request_span.set_attribute(key, value)
 
     def set_cluster_labels(self, cluster_name: Optional[str] = None, cluster_uuid: Optional[str] = None) -> None:
@@ -961,8 +975,13 @@ class WrappedSpan:
         if children:
             self._build_core_spans(children, parent_span=new_span)
 
-        for attr_name, attr_val in core_span.get('attributes', {}).items():
-            new_span.set_attribute(attr_name, attr_val)
+        attrs = core_span.get('attributes', {})
+        if attrs:
+            if getattr(new_span, '_supports_multi_op_fast_dispatch', False):
+                new_span.apply_core_span_attributes(attrs)
+            else:
+                for attr_name, attr_val in attrs.items():
+                    new_span.set_attribute(attr_name, attr_val)
 
         end_watermark = self._end_time_watermark
         self._end_time_watermark = end_watermark if end_watermark > core_span_end_time else core_span_end_time

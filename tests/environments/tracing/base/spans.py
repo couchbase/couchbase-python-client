@@ -86,6 +86,10 @@ class NoOpTestSpan(NoOpSpan):
 
 class TestThresholdLoggingSpan(ThresholdLoggingSpan):
 
+    # Disable the fast-path optimization for tests so that child spans are
+    # created and we can validate their attributes.
+    _supports_multi_op_fast_dispatch: bool = False
+
     def __init__(self,
                  name: str,
                  parent_span: Optional[ThresholdLoggingSpan] = None,
@@ -114,6 +118,12 @@ class TestThresholdLoggingSpan(ThresholdLoggingSpan):
         super().set_attribute(key, value)
         # We add every attribute so validation has all the data to make the necessary computations
         self._test_attributes[key] = value
+
+    def apply_core_span_attributes(self, attributes: Mapping[str, Any]) -> None:
+        super().apply_core_span_attributes(attributes)
+        # We add every attribute so validation has all the data to make the necessary computations
+        for k, v in attributes.items():
+            self._test_attributes[k] = v
 
 
 class TestSpan(RequestSpan):
