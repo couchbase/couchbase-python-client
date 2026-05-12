@@ -99,6 +99,76 @@ class CollectionMgmtRequestBuilder:
         collection_name = collection_spec.name
         return scope_name, collection_name, settings
 
+    def _extract_collection_overload_args(self,  # noqa: C901
+                                          method_name: str,
+                                          args: Tuple[object, ...],
+                                          kwargs: Dict[str, Any]
+                                          ) -> Tuple[Optional[str],
+                                                     Optional[str],
+                                                     Optional[CreateCollectionSettings],
+                                                     Tuple[object, ...]]:
+        supports_settings = method_name == 'create_collection'
+
+        spec_positional = bool(args) and isinstance(args[0], CollectionSpec)
+        spec_keyword = isinstance(kwargs.get('collection'), CollectionSpec)
+
+        if spec_positional and spec_keyword:
+            raise InvalidArgumentException(
+                f"{method_name}: CollectionSpec provided both positionally and as 'collection' keyword.")
+
+        if spec_positional or spec_keyword:
+            conflicting = [k for k in ('scope_name', 'collection_name', 'settings') if k in kwargs]
+            if conflicting:
+                raise InvalidArgumentException(
+                    f"{method_name}: cannot mix CollectionSpec form with keyword argument(s) "
+                    f"{', '.join(repr(c) for c in conflicting)}.")
+            if spec_positional:
+                collection_spec = args[0]
+                options = args[1:]
+            elif args:
+                raise InvalidArgumentException(
+                    f"{method_name}: cannot mix 'collection' keyword (CollectionSpec) with positional arguments.")
+            else:
+                collection_spec = kwargs.pop('collection')
+                options = ()
+            scope_name, collection_name, settings = self._get_collection_spec_details(collection_spec, method_name)
+            if not supports_settings:
+                settings = None
+            return scope_name, collection_name, settings, options
+
+        pos = list(args)
+
+        if pos:
+            if 'scope_name' in kwargs:
+                raise InvalidArgumentException(
+                    f"{method_name}: 'scope_name' provided both positionally and as a keyword argument.")
+            scope_name = pos.pop(0)
+        else:
+            scope_name = kwargs.pop('scope_name', None)
+
+        if pos:
+            if 'collection_name' in kwargs:
+                raise InvalidArgumentException(
+                    f"{method_name}: 'collection_name' provided both positionally and as a keyword argument.")
+            collection_name = pos.pop(0)
+        else:
+            collection_name = kwargs.pop('collection_name', None)
+
+        settings = None
+        if supports_settings:
+            if pos and (isinstance(pos[0], CreateCollectionSettings) or pos[0] is None):
+                if 'settings' in kwargs:
+                    raise InvalidArgumentException(
+                        f"{method_name}: 'settings' provided both positionally and as a keyword argument.")
+                settings = pos.pop(0)
+            else:
+                settings = kwargs.pop('settings', None)
+                if settings is not None and not isinstance(settings, CreateCollectionSettings):
+                    raise InvalidArgumentException(
+                        f"{method_name}: 'settings' must be a CreateCollectionSettings instance.")
+
+        return scope_name, collection_name, settings, tuple(pos)
+
     def _validate_bucket_name(self, bucket_name: str) -> None:
         if is_null_or_empty(bucket_name):
             raise InvalidArgumentException('The bucket_name cannot be empty.')
@@ -126,23 +196,8 @@ class CollectionMgmtRequestBuilder:
                                         **kwargs: object) -> CreateCollectionRequest:
         # the obs_handler is required, let pop fail if not provided
         obs_handler: ObservableRequestHandler = kwargs.pop('obs_handler')
-        settings = None
-        if args and isinstance(args[0], CollectionSpec):
-            collection_spec = args[0]
-            options = args[1:]
-            scope_name, collection_name, settings = self._get_collection_spec_details(collection_spec,
-                                                                                      'create_collection')
-        elif len(args) >= 2:
-            scope_name = args[0]
-            collection_name = args[1]
-            options_start = 2
-            if len(args) > options_start and isinstance(args[options_start], CreateCollectionSettings):
-                settings = args[2]
-                options_start = 3
-            options = args[options_start:] if len(args) > options_start else ()
-        else:
-            scope_name = None
-            collection_name = None
+        scope_name, collection_name, settings, options = self._extract_collection_overload_args(
+            'create_collection', args, kwargs)
 
         final_args = forward_args(kwargs, *options)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
@@ -208,17 +263,8 @@ class CollectionMgmtRequestBuilder:
                                       **kwargs: object) -> CreateCollectionRequest:
         # the obs_handler is required, let pop fail if not provided
         obs_handler: ObservableRequestHandler = kwargs.pop('obs_handler')
-        if args and isinstance(args[0], CollectionSpec):
-            collection_spec = args[0]
-            options = args[1:]
-            scope_name, collection_name, _ = self._get_collection_spec_details(collection_spec, 'drop_collection')
-        elif len(args) >= 2:
-            scope_name = args[0]
-            collection_name = args[1]
-            options = args[2:]
-        else:
-            scope_name = None
-            collection_name = None
+        scope_name, collection_name, _, options = self._extract_collection_overload_args(
+            'drop_collection', args, kwargs)
 
         final_args = forward_args(kwargs, *options)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))

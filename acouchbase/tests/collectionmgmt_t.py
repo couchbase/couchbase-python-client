@@ -32,6 +32,7 @@ from couchbase.management.buckets import StorageBackend
 from couchbase.management.collections import (CollectionSpec,
                                               CreateCollectionSettings,
                                               UpdateCollectionSettings)
+from couchbase.management.options import CreateCollectionOptions, DropCollectionOptions
 
 from ._test_utils import TestEnvironment
 
@@ -174,6 +175,83 @@ class CollectionManagementTests:
         await cb_env.test_bucket_cm.create_collection("_default", self.TEST_COLLECTION)
         assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
 
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_create_collection_kwargs(self, cb_env):
+        # all-keyword form
+        await cb_env.test_bucket_cm.create_collection(scope_name="_default",
+                                                      collection_name=self.TEST_COLLECTION)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_create_collection_mixed_kwargs(self, cb_env):
+        # positional scope_name, keyword collection_name
+        await cb_env.test_bucket_cm.create_collection("_default",
+                                                      collection_name=self.TEST_COLLECTION)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_create_collection_settings_kwarg(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES doesn't support collection expiry.")
+        # positional names with settings passed as a keyword
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=2))
+        await cb_env.test_bucket_cm.create_collection("_default",
+                                                      self.TEST_COLLECTION,
+                                                      settings=settings)
+        coll_spec = await cb_env.get_collection("_default", self.TEST_COLLECTION)
+        assert coll_spec is not None
+        assert coll_spec.max_expiry == timedelta(seconds=2)
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_create_collection_with_options(self, cb_env):
+        # positional names + positional options
+        opts = CreateCollectionOptions(timeout=timedelta(seconds=30))
+        await cb_env.test_bucket_cm.create_collection("_default", self.TEST_COLLECTION, None, opts)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_create_collection_timeout_kwarg(self, cb_env):
+        # kwargs path + timeout as a raw keyword
+        await cb_env.test_bucket_cm.create_collection(scope_name="_default",
+                                                      collection_name=self.TEST_COLLECTION,
+                                                      timeout=timedelta(seconds=30))
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_create_collection_collection_spec_kwarg(self, cb_env):
+        spec = CollectionSpec(self.TEST_COLLECTION)
+        await cb_env.test_bucket_cm.create_collection(collection=spec)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+
+    @pytest.mark.asyncio
+    async def test_create_collection_invalid_args(self, cb_env):
+        spec = CollectionSpec("coll", "scope")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection(spec, collection=spec)
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection(spec, scope_name="_default")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection(spec, settings=CreateCollectionSettings())
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection(collection=spec, collection_name="c")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection("_default", collection=spec)
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection("_default", scope_name="_default")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection("_default", "c", collection_name="c")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection("_default", "c", CreateCollectionSettings(),
+                                                          settings=CreateCollectionSettings())
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.create_collection("_default", "c", settings="not-a-settings")
+
     @pytest.mark.usefixtures("cleanup_scope")
     @pytest.mark.asyncio
     async def test_create_scope_and_collection(self, cb_env):
@@ -315,6 +393,60 @@ class CollectionManagementTests:
         await cb_env.test_bucket_cm.drop_collection("_default", self.TEST_COLLECTION)
         with pytest.raises(CollectionNotFoundException):
             await cb_env.test_bucket_cm.drop_collection("_default", self.TEST_COLLECTION)
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_drop_collection_kwargs(self, cb_env):
+        await cb_env.test_bucket_cm.create_collection("_default", self.TEST_COLLECTION)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+        await cb_env.test_bucket_cm.drop_collection(scope_name="_default",
+                                                    collection_name=self.TEST_COLLECTION)
+        with pytest.raises(CollectionNotFoundException):
+            await cb_env.test_bucket_cm.drop_collection(scope_name="_default",
+                                                        collection_name=self.TEST_COLLECTION)
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_drop_collection_with_options(self, cb_env):
+        opts = DropCollectionOptions(timeout=timedelta(seconds=30))
+        await cb_env.test_bucket_cm.create_collection("_default", self.TEST_COLLECTION)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+        await cb_env.test_bucket_cm.drop_collection("_default", self.TEST_COLLECTION, opts)
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_drop_collection_timeout_kwarg(self, cb_env):
+        await cb_env.test_bucket_cm.create_collection("_default", self.TEST_COLLECTION)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+        await cb_env.test_bucket_cm.drop_collection(scope_name="_default",
+                                                    collection_name=self.TEST_COLLECTION,
+                                                    timeout=timedelta(seconds=30))
+
+    @pytest.mark.usefixtures("cleanup_collection")
+    @pytest.mark.asyncio
+    async def test_drop_collection_collection_spec_kwarg(self, cb_env):
+        spec = CollectionSpec(self.TEST_COLLECTION)
+        await cb_env.test_bucket_cm.create_collection(spec)
+        assert await cb_env.get_collection("_default", self.TEST_COLLECTION) is not None
+        await cb_env.test_bucket_cm.drop_collection(collection=spec)
+        with pytest.raises(CollectionNotFoundException):
+            await cb_env.test_bucket_cm.drop_collection(collection=spec)
+
+    @pytest.mark.asyncio
+    async def test_drop_collection_invalid_args(self, cb_env):
+        spec = CollectionSpec("coll", "scope")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.drop_collection(spec, collection=spec)
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.drop_collection(spec, scope_name="_default")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.drop_collection(collection=spec, collection_name="c")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.drop_collection("_default", collection=spec)
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.drop_collection("_default", scope_name="_default")
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.test_bucket_cm.drop_collection("_default", "c", collection_name="c")
 
     @pytest.mark.asyncio
     async def test_drop_collection_not_found(self, cb_env):

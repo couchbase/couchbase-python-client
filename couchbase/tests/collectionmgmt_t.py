@@ -28,6 +28,7 @@ from couchbase.management.buckets import StorageBackend
 from couchbase.management.collections import (CollectionSpec,
                                               CreateCollectionSettings,
                                               UpdateCollectionSettings)
+from couchbase.management.options import CreateCollectionOptions, DropCollectionOptions
 from tests.environments import CollectionType
 from tests.environments.collection_mgmt_environment import CollectionManagementTestEnvironment
 from tests.environments.test_environment import EnvironmentFeatures, TestEnvironment
@@ -37,6 +38,10 @@ class CollectionManagementTestSuite:
     TEST_MANIFEST = [
         'test_collection_goes_in_correct_bucket',
         'test_create_collection',
+        'test_create_collection_kwargs',
+        'test_create_collection_with_options',
+        'test_create_collection_collection_spec_kwarg',
+        'test_create_collection_invalid_args',
         'test_create_collection_already_exists',
         'test_create_collection_bad_scope',
         'test_create_collection_max_expiry',
@@ -47,6 +52,10 @@ class CollectionManagementTestSuite:
         'test_create_scope_already_exists',
         'test_create_scope_and_collection',
         'test_drop_collection',
+        'test_drop_collection_kwargs',
+        'test_drop_collection_with_options',
+        'test_drop_collection_collection_spec_kwarg',
+        'test_drop_collection_invalid_args',
         'test_drop_collection_not_found',
         'test_drop_collection_scope_not_found',
         'test_drop_scope',
@@ -120,6 +129,90 @@ class CollectionManagementTestSuite:
         coll = cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name)
         assert coll.scope_name == scope_name
         assert coll is not None
+
+    def test_create_collection_kwargs(self, cb_env):
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+        cb_env.cm.create_collection(scope_name=scope_name, collection_name=collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
+        coll = cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name)
+        assert coll is not None
+        assert coll.scope_name == scope_name
+
+        # mixed: positional scope_name, keyword collection_name
+        collection_name = cb_env.get_collection_name()
+        cb_env.cm.create_collection(scope_name, collection_name=collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
+        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
+
+        # settings passed as a keyword alongside positional names
+        if not cb_env.is_mock_server:
+            collection_name = cb_env.get_collection_name()
+            settings = CreateCollectionSettings(max_expiry=timedelta(seconds=2))
+            cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings=settings)
+            cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+            coll_spec = cb_env.get_collection(scope_name, collection_name)
+            assert coll_spec is not None
+            assert coll_spec.max_expiry == timedelta(seconds=2)
+
+    def test_create_collection_with_options(self, cb_env):
+        scope_name = '_default'
+        opts = CreateCollectionOptions(timeout=timedelta(seconds=30))
+
+        # positional names + positional options
+        collection_name = cb_env.get_collection_name()
+        cb_env.cm.create_collection(scope_name, collection_name, None, opts)
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
+        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
+
+        # positional names + positional settings + positional options
+        collection_name = cb_env.get_collection_name()
+        settings = CreateCollectionSettings()
+        cb_env.cm.create_collection(scope_name, collection_name, settings, opts)
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
+        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
+
+        # kwargs path + timeout as a raw keyword
+        collection_name = cb_env.get_collection_name()
+        cb_env.cm.create_collection(scope_name=scope_name,
+                                    collection_name=collection_name,
+                                    timeout=timedelta(seconds=30))
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
+        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
+
+    def test_create_collection_collection_spec_kwarg(self, cb_env):
+        collection_name = cb_env.get_collection_name()
+        spec = CollectionSpec(collection_name)
+        cb_env.test_bucket_cm.create_collection(collection=spec)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
+        assert cb_env.get_collection('_default', collection_name) is not None
+
+    def test_create_collection_invalid_args(self, cb_env):
+        spec = CollectionSpec('coll', 'scope')
+        # CollectionSpec passed positionally + as 'collection' keyword
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection(spec, collection=spec)
+        # CollectionSpec form mixed with new-style keyword(s)
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection(spec, scope_name='_default')
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection(spec, settings=CreateCollectionSettings())
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection(collection=spec, collection_name='c')
+        # 'collection' kwarg + positional args
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection('_default', collection=spec)
+        # Duplicate scope_name / collection_name / settings
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection('_default', scope_name='_default')
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection('_default', 'c', collection_name='c')
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection('_default', 'c', CreateCollectionSettings(),
+                                        settings=CreateCollectionSettings())
+        # settings= kwarg with the wrong type
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.create_collection('_default', 'c', settings='not-a-settings')
 
     def test_create_collection_already_exists(self, cb_env):
         collection_name = cb_env.get_collection_name()
@@ -246,6 +339,64 @@ class CollectionManagementTestSuite:
         cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
         with pytest.raises(CollectionNotFoundException):
             cb_env.test_bucket_cm.drop_collection(scope_name, collection_name)
+
+    def test_drop_collection_kwargs(self, cb_env):
+        collection_name = cb_env.get_collection_name()
+        scope_name = '_default'
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+        assert cb_env.get_collection(scope_name, collection_name) is not None
+        cb_env.test_bucket_cm.drop_collection(scope_name=scope_name, collection_name=collection_name)
+        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
+        with pytest.raises(CollectionNotFoundException):
+            cb_env.test_bucket_cm.drop_collection(scope_name=scope_name, collection_name=collection_name)
+
+    def test_drop_collection_with_options(self, cb_env):
+        scope_name = '_default'
+        opts = DropCollectionOptions(timeout=timedelta(seconds=30))
+
+        # positional names + positional options
+        collection_name = cb_env.get_collection_name()
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+        cb_env.test_bucket_cm.drop_collection(scope_name, collection_name, opts)
+        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
+
+        # kwargs path + timeout as a raw keyword
+        collection_name = cb_env.get_collection_name()
+        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
+        cb_env.test_bucket_cm.drop_collection(scope_name=scope_name,
+                                              collection_name=collection_name,
+                                              timeout=timedelta(seconds=30))
+        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
+
+    def test_drop_collection_collection_spec_kwarg(self, cb_env):
+        collection_name = cb_env.get_collection_name()
+        spec = CollectionSpec(collection_name)
+        cb_env.test_bucket_cm.create_collection(spec)
+        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
+        cb_env.test_bucket_cm.drop_collection(collection=spec)
+        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, '_default', collection_name)
+
+    def test_drop_collection_invalid_args(self, cb_env):
+        spec = CollectionSpec('coll', 'scope')
+        # CollectionSpec passed positionally + as 'collection' keyword
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.drop_collection(spec, collection=spec)
+        # CollectionSpec form mixed with new-style keyword(s)
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.drop_collection(spec, scope_name='_default')
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.drop_collection(collection=spec, collection_name='c')
+        # 'collection' kwarg + positional args
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.drop_collection('_default', collection=spec)
+        # Duplicate scope_name / collection_name
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.drop_collection('_default', scope_name='_default')
+        with pytest.raises(InvalidArgumentException):
+            cb_env.cm.drop_collection('_default', 'c', collection_name='c')
 
     def test_drop_collection_not_found(self, cb_env):
         collection_name = 'fake-collection'
