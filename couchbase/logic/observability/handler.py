@@ -306,6 +306,16 @@ class ObservableRequestHandler:
         return ObservableRequestHandler(op_type, observability_instruments, op_type_toggle=op_type_toggle)
 
     @staticmethod
+    def create_or_none(op_type: OpType,
+                       observability_instruments: ObservabilityInstruments,
+                       op_type_toggle: Optional[bool] = None) -> Optional[ObservableRequestHandler]:
+        if observability_instruments.is_noop:
+            return None
+        handler = ObservableRequestHandler(op_type, observability_instruments, op_type_toggle=op_type_toggle)
+        handler.__enter__()
+        return handler
+
+    @staticmethod
     def get_query_context_components(query_context: str,
                                      is_analytics: Optional[bool] = False) -> Optional[Tuple[str, str]]:
         if is_analytics:
