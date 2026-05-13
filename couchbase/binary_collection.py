@@ -92,10 +92,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_increment_request(key, None, *opts, **kwargs)
-            return self._impl.increment(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Increment, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Increment, instruments) as obs_handler:
             req = self._impl.request_builder.build_increment_request(key, obs_handler, *opts, **kwargs)
             return self._impl.increment(req, obs_handler)
 
@@ -145,10 +142,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_decrement_request(key, None, *opts, **kwargs)
-            return self._impl.decrement(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Decrement, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Decrement, instruments) as obs_handler:
             req = self._impl.request_builder.build_decrement_request(key, obs_handler, *opts, **kwargs)
             return self._impl.decrement(req, obs_handler)
 
@@ -206,10 +200,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_append_request(key, value, None, *opts, **kwargs)
-            return self._impl.append(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Append, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Append, instruments) as obs_handler:
             req = self._impl.request_builder.build_append_request(key, value, obs_handler, *opts, **kwargs)
             return self._impl.append(req, obs_handler)
 
@@ -267,10 +258,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_prepend_request(key, value, None, *opts, **kwargs)
-            return self._impl.prepend(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Prepend, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Prepend, instruments) as obs_handler:
             req = self._impl.request_builder.build_prepend_request(key, value, obs_handler, *opts, **kwargs)
             return self._impl.prepend(req, obs_handler)
 
@@ -369,11 +357,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_append_multi_request(
-                keys_and_values, None, *opts, **kwargs)
-            return self._impl.append_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.AppendMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.AppendMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_append_multi_request(
                 keys_and_values, obs_handler, *opts, **kwargs)
             return self._impl.append_multi(req, obs_handler)
@@ -474,11 +458,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_prepend_multi_request(
-                keys_and_values, None, *opts, **kwargs)
-            return self._impl.prepend_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.PrependMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.PrependMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_prepend_multi_request(
                 keys_and_values, obs_handler, *opts, **kwargs)
             return self._impl.prepend_multi(req, obs_handler)
@@ -567,10 +547,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_increment_multi_request(keys, None, *opts, **kwargs)
-            return self._impl.increment_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.IncrementMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.IncrementMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_increment_multi_request(keys, obs_handler, *opts, **kwargs)
             return self._impl.increment_multi(req, obs_handler)
 
@@ -658,9 +635,6 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_decrement_multi_request(keys, None, *opts, **kwargs)
-            return self._impl.decrement_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.DecrementMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.DecrementMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_decrement_multi_request(keys, obs_handler, *opts, **kwargs)
             return self._impl.decrement_multi(req, obs_handler)

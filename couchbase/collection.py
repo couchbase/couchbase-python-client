@@ -161,10 +161,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_request(key, None, *opts, **kwargs)
-            return self._impl.get(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.Get, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Get, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
             return self._impl.get(req, transcoder, obs_handler)
 
@@ -214,10 +211,7 @@ class Collection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_any_replica_request(key, None, *opts, **kwargs)
-            return self._impl.get_any_replica(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.GetAnyReplica, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.GetAnyReplica, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_any_replica_request(
                 key, obs_handler, *opts, **kwargs)
             return self._impl.get_any_replica(req, transcoder, obs_handler)
@@ -287,10 +281,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(key, None, *opts, **kwargs)
-            return self._impl.get_all_replicas(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.GetAllReplicas, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.GetAllReplicas, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_all_replicas_request(
                 key, obs_handler, *opts, **kwargs)
             return self._impl.get_all_replicas(req, transcoder, obs_handler)
@@ -337,10 +328,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_exists_request(key, None, *opts, **kwargs)
-            return self._impl.exists(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Exists, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Exists, instruments) as obs_handler:
             req = self._impl.request_builder.build_exists_request(key, obs_handler, *opts, **kwargs)
             return self._impl.exists(req, obs_handler)
 
@@ -407,10 +395,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_insert_request(key, value, None, *opts, **kwargs)
-            return self._impl.insert(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Insert, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Insert, instruments) as obs_handler:
             req = self._impl.request_builder.build_insert_request(key, value, obs_handler, *opts, **kwargs)
             return self._impl.insert(req, obs_handler)
 
@@ -473,10 +458,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_upsert_request(key, value, None, *opts, **kwargs)
-            return self._impl.upsert(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Upsert, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Upsert, instruments) as obs_handler:
             req = self._impl.request_builder.build_upsert_request(key, value, obs_handler, *opts, **kwargs)
             return self._impl.upsert(req, obs_handler)
 
@@ -532,10 +514,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_replace_request(key, value, None, *opts, **kwargs)
-            return self._impl.replace(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Replace, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Replace, instruments) as obs_handler:
             req = self._impl.request_builder.build_replace_request(key, value, obs_handler, *opts, **kwargs)
             return self._impl.replace(req, obs_handler)
 
@@ -581,10 +560,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_remove_request(key, None, *opts, **kwargs)
-            return self._impl.remove(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Remove, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Remove, instruments) as obs_handler:
             req = self._impl.request_builder.build_remove_request(key, obs_handler, *opts, **kwargs)
             return self._impl.remove(req, obs_handler)
 
@@ -638,10 +614,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_touch_request(key, expiry, None, *opts, **kwargs)
-            return self._impl.touch(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Touch, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Touch, instruments) as obs_handler:
             req = self._impl.request_builder.build_touch_request(key, expiry, obs_handler, *opts, **kwargs)
             return self._impl.touch(req, obs_handler)
 
@@ -698,10 +671,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_and_touch_request(key, expiry, None, *opts, **kwargs)
-            return self._impl.get_and_touch(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.GetAndTouch, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.GetAndTouch, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_and_touch_request(
                 key, expiry, obs_handler, *opts, **kwargs)
             return self._impl.get_and_touch(req, transcoder, obs_handler)
@@ -760,11 +730,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
-                key, lock_time, None, *opts, **kwargs)
-            return self._impl.get_and_lock(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.GetAndLock, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.GetAndLock, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_and_lock_request(
                 key, lock_time, obs_handler, *opts, **kwargs)
             return self._impl.get_and_lock(req, transcoder, obs_handler)
@@ -809,10 +775,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_unlock_request(key, cas, None, *opts, **kwargs)
-            return self._impl.unlock(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.Unlock, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.Unlock, instruments) as obs_handler:
             req = self._impl.request_builder.build_unlock_request(key, cas, obs_handler, *opts, **kwargs)
             return self._impl.unlock(req, obs_handler)
 
@@ -874,10 +837,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_lookup_in_request(key, spec, None, *opts, **kwargs)
-            return self._impl.lookup_in(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.LookupIn, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.LookupIn, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_lookup_in_request(
                 key, spec, obs_handler, *opts, **kwargs)
             return self._impl.lookup_in(req, transcoder, obs_handler)
@@ -942,14 +902,7 @@ class Collection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(key,
-                                                                                             spec,
-                                                                                             None,
-                                                                                             *opts,
-                                                                                             **kwargs)
-            return self._impl.lookup_in_any_replica(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.LookupInAnyReplica, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.LookupInAnyReplica, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(key,
                                                                                              spec,
                                                                                              obs_handler,
@@ -1041,14 +994,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
-                                                                                              spec,
-                                                                                              None,
-                                                                                              *opts,
-                                                                                              **kwargs)
-            return self._impl.lookup_in_all_replicas(req, transcoder, None)
-        with ObservableRequestHandler(KeyValueOperationType.LookupInAllReplicas, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.LookupInAllReplicas, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
                                                                                               spec,
                                                                                               obs_handler,
@@ -1112,10 +1058,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_mutate_in_request(key, spec, None, *opts, **kwargs)
-            return self._impl.mutate_in(req, None)
-        with ObservableRequestHandler(KeyValueOperationType.MutateIn, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueOperationType.MutateIn, instruments) as obs_handler:
             req = self._impl.request_builder.build_mutate_in_request(key, spec, obs_handler, *opts, **kwargs)
             return self._impl.mutate_in(req, obs_handler)
 
@@ -1932,10 +1875,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_get_multi_request(keys, None, *opts, **kwargs)
-            return self._impl.get_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.GetMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.GetMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_get_multi_request(keys, obs_handler, *opts, **kwargs)
             return self._impl.get_multi(req, obs_handler)
 
@@ -2012,13 +1952,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_get_any_replica_multi_request(keys,
-                                                                                       None,
-                                                                                       *opts,
-                                                                                       **kwargs)
-            return self._impl.get_any_replica_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.GetAnyReplicaMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.GetAnyReplicaMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_get_any_replica_multi_request(keys,
                                                                                        obs_handler,
                                                                                        *opts,
@@ -2101,13 +2035,9 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_get_all_replicas_multi_request(keys,
-                                                                                        None,
-                                                                                        *opts,
-                                                                                        **kwargs)
-            return self._impl.get_all_replicas_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.GetAllReplicasMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(
+            KeyValueMultiOperationType.GetAllReplicasMulti, instruments
+        ) as obs_handler:
             req = self._impl.multi_request_builder.build_get_all_replicas_multi_request(keys,
                                                                                         obs_handler,
                                                                                         *opts,
@@ -2195,14 +2125,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_get_and_lock_multi_request(keys,
-                                                                                    lock_time,
-                                                                                    None,
-                                                                                    *opts,
-                                                                                    **kwargs)
-            return self._impl.get_and_lock_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.GetAndLockMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.GetAndLockMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_get_and_lock_multi_request(keys,
                                                                                     lock_time,
                                                                                     obs_handler,
@@ -2266,10 +2189,7 @@ class Collection:
                     print(f'Doc with key={k} {"exists" if v.exists else "does not exist"}')
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_exists_multi_request(keys, None, *opts, **kwargs)
-            return self._impl.exists_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.ExistsMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.ExistsMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_exists_multi_request(keys, obs_handler, *opts, **kwargs)
             return self._impl.exists_multi(req, obs_handler)
 
@@ -2351,13 +2271,7 @@ class Collection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_insert_multi_request(keys_and_docs,
-                                                                              None,
-                                                                              *opts,
-                                                                              **kwargs)
-            return self._impl.insert_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.InsertMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.InsertMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_insert_multi_request(keys_and_docs,
                                                                               obs_handler,
                                                                               *opts,
@@ -2437,13 +2351,7 @@ class Collection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_upsert_multi_request(keys_and_docs,
-                                                                              None,
-                                                                              *opts,
-                                                                              **kwargs)
-            return self._impl.upsert_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.UpsertMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.UpsertMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_upsert_multi_request(keys_and_docs,
                                                                               obs_handler,
                                                                               *opts,
@@ -2534,13 +2442,7 @@ class Collection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_replace_multi_request(keys_and_docs,
-                                                                               None,
-                                                                               *opts,
-                                                                               **kwargs)
-            return self._impl.replace_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.ReplaceMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.ReplaceMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_replace_multi_request(keys_and_docs,
                                                                                obs_handler,
                                                                                *opts,
@@ -2604,10 +2506,7 @@ class Collection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_remove_multi_request(keys, None, *opts, **kwargs)
-            return self._impl.remove_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.RemoveMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.RemoveMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_remove_multi_request(keys, obs_handler, *opts, **kwargs)
             return self._impl.remove_multi(req, obs_handler)
 
@@ -2638,14 +2537,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_touch_multi_request(keys,
-                                                                             expiry,
-                                                                             None,
-                                                                             *opts,
-                                                                             **kwargs)
-            return self._impl.touch_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.TouchMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.TouchMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_touch_multi_request(keys,
                                                                              expiry,
                                                                              obs_handler,
@@ -2682,10 +2574,7 @@ class Collection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.multi_request_builder.build_unlock_multi_request(keys, None, *opts, **kwargs)
-            return self._impl.unlock_multi(req, None)
-        with ObservableRequestHandler(KeyValueMultiOperationType.UnlockMulti, instruments) as obs_handler:
+        with ObservableRequestHandler.create(KeyValueMultiOperationType.UnlockMulti, instruments) as obs_handler:
             req = self._impl.multi_request_builder.build_unlock_multi_request(keys, obs_handler, *opts, **kwargs)
             return self._impl.unlock_multi(req, obs_handler)
 

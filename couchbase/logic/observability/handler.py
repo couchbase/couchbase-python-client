@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 import time
 from dataclasses import dataclass
@@ -105,6 +106,7 @@ class OpAttributeOptions(TypedDict, total=False):
 
 
 _KV_SERVICE_VALUE = ServiceType.KeyValue.value
+_NOOP_OBS_HANDLER_CTX = contextlib.nullcontext()
 
 
 def get_attributes_for_kv_op(op_name: str,
@@ -294,6 +296,14 @@ class ObservableRequestHandler:
                                cluster_name=self._tracer_impl.cluster_name,
                                cluster_uuid=self._tracer_impl.cluster_uuid,
                                exc_val=exc_val)
+
+    @staticmethod
+    def create(op_type: OpType,
+               observability_instruments: ObservabilityInstruments,
+               op_type_toggle: Optional[bool] = None) -> Union[ObservableRequestHandler, contextlib.nullcontext[None]]:
+        if observability_instruments.is_noop:
+            return _NOOP_OBS_HANDLER_CTX
+        return ObservableRequestHandler(op_type, observability_instruments, op_type_toggle=op_type_toggle)
 
     @staticmethod
     def get_query_context_components(query_context: str,

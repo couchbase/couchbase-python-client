@@ -83,10 +83,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_increment_request(key, None, *opts, **kwargs)
-            return await self._impl.increment(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Increment, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Increment, instruments) as obs_handler:
             req = self._impl.request_builder.build_increment_request(key, obs_handler, *opts, **kwargs)
             return await self._impl.increment(req, obs_handler)
 
@@ -136,10 +133,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_decrement_request(key, None, *opts, **kwargs)
-            return await self._impl.decrement(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Decrement, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Decrement, instruments) as obs_handler:
             req = self._impl.request_builder.build_decrement_request(key, obs_handler, *opts, **kwargs)
             return await self._impl.decrement(req, obs_handler)
 
@@ -197,10 +191,7 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_append_request(key, value, None, *opts, **kwargs)
-            return await self._impl.append(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Append, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Append, instruments) as obs_handler:
             req = self._impl.request_builder.build_append_request(key, value, obs_handler, *opts, **kwargs)
             return await self._impl.append(req, obs_handler)
 
@@ -258,9 +249,6 @@ class BinaryCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_prepend_request(key, value, None, *opts, **kwargs)
-            return await self._impl.prepend(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Prepend, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Prepend, instruments) as obs_handler:
             req = self._impl.request_builder.build_prepend_request(key, value, obs_handler, *opts, **kwargs)
             return await self._impl.prepend(req, obs_handler)

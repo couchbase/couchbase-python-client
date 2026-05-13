@@ -120,10 +120,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_request(key, None, *opts, **kwargs)
-            return await self._impl.get(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Get, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Get, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
             return await self._impl.get(req, transcoder, obs_handler)
 
@@ -174,10 +171,7 @@ class AsyncCollection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_any_replica_request(key, None, *opts, **kwargs)
-            return await self._impl.get_any_replica(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.GetAnyReplica, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.GetAnyReplica, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_any_replica_request(
                 key, obs_handler, *opts, **kwargs)
             return await self._impl.get_any_replica(req, transcoder, obs_handler)
@@ -249,10 +243,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(key, None, *opts, **kwargs)
-            return await self._impl.get_all_replicas(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.GetAllReplicas, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.GetAllReplicas, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_all_replicas_request(
                 key, obs_handler, *opts, **kwargs)
             return await self._impl.get_all_replicas(req, transcoder, obs_handler)
@@ -299,10 +290,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_exists_request(key, None, *opts, **kwargs)
-            return await self._impl.exists(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Exists, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Exists, instruments) as obs_handler:
             req = self._impl.request_builder.build_exists_request(key, obs_handler, *opts, **kwargs)
             return await self._impl.exists(req, obs_handler)
 
@@ -369,10 +357,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_insert_request(key, value, None, *opts, **kwargs)
-            return await self._impl.insert(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Insert, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Insert, instruments) as obs_handler:
             req = self._impl.request_builder.build_insert_request(key, value, obs_handler, *opts, **kwargs)
             return await self._impl.insert(req, obs_handler)
 
@@ -435,10 +420,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_upsert_request(key, value, None, *opts, **kwargs)
-            return await self._impl.upsert(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Upsert, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Upsert, instruments) as obs_handler:
             req = self._impl.request_builder.build_upsert_request(key, value, obs_handler, *opts, **kwargs)
             return await self._impl.upsert(req, obs_handler)
 
@@ -495,10 +477,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_replace_request(key, value, None, *opts, **kwargs)
-            return await self._impl.replace(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Replace, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Replace, instruments) as obs_handler:
             req = self._impl.request_builder.build_replace_request(key, value, obs_handler, *opts, **kwargs)
             return await self._impl.replace(req, obs_handler)
 
@@ -545,10 +524,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_remove_request(key, None, *opts, **kwargs)
-            return await self._impl.remove(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Remove, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Remove, instruments) as obs_handler:
             req = self._impl.request_builder.build_remove_request(key, obs_handler, *opts, **kwargs)
             return await self._impl.remove(req, obs_handler)
 
@@ -603,10 +579,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_touch_request(key, expiry, None, *opts, **kwargs)
-            return await self._impl.touch(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Touch, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Touch, instruments) as obs_handler:
             req = self._impl.request_builder.build_touch_request(key, expiry, obs_handler, *opts, **kwargs)
             return await self._impl.touch(req, obs_handler)
 
@@ -664,10 +637,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_and_touch_request(key, expiry, None, *opts, **kwargs)
-            return await self._impl.get_and_touch(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.GetAndTouch, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.GetAndTouch, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_and_touch_request(
                 key, expiry, obs_handler, *opts, **kwargs)
             return await self._impl.get_and_touch(req, transcoder, obs_handler)
@@ -726,11 +696,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
-                key, lock_time, None, *opts, **kwargs)
-            return await self._impl.get_and_lock(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.GetAndLock, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.GetAndLock, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_get_and_lock_request(
                 key, lock_time, obs_handler, *opts, **kwargs)
             return await self._impl.get_and_lock(req, transcoder, obs_handler)
@@ -778,10 +744,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_unlock_request(key, cas, None, *opts, **kwargs)
-            return await self._impl.unlock(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.Unlock, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.Unlock, instruments) as obs_handler:
             req = self._impl.request_builder.build_unlock_request(key, cas, obs_handler, *opts, **kwargs)
             await self._impl.unlock(req, obs_handler)
 
@@ -843,10 +806,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_lookup_in_request(key, spec, None, *opts, **kwargs)
-            return await self._impl.lookup_in(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.LookupIn, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.LookupIn, instruments) as obs_handler:
             req, transcoder = self._impl.request_builder.build_lookup_in_request(
                 key, spec, obs_handler, *opts, **kwargs)
             return await self._impl.lookup_in(req, transcoder, obs_handler)
@@ -911,11 +871,9 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(
-                key, spec, None, *opts, **kwargs)
-            return await self._impl.lookup_in_any_replica(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.LookupInAnyReplica, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(
+            KeyValueOperationType.LookupInAnyReplica, instruments
+        ) as obs_handler:
             req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(
                 key, spec, obs_handler, *opts, **kwargs)
             return await self._impl.lookup_in_any_replica(req, transcoder, obs_handler)
@@ -1003,11 +961,9 @@ class AsyncCollection:
 
         """  # noqa: E501
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(
-                key, spec, None, *opts, **kwargs)
-            return await self._impl.lookup_in_all_replicas(req, transcoder, None)
-        async with ObservableRequestHandler(KeyValueOperationType.LookupInAllReplicas, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(
+            KeyValueOperationType.LookupInAllReplicas, instruments
+        ) as obs_handler:
             req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(
                 key, spec, obs_handler, *opts, **kwargs)
             return await self._impl.lookup_in_all_replicas(req, transcoder, obs_handler)
@@ -1068,10 +1024,7 @@ class AsyncCollection:
 
         """
         instruments = self._impl.observability_instruments
-        if instruments.is_noop:
-            req = self._impl.request_builder.build_mutate_in_request(key, spec, None, *opts, **kwargs)
-            return await self._impl.mutate_in(req, None)
-        async with ObservableRequestHandler(KeyValueOperationType.MutateIn, instruments) as obs_handler:
+        async with ObservableRequestHandler.create(KeyValueOperationType.MutateIn, instruments) as obs_handler:
             req = self._impl.request_builder.build_mutate_in_request(key, spec, obs_handler, *opts, **kwargs)
             return await self._impl.mutate_in(req, obs_handler)
 
