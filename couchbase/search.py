@@ -68,6 +68,7 @@ from couchbase.logic.search_queries import TermQuery  # noqa: F401
 from couchbase.logic.search_queries import TermRangeQuery  # noqa: F401
 from couchbase.logic.search_queries import WildcardQuery  # noqa: F401
 from couchbase.logic.search_request import SearchRequest  # noqa: F401
+from couchbase.logic.streaming import stream_next
 from couchbase.logic.supportability import Supportability
 
 
@@ -127,26 +128,7 @@ class FullTextSearchRequest(FullTextSearchRequestLogic):
         return self._deserialize_row(row)
 
     def __next__(self):
-        try:
-            row = self._get_next_row()
-            # We want to end the streaming op span once we have a response from the C++ core.
-            # Unfortunately right now, that means we need to wait until we have the first row (or we have an error).
-            # As this method is idempotent, it is safe to call for each row (it will only do work for the first call).
-            self._process_core_span()
-            return row
-        except StopIteration:
-            self._done_streaming = True
-            self._process_core_span()
-            self._get_metadata()
-            raise
-        except CouchbaseException as ex:
-            self._process_core_span(exc_val=ex)
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            self._process_core_span(exc_val=excptn)
-            raise excptn
+        return stream_next(self)
 
 
 """

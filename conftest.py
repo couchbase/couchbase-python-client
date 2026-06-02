@@ -59,6 +59,7 @@ _STREAMING_TESTS = [
     "acouchbase/tests/search_t.py::ClassicSearchTests",
     "acouchbase/tests/search_t.py::ClassicSearchCollectionTests",
     "acouchbase/tests/views_t.py::ClassicViewsTests",
+    "acouchbase/tests/streaming_helpers_t.py::AsyncStreamingAnextTests",
     "couchbase/tests/analytics_params_t.py::ClassicAnalyticsParamTests",
     "couchbase/tests/analytics_t.py::ClassicAnalyticsTests",
     "couchbase/tests/analytics_t.py::ClassicAnalyticsCollectionTests",
@@ -70,6 +71,7 @@ _STREAMING_TESTS = [
     "couchbase/tests/search_t.py::ClassicSearchTests",
     "couchbase/tests/search_t.py::ClassicSearchCollectionTests",
     "couchbase/tests/views_t.py::ClassicViewsTests",
+    "couchbase/tests/streaming_helpers_t.py::ClassicStreamingNextTests",
 ]
 
 _MGMT_TESTS = [

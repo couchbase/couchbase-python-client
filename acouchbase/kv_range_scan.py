@@ -32,11 +32,12 @@ if TYPE_CHECKING:
 
 class AsyncRangeScanRequest(RangeScanRequestLogic):
     def __init__(self, connection: pycbc_connection, loop: asyncio.AbstractEventLoop, **kwargs: Any) -> None:
-        num_workers = kwargs.pop('num_workers', 2)
+        num_workers = kwargs.pop('num_workers', None) or 1
         super().__init__(connection, **kwargs)
         self._loop = loop
         self._result_ftr = None
         self._tp_executor = ThreadPoolExecutor(num_workers)
+        self._executor_shutdown = False
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -54,6 +55,16 @@ class AsyncRangeScanRequest(RangeScanRequestLogic):
 
         return self
 
+    def _shutdown_executor(self):
+        """
+        **INTERNAL**
+
+        Release the per-request streaming executor.  Safe to call multiple times.
+        """
+        if not self._executor_shutdown:
+            self._executor_shutdown = True
+            self._tp_executor.shutdown(wait=False)
+
     async def __anext__(self):
         try:
             return await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
@@ -61,16 +72,27 @@ class AsyncRangeScanRequest(RangeScanRequestLogic):
         except asyncio.QueueEmpty:
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls('Unexpected QueueEmpty exception caught when doing N1QL query.')
+            self._shutdown_executor()
             raise excptn
         except RangeScanCompletedException:
             self._done_streaming = True
+            self._shutdown_executor()
             raise StopAsyncIteration
         except StopAsyncIteration:
             self._done_streaming = True
+            self._shutdown_executor()
             raise
         except CouchbaseException as ex:
+            self._shutdown_executor()
             raise ex
         except Exception as ex:
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls(str(ex))
+            self._shutdown_executor()
             raise excptn
+        except BaseException:
+            # asyncio.CancelledError (and KeyboardInterrupt/SystemExit) derive from BaseException,
+            # not Exception, so they fall through every handler above.  Release the executor so the
+            # cancelled scan does not orphan its worker thread, then re-raise unchanged.
+            self._shutdown_executor()
+            raise

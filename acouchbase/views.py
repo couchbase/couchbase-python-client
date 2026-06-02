@@ -23,6 +23,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap)
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
+from couchbase.logic.streaming import stream_anext
 from couchbase.logic.views import ViewQuery  # noqa: F401
 from couchbase.logic.views import ViewRequestLogic, ViewRow
 
@@ -34,10 +35,11 @@ class AsyncViewRequest(ViewRequestLogic):
                  encoded_query,
                  **kwargs
                  ):
-        num_workers = kwargs.pop('num_workers', 2)
+        num_workers = kwargs.pop('num_workers', None) or 1
         super().__init__(connection, encoded_query, **kwargs)
         self._loop = loop
         self._tp_executor = ThreadPoolExecutor(num_workers)
+        self._executor_shutdown = False
 
     @property
     def loop(self):
@@ -99,29 +101,27 @@ class AsyncViewRequest(ViewRequestLogic):
         else:
             return deserialized_row
 
+    def _shutdown_executor(self):
+        """
+        **INTERNAL**
+
+        Release the per-request streaming executor.  Safe to call multiple times.
+        """
+        if not self._executor_shutdown:
+            self._executor_shutdown = True
+            self._tp_executor.shutdown(wait=False)
+
+    def _finalize(self, exc_val=None):
+        """
+        **INTERNAL**
+
+        Terminal cleanup for the streaming op: end the observability span/meter and release the
+        executor.  Invoked from every terminal branch of ``__anext__`` -- including cancellation --
+        so that ``asyncio.CancelledError`` (a ``BaseException``, not an ``Exception``) cannot bypass
+        teardown and leak the span/meter or orphan the streaming result and its executor thread.
+        """
+        self._process_core_span(exc_val=exc_val)
+        self._shutdown_executor()
+
     async def __anext__(self):
-        try:
-            row = await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
-            # We want to end the streaming op span once we have a response from the C++ core.
-            # Unfortunately right now, that means we need to wait until we have the first row (or we have an error).
-            # As this method is idempotent, it is safe to call for each row (it will only do work for the first call).
-            self._process_core_span()
-            return row
-        except asyncio.QueueEmpty:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls('Unexpected QueueEmpty exception caught when doing Search query.')
-            self._process_core_span(exc_val=excptn)
-            raise excptn
-        except StopAsyncIteration:
-            self._done_streaming = True
-            self._process_core_span()
-            self._get_metadata()
-            raise
-        except CouchbaseException as ex:
-            self._process_core_span(exc_val=ex)
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            self._process_core_span(exc_val=excptn)
-            raise excptn
+        return await stream_anext(self, 'View')
