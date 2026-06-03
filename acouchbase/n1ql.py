@@ -117,6 +117,12 @@ class AsyncN1QLRequest(QueryRequestLogic):
         teardown and leak the span/meter or orphan the streaming result and its executor thread.
         """
         self._process_core_span(exc_val=exc_val)
+        if exc_val is not None and self._streaming_result is not None:
+            # Cancellation/error: unblock a worker still waiting on the C++ core so its executor
+            # thread is released promptly instead of waiting for the whole server-side operation
+            # to finish.  Normal completion (exc_val is None) skips this so trailing metadata can
+            # still be read from the streaming result.
+            self._streaming_result.cancel()
         self._shutdown_executor()
 
     async def __anext__(self):

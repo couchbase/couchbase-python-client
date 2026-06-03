@@ -19,8 +19,19 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from acouchbase.n1ql import AsyncN1QLRequest
 from couchbase.exceptions import CouchbaseException, InternalSDKException
 from couchbase.logic.streaming import stream_anext
+
+
+class _FakeStreamingResult:
+    """Stand-in for the C-extension ``pycbc_streamed_result`` exposing the new cancel hook."""
+
+    def __init__(self):
+        self.cancel_calls = 0
+
+    def cancel(self):
+        self.cancel_calls += 1
 
 
 class _FakeAsyncStreamingRequest:
@@ -76,6 +87,8 @@ class StreamingAnextTestSuite:
         'test_queue_empty_converted_with_op_name',
         'test_keyboard_interrupt_propagates_unconverted',
         'test_cancellation_finalizes_and_propagates',
+        'test_finalize_cancels_streaming_result_on_error',
+        'test_finalize_skips_cancel_on_normal_completion',
     ]
 
     @pytest.mark.asyncio
@@ -157,6 +170,30 @@ class StreamingAnextTestSuite:
         assert len(req.finalize_calls) == 1
         assert isinstance(req.finalize_calls[0], asyncio.CancelledError)
         assert req.executor_shutdown is True
+
+    def test_finalize_cancels_streaming_result_on_error(self):
+        # _finalize is exercised on a real request to verify the cancel() wiring (Phase III).
+        loop = asyncio.new_event_loop()
+        try:
+            req = AsyncN1QLRequest(None, loop, {}, obs_handler=None)
+            req._streaming_result = _FakeStreamingResult()
+            req._finalize(exc_val=CouchbaseException('boom'))
+            # abort path: the C++ streamed result is cancelled so a blocked worker can unwind
+            assert req._streaming_result.cancel_calls == 1
+            assert req._executor_shutdown is True
+        finally:
+            loop.close()
+
+    def test_finalize_skips_cancel_on_normal_completion(self):
+        loop = asyncio.new_event_loop()
+        try:
+            req = AsyncN1QLRequest(None, loop, {}, obs_handler=None)
+            req._streaming_result = _FakeStreamingResult()
+            req._finalize()  # exc_val is None -> normal completion must NOT cancel (metadata follows)
+            assert req._streaming_result.cancel_calls == 0
+            assert req._executor_shutdown is True
+        finally:
+            loop.close()
 
 
 class AsyncStreamingAnextTests(StreamingAnextTestSuite):

@@ -65,6 +65,17 @@ class AsyncRangeScanRequest(RangeScanRequestLogic):
             self._executor_shutdown = True
             self._tp_executor.shutdown(wait=False)
 
+    def _abort(self):
+        """
+        **INTERNAL**
+
+        Cancel the in-flight core scan so a worker still waiting on the C++ core unwinds promptly,
+        then release the executor.  Used on the error/cancellation paths only.
+        """
+        if self._scan_iterator is not None and self._scan_iterator.is_cancelled() is False:
+            self._scan_iterator.cancel_scan()
+        self._shutdown_executor()
+
     async def __anext__(self):
         try:
             return await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
@@ -72,7 +83,7 @@ class AsyncRangeScanRequest(RangeScanRequestLogic):
         except asyncio.QueueEmpty:
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls('Unexpected QueueEmpty exception caught when doing N1QL query.')
-            self._shutdown_executor()
+            self._abort()
             raise excptn
         except RangeScanCompletedException:
             self._done_streaming = True
@@ -83,16 +94,16 @@ class AsyncRangeScanRequest(RangeScanRequestLogic):
             self._shutdown_executor()
             raise
         except CouchbaseException as ex:
-            self._shutdown_executor()
+            self._abort()
             raise ex
         except Exception as ex:
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls(str(ex))
-            self._shutdown_executor()
+            self._abort()
             raise excptn
         except BaseException:
             # asyncio.CancelledError (and KeyboardInterrupt/SystemExit) derive from BaseException,
-            # not Exception, so they fall through every handler above.  Release the executor so the
-            # cancelled scan does not orphan its worker thread, then re-raise unchanged.
-            self._shutdown_executor()
+            # not Exception, so they fall through every handler above.  Cancel the in-flight scan
+            # and release the executor so the worker thread is not orphaned, then re-raise unchanged.
+            self._abort()
             raise

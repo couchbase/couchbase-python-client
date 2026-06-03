@@ -51,6 +51,7 @@ public:
     : rows_()
     , mut_()
     , cv_()
+    , cancelled_(false)
   {
   }
 
@@ -72,11 +73,33 @@ public:
     cv_.notify_one();
   }
 
+  // Unblock a waiting get(): once cancelled, get() stops waiting for new rows and returns a
+  // null sentinel as soon as the queue drains.  Used to release a streaming iterator's worker
+  // thread when the operation is cancelled/errored, rather than waiting for the entire
+  // server-side operation to complete.  Already-queued rows are still drained first.
+  void cancel()
+  {
+    std::lock_guard<std::mutex> lock(mut_);
+    cancelled_ = true;
+    cv_.notify_all();
+  }
+
+  bool is_cancelled()
+  {
+    std::lock_guard<std::mutex> lock(mut_);
+    return cancelled_;
+  }
+
   T get(std::chrono::milliseconds timeout_ms)
   {
     std::unique_lock<std::mutex> lock(mut_);
 
     while (rows_.empty()) {
+      if (cancelled_) {
+        // Cancelled with no rows remaining: stop waiting and signal end-of-iteration
+        // (a null PyObject* surfaces as StopIteration to the Python iterator).
+        return nullptr;
+      }
       if (cv_.wait_for(lock, timeout_ms) == std::cv_status::timeout) {
         // This timeout (e.g. timeout_ms) is the same timeout we pass to the C++ core.
         // If we timeout on the Python side this means:
@@ -111,6 +134,7 @@ private:
   std::queue<T> rows_;
   std::mutex mut_;
   std::condition_variable cv_;
+  bool cancelled_;
 };
 
 struct pycbc_result {

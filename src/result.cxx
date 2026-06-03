@@ -214,6 +214,36 @@ static PyMemberDef pycbc_streamed_result_members[] = {
   { nullptr } // Sentinel
 };
 
+static PyObject*
+pycbc_streamed_result__cancel__(pycbc_streamed_result* self, PyObject* args)
+{
+  if (self->rows) {
+    self->rows->cancel();
+  }
+  Py_RETURN_NONE;
+}
+
+static PyObject*
+pycbc_streamed_result__is_cancelled__(pycbc_streamed_result* self, PyObject* args)
+{
+  if (self->rows && self->rows->is_cancelled()) {
+    Py_RETURN_TRUE;
+  }
+  Py_RETURN_FALSE;
+}
+
+static PyMethodDef pycbc_streamed_result_methods[] = {
+  { "cancel",
+    (PyCFunction)pycbc_streamed_result__cancel__,
+    METH_NOARGS,
+    PyDoc_STR("Cancel the streaming operation so a blocked iterator can unwind") },
+  { "is_cancelled",
+    (PyCFunction)pycbc_streamed_result__is_cancelled__,
+    METH_NOARGS,
+    PyDoc_STR("Check if the streaming operation has been cancelled") },
+  { nullptr } // Sentinel
+};
+
 static PyTypeObject pycbc_streamed_result_type = {
   PyVarObject_HEAD_INIT(nullptr, 0) "pycbc_core.pycbc_streamed_result", // tp_name
   sizeof(pycbc_streamed_result),                                        // tp_basicsize
@@ -241,7 +271,7 @@ static PyTypeObject pycbc_streamed_result_type = {
   0,                                                                    // tp_weaklistoffset
   pycbc_streamed_result__iter__,                                        // tp_iter
   pycbc_streamed_result__iternext__,                                    // tp_iternext
-  nullptr,                                                              // tp_methods
+  pycbc_streamed_result_methods,                                        // tp_methods
   pycbc_streamed_result_members,                                        // tp_members
   nullptr,                                                              // tp_getset
   nullptr,                                                              // tp_base

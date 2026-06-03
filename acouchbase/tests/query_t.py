@@ -187,6 +187,7 @@ class QueryTestSuite:
         'test_mixed_positional_parameters',
         'test_non_blocking',
         'test_preserve_expiry',
+        'test_query_cancellation',
         'test_query_error_context',
         'test_query_metadata',
         'test_query_raw_options',
@@ -215,6 +216,33 @@ class QueryTestSuite:
     async def test_bad_query(self, cb_env):
         with pytest.raises(ParsingFailedException):
             await cb_env.cluster.query("I'm not N1QL!").execute()
+
+    @pytest.mark.asyncio
+    async def test_query_cancellation(self, cb_env):
+        # PYCBC-1774: cancelling an in-flight streaming query must propagate CancelledError
+        # unchanged (not swallow or convert it) and cancel the underlying C++ streamed result so
+        # the executor worker is released promptly instead of waiting for the whole server-side
+        # operation to finish.
+        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 100")
+
+        async def consume():
+            rows = []
+            async for row in result:
+                rows.append(row)
+            return rows
+
+        task = asyncio.ensure_future(consume())
+        # let the task start streaming (submit the query) and reach the first, blocking __anext__
+        while result._request._streaming_result is None and not task.done():
+            await asyncio.sleep(0)
+        # cancel while the worker is still waiting on the C++ core for the first row
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        # the cancellation must have reached through to the C++ streamed result
+        assert result._request._streaming_result is not None
+        assert result._request._streaming_result.is_cancelled() is True
 
     @pytest.mark.asyncio
     async def test_mixed_named_parameters(self, cb_env):
