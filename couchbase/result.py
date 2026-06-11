@@ -1086,7 +1086,7 @@ class ScanResult(Result):
         if self.ids_only:
             raise InvalidArgumentException(("No expiry_time available when scan is requested with "
                                             "`ScanOptions` ids_only set to True."))
-        time_ms = self._orig.raw_result.get('scan_item', {}).get('body', {}).get('cas', None)
+        time_ms = self._orig.raw_result.get('scan_item', {}).get('body', {}).get('expiry', None)
         if time_ms:
             return datetime.fromtimestamp(time_ms)
         return None

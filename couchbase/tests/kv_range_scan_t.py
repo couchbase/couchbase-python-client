@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -26,9 +26,13 @@ from couchbase.kv_range_scan import (PrefixScan,
                                      RangeScan,
                                      SamplingScan,
                                      ScanTerm)
+from couchbase.logic.collection_req_builder import CollectionRequestBuilder
+from couchbase.logic.collection_types import CollectionDetails
 from couchbase.mutation_state import MutationState
 from couchbase.options import ScanOptions
-from couchbase.result import ScanResult, ScanResultIterable
+from couchbase.result import (MutationToken,
+                              ScanResult,
+                              ScanResultIterable)
 from tests.environments import CollectionType
 from tests.test_features import EnvironmentFeatures
 
@@ -116,6 +120,11 @@ class RangeScanTestSuite:
                 assert content is not None
                 if not skip_content_validation:
                     assert content == {'id': r.id}
+                # Regression guard (PYCBC-1778): ScanResult.expiry_time previously read the 'cas' field instead
+                # of 'expiry', passing a huge HLC value to datetime.fromtimestamp() raising an exception.
+                # Accessing it on a content result must not raise. The value is either None (no expiry) or a datetime.
+                expiry_time = r.expiry_time
+                assert expiry_time is None or isinstance(expiry_time, datetime)
             rows.append(r)
 
         if from_sample is True:
@@ -364,3 +373,52 @@ class ClassicRangeScanTests(RangeScanTestSuite):
         yield cb_base_env
         self._purge_temp_docs(cb_base_env, test_ids)
         cb_base_env.teardown(request.param)
+
+
+class RangeScanRequestBuilderUnitTests:
+    """Cluster-free unit tests for the range-scan request builder.
+
+    Regression coverage for the consistent_with serialization bug (PYCBC-1778)
+    """
+
+    @staticmethod
+    def _builder():
+        details = CollectionDetails('default', '_default', '_default', None)
+        return CollectionRequestBuilder(details)
+
+    @staticmethod
+    def _mutation_state(count):
+        state = MutationState()
+        for i in range(count):
+            state.add_mutation_token(MutationToken({'partition_id': i,
+                                                    'partition_uuid': 1000 + i,
+                                                    'sequence_number': 1,
+                                                    'bucket_name': 'default'}))
+        return state
+
+    def test_consistent_with_serialized_as_mutation_state(self):
+        opts = {'consistent_with': self._mutation_state(3), 'concurrency': 1}
+        self._builder()._process_scan_orchestrator_ops(opts)
+
+        # Must be a mutation_state dict ({'tokens': [...]}), not a bare list, or the C++
+        # binding drops every token.
+        consistent_with = opts['consistent_with']
+        assert isinstance(consistent_with, dict)
+        assert list(consistent_with.keys()) == ['tokens']
+
+        tokens = consistent_with['tokens']
+        assert isinstance(tokens, list)
+        assert len(tokens) == 3
+        for token in tokens:
+            assert set(token.keys()) == {'partition_id', 'partition_uuid',
+                                         'sequence_number', 'bucket_name'}
+
+    def test_empty_consistent_with_raises(self):
+        opts = {'consistent_with': MutationState()}
+        with pytest.raises(InvalidArgumentException):
+            self._builder()._process_scan_orchestrator_ops(opts)
+
+    def test_zero_concurrency_raises(self):
+        opts = {'concurrency': 0}
+        with pytest.raises(InvalidArgumentException):
+            self._builder()._process_scan_orchestrator_ops(opts)

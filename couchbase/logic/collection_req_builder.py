@@ -621,7 +621,10 @@ class CollectionRequestBuilder:
             if not (isinstance(consistent_with, MutationState) and len(consistent_with._sv) > 0):
                 raise InvalidArgumentException('Passed empty or invalid mutation state')
             else:
-                orchestrator_opts['consistent_with'] = list(token.as_dict() for token in consistent_with._sv)
+                # The C++ binding expects a mutation_state dict ({'tokens': [...]}), not a bare list.
+                orchestrator_opts['consistent_with'] = {
+                    'tokens': list(token.as_dict() for token in consistent_with._sv)
+                }
 
     def _get_scan_config(self, scan_type: ScanType) -> Dict[str, Any]:  # noqa: C901
         scan_config = {}

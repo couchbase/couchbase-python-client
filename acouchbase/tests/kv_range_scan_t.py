@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -120,6 +120,11 @@ class RangeScanTestSuite:
                 content = r.content_as[dict]
                 assert content is not None
                 assert content == {'id': r.id}
+                # Regression guard (PYCBC-1778): ScanResult.expiry_time previously read the 'cas' field instead
+                # of 'expiry', passing a huge HLC value to datetime.fromtimestamp() raising an exception.
+                # Accessing it on a content result must not raise. The value is either None (no expiry) or a datetime.
+                expiry_time = r.expiry_time
+                assert expiry_time is None or isinstance(expiry_time, datetime)
             rows.append(r)
 
         if from_sample is True:
