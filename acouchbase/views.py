@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -130,4 +130,4 @@ class AsyncViewRequest(ViewRequestLogic):
         self._shutdown_executor()
 
     async def __anext__(self):
-        return await stream_anext(self, 'View')
+        return await stream_anext(self)

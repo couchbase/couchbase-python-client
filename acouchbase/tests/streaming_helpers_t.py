@@ -84,7 +84,6 @@ class StreamingAnextTestSuite:
         'test_stop_async_iteration_finalizes_and_reads_metadata',
         'test_couchbase_exception_propagates_unchanged',
         'test_generic_exception_converted_to_internal',
-        'test_queue_empty_converted_with_op_name',
         'test_keyboard_interrupt_propagates_unconverted',
         'test_cancellation_finalizes_and_propagates',
         'test_finalize_cancels_streaming_result_on_error',
@@ -95,7 +94,7 @@ class StreamingAnextTestSuite:
     async def test_returns_row_and_ends_span(self):
         req = _FakeAsyncStreamingRequest(asyncio.get_running_loop(), rows=['row-1'])
         try:
-            row = await stream_anext(req, 'N1QL')
+            row = await stream_anext(req)
             assert row == 'row-1'
             # span ended on the (first) row, no error, and the op is NOT finalized mid-stream
             assert req.process_core_span_calls == [None]
@@ -108,7 +107,7 @@ class StreamingAnextTestSuite:
     async def test_stop_async_iteration_finalizes_and_reads_metadata(self):
         req = _FakeAsyncStreamingRequest(asyncio.get_running_loop(), rows=[])
         with pytest.raises(StopAsyncIteration):
-            await stream_anext(req, 'N1QL')
+            await stream_anext(req)
         assert req._done_streaming is True
         assert req.finalize_calls == [None]
         assert req.get_metadata_calls == 1
@@ -119,7 +118,7 @@ class StreamingAnextTestSuite:
         err = CouchbaseException('boom')
         req = _FakeAsyncStreamingRequest(asyncio.get_running_loop(), raise_exc=err)
         with pytest.raises(CouchbaseException) as exc_info:
-            await stream_anext(req, 'N1QL')
+            await stream_anext(req)
         assert exc_info.value is err
         assert req.finalize_calls == [err]
         assert req.executor_shutdown is True
@@ -128,25 +127,16 @@ class StreamingAnextTestSuite:
     async def test_generic_exception_converted_to_internal(self):
         req = _FakeAsyncStreamingRequest(asyncio.get_running_loop(), raise_exc=ValueError('bad'))
         with pytest.raises(InternalSDKException):
-            await stream_anext(req, 'N1QL')
+            await stream_anext(req)
         assert len(req.finalize_calls) == 1
         assert isinstance(req.finalize_calls[0], InternalSDKException)
-        assert req.executor_shutdown is True
-
-    @pytest.mark.asyncio
-    async def test_queue_empty_converted_with_op_name(self):
-        req = _FakeAsyncStreamingRequest(asyncio.get_running_loop(), raise_exc=asyncio.QueueEmpty())
-        with pytest.raises(InternalSDKException) as exc_info:
-            await stream_anext(req, 'Analytics')
-        assert 'Analytics' in str(exc_info.value)
-        assert len(req.finalize_calls) == 1
         assert req.executor_shutdown is True
 
     @pytest.mark.asyncio
     async def test_keyboard_interrupt_propagates_unconverted(self):
         req = _FakeAsyncStreamingRequest(asyncio.get_running_loop(), raise_exc=KeyboardInterrupt())
         with pytest.raises(KeyboardInterrupt):
-            await stream_anext(req, 'N1QL')
+            await stream_anext(req)
         # BaseException must be finalized for cleanup but NOT converted to a CouchbaseException
         assert len(req.finalize_calls) == 1
         assert isinstance(req.finalize_calls[0], KeyboardInterrupt)
@@ -157,7 +147,7 @@ class StreamingAnextTestSuite:
         # The core scenario: a task cancelled while blocked fetching the next row.
         block = threading.Event()
         req = _FakeAsyncStreamingRequest(asyncio.get_running_loop(), rows=['late-row'], block_event=block)
-        task = asyncio.ensure_future(stream_anext(req, 'N1QL'))
+        task = asyncio.ensure_future(stream_anext(req))
         # let the task reach the run_in_executor await (worker is now blocked on the event)
         await asyncio.sleep(0.05)
         task.cancel()

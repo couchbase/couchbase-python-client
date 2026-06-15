@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -12,8 +12,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-import asyncio
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
@@ -44,12 +42,11 @@ def _internal_exception(message):
     return exc_cls(message)
 
 
-async def stream_anext(req, op_name):
+async def stream_anext(req):
     """
     **INTERNAL**
 
     Drive a single async streaming iteration for ``req`` and apply uniform teardown/error handling.
-    ``op_name`` is the human-readable operation name used in diagnostic messages (e.g. ``'N1QL'``).
     """
     try:
         # this is a blocking operation, so it is offloaded to the request's executor
@@ -60,10 +57,6 @@ async def stream_anext(req, op_name):
         # work for the first call).
         req._process_core_span()
         return row
-    except asyncio.QueueEmpty:
-        excptn = _internal_exception(f'Unexpected QueueEmpty exception caught when doing {op_name} query.')
-        req._finalize(exc_val=excptn)
-        raise excptn
     except StopAsyncIteration:
         req._done_streaming = True
         req._finalize()
