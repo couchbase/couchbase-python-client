@@ -173,15 +173,21 @@ class EventingManagementTestSuite:
     @pytest.mark.usefixtures('create_eventing_function')
     @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
     def test_deploy_function_fail(self, cb_env):
-        with pytest.raises(EventingFunctionNotFoundException):
-            cb_env.efm.deploy_function("not-a-function")
+        # InternalServerFailureException in 8.0.1 (MB-68692)
+        if (cb_env.server_version_short > 8.0
+                or (cb_env.server_version_short == 8.0 and cb_env.server_version_patch >= 1)):
+            with pytest.raises(InternalServerFailureException):
+                cb_env.efm.deploy_function("not-a-function")
+        else:
+            with pytest.raises(EventingFunctionNotFoundException):
+                cb_env.efm.deploy_function("not-a-function")
 
         # deploy function -- but first verify in undeployed state
         cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
         cb_env.efm.deploy_function(cb_env.BASIC_FUNC.name)
         cb_env.wait_until_status(20, 3, EventingFunctionState.Deployed, cb_env.BASIC_FUNC.name)
-        if cb_env.server_version_short >= 8.0:
-            # no longer a failure in 8.0+
+        # only a failure in 8.0.0, 8.0.1 reverts back to failure (MB-68692)
+        if cb_env.server_version_short == 8.0 and cb_env.server_version_patch < 1:
             cb_env.efm.deploy_function(cb_env.BASIC_FUNC.name)
             cb_env.wait_until_status(20, 3, EventingFunctionState.Deployed, cb_env.BASIC_FUNC.name)
         else:
@@ -357,8 +363,14 @@ class EventingManagementTestSuite:
     def test_pause_function_fail(self, cb_env):
         cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
 
-        with pytest.raises(EventingFunctionNotFoundException):
-            cb_env.efm.pause_function('not-a-function')
+        # InternalServerFailureException in 8.0.1 (MB-68692)
+        if (cb_env.server_version_short > 8.0
+                or (cb_env.server_version_short == 8.0 and cb_env.server_version_patch >= 1)):
+            with pytest.raises(InternalServerFailureException):
+                cb_env.efm.pause_function('not-a-function')
+        else:
+            with pytest.raises(EventingFunctionNotFoundException):
+                cb_env.efm.pause_function('not-a-function')
 
         if cb_env.server_version_short >= 8.0:
             with pytest.raises(InternalServerFailureException):
@@ -390,8 +402,14 @@ class EventingManagementTestSuite:
     def test_resume_function_fail(self, cb_env):
         cb_env.wait_until_status(10, 1, EventingFunctionState.Undeployed, cb_env.BASIC_FUNC.name)
 
-        with pytest.raises(EventingFunctionNotFoundException):
-            cb_env.efm.resume_function('not-a-function')
+        # InternalServerFailureException in 8.0.1 (MB-68692)
+        if (cb_env.server_version_short > 8.0
+                or (cb_env.server_version_short == 8.0 and cb_env.server_version_patch >= 1)):
+            with pytest.raises(InternalServerFailureException):
+                cb_env.efm.resume_function('not-a-function')
+        else:
+            with pytest.raises(EventingFunctionNotFoundException):
+                cb_env.efm.resume_function('not-a-function')
 
     @pytest.mark.usefixtures('create_and_drop_eventing_function')
     def test_undeploy_function(self, cb_env):
@@ -412,11 +430,17 @@ class EventingManagementTestSuite:
         assert func.settings.deployment_status == EventingFunctionDeploymentStatus.Undeployed
 
     def test_undeploy_function_fail(self, cb_env):
-        with pytest.raises(
-            (EventingFunctionNotDeployedException,
-             EventingFunctionNotFoundException)
-        ):
-            cb_env.efm.undeploy_function('not-a-function')
+        # InternalServerFailureException in 8.0.1 (MB-68692)
+        if (cb_env.server_version_short > 8.0
+                or (cb_env.server_version_short == 8.0 and cb_env.server_version_patch >= 1)):
+            with pytest.raises(InternalServerFailureException):
+                cb_env.efm.undeploy_function('not-a-function')
+        else:
+            with pytest.raises(
+                (EventingFunctionNotDeployedException,
+                 EventingFunctionNotFoundException)
+            ):
+                cb_env.efm.undeploy_function('not-a-function')
 
     @pytest.mark.usefixtures('drop_eventing_functions')
     def test_upsert_function(self, cb_env):
