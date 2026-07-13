@@ -242,9 +242,13 @@ class EventingFunctionState(Enum):
     Undeploying
         Indicates the function is undeploying.
     Paused
-        Indicates the function is pausedd.
+        Indicates the function is paused.
     Pausing
         Indicates the function is pausing.
+    Resuming
+        Indicates the function is resuming.
+    Unknown
+        Indicates the function is in an unknown state.
     """
 
     Undeployed = "undeployed"
@@ -253,6 +257,8 @@ class EventingFunctionState(Enum):
     Undeploying = "undeploying"
     Paused = "paused"
     Pausing = "pausing"
+    Resuming = "resuming"
+    Unknown = "unknown"
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionState:
@@ -268,8 +274,10 @@ class EventingFunctionState(Enum):
             return cls.Paused
         elif value == "pausing":
             return cls.Pausing
+        elif value == "resuming":
+            return cls.Resuming
         else:
-            raise InvalidArgumentException(f"Invalid value for state: {value}")
+            return cls.Unknown
 
 
 @dataclass

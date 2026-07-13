@@ -295,6 +295,11 @@ cpp_core_types:
     - core_struct: couchbase::core::operations::get_all_replicas_response::entry
       header_file: "core/operations/document_get_all_replicas.hxx"
       py_type: GetAllReplicasResponseEntry
+      # dispatched_to_node_id is a couchbase::node_id (value type, private getters).
+      # Not surfaced to Python yet; ignore it so codegen doesn't emit an
+      # add_field<couchbase::node_id> with no converter. To incorporate later, add a
+      # hand-written py_to_cbpp_t<couchbase::node_id>.
+      ignored_fields: [dispatched_to_node_id]
       skip_request: true
     - core_struct: couchbase::core::impl::subdoc::command
       header_file: "core/impl/subdoc/command.hxx"
@@ -305,6 +310,8 @@ cpp_core_types:
     - core_struct: couchbase::core::operations::lookup_in_all_replicas_response::entry
       header_file: "core/operations/document_lookup_in_all_replicas.hxx"
       py_type: LookupInAllReplicasResponseEntry
+      # see note on get_all_replicas_response::entry above (node_id ignored for now).
+      ignored_fields: [dispatched_to_node_id]
       skip_request: true
     - core_struct: couchbase::core::operations::lookup_in_any_replica_response::entry
       header_file: "core/operations/document_lookup_in_any_replica.hxx"
