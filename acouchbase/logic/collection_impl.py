@@ -234,7 +234,8 @@ class AsyncCollectionImpl:
     async def mutate_in(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutateInResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutateInResult(ret, key=req.key)
+        transcoder = self._collection_details.default_transcoder
+        return MutateInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
 
     async def prepend(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()

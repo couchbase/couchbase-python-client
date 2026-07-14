@@ -330,7 +330,8 @@ class CollectionImpl:
                   req: PycbcCoreKeyValueRequest,
                   obs_handler: ObservableRequestHandler) -> MutateInResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutateInResult(ret, key=req.key)
+        transcoder = self._collection_details.default_transcoder
+        return MutateInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
 
     def prepend(self,
                 req: PycbcCoreKeyValueRequest,
