@@ -598,8 +598,10 @@ class MutationResult(Result):
     def __init__(self,
                  orig,  # type: pycbc_result
                  key=None,        # type: Optional[str]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 is_subdoc=None,  # type: Optional[bool]
                  ):
-        super().__init__(orig, key=key)
+        super().__init__(orig, key=key, transcoder=transcoder, is_subdoc=is_subdoc)
         self._raw_mutation_token = self._orig.raw_result.get('token', None)
         self._mutation_token = None
 

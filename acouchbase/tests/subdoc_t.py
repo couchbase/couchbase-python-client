@@ -64,6 +64,8 @@ class SubDocumentTestSuite:
         'test_decrement_create_parents',
         'test_increment',
         'test_increment_create_parents',
+        'test_increment_result_content',
+        'test_decrement_result_content',
         'test_insert_create_parents',
         'test_lookup_in_all_replicas_bad_key',
         'test_lookup_in_all_replicas_exists',
@@ -355,6 +357,22 @@ class SubDocumentTestSuite:
         assert isinstance(result, MutateInResult)
         result = await cb_env.collection.get(key)
         assert result.content_as[dict]['new']['counter'] == 100
+
+    @pytest.mark.asyncio
+    async def test_increment_result_content(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('count', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.increment('count', 50),))
+        assert isinstance(result, MutateInResult)
+        assert result.content_as[int](0) == 150
+
+    @pytest.mark.asyncio
+    async def test_decrement_result_content(self, cb_env):
+        key = cb_env.get_existing_doc_by_type('count', key_only=True)
+        result = await cb_env.collection.mutate_in(
+            key, (SD.decrement('count', 50),))
+        assert isinstance(result, MutateInResult)
+        assert result.content_as[int](0) == 50
 
     @pytest.mark.asyncio
     async def test_insert_create_parents(self, cb_env):
