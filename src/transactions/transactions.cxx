@@ -36,9 +36,9 @@ void
 pycbc::txns::dealloc_transactions(PyObject* obj)
 {
   auto txns = reinterpret_cast<pycbc::txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
-  txns->txns->close();
-  txns->txns.reset();
-  CB_LOG_DEBUG("dealloc transactions");
+  Py_BEGIN_ALLOW_THREADS txns->txns->close();
+  delete txns;
+  Py_END_ALLOW_THREADS CB_LOG_DEBUG("dealloc transactions");
 }
 
 void
@@ -627,6 +627,14 @@ pycbc::txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args
 
   pycbc::txns::transactions* txns = new pycbc::txns::transactions(res.second);
   PyObject* pyObj_txns = PyCapsule_New(txns, "txns_", dealloc_transactions);
+  if (pyObj_txns == nullptr) {
+    // No capsule means dealloc_transactions() never runs, so release the wrapper (and the core
+    // cleanup threads it owns) here. GIL released b/c close() blocks joining those threads.
+    Py_BEGIN_ALLOW_THREADS txns->txns->close();
+    delete txns;
+    res.second.reset();
+    Py_END_ALLOW_THREADS return nullptr;
+  }
   return pyObj_txns;
 }
 
