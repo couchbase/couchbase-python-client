@@ -336,6 +336,11 @@ pycbc_scan_iterator__iternext__(PyObject* self)
   }
 
   if (!result.has_value()) {
+    // Intentional C-API protocol deviation: on error we return an exception
+    // object as a normal row instead of calling PyErr_SetString()/returning
+    // NULL. The Python wrapper checks each row with
+    // isinstance(resp, PycbcCoreException) and raises it itself, so
+    // build_exception()'s result must be returned, not raised, here.
     return build_exception(
       result.error(), __FILE__, __LINE__, "Error retrieving next scan result item.");
   }
