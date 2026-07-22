@@ -129,8 +129,6 @@ static PyModuleDef pycbc_core_module = {
 PyMODINIT_FUNC
 PyInit__core(void)
 {
-  Py_Initialize();
-
   PyObject* module = PyModule_Create(&pycbc_core_module);
   if (module == nullptr) {
     return nullptr;
