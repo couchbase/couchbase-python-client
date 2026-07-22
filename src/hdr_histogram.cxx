@@ -119,6 +119,10 @@ pycbc_hdr_histogram__init__(pycbc_hdr_histogram* self, PyObject* args, PyObject*
   int res;
   {
     const std::unique_lock lock(self->mutex);
+    // __init__ can be re-invoked on an already-initialized instance (e.g. via
+    // __init__() from Python); close the prior histogram first so re-init
+    // doesn't orphan its buffer.
+    cb_hdr_histogram_close(self);
     res = hdr_init(
       lowest_discernible_value, highest_trackable_value, significant_figures, &self->histogram);
   }
