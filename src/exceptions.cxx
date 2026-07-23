@@ -518,7 +518,8 @@ build_pycbc_exception_from_python_exc(const char* default_message, const char* f
     pycbc_exc->inner_exception = exc_value; // we take ownership of exc_value
     PyObject* exc_str = PyObject_Str(exc_value);
     if (exc_str != nullptr) {
-      pycbc_exc->message = PyUnicode_AsUTF8(exc_str);
+      std::string msg;
+      pycbc_exc->message = safe_utf8_string(exc_str, msg) ? msg : default_message;
       Py_DECREF(exc_str);
     } else {
       pycbc_exc->message = default_message;

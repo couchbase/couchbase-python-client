@@ -23,6 +23,7 @@
 #include <core/range_scan_orchestrator.hxx>
 #include <core/timeout_defaults.hxx>
 #include <core/utils/connection_string.hxx>
+#include <stdexcept>
 
 namespace pycbc
 {
@@ -155,7 +156,10 @@ Connection::connect(PyObject* kwargs)
   }
 
   try {
-    std::string conn_str = std::string(PyUnicode_AsUTF8(pyObj_connstr));
+    std::string conn_str;
+    if (!safe_utf8_string(pyObj_connstr, conn_str)) {
+      throw std::invalid_argument("connstr must be a valid UTF-8 string");
+    }
     auto connstr = couchbase::core::utils::parse_connection_string(conn_str);
     auto creds = py_to_cbpp<couchbase::core::cluster_credentials>(pyObj_auth);
 
@@ -259,7 +263,10 @@ Connection::open_bucket(PyObject* kwargs)
   }
 
   try {
-    std::string bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+    std::string bucket_name;
+    if (!safe_utf8_string(pyObj_bucket_name, bucket_name)) {
+      throw std::invalid_argument("bucket_name must be a valid UTF-8 string");
+    }
 
     Py_BEGIN_ALLOW_THREADS
     {
@@ -308,7 +315,10 @@ Connection::close_bucket(PyObject* kwargs)
   }
 
   try {
-    std::string bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+    std::string bucket_name;
+    if (!safe_utf8_string(pyObj_bucket_name, bucket_name)) {
+      throw std::invalid_argument("bucket_name must be a valid UTF-8 string");
+    }
 
     Py_BEGIN_ALLOW_THREADS
     {
@@ -496,9 +506,18 @@ Connection::handle_range_scan_op(PyObject* kwargs)
         "bucket, scope, and collection are required", __FILE__, __LINE__);
     }
 
-    std::string bucket_name = PyUnicode_AsUTF8(pyObj_bucket);
-    std::string scope_name = PyUnicode_AsUTF8(pyObj_scope);
-    std::string collection_name = PyUnicode_AsUTF8(pyObj_collection);
+    std::string bucket_name;
+    if (!safe_utf8_string(pyObj_bucket, bucket_name)) {
+      throw std::invalid_argument("bucket must be a valid UTF-8 string");
+    }
+    std::string scope_name;
+    if (!safe_utf8_string(pyObj_scope, scope_name)) {
+      throw std::invalid_argument("scope must be a valid UTF-8 string");
+    }
+    std::string collection_name;
+    if (!safe_utf8_string(pyObj_collection, collection_name)) {
+      throw std::invalid_argument("collection_name must be a valid UTF-8 string");
+    }
 
     PyObject* pyObj_scan_type = PyDict_GetItemString(kwargs, "scan_type");
     if (!pyObj_scan_type) {

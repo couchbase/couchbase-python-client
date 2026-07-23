@@ -58,7 +58,10 @@
       if (pyObj == nullptr || !PyUnicode_Check(pyObj)) {                                           \
         return enum_type::default_val;                                                             \
       }                                                                                            \
-      std::string str = PyUnicode_AsUTF8(pyObj);                                                   \
+      std::string str;                                                                             \
+      if (!safe_utf8_string(pyObj, str)) {                                                         \
+        return enum_type::default_val;                                                             \
+      }                                                                                            \
       mappings(PYCBC_FROM_PY_CASE, enum_type) return enum_type::default_val;                       \
     }                                                                                              \
     static inline PyObject* to_py(const enum_type& val)                                            \
