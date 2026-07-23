@@ -19,12 +19,30 @@
 
 #include "Python.h"
 #include <core/tracing/wrapper_sdk_tracer.hxx>
+#include <string>
 #include <type_traits>
 
 namespace pycbc
 {
 
 struct pycbc_kv_request;
+
+// PyUnicode_AsUTF8 returns NULL (with an exception set) if pyObj cannot be
+// encoded as UTF-8 -- e.g. a str containing lone surrogates. Constructing a
+// std::string directly from that NULL is UB. On success, copies the decoded
+// string into out and returns true; on failure, clears the pending Python
+// error, leaves out untouched, and returns false.
+static inline bool
+safe_utf8_string(PyObject* pyObj, std::string& out)
+{
+  const char* str = PyUnicode_AsUTF8(pyObj);
+  if (nullptr == str) {
+    PyErr_Clear();
+    return false;
+  }
+  out.assign(str);
+  return true;
+}
 
 template<typename T, typename Enabled = void>
 struct py_to_cbpp_t;
