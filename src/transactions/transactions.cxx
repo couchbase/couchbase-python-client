@@ -1130,6 +1130,11 @@ pycbc::txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* arg
     Py_RETURN_NONE;
   }
   auto opt = reinterpret_cast<pycbc::txns::transaction_query_options*>(pyObj_options);
+  if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
+    PyErr_SetString(PyExc_ValueError,
+                    "callback and errback must both be provided or both be omitted");
+    return nullptr;
+  }
   Py_XINCREF(pyObj_callback);
   Py_XINCREF(pyObj_errback);
   auto barrier = std::make_shared<std::promise<PyObject*>>();
@@ -1141,7 +1146,7 @@ pycbc::txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* arg
       std::exception_ptr err, std::optional<couchbase::core::operations::query_response> resp) {
       handle_returning_query_result(pyObj_callback, pyObj_errback, barrier, err, resp);
     });
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)
+  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
   {
     PyObject* ret = nullptr;
     Py_BEGIN_ALLOW_THREADS ret = fut.get();
@@ -1206,6 +1211,12 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
   if (nullptr == ctx) {
     PyErr_SetString(PyExc_ValueError, "passed null transaction_context");
     Py_RETURN_NONE;
+  }
+
+  if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
+    PyErr_SetString(PyExc_ValueError,
+                    "callback and errback must both be provided or both be omitted");
+    return nullptr;
   }
 
   Py_XINCREF(pyObj_callback);
@@ -1303,7 +1314,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
       // return error!
       PyErr_SetString(PyExc_ValueError, "unknown txn operation");
   }
-  if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
     Py_BEGIN_ALLOW_THREADS ret = fut.get();
     Py_END_ALLOW_THREADS return ret;
@@ -1407,6 +1418,11 @@ pycbc::txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
       __LINE__);
   }
 
+  if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
+    return raise_invalid_argument(
+      "callback and errback must both be provided or both be omitted", __FILE__, __LINE__);
+  }
+
   Py_XINCREF(pyObj_callback);
   Py_XINCREF(pyObj_errback);
 
@@ -1468,7 +1484,7 @@ pycbc::txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
     Py_RETURN_NONE;
   }
 
-  if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
     Py_BEGIN_ALLOW_THREADS ret = fut.get();
     Py_END_ALLOW_THREADS return ret;
@@ -1519,11 +1535,16 @@ pycbc::txns::create_new_attempt_context([[maybe_unused]] PyObject* self,
     return nullptr;
   }
 
+  if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
+    PyErr_SetString(PyExc_ValueError,
+                    "callback and errback must both be provided or both be omitted");
+    return nullptr;
+  }
   std::shared_ptr<std::promise<PyObject*>> barrier = nullptr;
   std::future<PyObject*> fut;
   Py_XINCREF(pyObj_callback);
   Py_XINCREF(pyObj_errback);
-  if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     barrier = std::make_shared<std::promise<PyObject*>>();
     fut = barrier->get_future();
   }
@@ -1531,7 +1552,7 @@ pycbc::txns::create_new_attempt_context([[maybe_unused]] PyObject* self,
     [barrier, pyObj_callback, pyObj_errback](std::exception_ptr err) {
       handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
     });
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)
+  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
   {
     PyObject* ret = nullptr;
     Py_BEGIN_ALLOW_THREADS ret = fut.get();
@@ -1613,11 +1634,16 @@ pycbc::txns::transaction_commit([[maybe_unused]] PyObject* self, PyObject* args,
     return nullptr;
   }
 
+  if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
+    PyErr_SetString(PyExc_ValueError,
+                    "callback and errback must both be provided or both be omitted");
+    return nullptr;
+  }
   std::shared_ptr<std::promise<PyObject*>> barrier = nullptr;
   std::future<PyObject*> fut;
   Py_XINCREF(pyObj_callback);
   Py_XINCREF(pyObj_errback);
-  if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     barrier = std::make_shared<std::promise<PyObject*>>();
     fut = barrier->get_future();
   }
@@ -1668,7 +1694,7 @@ pycbc::txns::transaction_commit([[maybe_unused]] PyObject* self, PyObject* args,
       }
       PyGILState_Release(state);
     });
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)
+  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
   {
     PyObject* ret = nullptr;
     Py_BEGIN_ALLOW_THREADS ret = fut.get();
@@ -1704,11 +1730,16 @@ pycbc::txns::transaction_rollback([[maybe_unused]] PyObject* self, PyObject* arg
     PyErr_SetString(PyExc_ValueError, "passed null transaction context");
     return nullptr;
   }
+  if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
+    PyErr_SetString(PyExc_ValueError,
+                    "callback and errback must both be provided or both be omitted");
+    return nullptr;
+  }
   std::shared_ptr<std::promise<PyObject*>> barrier = nullptr;
   std::future<PyObject*> fut;
   Py_XINCREF(pyObj_callback);
   Py_XINCREF(pyObj_errback);
-  if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     barrier = std::make_shared<std::promise<PyObject*>>();
     fut = barrier->get_future();
   }
@@ -1718,7 +1749,7 @@ pycbc::txns::transaction_rollback([[maybe_unused]] PyObject* self, PyObject* arg
       handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
     });
   }
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)
+  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
   {
     PyObject* ret = nullptr;
     Py_BEGIN_ALLOW_THREADS ret = fut.get();
