@@ -72,11 +72,21 @@ convert_spdlog_level(spdlog::level::level_enum lvl);
 class pycbc_logger_sink : public spdlog::sinks::sink
 {
 public:
-  pycbc_logger_sink(PyObject* pyObj_logger)
+  // The logger's handle() method and the LogRecord type are resolved by the caller so a
+  // failed lookup can be reported as an exception; both are non-NULL for the sink's lifetime.
+  // All three arguments are borrowed: the sink takes its own reference to each, so the caller
+  // remains responsible for the references it holds.
+  pycbc_logger_sink(PyObject* pyObj_logger,
+                    PyObject* pyObj_logger_handle_method,
+                    PyObject* pyObj_log_record_type)
     : pyObj_logger_(pyObj_logger)
+    , pyObj_logger_handle_method_(pyObj_logger_handle_method)
+    , pyObj_log_record_type_(pyObj_log_record_type)
     , active_(true)
   {
     Py_INCREF(pyObj_logger_);
+    Py_INCREF(pyObj_logger_handle_method_);
+    Py_INCREF(pyObj_log_record_type_);
   }
 
   // no copy or move constructor or assignment
@@ -98,6 +108,8 @@ public:
     // Only DECREF if still active (not deactivated via atexit)
     if (active_.load(std::memory_order_acquire)) {
       auto state = PyGILState_Ensure();
+      Py_DECREF(pyObj_log_record_type_);
+      Py_DECREF(pyObj_logger_handle_method_);
       Py_DECREF(pyObj_logger_);
       PyGILState_Release(state);
     }
@@ -123,34 +135,50 @@ protected:
     PyGILState_STATE state = PyGILState_Ensure();
     try {
 
-      // static initialize the type and method once.   These 'leak' a single
-      // object, but that is fine.  Same for an empty tuple we will on each call.
-      static PyObject* pyObj_log_record_type = init_log_record_type();
-      static PyObject* pyObj_logger_handle_method = init_logger_handle_method();
-
       // convert the log_msg_copy to a dict first...
       auto pyObj_log_record_details = convert_log_msg(msg);
+      if (nullptr == pyObj_log_record_details) {
+        PyErr_WriteUnraisable(pyObj_logger_);
+        PyGILState_Release(state);
+        return;
+      }
 
       // now, create an actual LogRecord from it...
-      auto pyObj_log_record = PyObject_CallObject(pyObj_log_record_type, pyObj_log_record_details);
+      auto pyObj_log_record = PyObject_CallObject(pyObj_log_record_type_, pyObj_log_record_details);
       Py_DECREF(pyObj_log_record_details);
       if (nullptr != pyObj_log_record) {
         // we need to fixup the created time, which cannot be passed in the constructor...
         // The created member is a float containing a float expressed as seconds since the epoch, in
         // UTC.
         PyObject* log_time = convert_time_to_float(msg.time);
-        PyObject_SetAttrString(pyObj_log_record, "created", log_time);
-        Py_DECREF(log_time);
+        if (nullptr == log_time) {
+          PyErr_WriteUnraisable(pyObj_log_record);
+        } else {
+          if (-1 == PyObject_SetAttrString(pyObj_log_record, "created", log_time)) {
+            PyErr_WriteUnraisable(pyObj_log_record);
+          }
+          Py_DECREF(log_time);
+        }
 
         // now, we want to hand this record to the logger...
         PyObject* pyObj_args = PyTuple_Pack(1, pyObj_log_record);
-        PyObject_CallObject(pyObj_logger_handle_method, pyObj_args);
+        if (nullptr == pyObj_args) {
+          PyErr_WriteUnraisable(pyObj_logger_handle_method_);
+        } else {
+          PyObject* pyObj_handle_result =
+            PyObject_CallObject(pyObj_logger_handle_method_, pyObj_args);
+          if (nullptr == pyObj_handle_result) {
+            PyErr_WriteUnraisable(pyObj_logger_handle_method_);
+          } else {
+            Py_DECREF(pyObj_handle_result);
+          }
+          Py_DECREF(pyObj_args);
+        }
 
         // that's it, now cleanup.
         Py_DECREF(pyObj_log_record);
-        Py_DECREF(pyObj_args);
       } else {
-        PyErr_Print();
+        PyErr_WriteUnraisable(pyObj_log_record_type_);
       }
       PyGILState_Release(state);
     } catch (...) {
@@ -183,26 +211,49 @@ protected:
     // args: Dict (extras - probably we will not use that for now)
     // exc_info: str (python exception tuple if there is one)
     PyObject* retval = PyTuple_New(8);
-    // name
-    PyObject* pyObj_value =
-      PyUnicode_FromStringAndSize(msg.logger_name.data(), msg.logger_name.size());
-    PyTuple_SetItem(retval, 0, pyObj_value);
-    // level
-    pyObj_value = PyLong_FromSize_t(convert_spdlog_level(msg.level));
-    PyTuple_SetItem(retval, 1, pyObj_value);
-    // pathname
-    if (nullptr != msg.source.filename) {
-      pyObj_value = PyUnicode_FromString(msg.source.filename);
-    } else {
-      pyObj_value = PyUnicode_FromString("transactions");
+    if (nullptr == retval) {
+      return nullptr;
     }
-    PyTuple_SetItem(retval, 2, pyObj_value);
+
+    // stores value into retval at idx, or drops retval and reports failure if value is NULL
+    // (e.g. on OOM) so the caller never ends up with a NULL slot in the tuple.
+    auto set_item_or_bail = [&](Py_ssize_t idx, PyObject* value) {
+      if (nullptr == value) {
+        Py_DECREF(retval);
+        retval = nullptr;
+        return false;
+      }
+      PyTuple_SetItem(retval, idx, value);
+      return true;
+    };
+
+    // name
+    if (!set_item_or_bail(
+          0, PyUnicode_FromStringAndSize(msg.logger_name.data(), msg.logger_name.size()))) {
+      return nullptr;
+    }
+    // level
+    if (!set_item_or_bail(1, PyLong_FromSize_t(convert_spdlog_level(msg.level)))) {
+      return nullptr;
+    }
+    // pathname
+    PyObject* pyObj_pathname = (nullptr != msg.source.filename)
+                                 ? PyUnicode_FromString(msg.source.filename)
+                                 : PyUnicode_FromString("transactions");
+    if (!set_item_or_bail(2, pyObj_pathname)) {
+      return nullptr;
+    }
     // lineno
-    pyObj_value = PyLong_FromSize_t(static_cast<size_t>(msg.source.line));
-    PyTuple_SetItem(retval, 3, pyObj_value);
+    if (!set_item_or_bail(3, PyLong_FromSize_t(static_cast<size_t>(msg.source.line)))) {
+      return nullptr;
+    }
     // msg
-    pyObj_value = PyUnicode_FromStringAndSize(msg.payload.data(), msg.payload.size());
-    PyTuple_SetItem(retval, 4, pyObj_value);
+    // The payload is the only field carrying arbitrary bytes, so decode with "replace" rather
+    // than strict UTF-8: a log line with a non-UTF-8 byte degrades instead of being dropped.
+    if (!set_item_or_bail(
+          4, PyUnicode_DecodeUTF8(msg.payload.data(), msg.payload.size(), "replace"))) {
+      return nullptr;
+    }
     // args
     Py_INCREF(Py_None);
     PyTuple_SetItem(retval, 5, Py_None);
@@ -210,34 +261,24 @@ protected:
     Py_INCREF(Py_None);
     PyTuple_SetItem(retval, 6, Py_None);
     // func
+    PyObject* pyObj_funcname;
     if (nullptr != msg.source.funcname) {
-      pyObj_value = PyUnicode_FromString(msg.source.funcname);
+      pyObj_funcname = PyUnicode_FromString(msg.source.funcname);
     } else {
-      pyObj_value = Py_None;
-      Py_INCREF(pyObj_value);
+      pyObj_funcname = Py_None;
+      Py_INCREF(pyObj_funcname);
     }
-    PyTuple_SetItem(retval, 7, pyObj_value);
+    if (!set_item_or_bail(7, pyObj_funcname)) {
+      return nullptr;
+    }
 
     return retval;
   }
 
-  PyObject* init_log_record_type()
-  {
-    static PyObject* logging = PyImport_ImportModule("logging");
-    assert(nullptr != logging);
-    return PyObject_GetAttrString(logging, "LogRecord");
-  }
-
-  PyObject* init_logger_handle_method()
-  {
-    // we want the 'handle' method on the pyObj_logger_, so...
-    PyObject* meth = PyObject_GetAttrString(pyObj_logger_, "handle");
-    assert(nullptr != meth);
-    return meth;
-  }
-
 private:
   PyObject* pyObj_logger_;
+  PyObject* pyObj_logger_handle_method_;
+  PyObject* pyObj_log_record_type_;
   std::atomic<bool> active_;
 };
 

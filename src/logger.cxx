@@ -29,6 +29,19 @@ pycbc_logger_dealloc(pycbc_logger* self)
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+// Resolves logging.LogRecord.  Returns a new reference, or nullptr with an exception set.
+static PyObject*
+get_log_record_type()
+{
+  PyObject* pyObj_logging = PyImport_ImportModule("logging");
+  if (nullptr == pyObj_logging) {
+    return nullptr;
+  }
+  PyObject* pyObj_log_record_type = PyObject_GetAttrString(pyObj_logging, "LogRecord");
+  Py_DECREF(pyObj_logging);
+  return pyObj_log_record_type;
+}
+
 PyObject*
 pycbc_logger__configure_logging_sink__(PyObject* self, PyObject* args, PyObject* kwargs)
 {
@@ -51,14 +64,35 @@ pycbc_logger__configure_logging_sink__(PyObject* self, PyObject* args, PyObject*
                                   __LINE__);
   }
 
+  // py_to_cbpp has no way to report a failed conversion, and PyLong_AsUnsignedLong leaves an
+  // OverflowError pending for a negative or out-of-range level.  Resolve it before any state
+  // is mutated so the error can be raised here.
+  auto level = pycbc::py_to_cbpp<couchbase::core::logger::level>(pyObj_level);
+  if (nullptr != PyErr_Occurred()) {
+    return nullptr;
+  }
+
   if (pyObj_logger != nullptr) {
-    logger->logger_sink_ = std::make_shared<pycbc_logger_sink>(pyObj_logger);
+    // Resolve both callables up front so a bad logger or a failed import is reported here
+    // rather than becoming a NULL callable on the first log message.
+    PyObject* pyObj_logger_handle_method = PyObject_GetAttrString(pyObj_logger, "handle");
+    if (nullptr == pyObj_logger_handle_method) {
+      return nullptr;
+    }
+    PyObject* pyObj_log_record_type = get_log_record_type();
+    if (nullptr == pyObj_log_record_type) {
+      Py_DECREF(pyObj_logger_handle_method);
+      return nullptr;
+    }
+    logger->logger_sink_ = std::make_shared<pycbc_logger_sink>(
+      pyObj_logger, pyObj_logger_handle_method, pyObj_log_record_type);
+    Py_DECREF(pyObj_log_record_type);
+    Py_DECREF(pyObj_logger_handle_method);
   }
 
   couchbase::core::logger::configuration logger_settings;
   logger_settings.console = false;
   logger_settings.sink = logger->logger_sink_;
-  auto level = pycbc::py_to_cbpp<couchbase::core::logger::level>(pyObj_level);
   logger_settings.log_level = level;
   couchbase::core::logger::create_file_logger(logger_settings);
   Py_RETURN_NONE;
