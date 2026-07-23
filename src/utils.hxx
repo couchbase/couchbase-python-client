@@ -228,30 +228,50 @@ extract_legacy_span_field(PyObject* dict,
   }
 }
 
-// Add a field to result dict (auto-converts C++ value to Python)
+// Add a field to result dict (auto-converts C++ value to Python).
+// Returns 0 on success, -1 on failure. Most callers (generated code) don't
+// check the return value, so on failure we report the pending exception via
+// PyErr_WriteUnraisable (matches the pattern used in logger.hxx) rather than
+// leaving it set on the thread or silently dropping it.
 template<typename T>
-inline void
+inline int
 add_field(PyObject* dict, const char* key, const T& value)
 {
   PyObject* pyObj = cbpp_to_py(value);
-  PyDict_SetItemString(dict, key, pyObj);
+  if (pyObj == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    return -1;
+  }
+  int rv = PyDict_SetItemString(dict, key, pyObj);
   Py_DECREF(pyObj);
+  return rv;
 }
 
 template<typename T>
-inline void
+inline int
 add_field(PyObject* dict, PyObject* interned_key, const T& value)
 {
   PyObject* pyObj = cbpp_to_py(value);
-  PyDict_SetItem(dict, interned_key, pyObj);
+  if (pyObj == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    return -1;
+  }
+  int rv = PyDict_SetItem(dict, interned_key, pyObj);
   Py_DECREF(pyObj);
+  return rv;
 }
 
-inline void
+// value is a new reference; always consumed (DECREF'd) on both success and failure.
+inline int
 add_field(PyObject* dict, const char* key, PyObject* value)
 {
-  PyDict_SetItemString(dict, key, value);
+  if (value == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    return -1;
+  }
+  int rv = PyDict_SetItemString(dict, key, value);
   Py_DECREF(value);
+  return rv;
 }
 
 inline void
@@ -260,21 +280,34 @@ add_bool_field(PyObject* dict, const char* key, bool value)
   PyDict_SetItemString(dict, key, value ? Py_True : Py_False);
 }
 
-inline void
+inline int
 add_string_field_if_not_empty(PyObject* dict, const char* key, const std::string& value)
 {
-  if (!value.empty()) {
-    PyObject* pyObj = PyUnicode_FromString(value.c_str());
-    PyDict_SetItemString(dict, key, pyObj);
-    Py_DECREF(pyObj);
+  if (value.empty()) {
+    return 0;
   }
+  PyObject* pyObj = PyUnicode_FromString(value.c_str());
+  if (pyObj == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    return -1;
+  }
+  int rv = PyDict_SetItemString(dict, key, pyObj);
+  Py_DECREF(pyObj);
+  return rv;
 }
 
 // Add duration field to dict (specialized - as milliseconds)
-inline void
+inline int
 add_duration_field(PyObject* dict, const char* key, const std::chrono::milliseconds& value)
 {
-  PyDict_SetItemString(dict, key, PyLong_FromUnsignedLongLong(value.count()));
+  PyObject* pyObj = PyLong_FromUnsignedLongLong(value.count());
+  if (pyObj == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    return -1;
+  }
+  int rv = PyDict_SetItemString(dict, key, pyObj);
+  Py_DECREF(pyObj);
+  return rv;
 }
 
 inline void

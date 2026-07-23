@@ -290,7 +290,7 @@ struct py_to_cbpp_t<std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>>
 
     PyObject* attributesObj = PyDict_New();
     if (attributesObj == nullptr) {
-      Py_DECREF(attributesObj);
+      Py_DECREF(spanObj);
       return nullptr;
     }
 
