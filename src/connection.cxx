@@ -57,6 +57,12 @@ Connection::~Connection()
   cluster_.close([barrier]() {
     barrier->set_value();
   });
+
+  // Release the GIL while we block waiting on cluster close / IO thread join.
+  // Callbacks running on the IO thread call PyGILState_Ensure(), so holding
+  // the GIL here would deadlock against them.
+  PyThreadState* pyThreadState = PyEval_SaveThread();
+
   if (f.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
     CB_LOG_WARNING("PYCBC: Cluster close timed out in destructor.");
   }
@@ -72,6 +78,8 @@ Connection::~Connection()
       t.join();
     }
   }
+
+  PyEval_RestoreThread(pyThreadState);
 }
 
 void
