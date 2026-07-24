@@ -348,7 +348,11 @@ raise_invalid_argument(const char* message, const char* file, int line)
 
   PyObject* args = PyTuple_New(0);
   PyObject* kwargs = PyDict_New();
-  PyDict_SetItemString(kwargs, "message", PyUnicode_FromString(message));
+  PyObject* pyObj_message = PyUnicode_FromString(message);
+  if (pyObj_message != nullptr) {
+    PyDict_SetItemString(kwargs, "message", pyObj_message);
+    Py_DECREF(pyObj_message);
+  }
 
   PyObject* exc_info = build_exc_info_dict(file, line, message);
   if (exc_info != nullptr) {
@@ -406,7 +410,11 @@ raise_feature_unavailable(const char* message, const char* file, int line)
 
   PyObject* args = PyTuple_New(0);
   PyObject* kwargs = PyDict_New();
-  PyDict_SetItemString(kwargs, "message", PyUnicode_FromString(message));
+  PyObject* pyObj_message = PyUnicode_FromString(message);
+  if (pyObj_message != nullptr) {
+    PyDict_SetItemString(kwargs, "message", pyObj_message);
+    Py_DECREF(pyObj_message);
+  }
 
   PyObject* exc_info = build_exc_info_dict(file, line, message);
   if (exc_info != nullptr) {
@@ -438,7 +446,11 @@ raise_unsuccessful_operation(const char* message, const char* file, int line)
 
   PyObject* args = PyTuple_New(0);
   PyObject* kwargs = PyDict_New();
-  PyDict_SetItemString(kwargs, "message", PyUnicode_FromString(message));
+  PyObject* pyObj_message = PyUnicode_FromString(message);
+  if (pyObj_message != nullptr) {
+    PyDict_SetItemString(kwargs, "message", pyObj_message);
+    Py_DECREF(pyObj_message);
+  }
 
   PyObject* exc_info = build_exc_info_dict(file, line, message);
   if (exc_info != nullptr) {

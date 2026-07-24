@@ -288,6 +288,9 @@ pycbc_streamed_result*
 create_pycbc_streamed_result(std::chrono::milliseconds timeout_ms)
 {
   PyObject* pyObj_res = PyObject_CallObject((PyObject*)&pycbc_streamed_result_type, nullptr);
+  if (pyObj_res == nullptr) {
+    return nullptr;
+  }
   pycbc_streamed_result* s_res = reinterpret_cast<pycbc_streamed_result*>(pyObj_res);
   s_res->timeout_ms = timeout_ms;
   return s_res;
@@ -428,6 +431,10 @@ create_pycbc_scan_iterator(couchbase::core::scan_result result)
 {
   PyObject* pyObj_iter = PyObject_CallObject((PyObject*)&pycbc_scan_iterator_type, nullptr);
   if (!pyObj_iter) {
+    // The scan was already dispatched to the server (orchestrator.scan()) before this
+    // wrapper could be allocated. Cancel the scan_result explicitly so it doesn't keep
+    // running with no handle able to reach it.
+    result.cancel();
     return nullptr;
   }
 

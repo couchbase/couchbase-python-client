@@ -609,6 +609,10 @@ Connection::handle_range_scan_op(PyObject* kwargs)
     }
 
     pycbc_scan_iterator* iter = create_pycbc_scan_iterator(std::move(scan_result.value()));
+    if (iter == nullptr) {
+      return raise_unsuccessful_operation(
+        "Cannot perform kv scan operation.  Unable to create scan iterator.", __FILE__, __LINE__);
+    }
     return reinterpret_cast<PyObject*>(iter);
   } catch (const std::exception& e) {
     PyErr_SetString(PyExc_RuntimeError, e.what());

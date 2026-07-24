@@ -30,6 +30,7 @@
 #include <future>
 #include <list>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -145,6 +146,11 @@ private:
   {
     pycbc_streamed_result* streamed_res =
       create_pycbc_streamed_result(couchbase::core::timeout_defaults::key_value_durable_timeout);
+    if (streamed_res == nullptr) {
+      PyObject* alloc_error =
+        get_exception_as_object("Failed to create streamed result", __FILE__, __LINE__);
+      return { true, alloc_error };
+    }
 
     bool conversion_failed = false;
     for (const auto& entry : resp.entries) {
@@ -543,6 +549,9 @@ Connection::execute_streaming_op(PyObject* kwargs)
     }
 
     pycbc_streamed_result* streamed_res = create_pycbc_streamed_result(streaming_timeout);
+    if (streamed_res == nullptr) {
+      throw std::runtime_error("Failed to create streamed result");
+    }
     // Keep the streamed_result alive until the callback is done by INCREFing it here and DECREFing
     // in the callback
     Py_INCREF(streamed_res);
