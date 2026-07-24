@@ -536,21 +536,68 @@ pycbc::txns::add_transaction_objects(PyObject* pyObj_module)
     return nullptr;
   }
   PyObject* pyObj_enum_class = PyObject_GetAttrString(pyObj_enum_module, "Enum");
+  if (pyObj_enum_class == nullptr) {
+    Py_DECREF(pyObj_enum_module);
+    return nullptr;
+  }
   PyObject* pyObj_enum_values = PyUnicode_FromString(pycbc::txns::TxOperations::ALL_OPERATIONS());
+  if (pyObj_enum_values == nullptr) {
+    Py_DECREF(pyObj_enum_class);
+    Py_DECREF(pyObj_enum_module);
+    return nullptr;
+  }
   PyObject* pyObj_enum_name = PyUnicode_FromString("TransactionOperations");
+  if (pyObj_enum_name == nullptr) {
+    Py_DECREF(pyObj_enum_values);
+    Py_DECREF(pyObj_enum_class);
+    Py_DECREF(pyObj_enum_module);
+    return nullptr;
+  }
   PyObject* pyObj_args = PyTuple_Pack(2, pyObj_enum_name, pyObj_enum_values);
   Py_DECREF(pyObj_enum_name);
   Py_DECREF(pyObj_enum_values);
+  if (pyObj_args == nullptr) {
+    Py_DECREF(pyObj_enum_class);
+    Py_DECREF(pyObj_enum_module);
+    return nullptr;
+  }
 
   PyObject* pyObj_kwargs = PyDict_New();
-  PyObject_SetItem(
-    pyObj_kwargs, PyUnicode_FromString("module"), PyModule_GetNameObject(pyObj_module));
+  if (pyObj_kwargs == nullptr) {
+    Py_DECREF(pyObj_args);
+    Py_DECREF(pyObj_enum_class);
+    Py_DECREF(pyObj_enum_module);
+    return nullptr;
+  }
+  // Both of these are new references; PyObject_SetItem only borrows them, so they
+  // must be decref'd here regardless of whether the set succeeded.
+  PyObject* pyObj_module_key = PyUnicode_FromString("module");
+  PyObject* pyObj_module_name = PyModule_GetNameObject(pyObj_module);
+  int set_res = -1;
+  if (pyObj_module_key != nullptr && pyObj_module_name != nullptr) {
+    set_res = PyObject_SetItem(pyObj_kwargs, pyObj_module_key, pyObj_module_name);
+  }
+  Py_XDECREF(pyObj_module_key);
+  Py_XDECREF(pyObj_module_name);
+  if (set_res < 0) {
+    // Bail instead of falling into PyObject_Call() with an exception already set: the call would
+    // fail with a confusing SystemError ("returned a result with an exception set") rather than
+    // surfacing the original failure.
+    Py_DECREF(pyObj_kwargs);
+    Py_DECREF(pyObj_args);
+    Py_DECREF(pyObj_enum_class);
+    Py_DECREF(pyObj_enum_module);
+    return nullptr;
+  }
+
   PyObject* transaction_operations = PyObject_Call(pyObj_enum_class, pyObj_args, pyObj_kwargs);
   Py_DECREF(pyObj_args);
   Py_DECREF(pyObj_kwargs);
 
   if (PyModule_AddObject(pyObj_module, "transaction_operations", transaction_operations)) {
     Py_XDECREF(transaction_operations);
+    Py_DECREF(pyObj_enum_class);
+    Py_DECREF(pyObj_enum_module);
     return nullptr;
   }
   Py_DECREF(pyObj_enum_class);
@@ -725,6 +772,21 @@ txn_external_exception_to_string(cbcoretxns::external_exception ext_exception)
   return "unknown";
 }
 
+// Returns a new reference to a MemoryError instance (matching the exception-instance
+// convention the rest of create_python_exception uses), falling back to the class itself
+// if even that tiny allocation fails.
+static PyObject*
+memory_error_fallback()
+{
+  PyObject* exc = PyObject_CallObject(PyExc_MemoryError, nullptr);
+  if (exc != nullptr) {
+    return exc;
+  }
+  PyErr_Clear();
+  Py_INCREF(PyExc_MemoryError);
+  return PyExc_MemoryError;
+}
+
 PyObject*
 create_python_exception(pycbc::txns::TxnExceptionType exc_type,
                         const char* message,
@@ -751,6 +813,15 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
   PyObject* pyObj_final_error = nullptr;
   PyObject* pyObj_exc_type = nullptr;
   PyObject* pyObj_error_ctx = PyDict_New();
+  if (pyObj_error_ctx == nullptr) {
+    // Every current caller uses set_exception=false and embeds the return value directly
+    // into a promise/tuple with no NULL-tolerance. Never return NULL if set_exception=false,
+    // fall back to a MemoryError.
+    if (set_exception) {
+      return nullptr; // MemoryError already set by the failed PyDict_New() above
+    }
+    return memory_error_fallback();
+  }
 
   switch (exc_type) {
     case pycbc::txns::TxnExceptionType::TRANSACTION_FAILED: {
@@ -794,21 +865,44 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
       pyObj_exc_type = pyObj_couchbase_error;
   }
   PyObject* pyObj_tmp = PyUnicode_FromString(message);
+  if (pyObj_tmp == nullptr) {
+    Py_DECREF(pyObj_error_ctx);
+    if (set_exception) {
+      return nullptr; // MemoryError already set by the failed PyUnicode_FromString() above
+    }
+    return memory_error_fallback();
+  }
   PyDict_SetItemString(pyObj_error_ctx, "message", pyObj_tmp);
   Py_DECREF(pyObj_tmp);
   if (pyObj_inner_exc != nullptr) {
-    pyObj_tmp = PyDict_GetItemString(pyObj_inner_exc, "inner_cause");
-    if (pyObj_tmp != nullptr) {
+    // no DECREF here for pyObj_inner_exc & pyObj_cause b/c they are borrowed references
+    PyObject* pyObj_cause = PyDict_GetItemString(pyObj_inner_exc, "inner_cause");
+    if (pyObj_cause != nullptr) {
       PyDict_SetItemString(pyObj_error_ctx, "exc_info", pyObj_inner_exc);
-      Py_DECREF(pyObj_inner_exc);
     }
-    Py_DECREF(pyObj_tmp);
   }
   PyObject* pyObj_args = PyTuple_New(0);
+  if (pyObj_args == nullptr) {
+    Py_DECREF(pyObj_error_ctx);
+    if (set_exception) {
+      return nullptr; // MemoryError already set by the failed PyTuple_New() above
+    }
+    return memory_error_fallback();
+  }
   pyObj_final_error = PyObject_Call(pyObj_exc_type, pyObj_args, pyObj_error_ctx);
   Py_DECREF(pyObj_args);
+  Py_DECREF(pyObj_error_ctx);
+  if (pyObj_final_error == nullptr) {
+    if (set_exception) {
+      // Leave the original failure from PyObject_Call() in place rather than replacing it with an
+      // arg-less instance of pyObj_exc_type.
+      return nullptr;
+    }
+    return memory_error_fallback();
+  }
   if (set_exception) {
     PyErr_SetObject(pyObj_exc_type, pyObj_final_error);
+    Py_DECREF(pyObj_final_error); // PyErr_SetObject holds its own reference; release ours
     return nullptr;
   }
   return pyObj_final_error;
