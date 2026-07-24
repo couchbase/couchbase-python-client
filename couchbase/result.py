@@ -1165,6 +1165,11 @@ class QueryResult:
         .. note::
             If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
 
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
         Returns:
             Iterable: Either an iterable or async iterable.
         """
@@ -1218,6 +1223,11 @@ class AnalyticsResult:
         .. note::
             If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
 
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
         Returns:
             Iterable: Either an iterable or async iterable.
         """
@@ -1256,6 +1266,11 @@ class SearchResult:
 
         .. note::
             If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
 
         Returns:
             Iterable: Either an iterable or async iterable.
@@ -1301,6 +1316,11 @@ class ViewResult:
 
         .. note::
             If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
 
         Returns:
             Iterable: Either an iterable or async iterable.

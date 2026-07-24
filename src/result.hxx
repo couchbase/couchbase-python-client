@@ -116,6 +116,18 @@ public:
         CB_LOG_DEBUG(
           "PYCBC: No results received from C++ core after {}ms. Continue to wait for results.",
           timeout_ms.count());
+
+        // get() runs with the GIL released, and we never return to Python while waiting, so
+        // SIGINT can't be delivered. Briefly reacquire the GIL to check for a pending signal;
+        // a caught signal returns nullptr with KeyboardInterrupt set for the iterator to raise.
+        lock.unlock();
+        PyGILState_STATE gil_state = PyGILState_Ensure();
+        int signal = PyErr_CheckSignals();
+        PyGILState_Release(gil_state);
+        lock.lock();
+        if (signal < 0) {
+          return nullptr; // KeyboardInterrupt (or other signal exception) now set
+        }
       }
     }
 
