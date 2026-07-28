@@ -305,35 +305,44 @@ add_exception_objects(PyObject* pyObj_module)
   return pyObj_module;
 }
 
-void
+// Stores a new reference to exceptions_module.klass in cache, releasing whatever was cached
+// before so a repeated call cannot leak the previous class object.
+static int
+cache_exception_class(PyObject* exceptions_module, const char* klass, PyObject** cache)
+{
+  PyObject* pyObj_exc_class = PyObject_GetAttrString(exceptions_module, klass);
+  if (pyObj_exc_class == nullptr) {
+    return -1;
+  }
+  PyObject* pyObj_old_exc_class = *cache;
+  *cache = pyObj_exc_class;
+  // might be nice to use Py_XSETREF, but if we want the limited API it is not available
+  Py_XDECREF(pyObj_old_exc_class);
+  return 0;
+}
+
+int
 cache_exception_classes()
 {
   // Import couchbase.exceptions module
   PyObject* exceptions_module = PyImport_ImportModule("couchbase.exceptions");
   if (exceptions_module == nullptr) {
-    PyErr_Clear();
-    return;
+    return -1;
   }
 
-  cached_invalid_argument_exc =
-    PyObject_GetAttrString(exceptions_module, "InvalidArgumentException");
-  if (cached_invalid_argument_exc == nullptr) {
-    PyErr_Clear();
-  }
-
-  cached_feature_unavailable_exc =
-    PyObject_GetAttrString(exceptions_module, "FeatureUnavailableException");
-  if (cached_feature_unavailable_exc == nullptr) {
-    PyErr_Clear();
-  }
-
-  cached_unsuccessful_operation_exc =
-    PyObject_GetAttrString(exceptions_module, "UnsuccessfulOperationException");
-  if (cached_unsuccessful_operation_exc == nullptr) {
-    PyErr_Clear();
+  int rv = 0;
+  if (cache_exception_class(
+        exceptions_module, "InvalidArgumentException", &cached_invalid_argument_exc) < 0 ||
+      cache_exception_class(
+        exceptions_module, "FeatureUnavailableException", &cached_feature_unavailable_exc) < 0 ||
+      cache_exception_class(exceptions_module,
+                            "UnsuccessfulOperationException",
+                            &cached_unsuccessful_operation_exc) < 0) {
+    rv = -1;
   }
 
   Py_DECREF(exceptions_module);
+  return rv;
 }
 
 PyObject*

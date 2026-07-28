@@ -20,6 +20,7 @@
 #include "Python.h"
 #include <couchbase/tracing/request_tracer.hxx>
 #include <iostream>
+#include <stdexcept>
 
 namespace cbtracing = couchbase::tracing;
 
@@ -31,8 +32,8 @@ class deprecated_request_span : public cbtracing::request_span
 public:
   explicit deprecated_request_span(PyObject* span,
                                    std::shared_ptr<cbtracing::request_span> parent = nullptr)
-    : cbtracing::request_span("",
-                              parent) // name doesn't matter - it is in the underlying python span
+    // the name doesn't matter, it is in the underlying python span
+    : cbtracing::request_span("", parent)
     , pyObj_span_(span)
   {
     // called by deprecated_request_tracer.start_span & KV/streaming ops (when building a C++ core
@@ -43,11 +44,10 @@ public:
 
   ~deprecated_request_span() override
   {
-    // PYCBC-1748 - This can be a race condition when the Python interpreter finalizes before we can
-    // decref.
-    //              The work-around (which has been in tests all along) is to call cluster.close().
-    //              The FIX is to not use the legacy (deprecated) tracing which will no longer be an
-    //              issue w/ PYCBC-1746.
+    // PYCBC-1748 - This can be a race condition when the Python interpreter finalizes before we
+    // can decref. The work-around (which has been in tests all along) is to call cluster.close().
+    // The FIX is to not use the legacy (deprecated) tracing, which will no longer be an issue w/
+    // PYCBC-1746.
     PyGILState_STATE state = PyGILState_Ensure();
     Py_DECREF(pyObj_set_attribute_);
     Py_DECREF(pyObj_span_);
@@ -101,16 +101,20 @@ public:
     // Assumption here is we have the GIL when we wrap the python tracer here
     Py_INCREF(tracer);
     pyObj_start_span_ = PyObject_GetAttrString(tracer, "start_span");
-    assert(pyObj_start_span_);
+    if (pyObj_start_span_ == nullptr) {
+      // Leave the pending error set so connect()'s catch reports it, not this message. The
+      // destructor does not run when a ctor throws, so undo the INCREF here.
+      Py_DECREF(tracer);
+      throw std::invalid_argument("Legacy tracer must provide a start_span() method.");
+    }
   }
 
   ~deprecated_request_tracer()
   {
-    // PYCBC-1748 - This can be a race condition when the Python interpreter finalizes before we can
-    // decref.
-    //              The work-around (which has been in tests all along) is to call cluster.close().
-    //              The FIX is to not use the legacy (deprecated) tracing which will no longer be an
-    //              issue w/ PYCBC-1746.
+    // PYCBC-1748 - This can be a race condition when the Python interpreter finalizes before we
+    // can decref. The work-around (which has been in tests all along) is to call cluster.close().
+    // The FIX is to not use the legacy (deprecated) tracing, which will no longer be an issue w/
+    // PYCBC-1746.
     PyGILState_STATE state = PyGILState_Ensure();
     Py_DECREF(pyObj_start_span_);
     Py_DECREF(pyObj_tracer_);
@@ -121,9 +125,9 @@ public:
     std::string name,
     std::shared_ptr<cbtracing::request_span> parent = {}) override
   {
-    // defer to the pyObj_tracer_, and wrap the result in a pycbc span.  Note: Taking the GIL here,
-    // and elsewhere (like in the request_span) isn't perhaps the most efficient strategy.  We could
-    // cache spans and periodically (or just when asked) grab the GIL and create them.   However,
+    // defer to the pyObj_tracer_, and wrap the result in a pycbc span. Note: taking the GIL here,
+    // and elsewhere (like in the request_span) isn't perhaps the most efficient strategy. We could
+    // cache spans and periodically (or just when asked) grab the GIL and create them. However,
     // lets do this first, then think about optimizations
     PyGILState_STATE state = PyGILState_Ensure();
     PyObject* pyObj_name = PyUnicode_FromString(name.c_str());

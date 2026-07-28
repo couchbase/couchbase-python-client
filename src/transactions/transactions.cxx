@@ -714,8 +714,18 @@ PyObject*
 init_transaction_exception_type(const char* klass)
 {
   static PyObject* couchbase_exceptions = PyImport_ImportModule("couchbase.exceptions");
-  assert(nullptr != couchbase_exceptions);
-  return PyObject_GetAttrString(couchbase_exceptions, klass);
+  if (nullptr == couchbase_exceptions) {
+    // The import is cached in a static, so only the first call sees the error set.
+    PyErr_Clear();
+    return nullptr;
+  }
+  PyObject* pyObj_exc_class = PyObject_GetAttrString(couchbase_exceptions, klass);
+  if (nullptr == pyObj_exc_class) {
+    // Callers cache this in a static initializer and cannot propagate the failure; leaving
+    // an exception pending would corrupt the next C-API call, so hand back NULL instead.
+    PyErr_Clear();
+  }
+  return pyObj_exc_class;
 }
 
 std::string
@@ -785,6 +795,20 @@ memory_error_fallback()
   PyErr_Clear();
   Py_INCREF(PyExc_MemoryError);
   return PyExc_MemoryError;
+}
+
+// Returns a new reference to a RuntimeError instance carrying message, for the paths where the
+// couchbase.exceptions classes could not be resolved and we still must not return NULL.
+static PyObject*
+runtime_error_fallback(const char* message)
+{
+  PyObject* exc = PyObject_CallFunction(PyExc_RuntimeError, "s", message);
+  if (exc != nullptr) {
+    return exc;
+  }
+  PyErr_Clear();
+  Py_INCREF(PyExc_RuntimeError);
+  return PyExc_RuntimeError;
 }
 
 PyObject*
@@ -864,6 +888,21 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
     default:
       pyObj_exc_type = pyObj_couchbase_error;
   }
+  if (pyObj_exc_type == nullptr) {
+    // The specific class could not be resolved, fall back to the base class.
+    pyObj_exc_type = pyObj_couchbase_error;
+  }
+  if (pyObj_exc_type == nullptr) {
+    // None of the couchbase.exceptions classes resolved; PyObject_Call would deref a NULL
+    // callable, so raise/return a RuntimeError carrying the original message instead.
+    Py_DECREF(pyObj_error_ctx);
+    if (set_exception) {
+      PyErr_SetString(PyExc_RuntimeError, message);
+      return nullptr;
+    }
+    return runtime_error_fallback(message);
+  }
+
   PyObject* pyObj_tmp = PyUnicode_FromString(message);
   if (pyObj_tmp == nullptr) {
     Py_DECREF(pyObj_error_ctx);
@@ -872,13 +911,22 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
     }
     return memory_error_fallback();
   }
-  PyDict_SetItemString(pyObj_error_ctx, "message", pyObj_tmp);
+  int rv = PyDict_SetItemString(pyObj_error_ctx, "message", pyObj_tmp);
   Py_DECREF(pyObj_tmp);
+  if (rv < 0) {
+    Py_DECREF(pyObj_error_ctx);
+    if (set_exception) {
+      return nullptr; // exception already set by the failed PyDict_SetItemString() above
+    }
+    return memory_error_fallback();
+  }
   if (pyObj_inner_exc != nullptr) {
     // no DECREF here for pyObj_inner_exc & pyObj_cause b/c they are borrowed references
     PyObject* pyObj_cause = PyDict_GetItemString(pyObj_inner_exc, "inner_cause");
-    if (pyObj_cause != nullptr) {
-      PyDict_SetItemString(pyObj_error_ctx, "exc_info", pyObj_inner_exc);
+    if (pyObj_cause != nullptr &&
+        PyDict_SetItemString(pyObj_error_ctx, "exc_info", pyObj_inner_exc) < 0) {
+      // Non-fatal, the exception context is just missing the inner exception info.
+      PyErr_Clear();
     }
   }
   PyObject* pyObj_args = PyTuple_New(0);
@@ -916,8 +964,10 @@ convert_to_python_exc_type(std::exception_ptr err,
   auto exc_type = pycbc::txns::TxnExceptionType::COUCHBASE_ERROR;
   const char* message = nullptr;
 
-  // Must be an error
-  assert(!!err);
+  // Must be an error; rethrowing a null exception_ptr is undefined behavior.
+  if (!err) {
+    return create_python_exception(exc_type, "Unknown error", set_exception, pyObj_inner_exc);
+  }
 
   try {
     std::rethrow_exception(err);

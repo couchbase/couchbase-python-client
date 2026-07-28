@@ -175,7 +175,10 @@ PyInit__core(void)
   }
 
   // Cache exception classes for efficient access
-  pycbc::cache_exception_classes();
+  if (pycbc::cache_exception_classes() < 0) {
+    Py_DECREF(module);
+    return nullptr;
+  }
 
   init_pycbc_dict_keys();
 
