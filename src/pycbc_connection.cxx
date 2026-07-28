@@ -2316,7 +2316,7 @@ pycbc_connection__init__(pycbc_connection* self, PyObject* args, PyObject* kwarg
     self->conn = std::make_unique<Connection>(num_io_threads);
     return 0;
   } catch (const std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     return -1;
   }
 }

@@ -646,7 +646,7 @@ Connection::execute_streaming_op(PyObject* kwargs)
   } catch (const std::exception& e) {
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     return nullptr;
   }
 }
@@ -703,7 +703,7 @@ Connection::execute_mgmt_op(PyObject* kwargs)
     if (barrier) {
       barrier->set_value(nullptr);
     }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
     return nullptr;

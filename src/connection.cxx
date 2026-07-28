@@ -188,7 +188,7 @@ Connection::connect(PyObject* kwargs)
     if (barrier) {
       barrier->set_value(nullptr);
     }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
     return nullptr;
@@ -237,7 +237,7 @@ Connection::close(PyObject* kwargs)
     if (barrier) {
       barrier->set_value(nullptr);
     }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
     return nullptr;
@@ -289,7 +289,7 @@ Connection::open_bucket(PyObject* kwargs)
     if (barrier) {
       barrier->set_value(nullptr);
     }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
     return nullptr;
@@ -341,7 +341,7 @@ Connection::close_bucket(PyObject* kwargs)
     if (barrier) {
       barrier->set_value(nullptr);
     }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
     return nullptr;
@@ -380,7 +380,7 @@ Connection::get_connection_info()
     return cluster_options_to_py(opts, creds);
 
   } catch (const std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     return nullptr;
   }
 }
@@ -428,7 +428,7 @@ Connection::diagnostics(PyObject* kwargs)
     if (barrier) {
       barrier->set_value(nullptr);
     }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
     return nullptr;
@@ -486,7 +486,7 @@ Connection::ping(PyObject* kwargs)
     if (barrier) {
       barrier->set_value(nullptr);
     }
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
     return nullptr;
@@ -615,7 +615,7 @@ Connection::handle_range_scan_op(PyObject* kwargs)
     }
     return reinterpret_cast<PyObject*>(iter);
   } catch (const std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
+    set_runtime_error_if_unset(e.what());
     return nullptr;
   }
 }

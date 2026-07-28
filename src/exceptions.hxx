@@ -55,9 +55,26 @@ add_exception_objects(PyObject* pyObj_module);
 /**
  * Cache frequently-used Python exception classes from couchbase.exceptions module
  * for efficient access. Should be called during module initialization.
+ *
+ * @return 0 on success, -1 with a Python exception set on failure.
  */
-void
+int
 cache_exception_classes();
+
+/**
+ * Set a RuntimeError carrying message, but only if no Python exception is already pending.
+ * Intended for `catch` blocks: whatever threw may have already set a more specific exception
+ * that should not be replaced.
+ *
+ * @param message Error message (typically the caught exception's what())
+ */
+inline void
+set_runtime_error_if_unset(const char* message)
+{
+  if (!PyErr_Occurred()) {
+    PyErr_SetString(PyExc_RuntimeError, message);
+  }
+}
 
 /**
  * Get the PyTypeObject for the exception base type.
