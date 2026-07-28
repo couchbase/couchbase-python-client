@@ -38,8 +38,16 @@ public:
   {
     // called by deprecated_request_tracer.start_span & KV/streaming ops (when building a C++ core
     // request), so we are confident we have the GIL
-    Py_INCREF(span);
+    Py_XINCREF(pyObj_span_);
+    if (pyObj_span_ == nullptr) {
+      // the python tracer's start_span() failed, so this span degrades to a no-op
+      return;
+    }
     pyObj_set_attribute_ = PyObject_GetAttrString(pyObj_span_, "set_attribute");
+    if (pyObj_set_attribute_ == nullptr) {
+      // spans are built where we have no way to report a failure, so no-op add_tag() instead
+      PyErr_WriteUnraisable(pyObj_span_);
+    }
   }
 
   ~deprecated_request_span() override
@@ -49,35 +57,41 @@ public:
     // The FIX is to not use the legacy (deprecated) tracing, which will no longer be an issue w/
     // PYCBC-1746.
     PyGILState_STATE state = PyGILState_Ensure();
-    Py_DECREF(pyObj_set_attribute_);
-    Py_DECREF(pyObj_span_);
+    Py_XDECREF(pyObj_set_attribute_);
+    Py_XDECREF(pyObj_span_);
     PyGILState_Release(state);
   }
 
   void add_tag(const std::string& name, std::uint64_t value) override
   {
     PyGILState_STATE state = PyGILState_Ensure();
-    auto pyObj_args = Py_BuildValue("(sn)", name.c_str(), static_cast<Py_ssize_t>(value));
-    PyObject_Call(pyObj_set_attribute_, pyObj_args, nullptr);
-    Py_DECREF(pyObj_args);
+    call_set_attribute(Py_BuildValue("(sn)", name.c_str(), static_cast<Py_ssize_t>(value)));
     PyGILState_Release(state);
   }
 
   void add_tag(const std::string& name, const std::string& value) override
   {
     PyGILState_STATE state = PyGILState_Ensure();
-    auto pyObj_args = Py_BuildValue("(ss)", name.c_str(), value.c_str());
-    PyObject_Call(pyObj_set_attribute_, pyObj_args, nullptr);
-    Py_DECREF(pyObj_args);
+    call_set_attribute(Py_BuildValue("(ss)", name.c_str(), value.c_str()));
     PyGILState_Release(state);
   }
 
   void end() override
   {
     PyGILState_STATE state = PyGILState_Ensure();
-    auto pyObj_end = PyObject_GetAttrString(pyObj_span_, "finish");
-    PyObject_CallObject(pyObj_end, nullptr);
-    Py_DECREF(pyObj_end);
+    if (pyObj_span_ != nullptr) {
+      PyObject* pyObj_finish = PyObject_GetAttrString(pyObj_span_, "finish");
+      if (pyObj_finish == nullptr) {
+        PyErr_WriteUnraisable(pyObj_span_);
+      } else {
+        PyObject* pyObj_res = PyObject_CallObject(pyObj_finish, nullptr);
+        if (pyObj_res == nullptr) {
+          PyErr_WriteUnraisable(pyObj_finish);
+        }
+        Py_XDECREF(pyObj_res);
+        Py_DECREF(pyObj_finish);
+      }
+    }
     PyGILState_Release(state);
   }
 
@@ -87,9 +101,27 @@ public:
   }
 
 private:
+  // Steals pyObj_args, which is NULL when Py_BuildValue failed. The caller must hold the GIL.
+  void call_set_attribute(PyObject* pyObj_args)
+  {
+    if (pyObj_args == nullptr || pyObj_set_attribute_ == nullptr) {
+      // add_tag() returns into C++ core, so an error must never be left pending
+      if (PyErr_Occurred() != nullptr) {
+        PyErr_WriteUnraisable(pyObj_span_);
+      }
+      Py_XDECREF(pyObj_args);
+      return;
+    }
+    PyObject* pyObj_res = PyObject_Call(pyObj_set_attribute_, pyObj_args, nullptr);
+    if (pyObj_res == nullptr) {
+      PyErr_WriteUnraisable(pyObj_set_attribute_);
+    }
+    Py_XDECREF(pyObj_res);
+    Py_DECREF(pyObj_args);
+  }
+
   PyObject* pyObj_span_;
-  PyObject* pyObj_set_attribute_;
-  PyObject* pyObj_get_context_;
+  PyObject* pyObj_set_attribute_{ nullptr };
 };
 
 class deprecated_request_tracer : public cbtracing::request_tracer
@@ -130,21 +162,9 @@ public:
     // cache spans and periodically (or just when asked) grab the GIL and create them. However,
     // lets do this first, then think about optimizations
     PyGILState_STATE state = PyGILState_Ensure();
-    PyObject* pyObj_name = PyUnicode_FromString(name.c_str());
-    PyObject* pyObj_args = PyTuple_New(0);
-    PyObject* pyObj_kwargs = PyDict_New();
-    PyDict_SetItemString(pyObj_kwargs, "name", pyObj_name);
-    if (parent) {
-      auto pyObj_parent =
-        std::dynamic_pointer_cast<pycbc::deprecated_request_span>(parent)->py_span();
-      PyDict_SetItemString(pyObj_kwargs, "parent", pyObj_parent);
-    }
-    auto pyObj_span = PyObject_Call(pyObj_start_span_, pyObj_args, pyObj_kwargs);
+    PyObject* pyObj_span = call_start_span(name, parent);
     auto retval = std::make_shared<pycbc::deprecated_request_span>(pyObj_span, parent);
-    Py_DECREF(pyObj_name);
-    Py_DECREF(pyObj_args);
-    Py_DECREF(pyObj_kwargs);
-    Py_DECREF(pyObj_span);
+    Py_XDECREF(pyObj_span);
     PyGILState_Release(state);
     return retval;
   }
@@ -158,6 +178,46 @@ public:
   }
 
 private:
+  // Adds the python span behind parent, if there is one, to the kwargs. Returns false w/ an error
+  // set. The caller must hold the GIL.
+  static bool maybe_add_parent(PyObject* pyObj_kwargs,
+                               const std::shared_ptr<cbtracing::request_span>& parent)
+  {
+    if (!parent) {
+      return true;
+    }
+    auto pycbc_parent = std::dynamic_pointer_cast<pycbc::deprecated_request_span>(parent);
+    if (pycbc_parent == nullptr || pycbc_parent->py_span() == nullptr) {
+      // not a legacy span, or a no-op one, so start a top-level span instead of failing the op
+      return true;
+    }
+    return PyDict_SetItemString(pyObj_kwargs, "parent", pycbc_parent->py_span()) == 0;
+  }
+
+  // Calls the python tracer's start_span(). Returns a new reference, or NULL w/ the failure already
+  // reported. The caller must hold the GIL.
+  PyObject* call_start_span(const std::string& name,
+                            const std::shared_ptr<cbtracing::request_span>& parent)
+  {
+    PyObject* pyObj_span = nullptr;
+    PyObject* pyObj_args = PyTuple_New(0);
+    PyObject* pyObj_kwargs = PyDict_New();
+    PyObject* pyObj_name = PyUnicode_FromString(name.c_str());
+    if (pyObj_args != nullptr && pyObj_kwargs != nullptr && pyObj_name != nullptr &&
+        PyDict_SetItemString(pyObj_kwargs, "name", pyObj_name) == 0 &&
+        maybe_add_parent(pyObj_kwargs, parent)) {
+      pyObj_span = PyObject_Call(pyObj_start_span_, pyObj_args, pyObj_kwargs);
+    }
+    if (pyObj_span == nullptr) {
+      // start_span() returns into C++ core, so an error must never be left pending
+      PyErr_WriteUnraisable(pyObj_start_span_);
+    }
+    Py_XDECREF(pyObj_name);
+    Py_XDECREF(pyObj_args);
+    Py_XDECREF(pyObj_kwargs);
+    return pyObj_span;
+  }
+
   PyObject* pyObj_tracer_;
   PyObject* pyObj_start_span_;
 };
