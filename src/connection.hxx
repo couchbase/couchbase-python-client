@@ -81,7 +81,8 @@ public:
   template<typename Request>
   PyObject* execute_kv_op(pycbc_kv_request* request);
 
-  // execute_multi_op is public so it can be called by handle_multi_op() in pycbc_connection.hxx
+  // execute_multi_op is public so the pycbc_connection__*_multi__ handlers in
+  // pycbc_connection.cxx can call it
   template<typename Request>
   PyObject* execute_multi_op(PyObject* arg);
 
@@ -232,6 +233,20 @@ private:
           PyObject* result = finalize_kv_result<Request>(
             std::move(resp), std::move(wrapper_span), std::move(start_time));
 
+          if (result == nullptr) {
+            // Result conversion failed and an exception is pending. The barrier path can carry
+            // the failure; the callback path has no error channel from this IO thread.
+            if (barrier != nullptr) {
+              barrier->set_value(nullptr);
+            } else {
+              PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
+            }
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            PyGILState_Release(state);
+            return;
+          }
+
           PyObject* target_handler =
             PyObject_TypeCheck(result, &pycbc_exception_type) ? pyObj_errback : pyObj_callback;
 
@@ -256,6 +271,12 @@ private:
     PyObject* pyObj,
     const std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>& wrapper_span)
   {
+    // Callers pass the result of a conversion that can fail; cbpp_wrapper_span_to_py returns
+    // Py_None rather than NULL for an absent span, so pyObj is otherwise always dereferenced.
+    if (pyObj == nullptr) {
+      return;
+    }
+
     auto cluster_labels = wrapper_span != nullptr ? get_cluster_labels()
                                                   : std::make_pair(std::optional<std::string>{},
                                                                    std::optional<std::string>{});
@@ -282,6 +303,10 @@ private:
     std::optional<std::chrono::system_clock::time_point> start_time = std::nullopt,
     std::optional<std::chrono::system_clock::time_point> end_time = std::nullopt)
   {
+    if (pyObj == nullptr) {
+      return;
+    }
+
     if (start_time.has_value() && end_time.has_value()) {
       PyType* pyObj_ptr = reinterpret_cast<PyType*>(pyObj);
       PyObject* pyObj_start_time =
@@ -441,10 +466,14 @@ Connection::execute_multi_op(PyObject* arg)
   staging.reserve(num_docs);
 
   PyObject* pyObj_multi_result = create_pycbc_result();
+  if (pyObj_multi_result == nullptr) {
+    return nullptr;
+  }
   pycbc_result* multi_result = reinterpret_cast<pycbc_result*>(pyObj_multi_result);
 
   for (size_t i = 0; i < num_docs; ++i) {
     PyObject* pyObj_binding = PyList_GetItem(arg, i); // Borrowed ref
+    // Unchecked by contract, see validate_connection_and_multi_request
     pycbc_kv_request* request = reinterpret_cast<pycbc_kv_request*>(pyObj_binding);
     std::string key_str = py_to_cbpp<std::string>(request->key);
     std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span;
@@ -498,13 +527,27 @@ Connection::execute_multi_op(PyObject* arg)
   for (auto& s : staging) {
     PyObject* res =
       finalize_kv_result<Request>(s.fut.get(), std::move(s.wrapper_span), std::move(s.start_time));
+    // OOM is not a per-key condition, so abandon the whole multi result rather than
+    // reporting a partial one. An exception is already pending.
+    if (res == nullptr) {
+      Py_DECREF(pyObj_multi_result);
+      return nullptr;
+    }
     if (PyObject_TypeCheck(res, &pycbc_exception_type)) {
       all_okay = false;
     }
-    PyDict_SetItemString(multi_result->raw_result, s.key_str.c_str(), res);
+    int rc = PyDict_SetItemString(multi_result->raw_result, s.key_str.c_str(), res);
     Py_DECREF(res);
+    if (rc < 0) {
+      Py_DECREF(pyObj_multi_result);
+      return nullptr;
+    }
   }
-  PyDict_SetItemString(multi_result->raw_result, "all_okay", all_okay ? Py_True : Py_False);
+  if (PyDict_SetItemString(multi_result->raw_result, "all_okay", all_okay ? Py_True : Py_False) <
+      0) {
+    Py_DECREF(pyObj_multi_result);
+    return nullptr;
+  }
 
   return pyObj_multi_result;
 }
