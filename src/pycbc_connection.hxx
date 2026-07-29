@@ -99,49 +99,11 @@ validate_connection_and_multi_request(pycbc_connection* self, PyObject* arg, con
     return false;
   }
 
+  // Element types are deliberately not checked. Multi ops are a couchbase-only API and that
+  // layer only ever builds this list from pycbc_kv_request instances, so calling _core
+  // directly is unsupported and a wrong element type there can segfault.
+
   return true;
-}
-
-template<typename Request>
-static PyObject*
-handle_multi_kv_op(pycbc_connection* self, PyObject* args, PyObject* kwargs, const char* op_name)
-{
-  if (self->conn == nullptr) {
-    PyErr_SetString(PyExc_RuntimeError, "Connection not initialized");
-    return nullptr;
-  }
-
-  PyObject* pyObj_bucket = nullptr;
-  PyObject* pyObj_scope = nullptr;
-  PyObject* pyObj_collection = nullptr;
-  PyObject* pyObj_doc_list = nullptr;
-  PyObject* pyObj_op_args = nullptr;
-  PyObject* pyObj_per_key_args = nullptr;
-
-  static const char* kw_list[] = { "bucket",  "scope",        "collection", "doc_list",
-                                   "op_args", "per_key_args", nullptr };
-
-  if (!PyArg_ParseTupleAndKeywords(args,
-                                   kwargs,
-                                   "O!O!O!O!O!|O!",
-                                   const_cast<char**>(kw_list),
-                                   &PyUnicode_Type,
-                                   &pyObj_bucket,
-                                   &PyUnicode_Type,
-                                   &pyObj_scope,
-                                   &PyUnicode_Type,
-                                   &pyObj_collection,
-                                   &PyList_Type,
-                                   &pyObj_doc_list,
-                                   &PyDict_Type,
-                                   &pyObj_op_args,
-                                   &PyDict_Type,
-                                   &pyObj_per_key_args)) {
-    return nullptr;
-  }
-
-  return self->conn->execute_multi_op<Request>(
-    pyObj_doc_list, pyObj_op_args, pyObj_per_key_args, pyObj_bucket, pyObj_scope, pyObj_collection);
 }
 
 } // namespace pycbc
