@@ -20,6 +20,7 @@
 #include "Python.h"
 #include "error_contexts.hxx"
 #include "exceptions.hxx"
+#include "gil_guard.hxx"
 #include "operations_autogen.hxx"
 #include "pycbc_kv_request.hxx"
 #include "pytocbpp_defs.hxx"
@@ -234,8 +235,8 @@ private:
     std::optional<std::chrono::system_clock::time_point> start_time = std::nullopt)
   {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.execute(
         req,
         [pyObj_callback, pyObj_errback, barrier, wrapper_span, start_time, this](
@@ -276,7 +277,6 @@ private:
           PyGILState_Release(state);
         });
     }
-    Py_END_ALLOW_THREADS
   }
 
   template<typename PyType>
@@ -366,11 +366,14 @@ Connection::dispatch_sync(Request&& req)
   using Response = typename Request::response_type;
   auto barrier = std::make_shared<std::promise<Response>>();
   auto fut = barrier->get_future();
-  Py_BEGIN_ALLOW_THREADS cluster_.execute(std::forward<Request>(req), [barrier](Response resp) {
-    barrier->set_value(std::move(resp));
-  });
-  fut.wait();
-  Py_END_ALLOW_THREADS return fut.get();
+  {
+    gil_release_guard no_gil;
+    cluster_.execute(std::forward<Request>(req), [barrier](Response resp) {
+      barrier->set_value(std::move(resp));
+    });
+    fut.wait();
+  }
+  return fut.get();
 }
 
 template<typename Request, typename Response>
@@ -523,20 +526,21 @@ Connection::execute_multi_op(PyObject* arg)
                         std::move(fut) });
   }
 
-  Py_BEGIN_ALLOW_THREADS for (auto& s : staging)
   {
-    auto barrier = s.barrier;
-    cluster_.execute(s.req, [barrier](Response resp) {
-      barrier->set_value(std::move(resp));
-    });
+    gil_release_guard no_gil;
+    for (auto& s : staging) {
+      auto barrier = s.barrier;
+      cluster_.execute(s.req, [barrier](Response resp) {
+        barrier->set_value(std::move(resp));
+      });
+    }
+
+    for (auto& s : staging) {
+      s.fut.wait();
+    }
   }
 
-  for (auto& s : staging) {
-    s.fut.wait();
-  }
-  Py_END_ALLOW_THREADS
-
-    bool all_okay = true;
+  bool all_okay = true;
   for (auto& s : staging) {
     PyObject* res =
       finalize_kv_result<Request>(s.fut.get(), std::move(s.wrapper_span), std::move(s.start_time));
@@ -622,8 +626,8 @@ Connection::execute_streaming_op(PyObject* kwargs)
     // };
 
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.execute(
         req,
         // we pass the shared_ptr rows separately b/c we need t o allow the rows queue to survive
@@ -708,9 +712,8 @@ Connection::execute_streaming_op(PyObject* kwargs)
           PyGILState_Release(state);
         });
     }
-    Py_END_ALLOW_THREADS
 
-      return reinterpret_cast<PyObject*>(streamed_res);
+    return reinterpret_cast<PyObject*>(streamed_res);
 
   } catch (const std::exception& e) {
     Py_XDECREF(pyObj_callback);
@@ -764,9 +767,11 @@ Connection::execute_mgmt_op(PyObject* kwargs)
     execute_op(req, pyObj_callback, pyObj_errback, barrier, wrapper_span);
     if (barrier) {
       PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS if (result == nullptr)
       {
+        gil_release_guard no_gil;
+        result = fut.get();
+      }
+      if (result == nullptr) {
         // The IO thread's conversion failed; that failure was already reported via
         // PyErr_WriteUnraisable there, so nothing is pending on this thread.
         set_runtime_error_if_unset("Failed to process operation result.");

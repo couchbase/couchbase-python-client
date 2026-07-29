@@ -177,8 +177,8 @@ Connection::connect(PyObject* kwargs)
     update_cluster_options_from_py(connstr.options, pyObj_options, pyObj_auth);
     couchbase::core::origin origin(creds, connstr);
 
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.open(
         origin,
         [callback = pyObj_callback, errback = pyObj_errback, barrier, this](std::error_code ec) {
@@ -186,14 +186,14 @@ Connection::connect(PyObject* kwargs)
             ec, "connect", callback, errback, barrier, connection_state_action::set_connected);
         });
     }
-    Py_END_ALLOW_THREADS
 
-      if (barrier)
-    {
+    if (barrier) {
       PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS if (result == nullptr)
       {
+        gil_release_guard no_gil;
+        result = fut.get();
+      }
+      if (result == nullptr) {
         // The IO thread's result construction failed; that failure was already
         // reported via PyErr_WriteUnraisable there, so nothing is pending on this
         // thread.
@@ -231,8 +231,8 @@ Connection::close(PyObject* kwargs)
   }
 
   try {
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.close([callback = pyObj_callback, errback = pyObj_errback, barrier, this]() {
         handle_connection_operation_callback(std::error_code{},
                                              "close",
@@ -242,14 +242,14 @@ Connection::close(PyObject* kwargs)
                                              connection_state_action::set_disconnected);
       });
     }
-    Py_END_ALLOW_THREADS
 
-      if (barrier)
-    {
+    if (barrier) {
       PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS if (result == nullptr)
       {
+        gil_release_guard no_gil;
+        result = fut.get();
+      }
+      if (result == nullptr) {
         // The IO thread's result construction failed; that failure was already
         // reported via PyErr_WriteUnraisable there, so nothing is pending on this
         // thread.
@@ -293,22 +293,22 @@ Connection::open_bucket(PyObject* kwargs)
       throw std::invalid_argument("bucket_name must be a valid UTF-8 string");
     }
 
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.open_bucket(
         bucket_name,
         [callback = pyObj_callback, errback = pyObj_errback, barrier, this](std::error_code ec) {
           handle_connection_operation_callback(ec, "open_bucket", callback, errback, barrier);
         });
     }
-    Py_END_ALLOW_THREADS
 
-      if (barrier)
-    {
+    if (barrier) {
       PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS if (result == nullptr)
       {
+        gil_release_guard no_gil;
+        result = fut.get();
+      }
+      if (result == nullptr) {
         // The IO thread's result construction failed; that failure was already
         // reported via PyErr_WriteUnraisable there, so nothing is pending on this
         // thread.
@@ -352,22 +352,22 @@ Connection::close_bucket(PyObject* kwargs)
       throw std::invalid_argument("bucket_name must be a valid UTF-8 string");
     }
 
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.close_bucket(
         bucket_name,
         [callback = pyObj_callback, errback = pyObj_errback, barrier, this](std::error_code ec) {
           handle_connection_operation_callback(ec, "close_bucket", callback, errback, barrier);
         });
     }
-    Py_END_ALLOW_THREADS
 
-      if (barrier)
-    {
+    if (barrier) {
       PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS if (result == nullptr)
       {
+        gil_release_guard no_gil;
+        result = fut.get();
+      }
+      if (result == nullptr) {
         // The IO thread's result construction failed; that failure was already
         // reported via PyErr_WriteUnraisable there, so nothing is pending on this
         // thread.
@@ -445,8 +445,8 @@ Connection::diagnostics(PyObject* kwargs)
   }
 
   try {
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.diagnostics(report_id,
                            [pyObj_callback, pyObj_errback, barrier, this](
                              couchbase::core::diag::diagnostics_result resp) {
@@ -454,14 +454,14 @@ Connection::diagnostics(PyObject* kwargs)
                                resp, pyObj_callback, pyObj_errback, barrier);
                            });
     }
-    Py_END_ALLOW_THREADS
 
-      if (barrier)
-    {
+    if (barrier) {
       PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS if (result == nullptr)
       {
+        gil_release_guard no_gil;
+        result = fut.get();
+      }
+      if (result == nullptr) {
         // The IO thread's result construction failed; that failure was already
         // reported via PyErr_WriteUnraisable there, so nothing is pending on this
         // thread.
@@ -508,8 +508,8 @@ Connection::ping(PyObject* kwargs)
   }
 
   try {
-    Py_BEGIN_ALLOW_THREADS
     {
+      gil_release_guard no_gil;
       cluster_.ping(
         report_id,
         bucket_name,
@@ -519,14 +519,14 @@ Connection::ping(PyObject* kwargs)
           handle_cluster_operation_callback(resp, pyObj_callback, pyObj_errback, barrier);
         });
     }
-    Py_END_ALLOW_THREADS
 
-      if (barrier)
-    {
+    if (barrier) {
       PyObject* result = nullptr;
-      Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS if (result == nullptr)
       {
+        gil_release_guard no_gil;
+        result = fut.get();
+      }
+      if (result == nullptr) {
         // The IO thread's result construction failed; that failure was already
         // reported via PyErr_WriteUnraisable there, so nothing is pending on this
         // thread.
