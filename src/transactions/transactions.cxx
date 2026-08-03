@@ -54,8 +54,8 @@ void
 pycbc_txns::dealloc_transactions(PyObject* obj)
 {
   auto txns = reinterpret_cast<pycbc_txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
-  txns->txns->close();
-  txns->txns.reset();
+  Py_BEGIN_ALLOW_THREADS txns->txns->close();
+  Py_END_ALLOW_THREADS txns->txns.reset();
   CB_LOG_DEBUG("dealloc transactions");
 }
 

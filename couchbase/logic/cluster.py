@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import warnings
 from typing import (TYPE_CHECKING,
                     Any,
@@ -132,6 +133,9 @@ class ClusterLogic:
 
         self._transaction_config = cluster_opts.pop("transaction_config", TransactionConfig())
         self._transactions = None
+        # Guards the lazy init of self._transactions in the transactions property of both
+        # bindings.  Initialized here because AsyncCluster also extends ClusterLogic.
+        self._transactions_lock = threading.Lock()
 
         timeout_opts = {}
         for key in ClusterTimeoutOptions.get_allowed_option_keys(use_transform_keys=True):

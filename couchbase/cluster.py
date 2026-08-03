@@ -118,8 +118,10 @@ class Cluster(ClusterLogic):
             :class:`~couchbase.transactions.Transactions`: A Transactions instance which can be used to
                 perform transactions on this cluster.
         """
-        if not self._transactions:
-            self._transactions = Transactions(self, self._transaction_config)
+        if self._transactions is None:
+            with self._transactions_lock:
+                if self._transactions is None:
+                    self._transactions = Transactions(self, self._transaction_config)
         return self._transactions
 
     def close(self):
