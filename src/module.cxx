@@ -180,7 +180,10 @@ PyInit__core(void)
     return nullptr;
   }
 
-  init_pycbc_dict_keys();
+  if (init_pycbc_dict_keys() < 0) {
+    Py_DECREF(module);
+    return nullptr;
+  }
 
   return module;
 }
