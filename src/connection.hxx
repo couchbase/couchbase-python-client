@@ -128,7 +128,16 @@ private:
     PyObject* result = create_pycbc_result(pyObj_resp);
     Py_XDECREF(pyObj_resp);
 
-    if (pyObj_callback != nullptr) {
+    if (result == nullptr) {
+      // Result conversion failed and an exception is pending. Report it here: the
+      // barrier path has no thread state on the main thread to inherit it (it would
+      // otherwise be silently dropped when this IO thread's GIL state is released),
+      // and the callback path has no error channel from this IO thread at all.
+      PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
+      if (barrier != nullptr) {
+        barrier->set_value(nullptr);
+      }
+    } else if (pyObj_callback != nullptr) {
       PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_callback, result, nullptr);
       Py_XDECREF(ret);
       Py_XDECREF(result);
@@ -637,6 +646,7 @@ Connection::execute_streaming_op(PyObject* kwargs)
           if (error) {
             rows->put(error);
           } else {
+            bool row_conversion_failed = false;
             for (const auto& row : resp.rows) {
               PyObject* pyObj_row;
               if constexpr (std::is_same_v<response_type,
@@ -648,24 +658,36 @@ Connection::execute_streaming_op(PyObject* kwargs)
                 // special case for query/analytics_query; we want bytes from str
                 pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
               }
+              if (pyObj_row == nullptr) {
+                row_conversion_failed = true;
+                break;
+              }
               rows->put(pyObj_row);
             }
 
-            // Push sentinel to signal end of rows
-            Py_INCREF(Py_None);
-            rows->put(Py_None);
-
-            PyObject* result_obj = build_stream_end_result_obj(resp);
-            if (result_obj) {
-              rows->put(result_obj);
+            if (row_conversion_failed) {
+              // Row conversion failed with an exception pending; queue it as the
+              // final row instead of a raw NULL, mirroring the `error` case above.
+              PyObject* conversion_error =
+                get_exception_as_object("Failed to convert row", __FILE__, __LINE__);
+              rows->put(conversion_error);
             } else {
-              PyObject* pycbc_exc = build_pycbc_exception_from_python_exc(
-                "Failed to create stream end result.", __FILE__, __LINE__);
-              if (pycbc_exc != nullptr) {
-                rows->put(pycbc_exc);
+              // Push sentinel to signal end of rows
+              Py_INCREF(Py_None);
+              rows->put(Py_None);
+
+              PyObject* result_obj = build_stream_end_result_obj(resp);
+              if (result_obj) {
+                rows->put(result_obj);
               } else {
-                Py_INCREF(Py_None);
-                rows->put(Py_None);
+                PyObject* pycbc_exc = build_pycbc_exception_from_python_exc(
+                  "Failed to create stream end result.", __FILE__, __LINE__);
+                if (pycbc_exc != nullptr) {
+                  rows->put(pycbc_exc);
+                } else {
+                  Py_INCREF(Py_None);
+                  rows->put(Py_None);
+                }
               }
             }
           }
