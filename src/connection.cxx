@@ -100,7 +100,17 @@ Connection::handle_connection_operation_callback(std::error_code ec,
     msg += operation;
     result = build_exception(ec, __FILE__, __LINE__, msg.c_str());
 
-    if (pyObj_errback != nullptr) {
+    if (result == nullptr) {
+      // Exception object construction failed and an exception is pending. Report
+      // it here: the barrier path has no thread state on the main thread to
+      // inherit it (it would otherwise be silently dropped when this IO thread's
+      // GIL state is released), and the callback path has no error channel from
+      // this IO thread at all.
+      PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
+      if (barrier != nullptr) {
+        barrier->set_value(nullptr);
+      }
+    } else if (pyObj_errback != nullptr) {
       PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_errback, result, nullptr);
       Py_XDECREF(ret);
       Py_XDECREF(result);
@@ -181,7 +191,14 @@ Connection::connect(PyObject* kwargs)
     {
       PyObject* result = nullptr;
       Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+      Py_END_ALLOW_THREADS if (result == nullptr)
+      {
+        // The IO thread's result construction failed; that failure was already
+        // reported via PyErr_WriteUnraisable there, so nothing is pending on this
+        // thread.
+        set_runtime_error_if_unset("Failed to process operation result.");
+      }
+      return result;
     }
     Py_RETURN_NONE;
   } catch (const std::exception& e) {
@@ -230,7 +247,14 @@ Connection::close(PyObject* kwargs)
     {
       PyObject* result = nullptr;
       Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+      Py_END_ALLOW_THREADS if (result == nullptr)
+      {
+        // The IO thread's result construction failed; that failure was already
+        // reported via PyErr_WriteUnraisable there, so nothing is pending on this
+        // thread.
+        set_runtime_error_if_unset("Failed to process operation result.");
+      }
+      return result;
     }
     Py_RETURN_NONE;
   } catch (const std::exception& e) {
@@ -282,7 +306,14 @@ Connection::open_bucket(PyObject* kwargs)
     {
       PyObject* result = nullptr;
       Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+      Py_END_ALLOW_THREADS if (result == nullptr)
+      {
+        // The IO thread's result construction failed; that failure was already
+        // reported via PyErr_WriteUnraisable there, so nothing is pending on this
+        // thread.
+        set_runtime_error_if_unset("Failed to process operation result.");
+      }
+      return result;
     }
     Py_RETURN_NONE;
   } catch (const std::exception& e) {
@@ -334,7 +365,14 @@ Connection::close_bucket(PyObject* kwargs)
     {
       PyObject* result = nullptr;
       Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+      Py_END_ALLOW_THREADS if (result == nullptr)
+      {
+        // The IO thread's result construction failed; that failure was already
+        // reported via PyErr_WriteUnraisable there, so nothing is pending on this
+        // thread.
+        set_runtime_error_if_unset("Failed to process operation result.");
+      }
+      return result;
     }
     Py_RETURN_NONE;
   } catch (const std::exception& e) {
@@ -421,7 +459,14 @@ Connection::diagnostics(PyObject* kwargs)
     {
       PyObject* result = nullptr;
       Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+      Py_END_ALLOW_THREADS if (result == nullptr)
+      {
+        // The IO thread's result construction failed; that failure was already
+        // reported via PyErr_WriteUnraisable there, so nothing is pending on this
+        // thread.
+        set_runtime_error_if_unset("Failed to process operation result.");
+      }
+      return result;
     }
     Py_RETURN_NONE;
   } catch (const std::exception& e) {
@@ -479,7 +524,14 @@ Connection::ping(PyObject* kwargs)
     {
       PyObject* result = nullptr;
       Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+      Py_END_ALLOW_THREADS if (result == nullptr)
+      {
+        // The IO thread's result construction failed; that failure was already
+        // reported via PyErr_WriteUnraisable there, so nothing is pending on this
+        // thread.
+        set_runtime_error_if_unset("Failed to process operation result.");
+      }
+      return result;
     }
     Py_RETURN_NONE;
   } catch (const std::exception& e) {
