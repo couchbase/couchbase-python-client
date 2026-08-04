@@ -31,6 +31,7 @@
 #include <core/tracing/wrapper_sdk_tracer.hxx>
 #include <couchbase/cas.hxx>
 #include <couchbase/mutation_token.hxx>
+#include <stdexcept>
 
 namespace pycbc
 {
@@ -42,10 +43,16 @@ template<>
 struct py_to_cbpp_t<couchbase::core::document_id> {
   static inline couchbase::core::document_id from_py(pycbc_kv_request* request)
   {
-    return { PyUnicode_AsUTF8(request->bucket),
-             PyUnicode_AsUTF8(request->scope),
-             PyUnicode_AsUTF8(request->collection),
-             PyUnicode_AsUTF8(request->key) };
+    std::string bucket;
+    std::string scope;
+    std::string collection;
+    std::string key;
+    if (!safe_utf8_string(request->bucket, bucket) || !safe_utf8_string(request->scope, scope) ||
+        !safe_utf8_string(request->collection, collection) ||
+        !safe_utf8_string(request->key, key)) {
+      throw std::invalid_argument("bucket/scope/collection/key must be valid UTF-8 strings");
+    }
+    return { bucket, scope, collection, key };
   }
 
   static inline couchbase::core::document_id from_py(PyObject* pyObj)

@@ -368,7 +368,7 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
     pyObj_trust_store = PyDict_GetItemString(pyObj_options, "trust_store_path");
   }
   if (pyObj_trust_store && PyUnicode_Check(pyObj_trust_store)) {
-    options.trust_certificate = PyUnicode_AsUTF8(pyObj_trust_store);
+    safe_utf8_string(pyObj_trust_store, options.trust_certificate);
   }
 
   // TLS options
@@ -426,7 +426,7 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
   {
     PyObject* pyObj_server_group = PyDict_GetItemString(pyObj_options, "preferred_server_group");
     if (pyObj_server_group && PyUnicode_Check(pyObj_server_group)) {
-      options.server_group = std::string(PyUnicode_AsUTF8(pyObj_server_group));
+      safe_utf8_string(pyObj_server_group, options.server_group);
     }
   }
 
@@ -479,9 +479,10 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
   PyObject* pyObj_dns_nameserver = PyDict_GetItemString(pyObj_options, "dns_nameserver");
   PyObject* pyObj_dns_port = PyDict_GetItemString(pyObj_options, "dns_port");
   if (pyObj_dns_srv_timeout || pyObj_dns_nameserver || pyObj_dns_port) {
-    auto nameserver = pyObj_dns_nameserver && PyUnicode_Check(pyObj_dns_nameserver)
-                        ? std::string(PyUnicode_AsUTF8(pyObj_dns_nameserver))
-                        : options.dns_config.nameserver();
+    std::string nameserver = options.dns_config.nameserver();
+    if (pyObj_dns_nameserver && PyUnicode_Check(pyObj_dns_nameserver)) {
+      safe_utf8_string(pyObj_dns_nameserver, nameserver);
+    }
     auto port = pyObj_dns_port && PyLong_Check(pyObj_dns_port)
                   ? static_cast<uint16_t>(PyLong_AsUnsignedLong(pyObj_dns_port))
                   : options.dns_config.port();
@@ -506,6 +507,10 @@ cluster_options_to_py(const couchbase::core::cluster_options& opts,
 
   // timeouts
   PyObject* timeout_dict = PyDict_New();
+  if (timeout_dict == nullptr) {
+    Py_DECREF(dict);
+    return nullptr;
+  }
   add_field<std::chrono::milliseconds>(timeout_dict, "bootstrap_timeout", opts.bootstrap_timeout);
   add_field<std::chrono::milliseconds>(timeout_dict, "resolve_timeout", opts.resolve_timeout);
   add_field<std::chrono::milliseconds>(timeout_dict, "connect_timeout", opts.connect_timeout);
@@ -572,6 +577,10 @@ cluster_options_to_py(const couchbase::core::cluster_options& opts,
 
   // Credentials
   PyObject* creds_dict = cbpp_to_py(creds);
+  if (creds_dict == nullptr) {
+    Py_DECREF(dict);
+    return nullptr;
+  }
   PyDict_SetItemString(dict, "credentials", creds_dict);
   Py_DECREF(creds_dict);
 
