@@ -34,7 +34,7 @@ PyObject* {{key}} = nullptr;
 } // namespace keys
 } // namespace pycbc
 
-void
+int
 init_pycbc_dict_keys()
 {
     // To be compliant with the Limited API (Stable ABI) across all versions,
@@ -49,7 +49,12 @@ init_pycbc_dict_keys()
 
 {% for key in kv_dict_keys -%}
     pycbc::keys::{{key}} = intern("{{key}}");
+    if (pycbc::keys::{{key}} == nullptr) {
+        return -1;
+    }
 {% endfor %}
+
+    return 0;
 }
 
 // ====================================================================================================
