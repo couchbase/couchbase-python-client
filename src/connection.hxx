@@ -234,12 +234,13 @@ private:
             std::move(resp), std::move(wrapper_span), std::move(start_time));
 
           if (result == nullptr) {
-            // Result conversion failed and an exception is pending. The barrier path can carry
-            // the failure; the callback path has no error channel from this IO thread.
+            // Result conversion failed and an exception is pending. Report it here: the
+            // barrier path has no thread state on the main thread to inherit it (it would
+            // otherwise be silently dropped when this IO thread's GIL state is released),
+            // and the callback path has no error channel from this IO thread at all.
+            PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
             if (barrier != nullptr) {
               barrier->set_value(nullptr);
-            } else {
-              PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
             }
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
@@ -739,7 +740,13 @@ Connection::execute_mgmt_op(PyObject* kwargs)
     if (barrier) {
       PyObject* result = nullptr;
       Py_BEGIN_ALLOW_THREADS result = fut.get();
-      Py_END_ALLOW_THREADS return result;
+      Py_END_ALLOW_THREADS if (result == nullptr)
+      {
+        // The IO thread's conversion failed; that failure was already reported via
+        // PyErr_WriteUnraisable there, so nothing is pending on this thread.
+        set_runtime_error_if_unset("Failed to process operation result.");
+      }
+      return result;
     }
     Py_RETURN_NONE;
   } catch (const std::exception& e) {
