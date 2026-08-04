@@ -204,20 +204,30 @@ build_exc_info_dict(const char* file, int line, const char* message)
     return nullptr;
   }
 
-  if (file != nullptr) {
-    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
-    PyDict_SetItemString(exc_info, "cinfo", pyObj_cinfo);
-    Py_DECREF(pyObj_cinfo);
-  } else {
-    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", "", line);
-    PyDict_SetItemString(exc_info, "cinfo", pyObj_cinfo);
-    Py_DECREF(pyObj_cinfo);
+  PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file != nullptr ? file : "", line);
+  if (pyObj_cinfo == nullptr) {
+    Py_DECREF(exc_info);
+    return nullptr;
+  }
+  int rv = PyDict_SetItemString(exc_info, "cinfo", pyObj_cinfo);
+  Py_DECREF(pyObj_cinfo);
+  if (rv < 0) {
+    Py_DECREF(exc_info);
+    return nullptr;
   }
 
   if (message != nullptr) {
     PyObject* msg_str = PyUnicode_FromString(message);
-    PyDict_SetItemString(exc_info, "message", msg_str);
+    if (msg_str == nullptr) {
+      Py_DECREF(exc_info);
+      return nullptr;
+    }
+    rv = PyDict_SetItemString(exc_info, "message", msg_str);
     Py_DECREF(msg_str);
+    if (rv < 0) {
+      Py_DECREF(exc_info);
+      return nullptr;
+    }
   }
 
   return exc_info;

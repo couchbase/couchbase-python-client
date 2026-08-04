@@ -170,14 +170,18 @@ pycbc_exception__init__(pycbc_exception* self, PyObject* args, PyObject* kwargs)
     PyObject* ctx_obj = PyDict_GetItemString(kwargs, "error_context");
     if (ctx_obj != nullptr && PyDict_Check(ctx_obj)) {
       Py_INCREF(ctx_obj);
+      Py_XDECREF(self->error_context);
       self->error_context = ctx_obj;
     }
   }
   Py_INCREF(Py_None);
+  Py_XDECREF(self->core_span);
   self->core_span = Py_None;
   Py_INCREF(Py_None);
+  Py_XDECREF(self->start_time);
   self->start_time = Py_None;
   Py_INCREF(Py_None);
+  Py_XDECREF(self->end_time);
   self->end_time = Py_None;
 
   return 0;
@@ -345,40 +349,74 @@ cache_exception_classes()
   return rv;
 }
 
-PyObject*
-raise_invalid_argument(const char* message, const char* file, int line)
+// Shared implementation for raise_invalid_argument/raise_feature_unavailable/
+// raise_unsuccessful_operation. Every allocation is checked: an OOM at any step is left as the
+// pending exception and returned immediately, rather than being silently overwritten later by
+// PyErr_SetObject if the rest of the build happens to succeed.
+static PyObject*
+raise_cached_exception(PyObject* cached_exc, const char* message, const char* file, int line)
 {
   // TODO:  is this possible?
-  if (cached_invalid_argument_exc == nullptr) {
+  if (cached_exc == nullptr) {
     // Fallback to ValueError if exception not cached yet
     PyErr_SetString(PyExc_ValueError, message);
     return nullptr;
   }
 
   PyObject* args = PyTuple_New(0);
+  if (args == nullptr) {
+    return nullptr;
+  }
   PyObject* kwargs = PyDict_New();
-  PyObject* pyObj_message = PyUnicode_FromString(message);
-  if (pyObj_message != nullptr) {
-    PyDict_SetItemString(kwargs, "message", pyObj_message);
-    Py_DECREF(pyObj_message);
+  if (kwargs == nullptr) {
+    Py_DECREF(args);
+    return nullptr;
+  }
+
+  PyObject* pyObj_message = PyUnicode_FromString(message != nullptr ? message : "");
+  if (pyObj_message == nullptr) {
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    return nullptr;
+  }
+  int rv = PyDict_SetItemString(kwargs, "message", pyObj_message);
+  Py_DECREF(pyObj_message);
+  if (rv < 0) {
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    return nullptr;
   }
 
   PyObject* exc_info = build_exc_info_dict(file, line, message);
-  if (exc_info != nullptr) {
-    PyDict_SetItemString(kwargs, "exc_info", exc_info);
-    Py_DECREF(exc_info);
+  if (exc_info == nullptr) {
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    return nullptr;
+  }
+  rv = PyDict_SetItemString(kwargs, "exc_info", exc_info);
+  Py_DECREF(exc_info);
+  if (rv < 0) {
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    return nullptr;
   }
 
-  PyObject* exc = PyObject_Call(cached_invalid_argument_exc, args, kwargs);
+  PyObject* exc = PyObject_Call(cached_exc, args, kwargs);
   Py_DECREF(args);
   Py_DECREF(kwargs);
 
   if (exc != nullptr) {
-    PyErr_SetObject(cached_invalid_argument_exc, exc);
+    PyErr_SetObject(cached_exc, exc);
     Py_DECREF(exc);
   }
 
   return nullptr;
+}
+
+PyObject*
+raise_invalid_argument(const char* message, const char* file, int line)
+{
+  return raise_cached_exception(cached_invalid_argument_exc, message, file, line);
 }
 
 PyObject*
@@ -410,73 +448,13 @@ raise_required_field_empty(PyObject* interned_key, const char* context, const ch
 PyObject*
 raise_feature_unavailable(const char* message, const char* file, int line)
 {
-  // TODO:  is this possible?
-  if (cached_feature_unavailable_exc == nullptr) {
-    // Fallback to ValueError if exception not cached yet
-    PyErr_SetString(PyExc_ValueError, message);
-    return nullptr;
-  }
-
-  PyObject* args = PyTuple_New(0);
-  PyObject* kwargs = PyDict_New();
-  PyObject* pyObj_message = PyUnicode_FromString(message);
-  if (pyObj_message != nullptr) {
-    PyDict_SetItemString(kwargs, "message", pyObj_message);
-    Py_DECREF(pyObj_message);
-  }
-
-  PyObject* exc_info = build_exc_info_dict(file, line, message);
-  if (exc_info != nullptr) {
-    PyDict_SetItemString(kwargs, "exc_info", exc_info);
-    Py_DECREF(exc_info);
-  }
-
-  PyObject* exc = PyObject_Call(cached_feature_unavailable_exc, args, kwargs);
-  Py_DECREF(args);
-  Py_DECREF(kwargs);
-
-  if (exc != nullptr) {
-    PyErr_SetObject(cached_feature_unavailable_exc, exc);
-    Py_DECREF(exc);
-  }
-
-  return nullptr;
+  return raise_cached_exception(cached_feature_unavailable_exc, message, file, line);
 }
 
 PyObject*
 raise_unsuccessful_operation(const char* message, const char* file, int line)
 {
-  // TODO:  is this possible?
-  if (cached_unsuccessful_operation_exc == nullptr) {
-    // Fallback to ValueError if exception not cached yet
-    PyErr_SetString(PyExc_ValueError, message);
-    return nullptr;
-  }
-
-  PyObject* args = PyTuple_New(0);
-  PyObject* kwargs = PyDict_New();
-  PyObject* pyObj_message = PyUnicode_FromString(message);
-  if (pyObj_message != nullptr) {
-    PyDict_SetItemString(kwargs, "message", pyObj_message);
-    Py_DECREF(pyObj_message);
-  }
-
-  PyObject* exc_info = build_exc_info_dict(file, line, message);
-  if (exc_info != nullptr) {
-    PyDict_SetItemString(kwargs, "exc_info", exc_info);
-    Py_DECREF(exc_info);
-  }
-
-  PyObject* exc = PyObject_Call(cached_unsuccessful_operation_exc, args, kwargs);
-  Py_DECREF(args);
-  Py_DECREF(kwargs);
-
-  if (exc != nullptr) {
-    PyErr_SetObject(cached_unsuccessful_operation_exc, exc);
-    Py_DECREF(exc);
-  }
-
-  return nullptr;
+  return raise_cached_exception(cached_unsuccessful_operation_exc, message, file, line);
 }
 
 PyObject*
@@ -497,15 +475,19 @@ get_exception_as_object(const char* default_message, const char* file, int line)
 
     if (exc_type != nullptr) {
       PyObject* exc = PyObject_CallObject(exc_type, nullptr);
-      Py_DECREF(exc_type);
-      Py_XDECREF(exc_traceback);
       if (exc != nullptr) {
+        Py_DECREF(exc_type);
+        Py_XDECREF(exc_traceback);
         return exc;
       }
     }
     Py_XDECREF(exc_type);
     Py_XDECREF(exc_traceback);
   }
+
+  // Clear any leftover error (e.g. a failed PyObject_CallObject above) before
+  // making further Python API calls below.
+  PyErr_Clear();
 
   // No Python error was set, create a RuntimeError with the message
   PyObject* exc = PyObject_CallFunction(PyExc_RuntimeError, "s", default_message);
@@ -543,6 +525,7 @@ build_pycbc_exception_from_python_exc(const char* default_message, const char* f
       pycbc_exc->message = safe_utf8_string(exc_str, msg) ? msg : default_message;
       Py_DECREF(exc_str);
     } else {
+      PyErr_WriteUnraisable(exc_value);
       pycbc_exc->message = default_message;
     }
   } else {
