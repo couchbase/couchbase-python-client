@@ -68,17 +68,6 @@ extract_field(PyObject* source_obj, T& dest)
   }
 }
 
-// Extract boolean field directly (specialized - checks Py_True/Py_False directly)
-inline void
-extract_bool_field(PyObject* source_obj, bool& dest)
-{
-  if (source_obj == Py_True) {
-    dest = true;
-  } else if (source_obj == Py_False) {
-    dest = false;
-  }
-}
-
 template<typename T>
 inline void
 extract_field(PyObject* kwargs, const char* key, T& dest)
@@ -104,16 +93,6 @@ inline void
 extract_field_if_not_empty(PyObject* dict, const char* key, T& dest)
 {
   PyObject* pyObj = PyDict_GetItemString(dict, key);
-  if (pyObj != nullptr && pyObj != Py_None) {
-    dest = py_to_cbpp<T>(pyObj);
-  }
-}
-
-template<typename T>
-inline void
-extract_field_if_not_empty(PyObject* dict, PyObject* interned_key, T& dest)
-{
-  PyObject* pyObj = PyDict_GetItem(dict, interned_key);
   if (pyObj != nullptr && pyObj != Py_None) {
     dest = py_to_cbpp<T>(pyObj);
   }
@@ -168,33 +147,6 @@ extract_required_field(PyObject* kwargs,
   return true;
 }
 
-template<typename T>
-inline bool
-extract_required_field(PyObject* dict,
-                       PyObject* interned_key,
-                       T& dest,
-                       const char* context,
-                       const char* file,
-                       int line)
-{
-  PyObject* pyObj = PyDict_GetItem(dict, interned_key);
-  if (pyObj == nullptr || pyObj == Py_None) {
-    raise_required_field_missing(interned_key, context, file, line);
-    return false;
-  }
-
-  dest = py_to_cbpp<T>(pyObj);
-
-  if constexpr (std::is_same_v<T, std::string>) {
-    if (dest.empty()) {
-      raise_required_field_empty(interned_key, context, file, line);
-      return false;
-    }
-  }
-
-  return true;
-}
-
 inline void
 extract_legacy_span_field(PyObject* source_obj,
                           std::shared_ptr<couchbase::tracing::request_span>& dest)
@@ -230,9 +182,9 @@ extract_legacy_span_field(PyObject* dict,
 }
 
 // Shared convention for every add_* helper below (add_field, add_bool_field,
-// add_string_field_if_not_empty, add_duration_field, add_cpp_core_span_field): return 0 on
-// success, -1 on failure, self-reported via PyErr_WriteUnraisable (matches logger.hxx) since
-// most callers (generated code) never check the return value.
+// add_string_field_if_not_empty): return 0 on success, -1 on failure, self-reported via
+// PyErr_WriteUnraisable (matches logger.hxx) since most callers (generated code) never check
+// the return value.
 template<typename T>
 inline int
 add_field(PyObject* dict, const char* key, const T& value)
@@ -317,46 +269,6 @@ add_string_field_if_not_empty(PyObject* dict, const char* key, const std::string
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
     CB_LOG_WARNING("PYCBC: Failed to set string field '{}' on result dict.", key);
-  }
-  return rv;
-}
-
-// Add duration field to dict (specialized - as milliseconds)
-inline int
-add_duration_field(PyObject* dict, const char* key, const std::chrono::milliseconds& value)
-{
-  PyObject* pyObj = PyLong_FromUnsignedLongLong(value.count());
-  if (pyObj == nullptr) {
-    PyErr_WriteUnraisable(dict);
-    CB_LOG_WARNING("PYCBC: Failed to convert duration field '{}' for result dict.", key);
-    return -1;
-  }
-  int rv = PyDict_SetItemString(dict, key, pyObj);
-  Py_DECREF(pyObj);
-  if (rv < 0) {
-    PyErr_WriteUnraisable(dict);
-    CB_LOG_WARNING("PYCBC: Failed to set duration field '{}' on result dict.", key);
-  }
-  return rv;
-}
-
-inline int
-add_cpp_core_span_field(
-  PyObject* dict,
-  const char* key,
-  const std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>& wrapperSpan)
-{
-  PyObject* pyObj = cbpp_wrapper_span_to_py(wrapperSpan);
-  if (pyObj == nullptr) {
-    PyErr_WriteUnraisable(dict);
-    CB_LOG_WARNING("PYCBC: Failed to convert span field '{}' for result dict.", key);
-    return -1;
-  }
-  int rv = PyDict_SetItemString(dict, key, pyObj);
-  Py_DECREF(pyObj);
-  if (rv < 0) {
-    PyErr_WriteUnraisable(dict);
-    CB_LOG_WARNING("PYCBC: Failed to set span field '{}' on result dict.", key);
   }
   return rv;
 }
