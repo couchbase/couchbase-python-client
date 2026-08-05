@@ -77,12 +77,6 @@ set_runtime_error_if_unset(const char* message)
 }
 
 /**
- * Get the PyTypeObject for the exception base type.
- */
-PyTypeObject*
-get_exception_type();
-
-/**
  * Create a new exception base object.
  */
 pycbc_exception*
@@ -113,24 +107,6 @@ build_exception(const std::error_code& ec,
  */
 PyObject*
 raise_invalid_argument(const char* message, const char* file = __FILE__, int line = __LINE__);
-
-/**
- * Raise InvalidArgumentException for missing required field.
- */
-PyObject*
-raise_required_field_missing(PyObject* interned_key,
-                             const char* context,
-                             const char* file = __FILE__,
-                             int line = __LINE__);
-
-/**
- * Raise InvalidArgumentException for empty required field.
- */
-PyObject*
-raise_required_field_empty(PyObject* interned_key,
-                           const char* context,
-                           const char* file = __FILE__,
-                           int line = __LINE__);
 
 /**
  * Raise FeatureUnavailableException with the given message.
@@ -231,47 +207,6 @@ build_exc_info_dict(const char* file, int line, const char* message)
   }
 
   return exc_info;
-}
-
-template<typename Context>
-inline PyObject*
-build_base_error_context(const Context& ctx)
-{
-  PyObject* dict = PyDict_New();
-  if (dict == nullptr) {
-    return nullptr;
-  }
-
-  if (ctx.last_dispatched_to.has_value()) {
-    PyObject* pyObj_tmp = PyUnicode_FromString(ctx.last_dispatched_to.value().c_str());
-    PyDict_SetItemString(dict, "last_dispatched_to", pyObj_tmp);
-    Py_DECREF(pyObj_tmp);
-  }
-
-  if (ctx.last_dispatched_from.has_value()) {
-    PyObject* pyObj_tmp = PyUnicode_FromString(ctx.last_dispatched_from.value().c_str());
-    PyDict_SetItemString(dict, "last_dispatched_from", pyObj_tmp);
-    Py_DECREF(pyObj_tmp);
-  }
-
-  PyObject* pyObj_tmp = PyLong_FromLong(ctx.retry_attempts);
-  PyDict_SetItemString(dict, "retry_attempts", pyObj_tmp);
-  Py_DECREF(pyObj_tmp);
-
-  PyObject* retry_reasons = PySet_New(nullptr);
-  for (const auto& rr : ctx.retry_reasons) {
-    auto reason = retry_reason_to_string(rr);
-    PyObject* reason_str = PyUnicode_FromString(reason.c_str());
-    PySet_Add(retry_reasons, reason_str);
-    Py_DECREF(reason_str);
-  }
-  Py_ssize_t set_size = PySet_Size(retry_reasons);
-  if (set_size > 0) {
-    PyDict_SetItemString(dict, "retry_reasons", retry_reasons);
-  }
-  Py_DECREF(retry_reasons);
-
-  return dict;
 }
 
 template<typename Context>
