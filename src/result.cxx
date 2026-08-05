@@ -173,6 +173,7 @@ pycbc_streamed_result__dealloc__(pycbc_streamed_result* self)
   Py_XDECREF(self->core_span);
   Py_XDECREF(self->start_time);
   Py_XDECREF(self->end_time);
+  self->rows.reset();
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
