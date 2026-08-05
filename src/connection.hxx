@@ -27,6 +27,7 @@
 #include "utils.hxx"
 #include <asio/io_context.hpp>
 #include <core/cluster.hxx>
+#include <core/logger/logger.hxx>
 #include <future>
 #include <list>
 #include <memory>
@@ -134,6 +135,7 @@ private:
       // otherwise be silently dropped when this IO thread's GIL state is released),
       // and the callback path has no error channel from this IO thread at all.
       PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
+      CB_LOG_WARNING("PYCBC: Failed to convert cluster operation result.");
       if (barrier != nullptr) {
         barrier->set_value(nullptr);
       }
@@ -248,6 +250,7 @@ private:
             // otherwise be silently dropped when this IO thread's GIL state is released),
             // and the callback path has no error channel from this IO thread at all.
             PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
+            CB_LOG_WARNING("PYCBC: Failed to finalize KV result.");
             if (barrier != nullptr) {
               barrier->set_value(nullptr);
             }

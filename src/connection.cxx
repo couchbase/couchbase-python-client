@@ -107,6 +107,7 @@ Connection::handle_connection_operation_callback(std::error_code ec,
       // GIL state is released), and the callback path has no error channel from
       // this IO thread at all.
       PyErr_WriteUnraisable(pyObj_errback != nullptr ? pyObj_errback : pyObj_callback);
+      CB_LOG_WARNING("PYCBC: Failed to build exception object for '{}'.", operation);
       if (barrier != nullptr) {
         barrier->set_value(nullptr);
       }

@@ -27,6 +27,7 @@
 #include <core/cluster_credentials.hxx>
 #include <core/cluster_options.hxx>
 #include <core/io/dns_config.hxx>
+#include <core/logger/logger.hxx>
 #include <core/operations/document_analytics.hxx>
 #include <core/operations/document_query.hxx>
 #include <core/operations/document_search.hxx>
@@ -239,12 +240,14 @@ add_field(PyObject* dict, const char* key, const T& value)
   PyObject* pyObj = cbpp_to_py(value);
   if (pyObj == nullptr) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to convert field '{}' for result dict.", key);
     return -1;
   }
   int rv = PyDict_SetItemString(dict, key, pyObj);
   Py_DECREF(pyObj);
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set field '{}' on result dict.", key);
   }
   return rv;
 }
@@ -256,12 +259,14 @@ add_field(PyObject* dict, PyObject* interned_key, const T& value)
   PyObject* pyObj = cbpp_to_py(value);
   if (pyObj == nullptr) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to convert an interned-key field for result dict.");
     return -1;
   }
   int rv = PyDict_SetItem(dict, interned_key, pyObj);
   Py_DECREF(pyObj);
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set an interned-key field on result dict.");
   }
   return rv;
 }
@@ -272,12 +277,14 @@ add_field(PyObject* dict, const char* key, PyObject* value)
 {
   if (value == nullptr) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Field '{}' value was null when adding to result dict.", key);
     return -1;
   }
   int rv = PyDict_SetItemString(dict, key, value);
   Py_DECREF(value);
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set field '{}' on result dict.", key);
   }
   return rv;
 }
@@ -288,6 +295,7 @@ add_bool_field(PyObject* dict, const char* key, bool value)
   int rv = PyDict_SetItemString(dict, key, value ? Py_True : Py_False);
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set bool field '{}' on result dict.", key);
   }
   return rv;
 }
@@ -301,12 +309,14 @@ add_string_field_if_not_empty(PyObject* dict, const char* key, const std::string
   PyObject* pyObj = PyUnicode_FromString(value.c_str());
   if (pyObj == nullptr) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to convert string field '{}' for result dict.", key);
     return -1;
   }
   int rv = PyDict_SetItemString(dict, key, pyObj);
   Py_DECREF(pyObj);
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set string field '{}' on result dict.", key);
   }
   return rv;
 }
@@ -318,12 +328,14 @@ add_duration_field(PyObject* dict, const char* key, const std::chrono::milliseco
   PyObject* pyObj = PyLong_FromUnsignedLongLong(value.count());
   if (pyObj == nullptr) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to convert duration field '{}' for result dict.", key);
     return -1;
   }
   int rv = PyDict_SetItemString(dict, key, pyObj);
   Py_DECREF(pyObj);
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set duration field '{}' on result dict.", key);
   }
   return rv;
 }
@@ -337,12 +349,14 @@ add_cpp_core_span_field(
   PyObject* pyObj = cbpp_wrapper_span_to_py(wrapperSpan);
   if (pyObj == nullptr) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to convert span field '{}' for result dict.", key);
     return -1;
   }
   int rv = PyDict_SetItemString(dict, key, pyObj);
   Py_DECREF(pyObj);
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set span field '{}' on result dict.", key);
   }
   return rv;
 }
