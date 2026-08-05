@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Python.h"
+#include <core/logger/logger.hxx>
 #include <couchbase/tracing/request_tracer.hxx>
 #include <iostream>
 #include <stdexcept>
@@ -47,6 +48,8 @@ public:
     if (pyObj_set_attribute_ == nullptr) {
       // spans are built where we have no way to report a failure, so no-op add_tag() instead
       PyErr_WriteUnraisable(pyObj_span_);
+      CB_LOG_WARNING("PYCBC: Legacy tracing span has no 'set_attribute' method; add_tag() will "
+                     "be a no-op for this span.");
     }
   }
 
@@ -83,10 +86,13 @@ public:
       PyObject* pyObj_finish = PyObject_GetAttrString(pyObj_span_, "finish");
       if (pyObj_finish == nullptr) {
         PyErr_WriteUnraisable(pyObj_span_);
+        CB_LOG_WARNING("PYCBC: Legacy tracing span has no 'finish' method; end() is a no-op for "
+                       "this span.");
       } else {
         PyObject* pyObj_res = PyObject_CallObject(pyObj_finish, nullptr);
         if (pyObj_res == nullptr) {
           PyErr_WriteUnraisable(pyObj_finish);
+          CB_LOG_WARNING("PYCBC: Legacy tracing span's 'finish' method raised an exception.");
         }
         Py_XDECREF(pyObj_res);
         Py_DECREF(pyObj_finish);
@@ -108,6 +114,7 @@ private:
       // add_tag() returns into C++ core, so an error must never be left pending
       if (PyErr_Occurred() != nullptr) {
         PyErr_WriteUnraisable(pyObj_span_);
+        CB_LOG_WARNING("PYCBC: Failed to build args for legacy tracing add_tag().");
       }
       Py_XDECREF(pyObj_args);
       return;
@@ -115,6 +122,7 @@ private:
     PyObject* pyObj_res = PyObject_Call(pyObj_set_attribute_, pyObj_args, nullptr);
     if (pyObj_res == nullptr) {
       PyErr_WriteUnraisable(pyObj_set_attribute_);
+      CB_LOG_WARNING("PYCBC: Legacy tracing span's 'set_attribute' method raised an exception.");
     }
     Py_XDECREF(pyObj_res);
     Py_DECREF(pyObj_args);
@@ -211,6 +219,7 @@ private:
     if (pyObj_span == nullptr) {
       // start_span() returns into C++ core, so an error must never be left pending
       PyErr_WriteUnraisable(pyObj_start_span_);
+      CB_LOG_WARNING("PYCBC: Legacy tracer's 'start_span' method raised an exception.");
     }
     Py_XDECREF(pyObj_name);
     Py_XDECREF(pyObj_args);

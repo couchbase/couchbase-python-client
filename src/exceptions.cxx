@@ -18,6 +18,7 @@
 #include "exceptions.hxx"
 #include "pytocbpp_defs.hxx"
 #include "pytype_utils.hxx"
+#include <core/logger/logger.hxx>
 #include <cstring>
 
 namespace pycbc
@@ -526,6 +527,7 @@ build_pycbc_exception_from_python_exc(const char* default_message, const char* f
       Py_DECREF(exc_str);
     } else {
       PyErr_WriteUnraisable(exc_value);
+      CB_LOG_WARNING("PYCBC: Failed to stringify exception value.");
       pycbc_exc->message = default_message;
     }
   } else {
