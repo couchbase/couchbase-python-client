@@ -459,7 +459,7 @@ cluster_options_to_py(const couchbase::core::cluster_options& opts,
   // DNS configuration
   add_bool_field(dict, "enable_dns_srv", opts.enable_dns_srv);
   add_field(dict, "dns_nameserver", opts.dns_config.nameserver());
-  add_field(dict, "use_ip_protocol", opts.dns_config.port());
+  add_field(dict, "dns_port", opts.dns_config.port());
 
   // TLS options
   add_bool_field(dict, "enable_tls", opts.enable_tls);
@@ -586,15 +586,17 @@ get_default_timeout(const Request& req)
 {
   if constexpr (std::is_same_v<Request, couchbase::core::operations::analytics_request>) {
     return couchbase::core::timeout_defaults::analytics_timeout;
-  }
-  if constexpr (std::is_same_v<Request, couchbase::core::operations::query_request>) {
+  } else if constexpr (std::is_same_v<Request, couchbase::core::operations::query_request>) {
     return couchbase::core::timeout_defaults::query_timeout;
-  }
-  if constexpr (std::is_same_v<Request, couchbase::core::operations::search_request>) {
+  } else if constexpr (std::is_same_v<Request, couchbase::core::operations::search_request>) {
     return couchbase::core::timeout_defaults::search_timeout;
-  }
-  if constexpr (std::is_same_v<Request, couchbase::core::operations::document_view_request>) {
+  } else if constexpr (std::is_same_v<Request,
+                                      couchbase::core::operations::document_view_request>) {
     return couchbase::core::timeout_defaults::view_timeout;
+  } else {
+    // Dependent-false: only fires if this branch is actually instantiated via a request type
+    // that is currently not supported.
+    static_assert(!std::is_same_v<Request, Request>, "get_default_timeout: unhandled Request type");
   }
 }
 
