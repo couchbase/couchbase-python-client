@@ -46,4 +46,29 @@ private:
   PyThreadState* state_;
 };
 
+// Acquires the GIL for the guard's lifetime, for threads that may hold no Python thread state
+// at all (e.g. a core IO thread). Always releases on scope exit, including exception unwind,
+// unlike a bare PyGILState_Ensure/Release pair with a release site in every early return.
+class gil_acquire_guard
+{
+public:
+  gil_acquire_guard()
+    : state_(PyGILState_Ensure())
+  {
+  }
+
+  ~gil_acquire_guard()
+  {
+    PyGILState_Release(state_);
+  }
+
+  gil_acquire_guard(const gil_acquire_guard&) = delete;
+  gil_acquire_guard& operator=(const gil_acquire_guard&) = delete;
+  gil_acquire_guard(gil_acquire_guard&&) = delete;
+  gil_acquire_guard& operator=(gil_acquire_guard&&) = delete;
+
+private:
+  PyGILState_STATE state_;
+};
+
 } // namespace pycbc

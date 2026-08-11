@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Python.h"
+#include "gil_guard.hxx"
 #include <atomic>
 #include <core/logger/configuration.hxx>
 #include <core/logger/logger.hxx>
@@ -132,61 +133,51 @@ public:
 protected:
   void log_it_(const spdlog::details::log_msg& msg)
   {
-    PyGILState_STATE state = PyGILState_Ensure();
-    try {
+    pycbc::gil_acquire_guard gil;
 
-      // convert the log_msg_copy to a dict first...
-      auto pyObj_log_record_details = convert_log_msg(msg);
-      if (nullptr == pyObj_log_record_details) {
-        PyErr_WriteUnraisable(pyObj_logger_);
-        PyGILState_Release(state);
-        return;
+    // convert the log_msg_copy to a dict first...
+    auto pyObj_log_record_details = convert_log_msg(msg);
+    if (nullptr == pyObj_log_record_details) {
+      PyErr_WriteUnraisable(pyObj_logger_);
+      return;
+    }
+
+    // now, create an actual LogRecord from it...
+    auto pyObj_log_record = PyObject_CallObject(pyObj_log_record_type_, pyObj_log_record_details);
+    Py_DECREF(pyObj_log_record_details);
+    if (nullptr != pyObj_log_record) {
+      // we need to fixup the created time, which cannot be passed in the constructor...
+      // The created member is a float containing a float expressed as seconds since the epoch, in
+      // UTC.
+      PyObject* log_time = convert_time_to_float(msg.time);
+      if (nullptr == log_time) {
+        PyErr_WriteUnraisable(pyObj_log_record);
+      } else {
+        if (-1 == PyObject_SetAttrString(pyObj_log_record, "created", log_time)) {
+          PyErr_WriteUnraisable(pyObj_log_record);
+        }
+        Py_DECREF(log_time);
       }
 
-      // now, create an actual LogRecord from it...
-      auto pyObj_log_record = PyObject_CallObject(pyObj_log_record_type_, pyObj_log_record_details);
-      Py_DECREF(pyObj_log_record_details);
-      if (nullptr != pyObj_log_record) {
-        // we need to fixup the created time, which cannot be passed in the constructor...
-        // The created member is a float containing a float expressed as seconds since the epoch, in
-        // UTC.
-        PyObject* log_time = convert_time_to_float(msg.time);
-        if (nullptr == log_time) {
-          PyErr_WriteUnraisable(pyObj_log_record);
-        } else {
-          if (-1 == PyObject_SetAttrString(pyObj_log_record, "created", log_time)) {
-            PyErr_WriteUnraisable(pyObj_log_record);
-          }
-          Py_DECREF(log_time);
-        }
-
-        // now, we want to hand this record to the logger...
-        PyObject* pyObj_args = PyTuple_Pack(1, pyObj_log_record);
-        if (nullptr == pyObj_args) {
+      // now, we want to hand this record to the logger...
+      PyObject* pyObj_args = PyTuple_Pack(1, pyObj_log_record);
+      if (nullptr == pyObj_args) {
+        PyErr_WriteUnraisable(pyObj_logger_handle_method_);
+      } else {
+        PyObject* pyObj_handle_result =
+          PyObject_CallObject(pyObj_logger_handle_method_, pyObj_args);
+        if (nullptr == pyObj_handle_result) {
           PyErr_WriteUnraisable(pyObj_logger_handle_method_);
         } else {
-          PyObject* pyObj_handle_result =
-            PyObject_CallObject(pyObj_logger_handle_method_, pyObj_args);
-          if (nullptr == pyObj_handle_result) {
-            PyErr_WriteUnraisable(pyObj_logger_handle_method_);
-          } else {
-            Py_DECREF(pyObj_handle_result);
-          }
-          Py_DECREF(pyObj_args);
+          Py_DECREF(pyObj_handle_result);
         }
+        Py_DECREF(pyObj_args);
+      }
 
-        // that's it, now cleanup.
-        Py_DECREF(pyObj_log_record);
-      } else {
-        PyErr_WriteUnraisable(pyObj_log_record_type_);
-      }
-      PyGILState_Release(state);
-    } catch (...) {
-      // Only release GIL if still active
-      if (active_.load(std::memory_order_acquire)) {
-        PyGILState_Release(state);
-      }
-      throw;
+      // that's it, now cleanup.
+      Py_DECREF(pyObj_log_record);
+    } else {
+      PyErr_WriteUnraisable(pyObj_log_record_type_);
     }
   }
 
