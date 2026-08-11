@@ -19,6 +19,7 @@
 #include "transactions.hxx"
 #include "../cpp_core_enums_autogen.hxx"
 #include "../exceptions.hxx"
+#include "../gil_guard.hxx"
 #include "../operations_autogen.hxx"
 #include "../pytype_utils.hxx"
 #include "../utils.hxx"
@@ -36,9 +37,20 @@ void
 pycbc::txns::dealloc_transactions(PyObject* obj)
 {
   auto txns = reinterpret_cast<pycbc::txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
-  Py_BEGIN_ALLOW_THREADS txns->txns->close();
+  // A dealloc must not let a C++ exception escape into CPython's deallocation machinery, so
+  // log and swallow rather than propagate; there is no Python call frame left to report it to.
+  // The GIL stays released across the delete: ~transactions joins the cleanup threads and does
+  // blocking IO, so holding it there risks deadlocking a callback waiting to reacquire it.
+  gil_release_guard no_gil;
+  try {
+    txns->txns->close();
+  } catch (const std::exception& e) {
+    CB_LOG_ERROR("PYCBC: dealloc_transactions: close() threw: {}", e.what());
+  } catch (...) {
+    CB_LOG_ERROR("PYCBC: dealloc_transactions: close() threw an unknown exception");
+  }
   delete txns;
-  Py_END_ALLOW_THREADS CB_LOG_DEBUG("dealloc transactions");
+  CB_LOG_DEBUG("dealloc transactions");
 }
 
 void
@@ -665,15 +677,18 @@ pycbc::txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args
   }
 
   std::pair<std::error_code, std::shared_ptr<cbcoretxns::transactions>> res;
-  Py_BEGIN_ALLOW_THREADS auto txn_config =
-    reinterpret_cast<pycbc::txns::transaction_config*>(pyObj_config)->cfg;
-  std::future<std::pair<std::error_code, std::shared_ptr<cbcoretxns::transactions>>> fut =
-    cbcoretxns::transactions::create(conn->conn->cluster(), *txn_config);
-  res = fut.get();
-  Py_END_ALLOW_THREADS
+  try {
+    auto txn_config = reinterpret_cast<pycbc::txns::transaction_config*>(pyObj_config)->cfg;
+    gil_release_guard no_gil;
+    std::future<std::pair<std::error_code, std::shared_ptr<cbcoretxns::transactions>>> fut =
+      cbcoretxns::transactions::create(conn->conn->cluster(), *txn_config);
+    res = fut.get();
+  } catch (const std::exception& e) {
+    set_runtime_error_if_unset(e.what());
+    return nullptr;
+  }
 
-    if (res.first.value())
-  {
+  if (res.first.value()) {
     return pycbc::build_exception(res.first, __FILE__, __LINE__, res.first.message().c_str());
   }
 
@@ -681,11 +696,21 @@ pycbc::txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args
   PyObject* pyObj_txns = PyCapsule_New(txns, "txns_", dealloc_transactions);
   if (pyObj_txns == nullptr) {
     // No capsule means dealloc_transactions() never runs, so release the wrapper (and the core
-    // cleanup threads it owns) here. GIL released b/c close() blocks joining those threads.
-    Py_BEGIN_ALLOW_THREADS txns->txns->close();
-    delete txns;
-    res.second.reset();
-    Py_END_ALLOW_THREADS return nullptr;
+    // cleanup threads it owns) here. GIL released across all of it b/c close() blocks joining
+    // those threads and dropping the last shared_ptr ref runs the same teardown again.
+    {
+      gil_release_guard no_gil;
+      try {
+        txns->txns->close();
+      } catch (const std::exception& e) {
+        CB_LOG_ERROR("PYCBC: create_transactions cleanup close() threw: {}", e.what());
+      } catch (...) {
+        CB_LOG_ERROR("PYCBC: create_transactions cleanup close() threw an unknown exception");
+      }
+      delete txns;
+      res.second.reset();
+    }
+    return nullptr;
   }
   return pyObj_txns;
 }
@@ -711,8 +736,14 @@ pycbc::txns::destroy_transactions([[maybe_unused]] PyObject* self, PyObject* arg
     PyErr_SetString(PyExc_ValueError, "passed null transactions");
     return nullptr;
   }
-  Py_BEGIN_ALLOW_THREADS txns->txns->close();
-  Py_END_ALLOW_THREADS Py_RETURN_NONE;
+  try {
+    gil_release_guard no_gil;
+    txns->txns->close();
+  } catch (const std::exception& e) {
+    set_runtime_error_if_unset(e.what());
+    return nullptr;
+  }
+  Py_RETURN_NONE;
 }
 
 std::string
@@ -1158,18 +1189,30 @@ pycbc::txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* arg
   Py_XINCREF(pyObj_errback);
   auto barrier = std::make_shared<std::promise<PyObject*>>();
   auto fut = barrier->get_future();
-  Py_BEGIN_ALLOW_THREADS ctx->ctx->query(
-    statement,
-    *opt->opts,
-    [pyObj_callback, pyObj_errback, barrier](
-      std::exception_ptr err, std::optional<couchbase::core::operations::query_response> resp) {
-      handle_returning_query_result(pyObj_callback, pyObj_errback, barrier, err, resp);
-    });
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
-  {
+  try {
+    gil_release_guard no_gil;
+    ctx->ctx->query(
+      statement,
+      *opt->opts,
+      [pyObj_callback, pyObj_errback, barrier](
+        std::exception_ptr err, std::optional<couchbase::core::operations::query_response> resp) {
+        handle_returning_query_result(pyObj_callback, pyObj_errback, barrier, err, resp);
+      });
+  } catch (const std::exception& e) {
+    Py_XDECREF(pyObj_callback);
+    Py_XDECREF(pyObj_errback);
+    return raise_invalid_argument(e.what());
+  }
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
-    Py_BEGIN_ALLOW_THREADS ret = fut.get();
-    Py_END_ALLOW_THREADS return ret;
+    try {
+      gil_release_guard no_gil;
+      ret = fut.get();
+    } catch (const std::exception& e) {
+      set_runtime_error_if_unset(e.what());
+      return nullptr;
+    }
+    return ret;
   }
   Py_RETURN_NONE;
 }
@@ -1243,120 +1286,142 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
 
   auto barrier = std::make_shared<std::promise<PyObject*>>();
   auto fut = barrier->get_future();
-  switch (op_type) {
-    case TxOperations::GET: {
-      if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
-        PyErr_SetString(PyExc_ValueError, "couldn't create document id for get");
+  try {
+    switch (op_type) {
+      case TxOperations::GET: {
+        if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
+          PyErr_SetString(PyExc_ValueError, "couldn't create document id for get");
+          Py_XDECREF(pyObj_callback);
+          Py_XDECREF(pyObj_errback);
+          return nullptr;
+        }
+        couchbase::core::document_id id{ bucket, scope, collection, key };
+        gil_release_guard no_gil;
+        ctx->ctx->get_optional(
+          id,
+          [barrier, pyObj_callback, pyObj_errback](
+            std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
+            handle_returning_transaction_get_result(
+              pyObj_callback, pyObj_errback, barrier, err, res);
+          });
+        break;
+      }
+      case TxOperations::GET_REPLICA_FROM_PREFERRED_SERVER_GROUP: {
+        if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
+          PyErr_SetString(
+            PyExc_ValueError,
+            "couldn't create document id for get_replica_from_preferred_server_group");
+          Py_XDECREF(pyObj_callback);
+          Py_XDECREF(pyObj_errback);
+          return nullptr;
+        }
+        couchbase::core::document_id id{ bucket, scope, collection, key };
+        gil_release_guard no_gil;
+        ctx->ctx->get_replica_from_preferred_server_group(
+          id,
+          [barrier, pyObj_callback, pyObj_errback](
+            std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
+            handle_returning_transaction_get_result(
+              pyObj_callback, pyObj_errback, barrier, err, res, true);
+          });
+        break;
+      }
+      case TxOperations::INSERT: {
+        if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
+          PyErr_SetString(PyExc_ValueError, "couldn't create document id for insert");
+          Py_XDECREF(pyObj_callback);
+          Py_XDECREF(pyObj_errback);
+          return nullptr;
+        }
+        couchbase::core::document_id id{ bucket, scope, collection, key };
+        if (nullptr == pyObj_value) {
+          PyErr_SetString(PyExc_ValueError,
+                          fmt::format("no value given for an insert of key {}", id.key()).c_str());
+          Py_XDECREF(pyObj_callback);
+          Py_XDECREF(pyObj_errback);
+          return nullptr;
+        }
+        gil_release_guard no_gil;
+        ctx->ctx->insert(
+          id,
+          value,
+          [barrier, pyObj_callback, pyObj_errback](
+            std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
+            handle_returning_transaction_get_result(
+              pyObj_callback, pyObj_errback, barrier, err, res);
+          });
+        break;
+      }
+      case TxOperations::REPLACE: {
+        if (nullptr == pyObj_value) {
+          PyErr_SetString(PyExc_ValueError, "replace expects a value");
+          Py_XDECREF(pyObj_callback);
+          Py_XDECREF(pyObj_errback);
+          return nullptr;
+        }
+        if (nullptr == pyObj_txn_get_result ||
+            0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
+          PyErr_SetString(PyExc_ValueError,
+                          "replace expects to be passed a transaction_get_result");
+          Py_XDECREF(pyObj_callback);
+          Py_XDECREF(pyObj_errback);
+          return nullptr;
+        }
+        auto tx_get_result =
+          reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_txn_get_result);
+        gil_release_guard no_gil;
+        ctx->ctx->replace(
+          *tx_get_result->res,
+          value,
+          [pyObj_callback, pyObj_errback, barrier](
+            std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
+            handle_returning_transaction_get_result(
+              pyObj_callback, pyObj_errback, barrier, err, res);
+          });
+        break;
+      }
+      case TxOperations::REMOVE: {
+        if (nullptr == pyObj_txn_get_result ||
+            0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
+          PyErr_SetString(PyExc_ValueError, "remove expects to be passed a transaction_get_result");
+          Py_XDECREF(pyObj_callback);
+          Py_XDECREF(pyObj_errback);
+          return nullptr;
+        }
+        auto tx_get_result =
+          reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_txn_get_result);
+        gil_release_guard no_gil;
+        ctx->ctx->remove(*tx_get_result->res,
+                         [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err) {
+                           handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
+                         });
+        break;
+      }
+      default:
+        // No case dispatched, so no completion handler will ever run to fulfill barrier or
+        // DECREF the callback/errback refs above. Return here rather than falling through:
+        // the sync path would otherwise block forever on fut.get() waiting on a promise
+        // nothing will set, and the async path would leak both refs.
+        PyErr_SetString(PyExc_ValueError, "unknown txn operation");
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
         return nullptr;
-      }
-      couchbase::core::document_id id{ bucket, scope, collection, key };
-      Py_BEGIN_ALLOW_THREADS ctx->ctx->get_optional(
-        id,
-        [barrier, pyObj_callback, pyObj_errback](
-          std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
-          handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
-        });
-      Py_END_ALLOW_THREADS break;
     }
-    case TxOperations::GET_REPLICA_FROM_PREFERRED_SERVER_GROUP: {
-      if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
-        PyErr_SetString(PyExc_ValueError,
-                        "couldn't create document id for get_replica_from_preferred_server_group");
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-        return nullptr;
-      }
-      couchbase::core::document_id id{ bucket, scope, collection, key };
-      Py_BEGIN_ALLOW_THREADS ctx->ctx->get_replica_from_preferred_server_group(
-        id,
-        [barrier, pyObj_callback, pyObj_errback](
-          std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
-          handle_returning_transaction_get_result(
-            pyObj_callback, pyObj_errback, barrier, err, res, true);
-        });
-      Py_END_ALLOW_THREADS break;
-    }
-    case TxOperations::INSERT: {
-      if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
-        PyErr_SetString(PyExc_ValueError, "couldn't create document id for insert");
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-        return nullptr;
-      }
-      couchbase::core::document_id id{ bucket, scope, collection, key };
-      if (nullptr == pyObj_value) {
-        PyErr_SetString(PyExc_ValueError,
-                        fmt::format("no value given for an insert of key {}", id.key()).c_str());
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-        return nullptr;
-      }
-      Py_BEGIN_ALLOW_THREADS ctx->ctx->insert(
-        id,
-        value,
-        [barrier, pyObj_callback, pyObj_errback](
-          std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
-          handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
-        });
-      Py_END_ALLOW_THREADS break;
-    }
-    case TxOperations::REPLACE: {
-      if (nullptr == pyObj_value) {
-        PyErr_SetString(PyExc_ValueError, "replace expects a value");
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-        return nullptr;
-      }
-      if (nullptr == pyObj_txn_get_result ||
-          0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
-        PyErr_SetString(PyExc_ValueError, "replace expects to be passed a transaction_get_result");
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-        return nullptr;
-      }
-      auto tx_get_result =
-        reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_txn_get_result);
-      Py_BEGIN_ALLOW_THREADS ctx->ctx->replace(
-        *tx_get_result->res,
-        value,
-        [pyObj_callback, pyObj_errback, barrier](
-          std::exception_ptr err, std::optional<cbcoretxns::transaction_get_result> res) {
-          handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
-        });
-      Py_END_ALLOW_THREADS break;
-    }
-    case TxOperations::REMOVE: {
-      if (nullptr == pyObj_txn_get_result ||
-          0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
-        PyErr_SetString(PyExc_ValueError, "remove expects to be passed a transaction_get_result");
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-        return nullptr;
-      }
-      auto tx_get_result =
-        reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_txn_get_result);
-      Py_BEGIN_ALLOW_THREADS ctx->ctx->remove(
-        *tx_get_result->res, [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err) {
-          handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
-        });
-      Py_END_ALLOW_THREADS break;
-    }
-    default:
-      // No case dispatched, so no completion handler will ever run to fulfill barrier or
-      // DECREF the callback/errback refs above. Return here rather than falling through:
-      // the sync path would otherwise block forever on fut.get() waiting on a promise
-      // nothing will set, and the async path would leak both refs.
-      PyErr_SetString(PyExc_ValueError, "unknown txn operation");
-      Py_XDECREF(pyObj_callback);
-      Py_XDECREF(pyObj_errback);
-      return nullptr;
+  } catch (const std::exception& e) {
+    Py_XDECREF(pyObj_callback);
+    Py_XDECREF(pyObj_errback);
+    return raise_invalid_argument(e.what());
   }
   if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
-    Py_BEGIN_ALLOW_THREADS ret = fut.get();
-    Py_END_ALLOW_THREADS return ret;
+    try {
+      gil_release_guard no_gil;
+      ret = fut.get();
+    } catch (const std::exception& e) {
+      set_runtime_error_if_unset(e.what());
+      return nullptr;
+    }
+    return ret;
   }
   Py_RETURN_NONE;
 }
@@ -1494,43 +1559,56 @@ pycbc::txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
     ids.emplace_back(couchbase::core::document_id{ bucket, scope, collection, id });
   }
 
-  if (op_type == TxOperations::GET_MULTI) {
-    auto get_multi_mode = get_transaction_get_multi_mode(mode);
-    Py_BEGIN_ALLOW_THREADS ctx->ctx->get_multi(
-      ids,
-      get_multi_mode,
-      [barrier, pyObj_callback, pyObj_errback](
-        std::exception_ptr err, std::optional<cbcoretxns::transaction_get_multi_result> res) {
-        handle_returning_transaction_get_multi_result(
-          pyObj_callback, pyObj_errback, barrier, err, res);
-      });
-    Py_END_ALLOW_THREADS
-  } else if (op_type == TxOperations::GET_MULTI_REPLICAS_FROM_PREFERRED_SERVER_GROUP) {
-    auto get_multi_mode = get_transaction_get_multi_replicas_from_preferred_server_group_mode(mode);
-    Py_BEGIN_ALLOW_THREADS ctx->ctx->get_multi_replicas_from_preferred_server_group(
-      ids,
-      get_multi_mode,
-      [barrier, pyObj_callback, pyObj_errback](
-        std::exception_ptr err,
-        std::optional<cbcoretxns::transaction_get_multi_replicas_from_preferred_server_group_result>
-          res) {
-        handle_returning_transaction_get_multi_result(
-          pyObj_callback, pyObj_errback, barrier, err, res);
-      });
-    Py_END_ALLOW_THREADS
-  } else {
-    // Same leak as transaction_op's default: case (see comment there) — no op dispatched, so
-    // nothing will DECREF the callback/errback refs XINCREF'd above.
-    PyErr_SetString(PyExc_ValueError, "Unknown transaction operation");
+  try {
+    if (op_type == TxOperations::GET_MULTI) {
+      auto get_multi_mode = get_transaction_get_multi_mode(mode);
+      gil_release_guard no_gil;
+      ctx->ctx->get_multi(
+        ids,
+        get_multi_mode,
+        [barrier, pyObj_callback, pyObj_errback](
+          std::exception_ptr err, std::optional<cbcoretxns::transaction_get_multi_result> res) {
+          handle_returning_transaction_get_multi_result(
+            pyObj_callback, pyObj_errback, barrier, err, res);
+        });
+    } else if (op_type == TxOperations::GET_MULTI_REPLICAS_FROM_PREFERRED_SERVER_GROUP) {
+      auto get_multi_mode =
+        get_transaction_get_multi_replicas_from_preferred_server_group_mode(mode);
+      gil_release_guard no_gil;
+      ctx->ctx->get_multi_replicas_from_preferred_server_group(
+        ids,
+        get_multi_mode,
+        [barrier, pyObj_callback, pyObj_errback](
+          std::exception_ptr err,
+          std::optional<
+            cbcoretxns::transaction_get_multi_replicas_from_preferred_server_group_result> res) {
+          handle_returning_transaction_get_multi_result(
+            pyObj_callback, pyObj_errback, barrier, err, res);
+        });
+    } else {
+      // Same leak as transaction_op's default: case (see comment there) — no op dispatched, so
+      // nothing will DECREF the callback/errback refs XINCREF'd above.
+      PyErr_SetString(PyExc_ValueError, "Unknown transaction operation");
+      Py_XDECREF(pyObj_callback);
+      Py_XDECREF(pyObj_errback);
+      return nullptr;
+    }
+  } catch (const std::exception& e) {
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
-    return nullptr;
+    return raise_invalid_argument(e.what());
   }
 
   if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
-    Py_BEGIN_ALLOW_THREADS ret = fut.get();
-    Py_END_ALLOW_THREADS return ret;
+    try {
+      gil_release_guard no_gil;
+      ret = fut.get();
+    } catch (const std::exception& e) {
+      set_runtime_error_if_unset(e.what());
+      return nullptr;
+    }
+    return ret;
   }
   Py_RETURN_NONE;
 }
@@ -1591,15 +1669,26 @@ pycbc::txns::create_new_attempt_context([[maybe_unused]] PyObject* self,
     barrier = std::make_shared<std::promise<PyObject*>>();
     fut = barrier->get_future();
   }
-  Py_BEGIN_ALLOW_THREADS ctx->ctx->new_attempt_context(
-    [barrier, pyObj_callback, pyObj_errback](std::exception_ptr err) {
+  try {
+    gil_release_guard no_gil;
+    ctx->ctx->new_attempt_context([barrier, pyObj_callback, pyObj_errback](std::exception_ptr err) {
       handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
     });
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
-  {
+  } catch (const std::exception& e) {
+    Py_XDECREF(pyObj_callback);
+    Py_XDECREF(pyObj_errback);
+    return raise_invalid_argument(e.what());
+  }
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
-    Py_BEGIN_ALLOW_THREADS ret = fut.get();
-    Py_END_ALLOW_THREADS return ret;
+    try {
+      gil_release_guard no_gil;
+      ret = fut.get();
+    } catch (const std::exception& e) {
+      set_runtime_error_if_unset(e.what());
+      return nullptr;
+    }
+    return ret;
   }
   Py_RETURN_NONE;
 }
@@ -1643,9 +1732,18 @@ pycbc::txns::create_transaction_context([[maybe_unused]] PyObject* self,
     nullptr != pyObj_transaction_options && Py_None != pyObj_transaction_options
       ? *(reinterpret_cast<pycbc::txns::transaction_options*>(pyObj_transaction_options)->opts)
       : cbtxns::transaction_options();
-  auto py_ctx = new pycbc::txns::transaction_context(
-    cbcoretxns::transaction_context::create(*txns->txns, tx_options));
+  pycbc::txns::transaction_context* py_ctx = nullptr;
+  try {
+    py_ctx = new pycbc::txns::transaction_context(
+      cbcoretxns::transaction_context::create(*txns->txns, tx_options));
+  } catch (const std::exception& e) {
+    return raise_invalid_argument(e.what());
+  }
   PyObject* pyObj_ctx = PyCapsule_New(py_ctx, "ctx_", dealloc_transaction_context);
+  if (pyObj_ctx == nullptr) {
+    delete py_ctx;
+    return nullptr;
+  }
   return pyObj_ctx;
 }
 
@@ -1690,38 +1788,50 @@ pycbc::txns::transaction_commit([[maybe_unused]] PyObject* self, PyObject* args,
     barrier = std::make_shared<std::promise<PyObject*>>();
     fut = barrier->get_future();
   }
-  Py_BEGIN_ALLOW_THREADS ctx->ctx->finalize(
-    [pyObj_callback, pyObj_errback, barrier](std::optional<cbcoretxns::transaction_exception> err,
-                                             std::optional<cbtxns::transaction_result> res) {
-      auto state = PyGILState_Ensure();
-      bool had_error = static_cast<bool>(err);
-      PyObject* pyObj_result = nullptr;
-      if (had_error) {
-        auto exc_type = pycbc::txns::TxnExceptionType::COUCHBASE_ERROR;
-        switch (err->type()) {
-          case cbcoretxns::failure_type::FAIL:
-            exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_FAILED;
-            break;
-          case cbcoretxns::failure_type::COMMIT_AMBIGUOUS:
-            exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_COMMIT_AMBIGUOUS;
-            break;
-          case cbcoretxns::failure_type::EXPIRY:
-            exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_EXPIRED;
-            break;
+  try {
+    gil_release_guard no_gil;
+    ctx->ctx->finalize(
+      [pyObj_callback, pyObj_errback, barrier](std::optional<cbcoretxns::transaction_exception> err,
+                                               std::optional<cbtxns::transaction_result> res) {
+        auto state = PyGILState_Ensure();
+        bool had_error = static_cast<bool>(err);
+        PyObject* pyObj_result = nullptr;
+        if (had_error) {
+          auto exc_type = pycbc::txns::TxnExceptionType::COUCHBASE_ERROR;
+          switch (err->type()) {
+            case cbcoretxns::failure_type::FAIL:
+              exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_FAILED;
+              break;
+            case cbcoretxns::failure_type::COMMIT_AMBIGUOUS:
+              exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_COMMIT_AMBIGUOUS;
+              break;
+            case cbcoretxns::failure_type::EXPIRY:
+              exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_EXPIRED;
+              break;
+          }
+          auto message = txn_external_exception_to_string(err->cause());
+          pyObj_result = create_python_exception(exc_type, message.c_str());
+        } else {
+          pyObj_result = transaction_result_to_dict(res);
         }
-        auto message = txn_external_exception_to_string(err->cause());
-        pyObj_result = create_python_exception(exc_type, message.c_str());
-      } else {
-        pyObj_result = transaction_result_to_dict(res);
-      }
-      complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
-      PyGILState_Release(state);
-    });
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
-  {
+        complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
+        PyGILState_Release(state);
+      });
+  } catch (const std::exception& e) {
+    Py_XDECREF(pyObj_callback);
+    Py_XDECREF(pyObj_errback);
+    return raise_invalid_argument(e.what());
+  }
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
-    Py_BEGIN_ALLOW_THREADS ret = fut.get();
-    Py_END_ALLOW_THREADS return ret;
+    try {
+      gil_release_guard no_gil;
+      ret = fut.get();
+    } catch (const std::exception& e) {
+      set_runtime_error_if_unset(e.what());
+      return nullptr;
+    }
+    return ret;
   }
   Py_RETURN_NONE;
 }
@@ -1766,17 +1876,26 @@ pycbc::txns::transaction_rollback([[maybe_unused]] PyObject* self, PyObject* arg
     barrier = std::make_shared<std::promise<PyObject*>>();
     fut = barrier->get_future();
   }
-  Py_BEGIN_ALLOW_THREADS
-  {
+  try {
+    gil_release_guard no_gil;
     ctx->ctx->rollback([pyObj_callback, pyObj_errback, barrier](std::exception_ptr err) {
       handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
     });
+  } catch (const std::exception& e) {
+    Py_XDECREF(pyObj_callback);
+    Py_XDECREF(pyObj_errback);
+    return raise_invalid_argument(e.what());
   }
-  Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
-  {
+  if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
-    Py_BEGIN_ALLOW_THREADS ret = fut.get();
-    Py_END_ALLOW_THREADS return ret;
+    try {
+      gil_release_guard no_gil;
+      ret = fut.get();
+    } catch (const std::exception& e) {
+      set_runtime_error_if_unset(e.what());
+      return nullptr;
+    }
+    return ret;
   }
   Py_RETURN_NONE;
 }

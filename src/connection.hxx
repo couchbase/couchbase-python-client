@@ -496,83 +496,88 @@ Connection::execute_multi_op(PyObject* arg)
   }
   pycbc_result* multi_result = reinterpret_cast<pycbc_result*>(pyObj_multi_result);
 
-  for (size_t i = 0; i < num_docs; ++i) {
-    PyObject* pyObj_binding = PyList_GetItem(arg, i); // Borrowed ref
-    // Unchecked by contract, see validate_connection_and_multi_request
-    pycbc_kv_request* request = reinterpret_cast<pycbc_kv_request*>(pyObj_binding);
-    std::string key_str = py_to_cbpp<std::string>(request->key);
-    std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span;
-    std::string span_name;
-    extract_field(request->wrapper_span_name, span_name);
-    if (!span_name.empty()) {
-      wrapper_span = std::make_shared<couchbase::core::tracing::wrapper_sdk_span>(span_name);
+  try {
+    for (size_t i = 0; i < num_docs; ++i) {
+      PyObject* pyObj_binding = PyList_GetItem(arg, i); // Borrowed ref
+      // Unchecked by contract, see validate_connection_and_multi_request
+      pycbc_kv_request* request = reinterpret_cast<pycbc_kv_request*>(pyObj_binding);
+      std::string key_str = py_to_cbpp<std::string>(request->key);
+      std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span> wrapper_span;
+      std::string span_name;
+      extract_field(request->wrapper_span_name, span_name);
+      if (!span_name.empty()) {
+        wrapper_span = std::make_shared<couchbase::core::tracing::wrapper_sdk_span>(span_name);
+      }
+
+      auto req = py_to_cbpp<Request>(request, wrapper_span);
+      if (PyErr_Occurred()) {
+        Py_DECREF(pyObj_multi_result);
+        return nullptr;
+      }
+
+      // TODO(PYCBC-1746): Delete w/ removal of legacy tracing logic
+      if (wrapper_span == nullptr) {
+        add_cluster_labels(req);
+      }
+
+      std::optional<std::chrono::system_clock::time_point> start_time;
+      if (request->with_metrics == Py_True) {
+        start_time = std::chrono::system_clock::now();
+      }
+
+      auto barrier = std::make_shared<std::promise<Response>>();
+      auto fut = barrier->get_future();
+
+      staging.push_back({ std::move(req),
+                          std::move(key_str),
+                          std::move(wrapper_span),
+                          start_time,
+                          std::move(barrier),
+                          std::move(fut) });
     }
 
-    auto req = py_to_cbpp<Request>(request, wrapper_span);
-    if (PyErr_Occurred()) {
-      Py_DECREF(pyObj_multi_result);
-      return nullptr;
+    {
+      gil_release_guard no_gil;
+      for (auto& s : staging) {
+        auto barrier = s.barrier;
+        cluster_.execute(s.req, [barrier](Response resp) {
+          barrier->set_value(std::move(resp));
+        });
+      }
+
+      for (auto& s : staging) {
+        s.fut.wait();
+      }
     }
 
-    // TODO(PYCBC-1746): Delete w/ removal of legacy tracing logic
-    if (wrapper_span == nullptr) {
-      add_cluster_labels(req);
-    }
-
-    std::optional<std::chrono::system_clock::time_point> start_time;
-    if (request->with_metrics == Py_True) {
-      start_time = std::chrono::system_clock::now();
-    }
-
-    auto barrier = std::make_shared<std::promise<Response>>();
-    auto fut = barrier->get_future();
-
-    staging.push_back({ std::move(req),
-                        std::move(key_str),
-                        std::move(wrapper_span),
-                        start_time,
-                        std::move(barrier),
-                        std::move(fut) });
-  }
-
-  {
-    gil_release_guard no_gil;
+    bool all_okay = true;
     for (auto& s : staging) {
-      auto barrier = s.barrier;
-      cluster_.execute(s.req, [barrier](Response resp) {
-        barrier->set_value(std::move(resp));
-      });
+      PyObject* res = finalize_kv_result<Request>(
+        s.fut.get(), std::move(s.wrapper_span), std::move(s.start_time));
+      // OOM is not a per-key condition, so abandon the whole multi result rather than
+      // reporting a partial one. An exception is already pending.
+      if (res == nullptr) {
+        Py_DECREF(pyObj_multi_result);
+        return nullptr;
+      }
+      if (PyObject_TypeCheck(res, &pycbc_exception_type)) {
+        all_okay = false;
+      }
+      int rc = PyDict_SetItemString(multi_result->raw_result, s.key_str.c_str(), res);
+      Py_DECREF(res);
+      if (rc < 0) {
+        Py_DECREF(pyObj_multi_result);
+        return nullptr;
+      }
     }
-
-    for (auto& s : staging) {
-      s.fut.wait();
-    }
-  }
-
-  bool all_okay = true;
-  for (auto& s : staging) {
-    PyObject* res =
-      finalize_kv_result<Request>(s.fut.get(), std::move(s.wrapper_span), std::move(s.start_time));
-    // OOM is not a per-key condition, so abandon the whole multi result rather than
-    // reporting a partial one. An exception is already pending.
-    if (res == nullptr) {
+    if (PyDict_SetItemString(multi_result->raw_result, "all_okay", all_okay ? Py_True : Py_False) <
+        0) {
       Py_DECREF(pyObj_multi_result);
       return nullptr;
     }
-    if (PyObject_TypeCheck(res, &pycbc_exception_type)) {
-      all_okay = false;
-    }
-    int rc = PyDict_SetItemString(multi_result->raw_result, s.key_str.c_str(), res);
-    Py_DECREF(res);
-    if (rc < 0) {
-      Py_DECREF(pyObj_multi_result);
-      return nullptr;
-    }
-  }
-  if (PyDict_SetItemString(multi_result->raw_result, "all_okay", all_okay ? Py_True : Py_False) <
-      0) {
+  } catch (const std::exception& e) {
     Py_DECREF(pyObj_multi_result);
-    return nullptr;
+    return raise_invalid_argument(e.what());
   }
 
   return pyObj_multi_result;
