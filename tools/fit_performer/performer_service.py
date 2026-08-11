@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import grpc
 
+from couchbase import __version__ as PYCBC_VERSION
 from couchbase import get_transactions_protocol
 from couchbase.cluster import Cluster
 
@@ -76,7 +77,7 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
         self._logger.info("performerCapsFetch called")
 
         response = performer_caps_pb.PerformerCapsFetchResponse(
-            library_version="1.0.0",
+            library_version=PYCBC_VERSION,
             performer_user_agent="python",
             performer_caps=PERFORMER_CAPS,
             sdk_implementation_caps=SDK_CAPS,
