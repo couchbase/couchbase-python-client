@@ -20,6 +20,8 @@
 #include "Python.h"
 #include "pytocbpp_defs.hxx"
 
+#include <stdexcept>
+
 // ======================================================================
 // Generic Enum Conversion Machinery using X-Macros
 // ======================================================================
@@ -98,7 +100,12 @@
       if (pyObj == nullptr || !PyLong_Check(pyObj)) {                                              \
         return enum_type::default_val;                                                             \
       }                                                                                            \
-      auto int_val = static_cast<std::uint8_t>(PyLong_AsUnsignedLong(pyObj));                      \
+      auto raw_val = PyLong_AsUnsignedLong(pyObj);                                                 \
+      if (raw_val == static_cast<unsigned long>(-1) && PyErr_Occurred()) {                         \
+        PyErr_Clear();                                                                             \
+        throw std::invalid_argument("value out of range for " #enum_type);                         \
+      }                                                                                            \
+      auto int_val = static_cast<std::uint8_t>(raw_val);                                           \
       mappings(PYCBC_FROM_PY_INT_CASE, enum_type) return enum_type::default_val;                   \
     }                                                                                              \
     static inline PyObject* to_py(const enum_type& val)                                            \
@@ -130,7 +137,12 @@
       if (pyObj == nullptr || !PyLong_Check(pyObj)) {                                              \
         return enum_type::default_val;                                                             \
       }                                                                                            \
-      auto int_val = static_cast<std::uint16_t>(PyLong_AsUnsignedLong(pyObj));                     \
+      auto raw_val = PyLong_AsUnsignedLong(pyObj);                                                 \
+      if (raw_val == static_cast<unsigned long>(-1) && PyErr_Occurred()) {                         \
+        PyErr_Clear();                                                                             \
+        throw std::invalid_argument("value out of range for " #enum_type);                         \
+      }                                                                                            \
+      auto int_val = static_cast<std::uint16_t>(raw_val);                                          \
       mappings(PYCBC_FROM_PY_INT16_CASE, enum_type) return enum_type::default_val;                 \
     }                                                                                              \
     static inline PyObject* to_py(const enum_type& val)                                            \
