@@ -142,6 +142,10 @@ private:
       }
     } else if (pyObj_callback != nullptr) {
       PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_callback, result, nullptr);
+      if (ret == nullptr) {
+        // callback raised; nothing else observes this IO thread's exception state.
+        PyErr_WriteUnraisable(pyObj_callback);
+      }
       Py_XDECREF(ret);
       Py_XDECREF(result);
     } else if (barrier) {
@@ -265,7 +269,12 @@ private:
             PyObject_TypeCheck(result, &pycbc_exception_type) ? pyObj_errback : pyObj_callback;
 
           if (target_handler != nullptr) {
-            Py_XDECREF(PyObject_CallFunctionObjArgs(target_handler, result, nullptr));
+            PyObject* ret = PyObject_CallFunctionObjArgs(target_handler, result, nullptr);
+            if (ret == nullptr) {
+              // callback/errback raised; nothing else observes this IO thread's exception state.
+              PyErr_WriteUnraisable(target_handler);
+            }
+            Py_XDECREF(ret);
           } else if (barrier != nullptr) {
             barrier->set_value(result);
             result = nullptr; // Reference transferred to barrier
@@ -703,6 +712,10 @@ Connection::execute_streaming_op(PyObject* kwargs)
           // The python side will determine if the query has rows or returned an error
           if (callback != nullptr) {
             PyObject* result = PyObject_CallFunction(callback, "O", Py_True);
+            if (result == nullptr) {
+              // callback raised; nothing else observes this IO thread's exception state.
+              PyErr_WriteUnraisable(callback);
+            }
             Py_XDECREF(result);
           }
 

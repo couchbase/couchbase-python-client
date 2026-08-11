@@ -113,6 +113,10 @@ Connection::handle_connection_operation_callback(std::error_code ec,
       }
     } else if (pyObj_errback != nullptr) {
       PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_errback, result, nullptr);
+      if (ret == nullptr) {
+        // errback raised; nothing else observes this IO thread's exception state.
+        PyErr_WriteUnraisable(pyObj_errback);
+      }
       Py_XDECREF(ret);
       Py_XDECREF(result);
     } else if (barrier) {
@@ -132,6 +136,10 @@ Connection::handle_connection_operation_callback(std::error_code ec,
 
     if (pyObj_callback != nullptr) {
       PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_callback, result, nullptr);
+      if (ret == nullptr) {
+        // callback raised; nothing else observes this IO thread's exception state.
+        PyErr_WriteUnraisable(pyObj_callback);
+      }
       Py_XDECREF(ret);
       Py_XDECREF(result);
     } else if (barrier) {

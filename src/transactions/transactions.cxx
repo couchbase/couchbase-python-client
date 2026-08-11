@@ -1029,6 +1029,39 @@ convert_to_python_exc_type(std::exception_ptr err,
   return create_python_exception(exc_type, message, set_exception, pyObj_inner_exc);
 }
 
+// Common tail of every async txn completion: given the already-built result/exception object,
+// either fulfills the sync path's promise or invokes the async callback/errback. Callback and
+// errback are always both-NULL or both-non-NULL by this point (validated at the entry point before
+// the op was dispatched), so pyObj_func == nullptr is exactly the sync case.
+// Assumes the caller already holds the GIL. Takes ownership of pyObj_result, and of the
+// pyObj_callback/pyObj_errback references the entry point Py_XINCREF'd before dispatching.
+void
+complete_pending_operation(PyObject* pyObj_callback,
+                           PyObject* pyObj_errback,
+                           std::shared_ptr<std::promise<PyObject*>> barrier,
+                           PyObject* pyObj_result,
+                           bool had_error)
+{
+  PyObject* pyObj_func = had_error ? pyObj_errback : pyObj_callback;
+  if (nullptr == pyObj_func) {
+    barrier->set_value(pyObj_result);
+    return;
+  }
+  PyObject* pyObj_args = PyTuple_New(1);
+  PyTuple_SetItem(pyObj_args, 0, pyObj_result);
+  PyObject* pyObj_ret = PyObject_CallObject(pyObj_func, pyObj_args);
+  if (nullptr == pyObj_ret) {
+    // The user callback/errback raised; it would otherwise be silently dropped since nothing
+    // else observes this thread's exception state.
+    PyErr_WriteUnraisable(pyObj_func);
+  } else {
+    Py_DECREF(pyObj_ret);
+  }
+  Py_DECREF(pyObj_errback);
+  Py_DECREF(pyObj_callback);
+  Py_DECREF(pyObj_args);
+}
+
 void
 handle_returning_void(PyObject* pyObj_callback,
                       PyObject* pyObj_errback,
@@ -1036,34 +1069,15 @@ handle_returning_void(PyObject* pyObj_callback,
                       std::exception_ptr err)
 {
   auto state = PyGILState_Ensure();
-  PyObject* pyObj_args = nullptr;
-  PyObject* pyObj_func = nullptr;
-  PyObject* pyObj_err = nullptr;
-  if (err) {
-    pyObj_err = convert_to_python_exc_type(err);
-    if (nullptr == pyObj_errback) {
-      barrier->set_value(pyObj_err);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, pyObj_err);
-      pyObj_func = pyObj_errback;
-    }
+  bool had_error = static_cast<bool>(err);
+  PyObject* pyObj_result = nullptr;
+  if (had_error) {
+    pyObj_result = convert_to_python_exc_type(err);
   } else {
     Py_INCREF(Py_None);
-    if (nullptr == pyObj_callback) {
-      barrier->set_value(Py_None);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, Py_None);
-      pyObj_func = pyObj_callback;
-    }
+    pyObj_result = Py_None;
   }
-  if (nullptr != pyObj_func) {
-    PyObject_CallObject(pyObj_func, pyObj_args);
-    Py_DECREF(pyObj_errback);
-    Py_DECREF(pyObj_callback);
-    Py_DECREF(pyObj_args);
-  }
+  complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
   PyGILState_Release(state);
 }
 
@@ -1078,25 +1092,15 @@ handle_returning_transaction_get_result(
 {
   // TODO: flesh out transaction_get_result and exceptions...
   auto state = PyGILState_Ensure();
-  PyObject* pyObj_args = nullptr;
-  PyObject* pyObj_func = nullptr;
-  PyObject* pyObj_err = nullptr;
-  if (err) {
-    pyObj_err = convert_to_python_exc_type(err);
-    if (nullptr == pyObj_errback) {
-      barrier->set_value(pyObj_err);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, pyObj_err);
-      pyObj_func = pyObj_errback;
-    }
+  bool had_error = static_cast<bool>(err);
+  PyObject* pyObj_result = nullptr;
+  if (had_error) {
+    pyObj_result = convert_to_python_exc_type(err);
   } else {
-    PyObject* pyObj_get_result = nullptr;
-
     // BUG(PYCBC-1476): We should revert to using direct get
     // operations once the underlying issue has been resolved.
     if (!res.has_value()) {
-      pyObj_get_result = pycbc::build_exception(
+      pyObj_result = pycbc::build_exception(
         couchbase::errc::make_error_code((is_replica_get)
                                            ? couchbase::errc::key_value::document_irretrievable
                                            : couchbase::errc::key_value::document_not_found),
@@ -1104,26 +1108,13 @@ handle_returning_transaction_get_result(
         __LINE__,
         "Txn get op: document not found.");
     } else {
-      pyObj_get_result =
+      pyObj_result =
         PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_result_type), nullptr);
-      auto result = reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_get_result);
+      auto result = reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_result);
       result->res = std::make_unique<cbcoretxns::transaction_get_result>(std::move(res.value()));
     }
-
-    if (nullptr == pyObj_callback) {
-      barrier->set_value(pyObj_get_result);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, pyObj_get_result);
-      pyObj_func = pyObj_callback;
-    }
   }
-  if (nullptr != pyObj_func) {
-    PyObject_CallObject(pyObj_func, pyObj_args);
-    Py_DECREF(pyObj_errback);
-    Py_DECREF(pyObj_callback);
-    Py_DECREF(pyObj_args);
-  }
+  complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
   PyGILState_Release(state);
 }
 
@@ -1137,23 +1128,14 @@ handle_returning_transaction_get_multi_result(PyObject* pyObj_callback,
                                               bool is_replica_get = false)
 {
   auto state = PyGILState_Ensure();
-  PyObject* pyObj_args = nullptr;
-  PyObject* pyObj_func = nullptr;
-  PyObject* pyObj_err = nullptr;
-  if (err) {
-    pyObj_err = convert_to_python_exc_type(err);
-    if (nullptr == pyObj_errback) {
-      barrier->set_value(pyObj_err);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, pyObj_err);
-      pyObj_func = pyObj_errback;
-    }
+  bool had_error = static_cast<bool>(err);
+  PyObject* pyObj_result = nullptr;
+  if (had_error) {
+    pyObj_result = convert_to_python_exc_type(err);
   } else {
-    PyObject* pyObj_get_multi_result =
+    pyObj_result =
       PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_multi_result_type), nullptr);
-    auto result =
-      reinterpret_cast<pycbc::txns::transaction_get_multi_result*>(pyObj_get_multi_result);
+    auto result = reinterpret_cast<pycbc::txns::transaction_get_multi_result*>(pyObj_result);
     for (const auto& item : res->content()) {
       if (!item.has_value()) {
         Py_INCREF(Py_None);
@@ -1177,21 +1159,8 @@ handle_returning_transaction_get_multi_result(PyObject* pyObj_callback,
       Py_DECREF(pyObj_flags);
       Py_DECREF(pyObj_item);
     }
-
-    if (nullptr == pyObj_callback) {
-      barrier->set_value(pyObj_get_multi_result);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, pyObj_get_multi_result);
-      pyObj_func = pyObj_callback;
-    }
   }
-  if (nullptr != pyObj_func) {
-    PyObject_CallObject(pyObj_func, pyObj_args);
-    Py_DECREF(pyObj_errback);
-    Py_DECREF(pyObj_callback);
-    Py_DECREF(pyObj_args);
-  }
+  complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
   PyGILState_Release(state);
 }
 
@@ -1203,34 +1172,10 @@ handle_returning_query_result(PyObject* pyObj_callback,
                               std::optional<couchbase::core::operations::query_response> res)
 {
   auto state = PyGILState_Ensure();
-  PyObject* pyObj_args = nullptr;
-  PyObject* pyObj_func = nullptr;
-  PyObject* pyObj_err = nullptr;
-  if (err) {
-    pyObj_err = convert_to_python_exc_type(err);
-    if (nullptr == pyObj_errback) {
-      barrier->set_value(pyObj_err);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, pyObj_err);
-      pyObj_func = pyObj_errback;
-    }
-  } else {
-    PyObject* pyObj_json = PyBytes_FromString(res->ctx.http_body.c_str());
-    if (nullptr == pyObj_callback) {
-      barrier->set_value(pyObj_json);
-    } else {
-      pyObj_args = PyTuple_New(1);
-      PyTuple_SetItem(pyObj_args, 0, pyObj_json);
-      pyObj_func = pyObj_callback;
-    }
-  }
-  if (nullptr != pyObj_func) {
-    PyObject_CallObject(pyObj_func, pyObj_args);
-    Py_DECREF(pyObj_errback);
-    Py_DECREF(pyObj_callback);
-    Py_DECREF(pyObj_args);
-  }
+  bool had_error = static_cast<bool>(err);
+  PyObject* pyObj_result =
+    had_error ? convert_to_python_exc_type(err) : PyBytes_FromString(res->ctx.http_body.c_str());
+  complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
   PyGILState_Release(state);
 }
 
@@ -1375,6 +1320,8 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
     case TxOperations::GET: {
       if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
         PyErr_SetString(PyExc_ValueError, "couldn't create document id for get");
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
         Py_RETURN_NONE;
       }
       couchbase::core::document_id id{ bucket, scope, collection, key };
@@ -1390,6 +1337,8 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
       if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
         PyErr_SetString(PyExc_ValueError,
                         "couldn't create document id for get_replica_from_preferred_server_group");
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
         Py_RETURN_NONE;
       }
       couchbase::core::document_id id{ bucket, scope, collection, key };
@@ -1405,12 +1354,16 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
     case TxOperations::INSERT: {
       if (nullptr == bucket || nullptr == scope || nullptr == collection || nullptr == key) {
         PyErr_SetString(PyExc_ValueError, "couldn't create document id for insert");
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
         Py_RETURN_NONE;
       }
       couchbase::core::document_id id{ bucket, scope, collection, key };
       if (nullptr == pyObj_value) {
         PyErr_SetString(PyExc_ValueError,
                         fmt::format("no value given for an insert of key {}", id.key()).c_str());
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
         Py_RETURN_NONE;
       }
       Py_BEGIN_ALLOW_THREADS ctx->ctx->insert(
@@ -1425,11 +1378,15 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
     case TxOperations::REPLACE: {
       if (nullptr == pyObj_value) {
         PyErr_SetString(PyExc_ValueError, "replace expects a value");
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
         Py_RETURN_NONE;
       }
       if (nullptr == pyObj_txn_get_result ||
           0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
         PyErr_SetString(PyExc_ValueError, "replace expects to be passed a transaction_get_result");
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
         Py_RETURN_NONE;
       }
       auto tx_get_result =
@@ -1447,6 +1404,8 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
       if (nullptr == pyObj_txn_get_result ||
           0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
         PyErr_SetString(PyExc_ValueError, "remove expects to be passed a transaction_get_result");
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
         Py_RETURN_NONE;
       }
       auto tx_get_result =
@@ -1458,8 +1417,14 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
       Py_END_ALLOW_THREADS break;
     }
     default:
-      // return error!
+      // No case dispatched, so no completion handler will ever run to fulfill barrier or
+      // DECREF the callback/errback refs above. Return here rather than falling through:
+      // the sync path would otherwise block forever on fut.get() waiting on a promise
+      // nothing will set, and the async path would leak both refs.
       PyErr_SetString(PyExc_ValueError, "unknown txn operation");
+      Py_XDECREF(pyObj_callback);
+      Py_XDECREF(pyObj_errback);
+      Py_RETURN_NONE;
   }
   if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
@@ -1627,7 +1592,11 @@ pycbc::txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
       });
     Py_END_ALLOW_THREADS
   } else {
+    // Same leak as transaction_op's default: case (see comment there) — no op dispatched, so
+    // nothing will DECREF the callback/errback refs XINCREF'd above.
     PyErr_SetString(PyExc_ValueError, "Unknown transaction operation");
+    Py_XDECREF(pyObj_callback);
+    Py_XDECREF(pyObj_errback);
     Py_RETURN_NONE;
   }
 
@@ -1798,11 +1767,10 @@ pycbc::txns::transaction_commit([[maybe_unused]] PyObject* self, PyObject* args,
     [pyObj_callback, pyObj_errback, barrier](std::optional<cbcoretxns::transaction_exception> err,
                                              std::optional<cbtxns::transaction_result> res) {
       auto state = PyGILState_Ensure();
-      PyObject* pyObj_args = nullptr;
-      PyObject* pyObj_func = nullptr;
-      PyObject* pyObj_err = nullptr;
-      auto exc_type = pycbc::txns::TxnExceptionType::COUCHBASE_ERROR;
-      if (err) {
+      bool had_error = static_cast<bool>(err);
+      PyObject* pyObj_result = nullptr;
+      if (had_error) {
+        auto exc_type = pycbc::txns::TxnExceptionType::COUCHBASE_ERROR;
         switch (err->type()) {
           case cbcoretxns::failure_type::FAIL:
             exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_FAILED;
@@ -1815,30 +1783,11 @@ pycbc::txns::transaction_commit([[maybe_unused]] PyObject* self, PyObject* args,
             break;
         }
         auto message = txn_external_exception_to_string(err->cause());
-        pyObj_err = create_python_exception(exc_type, message.c_str());
-        if (nullptr == pyObj_errback) {
-          barrier->set_value(pyObj_err);
-        } else {
-          pyObj_args = PyTuple_New(1);
-          PyTuple_SET_ITEM(pyObj_args, 0, pyObj_err);
-          pyObj_func = pyObj_errback;
-        }
+        pyObj_result = create_python_exception(exc_type, message.c_str());
       } else {
-        PyObject* ret = transaction_result_to_dict(res);
-        if (nullptr == pyObj_callback) {
-          barrier->set_value(ret);
-        } else {
-          pyObj_args = PyTuple_New(1);
-          PyTuple_SET_ITEM(pyObj_args, 0, ret);
-          pyObj_func = pyObj_callback;
-        }
+        pyObj_result = transaction_result_to_dict(res);
       }
-      if (nullptr != pyObj_func) {
-        PyObject_CallObject(pyObj_func, pyObj_args);
-        Py_DECREF(pyObj_errback);
-        Py_DECREF(pyObj_callback);
-        Py_DECREF(pyObj_args);
-      }
+      complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
       PyGILState_Release(state);
     });
   Py_END_ALLOW_THREADS if (nullptr == pyObj_callback && nullptr == pyObj_errback)
