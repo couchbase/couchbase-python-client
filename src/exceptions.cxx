@@ -28,6 +28,17 @@ namespace pycbc
 static PyObject* cached_invalid_argument_exc = nullptr;
 static PyObject* cached_feature_unavailable_exc = nullptr;
 static PyObject* cached_unsuccessful_operation_exc = nullptr;
+// Classes used only by transactions.cxx; centralized here so all exception classes go
+// through the same eager, hard-failing cache instead of transactions.cxx's own lazy one.
+static PyObject* cached_transaction_failed_exc = nullptr;
+static PyObject* cached_transaction_expired_exc = nullptr;
+static PyObject* cached_transaction_commit_ambiguous_exc = nullptr;
+static PyObject* cached_transaction_operation_failed_exc = nullptr;
+static PyObject* cached_document_exists_exc = nullptr;
+static PyObject* cached_document_not_found_exc = nullptr;
+static PyObject* cached_query_parsing_failure_exc = nullptr;
+static PyObject* cached_couchbase_exc = nullptr;
+static PyObject* cached_document_unretrievable_exc = nullptr;
 
 std::string
 retry_reason_to_string(couchbase::retry_reason reason)
@@ -342,12 +353,107 @@ cache_exception_classes()
         exceptions_module, "FeatureUnavailableException", &cached_feature_unavailable_exc) < 0 ||
       cache_exception_class(exceptions_module,
                             "UnsuccessfulOperationException",
-                            &cached_unsuccessful_operation_exc) < 0) {
+                            &cached_unsuccessful_operation_exc) < 0 ||
+      cache_exception_class(
+        exceptions_module, "TransactionFailed", &cached_transaction_failed_exc) < 0 ||
+      cache_exception_class(
+        exceptions_module, "TransactionExpired", &cached_transaction_expired_exc) < 0 ||
+      cache_exception_class(exceptions_module,
+                            "TransactionCommitAmbiguous",
+                            &cached_transaction_commit_ambiguous_exc) < 0 ||
+      cache_exception_class(exceptions_module,
+                            "TransactionOperationFailed",
+                            &cached_transaction_operation_failed_exc) < 0 ||
+      cache_exception_class(
+        exceptions_module, "DocumentExistsException", &cached_document_exists_exc) < 0 ||
+      cache_exception_class(
+        exceptions_module, "DocumentNotFoundException", &cached_document_not_found_exc) < 0 ||
+      cache_exception_class(
+        exceptions_module, "ParsingFailedException", &cached_query_parsing_failure_exc) < 0 ||
+      cache_exception_class(exceptions_module, "CouchbaseException", &cached_couchbase_exc) < 0 ||
+      cache_exception_class(exceptions_module,
+                            "DocumentUnretrievableException",
+                            &cached_document_unretrievable_exc) < 0) {
     rv = -1;
   }
 
   Py_DECREF(exceptions_module);
   return rv;
+}
+
+PyObject*
+cached_feature_unavailable_exception()
+{
+  return cached_feature_unavailable_exc;
+}
+
+PyObject*
+cached_transaction_failed_exception()
+{
+  return cached_transaction_failed_exc;
+}
+
+PyObject*
+cached_transaction_expired_exception()
+{
+  return cached_transaction_expired_exc;
+}
+
+PyObject*
+cached_transaction_commit_ambiguous_exception()
+{
+  return cached_transaction_commit_ambiguous_exc;
+}
+
+PyObject*
+cached_transaction_operation_failed_exception()
+{
+  return cached_transaction_operation_failed_exc;
+}
+
+PyObject*
+cached_document_exists_exception()
+{
+  return cached_document_exists_exc;
+}
+
+PyObject*
+cached_document_not_found_exception()
+{
+  return cached_document_not_found_exc;
+}
+
+PyObject*
+cached_query_parsing_failure_exception()
+{
+  return cached_query_parsing_failure_exc;
+}
+
+PyObject*
+cached_couchbase_exception()
+{
+  return cached_couchbase_exc;
+}
+
+PyObject*
+cached_document_unretrievable_exception()
+{
+  return cached_document_unretrievable_exc;
+}
+
+// Returns a new reference to a MemoryError instance (matching the exception-instance
+// convention create_python_exception uses), falling back to the class itself if even that
+// tiny allocation fails.
+PyObject*
+memory_error_fallback()
+{
+  PyObject* exc = PyObject_CallObject(PyExc_MemoryError, nullptr);
+  if (exc != nullptr) {
+    return exc;
+  }
+  PyErr_Clear();
+  Py_INCREF(PyExc_MemoryError);
+  return PyExc_MemoryError;
 }
 
 // Shared implementation for raise_invalid_argument/raise_feature_unavailable/

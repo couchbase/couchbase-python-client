@@ -62,6 +62,39 @@ int
 cache_exception_classes();
 
 /**
+ * Accessors for the exception classes cache_exception_classes() resolves at module init.
+ * Each returns a borrowed reference to the cached class, valid for the lifetime of the
+ * module once cache_exception_classes() has succeeded.
+ */
+PyObject*
+cached_feature_unavailable_exception();
+PyObject*
+cached_transaction_failed_exception();
+PyObject*
+cached_transaction_expired_exception();
+PyObject*
+cached_transaction_commit_ambiguous_exception();
+PyObject*
+cached_transaction_operation_failed_exception();
+PyObject*
+cached_document_exists_exception();
+PyObject*
+cached_document_not_found_exception();
+PyObject*
+cached_query_parsing_failure_exception();
+PyObject*
+cached_couchbase_exception();
+PyObject*
+cached_document_unretrievable_exception();
+
+/**
+ * Returns a new reference to a MemoryError instance, falling back to the class itself if
+ * even that allocation fails.
+ */
+PyObject*
+memory_error_fallback();
+
+/**
  * Set a RuntimeError carrying message, but only if no Python exception is already pending.
  * Intended for `catch` blocks: whatever threw may have already set a more specific exception
  * that should not be replaced.

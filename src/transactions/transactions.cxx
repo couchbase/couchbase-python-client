@@ -715,24 +715,6 @@ pycbc::txns::destroy_transactions([[maybe_unused]] PyObject* self, PyObject* arg
   Py_END_ALLOW_THREADS Py_RETURN_NONE;
 }
 
-PyObject*
-init_transaction_exception_type(const char* klass)
-{
-  static PyObject* couchbase_exceptions = PyImport_ImportModule("couchbase.exceptions");
-  if (nullptr == couchbase_exceptions) {
-    // The import is cached in a static, so only the first call sees the error set.
-    PyErr_Clear();
-    return nullptr;
-  }
-  PyObject* pyObj_exc_class = PyObject_GetAttrString(couchbase_exceptions, klass);
-  if (nullptr == pyObj_exc_class) {
-    // Callers cache this in a static initializer and cannot propagate the failure; leaving
-    // an exception pending would corrupt the next C-API call, so hand back NULL instead.
-    PyErr_Clear();
-  }
-  return pyObj_exc_class;
-}
-
 std::string
 txn_external_exception_to_string(cbcoretxns::external_exception ext_exception)
 {
@@ -787,60 +769,59 @@ txn_external_exception_to_string(cbcoretxns::external_exception ext_exception)
   return "unknown";
 }
 
-// Returns a new reference to a MemoryError instance (matching the exception-instance
-// convention the rest of create_python_exception uses), falling back to the class itself
-// if even that tiny allocation fails.
-static PyObject*
-memory_error_fallback()
-{
-  PyObject* exc = PyObject_CallObject(PyExc_MemoryError, nullptr);
-  if (exc != nullptr) {
-    return exc;
-  }
-  PyErr_Clear();
-  Py_INCREF(PyExc_MemoryError);
-  return PyExc_MemoryError;
-}
-
-// Returns a new reference to a RuntimeError instance carrying message, for the paths where the
-// couchbase.exceptions classes could not be resolved and we still must not return NULL.
-static PyObject*
-runtime_error_fallback(const char* message)
-{
-  PyObject* exc = PyObject_CallFunction(PyExc_RuntimeError, "s", message);
-  if (exc != nullptr) {
-    return exc;
-  }
-  PyErr_Clear();
-  Py_INCREF(PyExc_RuntimeError);
-  return PyExc_RuntimeError;
-}
-
 PyObject*
 create_python_exception(pycbc::txns::TxnExceptionType exc_type,
                         const char* message,
                         bool set_exception = false,
                         PyObject* pyObj_inner_exc = nullptr)
 {
-  static PyObject* pyObj_txn_failed = init_transaction_exception_type("TransactionFailed");
-  static PyObject* pyObj_txn_expired = init_transaction_exception_type("TransactionExpired");
-  static PyObject* pyObj_txn_ambig = init_transaction_exception_type("TransactionCommitAmbiguous");
-  static PyObject* pyObj_txn_op_failed =
-    init_transaction_exception_type("TransactionOperationFailed");
-  static PyObject* pyObj_document_exists_ex =
-    init_transaction_exception_type("DocumentExistsException");
-  static PyObject* pyObj_document_not_found_ex =
-    init_transaction_exception_type("DocumentNotFoundException");
-  static PyObject* pyObj_query_parsing_failure =
-    init_transaction_exception_type("ParsingFailedException");
-  static PyObject* pyObj_couchbase_error = init_transaction_exception_type("CouchbaseException");
-  static PyObject* pyObj_feature_not_available_error =
-    init_transaction_exception_type("FeatureUnavailableException");
-  static PyObject* pyObj_document_unretrievable_ex =
-    init_transaction_exception_type("DocumentUnretrievableException");
+  // All classes below are resolved eagerly by pycbc::cache_exception_classes() during module
+  // init, which fails module init on any lookup failure; by the time this runs they are
+  // guaranteed non-null, so no per-call resolution or fallback-to-base-class is needed.
+  PyObject* pyObj_exc_type = nullptr;
+  switch (exc_type) {
+    case pycbc::txns::TxnExceptionType::TRANSACTION_FAILED: {
+      pyObj_exc_type = pycbc::cached_transaction_failed_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::TRANSACTION_COMMIT_AMBIGUOUS: {
+      pyObj_exc_type = pycbc::cached_transaction_commit_ambiguous_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::TRANSACTION_EXPIRED: {
+      pyObj_exc_type = pycbc::cached_transaction_expired_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::TRANSACTION_OPERATION_FAILED: {
+      pyObj_exc_type = pycbc::cached_transaction_operation_failed_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::FEATURE_NOT_AVAILABLE: {
+      pyObj_exc_type = pycbc::cached_feature_unavailable_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::QUERY_PARSING_FAILURE: {
+      pyObj_exc_type = pycbc::cached_query_parsing_failure_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::DOCUMENT_EXISTS: {
+      pyObj_exc_type = pycbc::cached_document_exists_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::DOCUMENT_NOT_FOUND: {
+      pyObj_exc_type = pycbc::cached_document_not_found_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::DOCUMENT_UNRETRIEVABLE: {
+      pyObj_exc_type = pycbc::cached_document_unretrievable_exception();
+      break;
+    }
+    case pycbc::txns::TxnExceptionType::COUCHBASE_ERROR:
+    default:
+      pyObj_exc_type = pycbc::cached_couchbase_exception();
+  }
 
   PyObject* pyObj_final_error = nullptr;
-  PyObject* pyObj_exc_type = nullptr;
   PyObject* pyObj_error_ctx = PyDict_New();
   if (pyObj_error_ctx == nullptr) {
     // Every current caller uses set_exception=false and embeds the return value directly
@@ -849,63 +830,7 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
     if (set_exception) {
       return nullptr; // MemoryError already set by the failed PyDict_New() above
     }
-    return memory_error_fallback();
-  }
-
-  switch (exc_type) {
-    case pycbc::txns::TxnExceptionType::TRANSACTION_FAILED: {
-      pyObj_exc_type = pyObj_txn_failed;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::TRANSACTION_COMMIT_AMBIGUOUS: {
-      pyObj_exc_type = pyObj_txn_ambig;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::TRANSACTION_EXPIRED: {
-      pyObj_exc_type = pyObj_txn_expired;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::TRANSACTION_OPERATION_FAILED: {
-      pyObj_exc_type = pyObj_txn_op_failed;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::FEATURE_NOT_AVAILABLE: {
-      pyObj_exc_type = pyObj_feature_not_available_error;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::QUERY_PARSING_FAILURE: {
-      pyObj_exc_type = pyObj_query_parsing_failure;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::DOCUMENT_EXISTS: {
-      pyObj_exc_type = pyObj_document_exists_ex;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::DOCUMENT_NOT_FOUND: {
-      pyObj_exc_type = pyObj_document_not_found_ex;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::DOCUMENT_UNRETRIEVABLE: {
-      pyObj_exc_type = pyObj_document_unretrievable_ex;
-      break;
-    }
-    case pycbc::txns::TxnExceptionType::COUCHBASE_ERROR:
-    default:
-      pyObj_exc_type = pyObj_couchbase_error;
-  }
-  if (pyObj_exc_type == nullptr) {
-    // The specific class could not be resolved, fall back to the base class.
-    pyObj_exc_type = pyObj_couchbase_error;
-  }
-  if (pyObj_exc_type == nullptr) {
-    // None of the couchbase.exceptions classes resolved; PyObject_Call would deref a NULL
-    // callable, so raise/return a RuntimeError carrying the original message instead.
-    Py_DECREF(pyObj_error_ctx);
-    if (set_exception) {
-      PyErr_SetString(PyExc_RuntimeError, message);
-      return nullptr;
-    }
-    return runtime_error_fallback(message);
+    return pycbc::memory_error_fallback();
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString(message);
@@ -914,7 +839,7 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
     if (set_exception) {
       return nullptr; // MemoryError already set by the failed PyUnicode_FromString() above
     }
-    return memory_error_fallback();
+    return pycbc::memory_error_fallback();
   }
   int rv = PyDict_SetItemString(pyObj_error_ctx, "message", pyObj_tmp);
   Py_DECREF(pyObj_tmp);
@@ -923,7 +848,7 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
     if (set_exception) {
       return nullptr; // exception already set by the failed PyDict_SetItemString() above
     }
-    return memory_error_fallback();
+    return pycbc::memory_error_fallback();
   }
   if (pyObj_inner_exc != nullptr) {
     // no DECREF here for pyObj_inner_exc & pyObj_cause b/c they are borrowed references
@@ -940,7 +865,7 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
     if (set_exception) {
       return nullptr; // MemoryError already set by the failed PyTuple_New() above
     }
-    return memory_error_fallback();
+    return pycbc::memory_error_fallback();
   }
   pyObj_final_error = PyObject_Call(pyObj_exc_type, pyObj_args, pyObj_error_ctx);
   Py_DECREF(pyObj_args);
@@ -951,7 +876,7 @@ create_python_exception(pycbc::txns::TxnExceptionType exc_type,
       // arg-less instance of pyObj_exc_type.
       return nullptr;
     }
-    return memory_error_fallback();
+    return pycbc::memory_error_fallback();
   }
   if (set_exception) {
     PyErr_SetObject(pyObj_exc_type, pyObj_final_error);
