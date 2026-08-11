@@ -247,6 +247,12 @@ def _pycbc_teardown(**kwargs: Any) -> None:
     if (_PYCBC_LOGGER
         and isinstance(_PYCBC_LOGGER, pycbc_logger)
             and not (_PYCBC_LOGGER.is_console_logger() or _PYCBC_LOGGER.is_file_logger())):
+        # Deactivate the sink before dropping our reference to it. A C++ core bug in
+        # logger::shutdown() (get_file_logger() is reset by value, so the global copy
+        # survives) means shutdown_logger() doesn't actually release the sink, which can
+        # then outlive us and destruct at static teardown, after Py_Finalize, where its
+        # PyGILState_Ensure() would be fatal.
+        _PYCBC_LOGGER.shutdown_sink()
         shutdown_logger()
         _PYCBC_LOGGER = None
 

@@ -155,6 +155,7 @@ pycbc_streamed_result__new__(PyTypeObject* type, PyObject* args, PyObject* kwarg
   pycbc_streamed_result* self = (pycbc_streamed_result*)type->tp_alloc(type, 0);
   if (self != nullptr) {
     self->ec = std::error_code();
+    new (&self->rows) std::shared_ptr<rows_queue<PyObject*>>();
     self->rows = std::make_shared<rows_queue<PyObject*>>();
     self->timeout_ms = std::chrono::milliseconds{ 0 };
     Py_INCREF(Py_None);
@@ -306,7 +307,7 @@ pycbc_scan_iterator__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
   pycbc_scan_iterator* self = (pycbc_scan_iterator*)type->tp_alloc(type, 0);
   if (self != nullptr) {
-    self->scan_result = nullptr;
+    new (&self->scan_result) std::shared_ptr<couchbase::core::scan_result>();
   }
   return (PyObject*)self;
 }

@@ -19,6 +19,7 @@
 
 #include "Python.h"
 #include "cpp_core_types_autogen.hxx"
+#include "gil_guard.hxx"
 #include "pytocbpp_defs.hxx"
 #include "structmember.h"
 #include <chrono>
@@ -57,6 +58,11 @@ public:
 
   ~rows_queue()
   {
+    // The last shared_ptr owner can be a core IO thread's completion-callback capture
+    // (see connection.hxx's streaming row_callback), which may hold no Python thread
+    // state at all, so the DECREFs below can't assume the GIL is already held.
+    pycbc::gil_acquire_guard gil;
+
     // Clean up any remaining PyObject* references in the queue
     std::lock_guard<std::mutex> lock(mut_);
     while (!rows_.empty()) {

@@ -458,6 +458,9 @@ PyObject*
 pycbc::txns::transaction_get_result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
   auto self = reinterpret_cast<pycbc::txns::transaction_get_result*>(type->tp_alloc(type, 0));
+  if (self != nullptr) {
+    new (&self->res) std::unique_ptr<cbcoretxns::transaction_get_result>();
+  }
   return reinterpret_cast<PyObject*>(self);
 }
 

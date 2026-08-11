@@ -26,6 +26,7 @@ namespace pycbc
 static void
 pycbc_logger_dealloc(pycbc_logger* self)
 {
+  self->logger_sink_.reset();
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -228,6 +229,9 @@ static PyObject*
 pycbc_logger_new(PyTypeObject* type, PyObject*, PyObject*)
 {
   pycbc_logger* self = reinterpret_cast<pycbc_logger*>(type->tp_alloc(type, 0));
+  if (self != nullptr) {
+    new (&self->logger_sink_) std::shared_ptr<pycbc_logger_sink>();
+  }
   return reinterpret_cast<PyObject*>(self);
 }
 
