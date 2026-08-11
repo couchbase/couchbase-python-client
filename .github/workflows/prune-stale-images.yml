@@ -1,0 +1,25 @@
+name: Prune Stale Images
+
+on:
+  schedule:
+    - cron: '35 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Prune old temporary FIT performer images
+        uses: vlaurin/action-ghcr-prune@v0.6.0
+        with:
+          token: ${{ github.token }}
+          organization: ${{ github.repository_owner }}
+          container: python-fit-performer
+          keep-younger-than: 7 # days
+          prune-untagged: true
+          prune-tags-regexes: |
+            ^refs-
+            ^sha-
