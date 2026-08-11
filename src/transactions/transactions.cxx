@@ -134,7 +134,8 @@ pycbc::txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObj
                                    &metadata_collection,
                                    &scan_consistency)) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    Py_DECREF(self);
+    return nullptr;
   }
   if (nullptr != durability_level) {
     self->cfg->durability_level(
@@ -280,7 +281,8 @@ pycbc::txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyOb
                                    &metadata_scope,
                                    &metadata_collection)) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    Py_DECREF(self);
+    return nullptr;
   }
   if (nullptr != durability_level) {
     self->opts->durability_level(
@@ -354,7 +356,7 @@ pycbc::txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args
   if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, kw_format, const_cast<char**>(kw_list), &pyObj_query_args)) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   auto self = reinterpret_cast<pycbc::txns::transaction_query_options*>(type->tp_alloc(type, 0));
   auto opts =
@@ -420,7 +422,7 @@ pycbc::txns::transaction_get_result__get__(pycbc::txns::transaction_get_result* 
   PyObject* default_value = nullptr;
   if (!PyArg_ParseTuple(args, "s|O", &field_name, &default_value)) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   if (ID == field_name) {
     return PyUnicode_FromString(result->res->id().key().c_str());
@@ -435,7 +437,7 @@ pycbc::txns::transaction_get_result__get__(pycbc::txns::transaction_get_result* 
       pyObj_value = pycbc::cbpp_to_py(result->res->content().data);
     } catch (const std::exception& e) {
       PyErr_SetString(PyExc_TypeError, e.what());
-      Py_RETURN_NONE;
+      return nullptr;
     }
     PyObject* pyObj_result = PyTuple_Pack(2, pyObj_value, pyObj_flags);
     Py_DECREF(pyObj_value);
@@ -443,7 +445,7 @@ pycbc::txns::transaction_get_result__get__(pycbc::txns::transaction_get_result* 
     return pyObj_result;
   }
   PyErr_SetString(PyExc_ValueError, fmt::format("unknown field_name {}", field_name).c_str());
-  Py_RETURN_NONE;
+  return nullptr;
 }
 
 static PyMethodDef transaction_get_result_methods[] = {
@@ -697,17 +699,17 @@ pycbc::txns::destroy_transactions([[maybe_unused]] PyObject* self, PyObject* arg
   if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, kw_format, const_cast<char**>(kw_list), &PyCapsule_Type, &pyObj_txns)) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   if (nullptr == pyObj_txns) {
     PyErr_SetString(PyExc_ValueError, "expected a transactions object");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   auto txns =
     reinterpret_cast<pycbc::txns::transactions*>(PyCapsule_GetPointer(pyObj_txns, "txns_"));
   if (nullptr == txns) {
     PyErr_SetString(PyExc_ValueError, "passed null transactions");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   Py_BEGIN_ALLOW_THREADS txns->txns->close();
   Py_END_ALLOW_THREADS Py_RETURN_NONE;
@@ -1201,25 +1203,25 @@ pycbc::txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* arg
                                    &pyObj_callback,
                                    &pyObj_errback)) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   if (nullptr == pyObj_ctx) {
     PyErr_SetString(PyExc_ValueError, "expected transaction_context");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   auto ctx =
     reinterpret_cast<pycbc::txns::transaction_context*>(PyCapsule_GetPointer(pyObj_ctx, "ctx_"));
   if (nullptr == ctx) {
     PyErr_SetString(PyExc_ValueError, "passed null transaction_context");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   if (nullptr == statement) {
     PyErr_SetString(PyExc_ValueError, "expected query statement");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   if (nullptr == pyObj_options) {
     PyErr_SetString(PyExc_ValueError, "expected options");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   auto opt = reinterpret_cast<pycbc::txns::transaction_query_options*>(pyObj_options);
   if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
@@ -1282,7 +1284,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
                                         &pyObj_txn_get_result);
   if (!ret) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   if (nullptr != pyObj_value) {
     PyObject* pyObj_data = PyTuple_GET_ITEM(pyObj_value, 0);
@@ -1296,13 +1298,13 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
   }
   if (nullptr == pyObj_ctx) {
     PyErr_SetString(PyExc_ValueError, "no transaction_context passed in");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   auto ctx =
     reinterpret_cast<pycbc::txns::transaction_context*>(PyCapsule_GetPointer(pyObj_ctx, "ctx_"));
   if (nullptr == ctx) {
     PyErr_SetString(PyExc_ValueError, "passed null transaction_context");
-    Py_RETURN_NONE;
+    return nullptr;
   }
 
   if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
@@ -1322,7 +1324,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
         PyErr_SetString(PyExc_ValueError, "couldn't create document id for get");
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
-        Py_RETURN_NONE;
+        return nullptr;
       }
       couchbase::core::document_id id{ bucket, scope, collection, key };
       Py_BEGIN_ALLOW_THREADS ctx->ctx->get_optional(
@@ -1339,7 +1341,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
                         "couldn't create document id for get_replica_from_preferred_server_group");
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
-        Py_RETURN_NONE;
+        return nullptr;
       }
       couchbase::core::document_id id{ bucket, scope, collection, key };
       Py_BEGIN_ALLOW_THREADS ctx->ctx->get_replica_from_preferred_server_group(
@@ -1356,7 +1358,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
         PyErr_SetString(PyExc_ValueError, "couldn't create document id for insert");
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
-        Py_RETURN_NONE;
+        return nullptr;
       }
       couchbase::core::document_id id{ bucket, scope, collection, key };
       if (nullptr == pyObj_value) {
@@ -1364,7 +1366,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
                         fmt::format("no value given for an insert of key {}", id.key()).c_str());
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
-        Py_RETURN_NONE;
+        return nullptr;
       }
       Py_BEGIN_ALLOW_THREADS ctx->ctx->insert(
         id,
@@ -1380,14 +1382,14 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
         PyErr_SetString(PyExc_ValueError, "replace expects a value");
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
-        Py_RETURN_NONE;
+        return nullptr;
       }
       if (nullptr == pyObj_txn_get_result ||
           0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
         PyErr_SetString(PyExc_ValueError, "replace expects to be passed a transaction_get_result");
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
-        Py_RETURN_NONE;
+        return nullptr;
       }
       auto tx_get_result =
         reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_txn_get_result);
@@ -1406,7 +1408,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
         PyErr_SetString(PyExc_ValueError, "remove expects to be passed a transaction_get_result");
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
-        Py_RETURN_NONE;
+        return nullptr;
       }
       auto tx_get_result =
         reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_txn_get_result);
@@ -1424,7 +1426,7 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
       PyErr_SetString(PyExc_ValueError, "unknown txn operation");
       Py_XDECREF(pyObj_callback);
       Py_XDECREF(pyObj_errback);
-      Py_RETURN_NONE;
+      return nullptr;
   }
   if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
     PyObject* ret = nullptr;
@@ -1495,18 +1497,18 @@ pycbc::txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
                                         &pyObj_errback);
   if (!ret) {
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_RETURN_NONE;
+    return nullptr;
   }
 
   if (nullptr == pyObj_ctx) {
     PyErr_SetString(PyExc_ValueError, "no transaction_context passed in");
-    Py_RETURN_NONE;
+    return nullptr;
   }
   auto ctx =
     reinterpret_cast<pycbc::txns::transaction_context*>(PyCapsule_GetPointer(pyObj_ctx, "ctx_"));
   if (nullptr == ctx) {
     PyErr_SetString(PyExc_ValueError, "passed null transaction_context");
-    Py_RETURN_NONE;
+    return nullptr;
   }
 
   if (!PyTuple_Check(pyObj_specs) && !PyList_Check(pyObj_specs)) {
@@ -1597,7 +1599,7 @@ pycbc::txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
     PyErr_SetString(PyExc_ValueError, "Unknown transaction operation");
     Py_XDECREF(pyObj_callback);
     Py_XDECREF(pyObj_errback);
-    Py_RETURN_NONE;
+    return nullptr;
   }
 
   if (nullptr == pyObj_callback && nullptr == pyObj_errback) {
