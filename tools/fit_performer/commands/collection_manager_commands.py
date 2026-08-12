@@ -15,8 +15,6 @@ from couchbase.bucket import Bucket
 from couchbase.management.collections import (CreateCollectionSettings,
                                               ScopeSpec,
                                               UpdateCollectionSettings)
-
-# [start:4.1.9]
 from couchbase.management.options import (CreateCollectionOptions,
                                           CreateScopeOptions,
                                           DropCollectionOptions,
@@ -31,9 +29,6 @@ from .sdk_commands import (SdkCommand,
                            SdkCommandOptions,
                            SdkCommandResult,
                            validate_command)
-
-# [end:4.1.9]
-
 
 VALID_COLLECTION_MANAGER_COMMAND_ARGS = {
     'return_result': lambda r: isinstance(r, bool),
@@ -91,10 +86,8 @@ class CollectionManagerCommandResult(SdkCommandResult):
                 }
                 if coll_spec.max_expiry is not None:
                     kwargs['expiry_secs'] = round(coll_spec.max_expiry.total_seconds())
-                # [start:4.1.9]
                 if coll_spec.history is not None:
                     kwargs['history'] = coll_spec.history
-                # [end:4.1.9]
                 proto_scope_spec.collections.append(collection_manager_pb.CollectionSpec(**kwargs))
             res.result.append(proto_scope_spec)
         return res
@@ -195,7 +188,6 @@ class DropScopeCommand(SdkCommand):
         return command
 
 
-# [start:4.1.9]
 class CreateCollectionCommand(SdkCommand):
     def __init__(self, **kwargs):
         validate_command(VALID_COLLECTION_MANAGER_COMMAND_ARGS, **kwargs)
@@ -298,7 +290,6 @@ class DropCollectionCommand(SdkCommand):
         command = DropCollectionCommand(**kwargs)
         command.set_options()
         return command
-# [end:4.1.9]
 
 
 class CollectionManagerCommandBuilder:
@@ -314,10 +305,8 @@ class CollectionManagerCommandBuilder:
         kwargs = {}
         if proto_settings.HasField('expiry_secs'):
             kwargs['max_expiry'] = timedelta(seconds=proto_settings.expiry_secs)
-        # [start:4.1.9]
         if proto_settings.HasField('history'):
             kwargs['history'] = proto_settings.history
-        # [end:4.1.9]
         return settings_cls(**kwargs)
 
     @classmethod
@@ -339,7 +328,6 @@ class CollectionManagerCommandBuilder:
         if cmd_type == 'drop_scope':
             cmd_kwargs['scope_name'] = cmd.name
             return DropScopeCommand.create_command(**cmd_kwargs)
-        # [start:4.1.9]
         if cmd_type == 'create_collection':
             cmd_kwargs.update({
                 'scope_name': cmd.scope_name,
@@ -361,5 +349,4 @@ class CollectionManagerCommandBuilder:
                 'collection_name': cmd.name,
             })
             return DropCollectionCommand.create_command(**cmd_kwargs)
-        # [end:4.1.9]
         raise NotImplementedError(f'Collection management command {cmd_type} not supported by the performer')

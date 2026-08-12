@@ -4,13 +4,10 @@ import logging
 import threading
 from typing import Dict, Optional
 
-# [if:4.6.0]
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from couchbase.observability.otel_tracing import OtelWrapperSpan
-
-# [end]
 
 
 class SpanOwner:
@@ -58,7 +55,6 @@ class SpanOwner:
         with self._lock:
             self._spans.clear()
 
-    # [if:4.6.0]
     def export_contexts(self) -> Dict[str, str]:
         prop = TraceContextTextMapPropagator()
         result = {}
@@ -86,4 +82,3 @@ class SpanOwner:
                 owner._spans[span_id] = proxy
 
         return owner
-    # [end]

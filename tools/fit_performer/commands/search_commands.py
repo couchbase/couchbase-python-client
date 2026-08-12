@@ -16,8 +16,6 @@ from google.protobuf import timestamp_pb2 as timestamp_pb
 from couchbase.cluster import Cluster
 from couchbase.exceptions import CouchbaseException
 from couchbase.logic.search_queries import GeoBoundingBoxQuery, GeoDistanceQuery
-
-# [start:4.1.11]
 from couchbase.options import SearchOptions, VectorSearchOptions
 from couchbase.scope import Scope
 from couchbase.search import (BooleanFieldQuery,
@@ -59,9 +57,6 @@ from ..generated.sdk import workload_pb2 as sdk_pb
 from ..generated.shared import content_pb2 as content_pb
 from ..generated.shared import exceptions_pb2 as exceptions_pb
 from ..generated.streams import top_level_pb2 as streams_pb
-
-# [end:4.1.11]
-
 
 if TYPE_CHECKING:
     from couchbase.result import SearchResult
@@ -109,12 +104,10 @@ class SearchCommandOptions(SdkCommandOptions):
         search_pb.SearchGeoDistanceUnits.SEARCH_GEO_DISTANCE_UNITS_INCHES: 'inch',
     }
 
-    # [start:4.1.11]
     _VALID_VECTOR_QUERY_COMBINATION = {
         search_pb.VectorQueryCombination.AND: VectorQueryCombination.AND,
         search_pb.VectorQueryCombination.OR: VectorQueryCombination.OR,
     }
-    # [end:4.1.11]
 
     @staticmethod
     def get_timeout(options):
@@ -277,14 +270,12 @@ class SearchCommandOptions(SdkCommandOptions):
     def get_include_locations(options):
         return SearchCommandOptions.get_simple_option(options, 'include_locations')
 
-    # [start:4.1.11]
     @staticmethod
     def get_vector_query_combination(options):
         if not options.HasField('vector_query_combination'):
             return None
 
         return SearchCommandOptions._VALID_VECTOR_QUERY_COMBINATION[options.vector_query_combination]
-    # [end:4.1.11]
 
 
 class SearchCommandResult(SdkCommandResult):
@@ -499,10 +490,8 @@ class SearchQueryCommand(SdkCommand):
         self._query = None
         self._options = None
         self._span_owner = kwargs.get('span_owner')
-        # [start:4.1.11]
         self._raw_request = kwargs.get('request')
         self._search_request = None
-        # [end:4.1.11]
 
     @property
     def stream_type(self):
@@ -538,7 +527,6 @@ class SearchQueryCommand(SdkCommand):
     def set_search_query(self):
         self._query = SearchQueryBuilder.build_search_query(self._raw_query)
 
-    # [start:4.1.11]
     def set_search_request(self):  # noqa: C901
         search_query = vector_search = None
         if self._raw_request.HasField('search_query'):
@@ -552,12 +540,10 @@ class SearchQueryCommand(SdkCommand):
                         vq_opts['num_candidates'] = vq.options.num_candidates
                     if vq.options.HasField('boost'):
                         vq_opts['boost'] = vq.options.boost
-                    # [start:4.4.0]
                     if vq.options.HasField('prefilter'):
                         prefilter_query = SearchQueryBuilder.build_search_query(vq.options.prefilter)
 
                         vq_opts['prefilter'] = prefilter_query
-                    # [end:4.4.0]
                 if vq.HasField('base64_vector_query'):
                     queries.append(VectorQuery.create(vq.vector_field_name, vq.base64_vector_query, **vq_opts))
                 else:
@@ -577,26 +563,19 @@ class SearchQueryCommand(SdkCommand):
                 self._search_request = SearchRequest.create(vector_search)
         if search_query is None and vector_search is None:
             self._search_request = SearchRequest.create(None)
-    # [end:4.1.11]
 
     # TODO:  can use as_search_result_stream once C++ supports streaming in operational SDK
     # @SearchCommandResult.as_search_result_stream
     @SearchCommandResult.as_blocking_search_result
     def execute_command(self) -> run_pb.Result:
         use_search_v2 = False
-        # [start:4.1.11]
         use_search_v2 = self._raw_request is not None
-        # [end:4.1.11]
 
-        # [start:4.1.12]
         if use_search_v2 and self._scope is not None:
             return self._scope.search(self._index_name, self._search_request, self._options)
-        # [end:4.1.12]
 
-        # [start:4.1.11]
         if use_search_v2:
             return self._cluster.search(self._index_name, self._search_request, self._options)
-        # [end:4.1.11]
 
         if not use_search_v2:
             if self._scope is None:
@@ -611,14 +590,12 @@ class SearchQueryCommand(SdkCommand):
         command.set_options()
         return command
 
-    # [start:4.1.11]
     @staticmethod
     def create_v2_command(**kwargs) -> SearchQueryCommand:
         command = SearchQueryCommand(**kwargs)
         command.set_search_request()
         command.set_options()
         return command
-    # [end:4.1.11]
 
 
 class SearchQueryBuilder:
@@ -749,13 +726,8 @@ class SearchQueryBuilder:
     def build_date_range_query(cls, raw_query):
         builder = cls(DateRangeQuery(raw_query.start, raw_query.end), raw_query)
         builder.set_primitive_fields('datetime_parser', 'field', 'boost')
-        # [if:<4.3.6]
-        builder.set_primitive_field('inclusive_start', sdk_field_name='start_inclusive')
-        builder.set_primitive_field('inclusive_end', sdk_field_name='end_inclusive')
-        # [else]
-        # ?builder.set_primitive_field('inclusive_start')
-        # ?builder.set_primitive_field('inclusive_end')
-        # [end]
+        builder.set_primitive_field('inclusive_start')
+        builder.set_primitive_field('inclusive_end')
         return builder.query
 
     @classmethod
@@ -764,26 +736,16 @@ class SearchQueryBuilder:
         # TODO(SDKQE-3584):  Fix lossy transmission of floating point proto fields
         builder = cls(NumericRangeQuery(round(raw_query.min, 7), round(raw_query.max, 7)), raw_query)
         builder.set_primitive_fields('field', 'boost')
-        # [if:<4.3.6]
-        builder.set_primitive_field('inclusive_min', sdk_field_name='min_inclusive')
-        builder.set_primitive_field('inclusive_max', sdk_field_name='max_inclusive')
-        # [else]
-        # ?builder.set_primitive_field('inclusive_min')
-        # ?builder.set_primitive_field('inclusive_max')
-        # [end]
+        builder.set_primitive_field('inclusive_min')
+        builder.set_primitive_field('inclusive_max')
         return builder.query
 
     @classmethod
     def build_term_range_query(cls, raw_query):
         builder = cls(TermRangeQuery(raw_query.min, raw_query.max), raw_query)
         builder.set_primitive_fields('field', 'boost')
-        # [if:<4.3.6]
-        builder.set_primitive_field('inclusive_min', sdk_field_name='start_inclusive')
-        builder.set_primitive_field('inclusive_max', sdk_field_name='end_inclusive')
-        # [else]
-        # ?builder.set_primitive_field('inclusive_min')
-        # ?builder.set_primitive_field('inclusive_min')
-        # [end]
+        builder.set_primitive_field('inclusive_min')
+        builder.set_primitive_field('inclusive_max')
         return builder.query
 
     @classmethod
@@ -877,7 +839,6 @@ class SearchCommandBuilder:
 
         return SearchQueryCommand.create_command(**cmd_kwargs)
 
-    # [start:4.1.11]
     @staticmethod
     def build_command_v2(search_v2_cmd,  # type: search_pb.SearchWrapper
                          **cmd_kwargs
@@ -896,4 +857,3 @@ class SearchCommandBuilder:
             cmd_kwargs['fields_as'] = search_v2_cmd.fields_as
 
         return SearchQueryCommand.create_v2_command(**cmd_kwargs)
-    # [end:4.1.11]

@@ -21,15 +21,10 @@ from couchbase.durability import (ClientDurability,
                                   ReplicateTo,
                                   ServerDurability)
 from couchbase.exceptions import CouchbaseException
-
-# [start:4.1.7]
 from couchbase.kv_range_scan import (PrefixScan,
                                      RangeScan,
                                      SamplingScan,
                                      ScanTerm)
-
-# [end:4.1.7]
-# [start:4.1.8]
 from couchbase.options import (AppendOptions,
                                DecrementOptions,
                                DeltaValue,
@@ -53,9 +48,6 @@ from couchbase.options import (AppendOptions,
                                TouchOptions,
                                UnlockOptions,
                                UpsertOptions)
-
-# [end:4.1.8]
-# [start:4.4.0]
 from couchbase.replica_reads import ReadPreference
 from couchbase.result import (CounterResult,
                               ExistsResult,
@@ -66,8 +58,6 @@ from couchbase.result import (CounterResult,
                               MutateInResult,
                               ScanResult,
                               ScanResultIterable)
-
-# [start:4.1.12]
 from couchbase.subdocument import MutationMacro, StoreSemantics
 
 from ..generated.run import top_level_pb2 as run_pb
@@ -86,10 +76,6 @@ from .sdk_commands import (DURABILITY_LEVEL_MAP,
                            SdkCommandOptions,
                            SdkCommandResult,
                            validate_command)
-
-# [end:4.1.12]
-
-# [end:4.4.0]
 
 if TYPE_CHECKING:
     from ..workloads import Counters
@@ -137,12 +123,10 @@ REPLICATE_TO_MAP = {
     basic_pb.ReplicateTo.REPLICATE_TO_THREE: ReplicateTo.THREE,
 }
 
-# [start:4.4.0]
 READ_PREFERENCE_MAP = {
     basic_pb.ReadPreference.NO_PREFERENCE: ReadPreference.NO_PREFERENCE,
     basic_pb.ReadPreference.SELECTED_SERVER_GROUP: ReadPreference.SELECTED_SERVER_GROUP,
 }
-# [end:4.4.0]
 
 
 class KvCommandOptions(SdkCommandOptions):
@@ -231,7 +215,6 @@ class KvCommandOptions(SdkCommandOptions):
     def get_access_deleted(options):
         return KvCommandOptions.get_simple_option(options, 'access_deleted')
 
-    # [start:4.1.7]
     @staticmethod
     def get_ids_only(options):
         return KvCommandOptions.get_simple_option(options, 'ids_only')
@@ -247,9 +230,7 @@ class KvCommandOptions(SdkCommandOptions):
     @staticmethod
     def get_concurrency(options):
         return KvCommandOptions.get_simple_option(options, 'concurrency')
-    # [end:4.1.7]
 
-    # [start:4.4.0]
     @staticmethod
     def get_read_preference(options):
         if not options.HasField('read_preference'):
@@ -259,7 +240,6 @@ class KvCommandOptions(SdkCommandOptions):
             raise ValueError(f'Unexpected read preference: {options.read_preference}')
 
         return READ_PREFERENCE_MAP[options.read_preference]
-    # [end:4.4.0]
 
 
 class KvCommandResult(SdkCommandResult):
@@ -377,7 +357,6 @@ class KvCommandResult(SdkCommandResult):
 
         return wrapped_fn
 
-    # [start:4.1.7]
     @classmethod
     def as_scan_result_stream(cls, fn):
         @wraps(fn)
@@ -393,8 +372,6 @@ class KvCommandResult(SdkCommandResult):
             )
 
         return wrapped_fn
-
-    # [end:4.1.7]
 
     @classmethod
     def as_lookup_in_result(cls, fn):
@@ -576,7 +553,6 @@ class KvCommandResult(SdkCommandResult):
 
         return kv_mutate_in_pb.MutateInSpecResult(content_as_result=content_or_error)
 
-    # [start:4.1.7]
     @classmethod
     def to_scan_result_iterator(cls,
                                 result: ScanResultIterable,
@@ -634,8 +610,6 @@ class KvCommandResult(SdkCommandResult):
         res = kv_range_scan_pb.ScanResult(**res_kwargs)
         return res
 
-    # [end:4.1.7]
-
     @classmethod
     def to_lookup_in_result(cls,
                             result: LookupInResult,
@@ -663,7 +637,6 @@ class KvCommandResult(SdkCommandResult):
             exists_or_error = kv_lookup_in_pb.BooleanOrError(exception=cls.to_exception(e))
         return kv_lookup_in_pb.LookupInSpecResult(content_as_result=content_or_error, exists_result=exists_or_error)
 
-    # [start:4.1.8]
     @classmethod
     def to_lookup_in_replica_result(cls,
                                     result: LookupInReplicaResult,
@@ -720,8 +693,6 @@ class KvCommandResult(SdkCommandResult):
             exception = cls.to_exception(e)
             yield exception
             return
-
-    # [end:4.1.8]
 
     @classmethod
     def to_get_all_replicas_result_iterator(cls,
@@ -824,14 +795,12 @@ class KvCommandBuilder:
 
     @staticmethod
     def get_macro(macro: kv_mutate_in_pb.MutateInMacro):
-        # [start:4.1.12]
         if macro == kv_mutate_in_pb.MutateInMacro.CAS:
             return MutationMacro.cas()
         if macro == kv_mutate_in_pb.MutateInMacro.SEQ_NO:
             return MutationMacro.seq_no()
         if macro == kv_mutate_in_pb.MutateInMacro.VALUE_CRC_32C:
             return MutationMacro.value_crc32c()
-        # [end:4.1.12]
         raise ValueError(f"The macro format '{macro}' is not recognized")
 
     @staticmethod
@@ -931,7 +900,6 @@ class KvCommandBuilder:
         if cmd_type == 'remove':
             return RemoveCommand.create_command(**cmd_kwargs)
 
-        # [start:4.1.7]
         elif cmd_type == 'range_scan':
             cmd_kwargs.update({
                 'collection': cls.get_collection(cluster, kv_cmd.collection),
@@ -940,12 +908,10 @@ class KvCommandBuilder:
                 'content_as': kv_cmd.content_as if kv_cmd.HasField('content_as') else None,
             })
             return ScanCommand.create_command(**cmd_kwargs)
-        # [end:4.1.7]
         if cmd_type == 'lookup_in':
             cmd_kwargs['specs'] = cls.get_lookup_in_specs(kv_cmd.spec)
             cmd_kwargs['raw_specs'] = kv_cmd.spec
             return LookupInCommand.create_command(**cmd_kwargs)
-        # [start:4.1.8]
         if cmd_type == 'lookup_in_any_replica':
             cmd_kwargs['specs'] = cls.get_lookup_in_specs(kv_cmd.spec)
             cmd_kwargs['raw_specs'] = kv_cmd.spec
@@ -955,7 +921,6 @@ class KvCommandBuilder:
             cmd_kwargs['raw_specs'] = kv_cmd.spec
             cmd_kwargs['stream_config'] = kv_cmd.stream_config
             return LookupInAllReplicasCommand.create_command(**cmd_kwargs)
-        # [end:4.1.8]
         if cmd_type == 'get_and_touch':
             cmd_kwargs['content_as'] = kv_cmd.content_as
             cmd_kwargs['expiry'] = KvCommandOptions.convert_expiry(kv_cmd.expiry)
@@ -1196,7 +1161,6 @@ class UpsertCommand(SdkCommand):
         return command
 
 
-# [start:4.1.7]
 class ScanCommand(SdkCommand):
     _STREAM_TYPE = streams_pb.Type.STREAM_KV_RANGE_SCAN
 
@@ -1297,7 +1261,6 @@ class ScanCommand(SdkCommand):
         command.set_options()
         command.set_scan_type()
         return command
-# [end:4.1.7]
 
 
 class LookupInCommand(SdkCommand):
@@ -1336,7 +1299,6 @@ class LookupInCommand(SdkCommand):
         return command
 
 
-# [start:4.1.8]
 class LookupInAnyReplicaCommand(SdkCommand):
     def __init__(self, **kwargs):
         validate_command(VALID_KV_COMMAND_ARGS, **kwargs)
@@ -1419,8 +1381,6 @@ class LookupInAllReplicasCommand(SdkCommand):
         command.set_options()
         return command
 
-
-# [end:4.1.8]
 
 class GetAndTouchCommand(SdkCommand):
     def __init__(self, **kwargs):

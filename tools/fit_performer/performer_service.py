@@ -9,11 +9,11 @@ import grpc
 from couchbase import get_transactions_protocol
 from couchbase.cluster import Cluster
 
+from .caps import PERFORMER_CAPS, SDK_CAPS
 from .executors import RequestExecutor, WorkloadExecutorBuilder
 from .generated import performer_pb2_grpc as performer_pb_grpc
 from .generated.observability import top_pb2 as observability_pb
 from .generated.performer import caps_pb2 as performer_caps_pb
-from .generated.sdk import caps_pb2 as sdk_caps_pb
 from .generated.shared import basic_pb2 as basic_pb
 from .generated.shared import bounds_pb2 as bounds_pb
 from .generated.shared import cluster_pb2 as cluster_pb
@@ -78,19 +78,13 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
         response = performer_caps_pb.PerformerCapsFetchResponse(
             library_version="1.0.0",
             performer_user_agent="python",
-            sdk_implementation_caps=[],
+            performer_caps=PERFORMER_CAPS,
+            sdk_implementation_caps=SDK_CAPS,
             transaction_implementations_caps=[],
             supported_apis=[basic_pb.API.DEFAULT]
         )
 
-        try:
-            transactions_protocol_version, supported_extensions = get_transactions_protocol()
-        except NameError:
-            transactions_protocol_version = 2.0
-            # The extensions supported by the SDK before the get_transactions_protocol() function was added
-            supported_extensions = ["TI", "DC", "TO", "MO", "CM", "BM", "QU", "SD", "BF3787", "BF3794",
-                                    "BF3705", "BF3838", "RC", "UA", "CO", "BF3791", "SQ", "SI"]
-
+        transactions_protocol_version, supported_extensions = get_transactions_protocol()
         response.transactions_protocol_version = str(transactions_protocol_version)
 
         for ext in supported_extensions:
@@ -100,66 +94,6 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
                 # This is a warning only as the performer doesn't have transactions support yet.
                 # We can consider making this an error once we add transactions support.
                 self._logger.warning(f"Library reported unexpected transactions extension '{ext}'")
-
-        response.performer_caps.append(performer_caps_pb.KV_SUPPORT_1)
-        response.performer_caps.append(performer_caps_pb.CLUSTER_CONFIG_CERT)
-        response.performer_caps.append(performer_caps_pb.CLUSTER_CONFIG_INSECURE)
-        # [start:4.6.0]
-        response.performer_caps.append(performer_caps_pb.OBSERVABILITY_1)
-        # [end:4.6.0]
-
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_KV)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_QUERY_INDEX_MANAGEMENT)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_SEARCH)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_SCOPE_SEARCH)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_SEARCH_INDEX_MANAGEMENT)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_QUERY)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_LOOKUP_IN)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_BUCKET_MANAGEMENT)
-        # [start:4.1.3]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_COLLECTION_QUERY_INDEX_MANAGEMENT)
-        # [end:4.1.3]
-        # [start:4.1.7]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_KV_RANGE_SCAN)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_QUERY_READ_FROM_REPLICA)
-        # [end:4.1.7]
-        # [start:4.1.8]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_LOOKUP_IN_REPLICAS)
-        # [end:4.1.8]
-        # [start:4.1.9]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_MANAGEMENT_HISTORY_RETENTION)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_COLLECTION_MANAGEMENT)
-        # [end:4.1.9]
-        # [start:4.1.10]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_DOCUMENT_NOT_LOCKED)
-        # [end:4.1.10]
-        # [start:4.1.11]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_VECTOR_SEARCH)
-        # [end:4.1.11]
-        # [start:4.1.12]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_SCOPE_SEARCH)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_SCOPE_SEARCH_INDEX_MANAGEMENT)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_INDEX_MANAGEMENT_RFC_REVISION_25)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_SEARCH_RFC_REVISION_11)
-        # [end:4.1.12]
-        # [start:4.2.2]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_VECTOR_SEARCH_BASE64)
-        # [end:4.2.2]
-        # [start:4.4.0]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_ZONE_AWARE_READ_FROM_REPLICA)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_APP_TELEMETRY)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_BUCKET_SETTINGS_NUM_VBUCKETS)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_PREFILTER_VECTOR_SEARCH)
-        # [end:4.4.0]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SUPPORTS_AUTHENTICATOR)
-        # [start:4.6.0]
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_SET_AUTHENTICATOR)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_JWT)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_OBSERVABILITY_RFC_REV_24)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_OBSERVABILITY_CLUSTER_LABELS)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_STABLE_OTEL_SEMANTIC_CONVENTIONS)
-        response.sdk_implementation_caps.append(sdk_caps_pb.SDK_STABLE_OTEL_SEMANTIC_CONVENTIONS_EMITTED_BY_DEFAULT)
-        # [end:4.6.0]
 
         return response
 
@@ -189,7 +123,6 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
 
         conn = ConnectionCache(hostname=hostname, options=options, mp_cluster_options=mp_options)
 
-        # [if:4.6.0]
         if (request.HasField('cluster_config')
                 and request.cluster_config.HasField('observability_config')):
             obs_config = request.cluster_config.observability_config
@@ -212,7 +145,6 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
                 options['enable_metrics'] = False
                 mp_options['enable_metrics'] = False
                 self._logger.info("Metrics disabled")
-        # [end]
 
         self._logger.info(f"Using connection string `{hostname}`")
         connection = Cluster(hostname, options)

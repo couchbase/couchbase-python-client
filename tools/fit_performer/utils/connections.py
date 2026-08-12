@@ -4,14 +4,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Union
 
-# [end:4.6.0]
 from acouchbase.cluster import AsyncCluster
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
 from couchbase.cluster import Cluster
-
-# [start:4.6.0]
 from couchbase.observability.metrics import Meter
 from couchbase.observability.tracing import RequestTracer
 from couchbase.options import (ClusterOptions,
@@ -29,22 +26,18 @@ class ConnectionCache:
     mp_cluster_options: ClusterOptions = None
     obs_config: object = None
     cluster: Union[AsyncCluster, Cluster] = None
-    # [start:4.6.0]
     tracer: Optional[RequestTracer] = None
     tracer_provider: object = None
     meter: Optional[Meter] = None
     meter_provider: object = None
-    # [end:4.6.0]
 
     def close(self):
         if self.cluster:
             self.cluster.close()
-        # [start:4.6.0]
         if self.tracer_provider:
             self.tracer_provider.shutdown()
         if self.meter_provider:
             self.meter_provider.shutdown()
-        # [end:4.6.0]
 
 
 class ClusterConnectOptions:
@@ -81,12 +74,9 @@ class ClusterConnectOptions:
 
         # JwtAuthenticator has no slot for the trust cert (unlike Password/Certificate authenticators),
         # so pass it on the cluster options.
-        # [if:4.6.0]
         if isinstance(authenticator, JwtAuthenticator) and trust_store_path is not None:
             kwargs['trust_store_path'] = trust_store_path
-        # [end]
 
-        # [start:4.4.0]
         if config.HasField('preferred_server_group'):
             kwargs['preferred_server_group'] = config.preferred_server_group
         if config.HasField('enable_app_telemetry'):
@@ -102,7 +92,6 @@ class ClusterConnectOptions:
         if config.HasField('app_telemetry_ping_timeout_secs'):
             ping_timeout = ClusterConnectOptions.get_timeout_secs(config, 'app_telemetry_ping_timeout_secs')
             kwargs['app_telemetry_ping_timeout'] = ping_timeout
-        # [end:4.4.0]
 
         return ClusterOptions(**kwargs)
 
@@ -151,11 +140,9 @@ class ClusterConnectOptions:
                                          password_auth.password,
                                          cert_path=trust_store_path)
 
-        # [if:4.6.0]
         if which_auth == 'jwt_auth':
             jwt_auth = auth_message.jwt_auth
             return JwtAuthenticator(jwt_auth.jwt)
-        # [end]
 
         if which_auth == 'certificate_auth':
             certificate_auth = auth_message.certificate_auth

@@ -12,14 +12,7 @@ from typing import (Any,
                     Iterator,
                     Union)
 
-# [end:4.1.10]
 from couchbase.durability import DurabilityLevel
-
-# [end:4.1.7]
-# [start:4.1.10]
-# [end:4.1.5]
-# [start:4.1.7]
-# [start:4.1.5]
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   AuthenticationException,
                                   BucketAlreadyExistsException,
@@ -257,10 +250,6 @@ class SdkCommandResult:
         GroupNotFoundException: exceptions_pb.SDK_GROUP_NOT_FOUND_EXCEPTION,
         BucketAlreadyExistsException: exceptions_pb.SDK_BUCKET_EXISTS_EXCEPTION,
         BucketNotFlushableException: exceptions_pb.SDK_BUCKET_NOT_FLUSHABLE_EXCEPTION,
-    }
-
-    # [start:4.1.5]
-    ERROR_MAP.update({
         DeltaInvalidException: exceptions_pb.SDK_DELTA_INVALID_EXCEPTION,
         DocumentNotJsonException: exceptions_pb.SDK_DOCUMENT_NOT_JSON_EXCEPTION,
         DocumentUnretrievableException: exceptions_pb.SDK_DOCUMENT_UNRETRIEVABLE_EXCEPTION,
@@ -269,16 +258,9 @@ class SdkCommandResult:
         PathTooBigException: exceptions_pb.SDK_PATH_TOO_BIG_EXCEPTION,
         PathTooDeepException: exceptions_pb.SDK_PATH_TOO_DEEP_EXCEPTION,
         ValueTooDeepException: exceptions_pb.SDK_VALUE_TOO_DEEP_EXCEPTION,
-    })
-    # [end:4.1.5]
-
-    # [start:4.1.7]
-    ERROR_MAP[UnsupportedOperation] = exceptions_pb.SDK_UNSUPPORTED_OPERATION_EXCEPTION
-    # [end:4.1.7]
-
-    # [start:4.1.10]
-    ERROR_MAP[DocumentNotLockedException] = exceptions_pb.SDK_DOCUMENT_NOT_LOCKED_EXCEPTION
-    # [end:4.1.10]
+        UnsupportedOperation: exceptions_pb.SDK_UNSUPPORTED_OPERATION_EXCEPTION,
+        DocumentNotLockedException: exceptions_pb.SDK_DOCUMENT_NOT_LOCKED_EXCEPTION,
+    }
 
     @classmethod
     def as_success(cls, fn):

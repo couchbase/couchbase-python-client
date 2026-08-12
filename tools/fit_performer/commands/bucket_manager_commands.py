@@ -159,18 +159,14 @@ class BucketManagerCommandResult(SdkCommandResult):
             kwargs['minimum_durability_level'] = INV_DURABILITY_LEVEL_MAP[sdk_settings['minimum_durability_level']]
         if sdk_settings.storage_backend is not None and sdk_settings.storage_backend != StorageBackend.UNDEFINED:
             kwargs['storage_backend'] = INV_STORAGE_BACKEND_MAP[sdk_settings.storage_backend]
-        # [start:4.1.9]
         if sdk_settings.history_retention_collection_default is not None:
             kwargs['history_retention_collection_default'] = sdk_settings.history_retention_collection_default
         if sdk_settings.history_retention_duration is not None:
             kwargs['history_retention_seconds'] = round(sdk_settings.history_retention_duration.total_seconds())
         if sdk_settings.history_retention_bytes is not None:
             kwargs['history_retention_bytes'] = sdk_settings.history_retention_bytes
-        # [end:4.1.9]
-        # [start:4.4.0]
         if sdk_settings.num_vbuckets is not None:
             kwargs['num_vbuckets'] = sdk_settings.num_vbuckets
-        # [end:4.4.0]
         return bucket_manager_pb.BucketSettings(**kwargs)
 
     @classmethod
@@ -399,18 +395,14 @@ class BucketManagerCommandBuilder:
             kwargs['minimum_durability_level'] = DURABILITY_LEVEL_MAP[proto_settings.minimum_durability_level]
         if proto_settings.HasField('storage_backend'):
             kwargs['storage_backend'] = STORAGE_BACKEND_MAP[proto_settings.storage_backend]
-        # [start:4.1.9]
         if proto_settings.HasField('history_retention_collection_default'):
             kwargs['history_retention_collection_default'] = proto_settings.history_retention_collection_default
         if proto_settings.HasField('history_retention_seconds'):
             kwargs['history_retention_duration'] = timedelta(seconds=proto_settings.history_retention_seconds)
         if proto_settings.HasField('history_retention_bytes'):
             kwargs['history_retention_bytes'] = proto_settings.history_retention_bytes
-        # [end:4.1.9]
-        # [start:4.4.0]
         if proto_settings.HasField('num_vbuckets'):
             kwargs['num_vbuckets'] = proto_settings.num_vbuckets
-        # [end:4.4.0]
 
         return kwargs
 

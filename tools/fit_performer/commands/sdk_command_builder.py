@@ -39,21 +39,17 @@ class SdkCommandBuilder:
                     cluster_cmd.query_index_manager, **cmd_kwargs)
             if cluster_cmd_type == 'search':
                 return SearchCommandBuilder.build_command(cluster_cmd.search, **cmd_kwargs)
-            # [start:4.1.11]
             if cluster_cmd_type == 'search_v2':
                 return SearchCommandBuilder.build_command_v2(cluster_cmd.search_v2, **cmd_kwargs)
-            # [end:4.1.11]
             if cluster_cmd_type == 'search_index_manager':
                 return SearchIndexManagerCommandBuilder.build_cluster_level_command(
                     cluster_cmd.search_index_manager, **cmd_kwargs)
             if cluster_cmd_type == 'bucket_manager':
                 return BucketManagerCommandBuilder.build_command(
                     cluster_cmd.bucket_manager, **cmd_kwargs)
-            # [start:4.6.0]
             if cluster_cmd_type == 'authenticator':
                 return UpdateAuthenticatorCommand.create_command(
                     auth_message=cluster_cmd.authenticator, **cmd_kwargs)
-            # [end:4.6.0]
             raise NotImplementedError(f'Cluster-level command `{cluster_cmd_type}` not implemented in performer')
 
         elif cmd_type == 'bucket_command':
@@ -74,13 +70,11 @@ class SdkCommandBuilder:
                 return QueryCommandBuilder.build_command(scope_cmd.query, **cmd_kwargs)
             if scope_cmd_type == 'search':
                 return SearchCommandBuilder.build_command(scope_cmd.search, **cmd_kwargs)
-            # [start:4.1.12]
             if scope_cmd_type == 'search_index_manager':
                 return SearchIndexManagerCommandBuilder.build_scope_level_command(
                     scope_cmd.search_index_manager, **cmd_kwargs)
             if scope_cmd_type == 'search_v2':
                 return SearchCommandBuilder.build_command_v2(scope_cmd.search_v2, **cmd_kwargs)
-            # [end:4.1.12]
             raise NotImplementedError(f'Scope-level command `{scope_cmd_type}` not implemented in performer')
 
         elif cmd_type == 'collection_command':

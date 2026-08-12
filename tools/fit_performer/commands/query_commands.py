@@ -292,9 +292,7 @@ class QueryCommand(SdkCommand):
             'preserve_expiry': QueryCommandOptions.get_preserve_expiry(self._raw_options),
             'consistent_with': QueryCommandOptions.get_consistent_with(self._raw_options),
         }
-        # [start:4.1.7]
         opt_kwargs['use_replica'] = QueryCommandOptions.get_use_replica(self._raw_options)
-        # [end:4.1.7]
         self._options = QueryOptions(**opt_kwargs)
         logger.debug(f"Query Options = {self._options}")
 

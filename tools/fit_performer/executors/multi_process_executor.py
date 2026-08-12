@@ -34,19 +34,16 @@ class PerformerProcess(_CTX.Process):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._results_queue = None
-        # [if:4.6.0]
         self._tracer = None
         self._meter = None
         self._tracer_provider = None
         self._meter_provider = None
         self._span_contexts = {}
-        # [end]
 
     @property
     def results(self):
         return self._results_queue
 
-    # [if:4.6.0]
     @property
     def meter(self):
         return self._meter
@@ -73,7 +70,6 @@ class PerformerProcess(_CTX.Process):
         self._meter = meter
         self._meter_provider = meter_provider
         self._span_contexts = span_contexts
-    # [end]
 
     def set_parent_items(self, queue):
         self._results_queue = queue
@@ -110,7 +106,6 @@ def init_process(queue,  # type: mp.Queue
     current_p = mp.current_process()
     current_p.set_parent_items(queue)
 
-    # [if:4.6.0]
     tracer = tracer_provider = meter = meter_provider = None
     if obs_config is not None:
         _logger = logging.getLogger(__name__)
@@ -132,7 +127,6 @@ def init_process(queue,  # type: mp.Queue
             weakref.finalize(meter_provider, _logger.warning,
                              'OTel MeterProvider GC\'d in process %d - metrics will not be exported', pid)
     current_p.set_otel(tracer, tracer_provider, meter, meter_provider, span_contexts or {})
-    # [end]
 
 
 def execute_workload(workloads,  # type: List[Workload]
@@ -158,12 +152,10 @@ def execute_workload(workloads,  # type: List[Workload]
     current_p = mp.current_process()
     results = current_p.results
 
-    # [if:4.6.0]
     from ..telemetry.otel import worker_otel_setup, worker_otel_teardown
     otel_tokens, worker_span_owner = worker_otel_setup(
         current_p.tracer, current_p.meter, current_p.span_contexts, options
     )
-    # [end]
 
     connection = None
     for _ in range(retries):
@@ -182,17 +174,11 @@ def execute_workload(workloads,  # type: List[Workload]
         for workload in workloads:
             workload.set_connection(connection)
             workload.set_counters_and_bounds(counters)
-            # [if:4.6.0]
             if worker_span_owner is not None and hasattr(workload, 'set_span_owner'):
                 workload.set_span_owner(worker_span_owner)
-            # [end]
             workload.execute(results)
     finally:
-        # [if:4.6.0]
         worker_otel_teardown(otel_tokens, current_p.tracer_provider, current_p.meter_provider)
-        # [else]
-        # ?pass
-        # [end]
     logger.info(f"Process {current_p.pid} has finished its workloads")
 
 
