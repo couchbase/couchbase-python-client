@@ -1,0 +1,13 @@
+# Keep .git: setup.py derives the SDK version from `git describe`.
+
+venv/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*.so
+docs/_build/
+
+# Local CPM cache. The image build fetches the dependencies instead.
+deps/couchbase-cxx-cache/

@@ -1,0 +1,13 @@
+# We install and pin BOTH grpcio and grpcio-tools to ensure we get the same version
+# keeping the version in sync w/ the driver looks to address https://jira.issues.couchbase.com/browse/PYCBC-1544
+grpcio~=1.69
+grpcio-tools~=1.69
+googleapis-common-protos~=1.62
+mypy-protobuf~=3.6
+psutil~=5.9.2
+# Typing support
+typing-extensions~=4.11; python_version<"3.11"
+# OpenTelemetry
+opentelemetry-api~=1.22
+opentelemetry-sdk~=1.22
+opentelemetry-exporter-otlp-proto-grpc~=1.22
