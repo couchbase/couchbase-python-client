@@ -266,7 +266,8 @@ private:
           }
 
           PyObject* target_handler =
-            PyObject_TypeCheck(result, &pycbc_exception_type) ? pyObj_errback : pyObj_callback;
+            PyObject_TypeCheck(result, (PyTypeObject*)pycbc_exception_type_obj) ? pyObj_errback
+                                                                                : pyObj_callback;
 
           if (target_handler != nullptr) {
             PyObject* ret = PyObject_CallFunctionObjArgs(target_handler, result, nullptr);
@@ -560,7 +561,7 @@ Connection::execute_multi_op(PyObject* arg)
         Py_DECREF(pyObj_multi_result);
         return nullptr;
       }
-      if (PyObject_TypeCheck(res, &pycbc_exception_type)) {
+      if (PyObject_TypeCheck(res, (PyTypeObject*)pycbc_exception_type_obj)) {
         all_okay = false;
       }
       int rc = PyDict_SetItemString(multi_result->raw_result, s.key_str.c_str(), res);

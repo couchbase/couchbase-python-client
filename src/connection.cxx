@@ -131,8 +131,7 @@ Connection::handle_connection_operation_callback(std::error_code ec,
       connected_ = false;
     }
 
-    Py_INCREF(Py_None);
-    result = Py_None;
+    result = Py_NewRef(Py_None);
 
     if (pyObj_callback != nullptr) {
       PyObject* ret = PyObject_CallFunctionObjArgs(pyObj_callback, result, nullptr);

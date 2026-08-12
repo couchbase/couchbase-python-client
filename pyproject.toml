@@ -1,6 +1,9 @@
 [build-system]
 requires = [
-  "setuptools>=42",
+  # 70.1 is when bdist_wheel moved into setuptools proper; see the fallback
+  # import in pycbc_build_setup.py. Also comfortably new enough to treat
+  # setup.py's SPDX `license="Apache-2.0"` as a real license expression.
+  "setuptools>=70.1",
   "wheel",
 ]
 build-backend = "setuptools.build_meta"

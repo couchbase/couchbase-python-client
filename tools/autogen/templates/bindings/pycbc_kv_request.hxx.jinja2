@@ -23,7 +23,7 @@
 #pragma once
 
 #include "Python.h"
-#include "structmember.h"
+#include "pytype_utils.hxx"
 
 #include <future>
 #include <optional>
@@ -57,7 +57,7 @@ struct pycbc_kv_request {
     PyObject* with_metrics;
 };
 
-extern PyTypeObject pycbc_kv_request_type;
+extern PyObject* pycbc_kv_request_type_obj;
 
 int
 add_kv_request_type(PyObject* module);

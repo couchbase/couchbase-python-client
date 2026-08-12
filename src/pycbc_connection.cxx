@@ -17,6 +17,7 @@
 
 #include "pycbc_connection.hxx"
 #include "cpp_core_types.hxx"
+#include "pytype_utils.hxx"
 #include "utils.hxx"
 #include <core/cluster_options.hxx>
 #include <core/origin.hxx>
@@ -25,12 +26,17 @@
 namespace pycbc
 {
 
+// Forward declarations
 static void
 pycbc_connection__dealloc__(pycbc_connection* self);
 static PyObject*
 pycbc_connection__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs);
 static int
 pycbc_connection__init__(pycbc_connection* self, PyObject* args, PyObject* kwargs);
+
+// Connection property getter
+static PyObject*
+pycbc_connection__connected__get__(pycbc_connection* self, void* closure);
 
 // ==========================================================================================
 // Connection Operations
@@ -2244,57 +2250,17 @@ static PyGetSetDef pycbc_connection_getsetters[] = {
   { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
-PyTypeObject pycbc_connection_type = {
-  PyVarObject_HEAD_INIT(nullptr, 0) "pycbc_core.pycbc_connection", // tp_name
-  sizeof(pycbc_connection),                                        // tp_basicsize
-  0,                                                               // tp_itemsize
-  (destructor)pycbc_connection__dealloc__,                         // tp_dealloc
-  0,                                                               // tp_vectorcall_offset/tp_print
-  nullptr,                                                         // tp_getattr
-  nullptr,                                                         // tp_setattr
-  nullptr,                                                         // tp_reserved/tp_as_async
-  nullptr,                                                         // tp_repr
-  nullptr,                                                         // tp_as_number
-  nullptr,                                                         // tp_as_sequence
-  nullptr,                                                         // tp_as_mapping
-  nullptr,                                                         // tp_hash
-  nullptr,                                                         // tp_call
-  nullptr,                                                         // tp_str
-  nullptr,                                                         // tp_getattro
-  nullptr,                                                         // tp_setattro
-  nullptr,                                                         // tp_as_buffer
-  Py_TPFLAGS_DEFAULT,                                              // tp_flags
-  PyDoc_STR("pycbc connection object"),                            // tp_doc
-  nullptr,                                                         // tp_traverse
-  nullptr,                                                         // tp_clear
-  nullptr,                                                         // tp_richcompare
-  0,                                                               // tp_weaklistoffset
-  nullptr,                                                         // tp_iter
-  nullptr,                                                         // tp_iternext
-  pycbc_connection_methods,                                        // tp_methods
-  nullptr,                                                         // tp_members
-  pycbc_connection_getsetters,                                     // tp_getset
-  nullptr,                                                         // tp_base
-  nullptr,                                                         // tp_dict
-  nullptr,                                                         // tp_descr_get
-  nullptr,                                                         // tp_descr_set
-  0,                                                               // tp_dictoffset
-  (initproc)pycbc_connection__init__,                              // tp_init
-  nullptr,                                                         // tp_alloc
-  pycbc_connection__new__,                                         // tp_new
-};
-
 static void
 pycbc_connection__dealloc__(pycbc_connection* self)
 {
   self->conn.reset();
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
 static PyObject*
 pycbc_connection__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
-  auto* self = reinterpret_cast<pycbc_connection*>(type->tp_alloc(type, 0));
+  auto* self = reinterpret_cast<pycbc_connection*>(PyType_GenericAlloc(type, 0));
   if (self != nullptr) {
     new (&self->conn) std::unique_ptr<Connection>();
   }
@@ -2321,16 +2287,32 @@ pycbc_connection__init__(pycbc_connection* self, PyObject* args, PyObject* kwarg
   }
 }
 
+static PyType_Slot pycbc_connection_slots[] = {
+  { Py_tp_new, (void*)pycbc_connection__new__ },
+  { Py_tp_init, (void*)pycbc_connection__init__ },
+  { Py_tp_dealloc, (void*)pycbc_connection__dealloc__ },
+  { Py_tp_getset, (void*)pycbc_connection_getsetters },
+  { Py_tp_methods, (void*)pycbc_connection_methods },
+  { Py_tp_doc, (void*)PyDoc_STR("pycbc connection object") },
+  { 0, nullptr }
+};
+
+static PyType_Spec pycbc_connection_spec = { "pycbc_core.pycbc_connection",
+                                             sizeof(pycbc_connection),
+                                             0,
+                                             Py_TPFLAGS_DEFAULT,
+                                             pycbc_connection_slots };
+
+PyObject* pycbc_connection_type_obj = nullptr;
+
 int
 add_connection_type(PyObject* module)
 {
-  if (PyType_Ready(&pycbc_connection_type) < 0) {
+  pycbc_connection_type_obj = PyType_FromSpec(&pycbc_connection_spec);
+  if (pycbc_connection_type_obj == nullptr) {
     return -1;
   }
-
-  Py_INCREF(&pycbc_connection_type);
-  if (PyModule_AddObject(module, "pycbc_connection", (PyObject*)&pycbc_connection_type) < 0) {
-    Py_DECREF(&pycbc_connection_type);
+  if (PyModule_AddType(module, (PyTypeObject*)pycbc_connection_type_obj) < 0) {
     return -1;
   }
 

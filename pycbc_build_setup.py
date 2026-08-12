@@ -43,6 +43,57 @@ CXXCBC_CACHE_DIR = os.environ.get('PYCBC_CXXCBC_CACHE_DIR', os.path.join(PYCBC_R
 ENV_TRUE = ['true', '1', 'y', 'yes', 'on']
 
 
+def use_py_limited_api() -> bool:
+    """Return True if the extension should be built against Py_LIMITED_API (abi3).
+
+    Defaults to True so we publish a single stable-ABI wheel per platform.
+    Power users can disable this by exporting ``PYCBC_PY_LIMITED_API=false``
+    (or 0/no/off) to build a CPython-version-specific binary.
+    """
+    return os.getenv('PYCBC_PY_LIMITED_API', 'true').lower() in ENV_TRUE
+
+
+# Lowest CPython version pycbc's C extension supports under the stable ABI.
+# Raising this floor frees up symbols (e.g. Py_T_OBJECT_EX is limited-API only
+# from 3.12), but invalidates wheels for older CPython releases.
+DEFAULT_PY_LIMITED_API_VERSION = '3.10'
+
+
+def _parse_py_limited_api_version(value: str) -> tuple:
+    try:
+        major_str, minor_str = value.split('.', 1)
+        major, minor = int(major_str), int(minor_str)
+    except (ValueError, AttributeError) as e:
+        raise OptionError(
+            f'PYCBC_PY_LIMITED_API_VERSION must be in MAJOR.MINOR form (e.g. "3.10"); got {value!r}'
+        ) from e
+    if major != 3 or minor < 10:
+        raise OptionError(
+            f'PYCBC_PY_LIMITED_API_VERSION must be 3.10 or newer; got {value!r}. '
+            'pycbc relies on stable-ABI symbols (PyType_FromSpec, PyUnicode_AsUTF8, ...) '
+            'first exposed in 3.10.'
+        )
+    return major, minor
+
+
+def py_limited_api_version() -> tuple:
+    """Return the (major, minor) CPython version that bounds the stable-ABI build."""
+    return _parse_py_limited_api_version(
+        os.getenv('PYCBC_PY_LIMITED_API_VERSION', DEFAULT_PY_LIMITED_API_VERSION))
+
+
+def py_limited_api_hex() -> str:
+    """Return the Py_LIMITED_API hex literal (e.g. '0x030A0000') passed to the C compiler."""
+    major, minor = py_limited_api_version()
+    return f'0x{major:02X}{minor:02X}0000'
+
+
+def py_limited_api_wheel_tag() -> str:
+    """Return the bdist_wheel --py-limited-api tag (e.g. 'cp310')."""
+    major, minor = py_limited_api_version()
+    return f'cp{major}{minor}'
+
+
 def check_for_cmake():
     if not CMAKE_EXE:
         print('cmake executable not found. '
@@ -120,6 +171,27 @@ def process_build_env_vars():  # noqa: C901
     if pycbc_tls_key_log_file is not None:
         cmake_extra_args += [f'-DCOUCHBASE_CXX_CLIENT_TLS_KEY_LOG_FILE={pycbc_tls_key_log_file}']
 
+    # Hand CMake this interpreter's own module suffix (e.g. .cpython-310-darwin.so)
+    # so it stays the single source of truth for both build modes: a version-specific
+    # build uses it as-is, while a stable-ABI build keeps only its trailing .so/.pyd
+    # (pairing the .so with ".abi3"), matching CMakeBuildExt.get_ext_filename() below.
+    # Without the interpreter tag, a version-specific build would produce a bare
+    # "_core.so" that any interpreter's import machinery will load, defeating the
+    # point of opting out of the stable ABI.
+    cmake_extra_args += [f'-DPYCBC_C_MOD_SUFFIX={get_config_var("EXT_SUFFIX")}']
+
+    # PYCBC_PY_LIMITED_API: build against the Python stable ABI (abi3).
+    # Defaults to ON; opt out for a Python-version-specific binary.
+    # The hex value (e.g. 0x030A0000 == 3.10) is the lowest CPython the resulting
+    # binary will load against, and must match the wheel tag set in BdistWheelCommand.
+    if use_py_limited_api():
+        cmake_extra_args += [
+            '-DPYCBC_PY_LIMITED_API:BOOL=ON',
+            f'-DPYCBC_PY_LIMITED_API_HEX={py_limited_api_hex()}',
+        ]
+    else:
+        cmake_extra_args += ['-DPYCBC_PY_LIMITED_API:BOOL=OFF']
+
     # now pop these in CMAKE_COMMON_VARIABLES, and they will be used by cmake...
     os.environ['CMAKE_COMMON_VARIABLES'] = ' '.join(cmake_extra_args)
 
@@ -143,11 +215,12 @@ class CMakeConfig:
         build_type = env.pop('PYCBC_BUILD_TYPE')
         cmake_generator = env.pop('PYCBC_CMAKE_SET_GENERATOR', None)
         cmake_arch = env.pop('PYCBC_CMAKE_SET_ARCH', None)
+        # PYCBC_MODULE_OUTPUT_DIRECTORY is consumed by a per-target property, so only the
+        # extension module lands in the package directory (PYCBC-1878).
         cmake_config_args = [CMAKE_EXE,
                              source_dir,
                              f'-DCMAKE_BUILD_TYPE={build_type}',
-                             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}',
-                             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
+                             f'-DPYCBC_MODULE_OUTPUT_DIRECTORY={output_dir}']
 
         cmake_config_args.extend(
             [x for x in
@@ -207,8 +280,6 @@ class CMakeConfig:
                 cmake_config_args.append(f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}')
 
         if platform.system() == "Windows":
-            cmake_config_args += [f'-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
-
             if cmake_generator:
                 if cmake_generator.upper() == 'TRUE':
                     cmake_config_args += ['-G', 'Visual Studio 16 2019']
@@ -232,8 +303,10 @@ class CMakeConfig:
 
 
 class CMakeExtension(Extension):
-    def __init__(self, name, sourcedir=''):
-        Extension.__init__(self, name, sources=[])
+    def __init__(self, name, sourcedir='', py_limited_api=False):
+        # py_limited_api is a documented setuptools Extension kwarg; passing it
+        # via Extension.__init__ lets bdist_wheel auto-tag the wheel as abi3.
+        Extension.__init__(self, name, sources=[], py_limited_api=py_limited_api)
         self.sourcedir = os.path.abspath(sourcedir)
 
 
@@ -288,8 +361,25 @@ class CMakeBuildExt(build_ext):
 
     def get_ext_filename(self, ext_name):
         ext_path = ext_name.split('.')
-        ext_suffix = get_config_var('EXT_SUFFIX')
-        ext_suffix = "." + ext_suffix.split('.')[-1]
+        ext = next(
+            (e for e in self.distribution.ext_modules if e.name == ext_name),
+            None,
+        )
+        if ext is not None and getattr(ext, 'py_limited_api', False):
+            # Stable-ABI build: emit `<name>.abi3.so` so the file CMake produces
+            # (see CMakeLists.txt) matches what setuptools expects to find on disk,
+            # regardless of which interpreter compiled it. Windows is the exception:
+            # importlib knows only `.cp3XY-win_amd64.pyd` and `.pyd` there, so an
+            # `.abi3.pyd` is unimportable and the module must stay `<name>.pyd`.
+            so_ext = "." + get_config_var('EXT_SUFFIX').split('.')[-1]
+            ext_suffix = so_ext if platform.system() == 'Windows' else '.abi3' + so_ext
+        else:
+            # Full C-API build: keep the interpreter-specific suffix (e.g.
+            # .cpython-310-darwin.so) so this extension can't be picked up
+            # by a mismatched interpreter's import machinery. A bare .so
+            # would be loadable by any version, defeating the point of a
+            # non-limited build.
+            ext_suffix = get_config_var('EXT_SUFFIX')
         return os.path.join(*ext_path) + ext_suffix
 
     def build_extension(self, ext):  # noqa: C901
@@ -338,6 +428,33 @@ class CMakeBuildExt(build_ext):
                         line = re.sub(r'Git REQUIRED', 'Git', line)
                     # remove ending whitespace to avoid double spaced output
                     print(line.rstrip())
+
+
+# bdist_wheel moved from the `wheel` package into setuptools in setuptools 70.1.
+# Prefer the setuptools-vendored location so we work without an explicit `wheel`
+# build dependency, but fall back for older setuptools.
+try:
+    from setuptools.command.bdist_wheel import bdist_wheel as _bdist_wheel
+except ImportError:  # pragma: no cover - older setuptools
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel  # type: ignore[no-redef]
+
+
+class BdistWheelCommand(_bdist_wheel):
+    """bdist_wheel that tags the wheel as abi3 when building against Py_LIMITED_API.
+
+    `pip wheel .` invokes bdist_wheel without flags, so even if Extension
+    declares py_limited_api=True the wheel still gets a CPython-specific tag.
+    Default --py-limited-api here so the produced wheel is named
+    `<dist>-<ver>-cp310-abi3-<platform>.whl` and installs onto any CPython >=3.10.
+
+    Both the wheel tag and the C-level Py_LIMITED_API hex come from
+    py_limited_api_version() so they cannot drift apart.
+    """
+
+    def finalize_options(self):
+        if use_py_limited_api() and not self.py_limited_api:
+            self.py_limited_api = py_limited_api_wheel_tag()
+        super().finalize_options()
 
 
 class BuildCommand(build):

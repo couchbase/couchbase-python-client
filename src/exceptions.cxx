@@ -143,13 +143,13 @@ pycbc_exception__dealloc__(pycbc_exception* self)
   Py_XDECREF(self->end_time);
   self->ec.~error_code();
   self->message.~basic_string();
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
 static PyObject*
 pycbc_exception__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
-  pycbc_exception* self = (pycbc_exception*)type->tp_alloc(type, 0);
+  pycbc_exception* self = (pycbc_exception*)PyType_GenericAlloc(type, 0);
   if (self != nullptr) {
     new (&self->ec) std::error_code();
     new (&self->message) std::string();
@@ -216,78 +216,55 @@ static PyMethodDef pycbc_exception_methods[] = {
 
 static PyMemberDef pycbc_exception_members[] = {
   { "core_span",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_exception, core_span),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary C++ core span information") },
   { "start_time",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_exception, start_time),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary op start time") },
   { "end_time",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_exception, end_time),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary op end time") },
   { "inner_exception",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_exception, inner_exception),
-    READONLY,
+    Py_READONLY,
     "Inner python exception" },
   { nullptr }
 };
 
-PyTypeObject pycbc_exception_type = {
-  PyVarObject_HEAD_INIT(nullptr, 0) "pycbc_core.pycbc_exception", // tp_name
-  sizeof(pycbc_exception),                                        // tp_basicsize
-  0,                                                              // tp_itemsize
-  (destructor)pycbc_exception__dealloc__,                         // tp_dealloc
-  0,                                                              // tp_vectorcall_offset/tp_print
-  nullptr,                                                        // tp_getattr
-  nullptr,                                                        // tp_setattr
-  nullptr,                                                        // tp_reserved/tp_as_async
-  nullptr,                                                        // tp_repr
-  nullptr,                                                        // tp_as_number
-  nullptr,                                                        // tp_as_sequence
-  nullptr,                                                        // tp_as_mapping
-  nullptr,                                                        // tp_hash
-  nullptr,                                                        // tp_call
-  nullptr,                                                        // tp_str
-  nullptr,                                                        // tp_getattro
-  nullptr,                                                        // tp_setattro
-  nullptr,                                                        // tp_as_buffer
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                       // tp_flags
-  PyDoc_STR("pycbc exception object"),                            // tp_doc
-  nullptr,                                                        // tp_traverse
-  nullptr,                                                        // tp_clear
-  nullptr,                                                        // tp_richcompare
-  0,                                                              // tp_weaklistoffset
-  nullptr,                                                        // tp_iter
-  nullptr,                                                        // tp_iternext
-  pycbc_exception_methods,                                        // tp_methods
-  pycbc_exception_members,                                        // tp_members
-  nullptr,                                                        // tp_getset
-  nullptr,                                                        // tp_base
-  nullptr,                                                        // tp_dict
-  nullptr,                                                        // tp_descr_get
-  nullptr,                                                        // tp_descr_set
-  0,                                                              // tp_dictoffset
-  (initproc)pycbc_exception__init__,                              // tp_init
-  nullptr,                                                        // tp_alloc
-  pycbc_exception__new__,                                         // tp_new
-};
+static PyType_Slot pycbc_exception_slots[] = { { Py_tp_new, (void*)pycbc_exception__new__ },
+                                               { Py_tp_init, (void*)pycbc_exception__init__ },
+                                               { Py_tp_dealloc, (void*)pycbc_exception__dealloc__ },
+                                               { Py_tp_methods, (void*)pycbc_exception_methods },
+                                               { Py_tp_members, (void*)pycbc_exception_members },
+                                               { Py_tp_doc,
+                                                 (void*)PyDoc_STR("pycbc exception object") },
+                                               { 0, nullptr } };
 
-PyTypeObject*
+static PyType_Spec pycbc_exception_spec = { "pycbc_core.pycbc_exception",
+                                            sizeof(pycbc_exception),
+                                            0,
+                                            Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+                                            pycbc_exception_slots };
+
+PyObject* pycbc_exception_type_obj = nullptr;
+
+PyObject*
 get_pycbc_exception_type()
 {
-  return &pycbc_exception_type;
+  return pycbc_exception_type_obj;
 }
 
 pycbc_exception*
 create_pycbc_exception()
 {
-  PyObject* exc = PyObject_CallObject((PyObject*)get_pycbc_exception_type(), nullptr);
+  PyObject* exc = PyObject_CallObject(get_pycbc_exception_type(), nullptr);
   if (exc == nullptr) {
     // Python error already set by PyObject_CallObject
     return nullptr;
@@ -314,7 +291,11 @@ build_exception(const std::error_code& ec, const char* file, int line, const cha
 PyObject*
 add_exception_objects(PyObject* pyObj_module)
 {
-  if (register_pytype(pyObj_module, &pycbc_exception_type, "pycbc_exception") < 0) {
+  pycbc_exception_type_obj = PyType_FromSpec(&pycbc_exception_spec);
+  if (pycbc_exception_type_obj == nullptr) {
+    return nullptr;
+  }
+  if (PyModule_AddType(pyObj_module, (PyTypeObject*)pycbc_exception_type_obj) < 0) {
     return nullptr;
   }
 
@@ -541,6 +522,15 @@ raise_unsuccessful_operation(const char* message, const char* file, int line)
 PyObject*
 get_exception_as_object(const char* default_message, const char* file, int line)
 {
+// PyErr_GetRaisedException is 3.12+ only and unavailable at runtime on our abi3 floor
+// (3.10), even though the limited-API headers declare it unconditionally. Only take this
+// path in a non-limited, version-specific build actually compiled against 3.12+.
+#if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030c0000
+  PyObject* exc_value = PyErr_GetRaisedException();
+  if (exc_value != nullptr) {
+    return exc_value;
+  }
+#else
   if (PyErr_Occurred()) {
     PyObject* exc_type = nullptr;
     PyObject* exc_value = nullptr;
@@ -565,6 +555,7 @@ get_exception_as_object(const char* default_message, const char* file, int line)
     Py_XDECREF(exc_type);
     Py_XDECREF(exc_traceback);
   }
+#endif
 
   // Clear any leftover error (e.g. a failed PyObject_CallObject above) before
   // making further Python API calls below.
@@ -582,17 +573,23 @@ get_exception_as_object(const char* default_message, const char* file, int line)
 PyObject*
 build_pycbc_exception_from_python_exc(const char* default_message, const char* file, int line)
 {
+// See get_exception_as_object() above: PyErr_GetRaisedException is unusable on our abi3
+// floor even though the header declares it unconditionally.
+#if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030c0000
+  PyObject* exc_value = PyErr_GetRaisedException();
+#else
   PyObject* exc_type = nullptr;
   PyObject* exc_value = nullptr;
   PyObject* exc_traceback = nullptr;
   PyErr_Fetch(&exc_type, &exc_value, &exc_traceback);
   PyErr_NormalizeException(&exc_type, &exc_value, &exc_traceback);
+  Py_XDECREF(exc_type);
+  Py_XDECREF(exc_traceback);
+#endif
 
   pycbc_exception* pycbc_exc = create_pycbc_exception();
   if (pycbc_exc == nullptr) {
-    Py_XDECREF(exc_type);
     Py_XDECREF(exc_value);
-    Py_XDECREF(exc_traceback);
     return nullptr;
   }
 
@@ -613,8 +610,6 @@ build_pycbc_exception_from_python_exc(const char* default_message, const char* f
   } else {
     pycbc_exc->message = default_message;
   }
-  Py_XDECREF(exc_type);
-  Py_XDECREF(exc_traceback);
 
   pycbc_exc->exc_info = build_exc_info_dict(file, line, pycbc_exc->message.c_str());
 

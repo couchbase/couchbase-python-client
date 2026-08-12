@@ -19,6 +19,7 @@
 
 #include "Python.h"
 #include "pytocbpp_defs.hxx"
+#include "pytype_utils.hxx"
 #include <chrono>
 #include <cstddef>
 #include <cstdint>

@@ -18,7 +18,7 @@
 #pragma once
 
 #include "Python.h"
-#include "structmember.h"
+#include "pytype_utils.hxx"
 #include <core/error_context/analytics.hxx>
 #include <core/error_context/http.hxx>
 #include <core/error_context/key_value_error_context.hxx>
@@ -47,7 +47,7 @@ struct pycbc_exception {
   PyObject* end_time;   // For metrics support
 };
 
-extern PyTypeObject pycbc_exception_type;
+extern PyObject* pycbc_exception_type_obj;
 
 PyObject*
 add_exception_objects(PyObject* pyObj_module);
@@ -108,6 +108,12 @@ set_runtime_error_if_unset(const char* message)
     PyErr_SetString(PyExc_RuntimeError, message);
   }
 }
+
+/**
+ * Get the exception base type object.
+ */
+PyObject*
+get_pycbc_exception_type();
 
 /**
  * Create a new exception base object.

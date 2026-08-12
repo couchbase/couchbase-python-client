@@ -28,7 +28,7 @@ namespace pycbc
 static PyObject*
 pycbc_result__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
-  pycbc_result* self = (pycbc_result*)type->tp_alloc(type, 0);
+  pycbc_result* self = (pycbc_result*)PyType_GenericAlloc(type, 0);
   if (self != nullptr) {
     self->raw_result = nullptr;
   }
@@ -42,12 +42,9 @@ pycbc_result__init__(pycbc_result* self, PyObject* args, PyObject* kwargs)
   if (self->raw_result == nullptr) {
     return -1;
   }
-  Py_INCREF(Py_None);
-  self->core_span = Py_None;
-  Py_INCREF(Py_None);
-  self->start_time = Py_None;
-  Py_INCREF(Py_None);
-  self->end_time = Py_None;
+  self->core_span = Py_NewRef(Py_None);
+  self->start_time = Py_NewRef(Py_None);
+  self->end_time = Py_NewRef(Py_None);
   return 0;
 }
 
@@ -65,77 +62,53 @@ pycbc_result__dealloc__(pycbc_result* self)
   Py_XDECREF(self->core_span);
   Py_XDECREF(self->start_time);
   Py_XDECREF(self->end_time);
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
 static PyMemberDef pycbc_result_members[] = {
   { "raw_result",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_result, raw_result),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary containing operation result data") },
   { "core_span",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_result, core_span),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary C++ core span information") },
   { "start_time",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_result, start_time),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary op start time") },
   { "end_time",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_result, end_time),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary op end time") },
   { nullptr }
 };
 
-static PyTypeObject pycbc_result_type = {
-  PyVarObject_HEAD_INIT(nullptr, 0) "pycbc_core.pycbc_result", // tp_name
-  sizeof(pycbc_result),                                        // tp_basicsize
-  0,                                                           // tp_itemsize
-  (destructor)pycbc_result__dealloc__,                         // tp_dealloc
-  0,                                                           // tp_vectorcall_offset
-  nullptr,                                                     // tp_getattr
-  nullptr,                                                     // tp_setattr
-  nullptr,                                                     // tp_as_async
-  (reprfunc)pycbc_result__str__,                               // tp_repr
-  nullptr,                                                     // tp_as_number
-  nullptr,                                                     // tp_as_sequence
-  nullptr,                                                     // tp_as_mapping
-  nullptr,                                                     // tp_hash
-  nullptr,                                                     // tp_call
-  nullptr,                                                     // tp_str
-  nullptr,                                                     // tp_getattro
-  nullptr,                                                     // tp_setattro
-  nullptr,                                                     // tp_as_buffer
-  Py_TPFLAGS_DEFAULT,                                          // tp_flags
-  PyDoc_STR("pycbc result object"),                            // tp_doc
-  nullptr,                                                     // tp_traverse
-  nullptr,                                                     // tp_clear
-  nullptr,                                                     // tp_richcompare
-  0,                                                           // tp_weaklistoffset
-  nullptr,                                                     // tp_iter
-  nullptr,                                                     // tp_iternext
-  nullptr,                                                     // tp_methods
-  pycbc_result_members,                                        // tp_members
-  nullptr,                                                     // tp_getset
-  nullptr,                                                     // tp_base
-  nullptr,                                                     // tp_dict
-  nullptr,                                                     // tp_descr_get
-  nullptr,                                                     // tp_descr_set
-  0,                                                           // tp_dictoffset
-  (initproc)pycbc_result__init__,                              // tp_init
-  nullptr,                                                     // tp_alloc
-  pycbc_result__new__,                                         // tp_new
-};
+static PyType_Slot pycbc_result_slots[] = { { Py_tp_new, (void*)pycbc_result__new__ },
+                                            { Py_tp_init, (void*)pycbc_result__init__ },
+                                            { Py_tp_dealloc, (void*)pycbc_result__dealloc__ },
+                                            { Py_tp_repr, (void*)pycbc_result__str__ },
+                                            { Py_tp_members, (void*)pycbc_result_members },
+                                            { Py_tp_doc, (void*)PyDoc_STR("pycbc result object") },
+                                            { 0, nullptr } };
+
+static PyType_Spec pycbc_result_spec = { "pycbc_core.pycbc_result",
+                                         sizeof(pycbc_result),
+                                         0,
+                                         Py_TPFLAGS_DEFAULT,
+                                         pycbc_result_slots };
+
+static PyObject* pycbc_result_type_obj = nullptr;
 
 PyObject*
 create_pycbc_result(PyObject* raw_result_dict)
 {
-  PyObject* obj = PyObject_CallObject((PyObject*)&pycbc_result_type, nullptr);
+  PyObject* obj = PyObject_CallObject(pycbc_result_type_obj, nullptr);
   if (obj != nullptr && raw_result_dict != nullptr) {
     pycbc_result* res = reinterpret_cast<pycbc_result*>(obj);
     Py_DECREF(res->raw_result); // Release empty dict from init
@@ -152,18 +125,15 @@ create_pycbc_result(PyObject* raw_result_dict)
 static PyObject*
 pycbc_streamed_result__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
-  pycbc_streamed_result* self = (pycbc_streamed_result*)type->tp_alloc(type, 0);
+  pycbc_streamed_result* self = (pycbc_streamed_result*)PyType_GenericAlloc(type, 0);
   if (self != nullptr) {
     self->ec = std::error_code();
     new (&self->rows) std::shared_ptr<rows_queue<PyObject*>>();
     self->rows = std::make_shared<rows_queue<PyObject*>>();
     self->timeout_ms = std::chrono::milliseconds{ 0 };
-    Py_INCREF(Py_None);
-    self->core_span = Py_None;
-    Py_INCREF(Py_None);
-    self->start_time = Py_None;
-    Py_INCREF(Py_None);
-    self->end_time = Py_None;
+    self->core_span = Py_NewRef(Py_None);
+    self->start_time = Py_NewRef(Py_None);
+    self->end_time = Py_NewRef(Py_None);
   }
   return (PyObject*)self;
 }
@@ -175,7 +145,7 @@ pycbc_streamed_result__dealloc__(pycbc_streamed_result* self)
   Py_XDECREF(self->start_time);
   Py_XDECREF(self->end_time);
   self->rows.reset();
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
 static PyObject*
@@ -199,19 +169,19 @@ pycbc_streamed_result__iternext__(PyObject* self)
 
 static PyMemberDef pycbc_streamed_result_members[] = {
   { "core_span",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_streamed_result, core_span),
     0,
     PyDoc_STR("Get the streamed results core_span, if it exists.") },
   { "start_time",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_streamed_result, start_time),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary op start time") },
   { "end_time",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc_streamed_result, end_time),
-    READONLY,
+    Py_READONLY,
     PyDoc_STR("Internal dictionary op end time") },
   { nullptr } // Sentinel
 };
@@ -246,50 +216,29 @@ static PyMethodDef pycbc_streamed_result_methods[] = {
   { nullptr } // Sentinel
 };
 
-static PyTypeObject pycbc_streamed_result_type = {
-  PyVarObject_HEAD_INIT(nullptr, 0) "pycbc_core.pycbc_streamed_result", // tp_name
-  sizeof(pycbc_streamed_result),                                        // tp_basicsize
-  0,                                                                    // tp_itemsize
-  (destructor)pycbc_streamed_result__dealloc__,                         // tp_dealloc
-  0,                                                                    // tp_vectorcall_offset
-  nullptr,                                                              // tp_getattr
-  nullptr,                                                              // tp_setattr
-  nullptr,                                                              // tp_as_async
-  nullptr,                                                              // tp_repr
-  nullptr,                                                              // tp_as_number
-  nullptr,                                                              // tp_as_sequence
-  nullptr,                                                              // tp_as_mapping
-  nullptr,                                                              // tp_hash
-  nullptr,                                                              // tp_call
-  nullptr,                                                              // tp_str
-  nullptr,                                                              // tp_getattro
-  nullptr,                                                              // tp_setattro
-  nullptr,                                                              // tp_as_buffer
-  Py_TPFLAGS_DEFAULT,                                                   // tp_flags
-  PyDoc_STR("pycbc streamed result"),                                   // tp_doc
-  nullptr,                                                              // tp_traverse
-  nullptr,                                                              // tp_clear
-  nullptr,                                                              // tp_richcompare
-  0,                                                                    // tp_weaklistoffset
-  pycbc_streamed_result__iter__,                                        // tp_iter
-  pycbc_streamed_result__iternext__,                                    // tp_iternext
-  pycbc_streamed_result_methods,                                        // tp_methods
-  pycbc_streamed_result_members,                                        // tp_members
-  nullptr,                                                              // tp_getset
-  nullptr,                                                              // tp_base
-  nullptr,                                                              // tp_dict
-  nullptr,                                                              // tp_descr_get
-  nullptr,                                                              // tp_descr_set
-  0,                                                                    // tp_dictoffset
-  nullptr,                      // tp_init (no custom init needed)
-  nullptr,                      // tp_alloc
-  pycbc_streamed_result__new__, // tp_new
+static PyType_Slot pycbc_streamed_result_slots[] = {
+  { Py_tp_new, (void*)pycbc_streamed_result__new__ },
+  { Py_tp_dealloc, (void*)pycbc_streamed_result__dealloc__ },
+  { Py_tp_iter, (void*)pycbc_streamed_result__iter__ },
+  { Py_tp_iternext, (void*)pycbc_streamed_result__iternext__ },
+  { Py_tp_methods, (void*)pycbc_streamed_result_methods },
+  { Py_tp_members, (void*)pycbc_streamed_result_members },
+  { Py_tp_doc, (void*)PyDoc_STR("pycbc streamed result") },
+  { 0, nullptr }
 };
+
+static PyType_Spec pycbc_streamed_result_spec = { "pycbc_core.pycbc_streamed_result",
+                                                  sizeof(pycbc_streamed_result),
+                                                  0,
+                                                  Py_TPFLAGS_DEFAULT,
+                                                  pycbc_streamed_result_slots };
+
+static PyObject* pycbc_streamed_result_type_obj = nullptr;
 
 pycbc_streamed_result*
 create_pycbc_streamed_result(std::chrono::milliseconds timeout_ms)
 {
-  PyObject* pyObj_res = PyObject_CallObject((PyObject*)&pycbc_streamed_result_type, nullptr);
+  PyObject* pyObj_res = PyObject_CallObject(pycbc_streamed_result_type_obj, nullptr);
   if (pyObj_res == nullptr) {
     return nullptr;
   }
@@ -305,7 +254,7 @@ create_pycbc_streamed_result(std::chrono::milliseconds timeout_ms)
 static PyObject*
 pycbc_scan_iterator__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
 {
-  pycbc_scan_iterator* self = (pycbc_scan_iterator*)type->tp_alloc(type, 0);
+  pycbc_scan_iterator* self = (pycbc_scan_iterator*)PyType_GenericAlloc(type, 0);
   if (self != nullptr) {
     new (&self->scan_result) std::shared_ptr<couchbase::core::scan_result>();
   }
@@ -319,7 +268,7 @@ pycbc_scan_iterator__dealloc__(pycbc_scan_iterator* self)
     self->scan_result->cancel();
     self->scan_result.reset();
   }
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
 static PyObject*
@@ -388,50 +337,28 @@ static PyMethodDef pycbc_scan_iterator_methods[] = {
   { nullptr } // Sentinel
 };
 
-static PyTypeObject pycbc_scan_iterator_type = {
-  PyVarObject_HEAD_INIT(nullptr, 0) "pycbc_core.pycbc_scan_iterator", // tp_name
-  sizeof(pycbc_scan_iterator),                                        // tp_basicsize
-  0,                                                                  // tp_itemsize
-  (destructor)pycbc_scan_iterator__dealloc__,                         // tp_dealloc
-  0,                                                                  // tp_vectorcall_offset
-  nullptr,                                                            // tp_getattr
-  nullptr,                                                            // tp_setattr
-  nullptr,                                                            // tp_as_async
-  nullptr,                                                            // tp_repr
-  nullptr,                                                            // tp_as_number
-  nullptr,                                                            // tp_as_sequence
-  nullptr,                                                            // tp_as_mapping
-  nullptr,                                                            // tp_hash
-  nullptr,                                                            // tp_call
-  nullptr,                                                            // tp_str
-  nullptr,                                                            // tp_getattro
-  nullptr,                                                            // tp_setattro
-  nullptr,                                                            // tp_as_buffer
-  Py_TPFLAGS_DEFAULT,                                                 // tp_flags
-  PyDoc_STR("pycbc range scan iterator"),                             // tp_doc
-  nullptr,                                                            // tp_traverse
-  nullptr,                                                            // tp_clear
-  nullptr,                                                            // tp_richcompare
-  0,                                                                  // tp_weaklistoffset
-  pycbc_scan_iterator__iter__,                                        // tp_iter
-  pycbc_scan_iterator__iternext__,                                    // tp_iternext
-  pycbc_scan_iterator_methods,                                        // tp_methods
-  nullptr,                                                            // tp_members
-  nullptr,                                                            // tp_getset
-  nullptr,                                                            // tp_base
-  nullptr,                                                            // tp_dict
-  nullptr,                                                            // tp_descr_get
-  nullptr,                                                            // tp_descr_set
-  0,                                                                  // tp_dictoffset
-  nullptr,                    // tp_init (no custom init needed)
-  nullptr,                    // tp_alloc
-  pycbc_scan_iterator__new__, // tp_new
+static PyType_Slot pycbc_scan_iterator_slots[] = {
+  { Py_tp_new, (void*)pycbc_scan_iterator__new__ },
+  { Py_tp_dealloc, (void*)pycbc_scan_iterator__dealloc__ },
+  { Py_tp_iter, (void*)pycbc_scan_iterator__iter__ },
+  { Py_tp_iternext, (void*)pycbc_scan_iterator__iternext__ },
+  { Py_tp_methods, (void*)pycbc_scan_iterator_methods },
+  { Py_tp_doc, (void*)PyDoc_STR("pycbc range scan iterator") },
+  { 0, nullptr }
 };
+
+static PyType_Spec pycbc_scan_iterator_spec = { "pycbc_core.pycbc_scan_iterator",
+                                                sizeof(pycbc_scan_iterator),
+                                                0,
+                                                Py_TPFLAGS_DEFAULT,
+                                                pycbc_scan_iterator_slots };
+
+static PyObject* pycbc_scan_iterator_type_obj = nullptr;
 
 pycbc_scan_iterator*
 create_pycbc_scan_iterator(couchbase::core::scan_result result)
 {
-  PyObject* pyObj_iter = PyObject_CallObject((PyObject*)&pycbc_scan_iterator_type, nullptr);
+  PyObject* pyObj_iter = PyObject_CallObject(pycbc_scan_iterator_type_obj, nullptr);
   if (!pyObj_iter) {
     // The scan was already dispatched to the server (orchestrator.scan()) before this
     // wrapper could be allocated. Cancel the scan_result explicitly so it doesn't keep
@@ -449,15 +376,27 @@ create_pycbc_scan_iterator(couchbase::core::scan_result result)
 int
 add_result_objects(PyObject* module)
 {
-  if (register_pytype(module, &pycbc_result_type, "pycbc_result") < 0) {
+  pycbc_result_type_obj = PyType_FromSpec(&pycbc_result_spec);
+  if (pycbc_result_type_obj == nullptr) {
+    return -1;
+  }
+  if (PyModule_AddType(module, (PyTypeObject*)pycbc_result_type_obj) < 0) {
     return -1;
   }
 
-  if (register_pytype(module, &pycbc_streamed_result_type, "pycbc_streamed_result") < 0) {
+  pycbc_streamed_result_type_obj = PyType_FromSpec(&pycbc_streamed_result_spec);
+  if (pycbc_streamed_result_type_obj == nullptr) {
+    return -1;
+  }
+  if (PyModule_AddType(module, (PyTypeObject*)pycbc_streamed_result_type_obj) < 0) {
     return -1;
   }
 
-  if (register_pytype(module, &pycbc_scan_iterator_type, "pycbc_scan_iterator") < 0) {
+  pycbc_scan_iterator_type_obj = PyType_FromSpec(&pycbc_scan_iterator_spec);
+  if (pycbc_scan_iterator_type_obj == nullptr) {
+    return -1;
+  }
+  if (PyModule_AddType(module, (PyTypeObject*)pycbc_scan_iterator_type_obj) < 0) {
     return -1;
   }
 

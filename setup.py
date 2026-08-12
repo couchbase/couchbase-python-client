@@ -21,11 +21,13 @@ from setuptools import find_packages, setup
 
 sys.path.append('.')
 import couchbase_version  # nopep8 # isort:skip # noqa: E402
-from pycbc_build_setup import (BuildCommand,  # nopep8 # isort:skip # noqa: E402
+from pycbc_build_setup import (BdistWheelCommand,  # nopep8 # isort:skip # noqa: E402
+                               BuildCommand,
                                CMakeBuildExt,
                                CMakeConfigureExt,
                                CMakeExtension,
-                               CMAKE_EXE)
+                               CMAKE_EXE,
+                               use_py_limited_api)
 
 try:
     couchbase_version.gen_version()
@@ -39,7 +41,8 @@ PYCBC_VERSION = couchbase_version.get_version()
 package_data = {}
 # some more Windows tomfoolery...
 if platform.system() == 'Windows':
-    package_data = {'couchbase.logic.pycbc_core': ['_core.pyd']}
+    # glob so both build modes match: _core.pyd (abi3) and _core.cp3XY-win_amd64.pyd
+    package_data = {'couchbase.logic.pycbc_core': ['_core*.pyd']}
 
 # request installing cmake from PyPI if no CMake executable was found.
 # otherwise, we want to use the system executable.
@@ -60,11 +63,13 @@ extras_require = {
 
 setup(name='couchbase',
       version=PYCBC_VERSION,
-      ext_modules=[CMakeExtension('couchbase.logic.pycbc_core._core')],
+      ext_modules=[CMakeExtension('couchbase.logic.pycbc_core._core',
+                                  py_limited_api=use_py_limited_api())],
       cmdclass={'build': BuildCommand,
                 'build_ext': CMakeBuildExt,
-                'configure_ext': CMakeConfigureExt},
-      python_requires='>=3.7',
+                'configure_ext': CMakeConfigureExt,
+                'bdist_wheel': BdistWheelCommand},
+      python_requires='>=3.10',
       install_requires=[
           'typing-extensions>=4.14; python_version<"3.13"',
       ],
@@ -77,18 +82,24 @@ setup(name='couchbase',
       url="https://github.com/couchbase/couchbase-python-client",
       author="Couchbase, Inc.",
       author_email="PythonPackage@couchbase.com",
-      license="Apache License 2.0",
+      license="Apache-2.0",
+      license_files=["LICENSE"],
       description="Python Client for Couchbase",
       long_description=open(PYCBC_README, "r").read(),
       long_description_content_type='text/markdown',
       keywords=["couchbase", "nosql", "pycouchbase", "libcouchbase"],
       classifiers=[
           "Development Status :: 5 - Production/Stable",
-          "License :: OSI Approved :: Apache Software License",
           "Intended Audience :: Developers",
           "Operating System :: OS Independent",
           "Programming Language :: Python",
           "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
           "Programming Language :: Python :: Implementation :: CPython",
           "Topic :: Database",
           "Topic :: Software Development :: Libraries",

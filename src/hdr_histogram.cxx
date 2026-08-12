@@ -52,7 +52,7 @@ pycbc_hdr_histogram__dealloc__(pycbc_hdr_histogram* self)
   }
   // Explicitly destroy the mutex
   self->mutex.~shared_mutex();
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
 /**
@@ -61,7 +61,7 @@ pycbc_hdr_histogram__dealloc__(pycbc_hdr_histogram* self)
 static PyObject*
 pycbc_hdr_histogram__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
-  auto* self = reinterpret_cast<pycbc_hdr_histogram*>(type->tp_alloc(type, 0));
+  auto* self = reinterpret_cast<pycbc_hdr_histogram*>(PyType_GenericAlloc(type, 0));
   if (self != nullptr) {
     // Use placement new to construct the mutex in-place
     new (&self->mutex) std::shared_mutex();
@@ -323,7 +323,11 @@ pycbc_hdr_histogram__get_percentiles_and_reset__(PyObject* self, PyObject* perce
       Py_DECREF(result);
       return nullptr;
     }
-    PyList_SET_ITEM(pyObj_percentiles, i, val); // Steals reference to val
+    if (PyList_SetItem(pyObj_percentiles, i, val) < 0) { // Steals reference to val
+      Py_DECREF(pyObj_percentiles);
+      Py_DECREF(result);
+      return nullptr;
+    }
   }
   if (PyDict_SetItemString(result, "percentiles", pyObj_percentiles) < 0) {
     Py_DECREF(pyObj_percentiles);
@@ -382,27 +386,24 @@ static PyMethodDef pycbc_hdr_histogram_methods[] = {
   { nullptr }
 };
 
-/**
- * Initialize the type object.
- */
-static PyTypeObject
-init_pycbc_hdr_histogram_type()
-{
-  PyTypeObject obj = {};
-  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.pycbc_hdr_histogram";
-  obj.tp_doc =
-    PyDoc_STR("HDR (High Dynamic Range) Histogram for recording and analyzing value distributions");
-  obj.tp_basicsize = sizeof(pycbc_hdr_histogram);
-  obj.tp_itemsize = 0;
-  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  obj.tp_new = pycbc_hdr_histogram__new__;
-  obj.tp_init = (initproc)pycbc_hdr_histogram__init__;
-  obj.tp_dealloc = (destructor)pycbc_hdr_histogram__dealloc__;
-  obj.tp_methods = pycbc_hdr_histogram_methods;
-  return obj;
-}
+static PyType_Slot pycbc_hdr_histogram_slots[] = {
+  { Py_tp_new, (void*)pycbc_hdr_histogram__new__ },
+  { Py_tp_init, (void*)pycbc_hdr_histogram__init__ },
+  { Py_tp_dealloc, (void*)pycbc_hdr_histogram__dealloc__ },
+  { Py_tp_methods, (void*)pycbc_hdr_histogram_methods },
+  { Py_tp_doc,
+    (void*)PyDoc_STR(
+      "HDR (High Dynamic Range) Histogram for recording and analyzing value distributions") },
+  { 0, nullptr }
+};
 
-static PyTypeObject pycbc_hdr_histogram_type = init_pycbc_hdr_histogram_type();
+static PyType_Spec pycbc_hdr_histogram_spec = { "pycbc_core.pycbc_hdr_histogram",
+                                                sizeof(pycbc_hdr_histogram),
+                                                0,
+                                                Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+                                                pycbc_hdr_histogram_slots };
+
+static PyObject* pycbc_hdr_histogram_type_obj = nullptr;
 
 } // anonymous namespace
 
@@ -412,7 +413,11 @@ static PyTypeObject pycbc_hdr_histogram_type = init_pycbc_hdr_histogram_type();
 int
 add_histogram_objects(PyObject* module)
 {
-  if (register_pytype(module, &pycbc_hdr_histogram_type, "pycbc_hdr_histogram") < 0) {
+  pycbc_hdr_histogram_type_obj = PyType_FromSpec(&pycbc_hdr_histogram_spec);
+  if (pycbc_hdr_histogram_type_obj == nullptr) {
+    return -1;
+  }
+  if (PyModule_AddType(module, (PyTypeObject*)pycbc_hdr_histogram_type_obj) < 0) {
     return -1;
   }
   return 0;

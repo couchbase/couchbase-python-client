@@ -23,6 +23,7 @@
 #include "deprecated_tracing.hxx"
 #include "exceptions.hxx"
 #include "pytocbpp_defs.hxx"
+#include "pytype_utils.hxx"
 #include <chrono>
 #include <core/cluster_credentials.hxx>
 #include <core/cluster_options.hxx>

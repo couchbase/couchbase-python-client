@@ -21,7 +21,7 @@
 #include "cpp_core_types_autogen.hxx"
 #include "gil_guard.hxx"
 #include "pytocbpp_defs.hxx"
-#include "structmember.h"
+#include "pytype_utils.hxx"
 #include <chrono>
 #include <condition_variable>
 #include <core/logger/logger.hxx>

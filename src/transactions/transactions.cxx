@@ -67,7 +67,7 @@ void
 pycbc::txns::transaction_config__dealloc__(pycbc::txns::transaction_config* cfg)
 {
   delete cfg->cfg;
-  Py_TYPE(cfg)->tp_free((PyObject*)cfg);
+  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(cfg));
   CB_LOG_DEBUG("dealloc transaction_config");
 }
 
@@ -128,7 +128,7 @@ pycbc::txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObj
                             "scan_consistency",
                             nullptr };
   const char* kw_format = "|OOOOOssss";
-  auto self = reinterpret_cast<pycbc::txns::transaction_config*>(type->tp_alloc(type, 0));
+  auto self = reinterpret_cast<pycbc::txns::transaction_config*>(PyType_GenericAlloc(type, 0));
 
   self->cfg = new cbtxns::transactions_config();
 
@@ -180,21 +180,21 @@ pycbc::txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObj
   return reinterpret_cast<PyObject*>(self);
 }
 
-static PyTypeObject
-init_transaction_config_type()
-{
-  PyTypeObject r = {};
-  r.tp_name = "pycbc_core.transaction_config";
-  r.tp_doc = "Transaction configuration";
-  r.tp_basicsize = sizeof(pycbc::txns::transaction_config);
-  r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  r.tp_new = pycbc::txns::transaction_config__new__;
-  r.tp_dealloc = (destructor)pycbc::txns::transaction_config__dealloc__;
-  r.tp_methods = transaction_config_methods;
-  return r;
-}
+static PyType_Slot transaction_config_slots[] = {
+  { Py_tp_new, (void*)pycbc::txns::transaction_config__new__ },
+  { Py_tp_dealloc, (void*)pycbc::txns::transaction_config__dealloc__ },
+  { Py_tp_methods, (void*)transaction_config_methods },
+  { Py_tp_doc, (void*)PyDoc_STR("Transaction configuration") },
+  { 0, nullptr }
+};
 
-static PyTypeObject transaction_config_type = init_transaction_config_type();
+static PyType_Spec transaction_config_spec = { "pycbc_core.transaction_config",
+                                               sizeof(pycbc::txns::transaction_config),
+                                               0,
+                                               Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+                                               transaction_config_slots };
+
+static PyObject* transaction_config_type_obj = nullptr;
 
 /* pycbc::txns::transaction_options type methods */
 
@@ -202,7 +202,7 @@ void
 pycbc::txns::transaction_options__dealloc__(pycbc::txns::transaction_options* opts)
 {
   delete opts->opts;
-  Py_TYPE(opts)->tp_free((PyObject*)opts);
+  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(opts));
   CB_LOG_DEBUG("dealloc transaction_options");
 }
 
@@ -278,7 +278,7 @@ pycbc::txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyOb
     "metadata_collection", nullptr
   };
   const char* kw_format = "|OOssss";
-  auto self = reinterpret_cast<pycbc::txns::transaction_options*>(type->tp_alloc(type, 0));
+  auto self = reinterpret_cast<pycbc::txns::transaction_options*>(PyType_GenericAlloc(type, 0));
 
   self->opts = new cbtxns::transaction_options();
   CB_LOG_DEBUG("transaction_options__new__ called");
@@ -317,22 +317,22 @@ pycbc::txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyOb
   return reinterpret_cast<PyObject*>(self);
 }
 
-static PyTypeObject
-init_transaction_options_type()
-{
-  PyTypeObject r = {};
-  r.tp_name = "pycbc_core.transaction_options";
-  r.tp_doc = "Transaction options";
-  r.tp_basicsize = sizeof(pycbc::txns::transaction_options);
-  r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  r.tp_new = pycbc::txns::transaction_options__new__;
-  r.tp_str = (reprfunc)pycbc::txns::transaction_options__str__;
-  r.tp_dealloc = (destructor)pycbc::txns::transaction_options__dealloc__;
-  r.tp_methods = transaction_options_methods;
-  return r;
-}
+static PyType_Slot transaction_options_slots[] = {
+  { Py_tp_new, (void*)pycbc::txns::transaction_options__new__ },
+  { Py_tp_str, (void*)pycbc::txns::transaction_options__str__ },
+  { Py_tp_dealloc, (void*)pycbc::txns::transaction_options__dealloc__ },
+  { Py_tp_methods, (void*)transaction_options_methods },
+  { Py_tp_doc, (void*)PyDoc_STR("Transaction options") },
+  { 0, nullptr }
+};
 
-static PyTypeObject transaction_options_type = init_transaction_options_type();
+static PyType_Spec transaction_options_spec = { "pycbc_core.transaction_options",
+                                                sizeof(pycbc::txns::transaction_options),
+                                                0,
+                                                Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+                                                transaction_options_slots };
+
+static PyObject* transaction_options_type_obj = nullptr;
 
 /* pycbc::txns::transaction_query_options type methods */
 
@@ -340,7 +340,7 @@ void
 pycbc::txns::transaction_query_options__dealloc__(pycbc::txns::transaction_query_options* opts)
 {
   delete opts->opts;
-  Py_TYPE(opts)->tp_free((PyObject*)opts);
+  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(opts));
   CB_LOG_DEBUG("dealloc transaction_query_options");
 }
 
@@ -370,28 +370,30 @@ pycbc::txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args
     PyErr_SetString(PyExc_ValueError, "couldn't parse args");
     return nullptr;
   }
-  auto self = reinterpret_cast<pycbc::txns::transaction_query_options*>(type->tp_alloc(type, 0));
+  auto self =
+    reinterpret_cast<pycbc::txns::transaction_query_options*>(PyType_GenericAlloc(type, 0));
   auto opts =
     pycbc::py_to_cbpp<couchbase::transactions::transaction_query_options>(pyObj_query_args);
   self->opts = new couchbase::transactions::transaction_query_options(std::move(opts));
   return reinterpret_cast<PyObject*>(self);
 }
 
-static PyTypeObject
-init_transaction_query_options_type()
-{
-  PyTypeObject r = {};
-  r.tp_name = "pycbc_core.transaction_query_options";
-  r.tp_doc = "Transaction query options";
-  r.tp_basicsize = sizeof(pycbc::txns::transaction_query_options);
-  r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  r.tp_new = pycbc::txns::transaction_query_options__new__;
-  r.tp_dealloc = (destructor)pycbc::txns::transaction_query_options__dealloc__;
-  r.tp_methods = transaction_query_options_methods;
-  return r;
-}
+static PyType_Slot transaction_query_options_slots[] = {
+  { Py_tp_new, (void*)pycbc::txns::transaction_query_options__new__ },
+  { Py_tp_dealloc, (void*)pycbc::txns::transaction_query_options__dealloc__ },
+  { Py_tp_methods, (void*)transaction_query_options_methods },
+  { Py_tp_doc, (void*)PyDoc_STR("Transaction query options") },
+  { 0, nullptr }
+};
 
-static PyTypeObject transaction_query_options_type = init_transaction_query_options_type();
+static PyType_Spec transaction_query_options_spec = { "pycbc_core.transaction_query_options",
+                                                      sizeof(
+                                                        pycbc::txns::transaction_query_options),
+                                                      0,
+                                                      Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+                                                      transaction_query_options_slots };
+
+static PyObject* transaction_query_options_type_obj = nullptr;
 
 /* pycbc::txns::transaction_get_result type methods */
 
@@ -399,7 +401,7 @@ void
 pycbc::txns::transaction_get_result__dealloc__(pycbc::txns::transaction_get_result* result)
 {
   result->res.reset();
-  Py_TYPE(result)->tp_free((PyObject*)result);
+  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(result));
   CB_LOG_DEBUG("dealloc transaction_get_result");
 }
 
@@ -471,29 +473,29 @@ static PyMethodDef transaction_get_result_methods[] = {
 PyObject*
 pycbc::txns::transaction_get_result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
-  auto self = reinterpret_cast<pycbc::txns::transaction_get_result*>(type->tp_alloc(type, 0));
+  auto self = reinterpret_cast<pycbc::txns::transaction_get_result*>(PyType_GenericAlloc(type, 0));
   if (self != nullptr) {
     new (&self->res) std::unique_ptr<cbcoretxns::transaction_get_result>();
   }
   return reinterpret_cast<PyObject*>(self);
 }
 
-static PyTypeObject
-init_transaction_get_result_type()
-{
-  PyTypeObject r = {};
-  r.tp_name = "pycbc_core.transaction_get_result";
-  r.tp_doc = "Result of transaction operation on client";
-  r.tp_basicsize = sizeof(pycbc::txns::transaction_get_result);
-  r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  r.tp_new = pycbc::txns::transaction_get_result__new__;
-  r.tp_dealloc = (destructor)pycbc::txns::transaction_get_result__dealloc__;
-  r.tp_methods = transaction_get_result_methods;
-  r.tp_repr = (reprfunc)pycbc::txns::transaction_get_result__str__;
-  return r;
-}
+static PyType_Slot transaction_get_result_slots[] = {
+  { Py_tp_new, (void*)pycbc::txns::transaction_get_result__new__ },
+  { Py_tp_dealloc, (void*)pycbc::txns::transaction_get_result__dealloc__ },
+  { Py_tp_methods, (void*)transaction_get_result_methods },
+  { Py_tp_repr, (void*)pycbc::txns::transaction_get_result__str__ },
+  { Py_tp_doc, (void*)PyDoc_STR("Result of transaction operation on client") },
+  { 0, nullptr }
+};
 
-static PyTypeObject transaction_get_result_type = init_transaction_get_result_type();
+static PyType_Spec transaction_get_result_spec = { "pycbc_core.transaction_get_result",
+                                                   sizeof(pycbc::txns::transaction_get_result),
+                                                   0,
+                                                   Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+                                                   transaction_get_result_slots };
+
+static PyObject* transaction_get_result_type_obj = nullptr;
 
 /* pycbc::txns::transaction_get_multi_result type methods */
 
@@ -505,7 +507,7 @@ pycbc::txns::transaction_get_multi_result__dealloc__(
     PyList_SetSlice(result->content, 0, PY_SSIZE_T_MAX, NULL);
     Py_DECREF(result->content);
   }
-  Py_TYPE(result)->tp_free((PyObject*)result);
+  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(result));
   CB_LOG_DEBUG("dealloc transaction_get_multi_result");
 }
 
@@ -513,7 +515,7 @@ static PyMethodDef transaction_get_multi_methods[] = { { NULL } };
 
 static PyMemberDef transaction_get_multi_members[] = {
   { "content",
-    T_OBJECT_EX,
+    Py_T_OBJECT_EX,
     offsetof(pycbc::txns::transaction_get_multi_result, content),
     0,
     PyDoc_STR("Transaction get_multi content list.\n") },
@@ -523,27 +525,30 @@ static PyMemberDef transaction_get_multi_members[] = {
 PyObject*
 pycbc::txns::transaction_get_multi_result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
-  auto self = reinterpret_cast<pycbc::txns::transaction_get_multi_result*>(type->tp_alloc(type, 0));
+  auto self =
+    reinterpret_cast<pycbc::txns::transaction_get_multi_result*>(PyType_GenericAlloc(type, 0));
   self->content = PyList_New(static_cast<Py_ssize_t>(0));
   return reinterpret_cast<PyObject*>(self);
 }
 
-static PyTypeObject
-init_transaction_get_multi_result_type()
-{
-  PyTypeObject r = {};
-  r.tp_name = "pycbc_core.transaction_get_multi_result";
-  r.tp_doc = "Result of transaction get_multi operation on client";
-  r.tp_basicsize = sizeof(pycbc::txns::transaction_get_multi_result);
-  r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  r.tp_new = pycbc::txns::transaction_get_multi_result__new__;
-  r.tp_dealloc = (destructor)pycbc::txns::transaction_get_multi_result__dealloc__;
-  r.tp_methods = transaction_get_multi_methods;
-  r.tp_members = transaction_get_multi_members;
-  return r;
-}
+static PyType_Slot transaction_get_multi_result_slots[] = {
+  { Py_tp_new, (void*)pycbc::txns::transaction_get_multi_result__new__ },
+  { Py_tp_dealloc, (void*)pycbc::txns::transaction_get_multi_result__dealloc__ },
+  { Py_tp_methods, (void*)transaction_get_multi_methods },
+  { Py_tp_members, (void*)transaction_get_multi_members },
+  { Py_tp_doc, (void*)PyDoc_STR("Result of transaction get_multi operation on client") },
+  { 0, nullptr }
+};
 
-static PyTypeObject transaction_get_multi_result_type = init_transaction_get_multi_result_type();
+static PyType_Spec transaction_get_multi_result_spec = {
+  "pycbc_core.transaction_get_multi_result",
+  sizeof(pycbc::txns::transaction_get_multi_result),
+  0,
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+  transaction_get_multi_result_slots
+};
+
+static PyObject* transaction_get_multi_result_type_obj = nullptr;
 
 PyObject*
 pycbc::txns::add_transaction_objects(PyObject* pyObj_module)
@@ -611,30 +616,54 @@ pycbc::txns::add_transaction_objects(PyObject* pyObj_module)
   Py_DECREF(pyObj_args);
   Py_DECREF(pyObj_kwargs);
 
-  if (PyModule_AddObject(pyObj_module, "transaction_operations", transaction_operations)) {
-    Py_XDECREF(transaction_operations);
-    Py_DECREF(pyObj_enum_class);
-    Py_DECREF(pyObj_enum_module);
-    return nullptr;
-  }
+  // PyModule_AddObjectRef never steals transaction_operations' reference, unlike
+  // PyModule_AddObject, so we always release our own copy below regardless of outcome.
+  int add_rc =
+    PyModule_AddObjectRef(pyObj_module, "transaction_operations", transaction_operations);
+  Py_XDECREF(transaction_operations);
   Py_DECREF(pyObj_enum_class);
   Py_DECREF(pyObj_enum_module);
+  if (add_rc < 0) {
+    return nullptr;
+  }
 
-  if (register_pytype(pyObj_module, &transaction_get_result_type, "transaction_get_result") < 0) {
+  transaction_get_result_type_obj = PyType_FromSpec(&transaction_get_result_spec);
+  if (transaction_get_result_type_obj == nullptr) {
     return nullptr;
   }
-  if (register_pytype(pyObj_module, &transaction_config_type, "transaction_config") < 0) {
+  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_get_result_type_obj) < 0) {
     return nullptr;
   }
-  if (register_pytype(pyObj_module, &transaction_query_options_type, "transaction_query_options") <
-      0) {
+
+  transaction_config_type_obj = PyType_FromSpec(&transaction_config_spec);
+  if (transaction_config_type_obj == nullptr) {
     return nullptr;
   }
-  if (register_pytype(pyObj_module, &transaction_options_type, "transaction_options") < 0) {
+  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_config_type_obj) < 0) {
     return nullptr;
   }
-  if (register_pytype(
-        pyObj_module, &transaction_get_multi_result_type, "transaction_get_multi_result") < 0) {
+
+  transaction_query_options_type_obj = PyType_FromSpec(&transaction_query_options_spec);
+  if (transaction_query_options_type_obj == nullptr) {
+    return nullptr;
+  }
+  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_query_options_type_obj) < 0) {
+    return nullptr;
+  }
+
+  transaction_options_type_obj = PyType_FromSpec(&transaction_options_spec);
+  if (transaction_options_type_obj == nullptr) {
+    return nullptr;
+  }
+  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_options_type_obj) < 0) {
+    return nullptr;
+  }
+
+  transaction_get_multi_result_type_obj = PyType_FromSpec(&transaction_get_multi_result_spec);
+  if (transaction_get_multi_result_type_obj == nullptr) {
+    return nullptr;
+  }
+  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_get_multi_result_type_obj) < 0) {
     return nullptr;
   }
 
@@ -662,7 +691,7 @@ pycbc::txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args
   }
 
   // Validate connection type
-  if (!PyObject_IsInstance(pyObj_conn, (PyObject*)&pycbc_connection_type)) {
+  if (!PyObject_IsInstance(pyObj_conn, pycbc_connection_type_obj)) {
     return raise_invalid_argument("conn must be a pycbc_connection object", __FILE__, __LINE__);
   }
 
@@ -1032,8 +1061,7 @@ handle_returning_void(PyObject* pyObj_callback,
   if (had_error) {
     pyObj_result = convert_to_python_exc_type(err);
   } else {
-    Py_INCREF(Py_None);
-    pyObj_result = Py_None;
+    pyObj_result = Py_NewRef(Py_None);
   }
   complete_pending_operation(pyObj_callback, pyObj_errback, barrier, pyObj_result, had_error);
   PyGILState_Release(state);
@@ -1066,8 +1094,7 @@ handle_returning_transaction_get_result(
         __LINE__,
         "Txn get op: document not found.");
     } else {
-      pyObj_result =
-        PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_result_type), nullptr);
+      pyObj_result = PyObject_CallObject(transaction_get_result_type_obj, nullptr);
       auto result = reinterpret_cast<pycbc::txns::transaction_get_result*>(pyObj_result);
       result->res = std::make_unique<cbcoretxns::transaction_get_result>(std::move(res.value()));
     }
@@ -1091,8 +1118,7 @@ handle_returning_transaction_get_multi_result(PyObject* pyObj_callback,
   if (had_error) {
     pyObj_result = convert_to_python_exc_type(err);
   } else {
-    pyObj_result =
-      PyObject_CallObject(reinterpret_cast<PyObject*>(&transaction_get_multi_result_type), nullptr);
+    pyObj_result = PyObject_CallObject(transaction_get_multi_result_type_obj, nullptr);
     auto result = reinterpret_cast<pycbc::txns::transaction_get_multi_result*>(pyObj_result);
     for (const auto& item : res->content()) {
       if (!item.has_value()) {
@@ -1255,8 +1281,8 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
     return nullptr;
   }
   if (nullptr != pyObj_value) {
-    PyObject* pyObj_data = PyTuple_GET_ITEM(pyObj_value, 0);
-    PyObject* pyObj_flags = PyTuple_GET_ITEM(pyObj_value, 1);
+    PyObject* pyObj_data = PyTuple_GetItem(pyObj_value, 0);
+    PyObject* pyObj_flags = PyTuple_GetItem(pyObj_value, 1);
     value.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
     try {
       value.data = pycbc::py_to_cbpp<std::vector<std::byte>>(pyObj_data);
@@ -1360,7 +1386,8 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
           return nullptr;
         }
         if (nullptr == pyObj_txn_get_result ||
-            0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
+            0 == PyObject_TypeCheck(pyObj_txn_get_result,
+                                    (PyTypeObject*)transaction_get_result_type_obj)) {
           PyErr_SetString(PyExc_ValueError,
                           "replace expects to be passed a transaction_get_result");
           Py_XDECREF(pyObj_callback);
@@ -1382,7 +1409,8 @@ pycbc::txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyO
       }
       case TxOperations::REMOVE: {
         if (nullptr == pyObj_txn_get_result ||
-            0 == PyObject_TypeCheck(pyObj_txn_get_result, &transaction_get_result_type)) {
+            0 == PyObject_TypeCheck(pyObj_txn_get_result,
+                                    (PyTypeObject*)transaction_get_result_type_obj)) {
           PyErr_SetString(PyExc_ValueError, "remove expects to be passed a transaction_get_result");
           Py_XDECREF(pyObj_callback);
           Py_XDECREF(pyObj_errback);
@@ -1510,9 +1538,9 @@ pycbc::txns::transaction_get_multi_op([[maybe_unused]] PyObject* self,
 
   size_t nspecs;
   if (PyTuple_Check(pyObj_specs)) {
-    nspecs = static_cast<size_t>(PyTuple_GET_SIZE(pyObj_specs));
+    nspecs = static_cast<size_t>(PyTuple_Size(pyObj_specs));
   } else {
-    nspecs = static_cast<size_t>(PyList_GET_SIZE(pyObj_specs));
+    nspecs = static_cast<size_t>(PyList_Size(pyObj_specs));
   }
 
   if (nspecs == 0) {
@@ -1721,8 +1749,7 @@ pycbc::txns::create_transaction_context([[maybe_unused]] PyObject* self,
     return nullptr;
   }
   if (nullptr != pyObj_transaction_options) {
-    if (!PyObject_IsInstance(pyObj_transaction_options,
-                             reinterpret_cast<PyObject*>(&transaction_options_type))) {
+    if (!PyObject_IsInstance(pyObj_transaction_options, transaction_options_type_obj)) {
       PyErr_SetString(PyExc_ValueError, "expected a valid transaction_options object");
       return nullptr;
     }

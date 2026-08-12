@@ -27,7 +27,7 @@ static void
 pycbc_logger_dealloc(pycbc_logger* self)
 {
   self->logger_sink_.reset();
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
 // Resolves logging.LogRecord.  Returns a new reference, or nullptr with an exception set.
@@ -228,29 +228,26 @@ static PyMethodDef pycbc_logger_methods[] = {
 static PyObject*
 pycbc_logger_new(PyTypeObject* type, PyObject*, PyObject*)
 {
-  pycbc_logger* self = reinterpret_cast<pycbc_logger*>(type->tp_alloc(type, 0));
+  pycbc_logger* self = reinterpret_cast<pycbc_logger*>(PyType_GenericAlloc(type, 0));
   if (self != nullptr) {
     new (&self->logger_sink_) std::shared_ptr<pycbc_logger_sink>();
   }
   return reinterpret_cast<PyObject*>(self);
 }
 
-static PyTypeObject
-init_pycbc_logger_type()
-{
-  PyTypeObject obj = {};
-  obj.ob_base = PyVarObject_HEAD_INIT(NULL, 0) obj.tp_name = "pycbc_core.pycbc_logger";
-  obj.tp_doc = PyDoc_STR("Python SDK Logger");
-  obj.tp_basicsize = sizeof(pycbc_logger);
-  obj.tp_itemsize = 0;
-  obj.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  obj.tp_new = pycbc_logger_new;
-  obj.tp_dealloc = (destructor)pycbc_logger_dealloc;
-  obj.tp_methods = pycbc_logger_methods;
-  return obj;
-}
+static PyType_Slot pycbc_logger_slots[] = { { Py_tp_new, (void*)pycbc_logger_new },
+                                            { Py_tp_dealloc, (void*)pycbc_logger_dealloc },
+                                            { Py_tp_methods, (void*)pycbc_logger_methods },
+                                            { Py_tp_doc, (void*)PyDoc_STR("Python SDK Logger") },
+                                            { 0, nullptr } };
 
-static PyTypeObject pycbc_logger_type = init_pycbc_logger_type();
+static PyType_Spec pycbc_logger_spec = { "pycbc_core.pycbc_logger",
+                                         sizeof(pycbc_logger),
+                                         0,
+                                         Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+                                         pycbc_logger_slots };
+
+static PyObject* pycbc_logger_type_obj = nullptr;
 
 size_t
 convert_spdlog_level(spdlog::level::level_enum lvl)
@@ -279,7 +276,11 @@ convert_spdlog_level(spdlog::level::level_enum lvl)
 PyObject*
 add_logger_objects(PyObject* pyObj_module)
 {
-  if (register_pytype(pyObj_module, &pycbc_logger_type, "pycbc_logger") < 0) {
+  pycbc_logger_type_obj = PyType_FromSpec(&pycbc_logger_spec);
+  if (pycbc_logger_type_obj == nullptr) {
+    return nullptr;
+  }
+  if (PyModule_AddType(pyObj_module, (PyTypeObject*)pycbc_logger_type_obj) < 0) {
     return nullptr;
   }
   return pyObj_module;

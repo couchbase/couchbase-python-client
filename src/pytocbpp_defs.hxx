@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Python.h"
+#include "pytype_utils.hxx"
 #include <core/tracing/wrapper_sdk_tracer.hxx>
 #include <string>
 #include <type_traits>

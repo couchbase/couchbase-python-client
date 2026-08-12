@@ -21,6 +21,7 @@
 #include "cpp_types.hxx"
 #include "pycbc_kv_request.hxx"
 #include "pytocbpp_defs.hxx"
+#include "pytype_utils.hxx"
 #include "result.hxx"
 #include "utils.hxx"
 #include <core/cluster_credentials.hxx>

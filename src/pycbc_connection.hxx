@@ -31,7 +31,7 @@ struct pycbc_connection {
   PyObject_HEAD std::unique_ptr<Connection> conn;
 };
 
-extern PyTypeObject pycbc_connection_type;
+extern PyObject* pycbc_connection_type_obj;
 
 int
 add_connection_type(PyObject* module);
@@ -76,7 +76,7 @@ validate_connection_and_request(pycbc_connection* self, PyObject* arg, const cha
     return false;
   }
 
-  if (!PyObject_TypeCheck(arg, &pycbc_kv_request_type)) {
+  if (!PyObject_TypeCheck(arg, (PyTypeObject*)pycbc_kv_request_type_obj)) {
     std::string err_msg = std::string(op_name) + " requires a pycbc_kv_request argument";
     raise_invalid_argument(err_msg.c_str(), __FILE__, __LINE__);
     return false;
