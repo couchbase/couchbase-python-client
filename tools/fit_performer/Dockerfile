@@ -21,6 +21,15 @@ RUN if [ ! -f deps/couchbase-cxx-client/CMakeLists.txt ]; then \
              "the SDK build below will fail without it."; \
     fi
 
+# CI checks out repo with no tags or commit history history, so unshallow the repo here.
+# This is to ensure couchbase_version.py is able to determine the version of the SDK.
+RUN if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then \
+        echo "Shallow checkout detected, fetching history and tags..."; \
+        git fetch --unshallow --tags --no-recurse-submodules origin; \
+    else \
+        echo "Full checkout detected, no need to fetch history or tags."; \
+    fi;
+
 RUN PYCBC_USE_CPM_CACHE=false pip install .
 
 WORKDIR /app/tools/fit_performer
