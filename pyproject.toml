@@ -29,6 +29,7 @@ markers = [
     "pycbc_couchbase: marks a test for the couchbase API (deselect with '-m \"not pycbc_couchbase\"')",
     "pycbc_acouchbase: marks a test for the acouchbase API (deselect with '-m \"not pycbc_acouchbase\"')",
     "pycbc_txcouchbase: marks a test for the txcouchbase API (deselect with '-m \"not pycbc_txcouchbase\"')",
+    "pycbc_core: marks a test as a pycbc_core C extension object-model test (no cluster required)",
     "pycbc_diag: marks a test as a diagnostic API test",
     "pycbc_kv: marks a test as a Key-Value API test",
     "pycbc_streaming: marks a test as a streaming (query, search, analytics, or views) API test",

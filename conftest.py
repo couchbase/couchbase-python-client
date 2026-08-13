@@ -144,6 +144,10 @@ _METRICS_TESTS = [
     "couchbase/tests/metrics_tests/management_t.py::ClassicManagementMetricsTests",
 ]
 
+_CORE_TESTS = [
+    "couchbase/tests/pycbc_core_t.py::ClassicPycbcCoreTypeTests",
+]
+
 _TXNS_TESTS = [
     "acouchbase/tests/transactions_t.py::ClassicTransactionTests",
     "couchbase/tests/transactions_t.py:ClassicTransactionTests",
@@ -195,6 +199,8 @@ def pytest_collection_modifyitems(items):  # noqa: C901
             item.add_marker(pytest.mark.pycbc_tracing)
         elif test_class_path in _TXNS_TESTS:
             item.add_marker(pytest.mark.pycbc_txn)
+        elif test_class_path in _CORE_TESTS:
+            item.add_marker(pytest.mark.pycbc_core)
 
         if test_class_path in _SLOW_MGMT_TESTS:
             item.add_marker(pytest.mark.pycbc_slow_mgmt)
