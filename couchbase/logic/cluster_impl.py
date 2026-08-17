@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import logging
+import threading
 import time
 from typing import (TYPE_CHECKING,
                     Any,
@@ -53,6 +55,8 @@ if TYPE_CHECKING:
                                                WaitUntilReadyRequest)
     from couchbase.serializer import Serializer
 
+log = logging.getLogger(__name__)
+
 
 class ClusterImpl:
     def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
@@ -68,6 +72,8 @@ class ClusterImpl:
         self._request_builder = ClusterRequestBuilder()
         self._cluster_info: Optional[ClusterInfoResult] = None
         self._transactions: Optional[Transactions] = None
+        # Guards the lazy init of self._transactions in the transactions property
+        self._transactions_lock = threading.Lock()
 
     @property
     def client_adapter(self) -> ClientAdapter:
@@ -143,8 +149,10 @@ class ClusterImpl:
     @property
     def transactions(self) -> Transactions:
         """**INTERNAL**"""
-        if not self._transactions:
-            self._transactions = Transactions(self)
+        if self._transactions is None:
+            with self._transactions_lock:
+                if self._transactions is None:
+                    self._transactions = Transactions(self)
         return self._transactions
 
     def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
@@ -165,6 +173,24 @@ class ClusterImpl:
 
     def close_connection(self) -> None:
         """**INTERNAL**"""
+
+        # Swap under the lock, close outside it.  A first access holds the lock across
+        # Transactions(), so an unlocked read here can see None mid-construction and skip
+        # teardown, stranding a live instance on a closed cluster with only GC to close it.
+        # close() is a network round-trip and must not be held under the lock.
+        with self._transactions_lock:
+            txns, self._transactions = self._transactions, None
+
+        # Ahead of the adapter close: the core cannot remove its client record once the
+        # connection is gone, and burns the full retry budget failing to.
+        if txns is not None:
+            try:
+                # Synchronous, but PYCBC-1798 releases the GIL, so only this thread blocks.
+                txns.close()
+            except Exception:
+                # Must not skip the connection close below and leak the core IO thread.
+                log.warning('Error closing transactions while closing the cluster.', exc_info=True)
+
         try:
             from couchbase.logic.observability import ThresholdLoggingTracer
             tracer = self._cluster_settings.observability_instruments.tracer.tracer
