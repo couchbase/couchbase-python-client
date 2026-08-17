@@ -108,8 +108,10 @@ _SLOW_MGMT_TESTS = [
 
 _MISC_TESTS = [
     "acouchbase/tests/rate_limit_t.py::RateLimitTests",
-    "couchbase/tests/connection_t.py::ClassicConnectionTests"
+    "acouchbase/tests/transactions_property_race_t.py::TransactionsPropertyRaceTests",
+    "couchbase/tests/connection_t.py::ClassicConnectionTests",
     "couchbase/tests/rate_limit_t.py::ClassicRateLimitTests",
+    "couchbase/tests/transactions_property_race_t.py::ClassicTransactionsPropertyRaceTests",
 ]
 
 _TRACING_TESTS = [

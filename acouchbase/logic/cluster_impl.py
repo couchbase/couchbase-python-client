@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import logging
+import threading
 import time
 from asyncio import AbstractEventLoop, sleep
 from typing import (TYPE_CHECKING,
@@ -52,9 +54,12 @@ if TYPE_CHECKING:
                                                UpdateCredentialsRequest,
                                                WaitUntilReadyRequest)
 
+log = logging.getLogger(__name__)
+
 
 class AsyncClusterImpl:
     def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
+        skip_connect = kwargs.pop('skip_connect', None)
         loop: Optional[AbstractEventLoop] = kwargs.pop('loop', None)
         loop_validator = kwargs.pop('loop_validator', None)
         kwargs['_default_timeouts'] = pycbc_connection.pycbc_get_default_timeouts()
@@ -65,12 +70,15 @@ class AsyncClusterImpl:
         # A connection is made when we create the client adapter, but it is an async operation that we cannot await
         # b/c the call needs to happen when we initialize a cluster (new cluster -> new client adapter). We await
         # the create connection future in whichever operation comes next.
-        self._client_adapter = AsyncClientAdapter(connect_request, loop=loop, loop_validator=loop_validator)
+        self._client_adapter = AsyncClientAdapter(
+            connect_request, loop=loop, loop_validator=loop_validator, skip_connect=skip_connect)
         self._cluster_settings.set_observability_cluster_labels_callable(
             self._client_adapter.binding_map.op_map[ClusterOperationType.GetClusterLabels.value])
         self._request_builder = ClusterRequestBuilder()
         self._cluster_info: Optional[ClusterInfoResult] = None
         self._transactions: Optional[Transactions] = None
+        # Guards the lazy init of self._transactions in the transactions property
+        self._transactions_lock = threading.Lock()
 
     @property
     def client_adapter(self) -> AsyncClientAdapter:
@@ -149,8 +157,13 @@ class AsyncClusterImpl:
     @property
     def transactions(self) -> Transactions:
         """**INTERNAL**"""
-        if not self._transactions:
-            self._transactions = Transactions(self)
+        # Transactions.__init__ goes straight into the synchronous create_transactions (no executor
+        # anywhere in the async path), which releases the GIL for a full cluster round-trip.
+        # Use threading.Lock, not asyncio.Lock, for the same reason.
+        if self._transactions is None:
+            with self._transactions_lock:
+                if self._transactions is None:
+                    self._transactions = Transactions(self)
         return self._transactions
 
     def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
@@ -173,6 +186,25 @@ class AsyncClusterImpl:
 
     async def close_connection(self) -> None:
         """**INTERNAL**"""
+
+        # Swap under the lock, close outside it.  An off-loop first access holds the lock
+        # across Transactions(), so an unlocked read here can see None mid-construction and
+        # skip teardown, stranding a live instance on a closed cluster with only GC to close
+        # it.  close() is a network round-trip and must not be held under the lock.
+        with self._transactions_lock:
+            txns, self._transactions = self._transactions, None
+
+        # Ahead of the adapter close: the core cannot remove its client record once the
+        # connection is gone, and burns the full retry budget failing to.
+        if txns is not None:
+            try:
+                # Synchronous with no async override, so this blocks the loop thread (as in
+                # < 4.6.0).  PYCBC-1798 releases the GIL, so only this thread blocks.
+                txns.close()
+            except Exception:
+                # Must not skip the connection close below and leak the core IO thread.
+                log.warning('Error closing transactions while closing the cluster.', exc_info=True)
+
         try:
             from couchbase.logic.observability import ThresholdLoggingTracer
             tracer = self._cluster_settings.tracer.tracer

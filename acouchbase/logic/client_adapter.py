@@ -51,7 +51,8 @@ class AsyncClientAdapter:
     def __init__(self,
                  connect_req: CreateConnectionRequest,
                  loop: Optional[AbstractEventLoop] = None,
-                 loop_validator: Optional[Callable[[Optional[AbstractEventLoop]], AbstractEventLoop]] = None
+                 loop_validator: Optional[Callable[[Optional[AbstractEventLoop]], AbstractEventLoop]] = None,
+                 **kwargs: Any
                  ) -> None:
         num_io_threads = connect_req.options.get('num_io_threads', None)
         self._connection = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
@@ -64,7 +65,9 @@ class AsyncClientAdapter:
         self._close_ft: Optional[Future[None]] = None
         self._connect_ft: Optional[Future[None]] = None
         self._closed = False
-        self._create_connection()
+        # for testing we sometimes want to skip the actual C++ core connection
+        if not (kwargs.get('skip_connect', None) == 'TEST_SKIP_CONNECT'):
+            self._create_connection()
 
     @property
     def binding_map(self) -> BindingMap:
