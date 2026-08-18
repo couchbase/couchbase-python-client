@@ -26,3 +26,9 @@ tests/test_logs/
 CouchbaseMock*.jar
 gocaves*
 .pytest_cache/
+
+
+# AI things
+.agents/
+.claude/
+.ai_discussions/
