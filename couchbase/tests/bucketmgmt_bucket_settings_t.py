@@ -50,8 +50,9 @@ class BucketSettingsTestSuite:
         'test_durability_level_none_to_server',
         'test_max_expiry_zero_to_server',
 
-        # Category 4: Translation to Server - Exhaustive (1 test)
+        # Category 4: Translation to Server - Exhaustive (2 tests)
         'test_all_fields_to_server_translation',
+        'test_conflict_resolution_type_not_sent_on_update',
 
         # Category 5: Translation from Server (3 tests)
         'test_minimal_settings_from_server',
@@ -81,8 +82,9 @@ class BucketSettingsTestSuite:
     def assert_all_optional_fields_none(self, settings, exclude=None):
         exclude = exclude or []
         optional_fields = [
-            'bucket_type', 'compression_mode', 'eviction_policy',
-            'flush_enabled', 'history_retention_collection_default',
+            'bucket_type', 'compression_mode', 'conflict_resolution_type',
+            'eviction_policy', 'flush_enabled',
+            'history_retention_collection_default',
             'history_retention_bytes', 'history_retention_duration',
             'max_expiry', 'max_ttl', 'minimum_durability_level',
             'num_replicas', 'ram_quota_mb', 'replica_index',
@@ -112,7 +114,6 @@ class BucketSettingsTestSuite:
         assert settings['name'] == "test-bucket"
         assert settings.name == "test-bucket"
         self.assert_all_optional_fields_none(settings)
-        assert settings.conflict_resolution_type is None
 
     def test_bucket_settings_num_replicas_zero(self):
         settings = BucketSettings(name="test", num_replicas=0)
@@ -229,7 +230,7 @@ class BucketSettingsTestSuite:
             num_vbuckets=128
         )
 
-        result = request_builder._bucket_settings_to_server(settings)
+        result = request_builder._create_bucket_settings_to_server(settings)
 
         expected = {
             'name': 'test',
@@ -251,6 +252,16 @@ class BucketSettingsTestSuite:
         }
 
         assert result == expected
+
+    def test_conflict_resolution_type_not_sent_on_update(self, request_builder):
+        settings = CreateBucketSettings(name="test",
+                                        conflict_resolution_type=ConflictResolutionType.CUSTOM)
+
+        create_result = request_builder._create_bucket_settings_to_server(settings)
+        update_result = request_builder._bucket_settings_to_server(settings)
+
+        assert create_result['conflict_resolution_type'] == 'custom'
+        assert 'conflict_resolution_type' not in update_result
 
     def test_minimal_settings_from_server(self):
         server_dict = {'name': 'test-bucket'}
@@ -287,6 +298,7 @@ class BucketSettingsTestSuite:
         assert settings.name == 'test'
         assert settings.bucket_type == BucketType.COUCHBASE
         assert settings.compression_mode == CompressionMode.ACTIVE
+        assert settings.conflict_resolution_type == ConflictResolutionType.SEQUENCE_NUMBER
         assert settings.eviction_policy == EvictionPolicyType.FULL
         assert settings.flush_enabled is True
         assert settings.history_retention_collection_default is True
@@ -394,7 +406,7 @@ class BucketSettingsTestSuite:
     ])
     def test_enum_conversions_to_server(self, request_builder, enum_field, enum_value, server_key, expected_str):
         settings = CreateBucketSettings(name="test", **{enum_field: enum_value})
-        result = request_builder._bucket_settings_to_server(settings)
+        result = request_builder._create_bucket_settings_to_server(settings)
 
         assert server_key in result
         assert result[server_key] == expected_str

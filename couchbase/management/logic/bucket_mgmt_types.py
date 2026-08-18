@@ -210,6 +210,16 @@ class BucketSettings(dict):
         return self.get('compression_mode', None)
 
     @property
+    def conflict_resolution_type(self) -> Optional[ConflictResolutionType]:
+        """{timestamp | sequence_number | custom} - The bucket's conflict resolution type.
+
+        Read-only. A bucket's conflict resolution type is fixed when it is created, so it is
+        only sent to the server when provided to :class:`.CreateBucketSettings`; update_bucket
+        never sends it.
+        """
+        return self.get('conflict_resolution_type', None)
+
+    @property
     def eviction_policy(self) -> Optional[EvictionPolicyType]:
         """{fullEviction | valueOnly}. The eviction policy to use."""
         return self.get('eviction_policy', None)
@@ -387,10 +397,6 @@ class CreateBucketSettings(BucketSettings):
 
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
-
-    @property
-    def conflict_resolution_type(self) -> Optional[ConflictResolutionType]:
-        return self.get('conflict_resolution_type', None)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({super().__repr__()})"

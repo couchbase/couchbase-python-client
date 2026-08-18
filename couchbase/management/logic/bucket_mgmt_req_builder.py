@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (Any,
-                    Dict,
-                    Union)
+from typing import Any, Dict
 
 from couchbase._utils import is_null_or_empty
 from couchbase.exceptions import InvalidArgumentException
@@ -48,7 +46,7 @@ class BucketMgmtRequestBuilder:
         self._error_map = BUCKET_MGMT_ERROR_MAP
 
     def _bucket_settings_to_server(self,  # noqa: C901
-                                   settings: Union[CreateBucketRequest, BucketSettings]) -> Dict[str, Any]:
+                                   settings: BucketSettings) -> Dict[str, Any]:
         """**INTERNAL**"""
         output = {'name': settings['name']}
         bucket_type = settings.get('bucket_type', None)
@@ -59,11 +57,6 @@ class BucketMgmtRequestBuilder:
         compression_mode = settings.get('compression_mode', None)
         if compression_mode:
             output['compression_mode'] = enum_to_str(compression_mode, CompressionMode)
-        conflict_resolution_type = settings.get('conflict_resolution_type', None)
-        if conflict_resolution_type:
-            output['conflict_resolution_type'] = enum_to_str(conflict_resolution_type,
-                                                             ConflictResolutionType,
-                                                             ConflictResolutionType.to_server_str)
         eviction_policy = settings.get('eviction_policy', None)
         if eviction_policy:
             output['eviction_policy'] = enum_to_str(eviction_policy,
@@ -112,6 +105,18 @@ class BucketMgmtRequestBuilder:
 
         return output
 
+    def _create_bucket_settings_to_server(self, settings: CreateBucketSettings) -> Dict[str, Any]:
+        """**INTERNAL**"""
+        output = self._bucket_settings_to_server(settings)
+        # conflict resolution type is fixed at creation, so only this path sends it
+        conflict_resolution_type = settings.get('conflict_resolution_type', None)
+        if conflict_resolution_type:
+            output['conflict_resolution_type'] = enum_to_str(conflict_resolution_type,
+                                                             ConflictResolutionType,
+                                                             ConflictResolutionType.to_server_str)
+
+        return output
+
     def _validate_bucket_name(self, bucket_name: str) -> None:
         if is_null_or_empty(bucket_name):
             raise InvalidArgumentException('The bucket_name cannot be empty.')
@@ -143,7 +148,7 @@ class BucketMgmtRequestBuilder:
         final_args = forward_args(kwargs, *options)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span, bucket_name=settings.get('name', None))
-        bucket_settings = self._bucket_settings_to_server(settings)
+        bucket_settings = self._create_bucket_settings_to_server(settings)
         timeout = final_args.pop('timeout', None)
         req = CreateBucketRequest(self._error_map, bucket_settings)
         if timeout is not None:
@@ -215,7 +220,7 @@ class BucketMgmtRequestBuilder:
         return req
 
     def build_update_bucket_request(self,
-                                    settings: CreateBucketSettings,
+                                    settings: BucketSettings,
                                     obs_handler: ObservableRequestHandler,
                                     *options: object,
                                     **kwargs: object) -> UpdateBucketRequest:
