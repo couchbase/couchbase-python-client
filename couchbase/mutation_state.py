@@ -15,8 +15,7 @@
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
-                    List)
+                    Optional)
 
 from couchbase.exceptions import MissingTokenException
 from couchbase.result import MutationToken
@@ -26,14 +25,14 @@ if TYPE_CHECKING:
 
 
 class MutationState:
-    def __init__(self, *docs,  # type: List[MutationResult]
-                 **kwargs  # type: Dict[str, Any]
+    def __init__(self, *docs,  # type: MutationResult
+                 **kwargs  # type: Any
                  ):
         self._sv = set()
         if docs:
             self.add_results(*docs, **kwargs)
 
-    def add_mutation_token(self, mut_token  # type: MutationToken
+    def add_mutation_token(self, mut_token  # type: Optional[MutationToken]
                            ) -> None:
         if isinstance(mut_token, MutationToken):
             self._sv.add(mut_token)
@@ -51,8 +50,8 @@ class MutationState:
 
         return False
 
-    def add_results(self, *rvs,  # type: List[MutationResult]
-                    **kwargs  # type: Dict[str, Any]
+    def add_results(self, *rvs,  # type: MutationResult
+                    **kwargs  # type: Any
                     ) -> bool:
         """
         Changes the state to reflect the mutation which yielded the given

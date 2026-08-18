@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
@@ -65,7 +63,7 @@ class Bucket:
 
     def ping(self,
              *opts,  # type: PingOptions
-             **kwargs  # type: Dict[str, Any]
+             **kwargs  # type: Any
              ) -> Deferred[PingResult]:
         req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
         return self._impl.ping_deferred(req)

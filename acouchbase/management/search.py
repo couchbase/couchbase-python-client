@@ -53,7 +53,7 @@ class SearchIndexManager:
     async def upsert_index(self,
                            index,     # type: SearchIndex
                            *options,  # type: UpsertSearchIndexOptions
-                           **kwargs   # type: Dict[str, Any]
+                           **kwargs   # type: Any
                            ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexUpsert
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -64,7 +64,7 @@ class SearchIndexManager:
     async def drop_index(self,
                          index_name,  # type: str
                          *options,   # type: DropSearchIndexOptions
-                         **kwargs    # type: Dict[str, Any]
+                         **kwargs    # type: Any
                          ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexDrop
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -75,7 +75,7 @@ class SearchIndexManager:
     async def get_index(self,
                         index_name,  # type: str
                         *options,   # type: GetSearchIndexOptions
-                        **kwargs    # type: Dict[str, Any]
+                        **kwargs    # type: Any
                         ) -> SearchIndex:
         op_type = SearchIndexMgmtOperationType.SearchIndexGet
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -85,7 +85,7 @@ class SearchIndexManager:
 
     async def get_all_indexes(self,
                               *options,  # type: GetAllSearchIndexesOptions
-                              **kwargs  # type: Dict[str, Any]
+                              **kwargs  # type: Any
                               ) -> Iterable[SearchIndex]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetAll
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -96,7 +96,7 @@ class SearchIndexManager:
     async def get_indexed_documents_count(self,
                                           index_name,  # type: str
                                           *options,   # type: GetSearchIndexedDocumentsCountOptions
-                                          **kwargs    # type: Dict[str, Any]
+                                          **kwargs    # type: Any
                                           ) -> int:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -110,7 +110,7 @@ class SearchIndexManager:
     async def pause_ingest(self,
                            index_name,  # type: str
                            *options,  # type: PauseIngestSearchIndexOptions
-                           **kwargs  # type: Dict[str, Any]
+                           **kwargs  # type: Any
                            ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -122,7 +122,7 @@ class SearchIndexManager:
     async def resume_ingest(self,
                             index_name,  # type: str
                             *options,  # type: ResumeIngestSearchIndexOptions
-                            **kwargs  # type: Dict[str, Any]
+                            **kwargs  # type: Any
                             ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -137,7 +137,7 @@ class SearchIndexManager:
     async def allow_querying(self,
                              index_name,  # type: str
                              *options,  # type: AllowQueryingSearchIndexOptions
-                             **kwargs  # type: Dict[str, Any]
+                             **kwargs  # type: Any
                              ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -152,7 +152,7 @@ class SearchIndexManager:
     async def disallow_querying(self,
                                 index_name,  # type: str
                                 *options,  # type: DisallowQueryingSearchIndexOptions
-                                **kwargs  # type: Dict[str, Any]
+                                **kwargs  # type: Any
                                 ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -167,7 +167,7 @@ class SearchIndexManager:
     async def freeze_plan(self,
                           index_name,  # type: str
                           *options,  # type: FreezePlanSearchIndexOptions
-                          **kwargs  # type: Dict[str, Any]
+                          **kwargs  # type: Any
                           ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -179,7 +179,7 @@ class SearchIndexManager:
     async def unfreeze_plan(self,
                             index_name,  # type: str
                             *options,  # type: UnfreezePlanSearchIndexOptions
-                            **kwargs  # type: Dict[str, Any]
+                            **kwargs  # type: Any
                             ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -195,7 +195,7 @@ class SearchIndexManager:
                                index_name,  # type: str
                                document,  # type: Any
                                *options,  # type: AnalyzeDocumentSearchIndexOptions
-                               **kwargs  # type: Dict[str, Any]
+                               **kwargs  # type: Any
                                ) -> Dict[str, Any]:
         op_type = SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -210,7 +210,7 @@ class SearchIndexManager:
     async def get_index_stats(self,
                               index_name,  # type: str
                               *options,  # type: GetSearchIndexStatsOptions
-                              **kwargs  # type: Dict[str, Any]
+                              **kwargs  # type: Any
                               ) -> Dict[str, Any]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetStats
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -223,7 +223,7 @@ class SearchIndexManager:
 
     async def get_all_index_stats(self,
                                   *options,  # type: GetAllSearchIndexStatsOptions
-                                  **kwargs  # type: Dict[str, Any]
+                                  **kwargs  # type: Any
                                   ) -> Dict[str, Any]:
         op_type = SearchIndexMgmtOperationType.SearchGetStats
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -244,7 +244,7 @@ class ScopeSearchIndexManager:
     async def upsert_index(self,
                            index,     # type: SearchIndex
                            *options,  # type: UpsertSearchIndexOptions
-                           **kwargs   # type: Dict[str, Any]
+                           **kwargs   # type: Any
                            ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexUpsert
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -258,7 +258,7 @@ class ScopeSearchIndexManager:
     async def drop_index(self,
                          index_name,  # type: str
                          *options,   # type: DropSearchIndexOptions
-                         **kwargs    # type: Dict[str, Any]
+                         **kwargs    # type: Any
                          ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexDrop
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -272,7 +272,7 @@ class ScopeSearchIndexManager:
     async def get_index(self,
                         index_name,  # type: str
                         *options,   # type: GetSearchIndexOptions
-                        **kwargs    # type: Dict[str, Any]
+                        **kwargs    # type: Any
                         ) -> SearchIndex:
         op_type = SearchIndexMgmtOperationType.SearchIndexGet
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -285,7 +285,7 @@ class ScopeSearchIndexManager:
 
     async def get_all_indexes(self,
                               *options,  # type: GetAllSearchIndexesOptions
-                              **kwargs  # type: Dict[str, Any]
+                              **kwargs  # type: Any
                               ) -> Iterable[SearchIndex]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetAll
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -298,7 +298,7 @@ class ScopeSearchIndexManager:
     async def get_indexed_documents_count(self,
                                           index_name,  # type: str
                                           *options,   # type: GetSearchIndexedDocumentsCountOptions
-                                          **kwargs    # type: Dict[str, Any]
+                                          **kwargs    # type: Any
                                           ) -> int:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -312,7 +312,7 @@ class ScopeSearchIndexManager:
     async def pause_ingest(self,
                            index_name,  # type: str
                            *options,  # type: PauseIngestSearchIndexOptions
-                           **kwargs  # type: Dict[str, Any]
+                           **kwargs  # type: Any
                            ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -327,7 +327,7 @@ class ScopeSearchIndexManager:
     async def resume_ingest(self,
                             index_name,  # type: str
                             *options,  # type: ResumeIngestSearchIndexOptions
-                            **kwargs  # type: Dict[str, Any]
+                            **kwargs  # type: Any
                             ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -342,7 +342,7 @@ class ScopeSearchIndexManager:
     async def allow_querying(self,
                              index_name,  # type: str
                              *options,  # type: AllowQueryingSearchIndexOptions
-                             **kwargs  # type: Dict[str, Any]
+                             **kwargs  # type: Any
                              ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -357,7 +357,7 @@ class ScopeSearchIndexManager:
     async def disallow_querying(self,
                                 index_name,  # type: str
                                 *options,  # type: DisallowQueryingSearchIndexOptions
-                                **kwargs  # type: Dict[str, Any]
+                                **kwargs  # type: Any
                                 ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -372,7 +372,7 @@ class ScopeSearchIndexManager:
     async def freeze_plan(self,
                           index_name,  # type: str
                           *options,  # type: FreezePlanSearchIndexOptions
-                          **kwargs  # type: Dict[str, Any]
+                          **kwargs  # type: Any
                           ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -387,7 +387,7 @@ class ScopeSearchIndexManager:
     async def unfreeze_plan(self,
                             index_name,  # type: str
                             *options,  # type: UnfreezePlanSearchIndexOptions
-                            **kwargs  # type: Dict[str, Any]
+                            **kwargs  # type: Any
                             ) -> None:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments,
@@ -403,7 +403,7 @@ class ScopeSearchIndexManager:
                                index_name,  # type: str
                                document,  # type: Any
                                *options,  # type: AnalyzeDocumentSearchIndexOptions
-                               **kwargs  # type: Dict[str, Any]
+                               **kwargs  # type: Any
                                ) -> Dict[str, Any]:
         op_type = SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -418,7 +418,7 @@ class ScopeSearchIndexManager:
     async def get_index_stats(self,
                               index_name,  # type: str
                               *options,  # type: GetSearchIndexStatsOptions
-                              **kwargs  # type: Dict[str, Any]
+                              **kwargs  # type: Any
                               ) -> Dict[str, Any]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetStats
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -431,7 +431,7 @@ class ScopeSearchIndexManager:
 
     async def get_all_index_stats(self,
                                   *options,  # type: GetAllSearchIndexStatsOptions
-                                  **kwargs  # type: Dict[str, Any]
+                                  **kwargs  # type: Any
                                   ) -> Dict[str, Any]:
         op_type = SearchIndexMgmtOperationType.SearchGetStats
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:

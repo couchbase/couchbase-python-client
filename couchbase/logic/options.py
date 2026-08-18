@@ -826,7 +826,7 @@ class OptionsTimeoutBase(OptionsBase):
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
                  span=None,  # type: Optional[SpanProtocol]
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         """
         Base options with timeout and span options
@@ -1613,10 +1613,10 @@ class DeltaValueBase(ConstrainedIntBase):
         """
         super().__init__(value)
 
-    @ classmethod
+    @classmethod
     def max(cls):
         return 0x7FFFFFFFFFFFFFFF
 
-    @ classmethod
+    @classmethod
     def min(cls):
         return 0

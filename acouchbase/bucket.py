@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.collection import Collection
 from acouchbase.logic.bucket_impl import AsyncBucketImpl
@@ -123,7 +121,7 @@ class AsyncBucket:
 
     async def ping(self,
                    *opts,  # type: PingOptions
-                   **kwargs  # type: Dict[str, Any]
+                   **kwargs  # type: Any
                    ) -> PingResult:
         """Performs a ping operation against the bucket.
 
@@ -146,7 +144,7 @@ class AsyncBucket:
                    design_doc,      # type: str
                    view_name,       # type: str
                    *view_options,   # type: ViewOptions
-                   **kwargs         # type: Dict[str, Any]
+                   **kwargs         # type: Any
                    ) -> ViewResult:
         """Executes a View query against the bucket.
 

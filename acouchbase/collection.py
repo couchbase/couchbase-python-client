@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Iterable)
 
 from acouchbase.binary_collection import BinaryCollection
@@ -127,7 +126,7 @@ class AsyncCollection:
     async def get_any_replica(self,
                               key,  # type: str
                               *opts,  # type: GetAnyReplicaOptions
-                              **kwargs,  # type: Dict[str, Any]
+                              **kwargs,  # type: Any
                               ) -> GetReplicaResult:
         """Retrieves the value of a document from the collection leveraging both active and all available replicas returning
         the first available.
@@ -179,7 +178,7 @@ class AsyncCollection:
     async def get_all_replicas(self,
                                key,  # type: str
                                *opts,  # type: GetAllReplicasOptions
-                               **kwargs,  # type: Dict[str, Any]
+                               **kwargs,  # type: Any
                                ) -> Iterable[GetReplicaResult]:
         """Retrieves the value of a document from the collection returning both active and all available replicas.
 
@@ -1031,7 +1030,7 @@ class AsyncCollection:
     def scan(self,
              scan_type,  # type: ScanType
              *opts,  # type: ScanOptions
-             **kwargs,  # type: Dict[str, Any]
+             **kwargs,  # type: Any
              ) -> ScanResultIterable:
         """Execute a key-value range scan operation from the collection.
 

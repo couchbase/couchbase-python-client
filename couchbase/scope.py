@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from typing import TYPE_CHECKING, Any
 
 from couchbase.collection import Collection
 from couchbase.logic.observability import ObservableRequestHandler
@@ -25,9 +23,7 @@ from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.logic.scope_impl import ScopeImpl
 from couchbase.management.eventing import ScopeEventingFunctionManager
 from couchbase.management.search import ScopeSearchIndexManager
-from couchbase.options import (AnalyticsOptions,
-                               QueryOptions,
-                               SearchOptions)
+from couchbase.options import AnalyticsOptions, SearchOptions
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
@@ -69,8 +65,9 @@ class Scope:
 
     def query(self,
               statement,  # type: str
-              *options,  # type: QueryOptions
-              **kwargs  # type: Dict[str, Any]
+              *options,  # type: Any  # QueryOptions, or a positional query parameter: the request
+              # builder walks *options and treats every non-QueryOptions entry as one.
+              **kwargs  # type: Any
               ) -> QueryResult:
         """Executes a N1QL query against the scope.
 
@@ -147,7 +144,7 @@ class Scope:
     def analytics_query(self,
                         statement,  # type: str
                         *options,  # type: AnalyticsOptions
-                        **kwargs   # type: Dict[str, Any]
+                        **kwargs   # type: Any
                         ) -> AnalyticsResult:
         """Executes an analaytics query against the scope.
 
@@ -225,7 +222,7 @@ class Scope:
                      index,  # type: str
                      query,  # type: SearchQuery
                      *options,  # type: SearchOptions
-                     **kwargs   # type: Dict[str, Any]
+                     **kwargs   # type: Any
                      ) -> SearchResult:
         """Executes an search query against the scope.
 
@@ -323,7 +320,7 @@ class Scope:
                index,  # type: str
                request,  # type: SearchRequest
                *options,  # type: SearchOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> SearchResult:
         """Executes an search against the scope.
 

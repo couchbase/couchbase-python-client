@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from typing import TYPE_CHECKING, Any
 
 from couchbase.collection import Collection
 from couchbase.logic.bucket_impl import BucketImpl
@@ -112,7 +110,7 @@ class Bucket:
 
     def ping(self,
              *opts,  # type: PingOptions
-             **kwargs  # type: Dict[str, Any]
+             **kwargs  # type: Any
              ) -> PingResult:
         """Performs a ping operation against the bucket.
 
@@ -135,7 +133,7 @@ class Bucket:
                    design_doc,      # type: str
                    view_name,       # type: str
                    *view_options,   # type: ViewOptions
-                   **kwargs         # type: Dict[str, Any]
+                   **kwargs         # type: Any
                    ) -> ViewResult:
         """Executes a View query against the bucket.
 

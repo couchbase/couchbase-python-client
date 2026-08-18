@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
@@ -57,7 +55,7 @@ class Scope:
         self,
         statement,  # type: str
         *options,  # type: QueryOptions
-        **kwargs  # type: Dict[str, Any]
+        **kwargs  # type: Any
     ) -> Deferred[QueryResult]:
         op_type = StreamingOperationType.Query
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -68,7 +66,7 @@ class Scope:
         self,
         statement,  # type: str
         *options,  # type: AnalyticsOptions
-        **kwargs  # type: Dict[str, Any]
+        **kwargs  # type: Any
     ) -> Deferred[AnalyticsResult]:
         op_type = StreamingOperationType.AnalyticsQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -80,7 +78,7 @@ class Scope:
         index,  # type: str
         query,  # type: SearchQuery
         *options,  # type: SearchOptions
-        **kwargs  # type: Dict[str, Any]
+        **kwargs  # type: Any
     ) -> Deferred[SearchResult]:
         op_type = StreamingOperationType.SearchQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -91,7 +89,7 @@ class Scope:
                index,  # type: str
                request,  # type: SearchRequest
                *options,  # type: SearchOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> Deferred[SearchResult]:
         op_type = StreamingOperationType.SearchQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)

@@ -64,7 +64,7 @@ class AttemptContextLogic:
         self._handle_exception(new_attempt_ctx)
 
     def _new_attempt_async(self,
-                           **kwargs,  # type: Dict[str, Any]
+                           **kwargs,  # type: Any
                            ) -> None:
         create_new_attempt_context(ctx=self._txnctx, **kwargs)
 
@@ -73,7 +73,7 @@ class AttemptContextLogic:
         self._handle_exception(rollback_res)
 
     def _rollback_async(self,
-                        **kwargs,  # type: Dict[str, Any]
+                        **kwargs,  # type: Any
                         ) -> None:
         transaction_rollback(ctx=self._txnctx, **kwargs)
 
@@ -83,7 +83,7 @@ class AttemptContextLogic:
         return commit_res
 
     def _commit_async(self,
-                      **kwargs,  # type: Dict[str, Any]
+                      **kwargs,  # type: Any
                       ) -> Optional[Dict[str, Any]]:
         return transaction_commit(ctx=self._txnctx, **kwargs)
 

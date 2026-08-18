@@ -383,7 +383,7 @@ def insert(path,                     # type: str
            value,                    # type: Union[JSONType, MutationMacro]
            create_parents=False,     # type: Optional[bool]
            xattr=False,               # type: Optional[bool]
-           **kwargs                 # type: Dict[str, Any]
+           **kwargs                 # type: Any
            ) -> Spec:
     """Creates a :class:`.Spec` for inserting a field into the document. Failing if the field already
     exists at the specified path.

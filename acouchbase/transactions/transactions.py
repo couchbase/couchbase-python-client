@@ -22,7 +22,6 @@ from typing import (TYPE_CHECKING,
                     Awaitable,
                     Callable,
                     Coroutine,
-                    Dict,
                     List,
                     Optional,
                     Tuple,
@@ -129,7 +128,7 @@ class Transactions(TransactionsLogic):
                          cluster.cluster_settings.default_serializer)
 
     async def run(self,
-                  txn_logic,  # type:  Callable[[AttemptContextLogic], Coroutine[Any, Any, None]]
+                  txn_logic,  # type: Callable[[AttemptContext], Coroutine[Any, Any, None]]
                   transaction_options=None,  # type: Optional[TransactionOptions]
                   **kwargs) -> TransactionResult:
         opts = None
@@ -168,19 +167,19 @@ class AttemptContext(AttemptContextLogic):
 
     @AsyncWrapper.inject_callbacks(None)
     def _new_attempt(self,
-                     **kwargs  # type: Dict[str, Any]
+                     **kwargs  # type: Any
                      ) -> Awaitable[None]:
         return super()._new_attempt_async(**kwargs)
 
     @AsyncWrapper.inject_callbacks(None)
     def _rollback(self,
-                  **kwargs  # type: Dict[str, Any]
+                  **kwargs  # type: Any
                   ) -> Awaitable[None]:
         return super()._rollback_async(**kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionResult)
     def _commit(self,
-                **kwargs  # type: Dict[str, Any]
+                **kwargs  # type: Any
                 ) -> Awaitable[TransactionResult]:
         return super()._commit_async(**kwargs)
 
@@ -188,7 +187,7 @@ class AttemptContext(AttemptContextLogic):
     def _get(self,
              coll,     # type: AsyncCollection
              key,      # type: str
-             **kwargs  # type: Dict[str, Any]
+             **kwargs  # type: Any
              ) -> Awaitable[TransactionGetResult]:
         return super().get(coll, key, **kwargs)
 
@@ -196,7 +195,7 @@ class AttemptContext(AttemptContextLogic):
             coll,          # type: AsyncCollection
             key,           # type: str
             options=None,  # type: Optional[TransactionGetOptions]
-            **kwargs       # type: Dict[str, Any]
+            **kwargs       # type: Any
             ) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction.
@@ -224,7 +223,7 @@ class AttemptContext(AttemptContextLogic):
     def _get_replica_from_preferred_server_group(self,
                                                  coll,     # type: AsyncCollection
                                                  key,      # type: str
-                                                 **kwargs  # type: Dict[str, Any]
+                                                 **kwargs  # type: Any
                                                  ) -> Awaitable[TransactionGetResult]:
         return super().get_replica_from_preferred_server_group(coll, key, **kwargs)
 
@@ -232,7 +231,7 @@ class AttemptContext(AttemptContextLogic):
                                                 coll,          # type: AsyncCollection
                                                 key,           # type: str
                                                 options=None,  # type: Optional[TransactionGetReplicaFromPreferredServerGroupOptions]  # noqa: E501
-                                                **kwargs       # type: Dict[str, Any]
+                                                **kwargs       # type: Any
                                                 ) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction from any replica in the preferred server group that is specified in
@@ -262,15 +261,15 @@ class AttemptContext(AttemptContextLogic):
 
     @AsyncWrapper.inject_callbacks(TransactionGetMultiResult)
     def _get_multi(self,
-                   specs,    # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec]]
-                   **kwargs  # type: Dict[str, Any]
+                   specs,    # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec, ...]]
+                   **kwargs  # type: Any
                    ) -> Awaitable[TransactionGetMultiResult]:
         return super().get_multi(specs, **kwargs)
 
     def get_multi(self,
-                  specs,         # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec]]
+                  specs,         # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec, ...]]
                   options=None,  # type: Optional[TransactionGetMultiOptions]
-                  **kwargs       # type: Dict[str, Any]
+                  **kwargs       # type: Any
                   ) -> Awaitable[TransactionGetMultiResult]:
         """
         Get a document within this transaction.
@@ -295,15 +294,15 @@ class AttemptContext(AttemptContextLogic):
 
     @AsyncWrapper.inject_callbacks(TransactionGetMultiReplicasFromPreferredServerGroupResult)
     def _get_multi_replicas_from_preferred_server_group(self,
-                                                        specs,    # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec]]  # noqa: E501
-                                                        **kwargs  # type: Dict[str, Any]
+                                                        specs,    # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]]  # noqa: E501
+                                                        **kwargs  # type: Any
                                                         ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:  # noqa: E501
         return super().get_multi_replicas_from_preferred_server_group(specs, **kwargs)
 
     def get_multi_replicas_from_preferred_server_group(self,
-                                                       specs,         # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec]] # noqa: E501
+                                                       specs,         # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]] # noqa: E501
                                                        options=None,  # type: Optional[TransactionGetMultiReplicasFromPreferredServerGroupOptions]  # noqa: E501
-                                                       **kwargs       # type: Dict[str, Any]
+                                                       **kwargs       # type: Any
                                                        ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:  # noqa: E501
         """
         Get multiple documents within this transaction from any replica.
@@ -330,7 +329,7 @@ class AttemptContext(AttemptContextLogic):
                 coll,     # type: AsyncCollection
                 key,      # type: str
                 value,    # type: JSONType
-                **kwargs  # type: Dict[str, Any]
+                **kwargs  # type: Any
                 ) -> Awaitable[TransactionGetResult]:
         return super().insert(coll, key, value, **kwargs)
 
@@ -339,7 +338,7 @@ class AttemptContext(AttemptContextLogic):
                key,           # type: str
                value,         # type: JSONType
                options=None,  # type: Optional[TransactionInsertOptions]
-               **kwargs       # type: Dict[str, Any]
+               **kwargs       # type: Any
                ) -> Awaitable[TransactionGetResult]:
         """
         Insert a new document within a transaction.
@@ -368,7 +367,7 @@ class AttemptContext(AttemptContextLogic):
     def _replace(self,
                  txn_get_result,  # type: TransactionGetResult
                  value,           # type: JSONType
-                 **kwargs         # type: Dict[str, Any]
+                 **kwargs         # type: Any
                  ) -> Awaitable[TransactionGetResult]:
         return super().replace(txn_get_result, value, **kwargs)
 
@@ -376,7 +375,7 @@ class AttemptContext(AttemptContextLogic):
                 txn_get_result,  # type: TransactionGetResult
                 value,           # type: JSONType
                 options=None,    # type: Optional[TransactionReplaceOptions]
-                **kwargs         # type: Dict[str, Any]
+                **kwargs         # type: Any
                 ) -> Awaitable[TransactionGetResult]:
         """
         Replace the contents of a document within a transaction.
@@ -403,7 +402,7 @@ class AttemptContext(AttemptContextLogic):
     @AsyncWrapper.inject_callbacks(None)
     def remove(self,
                txn_get_result,      # type: TransactionGetResult
-               **kwargs             # type: Dict[str, Any]
+               **kwargs             # type: Any
                ) -> Awaitable[None]:
         """
         Remove a document in a transaction.
@@ -423,7 +422,7 @@ class AttemptContext(AttemptContextLogic):
     def query(self,
               query,         # type: str
               options=None,  # type: Optional[TransactionQueryOptions]
-              **kwargs       # type: Dict[str, Any]
+              **kwargs       # type: Any
               ) -> Awaitable[TransactionQueryResults]:
         """
         Perform a query within a transaction.

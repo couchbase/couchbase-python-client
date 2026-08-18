@@ -16,9 +16,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import (Any,
-                    Dict,
-                    Optional)
+from typing import Any, Optional
 
 from couchbase.exceptions import InvalidArgumentException
 
@@ -41,7 +39,7 @@ class PasswordAuthenticator(Authenticator):
                  username,          # type: str
                  password,          # type: str
                  cert_path=None,    # type: Optional[str]
-                 **kwargs           # type: Dict[str, Any]
+                 **kwargs           # type: Any
                  ):
         """PasswordAuthenticator instance."""
         if not isinstance(username, str):

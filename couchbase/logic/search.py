@@ -387,7 +387,7 @@ Sorting Classes
 
 class Sort:
     def __init__(self, by,  # type: str
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         self._json_ = {
             'by': by
@@ -441,7 +441,7 @@ class SortScore(Sort):
     Sorts by the score of each match.
     """
 
-    def __init__(self, **kwargs  # type: Dict[str, Any]
+    def __init__(self, **kwargs  # type: Any
                  ) -> None:
         super(SortScore, self).__init__('score', **kwargs)
 
@@ -451,7 +451,7 @@ class SortID(Sort):
     Sorts lexically by the document ID of each match
     """
 
-    def __init__(self, **kwargs  # type: Dict[str, Any]
+    def __init__(self, **kwargs  # type: Any
                  ) -> None:
         super(SortID, self).__init__('id', **kwargs)
 
@@ -462,7 +462,7 @@ class SortField(Sort):
     """
 
     def __init__(self, field,  # type: str
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         kwargs['field'] = field
         super(SortField, self).__init__('field', **kwargs)
@@ -516,7 +516,7 @@ class SortGeoDistance(Sort):
 
     def __init__(self, location,  # type: Tuple[float, float]
                  field,  # type: str
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         kwargs.update(location=location, field=field)
         super().__init__('geo_distance', **kwargs)
@@ -940,7 +940,7 @@ class SearchQueryBuilder:
                  index_name,  # type: str
                  query=None,  # type: Optional[SearchQuery]
                  vector_search=None,  # type: Optional[VectorSearch]
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ):
 
         self._index_name = index_name
@@ -1352,7 +1352,7 @@ class SearchQueryBuilder:
                                    index_name,  # type: str
                                    search_query,  # type: SearchQuery
                                    *options,  # type: Optional[SearchOptions]
-                                   **kwargs,  # type: Dict[str, Any]
+                                   **kwargs,  # type: Any
                                    ) -> SearchQueryBuilder:
         args = SearchQueryBuilder.get_search_query_args(*options, **kwargs)
 
@@ -1374,7 +1374,7 @@ class SearchQueryBuilder:
                                          index_name,  # type: str
                                          request,  # type: SearchRequest
                                          *options,  # type: Optional[SearchOptions]
-                                         **kwargs,  # type: Dict[str, Any]
+                                         **kwargs,  # type: Any
                                          ) -> SearchQueryBuilder:
         args = SearchQueryBuilder.get_search_query_args(*options, **kwargs)
 

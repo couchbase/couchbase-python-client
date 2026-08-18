@@ -20,7 +20,6 @@ from functools import wraps
 from typing import (TYPE_CHECKING,
                     Any,
                     Callable,
-                    Dict,
                     List,
                     Optional,
                     Tuple,
@@ -103,7 +102,7 @@ class Transactions(TransactionsLogic):
     def run(self,
             txn_logic,                 # type: Callable[[AttemptContext], None]
             transaction_options=None,  # type: Optional[TransactionOptions]
-            **kwargs                   # type: Dict[str, Any]
+            **kwargs                   # type: Any
             ) -> TransactionResult:
         """ Run a set of operations within a transaction.
 
@@ -166,7 +165,7 @@ class AttemptContext(AttemptContextLogic):
     def _get(self,
              coll,     # type: Collection
              key,      # type: str
-             **kwargs  # type: Dict[str, Any]
+             **kwargs  # type: Any
              ) -> TransactionGetResult:
         return super().get(coll, key, **kwargs)
 
@@ -174,7 +173,7 @@ class AttemptContext(AttemptContextLogic):
             coll,          # type: Collection
             key,           # type: str
             options=None,  # type: Optional[TransactionGetOptions]
-            **kwargs       # type: Dict[str, Any]
+            **kwargs       # type: Any
             ) -> TransactionGetResult:
         """
         Get a document within this transaction.
@@ -201,7 +200,7 @@ class AttemptContext(AttemptContextLogic):
     def _get_replica_from_preferred_server_group(self,
                                                  coll,     # type: Collection
                                                  key,      # type: str
-                                                 **kwargs  # type: Dict[str, Any]
+                                                 **kwargs  # type: Any
                                                  ) -> TransactionGetResult:
         return super().get_replica_from_preferred_server_group(coll, key, **kwargs)
 
@@ -209,7 +208,7 @@ class AttemptContext(AttemptContextLogic):
                                                 coll,          # type: Collection
                                                 key,           # type: str
                                                 options=None,  # type: Optional[TransactionGetReplicaFromPreferredServerGroupOptions]  # noqa: E501
-                                                **kwargs       # type: Dict[str, Any]
+                                                **kwargs       # type: Any
                                                 ) -> TransactionGetResult:
         """
         Get a document within this transaction from any replica in the preferred server group that has been specified in
@@ -239,15 +238,15 @@ class AttemptContext(AttemptContextLogic):
 
     @BlockingWrapper.block(TransactionGetMultiResult)
     def _get_multi(self,
-                   specs,    # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec]]
-                   **kwargs  # type: Dict[str, Any]
+                   specs,    # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec, ...]]
+                   **kwargs  # type: Any
                    ) -> TransactionGetMultiResult:
         return super().get_multi(specs, **kwargs)
 
     def get_multi(self,
-                  specs,         # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec]]
+                  specs,         # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec, ...]]
                   options=None,  # type: Optional[TransactionGetMultiOptions]
-                  **kwargs       # type: Dict[str, Any]
+                  **kwargs       # type: Any
                   ) -> TransactionGetMultiResult:
         """
         Get multiple documents within this transaction.
@@ -272,15 +271,15 @@ class AttemptContext(AttemptContextLogic):
 
     @BlockingWrapper.block(TransactionGetMultiReplicasFromPreferredServerGroupResult)
     def _get_multi_replicas_from_preferred_server_group(self,
-                                                        specs,    # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec]]  # noqa: E501
-                                                        **kwargs  # type: Dict[str, Any]
+                                                        specs,    # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]]  # noqa: E501
+                                                        **kwargs  # type: Any
                                                         ) -> TransactionGetMultiReplicasFromPreferredServerGroupResult:
         return super().get_multi_replicas_from_preferred_server_group(specs, **kwargs)
 
     def get_multi_replicas_from_preferred_server_group(self,
-                                                       specs,         # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec]] # noqa: E501
+                                                       specs,         # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]] # noqa: E501
                                                        options=None,  # type: Optional[TransactionGetMultiReplicasFromPreferredServerGroupOptions]  # noqa: E501
-                                                       **kwargs       # type: Dict[str, Any]
+                                                       **kwargs       # type: Any
                                                        ) -> TransactionGetMultiReplicasFromPreferredServerGroupResult:
         """
         Get multiple documents within this transaction from any replica.
@@ -307,7 +306,7 @@ class AttemptContext(AttemptContextLogic):
                 coll,     # type: Collection
                 key,      # type: str
                 value,    # type: JSONType
-                **kwargs  # type: Dict[str, Any]
+                **kwargs  # type: Any
                 ) -> Optional[TransactionGetResult]:
         return super().insert(coll, key, value, **kwargs)
 
@@ -316,7 +315,7 @@ class AttemptContext(AttemptContextLogic):
                key,           # type: str
                value,         # type: JSONType
                options=None,  # type: Optional[TransactionInsertOptions]
-               **kwargs       # type: Dict[str, Any]
+               **kwargs       # type: Any
                ) -> Optional[TransactionGetResult]:
         """
         Insert a new document within a transaction.
@@ -344,7 +343,7 @@ class AttemptContext(AttemptContextLogic):
     def _replace(self,
                  txn_get_result,  # type: TransactionGetResult
                  value,           # type: JSONType
-                 **kwargs,        # type: Dict[str, Any]
+                 **kwargs,        # type: Any
                  ) -> TransactionGetResult:
         return super().replace(txn_get_result, value, **kwargs)
 
@@ -352,7 +351,7 @@ class AttemptContext(AttemptContextLogic):
                 txn_get_result,  # type: TransactionGetResult
                 value,           # type: JSONType
                 options=None,    # type: Optional[TransactionReplaceOptions]
-                **kwargs,        # type: Dict[str, Any]
+                **kwargs,        # type: Any
                 ) -> TransactionGetResult:
         """
         Replace the contents of a document within a transaction.
@@ -380,7 +379,7 @@ class AttemptContext(AttemptContextLogic):
     @BlockingWrapper.block(None)
     def remove(self,
                txn_get_result,  # type: TransactionGetResult
-               **kwargs         # type: Dict[str, Any]
+               **kwargs         # type: Any
                ) -> None:
         """
         Remove a document in a transaction.
@@ -400,7 +399,7 @@ class AttemptContext(AttemptContextLogic):
     def query(self,
               query,           # type: str
               options=None,    # type: Optional[TransactionQueryOptions]
-              **kwargs         # type: Dict[str, Any]
+              **kwargs         # type: Any
               ) -> TransactionQueryResults:
         """
         Perform a query within a transaction.

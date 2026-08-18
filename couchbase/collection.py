@@ -121,7 +121,7 @@ class Collection:
     def get(self,
             key,  # type: str
             *opts,  # type: GetOptions
-            **kwargs,  # type: Dict[str, Any]
+            **kwargs,  # type: Any
             ) -> GetResult:
         """Retrieves the value of a document from the collection.
 
@@ -168,7 +168,7 @@ class Collection:
     def get_any_replica(self,
                         key,  # type: str
                         *opts,  # type: GetAnyReplicaOptions
-                        **kwargs,  # type: Dict[str, Any]
+                        **kwargs,  # type: Any
                         ) -> GetReplicaResult:
         """Retrieves the value of a document from the collection leveraging both active and all available replicas returning
         the first available.
@@ -219,7 +219,7 @@ class Collection:
     def get_all_replicas(self,
                          key,  # type: str
                          *opts,  # type: GetAllReplicasOptions
-                         **kwargs,  # type: Dict[str, Any]
+                         **kwargs,  # type: Any
                          ) -> Iterable[GetReplicaResult]:
         """Retrieves the value of a document from the collection returning both active and all available replicas.
 
@@ -290,7 +290,7 @@ class Collection:
         self,
         key,  # type: str
         *opts,  # type: ExistsOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> ExistsResult:
         """Checks whether a specific document exists or not.
 
@@ -337,7 +337,7 @@ class Collection:
         key,  # type: str
         value,  # type: JSONType
         *opts,  # type: InsertOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> MutationResult:
         """Inserts a new document to the collection, failing if the document already exists.
 
@@ -404,7 +404,7 @@ class Collection:
         key,  # type: str
         value,  # type: JSONType
         *opts,  # type: UpsertOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> MutationResult:
         """Upserts a document to the collection. This operation succeeds whether or not the document already exists.
 
@@ -466,7 +466,7 @@ class Collection:
                 key,  # type: str
                 value,  # type: JSONType
                 *opts,  # type: ReplaceOptions
-                **kwargs,  # type: Dict[str, Any]
+                **kwargs,  # type: Any
                 ) -> MutationResult:
         """Replaces the value of an existing document. Failing if the document does not exist.
 
@@ -521,7 +521,7 @@ class Collection:
     def remove(self,
                key,  # type: str
                *opts,  # type: RemoveOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> MutationResult:
         """Removes an existing document. Failing if the document does not exist.
 
@@ -568,7 +568,7 @@ class Collection:
               key,  # type: str
               expiry,  # type: timedelta
               *opts,  # type: TouchOptions
-              **kwargs,  # type: Dict[str, Any]
+              **kwargs,  # type: Any
               ) -> MutationResult:
         """Updates the expiry on an existing document.
 
@@ -622,7 +622,7 @@ class Collection:
                       key,  # type: str
                       expiry,  # type: timedelta
                       *opts,  # type: GetAndTouchOptions
-                      **kwargs,  # type: Dict[str, Any]
+                      **kwargs,  # type: Any
                       ) -> GetResult:
         """Retrieves the value of the document and simultanously updates the expiry time for the same document.
 
@@ -681,7 +681,7 @@ class Collection:
         key,  # type: str
         lock_time,  # type: timedelta
         *opts,  # type: GetAndLockOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> GetResult:
         """Locks a document and retrieves the value of that document at the time it is locked.
 
@@ -739,7 +739,7 @@ class Collection:
                key,  # type: str
                cas,  # type: int
                *opts,  # type: UnlockOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> None:
         """Unlocks a previously locked document.
 
@@ -784,7 +784,7 @@ class Collection:
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> LookupInResult:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value.
@@ -847,7 +847,7 @@ class Collection:
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInAnyReplicaOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> LookupInReplicaResult:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value. It leverages both active and all available replicas
@@ -1007,7 +1007,7 @@ class Collection:
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: MutateInOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> MutateInResult:
         """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
         within a document. Also enables access to document extended-attributes (i.e. xattrs).
@@ -1065,7 +1065,7 @@ class Collection:
     def scan(self,
              scan_type,  # type: ScanType
              *opts,  # type: ScanOptions
-             **kwargs,  # type: Dict[str, Any]
+             **kwargs,  # type: Any
              ) -> ScanResultIterable:
         """Execute a key-value range scan operation from the collection.
 
@@ -1814,7 +1814,7 @@ class Collection:
     def get_multi(self,
                   keys,  # type: List[str]
                   *opts,  # type: GetMultiOptions
-                  **kwargs,  # type: Dict[str, Any]
+                  **kwargs,  # type: Any
                   ) -> MultiGetResult:
         """For each key in the provided list, retrieve the document associated with the key.
 
@@ -1882,7 +1882,7 @@ class Collection:
     def get_any_replica_multi(self,
                               keys,  # type: List[str]
                               *opts,  # type: GetAnyReplicaMultiOptions
-                              **kwargs,  # type: Dict[str, Any]
+                              **kwargs,  # type: Any
                               ) -> MultiGetReplicaResult:
         """For each key in the provided list, retrieve the document associated with the key from the collection
         leveraging both active and all available replicas returning the first available.
@@ -1962,7 +1962,7 @@ class Collection:
     def get_all_replicas_multi(self,
                                keys,  # type: List[str]
                                *opts,  # type: GetAllReplicasMultiOptions
-                               **kwargs,  # type: Dict[str, Any]
+                               **kwargs,  # type: Any
                                ) -> MultiGetReplicaResult:
         """For each key in the provided list, retrieve the document from the collection returning both
         active and all available replicas.
@@ -2048,7 +2048,7 @@ class Collection:
                    keys,  # type: List[str]
                    lock_time,  # type: timedelta
                    *opts,  # type: LockMultiOptions
-                   **kwargs,  # type: Dict[str, Any]
+                   **kwargs,  # type: Any
                    ) -> MultiGetResult:
         """
         .. warning::
@@ -2062,7 +2062,7 @@ class Collection:
                            keys,  # type; List[str]
                            lock_time,  # type: timedelta
                            *opts,  # type: GetAndLockMultiOptions
-                           **kwargs,  # type: Dict[str, Any]
+                           **kwargs,  # type: Any
                            ) -> MultiGetResult:
         """For each key in the provided list, lock the document associated with the key.
 
@@ -2136,7 +2136,7 @@ class Collection:
     def exists_multi(self,
                      keys,  # type: List[str]
                      *opts,  # type: ExistsMultiOptions
-                     **kwargs,  # type: Dict[str, Any]
+                     **kwargs,  # type: Any
                      ) -> MultiExistsResult:
         """For each key in the provided list, check if the document associated with the key exists.
 
@@ -2196,7 +2196,7 @@ class Collection:
     def insert_multi(self,
                      keys_and_docs,  # type: Dict[str, JSONType]
                      *opts,  # type: InsertMultiOptions
-                     **kwargs,  # type: Dict[str, Any]
+                     **kwargs,  # type: Any
                      ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, inserts a new document to the collection,
         failing if the document already exists.
@@ -2281,7 +2281,7 @@ class Collection:
     def upsert_multi(self,
                      keys_and_docs,  # type: Dict[str, JSONType]
                      *opts,  # type: UpsertMultiOptions
-                     **kwargs,  # type: Dict[str, Any]
+                     **kwargs,  # type: Any
                      ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, upserts a document to the collection. This operation
         succeeds whether or not the document already exists.
@@ -2361,7 +2361,7 @@ class Collection:
     def replace_multi(self,
                       keys_and_docs,  # type: Dict[str, JSONType]
                       *opts,  # type: ReplaceMultiOptions
-                      **kwargs,  # type: Dict[str, Any]
+                      **kwargs,  # type: Any
                       ) -> MultiMutationResult:
         """For each key, value pair in the provided dict, replaces the value of a document in the collection.
         This operation fails if the document does not exist.
@@ -2452,7 +2452,7 @@ class Collection:
     def remove_multi(self,
                      keys,  # type: List[str]
                      *opts,  # type: RemoveMultiOptions
-                     **kwargs,  # type: Dict[str, Any]
+                     **kwargs,  # type: Any
                      ) -> MultiMutationResult:
         """For each key in the provided list, remove the existing document.  This operation fails
         if the document does not exist.
@@ -2514,7 +2514,7 @@ class Collection:
                     keys,  # type: List[str]
                     expiry,  # type: timedelta
                     *opts,  # type: TouchMultiOptions
-                    **kwargs,  # type: Dict[str, Any]
+                    **kwargs,  # type: Any
                     ) -> MultiMutationResult:
         """For each key in the provided list, update the expiry on an existing document. This operation fails
         if the document does not exist.
@@ -2548,7 +2548,7 @@ class Collection:
     def unlock_multi(self,  # noqa: C901
                      keys,  # type: Union[MultiResultType, Dict[str, int]]
                      *opts,  # type: UnlockMultiOptions
-                     **kwargs,  # type: Dict[str, Any]
+                     **kwargs,  # type: Any
                      ) -> Dict[str, Union[None, PycbcCoreException]]:
         """For each result in the provided :class:`~couchbase.result.MultiResultType` in the provided list,
         unlocks a previously locked document. This operation fails if the document does not exist.

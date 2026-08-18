@@ -495,7 +495,7 @@ class ViewQuery:
                                  design_doc_name,  # type: str
                                  view_name,  # type: str
                                  *options,  # type: ViewOptions
-                                 **kwargs    # type: Dict[str, Any]
+                                 **kwargs    # type: Any
                                  ) -> ViewQuery:
 
         # lets make a copy of the options, and update with kwargs...

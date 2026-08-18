@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Iterable)
 
 from twisted.internet.defer import Deferred
@@ -138,7 +137,7 @@ class QueryIndexManager:
     def get_all_indexes(self,
                         bucket_name,    # type: str
                         *options,       # type: GetAllQueryIndexOptions
-                        **kwargs        # type: Dict[str,Any]
+                        **kwargs        # type: Any
                         ) -> Deferred[Iterable[QueryIndex]]:
         op_type = QueryIndexMgmtOperationType.QueryIndexGetAll
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -190,7 +189,7 @@ class QueryIndexManager:
                       bucket_name,  # type: str
                       index_names,  # type: Iterable[str]
                       *options,     # type: WatchQueryIndexOptions
-                      **kwargs      # type: Dict[str,Any]
+                      **kwargs      # type: Any
                       ) -> Deferred[None]:
         """
         Watch polls indexes until they are online.

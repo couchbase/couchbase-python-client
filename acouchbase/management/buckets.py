@@ -18,7 +18,6 @@ from __future__ import annotations
 from typing import (TYPE_CHECKING,
                     Any,
                     Awaitable,
-                    Dict,
                     List)
 
 from acouchbase.management.logic.bucket_mgmt_impl import AsyncBucketMgmtImpl
@@ -69,7 +68,7 @@ class BucketManager:
     async def update_bucket(self,
                             settings,  # type: BucketSettings
                             *options,  # type: UpdateBucketOptions
-                            **kwargs  # type: Dict[str, Any]
+                            **kwargs  # type: Any
                             ) -> None:
         op_type = BucketMgmtOperationType.BucketUpdate
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -79,7 +78,7 @@ class BucketManager:
     async def drop_bucket(self,
                           bucket_name,  # type: str
                           *options,     # type: DropBucketOptions
-                          **kwargs      # type: Dict[str, Any]
+                          **kwargs      # type: Any
                           ) -> None:
         op_type = BucketMgmtOperationType.BucketDrop
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -89,7 +88,7 @@ class BucketManager:
     async def get_bucket(self,
                          bucket_name,   # type: str
                          *options,      # type: GetBucketOptions
-                         **kwargs       # type: Dict[str, Any]
+                         **kwargs       # type: Any
                          ) -> Awaitable[BucketSettings]:
         op_type = BucketMgmtOperationType.BucketGet
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -98,7 +97,7 @@ class BucketManager:
 
     async def get_all_buckets(self,
                               *options,  # type: GetAllBucketOptions
-                              **kwargs  # type: Dict[str, Any]
+                              **kwargs  # type: Any
                               ) -> Awaitable[List[BucketSettings]]:
         op_type = BucketMgmtOperationType.BucketGetAll
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -108,7 +107,7 @@ class BucketManager:
     async def flush_bucket(self,
                            bucket_name,   # type: str
                            *options,      # type: FlushBucketOptions
-                           **kwargs       # type: Dict[str, Any]
+                           **kwargs       # type: Any
                            ) -> Awaitable[None]:
         op_type = BucketMgmtOperationType.BucketFlush
         async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
@@ -118,7 +117,7 @@ class BucketManager:
     async def bucket_describe(self,
                               bucket_name,   # type: str
                               *options,      # type: BucketDescribeOptions
-                              **kwargs       # type: Dict[str, Any]
+                              **kwargs       # type: Any
                               ) -> BucketDescribeResult:
         """Provides details on provided the bucket.
 

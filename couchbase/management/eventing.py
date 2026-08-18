@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     List)
 
 from couchbase.logic.observability import ObservableRequestHandler
@@ -183,7 +182,7 @@ class ScopeEventingFunctionManager:
     def upsert_function(self,
                         function,  # type: EventingFunction
                         *options,  # type: UpsertFunctionOptions
-                        **kwargs  # type: Dict[str, Any]
+                        **kwargs  # type: Any
                         ) -> None:
         op_type = EventingFunctionMgmtOperationType.EventingUpsertFunction
         with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:

@@ -174,7 +174,7 @@ class BuildDeferredIndexesRequest(QueryIndexMgmtRequest):
 @dataclass
 class WatchIndexesRequest(QueryIndexMgmtRequest):
     bucket_name: str
-    index_names: Union[List[str], Tuple[str]]
+    index_names: Union[List[str], Tuple[str, ...]]
     timeout: int
     scope_name: Optional[str] = None
     collection_name: Optional[str] = None

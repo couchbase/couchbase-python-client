@@ -40,7 +40,7 @@ class QueryIndexMgmtRequestBuilder:
 
     def _get_create_index_op_args(self,  # noqa: C901
                                   bucket_name: str,
-                                  keys: Union[List[str], Tuple[str]],
+                                  keys: Union[List[str], Tuple[str, ...]],
                                   *,
                                   index_name: Optional[str] = None,
                                   primary: Optional[bool] = False,
@@ -125,12 +125,12 @@ class QueryIndexMgmtRequestBuilder:
         if not isinstance(index_name, str):
             raise InvalidArgumentException('The index_name must be provided when creating a secondary index.')
 
-    def _validate_index_names(self, index_names: Union[List[str], Tuple[str]]) -> None:
+    def _validate_index_names(self, index_names: Union[List[str], Tuple[str, ...]]) -> None:
         if not isinstance(index_names, (list, tuple)):
             raise InvalidArgumentException(
                 'A list/tuple of at least one index_name must be provided when watching indexes.')
 
-    def _validate_index_keys(self, keys: Union[List[str], Tuple[str]]) -> None:
+    def _validate_index_keys(self, keys: Union[List[str], Tuple[str, ...]]) -> None:
         if not isinstance(keys, (list, tuple)):
             raise InvalidArgumentException('Index keys must be provided when creating a secondary index.')
 
@@ -145,7 +145,7 @@ class QueryIndexMgmtRequestBuilder:
     def build_create_index_request(self,
                                    bucket_name: str,
                                    index_name: str,
-                                   keys: Union[List[str], Tuple[str]],
+                                   keys: Union[List[str], Tuple[str, ...]],
                                    obs_handler: ObservableRequestHandler,
                                    collection_context: Optional[Tuple[str, str]] = None,
                                    *options: object,
@@ -345,7 +345,7 @@ class QueryIndexMgmtRequestBuilder:
 
     def build_watch_indexes_request(self,
                                     bucket_name: str,
-                                    index_names: Union[List[str], Tuple[str]],
+                                    index_names: Union[List[str], Tuple[str, ...]],
                                     obs_handler: ObservableRequestHandler,
                                     collection_context: Optional[Tuple[str, str]] = None,
                                     *options: object,

@@ -431,7 +431,7 @@ class CollectionRequestBuilder:
 
     def build_lookup_in_all_replicas_request(self,
                                              key: str,
-                                             specs: Union[List[Spec], Tuple[Spec]],
+                                             specs: Union[List[Spec], Tuple[Spec, ...]],
                                              obs_handler: Optional[ObservableRequestHandler],
                                              *opts: object,
                                              **kwargs: object) -> Tuple[PycbcCoreKeyValueRequest, Transcoder]:
@@ -454,7 +454,7 @@ class CollectionRequestBuilder:
 
     def build_lookup_in_any_replica_request(self,
                                             key: str,
-                                            specs: Union[List[Spec], Tuple[Spec]],
+                                            specs: Union[List[Spec], Tuple[Spec, ...]],
                                             obs_handler: Optional[ObservableRequestHandler],
                                             *opts: object,
                                             **kwargs: object) -> Tuple[PycbcCoreKeyValueRequest, Transcoder]:
@@ -477,7 +477,7 @@ class CollectionRequestBuilder:
 
     def build_lookup_in_request(self,
                                 key: str,
-                                specs: Union[List[Spec], Tuple[Spec]],
+                                specs: Union[List[Spec], Tuple[Spec, ...]],
                                 obs_handler: Optional[ObservableRequestHandler],
                                 *opts: object,
                                 **kwargs: object) -> Tuple[PycbcCoreKeyValueRequest, Transcoder]:
@@ -500,7 +500,7 @@ class CollectionRequestBuilder:
 
     def build_mutate_in_request(self,  # noqa: C901
                                 key: str,
-                                specs: Union[List[Spec], Tuple[Spec]],
+                                specs: Union[List[Spec], Tuple[Spec, ...]],
                                 obs_handler: Optional[ObservableRequestHandler],
                                 *opts: object,
                                 **kwargs: object) -> PycbcCoreKeyValueRequest:

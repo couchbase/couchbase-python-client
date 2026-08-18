@@ -353,7 +353,7 @@ class ClusterSettings:
     def build_cluster_settings(cls,
                                connstr,  # type: str
                                *options,  # type: ClusterOptions
-                               **kwargs  # type: Dict[str, Any]
+                               **kwargs  # type: Any
                                ) -> ClusterSettings:
         default_timeouts = kwargs.pop('_default_timeouts', {})
         # parse query string prior to parsing ClusterOptions

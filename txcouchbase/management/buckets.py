@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     List)
 
 from twisted.internet.defer import Deferred
@@ -50,7 +49,7 @@ class BucketManager:
     def create_bucket(self,
                       settings,  # type: CreateBucketSettings
                       *options,  # type: CreateBucketOptions
-                      **kwargs   # type: Dict[str, Any]
+                      **kwargs   # type: Any
                       ) -> Deferred[None]:
         """Creates a new bucket.
 
@@ -84,7 +83,7 @@ class BucketManager:
     def update_bucket(self,
                       settings,  # type: BucketSettings
                       *options,  # type: UpdateBucketOptions
-                      **kwargs  # type: Dict[str, Any]
+                      **kwargs  # type: Any
                       ) -> Deferred[None]:
         """Update the settings for an existing bucket.
 
@@ -117,7 +116,7 @@ class BucketManager:
     def drop_bucket(self,
                     bucket_name,  # type: str
                     *options,     # type: DropBucketOptions
-                    **kwargs      # type: Dict[str, Any]
+                    **kwargs      # type: Any
                     ) -> Deferred[None]:
         """Drops an existing bucket.
 
@@ -149,7 +148,7 @@ class BucketManager:
     def get_bucket(self,
                    bucket_name,   # type: str
                    *options,      # type: GetBucketOptions
-                   **kwargs       # type: Dict[str, Any]
+                   **kwargs       # type: Any
                    ) -> Deferred[BucketSettings]:
         """Fetches the settings in use for a specified bucket.
 
@@ -180,7 +179,7 @@ class BucketManager:
 
     def get_all_buckets(self,
                         *options,  # type: GetAllBucketOptions
-                        **kwargs  # type: Dict[str, Any]
+                        **kwargs  # type: Any
                         ) -> Deferred[List[BucketSettings]]:
         """Returns a list of existing buckets in the cluster.
 
@@ -208,7 +207,7 @@ class BucketManager:
     def flush_bucket(self,
                      bucket_name,   # type: str
                      *options,      # type: FlushBucketOptions
-                     **kwargs       # type: Dict[str, Any]
+                     **kwargs       # type: Any
                      ) -> Deferred[None]:
         """Flushes the bucket, deleting all the existing data that is stored in it.
 
@@ -242,7 +241,7 @@ class BucketManager:
     def bucket_describe(self,
                         bucket_name,   # type: str
                         *options,      # type: BucketDescribeOptions
-                        **kwargs       # type: Dict[str, Any]
+                        **kwargs       # type: Any
                         ) -> Deferred[BucketDescribeResult]:
         """Provides details on provided the bucket.
 

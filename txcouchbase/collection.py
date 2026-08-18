@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Iterable)
 
 from twisted.internet.defer import Deferred
@@ -74,7 +73,7 @@ class Collection:
     def get(self,
             key,  # type: str
             *opts,  # type: GetOptions
-            **kwargs,  # type: Dict[str, Any]
+            **kwargs,  # type: Any
             ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Get, instruments)
@@ -91,7 +90,7 @@ class Collection:
     def get_any_replica(self,
                         key,  # type: str
                         *opts,  # type: GetAnyReplicaOptions
-                        **kwargs,  # type: Dict[str, Any]
+                        **kwargs,  # type: Any
                         ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.GetAnyReplica, instruments)
@@ -109,7 +108,7 @@ class Collection:
     def get_all_replicas(self,
                          key,  # type: str
                          *opts,  # type: GetAllReplicasOptions
-                         **kwargs,  # type: Dict[str, Any]
+                         **kwargs,  # type: Any
                          ) -> Deferred[Iterable[GetReplicaResult]]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.GetAllReplicas, instruments)
@@ -128,7 +127,7 @@ class Collection:
         self,
         key,  # type: str
         *opts,  # type: ExistsOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[ExistsResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Exists, instruments)
@@ -147,7 +146,7 @@ class Collection:
         key,  # type: str
         value,  # type: JSONType
         *opts,  # type: InsertOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Insert, instruments)
@@ -166,7 +165,7 @@ class Collection:
         key,  # type: str
         value,  # type: JSONType
         *opts,  # type: UpsertOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Upsert, instruments)
@@ -184,7 +183,7 @@ class Collection:
                 key,  # type: str
                 value,  # type: JSONType
                 *opts,  # type: ReplaceOptions
-                **kwargs,  # type: Dict[str, Any]
+                **kwargs,  # type: Any
                 ) -> Deferred[MutationResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Replace, instruments)
@@ -201,7 +200,7 @@ class Collection:
     def remove(self,
                key,  # type: str
                *opts,  # type: RemoveOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> Deferred[MutationResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Remove, instruments)
@@ -219,7 +218,7 @@ class Collection:
               key,  # type: str
               expiry,  # type: timedelta
               *opts,  # type: TouchOptions
-              **kwargs,  # type: Dict[str, Any]
+              **kwargs,  # type: Any
               ) -> Deferred[MutationResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Touch, instruments)
@@ -237,7 +236,7 @@ class Collection:
                       key,  # type: str
                       expiry,  # type: timedelta
                       *opts,  # type: GetAndTouchOptions
-                      **kwargs,  # type: Dict[str, Any]
+                      **kwargs,  # type: Any
                       ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.GetAndTouch, instruments)
@@ -257,7 +256,7 @@ class Collection:
         key,  # type: str
         lock_time,  # type: timedelta
         *opts,  # type: GetAndLockOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[GetResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.GetAndLock, instruments)
@@ -276,7 +275,7 @@ class Collection:
                key,  # type: str
                cas,  # type: int
                *opts,  # type: UnlockOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> Deferred[None]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.Unlock, instruments)
@@ -295,7 +294,7 @@ class Collection:
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[LookupInResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.LookupIn, instruments)
@@ -315,7 +314,7 @@ class Collection:
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInAnyReplicaOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[LookupInReplicaResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.LookupInAnyReplica, instruments)
@@ -335,7 +334,7 @@ class Collection:
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInAllReplicasOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[Iterable[LookupInReplicaResult]]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.LookupInAllReplicas, instruments)
@@ -355,7 +354,7 @@ class Collection:
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: MutateInOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> Deferred[MutateInResult]:
         instruments = self._impl.observability_instruments
         obs_handler = ObservableRequestHandler.create_or_none(KeyValueOperationType.MutateIn, instruments)

@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.collection import Collection
 from acouchbase.logic.scope_impl import AsyncScopeImpl
@@ -26,9 +24,7 @@ from acouchbase.management.search import ScopeSearchIndexManager
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.logic.pycbc_core import pycbc_connection
-from couchbase.options import (AnalyticsOptions,
-                               QueryOptions,
-                               SearchOptions)
+from couchbase.options import AnalyticsOptions, SearchOptions
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
@@ -87,8 +83,9 @@ class AsyncScope:
 
     def query(self,
               statement,  # type: str
-              *options,  # type: QueryOptions
-              **kwargs   # type: Dict[str, Any]
+              *options,  # type: Any  # QueryOptions, or a positional query parameter: the request
+              # builder walks *options and treats every non-QueryOptions entry as one.
+              **kwargs   # type: Any
               ) -> QueryResult:
         """Executes a N1QL query against the scope.
 
@@ -165,7 +162,7 @@ class AsyncScope:
     def analytics_query(self,
                         statement,  # type: str
                         *options,  # type: AnalyticsOptions
-                        **kwargs   # type: Dict[str, Any]
+                        **kwargs   # type: Any
                         ) -> AnalyticsResult:
         """Executes an analaytics query against the scope.
 
@@ -243,7 +240,7 @@ class AsyncScope:
                      index,  # type: str
                      query,  # type: SearchQuery
                      *options,  # type: SearchOptions
-                     **kwargs   # type: Dict[str, Any]
+                     **kwargs   # type: Any
                      ) -> SearchResult:
         """Executes an search query against the scope.
 
@@ -341,7 +338,7 @@ class AsyncScope:
                index,  # type: str
                request,  # type: SearchRequest
                *options,  # type: SearchOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> SearchResult:
         """Executes an search against the scope.
 

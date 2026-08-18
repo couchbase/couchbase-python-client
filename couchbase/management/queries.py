@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Iterable)
 
 from couchbase.logic.observability import ObservableRequestHandler
@@ -54,7 +53,7 @@ class QueryIndexManager:
                      index_name,    # type: str
                      keys,          # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
-                     **kwargs       # type: Dict[str, Any]
+                     **kwargs       # type: Any
                      ) -> None:
         """Creates a new query index.
 
@@ -86,7 +85,7 @@ class QueryIndexManager:
     def create_primary_index(self,
                              bucket_name,   # type: str
                              *options,      # type: CreatePrimaryQueryIndexOptions
-                             **kwargs       # type: Dict[str, Any]
+                             **kwargs       # type: Any
                              ) -> None:
         """Creates a new primary query index.
 
@@ -114,7 +113,7 @@ class QueryIndexManager:
                    bucket_name,     # type: str
                    index_name,      # type: str
                    *options,        # type: DropQueryIndexOptions
-                   **kwargs         # type: Dict[str, Any]
+                   **kwargs         # type: Any
                    ) -> None:
         """Drops an existing query index.
 
@@ -144,7 +143,7 @@ class QueryIndexManager:
     def drop_primary_index(self,
                            bucket_name,     # type: str
                            *options,        # type: DropPrimaryQueryIndexOptions
-                           **kwargs         # type: Dict[str, Any]
+                           **kwargs         # type: Any
                            ) -> None:
         """Drops an existing primary query index.
 
@@ -171,7 +170,7 @@ class QueryIndexManager:
     def get_all_indexes(self,
                         bucket_name,    # type: str
                         *options,       # type: GetAllQueryIndexOptions
-                        **kwargs        # type: Dict[str,Any]
+                        **kwargs        # type: Any
                         ) -> Iterable[QueryIndex]:
         """Returns a list of indexes for a specific bucket.
 
@@ -200,7 +199,7 @@ class QueryIndexManager:
     def build_deferred_indexes(self,
                                bucket_name,     # type: str
                                *options,        # type: BuildDeferredQueryIndexOptions
-                               **kwargs         # type: Dict[str, Any]
+                               **kwargs         # type: Any
                                ) -> None:
         """Starts building any indexes which were previously created with ``deferred=True``.
 
@@ -227,7 +226,7 @@ class QueryIndexManager:
                       bucket_name,  # type: str
                       index_names,  # type: Iterable[str]
                       *options,     # type: WatchQueryIndexOptions
-                      **kwargs      # type: Dict[str,Any]
+                      **kwargs      # type: Any
                       ) -> None:
         """Waits for a number of indexes to finish creation and be ready to use.
 
@@ -275,7 +274,7 @@ class CollectionQueryIndexManager:
                      index_name,    # type: str
                      keys,        # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
-                     **kwargs       # type: Dict[str, Any]
+                     **kwargs       # type: Any
                      ) -> None:
         """Creates a new query index.
 
@@ -304,7 +303,7 @@ class CollectionQueryIndexManager:
 
     def create_primary_index(self,
                              *options,      # type: CreatePrimaryQueryIndexOptions
-                             **kwargs       # type: Dict[str, Any]
+                             **kwargs       # type: Any
                              ) -> None:
         """Creates a new primary query index.
 
@@ -329,7 +328,7 @@ class CollectionQueryIndexManager:
     def drop_index(self,
                    index_name,      # type: str
                    *options,        # type: DropQueryIndexOptions
-                   **kwargs         # type: Dict[str, Any]
+                   **kwargs         # type: Any
                    ) -> None:
         """Drops an existing query index.
 
@@ -356,7 +355,7 @@ class CollectionQueryIndexManager:
 
     def drop_primary_index(self,
                            *options,        # type: DropPrimaryQueryIndexOptions
-                           **kwargs         # type: Dict[str, Any]
+                           **kwargs         # type: Any
                            ) -> None:
         """Drops an existing primary query index.
 
@@ -380,7 +379,7 @@ class CollectionQueryIndexManager:
 
     def get_all_indexes(self,
                         *options,       # type: GetAllQueryIndexOptions
-                        **kwargs        # type: Dict[str,Any]
+                        **kwargs        # type: Any
                         ) -> Iterable[QueryIndex]:
         """Returns a list of indexes for a specific collection.
 
@@ -405,7 +404,7 @@ class CollectionQueryIndexManager:
 
     def build_deferred_indexes(self,
                                *options,        # type: BuildDeferredQueryIndexOptions
-                               **kwargs         # type: Dict[str, Any]
+                               **kwargs         # type: Any
                                ) -> None:
         """Starts building any indexes which were previously created with ``deferred=True``.
 
@@ -428,7 +427,7 @@ class CollectionQueryIndexManager:
     def watch_indexes(self,
                       index_names,  # type: Iterable[str]
                       *options,     # type: WatchQueryIndexOptions
-                      **kwargs      # type: Dict[str, Any]
+                      **kwargs      # type: Any
                       ) -> None:
         """Waits for a number of indexes to finish creation and be ready to use.
 

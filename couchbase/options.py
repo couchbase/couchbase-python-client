@@ -1760,7 +1760,7 @@ class TransactionConfig:
         """  # noqa: E501
 
     def __init__(self,   # noqa: C901
-                 **kwargs  # type: dict[str, Any]
+                 **kwargs  # type: Any
                  ):   # noqa: C901
         # CXXCBC-391: Adds support for ExtSDKIntegration which removes kv_timeout, the cluster kv_durable
         # timeout is used internally
@@ -1825,7 +1825,7 @@ class TransactionOptions:
         """  # noqa: E501
 
     def __init__(self,
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ):
         # CXXCBC-391: Adds support for ExtSDKIntegration which removes kv_timeout, the cluster kv_durable
         # timeout is used internally
@@ -1991,7 +1991,7 @@ class TransactionQueryOptions:
         pass
 
     def __init__(self,   # noqa: C901
-                 **kwargs  # type: Dict[str, JSONType]
+                 **kwargs  # type: JSONType
                  ):
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionQueryOptions.ALLOWED_KEYS}
         # TODO: mapping similar to the options elsewhere.

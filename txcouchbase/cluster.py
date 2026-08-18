@@ -17,9 +17,7 @@
 from __future__ import annotations
 
 from asyncio import AbstractEventLoop
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict)
+from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
@@ -57,7 +55,7 @@ class Cluster:
     def __init__(self,
                  connstr,  # type: str
                  *options,  # type: ClusterOptions
-                 **kwargs,  # type: Dict[str, Any]
+                 **kwargs,  # type: Any
                  ) -> None:
         self._impl = TxClusterImpl(connstr, *options, **kwargs)
 
@@ -83,14 +81,14 @@ class Cluster:
 
     def ping(self,
              *opts,  # type: PingOptions
-             **kwargs  # type: Dict[str, Any]
+             **kwargs  # type: Any
              ) -> Deferred[PingResult]:
         req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
         return self._impl.ping_deferred(req)
 
     def diagnostics(self,
                     *opts,  # type: DiagnosticsOptions
-                    **kwargs  # type: Dict[str, Any]
+                    **kwargs  # type: Any
                     ) -> Deferred[DiagnosticsResult]:
 
         req = self._impl.request_builder.build_diagnostics_request(*opts, **kwargs)
@@ -99,7 +97,7 @@ class Cluster:
     def wait_until_ready(self,
                          timeout,  # type: timedelta
                          *opts,  # type: WaitUntilReadyOptions
-                         **kwargs  # type: Dict[str, Any]
+                         **kwargs  # type: Any
                          ) -> Deferred[None]:
         req = self._impl.request_builder.build_wait_until_ready_request(timeout, *opts, **kwargs)
         return self._impl.wait_until_ready_deferred(req)
@@ -108,7 +106,7 @@ class Cluster:
         self,
         statement,  # type: str
         *options,  # type: QueryOptions
-        **kwargs  # type: Dict[str, Any]
+        **kwargs  # type: Any
     ) -> Deferred[QueryResult]:
         op_type = StreamingOperationType.Query
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -119,7 +117,7 @@ class Cluster:
         self,
         statement,  # type: str
         *options,  # type: AnalyticsOptions
-        **kwargs  # type: Dict[str, Any]
+        **kwargs  # type: Any
     ) -> Deferred[AnalyticsResult]:
         op_type = StreamingOperationType.AnalyticsQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -130,7 +128,7 @@ class Cluster:
                      index,  # type: str
                      query,  # type: SearchQuery
                      *options,  # type: SearchOptions
-                     **kwargs  # type: Dict[str, Any]
+                     **kwargs  # type: Any
                      ) -> Deferred[SearchResult]:
         op_type = StreamingOperationType.SearchQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -141,7 +139,7 @@ class Cluster:
                index,  # type: str
                request,  # type: SearchRequest
                *options,  # type: SearchOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> Deferred[SearchResult]:
         op_type = StreamingOperationType.SearchQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)

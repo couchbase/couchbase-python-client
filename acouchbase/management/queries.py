@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Iterable)
 
 from acouchbase.management.logic.query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
@@ -164,7 +163,7 @@ class QueryIndexManager:
     async def get_all_indexes(self,
                               bucket_name,    # type: str
                               *options,       # type: GetAllQueryIndexOptions
-                              **kwargs        # type: Dict[str,Any]
+                              **kwargs        # type: Any
                               ) -> Iterable[QueryIndex]:
         """Returns a list of indexes for a specific bucket.
 
@@ -220,7 +219,7 @@ class QueryIndexManager:
                             bucket_name,  # type: str
                             index_names,  # type: Iterable[str]
                             *options,     # type: WatchQueryIndexOptions
-                            **kwargs      # type: Dict[str,Any]
+                            **kwargs      # type: Any
                             ) -> None:
         """Waits for a number of indexes to finish creation and be ready to use.
 
@@ -367,7 +366,7 @@ class CollectionQueryIndexManager:
 
     async def get_all_indexes(self,
                               *options,       # type: GetAllQueryIndexOptions
-                              **kwargs        # type: Dict[str, Any]
+                              **kwargs        # type: Any
                               ) -> Iterable[QueryIndex]:
         """Returns a list of indexes for a specific collection.
 
@@ -415,7 +414,7 @@ class CollectionQueryIndexManager:
     async def watch_indexes(self,
                             index_names,  # type: Iterable[str]
                             *options,     # type: WatchQueryIndexOptions
-                            **kwargs      # type: Dict[str,Any]
+                            **kwargs      # type: Any
                             ) -> None:
         """Waits for a number of indexes to finish creation and be ready to use.
 

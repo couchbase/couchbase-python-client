@@ -18,7 +18,6 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     Union)
 
 from couchbase.auth import (CertificateAuthenticator,
@@ -90,7 +89,7 @@ class Cluster:
     def __init__(self,
                  connstr,  # type: str
                  *options,  # type: ClusterOptions
-                 **kwargs,  # type: Dict[str, Any]
+                 **kwargs,  # type: Any
                  ) -> None:
         self._impl = ClusterImpl(connstr, *options, **kwargs)
 
@@ -177,7 +176,7 @@ class Cluster:
 
     def diagnostics(self,
                     *opts,  # type: DiagnosticsOptions
-                    **kwargs  # type: Dict[str, Any]
+                    **kwargs  # type: Any
                     ) -> DiagnosticsResult:
         """Performs a diagnostic operation against the cluster.
 
@@ -223,7 +222,7 @@ class Cluster:
     def wait_until_ready(self,
                          timeout,  # type: timedelta
                          *opts,  # type: WaitUntilReadyOptions
-                         **kwargs  # type: Dict[str, Any]
+                         **kwargs  # type: Any
                          ) -> None:
         """Wait until the cluster is ready for use.
 
@@ -268,8 +267,9 @@ class Cluster:
 
     def query(self,
               statement,  # type: str
-              *options,  # type: QueryOptions
-              **kwargs  # type: Dict[str, Any]
+              *options,  # type: Any  # QueryOptions, or a positional query parameter: the request
+              # builder walks *options and treats every non-QueryOptions entry as one.
+              **kwargs  # type: Any
               ) -> QueryResult:
         """Executes a N1QL query against the cluster.
 
@@ -343,7 +343,7 @@ class Cluster:
     def analytics_query(self,
                         statement,  # type: str
                         *options,  # type: AnalyticsOptions
-                        **kwargs   # type: Dict[str, Any]
+                        **kwargs   # type: Any
                         ) -> AnalyticsResult:
         """Executes an analaytics query against the cluster.
 
@@ -423,7 +423,7 @@ class Cluster:
                      index,  # type: str
                      query,  # type: SearchQuery
                      *options,  # type: SearchOptions
-                     **kwargs   # type: Dict[str, Any]
+                     **kwargs   # type: Any
                      ) -> SearchResult:
         """Executes an search query against the cluster.
 
@@ -520,7 +520,7 @@ class Cluster:
                index,  # type: str
                request,  # type: SearchRequest
                *options,  # type: SearchOptions
-               **kwargs,  # type: Dict[str, Any]
+               **kwargs,  # type: Any
                ) -> SearchResult:
         """Executes an search against the cluster.
 
@@ -679,7 +679,7 @@ class Cluster:
     @staticmethod
     def connect(connstr,  # type: str
                 *options,  # type: ClusterOptions
-                **kwargs,  # type: Dict[str, Any]
+                **kwargs,  # type: Any
                 ) -> Cluster:
         """Create a Couchbase Cluster and connect
 

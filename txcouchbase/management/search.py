@@ -57,7 +57,7 @@ class SearchIndexManager:
     def upsert_index(self,
                      index,     # type: SearchIndex
                      *options,  # type: UpsertSearchIndexOptions
-                     **kwargs   # type: Dict[str, Any]
+                     **kwargs   # type: Any
                      ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexUpsert
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -78,7 +78,7 @@ class SearchIndexManager:
     def drop_index(self,
                    index_name,  # type: str
                    *options,   # type: DropSearchIndexOptions
-                   **kwargs    # type: Dict[str, Any]
+                   **kwargs    # type: Any
                    ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexDrop
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -99,7 +99,7 @@ class SearchIndexManager:
     def get_index(self,
                   index_name,  # type: str
                   *options,   # type: GetSearchIndexOptions
-                  **kwargs    # type: Dict[str, Any]
+                  **kwargs    # type: Any
                   ) -> Deferred[SearchIndex]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGet
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -119,7 +119,7 @@ class SearchIndexManager:
 
     def get_all_indexes(self,
                         *options,  # type: GetAllSearchIndexesOptions
-                        **kwargs  # type: Dict[str, Any]
+                        **kwargs  # type: Any
                         ) -> Deferred[Iterable[SearchIndex]]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetAll
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -139,7 +139,7 @@ class SearchIndexManager:
     def get_indexed_documents_count(self,
                                     index_name,  # type: str
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
-                                    **kwargs    # type: Dict[str, Any]
+                                    **kwargs    # type: Any
                                     ) -> Deferred[int]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -160,7 +160,7 @@ class SearchIndexManager:
     def pause_ingest(self,
                      index_name,  # type: str
                      *options,  # type: PauseIngestSearchIndexOptions
-                     **kwargs  # type: Dict[str, Any]
+                     **kwargs  # type: Any
                      ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=True)
@@ -181,7 +181,7 @@ class SearchIndexManager:
     def resume_ingest(self,
                       index_name,  # type: str
                       *options,  # type: ResumeIngestSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
+                      **kwargs  # type: Any
                       ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=False)
@@ -202,7 +202,7 @@ class SearchIndexManager:
     def allow_querying(self,
                        index_name,  # type: str
                        *options,  # type: AllowQueryingSearchIndexOptions
-                       **kwargs  # type: Dict[str, Any]
+                       **kwargs  # type: Any
                        ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=True)
@@ -223,7 +223,7 @@ class SearchIndexManager:
     def disallow_querying(self,
                           index_name,  # type: str
                           *options,  # type: DisallowQueryingSearchIndexOptions
-                          **kwargs  # type: Dict[str, Any]
+                          **kwargs  # type: Any
                           ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=False)
@@ -244,7 +244,7 @@ class SearchIndexManager:
     def freeze_plan(self,
                     index_name,  # type: str
                     *options,  # type: FreezePlanSearchIndexOptions
-                    **kwargs  # type: Dict[str, Any]
+                    **kwargs  # type: Any
                     ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=True)
@@ -265,7 +265,7 @@ class SearchIndexManager:
     def unfreeze_plan(self,
                       index_name,  # type: str
                       *options,  # type: UnfreezePlanSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
+                      **kwargs  # type: Any
                       ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=False)
@@ -287,7 +287,7 @@ class SearchIndexManager:
                          index_name,  # type: str
                          document,  # type: Any
                          *options,  # type: AnalyzeDocumentSearchIndexOptions
-                         **kwargs  # type: Dict[str, Any]
+                         **kwargs  # type: Any
                          ) -> Deferred[Dict[str, Any]]:
         op_type = SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -309,7 +309,7 @@ class SearchIndexManager:
     def get_index_stats(self,
                         index_name,  # type: str
                         *options,  # type: GetSearchIndexStatsOptions
-                        **kwargs  # type: Dict[str, Any]
+                        **kwargs  # type: Any
                         ) -> Deferred[Dict[str, Any]]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetStats
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -329,7 +329,7 @@ class SearchIndexManager:
 
     def get_all_index_stats(self,
                             *options,  # type: GetAllSearchIndexStatsOptions
-                            **kwargs  # type: Dict[str, Any]
+                            **kwargs  # type: Any
                             ) -> Deferred[Dict[str, Any]]:
         op_type = SearchIndexMgmtOperationType.SearchGetStats
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -357,7 +357,7 @@ class ScopeSearchIndexManager:
     def upsert_index(self,
                      index,     # type: SearchIndex
                      *options,  # type: UpsertSearchIndexOptions
-                     **kwargs   # type: Dict[str, Any]
+                     **kwargs   # type: Any
                      ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexUpsert
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -378,7 +378,7 @@ class ScopeSearchIndexManager:
     def drop_index(self,
                    index_name,  # type: str
                    *options,   # type: DropSearchIndexOptions
-                   **kwargs    # type: Dict[str, Any]
+                   **kwargs    # type: Any
                    ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexDrop
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -399,7 +399,7 @@ class ScopeSearchIndexManager:
     def get_index(self,
                   index_name,  # type: str
                   *options,   # type: GetSearchIndexOptions
-                  **kwargs    # type: Dict[str, Any]
+                  **kwargs    # type: Any
                   ) -> Deferred[SearchIndex]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGet
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -419,7 +419,7 @@ class ScopeSearchIndexManager:
 
     def get_all_indexes(self,
                         *options,  # type: GetAllSearchIndexesOptions
-                        **kwargs  # type: Dict[str, Any]
+                        **kwargs  # type: Any
                         ) -> Deferred[Iterable[SearchIndex]]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetAll
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -439,7 +439,7 @@ class ScopeSearchIndexManager:
     def get_indexed_documents_count(self,
                                     index_name,  # type: str
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
-                                    **kwargs    # type: Dict[str, Any]
+                                    **kwargs    # type: Any
                                     ) -> Deferred[int]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -460,7 +460,7 @@ class ScopeSearchIndexManager:
     def pause_ingest(self,
                      index_name,  # type: str
                      *options,  # type: PauseIngestSearchIndexOptions
-                     **kwargs  # type: Dict[str, Any]
+                     **kwargs  # type: Any
                      ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=True)
@@ -481,7 +481,7 @@ class ScopeSearchIndexManager:
     def resume_ingest(self,
                       index_name,  # type: str
                       *options,  # type: ResumeIngestSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
+                      **kwargs  # type: Any
                       ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlIngest
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=False)
@@ -502,7 +502,7 @@ class ScopeSearchIndexManager:
     def allow_querying(self,
                        index_name,  # type: str
                        *options,  # type: AllowQueryingSearchIndexOptions
-                       **kwargs  # type: Dict[str, Any]
+                       **kwargs  # type: Any
                        ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=True)
@@ -523,7 +523,7 @@ class ScopeSearchIndexManager:
     def disallow_querying(self,
                           index_name,  # type: str
                           *options,  # type: DisallowQueryingSearchIndexOptions
-                          **kwargs  # type: Dict[str, Any]
+                          **kwargs  # type: Any
                           ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=False)
@@ -544,7 +544,7 @@ class ScopeSearchIndexManager:
     def freeze_plan(self,
                     index_name,  # type: str
                     *options,  # type: FreezePlanSearchIndexOptions
-                    **kwargs  # type: Dict[str, Any]
+                    **kwargs  # type: Any
                     ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=True)
@@ -565,7 +565,7 @@ class ScopeSearchIndexManager:
     def unfreeze_plan(self,
                       index_name,  # type: str
                       *options,  # type: UnfreezePlanSearchIndexOptions
-                      **kwargs  # type: Dict[str, Any]
+                      **kwargs  # type: Any
                       ) -> Deferred[None]:
         op_type = SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments, op_type_toggle=False)
@@ -587,7 +587,7 @@ class ScopeSearchIndexManager:
                          index_name,  # type: str
                          document,  # type: Any
                          *options,  # type: AnalyzeDocumentSearchIndexOptions
-                         **kwargs  # type: Dict[str, Any]
+                         **kwargs  # type: Any
                          ) -> Deferred[Dict[str, Any]]:
         op_type = SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -609,7 +609,7 @@ class ScopeSearchIndexManager:
     def get_index_stats(self,
                         index_name,  # type: str
                         *options,  # type: GetSearchIndexStatsOptions
-                        **kwargs  # type: Dict[str, Any]
+                        **kwargs  # type: Any
                         ) -> Deferred[Dict[str, Any]]:
         op_type = SearchIndexMgmtOperationType.SearchIndexGetStats
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
@@ -629,7 +629,7 @@ class ScopeSearchIndexManager:
 
     def get_all_index_stats(self,
                             *options,  # type: GetAllSearchIndexStatsOptions
-                            **kwargs  # type: Dict[str, Any]
+                            **kwargs  # type: Any
                             ) -> Deferred[Dict[str, Any]]:
         op_type = SearchIndexMgmtOperationType.SearchGetStats
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)

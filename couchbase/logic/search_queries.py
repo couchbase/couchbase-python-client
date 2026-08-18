@@ -539,7 +539,7 @@ class PhraseQuery(SearchQuery):
 
     def __init__(self,
                  *phrases,  # type: str
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         super().__init__()
         if self._TERMPROP in kwargs:
@@ -560,7 +560,7 @@ class PhraseQuery(SearchQuery):
 
     @terms.setter
     def terms(self,
-              value  # type: Union[List[str], Tuple[str]]
+              value  # type: Union[List[str], Tuple[str, ...]]
               ) -> None:
         if not (isinstance(value, (list, tuple)) and all(map(lambda f: isinstance(f, str), value))):
             raise InvalidArgumentException(message='Expected a list of strings')
@@ -861,7 +861,7 @@ class GeoDistanceQuery(SearchQuery):
     def __init__(self,
                  distance=None,  # type: str
                  location=None,  # type: Union[List[float, float], Tuple[float, float], Dict[str, float]]
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         super(GeoDistanceQuery, self).__init__()
         kwargs['distance'] = distance
@@ -976,7 +976,7 @@ class GeoBoundingBoxQuery(SearchQuery):
     def __init__(self,
                  top_left=None,  # type: Tuple[float, float]
                  bottom_right=None,  # type: Tuple[float, float]
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         super(GeoBoundingBoxQuery, self).__init__()
         kwargs['top_left'] = top_left
@@ -1080,7 +1080,7 @@ class GeoPolygonQuery(SearchQuery):
 
     def __init__(self,
                  polygon_points=None,  # type: List[Tuple[float, float]]
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         super(GeoPolygonQuery, self).__init__()
         pts = polygon_points or kwargs.pop('polygon_points', None)
@@ -1172,7 +1172,7 @@ class NumericRangeQuery(SearchQuery):
     def __init__(self,
                  min=None,  # type: Optional[float]
                  max=None,  # type: Optional[float]
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         super().__init__()
         _QueryBuilder._validate_range_query(self, min, max, **kwargs)
@@ -1466,7 +1466,7 @@ class TermRangeQuery(SearchQuery):
                  end=None,  # type: Optional[str]
                  min=None,  # type: Optional[str]
                  max=None,  # type: Optional[str]
-                 **kwargs  # type: Dict[str, Any]
+                 **kwargs  # type: Any
                  ) -> None:
         super().__init__()
         if start is not None and min is None:

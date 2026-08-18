@@ -266,7 +266,7 @@ class BinaryCollection:
         self,
         keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
         *opts,  # type: AppendMultiOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> MultiMutationResult:
         """For each key-value pair, appends the specified value to the end of the document specified by the key.
 
@@ -366,7 +366,7 @@ class BinaryCollection:
         self,
         keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
         *opts,  # type: PrependMultiOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> MultiMutationResult:
         """For each key-value pair, prepends the specified value to the beginning of the document specified
         by the key.
@@ -467,7 +467,7 @@ class BinaryCollection:
         self,
         keys,  # type: List[str]
         *opts,  # type: IncrementMultiOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> MultiCounterResult:
         """For each key in the provided list, increments the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
@@ -555,7 +555,7 @@ class BinaryCollection:
         self,
         keys,  # type: List[str]
         *opts,  # type: DecrementMultiOptions
-        **kwargs,  # type: Dict[str, Any]
+        **kwargs,  # type: Any
     ) -> MultiCounterResult:
         """For each key in the provided list, decrements the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
