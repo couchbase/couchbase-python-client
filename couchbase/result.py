@@ -20,6 +20,7 @@ from copy import copy
 from datetime import datetime
 from typing import (Any,
                     Dict,
+                    List,
                     Optional,
                     Tuple,
                     Union)
@@ -71,9 +72,9 @@ class Result:
         return self._decoded_value
 
     @property
-    def cas(self) -> Optional[int]:
+    def cas(self) -> int:
         """
-            Optional[int]: The CAS of the document, if it exists
+            int: The CAS of the document.
         """
         return self._orig.raw_result.get("cas", 0)
 
@@ -208,9 +209,9 @@ class DiagnosticsResult(Result):
         return self._orig.raw_result.get("sdk", None)
 
     @property
-    def endpoints(self) -> Dict[str, Any]:
+    def endpoints(self) -> Dict[ServiceType, List[EndpointDiagnosticsReport]]:
         """
-            Dict[str, Any]: A map of service endpoints and their diagnostic status.
+            Dict[ServiceType, List[EndpointDiagnosticsReport]]: A map of service endpoints and their diagnostic status.
         """
         return self._endpoints
 
@@ -291,9 +292,9 @@ class PingResult(Result):
         return self._orig.raw_result.get("sdk", None)
 
     @property
-    def endpoints(self) -> Dict[str, Any]:
+    def endpoints(self) -> Dict[ServiceType, List[EndpointPingReport]]:
         """
-            Dict[str, Any]: A map of service endpoints and their ping status.
+            Dict[ServiceType, List[EndpointPingReport]]: A map of service endpoints and their ping status.
         """
         return self._endpoints
 
