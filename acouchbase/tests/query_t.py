@@ -125,7 +125,8 @@ class QueryCollectionTestSuite:
         result = cb_env.scope.query(f'SELECT * FROM `{cb_env.collection.name}` USE KEYS "{key}"')
         await cb_env.assert_rows(result, 0)
         res = await cb_env.collection.insert(key, value)
-        ms = MutationState().add_mutation_token(res.mutation_token())
+        ms = MutationState()
+        ms.add_mutation_token(res.mutation_token())
         result = cb_env.scope.query(f'SELECT * FROM `{cb_env.collection.name}` USE KEYS "{key}"',
                                     QueryOptions(consistent_with=ms))
         await cb_env.assert_rows(result, 1)
@@ -365,7 +366,8 @@ class QueryTestSuite:
         result = cb_env.cluster.query(q_str)
         await cb_env.assert_rows(result, 0)
         res = await cb_env.collection.insert(key, value)
-        ms = MutationState().add_mutation_token(res.mutation_token())
+        ms = MutationState()
+        ms.add_mutation_token(res.mutation_token())
         result = cb_env.cluster.query(q_str, QueryOptions(consistent_with=ms))
         await cb_env.assert_rows(result, 1)
 
