@@ -304,3 +304,27 @@ set_target_properties(
   PROPERTIES PREFIX ""
              OUTPUT_NAME _core
              SUFFIX ${PYCBC_C_MOD_SUFFIX})
+
+# The extension module is the only build artifact that belongs in the Python package
+# directory, so the directory is set on the target: a global CMAKE_RUNTIME_OUTPUT_DIRECTORY
+# applies to every target in the build tree, and on Windows the RUNTIME category covers
+# executables as well as DLLs (PYCBC-1878).  PDB_OUTPUT_DIRECTORY otherwise follows the
+# target's own output directory.  Windows only: elsewhere the extension is a LIBRARY artifact
+# and CMAKE_LIBRARY_OUTPUT_DIRECTORY does not apply to executables.
+# The path is used as passed: file(TO_CMAKE_PATH) treats ':' as a path-list separator and
+# would turn "C:/pkg" into "C;/pkg".
+if(WIN32 AND PYCBC_MODULE_OUTPUT_DIRECTORY)
+  set_target_properties(
+    pycbc_core
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PYCBC_MODULE_OUTPUT_DIRECTORY}"
+               PDB_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+  # Multi-config generators (Visual Studio) append the configuration name unless the
+  # per-config property is set; single-config generators (Ninja) use the plain property.
+  foreach(pycbc_config IN LISTS CMAKE_CONFIGURATION_TYPES)
+    string(TOUPPER "${pycbc_config}" pycbc_config_uc)
+    set_target_properties(
+      pycbc_core
+      PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${pycbc_config_uc} "${PYCBC_MODULE_OUTPUT_DIRECTORY}"
+                 PDB_OUTPUT_DIRECTORY_${pycbc_config_uc} "${CMAKE_BINARY_DIR}")
+  endforeach()
+endif()
