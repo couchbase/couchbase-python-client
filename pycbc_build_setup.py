@@ -207,7 +207,10 @@ class CMakeConfig:
                 cmake_config_args.append(f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}')
 
         if platform.system() == "Windows":
-            cmake_config_args += [f'-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
+            # Consumed by a per-target property in CMakeLists.txt: a global
+            # CMAKE_RUNTIME_OUTPUT_DIRECTORY would apply to every target in the build tree,
+            # not just the extension module (PYCBC-1878).
+            cmake_config_args += [f'-DPYCBC_MODULE_OUTPUT_DIRECTORY={output_dir}']
 
             if cmake_generator:
                 if cmake_generator.upper() == 'TRUE':
