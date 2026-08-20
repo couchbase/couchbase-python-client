@@ -416,9 +416,23 @@ class ClusterLogic:
 
         # first close the transactions object, if any
         log.debug("closing cluster")
-        if self._transactions:
-            self._transactions.close()
-            del self._transactions
+        # Swap under the lock, close outside it.  A first access holds the lock across
+        # Transactions(), so an unlocked read here can see None mid-construction and skip
+        # teardown, stranding a live instance on a closed cluster with only GC to close it.
+        # close() is a network round-trip and must not be held under the lock.
+        with self._transactions_lock:
+            txns = self._transactions
+            if txns is not None:
+                del self._transactions
+
+        # Ahead of close_connection() below: the core cannot remove its client record once
+        # the connection is gone, and burns the full retry budget failing to.
+        if txns is not None:
+            try:
+                txns.close()
+            except Exception:
+                # Must not skip the connection close below and leak the core IO thread.
+                log.warning('Error closing transactions while closing the cluster.', exc_info=True)
 
         close_kwargs = {}
 

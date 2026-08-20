@@ -21,6 +21,10 @@ Transactions instance. An orphaned instance still owns cleanup threads and a
 client-record registration, and closing it on GC can deadlock the single core
 IO thread against the GIL (see transactions.cxx's dealloc_transactions).
 
+ClusterLogic._close_cluster() had the mirror of that defect: it read
+self._transactions without the lock, so a close racing a first access could see
+None mid-construction and skip teardown altogether.
+
 No live cluster is needed. The property never touches the network before
 constructing a Transactions object, so a Cluster/AsyncCluster is built via
 ClusterLogic.__init__ directly (bypassing Cluster._connect() /
@@ -57,11 +61,18 @@ def _make_tracking_transactions():
 
     class _Tracker:
         instances_created = 0
+        construction_started = threading.Event()
 
         def __init__(self, cluster, config):
+            self.close_count = 0
             with lock:
                 type(self).instances_created += 1
+            type(self).construction_started.set()
             time.sleep(CONSTRUCTION_DELAY)
+
+        def close(self):
+            with lock:
+                self.close_count += 1
 
     return _Tracker
 
@@ -75,8 +86,44 @@ def _make_unconnected_cluster(cluster_cls):
 
 class TransactionsPropertyRaceTestSuite:
     TEST_MANIFEST = [
+        'test_close_during_first_access_closes_instance',
         'test_concurrent_first_access_returns_single_instance',
     ]
+
+    @pytest.mark.parametrize('cluster_cls,transactions_patch_target', [
+        (Cluster, 'couchbase.cluster.Transactions'),
+        (AsyncCluster, 'acouchbase.cluster.Transactions'),
+    ])
+    def test_close_during_first_access_closes_instance(self,
+                                                       monkeypatch,
+                                                       cluster_cls,
+                                                       transactions_patch_target):
+        tracker = _make_tracking_transactions()
+        monkeypatch.setattr(transactions_patch_target, tracker)
+        # _close_cluster() ends in the core close_connection().  The fake cluster never
+        # connected, and only the transactions teardown ahead of that is under test.
+        monkeypatch.setattr('couchbase.logic.cluster.close_connection', lambda *a, **kw: None)
+        cluster = _make_unconnected_cluster(cluster_cls)
+
+        result = {}
+
+        def touch():
+            result['txns'] = cluster.transactions
+
+        toucher = threading.Thread(target=touch)
+        toucher.start()
+        # Proceed only once the property is inside Transactions(), so the close races it.
+        assert tracker.construction_started.wait(timeout=10), 'construction never started'
+        # All three bindings delegate teardown to ClusterLogic._close_cluster().
+        ClusterLogic._close_cluster(cluster)
+        toucher.join(timeout=10)
+        assert not toucher.is_alive(), 'thread failed to join, possible deadlock'
+
+        txns = result.get('txns')
+        assert txns is not None
+        assert tracker.instances_created == 1
+        assert txns.close_count == 1, 'the instance published by the racing first access was never closed'
+        assert not hasattr(cluster, '_transactions'), 'a live Transactions outlived the cluster close'
 
     @pytest.mark.parametrize('cluster_cls,transactions_patch_target', [
         (Cluster, 'couchbase.cluster.Transactions'),
