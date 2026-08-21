@@ -109,7 +109,7 @@ class Bucket:
         return scope.collection(Collection.default_name())
 
     def ping(self,
-             *opts,  # type: PingOptions
+             *opts,  # type: PingOptionsBase
              **kwargs  # type: Any
              ) -> PingResult:
         """Performs a ping operation against the bucket.
@@ -132,7 +132,7 @@ class Bucket:
     def view_query(self,
                    design_doc,      # type: str
                    view_name,       # type: str
-                   *view_options,   # type: ViewOptions
+                   *view_options,   # type: ViewOptionsBase
                    **kwargs         # type: Any
                    ) -> ViewResult:
         """Executes a View query against the bucket.

@@ -88,7 +88,7 @@ class Cluster:
 
     def __init__(self,
                  connstr,  # type: str
-                 *options,  # type: ClusterOptions
+                 *options,  # type: ClusterOptionsBase
                  **kwargs,  # type: Any
                  ) -> None:
         self._impl = ClusterImpl(connstr, *options, **kwargs)
@@ -175,7 +175,7 @@ class Cluster:
         return self._impl.ping(req)
 
     def diagnostics(self,
-                    *opts,  # type: DiagnosticsOptions
+                    *opts,  # type: DiagnosticsOptionsBase
                     **kwargs  # type: Any
                     ) -> DiagnosticsResult:
         """Performs a diagnostic operation against the cluster.
@@ -678,7 +678,7 @@ class Cluster:
 
     @staticmethod
     def connect(connstr,  # type: str
-                *options,  # type: ClusterOptions
+                *options,  # type: ClusterOptionsBase
                 **kwargs,  # type: Any
                 ) -> Cluster:
         """Create a Couchbase Cluster and connect

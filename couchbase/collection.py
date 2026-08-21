@@ -120,7 +120,7 @@ class Collection:
 
     def get(self,
             key,  # type: str
-            *opts,  # type: GetOptions
+            *opts,  # type: GetOptionsBase
             **kwargs,  # type: Any
             ) -> GetResult:
         """Retrieves the value of a document from the collection.
@@ -167,7 +167,7 @@ class Collection:
 
     def get_any_replica(self,
                         key,  # type: str
-                        *opts,  # type: GetAnyReplicaOptions
+                        *opts,  # type: GetAnyReplicaOptionsBase
                         **kwargs,  # type: Any
                         ) -> GetReplicaResult:
         """Retrieves the value of a document from the collection leveraging both active and all available replicas returning
@@ -218,7 +218,7 @@ class Collection:
 
     def get_all_replicas(self,
                          key,  # type: str
-                         *opts,  # type: GetAllReplicasOptions
+                         *opts,  # type: GetAllReplicasOptionsBase
                          **kwargs,  # type: Any
                          ) -> Iterable[GetReplicaResult]:
         """Retrieves the value of a document from the collection returning both active and all available replicas.
@@ -289,7 +289,7 @@ class Collection:
     def exists(
         self,
         key,  # type: str
-        *opts,  # type: ExistsOptions
+        *opts,  # type: ExistsOptionsBase
         **kwargs,  # type: Any
     ) -> ExistsResult:
         """Checks whether a specific document exists or not.
@@ -336,7 +336,7 @@ class Collection:
         self,  # type: "Collection"
         key,  # type: str
         value,  # type: JSONType
-        *opts,  # type: InsertOptions
+        *opts,  # type: InsertOptionsBase
         **kwargs,  # type: Any
     ) -> MutationResult:
         """Inserts a new document to the collection, failing if the document already exists.
@@ -403,7 +403,7 @@ class Collection:
         self,
         key,  # type: str
         value,  # type: JSONType
-        *opts,  # type: UpsertOptions
+        *opts,  # type: UpsertOptionsBase
         **kwargs,  # type: Any
     ) -> MutationResult:
         """Upserts a document to the collection. This operation succeeds whether or not the document already exists.
@@ -465,7 +465,7 @@ class Collection:
     def replace(self,
                 key,  # type: str
                 value,  # type: JSONType
-                *opts,  # type: ReplaceOptions
+                *opts,  # type: ReplaceOptionsBase
                 **kwargs,  # type: Any
                 ) -> MutationResult:
         """Replaces the value of an existing document. Failing if the document does not exist.
@@ -520,7 +520,7 @@ class Collection:
 
     def remove(self,
                key,  # type: str
-               *opts,  # type: RemoveOptions
+               *opts,  # type: RemoveOptionsBase
                **kwargs,  # type: Any
                ) -> MutationResult:
         """Removes an existing document. Failing if the document does not exist.
@@ -567,7 +567,7 @@ class Collection:
     def touch(self,
               key,  # type: str
               expiry,  # type: timedelta
-              *opts,  # type: TouchOptions
+              *opts,  # type: TouchOptionsBase
               **kwargs,  # type: Any
               ) -> MutationResult:
         """Updates the expiry on an existing document.
@@ -621,7 +621,7 @@ class Collection:
     def get_and_touch(self,
                       key,  # type: str
                       expiry,  # type: timedelta
-                      *opts,  # type: GetAndTouchOptions
+                      *opts,  # type: GetAndTouchOptionsBase
                       **kwargs,  # type: Any
                       ) -> GetResult:
         """Retrieves the value of the document and simultanously updates the expiry time for the same document.
@@ -680,7 +680,7 @@ class Collection:
         self,
         key,  # type: str
         lock_time,  # type: timedelta
-        *opts,  # type: GetAndLockOptions
+        *opts,  # type: GetAndLockOptionsBase
         **kwargs,  # type: Any
     ) -> GetResult:
         """Locks a document and retrieves the value of that document at the time it is locked.
@@ -738,7 +738,7 @@ class Collection:
     def unlock(self,
                key,  # type: str
                cas,  # type: int
-               *opts,  # type: UnlockOptions
+               *opts,  # type: UnlockOptionsBase
                **kwargs,  # type: Any
                ) -> None:
         """Unlocks a previously locked document.
@@ -783,7 +783,7 @@ class Collection:
         self,
         key,  # type: str
         spec,  # type: Iterable[Spec]
-        *opts,  # type: LookupInOptions
+        *opts,  # type: LookupInOptionsBase
         **kwargs,  # type: Any
     ) -> LookupInResult:
         """Performs a lookup-in operation against a document, fetching individual fields or information
