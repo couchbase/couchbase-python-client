@@ -692,8 +692,11 @@ class TestEnvironment:
         mutation_token = result.mutation_token()
         assert mutation_token is not None
         partition_id, partition_uuid, sequence_number, mt_bucket_name = mutation_token.as_tuple()
+        # partition_id is the vbucket id and 0 is a legal vbucket, so it cannot be asserted
+        # nonzero.  The keys here are random, and a retry cannot mask the failure because the
+        # key is fixed for the test, so every attempt hashes to the same vbucket.
+        # partition_uuid and sequence_number are what an empty token cannot fake.
         assert isinstance(partition_id, int)
-        assert partition_id != 0
         assert isinstance(partition_uuid, int)
         assert partition_uuid != 0
         assert isinstance(sequence_number, int)
@@ -704,7 +707,9 @@ class TestEnvironment:
         mutation_token = result.mutation_token()
         assert mutation_token is not None
         partition_id, partition_uuid, sequence_number, mt_bucket_name = mutation_token.as_tuple()
-        assert partition_id != 0
+        # Same vbucket-id defect as above: the assertion here claimed a token with no sequence
+        # still carries a nonzero vbucket.  The absent uuid and sequence below are the signal.
+        assert isinstance(partition_id, int)
         assert partition_uuid == 0
         assert sequence_number == 0
         assert bucket_name == mt_bucket_name
