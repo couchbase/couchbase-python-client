@@ -58,7 +58,7 @@ from couchbase.transcoder import Transcoder
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import JSONType
+    from couchbase._utils import DocumentValue
 
 
 _LEGACY_DURABILITY_LOOKUP = {
@@ -249,7 +249,7 @@ class CollectionMultiRequestBuilder:
         return KeyValueMultiRequest(opcode, requests, return_exceptions)
 
     def _get_multi_op_mutation_req(self,  # noqa: C901
-                                   keys_and_docs: Dict[str, JSONType],
+                                   keys_and_docs: Dict[str, DocumentValue],
                                    opts_type: Type[MutationMultiOptions],
                                    opcode: KeyValueMultiOperationCode,
                                    obs_handler: Optional[ObservableRequestHandler],
@@ -496,7 +496,7 @@ class CollectionMultiRequestBuilder:
                                               **kwargs)
 
     def build_insert_multi_request(self,
-                                   keys_and_docs: Dict[str, JSONType],
+                                   keys_and_docs: Dict[str, DocumentValue],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> KeyValueMultiRequest:
@@ -533,7 +533,7 @@ class CollectionMultiRequestBuilder:
                                                 **kwargs)
 
     def build_replace_multi_request(self,
-                                    keys_and_docs: Dict[str, JSONType],
+                                    keys_and_docs: Dict[str, DocumentValue],
                                     obs_handler: ObservableRequestHandler,
                                     *opts: object,
                                     **kwargs: object) -> KeyValueMultiRequest:
@@ -587,7 +587,7 @@ class CollectionMultiRequestBuilder:
                                                 **kwargs)
 
     def build_upsert_multi_request(self,
-                                   keys_and_docs: Dict[str, JSONType],
+                                   keys_and_docs: Dict[str, DocumentValue],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> KeyValueMultiRequest:

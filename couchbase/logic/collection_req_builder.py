@@ -52,7 +52,7 @@ from couchbase.transcoder import Transcoder
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
-    from couchbase._utils import JSONType
+    from couchbase._utils import DocumentValue
     from couchbase.logic.pycbc_core import pycbc_connection
     from couchbase.subdocument import Spec
 
@@ -393,7 +393,7 @@ class CollectionRequestBuilder:
 
     def build_insert_request(self,
                              key: str,
-                             value: JSONType,
+                             value: DocumentValue,
                              obs_handler: Optional[ObservableRequestHandler],
                              *opts: object,
                              **kwargs: object) -> PycbcCoreKeyValueRequest:
@@ -726,7 +726,7 @@ class CollectionRequestBuilder:
 
     def build_replace_request(self,
                               key: str,
-                              value: JSONType,
+                              value: DocumentValue,
                               obs_handler: Optional[ObservableRequestHandler],
                               *opts: object,
                               **kwargs: object) -> PycbcCoreKeyValueRequest:
@@ -808,7 +808,7 @@ class CollectionRequestBuilder:
 
     def build_upsert_request(self,
                              key: str,
-                             value: JSONType,
+                             value: DocumentValue,
                              obs_handler: Optional[ObservableRequestHandler],
                              *opts: object,
                              **kwargs: object) -> PycbcCoreKeyValueRequest:

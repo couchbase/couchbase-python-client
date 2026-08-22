@@ -81,7 +81,7 @@ from couchbase.subdocument import upsert as subdoc_upsert
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import JSONType
+    from couchbase._utils import DocumentValue, JSONType
     from couchbase.kv_range_scan import ScanType
     from couchbase.logic.observability import WrappedSpan
     from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
@@ -335,7 +335,7 @@ class Collection:
     def insert(
         self,  # type: "Collection"
         key,  # type: str
-        value,  # type: JSONType
+        value,  # type: DocumentValue
         *opts,  # type: InsertOptionsBase
         **kwargs,  # type: Any
     ) -> MutationResult:
@@ -343,7 +343,7 @@ class Collection:
 
         Args:
             key (str): Document key to insert.
-            value (JSONType): The value of the document to insert.
+            value (DocumentValue): The value of the document to insert.
             opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertOptions`
@@ -402,7 +402,7 @@ class Collection:
     def upsert(
         self,
         key,  # type: str
-        value,  # type: JSONType
+        value,  # type: DocumentValue
         *opts,  # type: UpsertOptionsBase
         **kwargs,  # type: Any
     ) -> MutationResult:
@@ -410,7 +410,7 @@ class Collection:
 
         Args:
             key (str): Document key to upsert.
-            value (JSONType): The value of the document to upsert.
+            value (DocumentValue): The value of the document to upsert.
             opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertOptions`
@@ -464,7 +464,7 @@ class Collection:
 
     def replace(self,
                 key,  # type: str
-                value,  # type: JSONType
+                value,  # type: DocumentValue
                 *opts,  # type: ReplaceOptionsBase
                 **kwargs,  # type: Any
                 ) -> MutationResult:
@@ -472,7 +472,7 @@ class Collection:
 
         Args:
             key (str): Document key to replace.
-            value (JSONType): The value of the document to replace.
+            value (DocumentValue): The value of the document to replace.
             opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceOptions`
@@ -2194,7 +2194,7 @@ class Collection:
             return self._impl.exists_multi(req, obs_handler)
 
     def insert_multi(self,
-                     keys_and_docs,  # type: Dict[str, JSONType]
+                     keys_and_docs,  # type: Dict[str, DocumentValue]
                      *opts,  # type: InsertMultiOptions
                      **kwargs,  # type: Any
                      ) -> MultiMutationResult:
@@ -2202,7 +2202,7 @@ class Collection:
         failing if the document already exists.
 
         Args:
-            keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple insert operations.
+            keys_and_docs (Dict[str, DocumentValue]): The keys and values/docs to use for the multiple insert operations.
             opts (:class:`~couchbase.options.InsertMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertMultiOptions`
@@ -2279,7 +2279,7 @@ class Collection:
             return self._impl.insert_multi(req, obs_handler)
 
     def upsert_multi(self,
-                     keys_and_docs,  # type: Dict[str, JSONType]
+                     keys_and_docs,  # type: Dict[str, DocumentValue]
                      *opts,  # type: UpsertMultiOptions
                      **kwargs,  # type: Any
                      ) -> MultiMutationResult:
@@ -2287,7 +2287,7 @@ class Collection:
         succeeds whether or not the document already exists.
 
         Args:
-            keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple upsert operations.
+            keys_and_docs (Dict[str, DocumentValue]): The keys and values/docs to use for the multiple upsert operations.
             opts (:class:`~couchbase.options.UpsertMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertMultiOptions`
@@ -2359,7 +2359,7 @@ class Collection:
             return self._impl.upsert_multi(req, obs_handler)
 
     def replace_multi(self,
-                      keys_and_docs,  # type: Dict[str, JSONType]
+                      keys_and_docs,  # type: Dict[str, DocumentValue]
                       *opts,  # type: ReplaceMultiOptions
                       **kwargs,  # type: Any
                       ) -> MultiMutationResult:
@@ -2367,7 +2367,7 @@ class Collection:
         This operation fails if the document does not exist.
 
         Args:
-            keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple replace operations.
+            keys_and_docs (Dict[str, DocumentValue]): The keys and values/docs to use for the multiple replace operations.
             opts (:class:`~couchbase.options.ReplaceMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceMultiOptions`

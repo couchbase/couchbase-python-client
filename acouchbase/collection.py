@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from datetime import timedelta
 
     from acouchbase.scope import AsyncScope
-    from couchbase._utils import JSONType
+    from couchbase._utils import DocumentValue
     from couchbase.kv_range_scan import ScanType
     from couchbase.options import (ExistsOptions,
                                    GetAllReplicasOptions,
@@ -295,7 +295,7 @@ class AsyncCollection:
 
     async def insert(self,
                      key,  # type: str
-                     value,  # type: JSONType
+                     value,  # type: DocumentValue
                      *opts,  # type: InsertOptions
                      **kwargs,  # type: Any
                      ) -> MutationResult:
@@ -303,7 +303,7 @@ class AsyncCollection:
 
         Args:
             key (str): Document key to insert.
-            value (JSONType): The value of the document to insert.
+            value (DocumentValue): The value of the document to insert.
             opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertOptions`
@@ -362,7 +362,7 @@ class AsyncCollection:
 
     async def upsert(self,
                      key,  # type: str
-                     value,  # type: JSONType
+                     value,  # type: DocumentValue
                      *opts,  # type: UpsertOptions
                      **kwargs,  # type: Any
                      ) -> MutationResult:
@@ -370,7 +370,7 @@ class AsyncCollection:
 
         Args:
             key (str): Document key to upsert.
-            value (JSONType): The value of the document to upsert.
+            value (DocumentValue): The value of the document to upsert.
             opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertOptions`
@@ -425,7 +425,7 @@ class AsyncCollection:
 
     async def replace(self,
                       key,  # type: str
-                      value,  # type: JSONType
+                      value,  # type: DocumentValue
                       *opts,  # type: ReplaceOptions
                       **kwargs,  # type: Any
                       ) -> MutationResult:
@@ -433,7 +433,7 @@ class AsyncCollection:
 
         Args:
             key (str): Document key to replace.
-            value (JSONType): The value of the document to replace.
+            value (DocumentValue): The value of the document to replace.
             opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceOptions`

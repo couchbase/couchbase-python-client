@@ -37,6 +37,11 @@ from couchbase.logic.pycbc_core import pycbc_exception
 JSONType = Union[str, int, float, bool,
                  None, Mapping[str, Any], Sequence[Any]]
 
+# What a KV write accepts, which is a property of the collection's transcoder and not of the
+# operation.  JSONType cannot state it: LegacyTranscoder pickles values outside that union by
+# design, while JSONTranscoder rejects the bytes that union's Sequence[Any] arm admits.
+DocumentValue = Any
+
 
 def is_null_or_empty(
     value  # type: str

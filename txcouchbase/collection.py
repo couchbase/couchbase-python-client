@@ -37,7 +37,7 @@ from txcouchbase.logic.collection_impl import TxCollectionImpl
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import JSONType
+    from couchbase._utils import DocumentValue
     from couchbase.options import (ExistsOptions,
                                    GetAllReplicasOptions,
                                    GetAndLockOptions,
@@ -144,7 +144,7 @@ class Collection:
     def insert(
         self,
         key,  # type: str
-        value,  # type: JSONType
+        value,  # type: DocumentValue
         *opts,  # type: InsertOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
@@ -163,7 +163,7 @@ class Collection:
     def upsert(
         self,
         key,  # type: str
-        value,  # type: JSONType
+        value,  # type: DocumentValue
         *opts,  # type: UpsertOptions
         **kwargs,  # type: Any
     ) -> Deferred[MutationResult]:
@@ -181,7 +181,7 @@ class Collection:
 
     def replace(self,
                 key,  # type: str
-                value,  # type: JSONType
+                value,  # type: DocumentValue
                 *opts,  # type: ReplaceOptions
                 **kwargs,  # type: Any
                 ) -> Deferred[MutationResult]:
