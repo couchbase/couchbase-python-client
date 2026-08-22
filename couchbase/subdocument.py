@@ -19,7 +19,6 @@ from enum import IntEnum, IntFlag
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
-                    Iterable,
                     List,
                     Optional,
                     Union)
@@ -483,7 +482,7 @@ def remove(path,                     # type: str
 
 
 def array_append(path,              # type: str
-                 *values,                 # type: Iterable[Any]
+                 *values,                 # type: Union[JSONType, MutationMacro]
                  create_parents=False,     # type: Optional[bool]
                  xattr=False               # type: Optional[bool]
                  ) -> Spec:
@@ -491,7 +490,7 @@ def array_append(path,              # type: str
 
     Args:
         path (str): The path to an element of an array.
-        *values (Iterable[Any]): The values to add.
+        *values (Union[JSONType, MutationMacro]): The values to add.
         create_parents (bool, optional): Whether or not the path to the field should be created
             if it does not already exist.
         xattr (bool, optional): Whether this operation should reference the document body or the
@@ -510,7 +509,7 @@ def array_append(path,              # type: str
 
 
 def array_prepend(path,              # type: str
-                  *values,                 # type: Iterable[Any]
+                  *values,                 # type: Union[JSONType, MutationMacro]
                   create_parents=False,     # type: Optional[bool]
                   xattr=False               # type: Optional[bool]
                   ) -> Spec:
@@ -518,7 +517,7 @@ def array_prepend(path,              # type: str
 
     Args:
         path (str): The path to an element of an array.
-        *values (Iterable[Any]): The values to add.
+        *values (Union[JSONType, MutationMacro]): The values to add.
         create_parents (bool, optional): Whether or not the path to the field should be created
             if it does not already exist.
         xattr (bool, optional): Whether this operation should reference the document body or the
@@ -537,7 +536,7 @@ def array_prepend(path,              # type: str
 
 
 def array_insert(path,              # type: str
-                 *values,                 # type: Iterable[Any]
+                 *values,                 # type: Union[JSONType, MutationMacro]
                  create_parents=False,     # type: Optional[bool]
                  xattr=False               # type: Optional[bool]
                  ) -> Spec:
@@ -546,7 +545,7 @@ def array_insert(path,              # type: str
 
     Args:
         path (str): The path to an element of an array.
-        *values (Iterable[Any]): The values to add.
+        *values (Union[JSONType, MutationMacro]): The values to add.
         create_parents (bool, optional): Whether or not the path to the field should be created
             if it does not already exist.
         xattr (bool, optional): Whether this operation should reference the document body or the
@@ -565,7 +564,7 @@ def array_insert(path,              # type: str
 
 
 def array_addunique(path,              # type: str
-                    value,                 # type: Union[str, int, float, bool, None]
+                    value,                 # type: Union[str, int, float, bool, MutationMacro, None]
                     create_parents=False,     # type: Optional[bool]
                     xattr=False               # type: Optional[bool]
                     ) -> Spec:
@@ -574,7 +573,7 @@ def array_addunique(path,              # type: str
 
     Args:
         path (str): The path to an element of an array.
-        value (Union[str, int, float, bool, None]): The value to add into the array.
+        value (Union[str, int, float, bool, MutationMacro, None]): The value to add into the array.
         create_parents (bool, optional): Whether or not the path to the field should be created
             if it does not already exist.
         xattr (bool, optional): Whether this operation should reference the document body or the
