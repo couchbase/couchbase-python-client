@@ -17,12 +17,19 @@ from __future__ import annotations
 
 import json
 import pickle  # nosec
+import sys
 from abc import ABC, abstractmethod
 from typing import (TYPE_CHECKING,
                     Any,
+                    Generic,
                     Optional,
                     Tuple,
                     Union)
+
+if sys.version_info >= (3, 13):
+    from typing import TypeVar
+else:
+    from typing_extensions import TypeVar
 
 from couchbase.constants import (FMT_BYTES,
                                  FMT_COMMON_MASK,
@@ -74,20 +81,26 @@ def get_decode_format(flags,  # type: Optional[int]
         return LEGACY2UNIFIED.get(l_flags, None)
 
 
-class Transcoder(ABC):
+# Contravariant because a transcoder that accepts a wider value type is usable wherever one
+# accepting a narrower type is expected.  Defaulted to Any so that a bare Transcoder annotation
+# keeps meaning what it means today.
+V_contra = TypeVar('V_contra', contravariant=True, default=Any)
+
+
+class Transcoder(ABC, Generic[V_contra]):
     """Interface a Custom Transcoder must implement
     """
 
     @abstractmethod
     def encode_value(self,
-                     value  # type: Any
+                     value  # type: V_contra
                      ) -> Tuple[bytes, int]:
         raise NotImplementedError()
 
     @abstractmethod
     def decode_value(self,
                      value,  # type: bytes
-                     flags  # type: int
+                     flags  # type: Optional[int]
                      ) -> Any:
         raise NotImplementedError()
 
@@ -99,7 +112,7 @@ class Transcoder(ABC):
                 callable(subclass.decode_value))
 
 
-class JSONTranscoder(Transcoder):
+class JSONTranscoder(Transcoder[Any]):
 
     def __init__(self, serializer=None  # type: Serializer
                  ):
@@ -131,7 +144,7 @@ class JSONTranscoder(Transcoder):
 
     def decode_value(self,
                      value,  # type: bytes
-                     flags  # type: int
+                     flags  # type: Optional[int]
                      ) -> Any:
 
         format = get_decode_format(flags)
@@ -151,7 +164,7 @@ class JSONTranscoder(Transcoder):
             raise ValueFormatException(f"Unrecognized format provided: {format}")
 
 
-class RawJSONTranscoder(Transcoder):
+class RawJSONTranscoder(Transcoder[Union[str, bytes, bytearray]]):
 
     def encode_value(self,
                      value  # type: Union[str,bytes,bytearray]
@@ -168,7 +181,7 @@ class RawJSONTranscoder(Transcoder):
 
     def decode_value(self,
                      value,  # type: bytes
-                     flags  # type: int
+                     flags  # type: Optional[int]
                      ) -> Union[str, bytes]:
 
         format = get_decode_format(flags)
@@ -187,7 +200,7 @@ class RawJSONTranscoder(Transcoder):
             raise ValueFormatException(f"Unrecognized format provided: {format}")
 
 
-class RawStringTranscoder(Transcoder):
+class RawStringTranscoder(Transcoder[str]):
 
     def encode_value(self,
                      value  # type: str
@@ -200,7 +213,7 @@ class RawStringTranscoder(Transcoder):
 
     def decode_value(self,
                      value,  # type: bytes
-                     flags  # type: int
+                     flags  # type: Optional[int]
                      ) -> Union[str, bytes]:
 
         format = get_decode_format(flags)
@@ -215,7 +228,7 @@ class RawStringTranscoder(Transcoder):
             raise ValueFormatException(f"Unrecognized format provided: {format}")
 
 
-class RawBinaryTranscoder(Transcoder):
+class RawBinaryTranscoder(Transcoder[Union[bytes, bytearray]]):
     def encode_value(self,
                      value  # type: Union[bytes,bytearray]
                      ) -> Tuple[bytes, int]:
@@ -229,7 +242,7 @@ class RawBinaryTranscoder(Transcoder):
 
     def decode_value(self,
                      value,  # type: bytes
-                     flags  # type: int
+                     flags  # type: Optional[int]
                      ) -> bytes:
 
         format = get_decode_format(flags)
@@ -246,7 +259,7 @@ class RawBinaryTranscoder(Transcoder):
             raise ValueFormatException(f"Unrecognized format provided: {format}")
 
 
-class LegacyTranscoder(Transcoder):
+class LegacyTranscoder(Transcoder[Any]):
 
     def encode_value(self,
                      value  # type: Any
@@ -278,7 +291,7 @@ class LegacyTranscoder(Transcoder):
 
     def decode_value(self,
                      value,  # type: bytes
-                     flags  # type: int
+                     flags  # type: Optional[int]
                      ) -> Any:
 
         format = get_decode_format(flags)
