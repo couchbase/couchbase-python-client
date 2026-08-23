@@ -48,7 +48,7 @@ class TxScopeImpl(AsyncScopeImpl):
         # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
         # also does not specify an analytics_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('analytics_timeout', None)
+        streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
         q_req = AnalyticsRequest.generate_analytics_request(self.connection,
                                                             self.loop,
                                                             req.analytics_query.params,
@@ -77,7 +77,7 @@ class TxScopeImpl(AsyncScopeImpl):
         # timeout, the streaming_timeout defaults to cluster's query_timeout (set here). If the cluster
         # also does not specify a query_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::query_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('query_timeout', None)
+        streaming_timeout = self.streaming_timeouts.get('query_timeout', None)
         q_req = N1QLRequest.generate_n1ql_request(self.connection,
                                                   self.loop,
                                                   req.n1ql_query.params,
@@ -106,7 +106,7 @@ class TxScopeImpl(AsyncScopeImpl):
         # timeout, the streaming_timeout defaults to cluster's search_timeout (set here). If the cluster
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('search_timeout', None)
+        streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
         q_req = FullTextSearchRequest.generate_search_request(self.connection,
                                                               self.loop,
                                                               req.query_builder.as_encodable(),
