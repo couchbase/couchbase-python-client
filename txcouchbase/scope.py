@@ -15,7 +15,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Union)
 
 from twisted.internet.defer import Deferred
 
@@ -29,6 +31,7 @@ from txcouchbase.logic.scope_impl import TxScopeImpl
 from txcouchbase.management.search import ScopeSearchIndexManager
 
 if TYPE_CHECKING:
+    from couchbase._utils import JSONType
     from couchbase.options import (AnalyticsOptions,
                                    QueryOptions,
                                    SearchOptions)
@@ -54,7 +57,7 @@ class Scope:
     def query(
         self,
         statement,  # type: str
-        *options,  # type: QueryOptions
+        *options,  # type: Union[QueryOptions, JSONType]
         **kwargs  # type: Any
     ) -> Deferred[QueryResult]:
         op_type = StreamingOperationType.Query
@@ -65,7 +68,7 @@ class Scope:
     def analytics_query(
         self,
         statement,  # type: str
-        *options,  # type: AnalyticsOptions
+        *options,  # type: Union[AnalyticsOptions, JSONType]
         **kwargs  # type: Any
     ) -> Deferred[AnalyticsResult]:
         op_type = StreamingOperationType.AnalyticsQuery

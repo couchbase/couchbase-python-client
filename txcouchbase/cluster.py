@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 from asyncio import AbstractEventLoop
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Union)
 
 from twisted.internet.defer import Deferred
 
@@ -43,6 +45,7 @@ from txcouchbase.management.users import UserManager
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from couchbase._utils import JSONType
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    QueryOptions,
@@ -105,7 +108,7 @@ class Cluster:
     def query(
         self,
         statement,  # type: str
-        *options,  # type: QueryOptions
+        *options,  # type: Union[QueryOptions, JSONType]
         **kwargs  # type: Any
     ) -> Deferred[QueryResult]:
         op_type = StreamingOperationType.Query
@@ -116,7 +119,7 @@ class Cluster:
     def analytics_query(
         self,
         statement,  # type: str
-        *options,  # type: AnalyticsOptions
+        *options,  # type: Union[AnalyticsOptions, JSONType]
         **kwargs  # type: Any
     ) -> Deferred[AnalyticsResult]:
         op_type = StreamingOperationType.AnalyticsQuery

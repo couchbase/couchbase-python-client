@@ -44,10 +44,12 @@ from couchbase.result import (AnalyticsResult,
                               SearchResult)
 
 if TYPE_CHECKING:
+    from couchbase._utils import JSONType
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    DiagnosticsOptions,
                                    PingOptions,
+                                   QueryOptions,
                                    SearchOptions,
                                    WaitUntilReadyOptions)
     from couchbase.search import SearchQuery, SearchRequest
@@ -287,8 +289,7 @@ class AsyncCluster:
 
     def query(self,
               statement,  # type: str
-              *options,  # type: Any  # QueryOptions, or a positional query parameter: the request
-              # builder walks *options and treats every non-QueryOptions entry as one.
+              *options,  # type: Union[QueryOptions, JSONType]
               **kwargs  # type: Any
               ) -> QueryResult:
         """Executes a N1QL query against the cluster.
@@ -362,7 +363,7 @@ class AsyncCluster:
 
     def analytics_query(self,  # type: Cluster
                         statement,  # type: str
-                        *options,  # type: AnalyticsOptions
+                        *options,  # type: Union[AnalyticsOptions, JSONType]
                         **kwargs,  # type: Any
                         ) -> AnalyticsResult:
         """Executes an analaytics query against the cluster.

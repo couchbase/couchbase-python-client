@@ -15,7 +15,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Union)
 
 from couchbase.collection import Collection
 from couchbase.logic.observability import ObservableRequestHandler
@@ -23,12 +25,15 @@ from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.logic.scope_impl import ScopeImpl
 from couchbase.management.eventing import ScopeEventingFunctionManager
 from couchbase.management.search import ScopeSearchIndexManager
-from couchbase.options import AnalyticsOptions, SearchOptions
+from couchbase.options import (AnalyticsOptions,
+                               QueryOptions,
+                               SearchOptions)
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 
 if TYPE_CHECKING:
+    from couchbase._utils import JSONType
     from couchbase.bucket import Bucket
     from couchbase.search import SearchQuery, SearchRequest
 
@@ -65,8 +70,7 @@ class Scope:
 
     def query(self,
               statement,  # type: str
-              *options,  # type: Any  # QueryOptions, or a positional query parameter: the request
-              # builder walks *options and treats every non-QueryOptions entry as one.
+              *options,  # type: Union[QueryOptions, JSONType]
               **kwargs  # type: Any
               ) -> QueryResult:
         """Executes a N1QL query against the scope.
@@ -143,7 +147,7 @@ class Scope:
 
     def analytics_query(self,
                         statement,  # type: str
-                        *options,  # type: AnalyticsOptions
+                        *options,  # type: Union[AnalyticsOptions, JSONType]
                         **kwargs   # type: Any
                         ) -> AnalyticsResult:
         """Executes an analaytics query against the scope.
