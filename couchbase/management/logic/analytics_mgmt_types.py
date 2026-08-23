@@ -129,6 +129,15 @@ class AnalyticsLink(ABC):
         """
         pass
 
+    @abstractmethod
+    def as_dict(self) -> Dict[str, Any]:
+        """Returns the :class:`couchbase.analytics.AnalyticsLink` as a dict,
+            in the form the management API sends it in
+
+        :return: A dict representation of the :class:`couchbase.analytics.AnalyticsLink`
+        """
+        pass
+
 
 class CouchbaseAnalyticsEncryptionSettings:
 
