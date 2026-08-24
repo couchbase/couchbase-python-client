@@ -37,8 +37,11 @@ class SearchQuery:
         :class:`DisjunctionQuery`, and others in this module.
     """
 
-    def __init__(self):
-        self._json_ = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        # Permissive because `_QueryBuilder._single_term_query` reassigns `__init__` on ten of
+        # this module's query classes; a checker cannot follow that, so it resolves their
+        # constructions against this signature.  Narrowing means giving each subclass its own.
+        self._json_: Dict[str, Any] = {}
 
     def set_prop(self, key,  # type: str
                  value  # type: Any
