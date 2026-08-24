@@ -123,10 +123,23 @@ class DealershipProvider(BaseProvider):
 fake.add_provider(DealershipProvider)
 
 
+def _batch_id_with_distinct_view_keys() -> str:
+    """Return an 8-character batch id whose four 2-character slices are all distinct.
+
+    The views design document (tests/test_cases/test-view-new.txt) emits one slice per
+    docid decade, so two equal slices collapse two decades into a single view key and
+    invalidate every docid expectation in the views suites.  A raw uuid4 prefix collides
+    about 2.3% of the time; drawing until the slices differ costs a mean of 1.02 draws.
+    """
+    while True:
+        batch_id = fake.uuid4()[:8]
+        if len({batch_id[i:i + 2] for i in range(0, 8, 2)}) == 4:
+            return batch_id
+
+
 class DataProvider:
     def __init__(self, num_docs=100):
         dealer_uuid = fake.uuid4()
-        vehicle_uuid = fake.uuid4()
 
         self._dealer_list = []
         self._dealer_uuid = dealer_uuid[:8]
@@ -134,7 +147,7 @@ class DataProvider:
         self._new_vehicle_list = []
         self._num_docs = num_docs
         self._vehicle_list = []
-        self._vehicle_uuid = vehicle_uuid[:8]
+        self._vehicle_uuid = _batch_id_with_distinct_view_keys()
 
     def build_docs(self):
         self._build_vehicles()

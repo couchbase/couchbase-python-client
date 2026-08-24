@@ -112,7 +112,12 @@ class ViewsTestEnvironment(TestEnvironment):
         return self._batch_id
 
     def get_keys(self) -> List[str]:
-        return wrap(self._batch_id, 2)
+        keys = wrap(self._batch_id, 2)
+        # Regression guard (PYCBC-1898): a duplicate slice collapses two docid decades
+        # into a single view key.  DataProvider guarantees distinctness; failing here
+        # reports that directly instead of as a fifty-line docid diff further down.
+        assert len(set(keys)) == len(keys), f'batch id {self._batch_id} yields duplicate view keys'
+        return keys
 
     def get_docids_by_key(self, key: str) -> List[str]:
         keys = self.get_keys()
@@ -303,7 +308,12 @@ class AsyncViewsTestEnvironment(AsyncTestEnvironment):
         return self._batch_id
 
     def get_keys(self) -> List[str]:
-        return wrap(self._batch_id, 2)
+        keys = wrap(self._batch_id, 2)
+        # Regression guard (PYCBC-1898): a duplicate slice collapses two docid decades
+        # into a single view key.  DataProvider guarantees distinctness; failing here
+        # reports that directly instead of as a fifty-line docid diff further down.
+        assert len(set(keys)) == len(keys), f'batch id {self._batch_id} yields duplicate view keys'
+        return keys
 
     def get_docids_by_key(self, key: str) -> List[str]:
         keys = self.get_keys()
