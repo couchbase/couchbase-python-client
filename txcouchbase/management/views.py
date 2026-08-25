@@ -144,8 +144,12 @@ class ViewIndexManager:
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
         obs_handler.__enter__()
         try:
-            d = self._impl.publish_design_document_deferred(
-                self._bucket_name, design_doc_name, obs_handler, *options, **kwargs)
+            req = self._impl.request_builder.build_publish_design_document_request(self._bucket_name,
+                                                                                   design_doc_name,
+                                                                                   obs_handler,
+                                                                                   *options,
+                                                                                   **kwargs)
+            d = self._impl.publish_design_document_deferred(req, obs_handler)
             d.addBoth(self._impl._finish_span, obs_handler)
             return d
         except Exception as e:

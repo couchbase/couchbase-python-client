@@ -25,6 +25,7 @@ from couchbase.result import PingResult, ViewResult
 from txcouchbase.collection import Collection
 from txcouchbase.logic.bucket_impl import TxBucketImpl
 from txcouchbase.management.collections import CollectionManager
+from txcouchbase.management.views import ViewIndexManager
 from txcouchbase.scope import Scope
 
 if TYPE_CHECKING:
@@ -99,6 +100,20 @@ class Bucket:
         :return: the :class:`.management.collections.CollectionManager` for this bucket.
         """
         return CollectionManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
+
+    def view_indexes(self) -> ViewIndexManager:
+        """
+        Get the ViewIndexManager.
+
+        .. deprecated:: 4.6.0
+
+            Views are deprecated in Couchbase Server 7.0+, and will be removed from a future server version.
+            Views are not compatible with the Magma storage engine. Instead of views, use indexes and queries using the
+            Index Service (GSI) and the Query Service (SQL++).
+
+        :return: the :class:`.management.views.ViewIndexManager` for this bucket.
+        """
+        return ViewIndexManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
 
 
 TxBucket = Bucket

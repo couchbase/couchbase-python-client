@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from couchbase.management.logic.view_index_mgmt_types import (DropDesignDocumentRequest,
                                                                   GetAllDesignDocumentsRequest,
                                                                   GetDesignDocumentRequest,
+                                                                  PublishDesignDocumentRequest,
                                                                   UpsertDesignDocumentRequest)
 
 
@@ -77,13 +78,10 @@ class TxViewIndexMgmtImpl(AsyncViewIndexMgmtImpl):
         return d
 
     def publish_design_document_deferred(self,
-                                         bucket_name: str,
-                                         design_doc_name: str,
-                                         obs_handler: ObservableRequestHandler,
-                                         *options: object,
-                                         **kwargs: object) -> Deferred[None]:
+                                         req: PublishDesignDocumentRequest,
+                                         obs_handler: ObservableRequestHandler) -> Deferred[None]:
         """**INTERNAL**"""
-        coro = super().publish_design_document(bucket_name, design_doc_name, obs_handler, *options, **kwargs)
+        coro = super().publish_design_document(req, obs_handler)
         future = asyncio.ensure_future(coro, loop=self.loop)
         d = Deferred.fromFuture(future)
         return d
