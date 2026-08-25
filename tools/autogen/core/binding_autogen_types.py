@@ -109,6 +109,7 @@ class BindingConfigCppType(TypedDict, total=False):
     skip_if_empty_fields: Optional[List[str]] = None
     input_missing_err_msg: Optional[str] = None
     skip_request: Optional[bool] = None
+    allow_empty_fields: Optional[bool] = None
 
 
 class BindingConfigCppTypes(TypedDict):

@@ -227,6 +227,11 @@ class BindingGenerator:
 
         return output_dir / file_output['filename']
 
+    @property
+    def output_files(self) -> List[Path]:
+        """Every file this generator is configured to produce."""
+        return [self._get_output_file(bft) for bft in BindingFileType]
+
     def _get_rendered_content(self, template_name: str, context: Dict[str, Any]) -> str:
         template = self._jinja_env.get_template(template_name)
         return template.render(**context)

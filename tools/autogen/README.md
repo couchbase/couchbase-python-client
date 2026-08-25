@@ -34,6 +34,52 @@ The generation is driven by `bindings.yaml`. You can add new operations or types
 - `cpp_core_types`: Generic structs that need conversion logic.
 - `cpp_core_enums`: Enums that need conversion logic.
 
+## Post-Processing (formatting & churn)
+
+`bindings generate` renders unformatted output, so the committed files are whatever the repo's
+pre-commit fixers turn that output into. Generation therefore finishes with two extra steps:
+
+1. **Format** - runs `pre-commit run --files <generated files>`. Scoped with `--files` so nothing
+   outside the generated set is touched and unrelated lint failures cannot block generation.
+2. **Restore unchanged** - every generated file whose only delta against `HEAD` is the
+   `Generated-On` / `Content-Hash` lines is restored, so a regeneration that changes nothing
+   leaves a clean `git status`.
+
+The restore is safe by construction: a file is only restored when its content is byte-identical
+to `HEAD` once those metadata lines are removed, so real changes - including hand-edits - can
+never be discarded.
+
+Opt out with `--no-format` and `--no-restore-unchanged`. If generation and formatting were done
+by hand, run the same tail on its own:
+
+```bash
+python -m tools.autogen bindings tidy
+```
+
+## Debugging a Struct
+
+When a generated binding looks wrong or empty, inspect exactly what the libclang pass sees for
+one struct (or a list of them). This renders nothing and writes no files:
+
+```bash
+# everything a single header yields
+python -m tools.autogen bindings inspect --header core/operations/document_query.hxx
+
+# a single struct, defining header located automatically
+python -m tools.autogen bindings inspect --type couchbase::core::operations::query_request
+
+# several at once, as JSON
+python -m tools.autogen bindings inspect --type query_request --type analytics_request --as-json
+```
+
+`--type` accepts a fully-qualified name, a leaf name, or a substring. Add `--no-resolve` to skip
+C++/Python type mapping and see only the parsed canonical types.
+
+A configured struct that parses to **zero fields** aborts generation rather than silently
+emitting an empty binding. If the C++ struct genuinely has no fields (an empty tag type used as
+a `std::variant` alternative, for example), set `allow_empty_fields: true` on its
+`cpp_core_types` entry.
+
 ## Extensibility
 
 To add a new generation command:

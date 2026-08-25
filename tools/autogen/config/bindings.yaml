@@ -524,6 +524,8 @@ cpp_core_types:
     - core_struct: couchbase::core::management::eventing::function_url_no_auth
       header_file: "core/management/eventing_function.hxx"
       py_type: EventingFunctionUrlNoAuth
+      # Empty tag struct used as a std::variant alternative
+      allow_empty_fields: true
     - core_struct: couchbase::core::management::eventing::function_url_auth_basic
       header_file: "core/management/eventing_function.hxx"
       py_type: EventingFunctionUrlAuthBasic

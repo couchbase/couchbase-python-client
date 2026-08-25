@@ -74,6 +74,10 @@ class BindingBuilder:
         self._mgmt_op_groups = []
 
     @property
+    def cpp_parser(self) -> CppTypeParser:
+        return self._cpp_parser
+
+    @property
     def cpp_enums(self) -> List[BindingEnumType]:
         return self._cpp_enums
 
@@ -353,12 +357,29 @@ class BindingBuilder:
                            use_req_fields: bool,
                            is_kv_op: Optional[bool] = None,
                            response_override: Optional[str] = None,
-                           skip_if_empty_fields: Optional[str] = None) -> Dict[str, Any]:
+                           skip_if_empty_fields: Optional[str] = None,
+                           allow_empty_fields: Optional[bool] = None) -> Dict[str, Any]:
 
         cpp_types = self._cpp_parser.parse_op(header_path)
         cpp_type_match = next((cpp_type for cpp_type in cpp_types if struct_name_full == cpp_type['struct_name']), None)
         if cpp_type_match is None:
             raise RuntimeError(f'Unable to find C++ type for {struct_name_full}')
+
+        # A configured struct never legitimately parses to zero fields.  Hitting this means the
+        # C++ core header changed shape in a way the parser mis-read, so fail loudly instead of
+        # silently emitting an empty binding.
+        if not cpp_type_match['fields'] and allow_empty_fields is not True:
+            raise RuntimeError(f'Parsed zero fields for {struct_name_full} (header={header_path}). '
+                               'If the C++ struct really is empty, set allow_empty_fields on its '
+                               'config entry. Otherwise inspect with: '
+                               f'python -m tools.autogen bindings inspect --type {struct_name_full}')
+
+        parsed_names = {f['name'] for f in cpp_type_match['fields']}
+        missing_required = [f for f in required_fields if f not in parsed_names] if use_req_fields else []
+        if missing_required:
+            raise RuntimeError(f'Required field(s) {missing_required} not found on {struct_name_full} '
+                               f'(header={header_path}). Inspect with: '
+                               f'python -m tools.autogen bindings inspect --type {struct_name_full}')
 
         struct_name = struct_name_full.split('::')[-1]
         binding_dict = {
@@ -815,7 +836,9 @@ class BindingBuilder:
                                                     config_cpp_type.get('required_fields', []),
                                                     config_cpp_type.get('ignored_fields', ignored_fields),
                                                     True,
-                                                    skip_if_empty_fields=skip_if_empty_fields)
+                                                    skip_if_empty_fields=skip_if_empty_fields,
+                                                    allow_empty_fields=config_cpp_type.get(
+                                                        'allow_empty_fields', False))
             type_req_dict['name'] = type_req_dict.pop('struct_name')
             type_req_dict['full_name'] = type_req_dict.pop('struct_name_full')
             if 'skip_request' in config_cpp_type:
