@@ -29,15 +29,17 @@ namespace pycbc
 {
 
 Connection::Connection(int num_io_threads)
-  : io_()
-  , cluster_(io_)
+  : io_(std::make_shared<asio::io_context>())
+  , cluster_(*io_)
   , io_threads_()
   , connected_(false)
 {
   for (int i = 0; i < num_io_threads; ++i) {
-    io_threads_.emplace_back([this]() {
+    // The context is captured by value rather than reached through `this`, so a thread that
+    // outlives the Connection keeps the context alive and touches nothing else that is gone.
+    io_threads_.emplace_back([io = io_]() {
       try {
-        io_.run();
+        io->run();
       } catch (const std::exception& e) {
         CB_LOG_ERROR(e.what());
         throw;
@@ -68,11 +70,14 @@ Connection::~Connection()
     CB_LOG_WARNING("PYCBC: Cluster close timed out in destructor.");
   }
 
-  io_.stop();
+  io_->stop();
 
   for (auto& t : io_threads_) {
     if (t.get_id() == std::this_thread::get_id()) {
-      // Cannot join from the same thread - detach instead to avoid deadlock
+      // Cannot join from the same thread - detach instead to avoid deadlock.  stop() only
+      // asks run() to return, it does not wait for the thread to leave it, so the detached
+      // thread is still unwinding after this returns.  The reference it holds on the io
+      // context is what keeps that safe; see the member declaration.
       CB_LOG_DEBUG("PYCBC: dealloc_conn called from IO thread, detaching instead of joining");
       t.detach();
     } else {
@@ -619,7 +624,7 @@ Connection::handle_range_scan_op(PyObject* kwargs)
     }
 
     auto agent_group =
-      couchbase::core::agent_group(io_, couchbase::core::agent_group_config{ { cluster_ } });
+      couchbase::core::agent_group(*io_, couchbase::core::agent_group_config{ { cluster_ } });
     agent_group.open_bucket(bucket_name);
     auto agent = agent_group.get_agent(bucket_name);
 
@@ -655,7 +660,7 @@ Connection::handle_range_scan_op(PyObject* kwargs)
         return raise_invalid_argument("scan_type must be 1, 2, or 3", __FILE__, __LINE__);
     }
 
-    auto orchestrator = couchbase::core::range_scan_orchestrator(io_,
+    auto orchestrator = couchbase::core::range_scan_orchestrator(*io_,
                                                                  agent.value(),
                                                                  bucket_config->vbmap.value(),
                                                                  scope_name,

@@ -104,7 +104,12 @@ private:
     set_disconnected
   };
 
-  asio::io_context io_;
+  // shared_ptr rather than a plain member, and the destructor is why.  When the last
+  // reference to a Connection is dropped inside a callback running on an io thread, the
+  // destructor runs on that thread and cannot join it, so it detaches instead.  A plain
+  // member would then be destroyed while the detached thread is still inside run().  Each
+  // io thread holds its own reference, so the context outlives whichever thread leaves last.
+  std::shared_ptr<asio::io_context> io_;
   couchbase::core::cluster cluster_;
   std::list<std::thread> io_threads_;
 
