@@ -23,7 +23,10 @@ from typing import (Any,
                     Dict,
                     List,
                     Optional,
-                    Set)
+                    Set,
+                    Tuple,
+                    TypeVar,
+                    Union)
 
 from couchbase.auth import AuthDomain
 from couchbase.exceptions import (FeatureUnavailableException,
@@ -34,6 +37,14 @@ from couchbase.exceptions import (FeatureUnavailableException,
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import UserMgmtOperationType
 from couchbase.management.logic.mgmt_req import MgmtRequest
+
+T = TypeVar('T')
+
+# What UserManagementUtils.to_set accepts, which is wider than the set it returns: it
+# normalises a set, a list, a tuple, or a single bare element of the valid type.  Every
+# parameter feeding to_set is annotated with this, so the signature states what the helper
+# takes rather than only the one shape of the four it passes through unchanged.
+SetInputType = Union[Set[T], List[T], Tuple[T, ...], T]
 
 
 class Role:
@@ -58,18 +69,18 @@ class Role:
         return self._name
 
     @property
-    def bucket(self) -> str:
+    def bucket(self) -> Optional[str]:
         return self._bucket
 
     @property
-    def scope(self) -> str:
+    def scope(self) -> Optional[str]:
         return self._scope
 
     @property
-    def collection(self) -> str:
+    def collection(self) -> Optional[str]:
         return self._collection
 
-    def as_dict(self) -> Dict[str, str]:
+    def as_dict(self) -> Dict[str, Optional[str]]:
         return {
             'name': self._name,
             'bucket': self._bucket,
@@ -77,7 +88,7 @@ class Role:
             'collection': self._collection
         }
 
-    def __eq__(self, other: Role) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Role):
             return False
         return (self.name == other.name
@@ -129,7 +140,7 @@ class RoleAndDescription:
         return self._ce
 
     @classmethod
-    def create_role_and_description(cls, raw_data: Dict[str, str]) -> RoleAndDescription:
+    def create_role_and_description(cls, raw_data: Dict[str, Any]) -> RoleAndDescription:
         return cls(
             role=Role.create_role(raw_data),
             display_name=raw_data.get('display_name', None),
@@ -175,7 +186,7 @@ class RoleAndOrigins:
         return self._origins
 
     @classmethod
-    def create_role_and_origins(cls, raw_data: Dict[str, str]) -> RoleAndOrigins:
+    def create_role_and_origins(cls, raw_data: Dict[str, Any]) -> RoleAndOrigins:
 
         # RBAC prior to v6.5 does not have origins
         origin_data = raw_data.get("origins", None)
@@ -224,8 +235,8 @@ class User:
     def __init__(self,
                  username: Optional[str] = None,
                  display_name: Optional[str] = None,
-                 groups: Optional[Set[str]] = None,
-                 roles: Optional[Set[Role]] = None,
+                 groups: Optional[SetInputType[str]] = None,
+                 roles: Optional[SetInputType[Role]] = None,
                  password: Optional[str] = None,
                  ) -> None:
 
@@ -256,7 +267,7 @@ class User:
         return self._groups
 
     @groups.setter
-    def groups(self, value: Set[str]) -> None:
+    def groups(self, value: SetInputType[str]) -> None:
         self._groups = UserManagementUtils.to_set(value, str, 'Groups')
 
     @property
@@ -265,16 +276,24 @@ class User:
         return self._roles
 
     @roles.setter
-    def roles(self, value: Set[Role]) -> None:
+    def roles(self, value: SetInputType[Role]) -> None:
         self._roles = UserManagementUtils.to_set(value, Role, 'Roles')
 
+    @property
+    def password(self) -> str:
+        # Write-only.  The previous spelling was ``password = property(None, password)``, whose
+        # absent getter made every read raise AttributeError; raising here keeps that, in a
+        # shape a checker reads as a property rather than as a method being overwritten.
+        raise AttributeError('The password property is write-only.')
+
+    @password.setter
     def password(self, value: str) -> None:
         self._password = value
 
-    password = property(None, password)
-
     def as_dict(self) -> Dict[str, Any]:
-        output = {
+        # Annotated because the literal below infers Dict[str, Optional[str]], which the roles
+        # list and the groups set that follow do not fit.
+        output: Dict[str, Any] = {
             "username": self.username,
             "display_name": self.display_name,
             "password": self._password
@@ -289,7 +308,7 @@ class User:
         return output
 
     @classmethod
-    def create_user(cls, raw_data: Dict[str, Any], roles: Optional[Dict[str, Any]] = None) -> User:
+    def create_user(cls, raw_data: Dict[str, Any], roles: Optional[SetInputType[Role]] = None) -> User:
 
         user_roles = roles
         if not user_roles:
@@ -359,7 +378,7 @@ class UserAndMetadata:
         return self._external_groups
 
     @property
-    def raw_data(self) -> Dict[str, Any]:
+    def raw_data(self) -> Optional[Dict[str, Any]]:
         return self._raw_data
 
     @classmethod
@@ -368,8 +387,12 @@ class UserAndMetadata:
         effective_roles = list(map(lambda r: RoleAndOrigins.create_role_and_origins(r),
                                    raw_data.get("effective_roles")))
 
+        # RoleAndOrigins.role is Optional, so without the first clause this could admit a None
+        # into the user's roles.  create_role_and_origins always supplies one, so the guard never
+        # drops anything; it is here so the code holds to what the annotation says.
         user_roles = set(r.role for r in effective_roles
-                         if any(map(lambda o: o.type == "user", r.origins)) or len(r.origins) == 0)
+                         if r.role is not None
+                         and (any(map(lambda o: o.type == "user", r.origins)) or len(r.origins) == 0))
 
         # RBAC prior to v6.5 does not have groups
         ext_group_data = raw_data.get("external_groups", None)
@@ -401,7 +424,7 @@ class Group:
     def __init__(self,
                  name: Optional[str] = None,
                  description: Optional[str] = None,
-                 roles: Optional[set[Role]] = None,
+                 roles: Optional[SetInputType[Role]] = None,
                  ldap_group_reference: Optional[str] = None,
                  **kwargs: Any
                  ) -> None:
@@ -416,7 +439,7 @@ class Group:
         self._raw_data = kwargs.get('raw_data', None)
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> str:
         return self._name
 
     @property
@@ -428,11 +451,11 @@ class Group:
         self._description = value
 
     @property
-    def roles(self) -> Optional[Set[Role]]:
+    def roles(self) -> Set[Role]:
         return self._roles
 
     @roles.setter
-    def roles(self, value: Set[Role]) -> None:
+    def roles(self, value: SetInputType[Role]) -> None:
         self._roles = UserManagementUtils.to_set(value, Role, 'Roles')
 
     @property
@@ -444,7 +467,7 @@ class Group:
         self._ldap_group_reference = value
 
     @property
-    def raw_data(self) -> Dict[str, Any]:
+    def raw_data(self) -> Optional[Dict[str, Any]]:
         return self._raw_data
 
     def as_dict(self) -> Dict[str, Any]:
