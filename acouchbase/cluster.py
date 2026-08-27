@@ -151,7 +151,9 @@ class AsyncCluster:
                 current authenticator.
 
         Raises:
-            RuntimeError: If cluster is not connected.
+            RuntimeError: If the cluster has been closed.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If `authenticator` is not the
+                same type as the current authenticator.
         """
         req = self._impl.request_builder.build_update_credential_request(authenticator)
         self._impl.update_credentials(req)

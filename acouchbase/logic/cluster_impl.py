@@ -30,7 +30,7 @@ from acouchbase.n1ql import AsyncN1QLRequest
 from acouchbase.search import AsyncFullTextSearchRequest
 from acouchbase.transactions import Transactions
 from couchbase.exceptions import ServiceUnavailableException, UnAmbiguousTimeoutException
-from couchbase.logic.cluster_impl import ClusterSettings
+from couchbase.logic.cluster_impl import ClusterSettings, normalize_connection_info
 from couchbase.logic.cluster_req_builder import ClusterRequestBuilder
 from couchbase.logic.cluster_types import CreateConnectionRequest, GetConnectionInfoRequest
 from couchbase.logic.observability import ObservabilityInstruments
@@ -238,7 +238,8 @@ class AsyncClusterImpl:
 
     def get_connection_info(self) -> Dict[str, Any]:
         """**INTERNAL**"""
-        return self._client_adapter.execute_cluster_request_sync(GetConnectionInfoRequest())
+        return normalize_connection_info(
+            self._client_adapter.execute_cluster_request_sync(GetConnectionInfoRequest()))
 
     async def ping(self, req: PingRequest) -> PingResult:
         """**INTERNAL**"""
