@@ -50,7 +50,7 @@ class NoOpSpan(RequestSpan):
 
     def __init__(self,
                  name: str,
-                 parent_span: Optional[NoOpSpan] = None,
+                 parent_span: Optional[RequestSpan] = None,
                  start_time: Optional[int] = None) -> None:
         pass
 
@@ -93,4 +93,4 @@ class NoOpTracer(RequestTracer):
         parent_span: Optional[RequestSpan] = None,
         start_time: Optional[int] = None
     ) -> RequestSpan:
-        return NoOpSpan()
+        return NoOpSpan(name, parent_span=parent_span, start_time=start_time)

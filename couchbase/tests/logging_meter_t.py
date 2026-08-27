@@ -46,6 +46,7 @@ class LoggingMeterTestSuite:
         'test_multiple_services',
         'test_multiple_operations_per_service',
         'test_recorder_reuse',
+        'test_reports_every_interval',
         'test_thread_safety',
         'test_large_value_ranges',
         'test_empty_histogram',
@@ -291,6 +292,27 @@ class LoggingMeterTestSuite:
         # Should have 2 total values (both recorders write to same histogram)
         stats = report['operations'][ServiceType.KeyValue.value][OpName.Get.value]
         assert stats['total_count'] == 2
+
+        # Clean up
+        meter.close()
+
+    def test_reports_every_interval(self):
+        """Every interval with activity should report, not just the first."""
+        meter = LoggingMeter()
+        meter._reporter.stop()
+        meter._reporter = FakeReporter()
+
+        tags = {
+            OpAttributeName.Service.value: ServiceType.KeyValue.value,
+            OpAttributeName.OperationName.value: OpName.Get.value,
+        }
+
+        for _ in range(3):
+            # A fresh value_recorder() call each interval, as the request path makes.
+            meter.value_recorder(OpAttributeName.MeterOperationDuration, tags).record_value(100)
+            report = meter.create_report()
+            stats = report['operations'][ServiceType.KeyValue.value][OpName.Get.value]
+            assert stats['total_count'] == 1
 
         # Clean up
         meter.close()
