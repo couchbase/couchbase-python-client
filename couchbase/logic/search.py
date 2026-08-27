@@ -25,6 +25,7 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     List,
                     Optional,
+                    Sequence,
                     Set,
                     Tuple,
                     Union)
@@ -1242,7 +1243,7 @@ class SearchQueryBuilder:
         self.set_option('client_context_id', value)
 
     @property
-    def sort(self) -> Optional[Union[List[str], List[Sort]]]:
+    def sort(self) -> Optional[Sequence[Union[str, Sort]]]:
         return self._sort
 
     @sort.setter

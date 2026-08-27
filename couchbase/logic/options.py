@@ -25,6 +25,7 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     List,
                     Optional,
+                    Sequence,
                     Type,
                     Union,
                     overload)
@@ -863,7 +864,7 @@ class PingOptionsBase(OptionsTimeoutBase):
     def __init__(self,
                  timeout=None,       # type: timedelta
                  report_id=None,     # type: str
-                 service_types=None  # type: Iterable[ServiceType]
+                 service_types=None  # type: Union[Iterable[ServiceType], Iterable[str]]
                  ):
         pass
 
@@ -893,7 +894,7 @@ class WaitUntilReadyOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
                  desired_state=None,     # type: ClusterState
-                 service_types=None  # type: Iterable[ServiceType]
+                 service_types=None  # type: Union[Iterable[ServiceType], Iterable[str]]
                  ):
         pass
 
@@ -931,7 +932,9 @@ class InsertOptionsBase(DurabilityOptionBlockBase):
                  timeout=None,  # type: Optional[timedelta]
                  expiry=None,  # type: Optional[timedelta]
                  durability=None,  # type: Optional[DurabilityType]
-                 transcoder=None  # type: Optional[Transcoder]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -947,7 +950,9 @@ class UpsertOptionsBase(DurabilityOptionBlockBase):
                  expiry=None,  # type: Optional[timedelta]
                  preserve_expiry=False,  # type: Optional[bool]
                  durability=None,  # type: Optional[DurabilityType]
-                 transcoder=None  # type: Optional[Transcoder]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -998,7 +1003,9 @@ class ReplaceOptionsBase(DurabilityOptionBlockBase):
                  cas=None,  # type: Optional[int]
                  preserve_expiry=False,  # type: Optional[bool]
                  durability=None,  # type: Optional[DurabilityType]
-                 transcoder=None  # type: Optional[Transcoder]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1012,7 +1019,9 @@ class RemoveOptionsBase(DurabilityOptionBlockBase):
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
                  cas=None,  # type: Optional[int]
-                 durability=None  # type: Optional[DurabilityType]
+                 durability=None,  # type: Optional[DurabilityType]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1028,7 +1037,9 @@ class GetOptionsBase(OptionsTimeoutBase):
         timeout=None,  # type: Optional[timedelta]
         with_expiry=None,  # type: Optional[bool]
         project=None,  # type: Optional[Iterable[str]]
-        transcoder=None  # type: Optional[Transcoder]
+        transcoder=None,  # type: Optional[Transcoder]
+        span=None,  # type: Optional[SpanProtocol]
+        parent_span=None,  # type: Optional[SpanProtocol]
     ):
         pass
 
@@ -1048,7 +1059,9 @@ class GetOptionsBase(OptionsTimeoutBase):
 class ExistsOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1060,7 +1073,9 @@ class ExistsOptionsBase(OptionsTimeoutBase):
 class TouchOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1075,6 +1090,8 @@ class GetAllReplicasOptionsBase(OptionsTimeoutBase):
                  timeout=None,  # type: Optional[timedelta]
                  transcoder=None,  # type: Optional[Transcoder]
                  read_preference=None,  # type: Optional[ReadPreference]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1087,7 +1104,9 @@ class GetAndTouchOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 transcoder=None  # type: Optional[Transcoder]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1100,7 +1119,9 @@ class GetAndLockOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 transcoder=None  # type: Optional[Transcoder]
+                 transcoder=None,  # type: Optional[Transcoder]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1115,6 +1136,8 @@ class GetAnyReplicaOptionsBase(OptionsTimeoutBase):
                  timeout=None,  # type: Optional[timedelta]
                  transcoder=None,  # type: Optional[Transcoder]
                  read_preference=None,  # type: Optional[ReadPreference]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1126,7 +1149,9 @@ class GetAnyReplicaOptionsBase(OptionsTimeoutBase):
 class UnlockOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
-                 timeout=None  # type: Optional[timedelta]
+                 timeout=None,  # type: Optional[timedelta]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1142,7 +1167,9 @@ class LookupInOptionsBase(DurabilityOptionBlockBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
-                 access_deleted=None  # type: Optional[bool]
+                 access_deleted=None,  # type: Optional[bool]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1187,11 +1214,14 @@ class MutateInOptionsBase(DurabilityOptionBlockBase):
     @overload
     def __init__(self,
                  timeout=None,  # type: Optional[timedelta]
+                 expiry=None,  # type: Optional[timedelta]
                  cas=0,          # type: Optional[int]
                  durability=None,  # type: Optional[DurabilityType]
                  store_semantics=None,  # type: Optional[StoreSemantics]
                  access_deleted=None,  # type: Optional[bool]
-                 preserve_expiry=None  # type: Optional[bool]
+                 preserve_expiry=None,  # type: Optional[bool]
+                 span=None,  # type: Optional[SpanProtocol]
+                 parent_span=None,  # type: Optional[SpanProtocol]
                  ):
         pass
 
@@ -1367,7 +1397,7 @@ class SearchOptionsBase(OptionsTimeoutBase):
                  consistent_with=None,   # type: Optional[MutationState]
                  facets=None,            # type: Optional[Dict[str, Facet]]
                  raw=None,               # type: Optional[Dict[str, Any]]
-                 sort=None,              # type: Optional[Union[List[str],List[Sort]]]
+                 sort=None,              # type: Optional[Union[Sequence[str], Sequence[Sort]]]
                  disable_scoring=None,   # type: Optional[bool]
                  scope_name=None,  # type: Optional[str]
                  collections=None,       # type: Optional[List[str]]
@@ -1424,7 +1454,7 @@ class ViewOptionsBase(OptionsTimeoutBase):
                  group=None,                 # type: Optional[bool]
                  group_level=None,           # type: Optional[int]
                  key=None,                   # type: Optional[JSONType]
-                 keys=None,                  # type: Optional[List[JSONType]]
+                 keys=None,                  # type: Optional[Sequence[JSONType]]
                  order=None,                 # type: Optional[ViewOrdering]
                  reduce=None,                # type: Optional[bool]
                  on_error=None,              # type: Optional[ViewErrorMode]
