@@ -339,12 +339,18 @@ ErrorContextType = Union[AnalyticsErrorContext,
 
 class CouchbaseException(Exception):
     def __init__(self,
-                 base=None,  # type: Optional[pycbc_exception]
+                 base=None,  # type: Optional[Union[pycbc_exception, str]]
                  message=None,     # type: Optional[str]
                  context=None,      # type: Optional[ErrorContextType]
                  error_code=None,  # type: Optional[int]
                  exc_info=None      # type: Optional[Dict[str, Any]]
                  ):
+        if isinstance(base, str) and message is None:
+            # Every subclass takes `message` first and routes a bare string to it; the base
+            # takes `base` first, so the one spelling that reads as correct silently discarded
+            # the message and left an object __repr__ could not render.  Goes away with `base`
+            # itself once the hierarchy no longer wraps a C-extension error.
+            base, message = None, base
         self._base = base
         self._context = context
         self._message = message

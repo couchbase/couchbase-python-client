@@ -324,7 +324,7 @@ def parse_subdocument_status(status, path, key):  # noqa: C901
     if status == SubDocStatus.ValueTooDeep:
         raise ValueTooDeepException(f"Value too deep for document. Path={path}, key={key}.")
 
-    raise CouchbaseException(f"Unknown status. Status={status}, path={path}, key={key}")
+    raise CouchbaseException(message=f"Unknown status. Status={status}, path={path}, key={key}")
 
 
 def exists(path,  # type: str
