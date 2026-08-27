@@ -205,11 +205,16 @@ class ClusterImpl:
                 log.warning('Error closing transactions while closing the cluster.', exc_info=True)
 
         try:
-            from couchbase.logic.observability import ThresholdLoggingTracer
-            tracer = self._cluster_settings.observability_instruments.tracer.tracer
+            from couchbase.logic.observability import LoggingMeter, ThresholdLoggingTracer
+            instruments = self._cluster_settings.observability_instruments
+            tracer = instruments.tracer.tracer
             if isinstance(tracer, ThresholdLoggingTracer):
                 # shutdown the tracer's reporter
                 tracer.close()
+            meter = instruments.meter
+            if isinstance(meter, LoggingMeter):
+                # shutdown the meter's reporter
+                meter.close()
         except Exception:  # nosec
             # Don't raise exceptions during shutdown
             pass

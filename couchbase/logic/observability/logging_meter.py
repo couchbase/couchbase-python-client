@@ -67,12 +67,6 @@ class ConcurrentMap(Generic[K, V]):
                 self._data[key] = self._factory(key)
             return self._data[key]
 
-    def flush(self) -> Dict[K, V]:
-        with self._lock:
-            snapshot = self._data
-            self._data = {}
-            return snapshot
-
     def items(self):
         with self._lock:
             # Return a static list so we don't get iteration size mutation errors
@@ -221,6 +215,11 @@ class LoggingMeter(Meter):
         # (service_str, op_str) -> recorder cache. Avoids OpName() and
         # ServiceType() enum construction on every value_recorder() call. There
         # are only ~8 KV op combinations so this fills up after the first ops.
+        # It also pins the recorders: a cached entry outlives every lookup, so
+        # self._recorders must keep the same objects for the life of the meter.
+        # Replacing that map, rather than resetting the recorders in it, strands
+        # each cached recorder beyond create_report's reach and it reports
+        # nothing again.
         self._recorder_cache: Dict[Tuple[str, str], LoggingValueRecorder] = {}
         self._reporter = LoggingMeterReporter(logging_meter=self, interval=self._emit_interval_s)
         self._reporter.start()
@@ -249,9 +248,11 @@ class LoggingMeter(Meter):
         }
         for svc_type, op_map in self._recorders.items():
             svc_report = {}
-            for op_name, recorder in op_map.flush().items():
+            for op_name, recorder in op_map.items():
                 percentile_report = recorder.get_percentiles_and_reset()
-                if percentile_report:
+                # get_percentiles_and_reset returns a populated dict either way,
+                # so an idle operation is only recognizable by its count.
+                if percentile_report['total_count']:
                     svc_report[op_name.value] = percentile_report
             if svc_report:
                 report['operations'][svc_type.value] = svc_report
