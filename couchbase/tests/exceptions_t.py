@@ -18,13 +18,16 @@ import sys
 import pytest
 
 import couchbase.exceptions as E
+from couchbase.subdocument import parse_subdocument_status
 from tests.environments import CollectionType
 
 
 class ExceptionTestSuite:
     TEST_MANIFEST = [
         'test_couchbase_exception_base',
+        'test_couchbase_exception_positional_message',
         'test_exceptions_create_only_message',
+        'test_unknown_subdocument_status_reports_the_status',
     ]
 
     @pytest.fixture(scope='class', name='cb_exceptions')
@@ -46,6 +49,25 @@ class ExceptionTestSuite:
         assert isinstance(base, E.CouchbaseException)
         assert str(base).startswith('<')
         assert 'message=This is a test message.' in str(base)
+
+    def test_couchbase_exception_positional_message(self):
+        # Every CouchbaseException subclass takes `message` as its first positional parameter.
+        # The base took `base`, so a bare string landed in `_base` and __repr__ then called
+        # .err() on it, raising AttributeError from str() rather than reporting the message.
+        base = E.CouchbaseException('This is a test message.')
+        assert base.message == 'This is a test message.'
+        assert str(base) == '<message=This is a test message.>'
+
+    def test_unknown_subdocument_status_reports_the_status(self):
+        # The fallback of parse_subdocument_status is the only shipped caller that constructed
+        # the base class positionally, so the one branch whose whole job is to describe an
+        # unrecognised status was the one that dropped its description.
+        with pytest.raises(E.CouchbaseException) as exc_info:
+            parse_subdocument_status(0xFFFF, 'some.path', 'some-key')
+        message = str(exc_info.value)
+        assert 'Status=65535' in message
+        assert 'path=some.path' in message
+        assert 'key=some-key' in message
 
     def test_exceptions_create_only_message(self, cb_exceptions):
         for ex in cb_exceptions:
