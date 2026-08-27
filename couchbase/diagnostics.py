@@ -115,7 +115,7 @@ class EndpointDiagnosticsReport:
     def as_dict(self) -> Dict[str, Any]:
         output = {k: v for k, v in self._src.items() if v is not None}
         last_activity = output.pop('last_activity', None)
-        if last_activity:
+        if last_activity is not None:
             output['last_activity_us'] = last_activity
         return output
 
@@ -166,7 +166,7 @@ class EndpointPingReport:
     def as_dict(self) -> Dict[str, Any]:
         output = {k: v for k, v in self._src_ping.items() if v is not None}
         latency = output.pop('latency', None)
-        if latency:
+        if latency is not None:
             output['latency_us'] = latency
         return output
 
