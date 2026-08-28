@@ -246,7 +246,7 @@ class TLSVerifyMode(Enum):
                 return cls.NONE
 
         raise InvalidArgumentException(message=(f"{value} is not a valid TLSVerifyMode option. "
-                                                "Excepted str representation of type TLSVerifyMode."))
+                                                "Expected str representation of type TLSVerifyMode."))
 
     @classmethod
     def to_str(cls, value  # type: Union[TLSVerifyMode, str]
@@ -264,7 +264,7 @@ class TLSVerifyMode(Enum):
                 return cls.NONE.value
 
         raise InvalidArgumentException(message=(f"{value} is not a valid TLSVerifyMode option. "
-                                                "Excepted TLS verify mode to be either of type "
+                                                "Expected TLS verify mode to be either of type "
                                                 "TLSVerifyMode or str representation "
                                                 "of TLSVerifyMode."))
 
@@ -286,7 +286,7 @@ class IpProtocol(Enum):
                 return cls.ForceIPv6
 
         raise InvalidArgumentException(message=(f"{value} is not a valid IpProtocol option. "
-                                                "Excepted str representation of type IpProtocol."))
+                                                "Expected str representation of type IpProtocol."))
 
     @classmethod
     def to_str(cls, value  # type: Union[IpProtocol, str]
@@ -302,7 +302,7 @@ class IpProtocol(Enum):
                 return cls.ForceIPv6.value
 
         raise InvalidArgumentException(message=(f"{value} is not a valid IpProtocol option. "
-                                                "Excepted IP Protocol mode to be either of type "
+                                                "Expected IP Protocol mode to be either of type "
                                                 "IpProtocol or str representation "
                                                 "of IpProtocol."))
 
@@ -370,7 +370,7 @@ class KnownConfigProfiles(Enum):
                 return cls.WanDevelopment
 
         raise InvalidArgumentException(message=(f"{value} is not a valid KnownConfigProfiles option. "
-                                                "Excepted str representation of type KnownConfigProfiles."))
+                                                "Expected str representation of type KnownConfigProfiles."))
 
     @classmethod
     def to_str(cls, value  # type: Union[KnownConfigProfiles, str]
@@ -383,7 +383,7 @@ class KnownConfigProfiles(Enum):
             return value
 
         raise InvalidArgumentException(message=(f"{value} is not a valid KnownConfigProfiles option. "
-                                                "Excepted config profile to be either of type "
+                                                "Expected config profile to be either of type "
                                                 "KnownConfigProfiles or str representation "
                                                 "of KnownConfigProfiles."))
 

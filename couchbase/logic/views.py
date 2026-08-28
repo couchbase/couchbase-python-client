@@ -246,7 +246,7 @@ class ViewQuery:
         elif isinstance(value, str) and value in [sc.value for sc in ViewScanConsistency]:
             self.set_option('scan_consistency', ViewScanConsistency(value).to_str())
         else:
-            raise InvalidArgumentException(message=("Excepted consistency to be either of type "
+            raise InvalidArgumentException(message=("Expected consistency to be either of type "
                                                     "ViewScanConsistency or str representation "
                                                     "of ViewScanConsistency"))
 
@@ -361,7 +361,7 @@ class ViewQuery:
         elif isinstance(value, str) and value in [sc.value for sc in ViewOrdering]:
             self.set_option('order', ViewOrdering(value).to_str())
         else:
-            raise InvalidArgumentException(message=("Excepted order to be either of type "
+            raise InvalidArgumentException(message=("Expected order to be either of type "
                                                     "ViewOrdering or str representation "
                                                     "of ViewOrdering"))
 
@@ -383,7 +383,7 @@ class ViewQuery:
         elif isinstance(value, str) and value in [sc.value for sc in ViewErrorMode]:
             self.set_option('on_error', ViewErrorMode(value).to_str())
         else:
-            raise InvalidArgumentException(message=("Excepted on_error to be either of type "
+            raise InvalidArgumentException(message=("Expected on_error to be either of type "
                                                     "ViewErrorMode or str representation "
                                                     "of ViewErrorMode"))
 
@@ -411,7 +411,7 @@ class ViewQuery:
         elif isinstance(value, str) and value in [sc.value for sc in DesignDocumentNamespace]:
             self.set_option('ns', DesignDocumentNamespace(value).to_str())
         else:
-            raise InvalidArgumentException(message=("Excepted namespace to be either of type "
+            raise InvalidArgumentException(message=("Expected namespace to be either of type "
                                                     "DesignDocumentNamespace or str representation "
                                                     "of DesignDocumentNamespace"))
 

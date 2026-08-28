@@ -70,7 +70,7 @@ def int_to_enum(value: int, enum: IntEnum, conversion_fn: Optional[Callable[...,
 
 def seconds_to_timedelta(value: Union[float, int]) -> timedelta:
     if value and not isinstance(value, (float, int)):
-        raise InvalidArgumentException(message=("Excepted value to be of type "
+        raise InvalidArgumentException(message=("Expected value to be of type "
                                                 f"Union[float, int] instead of {type(value)}"))
     return timedelta(seconds=value)
 
@@ -94,7 +94,7 @@ def timedelta_as_milliseconds(duration: timedelta) -> int:
 
 def to_seconds(value: Union[timedelta, float, int]) -> int:
     if value and not isinstance(value, (timedelta, float, int)):
-        raise InvalidArgumentException(message=("Excepted value to be of type "
+        raise InvalidArgumentException(message=("Expected value to be of type "
                                                 f"Union[timedelta, float, int] instead of {value}"))
     if not value:
         total_secs = 0

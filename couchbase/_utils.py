@@ -68,7 +68,7 @@ def to_microseconds(
     timeout  # type: Union[timedelta, float, int]
 ) -> int:
     if timeout and not isinstance(timeout, (timedelta, float, int)):
-        raise InvalidArgumentException(message=("Excepted timeout to be of type "
+        raise InvalidArgumentException(message=("Expected timeout to be of type "
                                                 f"Union[timedelta, float, int] instead of {timeout}"))
     if not timeout:
         total_us = 0
@@ -84,7 +84,7 @@ def to_milliseconds(
     timeout  # type: Union[timedelta, float, int]
 ) -> int:
     if timeout and not isinstance(timeout, (timedelta, float, int)):
-        raise InvalidArgumentException(message=("Excepted timeout to be of type "
+        raise InvalidArgumentException(message=("Expected timeout to be of type "
                                                 f"Union[timedelta, float, int] instead of {timeout}"))
     if not timeout:
         total_us = 0
