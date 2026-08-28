@@ -1630,7 +1630,7 @@ class SearchOptions(SearchOptionsBase):
             makes it impossible to sort based on how well a particular result scored. Defaults to False.
         include_locations (bool optional): If set to True, will include the locations in the search result.
             Defaults to False.
-        sort (Union[Sequence[str], Sequence[:class:`~couchbase.search.Sort`]], optional): Specifies a list of
+        sort (Sequence[Union[str, :class:`~couchbase.search.Sort`]], optional): Specifies a list of
             fields or search :class:`~couchbase.search.Sort`'s to use when sorting the result sets.
             Defaults to None.
         scope_name (string, optional): Specifies the scope which should be searched as part of the search

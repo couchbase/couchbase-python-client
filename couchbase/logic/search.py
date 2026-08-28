@@ -1013,14 +1013,9 @@ class SearchQueryBuilder:
 
         if self.sort:
             sort_specs = []
-            if all(map(lambda s: isinstance(s, str), self.sort)):
-                for s in self.sort:
-                    encoded = json.dumps(s)
-                    sort_specs.append(encoded)
-            else:
-                for s in self.sort:
-                    encoded = json.dumps(s.as_encodable())
-                    sort_specs.append(encoded)
+            for s in self.sort:
+                encoded = json.dumps(s if isinstance(s, str) else s.as_encodable())
+                sort_specs.append(encoded)
 
             params['sort_specs'] = sort_specs
 
@@ -1254,7 +1249,8 @@ class SearchQueryBuilder:
         elif all(map(lambda s: isinstance(s, (Sort, str)), value)):
             self._sort = value
         else:
-            InvalidArgumentException(message='sort option must be either List[str] | List[Sort] | List[Sort | str]')
+            raise InvalidArgumentException(
+                message='sort option must be either List[str] | List[Sort] | List[Sort | str]')
 
     @property
     def raw(self) -> Optional[Dict[str, Any]]:
