@@ -196,7 +196,9 @@ class UserManagementUtils:
     def to_set(value: Any, valid_type: Any, display_name: str) -> Set[Any]:
 
         if not value:
-            return value
+            # Returning the argument handed back None to every caller below, and Group.as_dict
+            # iterates self.roles unguarded.
+            return set()
         elif isinstance(value, set):
             UserManagementUtils.validate_all_set_types(value, valid_type, display_name)
             return value
@@ -291,8 +293,8 @@ class User:
 
         user_roles = roles
         if not user_roles:
-            set(map(lambda r: Role.create_role(r),
-                    raw_data.get("roles")))
+            user_roles = set(map(lambda r: Role.create_role(r),
+                                 raw_data.get("roles", [])))
 
         # RBAC prior to v6.5 does not have groups
         group_data = raw_data.get("groups", None)
@@ -447,8 +449,6 @@ class Group:
 
     def as_dict(self) -> Dict[str, Any]:
         rs = list(map(lambda r: r.as_dict(), self.roles))
-        for r in self.roles:
-            r.as_dict()
         return {
             'name': self.name,
             'description': self.description,
@@ -462,8 +462,8 @@ class Group:
             raw_data.get('name'),
             description=raw_data.get('description', None),
             roles=set(map(lambda r: Role.create_role(
-                r), raw_data.get('roles'))),
-            ldap_group_referenc=raw_data.get('ldap_group_ref', None)
+                r), raw_data.get('roles', []))),
+            ldap_group_reference=raw_data.get('ldap_group_ref', None)
         )
 
 
@@ -623,6 +623,10 @@ class UpsertUserRequest(UserMgmtRequest):
 USER_MGMT_ERROR_MAP: Dict[str, Exception] = {
     r'Unknown group.*': GroupNotFoundException,
     r'Unknown user.*': UserNotFoundException,
+    # The drop endpoints word it differently from the get endpoints, and the patterns are
+    # applied with re.match, so the get wording above cannot reach them.
+    r'Group was not found.*': GroupNotFoundException,
+    r'User was not found.*': UserNotFoundException,
     r'Not found.*': FeatureUnavailableException,
     r'Method Not Allowed.*': FeatureUnavailableException,
     r'.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException

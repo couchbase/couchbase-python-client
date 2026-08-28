@@ -39,13 +39,19 @@ from tests.test_features import EnvironmentFeatures
 
 class UserManagementTestSuite:
     TEST_MANIFEST = [
+        'test_create_group_absent_roles_key',
+        'test_create_group_keeps_ldap_reference',
+        'test_create_user_assigns_roles',
         'test_default_domain',
+        'test_drop_missing_group',
+        'test_drop_missing_user',
         'test_external_nopassword',
         'test_external_user',
         'test_get_all_groups',
         'test_get_roles',
         'test_get_roles_all_valid',
         'test_group',
+        'test_group_as_dict_without_roles',
         'test_group_feature_not_found',
         'test_internal_user',
         'test_internal_user_fail',
@@ -70,6 +76,26 @@ class UserManagementTestSuite:
         EnvironmentFeatures.check_if_feature_supported('user_group_mgmt',
                                                        cb_env.server_version_short,
                                                        cb_env.mock_server_type)
+
+    def test_create_group_absent_roles_key(self):
+        # A group with no roles at all is a valid response, not a missing key.
+        assert Group.create_group({'name': 'test-group'}).roles == set()
+
+    def test_create_group_keeps_ldap_reference(self):
+        group = Group.create_group({'name': 'test-group',
+                                    'roles': [],
+                                    'ldap_group_ref': 'cn=test,ou=groups'})
+        assert group.ldap_group_reference == 'cn=test,ou=groups'
+
+    def test_create_user_assigns_roles(self):
+        raw_data = {'username': 'test-user',
+                    'roles': [{'name': 'data_reader', 'bucket': 'default'}]}
+        assert sorted(r.name for r in User.create_user(raw_data).roles) == ['data_reader']
+        # A user with no roles at all is a valid response, not a missing key.
+        assert User.create_user({'username': 'test-user'}).roles == set()
+
+    def test_group_as_dict_without_roles(self):
+        assert Group(name='test-group').as_dict()['roles'] == []
 
     def test_default_domain(self, cb_env):
 
@@ -490,6 +516,15 @@ class UserManagementTestSuite:
     def test_missing_user(self, cb_env):
         with pytest.raises(UserNotFoundException):
             cb_env.um.get_user('keith')
+
+    @pytest.mark.usefixtures('check_user_groups_supported')
+    def test_drop_missing_group(self, cb_env):
+        with pytest.raises(GroupNotFoundException):
+            cb_env.um.drop_group('fred')
+
+    def test_drop_missing_user(self, cb_env):
+        with pytest.raises(UserNotFoundException):
+            cb_env.um.drop_user('keith')
 
     @pytest.mark.usefixtures('check_user_groups_supported')
     def test_user_and_groups(self, cb_env):
