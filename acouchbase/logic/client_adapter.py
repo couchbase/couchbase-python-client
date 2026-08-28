@@ -130,8 +130,12 @@ class AsyncClientAdapter:
         return ft
 
     def execute_close_bucket_request(self, bucket_name: str) -> Future[None]:
-        req = CloseBucketRequest(bucket_name)
-        return self.execute_bucket_request(req)
+        if self._closed or not self.connected:
+            # execute_bucket_request guards for operations, which close is not
+            ft = self.loop.create_future()
+            ft.set_result(None)
+            return ft
+        return self.execute_bucket_request(CloseBucketRequest(bucket_name))
 
     def execute_cluster_request(self, req: ClusterRequest) -> Future[Any]:
         self._ensure_not_closed()
@@ -299,15 +303,27 @@ class AsyncClientAdapter:
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
-            # If we're closed, don't try to reconnect just to close again
-            if self._closed:
+            if self._connect_ft is None:
+                # Never attempted, so there is nothing to tear down.  Starting a connection in
+                # order to close it is the one thing close must not do.
+                self._reset_connection()
                 ft.set_result(None)
                 return ft
 
-            chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
-            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
-        else:
-            self._execute_req(ft, req.op_name, req_dict)
+            # A connect is already in flight.  Wait for it, so a connection that comes up after
+            # this call is still torn down, but never let its failure become a close failure:
+            # nothing came up, and the caller cannot act on a connect error raised out of close.
+            def _close_once_connected(chained_ft: Future[None]) -> None:
+                if chained_ft.cancelled() or chained_ft.exception() is not None:
+                    self._reset_connection()
+                    ft.set_result(None)
+                    return
+                self._execute_req(ft, req.op_name, req_dict)
+
+            self._connect_ft.add_done_callback(_close_once_connected)
+            return ft
+
+        self._execute_req(ft, req.op_name, req_dict)
         return ft
 
     def _execute_connect_request(self) -> Future[None]:

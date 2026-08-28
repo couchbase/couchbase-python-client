@@ -110,7 +110,12 @@ class AsyncBucketImpl:
 
     async def close_bucket(self) -> None:
         """**INTERNAL**"""
-        await self.wait_until_bucket_connected()
+        try:
+            await self.wait_until_bucket_connected()
+        except Exception:
+            # The bucket never opened, so there is nothing to tear down, and the caller cannot
+            # act on an open error raised out of close.
+            return
         await self._client_adapter.execute_close_bucket_request(self._bucket_name)
 
     async def ping(self, req: PingRequest) -> PingResult:

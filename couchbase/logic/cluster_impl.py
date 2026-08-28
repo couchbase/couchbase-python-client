@@ -162,6 +162,8 @@ class ClusterImpl:
     @property
     def transactions(self) -> Transactions:
         """**INTERNAL**"""
+        self._client_adapter._ensure_not_closed()
+        self._client_adapter._ensure_connected()
         if self._transactions is None:
             with self._transactions_lock:
                 if self._transactions is None:
