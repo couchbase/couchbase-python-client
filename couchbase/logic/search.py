@@ -1129,7 +1129,7 @@ class SearchQueryBuilder:
             if value in [HighlightStyle.Html.value, HighlightStyle.Ansi.value]:
                 self.set_option('highlight_style', value)
         else:
-            raise InvalidArgumentException(message=("Excepted highlight_style to be either of type "
+            raise InvalidArgumentException(message=("Expected highlight_style to be either of type "
                                                     "HighlightStyle or str representation "
                                                     "of HighlightStyle"))
 
@@ -1172,7 +1172,7 @@ class SearchQueryBuilder:
                 else:
                     self.set_option('scan_consistency', value)
             else:
-                raise InvalidArgumentException(message=("Excepted consistency to be either of type "
+                raise InvalidArgumentException(message=("Expected consistency to be either of type "
                                                         "SearchScanConsistency or str representation "
                                                         "of SearchScanConsistency"))
 
@@ -1326,7 +1326,7 @@ class SearchQueryBuilder:
             if value.lower() in [VectorQueryCombination.AND.value, VectorQueryCombination.OR.value]:
                 self.set_option('vector_query_combination', value.lower())
         else:
-            raise InvalidArgumentException(message=("Excepted vector_query_combination to be either of type "
+            raise InvalidArgumentException(message=("Expected vector_query_combination to be either of type "
                                                     "VectorQueryCombination or str representation "
                                                     "of VectorQueryCombination"))
 

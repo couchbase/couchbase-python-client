@@ -418,7 +418,7 @@ class MatchQuery(SearchQuery):
         if isinstance(value, MatchOperator):
             match_op = value.value
         if match_op and match_op.lower() not in ('or', 'and'):
-            raise ValueError(("Excepted match_operator to be either of type "
+            raise ValueError(("Expected match_operator to be either of type "
                               "MatchOperator or str representation "
                               "of MatchOperator"))
         self.set_prop('operator', match_op)

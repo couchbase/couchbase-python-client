@@ -109,7 +109,7 @@ class QueryStatus(Enum):
             elif value == cls.UNKNOWN.value:
                 return cls.UNKNOWN
         raise InvalidArgumentException(message=(f"{value} is not a valid QueryStatus option. "
-                                                "Excepted str representation of type QueryStatus."))
+                                                "Expected str representation of type QueryStatus."))
 
 
 class QueryProblem(object):
@@ -461,7 +461,7 @@ class N1QLQuery:
                 else:
                     self.set_option('scan_consistency', value)
             else:
-                raise InvalidArgumentException(message=("Excepted consistency to be either of type "
+                raise InvalidArgumentException(message=("Expected consistency to be either of type "
                                                         "QueryScanConsistency or str representation "
                                                         "of QueryScanConsistency"))
 
@@ -568,7 +568,7 @@ class N1QLQuery:
         elif isinstance(value, str) and value in [pm.value for pm in QueryProfile]:
             self.set_option('profile', value)
         else:
-            raise InvalidArgumentException(message=("Excepted profile to be either of type "
+            raise InvalidArgumentException(message=("Expected profile to be either of type "
                                                     "QueryProfile or str representation of QueryProfile"))
 
     @property
