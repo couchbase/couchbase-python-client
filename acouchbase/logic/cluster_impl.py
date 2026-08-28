@@ -160,6 +160,8 @@ class AsyncClusterImpl:
         # Transactions.__init__ goes straight into the synchronous create_transactions (no executor
         # anywhere in the async path), which releases the GIL for a full cluster round-trip.
         # Use threading.Lock, not asyncio.Lock, for the same reason.
+        self._client_adapter._ensure_not_closed()
+        self._client_adapter._ensure_connected()
         if self._transactions is None:
             with self._transactions_lock:
                 if self._transactions is None:

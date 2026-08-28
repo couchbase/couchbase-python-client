@@ -25,12 +25,13 @@ The property is synchronous and Transactions.__init__ drops the GIL for a full
 cluster round-trip, so the racers here are OS threads, not tasks -- the guard
 is a threading.Lock for the same reason.
 
-No live cluster is needed.  The property never touches the network before
-constructing a Transactions object, so the cluster is built with
+No live cluster is needed.  The cluster is built with
 skip_connect='TEST_SKIP_CONNECT' (same mechanism couchbase/tests/connection_t.py
 uses) and exercised purely at the Python layer, with Transactions swapped for a
 fake that holds the construction window open long enough to hit the race
-reliably.
+reliably.  The property gates on the connection before it constructs anything,
+so the race fixtures stub that guard out; the guard itself is covered separately
+below.
 """
 
 import threading
@@ -38,7 +39,6 @@ import threading
 import pytest
 
 from acouchbase.cluster import AsyncCluster
-from acouchbase.logic.client_adapter import AsyncClientAdapter
 from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterOptions
 
@@ -53,6 +53,8 @@ class TransactionsPropertyRaceTestSuite:
     TEST_MANIFEST = [
         'test_close_during_first_access_closes_instance',
         'test_concurrent_first_access_returns_single_instance',
+        'test_transactions_raises_when_closed',
+        'test_transactions_raises_when_not_connected',
     ]
 
     @pytest.fixture(name='tracking_transactions')
@@ -93,36 +95,41 @@ class TransactionsPropertyRaceTestSuite:
                             ClusterOptions(PasswordAuthenticator(username, pw)),
                             skip_connect='TEST_SKIP_CONNECT')
 
-    @pytest.fixture(name='stub_adapter_close')
-    def stub_async_adapter_close(self, monkeypatch):
-        """Stub out the core half of close_connection().
-
-        When not connected, AsyncClientAdapter chains a connect request ahead of the
-        close (client_adapter.py:301), so under skip_connect the close would establish
-        the very connection this test skipped.  The sync adapter early-outs instead and
-        needs no stub, so this keeps both tests network-free and asserting only the
-        lock ordering.
-        """
-
-        async def _noop(self):
-            self._closed = True
-
-        monkeypatch.setattr(AsyncClientAdapter, 'close_connection', _noop)
+    @pytest.fixture(name='race_cluster')
+    def cluster_with_the_connection_guard_stubbed(self, unconnected_cluster, monkeypatch):
+        """The race is in the property's check-then-set, not in its guard."""
+        monkeypatch.setattr(unconnected_cluster._impl._client_adapter, '_ensure_connected', lambda: None)
+        return unconnected_cluster
 
     @pytest.mark.asyncio
-    @pytest.mark.usefixtures('stub_adapter_close')
-    async def test_close_during_first_access_closes_instance(self, tracking_transactions, unconnected_cluster):
+    async def test_transactions_raises_when_not_connected(self, tracking_transactions, unconnected_cluster):
+        with pytest.raises(RuntimeError):
+            unconnected_cluster.transactions
+
+        assert tracking_transactions.instances_created == 0
+
+    @pytest.mark.asyncio
+    async def test_transactions_raises_when_closed(self, tracking_transactions, race_cluster):
+        await race_cluster.close()
+
+        with pytest.raises(RuntimeError):
+            race_cluster.transactions
+
+        assert tracking_transactions.instances_created == 0
+
+    @pytest.mark.asyncio
+    async def test_close_during_first_access_closes_instance(self, tracking_transactions, race_cluster):
         result = {}
 
         def touch():
             # Off-loop: how the property stays reachable while close() runs on the loop.
-            result['txns'] = unconnected_cluster.transactions
+            result['txns'] = race_cluster.transactions
 
         toucher = threading.Thread(target=touch)
         toucher.start()
         # Proceed only once the property is inside Transactions(), so close() races it.
         assert tracking_transactions.construction_started.wait(timeout=10), 'construction never started'
-        await unconnected_cluster.close()
+        await race_cluster.close()
         toucher.join(timeout=10)
         assert not toucher.is_alive(), 'thread failed to join, possible deadlock'
 
@@ -130,15 +137,15 @@ class TransactionsPropertyRaceTestSuite:
         assert txns is not None
         assert tracking_transactions.instances_created == 1
         assert txns.close_count == 1, 'the instance published by the racing first access was never closed'
-        assert unconnected_cluster._impl._transactions is None, 'a live Transactions outlived cluster.close()'
+        assert race_cluster._impl._transactions is None, 'a live Transactions outlived cluster.close()'
 
-    def test_concurrent_first_access_returns_single_instance(self, tracking_transactions, unconnected_cluster):
+    def test_concurrent_first_access_returns_single_instance(self, tracking_transactions, race_cluster):
         barrier = threading.Barrier(NUM_THREADS)
         results = [None] * NUM_THREADS
 
         def touch(idx):
             barrier.wait()
-            results[idx] = unconnected_cluster.transactions
+            results[idx] = race_cluster.transactions
 
         threads = [threading.Thread(target=touch, args=(i,)) for i in range(NUM_THREADS)]
         for t in threads:

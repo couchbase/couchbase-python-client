@@ -78,8 +78,8 @@ class ClientAdapter:
 
     def close_bucket(self, bucket_name: str) -> None:
         """**INTERNAL**"""
-        self._ensure_not_closed()
-        self._ensure_connected()
+        if self._closed or not self.connected:
+            return  # nothing was opened, so there is nothing to tear down
         self.execute_bucket_request(CloseBucketRequest(bucket_name))
 
     def close_connection(self) -> None:
