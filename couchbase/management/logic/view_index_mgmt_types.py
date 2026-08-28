@@ -57,6 +57,9 @@ class DesignDocumentNamespace(Enum):
 
 class View:
     def __init__(self, map: str, reduce: Optional[str] = None, name: Optional[str] = None) -> None:
+        # name is accepted but not stored: the core puts it in every view dict it builds, and
+        # DesignDocument.from_json splats the whole value in here, so dropping the parameter
+        # breaks every read.  A view's name is its key in the design document.
         self._map = map
         self._reduce = reduce
 
@@ -81,7 +84,7 @@ class View:
 
     @classmethod
     def from_json(cls, json_view: Dict[str, Any]) -> View:
-        return cls(json.loads(json_view))
+        return cls(**json_view)
 
 
 class DesignDocument(object):

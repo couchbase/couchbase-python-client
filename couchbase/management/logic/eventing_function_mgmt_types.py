@@ -954,11 +954,11 @@ class EventingFunction:
 
         metadata_keyspace = eventing_function.get('metadata_keyspace', None)
         if metadata_keyspace:
-            input['metadata_keyspace'] = EventingFunctionKeyspace.from_server(metadata_keyspace)
+            input['metadata_keyspace'] = EventingFunctionKeyspace.from_server(**metadata_keyspace)
 
         source_keyspace = eventing_function.get('source_keyspace', None)
         if source_keyspace:
-            input['source_keyspace'] = EventingFunctionKeyspace.from_server(source_keyspace)
+            input['source_keyspace'] = EventingFunctionKeyspace.from_server(**source_keyspace)
 
         bucket_bindings = eventing_function.get('bucket_bindings', None)
         if bucket_bindings:
