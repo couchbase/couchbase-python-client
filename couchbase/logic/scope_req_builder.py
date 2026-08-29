@@ -94,7 +94,7 @@ class ScopeRequestBuilder:
         else:
             query_builder = SearchQueryBuilder.create_search_query_from_request(index, query, *options, **kwargs)
 
-        scope_name = query_builder.scope_name if query_builder.scope_name else self._scope_name
+        scope_name = query_builder.params.get('scope_name', None) or self._scope_name
         req = SearchQueryRequest(query_builder, obs_handler, self._bucket_name, scope_name)
 
         # since query is lazy executed, we wait until we submit the query to create the span
