@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from types import MappingProxyType
+
 import pytest
 
 from couchbase.durability import (ClientDurability,
@@ -42,6 +44,7 @@ class BinaryCollectionMultiTestSuite:
 
     TEST_MANIFEST = [
         'test_append_multi_bytes',
+        'test_append_multi_mapping',
         'test_append_multi_string',
         'test_counter_multi_decrement',
         'test_counter_multi_decrement_non_default',
@@ -61,6 +64,18 @@ class BinaryCollectionMultiTestSuite:
         assert isinstance(res, MultiMutationResult)
         assert res.all_ok is True
         assert isinstance(res.results, dict)
+        assert res.exceptions == {}
+        assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
+
+    def test_append_multi_mapping(self, cb_env):
+        # The multi write APIs only read the mapping they are given, so any read-only Mapping
+        # has to reach the server, not just a dict.
+        keys = cb_env.get_multiple_existing_docs_by_type('bytes_empty', 4)
+        values = [b'foo', b'bar', b'baz', b'qux']
+        keys_and_docs = MappingProxyType(dict(zip(keys, values)))
+        res = cb_env.collection.binary().append_multi(keys_and_docs)
+        assert isinstance(res, MultiMutationResult)
+        assert res.all_ok is True
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
 

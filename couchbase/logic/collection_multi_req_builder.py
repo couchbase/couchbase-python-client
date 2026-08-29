@@ -20,6 +20,7 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     List,
+                    Mapping,
                     Optional,
                     Tuple,
                     Type,
@@ -126,7 +127,7 @@ class CollectionMultiRequestBuilder:
             return delta, None
 
     def _get_multi_binary_mutation_req(self,  # noqa: C901
-                                       keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
+                                       keys_and_docs: Mapping[str, Union[str, bytes, bytearray]],
                                        opts_type: Type[Union[AppendMultiOptions, PrependMultiOptions]],
                                        opcode: KeyValueMultiOperationCode,
                                        obs_handler: Optional[ObservableRequestHandler],
@@ -141,8 +142,8 @@ class CollectionMultiRequestBuilder:
         if obs_handler:
             obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
-        if not isinstance(keys_and_docs, dict):
-            raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
+        if not isinstance(keys_and_docs, Mapping):
+            raise InvalidArgumentException(message='Expected keys_and_docs to be a mapping.')
 
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
@@ -249,7 +250,7 @@ class CollectionMultiRequestBuilder:
         return KeyValueMultiRequest(opcode, requests, return_exceptions)
 
     def _get_multi_op_mutation_req(self,  # noqa: C901
-                                   keys_and_docs: Dict[str, DocumentValue],
+                                   keys_and_docs: Mapping[str, DocumentValue],
                                    opts_type: Type[MutationMultiOptions],
                                    opcode: KeyValueMultiOperationCode,
                                    obs_handler: Optional[ObservableRequestHandler],
@@ -265,8 +266,8 @@ class CollectionMultiRequestBuilder:
         if obs_handler:
             obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
-        if not isinstance(keys_and_docs, dict):
-            raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
+        if not isinstance(keys_and_docs, Mapping):
+            raise InvalidArgumentException(message='Expected keys_and_docs to be a mapping.')
 
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
@@ -398,7 +399,7 @@ class CollectionMultiRequestBuilder:
                 raise InvalidArgumentException("Argument is not valid SignedInt64")
 
     def build_append_multi_request(self,
-                                   keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
+                                   keys_and_docs: Mapping[str, Union[str, bytes, bytearray]],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> KeyValueMultiRequest:
@@ -496,7 +497,7 @@ class CollectionMultiRequestBuilder:
                                               **kwargs)
 
     def build_insert_multi_request(self,
-                                   keys_and_docs: Dict[str, DocumentValue],
+                                   keys_and_docs: Mapping[str, DocumentValue],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> KeyValueMultiRequest:
@@ -508,7 +509,7 @@ class CollectionMultiRequestBuilder:
                                                **kwargs)
 
     def build_prepend_multi_request(self,
-                                    keys_and_docs: Dict[str, Union[str, bytes, bytearray]],
+                                    keys_and_docs: Mapping[str, Union[str, bytes, bytearray]],
                                     obs_handler: ObservableRequestHandler,
                                     *opts: object,
                                     **kwargs: object) -> KeyValueMultiRequest:
@@ -533,7 +534,7 @@ class CollectionMultiRequestBuilder:
                                                 **kwargs)
 
     def build_replace_multi_request(self,
-                                    keys_and_docs: Dict[str, DocumentValue],
+                                    keys_and_docs: Mapping[str, DocumentValue],
                                     obs_handler: ObservableRequestHandler,
                                     *opts: object,
                                     **kwargs: object) -> KeyValueMultiRequest:
@@ -587,7 +588,7 @@ class CollectionMultiRequestBuilder:
                                                 **kwargs)
 
     def build_upsert_multi_request(self,
-                                   keys_and_docs: Dict[str, DocumentValue],
+                                   keys_and_docs: Mapping[str, DocumentValue],
                                    obs_handler: ObservableRequestHandler,
                                    *opts: object,
                                    **kwargs: object) -> KeyValueMultiRequest:

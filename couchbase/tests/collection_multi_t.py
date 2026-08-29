@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 from datetime import timedelta
+from types import MappingProxyType
 
 import pytest
 
@@ -87,6 +88,7 @@ class CollectionMultiTestSuite:
         'test_multi_upsert_global_opts',
         'test_multi_upsert_invalid_input',
         'test_multi_upsert_key_opts',
+        'test_multi_upsert_mapping',
         'test_multi_upsert_simple',
     ]
 
@@ -570,6 +572,16 @@ class CollectionMultiTestSuite:
 
         # lets verify they all expired...
         TestEnvironment.try_n_times(5, 3, cb_env.check_all_not_found, cb_env, list(keys_and_docs.keys()), okay_key=key1)
+
+    def test_multi_upsert_mapping(self, cb_env):
+        # The multi write APIs only read the mapping they are given, so any read-only Mapping
+        # has to reach the server, not just a dict.
+        keys_and_docs = MappingProxyType(cb_env.get_docs(4))
+        res = cb_env.collection.upsert_multi(keys_and_docs)
+        assert isinstance(res, MultiMutationResult)
+        assert res.all_ok is True
+        assert res.exceptions == {}
+        assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
 
     def test_multi_upsert_simple(self, cb_env):
         keys_and_docs = cb_env.get_docs(4)

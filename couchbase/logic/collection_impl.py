@@ -20,6 +20,7 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable,
                     Iterator,
+                    List,
                     Optional)
 
 from couchbase.exceptions import (ErrorMapper,
@@ -161,7 +162,8 @@ class CollectionImpl:
 
     def get_all_replicas_multi(self,  # noqa: C901
                                req: KeyValueMultiWithTranscoderRequest,
-                               obs_handler: ObservableRequestHandler) -> MultiGetReplicaResult:
+                               obs_handler: ObservableRequestHandler
+                               ) -> MultiGetReplicaResult[List[GetReplicaResult]]:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
 
         def _decode_replicas(key: str, transcoder: Transcoder, value: Any) -> Iterator[GetReplicaResult]:
@@ -244,7 +246,7 @@ class CollectionImpl:
 
     def get_any_replica_multi(self,
                               req: KeyValueMultiWithTranscoderRequest,
-                              obs_handler: ObservableRequestHandler) -> MultiGetReplicaResult:
+                              obs_handler: ObservableRequestHandler) -> MultiGetReplicaResult[GetReplicaResult]:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
         return MultiGetReplicaResult(ret,
                                      return_exceptions=req.return_exceptions,

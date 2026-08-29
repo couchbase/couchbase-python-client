@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
                     List,
+                    Mapping,
                     Union)
 
 from couchbase.logic.observability.handler import ObservableRequestHandler
@@ -264,14 +264,14 @@ class BinaryCollection:
 
     def append_multi(
         self,
-        keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
+        keys_and_values,  # type: Mapping[str, Union[str,bytes,bytearray]]
         *opts,  # type: AppendMultiOptions
         **kwargs,  # type: Any
     ) -> MultiMutationResult:
         """For each key-value pair, appends the specified value to the end of the document specified by the key.
 
         Args:
-            keys_and_values (Dict[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
+            keys_and_values (Mapping[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
                 append operations.  Each key should correspond to the document to append to and each value should
                 correspond to the value to append to the document.
             opts (:class:`~couchbase.options.AppendMultiOptions`): Optional parameters for this operation.
@@ -364,7 +364,7 @@ class BinaryCollection:
 
     def prepend_multi(
         self,
-        keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
+        keys_and_values,  # type: Mapping[str, Union[str,bytes,bytearray]]
         *opts,  # type: PrependMultiOptions
         **kwargs,  # type: Any
     ) -> MultiMutationResult:
@@ -372,7 +372,7 @@ class BinaryCollection:
         by the key.
 
         Args:
-            keys_and_values (Dict[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
+            keys_and_values (Mapping[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
                 prepend operations.  Each key should correspond to the document to prepend to and each value should
                 correspond to the value to prepend to the document.
             opts (:class:`~couchbase.options.PrependMultiOptions`): Optional parameters for this operation.

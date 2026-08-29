@@ -16,14 +16,21 @@
 from __future__ import annotations
 
 import json
+import sys
 from copy import copy
 from datetime import datetime
 from typing import (Any,
                     Dict,
+                    Generic,
                     List,
                     Optional,
                     Tuple,
                     Union)
+
+if sys.version_info >= (3, 13):
+    from typing import TypeVar
+else:
+    from typing_extensions import TypeVar
 
 from acouchbase.analytics import AsyncAnalyticsRequest
 from acouchbase.n1ql import AsyncN1QLRequest
@@ -453,7 +460,15 @@ class MultiResult:
         return exc
 
 
-class MultiGetReplicaResult(MultiResult):
+# get_any_replica_multi maps each key to a single GetReplicaResult, get_all_replicas_multi maps
+# each key to a list of them.  Defaulted to Any so that a bare MultiGetReplicaResult annotation
+# keeps meaning what it means today.
+ReplicaValueType = TypeVar('ReplicaValueType',
+                           bound=Union[GetReplicaResult, List[GetReplicaResult]],
+                           default=Any)
+
+
+class MultiGetReplicaResult(MultiResult, Generic[ReplicaValueType]):
     def __init__(self,
                  orig,  # type: pycbc_result
                  return_exceptions,  # type: bool
@@ -463,10 +478,11 @@ class MultiGetReplicaResult(MultiResult):
         super().__init__(orig, GetReplicaResult, return_exceptions, transcoders, obs_handler=obs_handler)
 
     @property
-    def results(self) -> Dict[str, GetReplicaResult]:
+    def results(self) -> Dict[str, ReplicaValueType]:
         """
-            Dict[str, :class:`.GetReplicaResult`]: Map of keys to their respective :class:`.GetReplicaResult`, if the
-                operation has a result.
+            Dict[str, ReplicaValueType]: Map of keys to their respective result, if the operation has a
+                result.  A :class:`.GetReplicaResult` for ``get_any_replica_multi``, a list of
+                :class:`.GetReplicaResult` for ``get_all_replicas_multi``.
         """
         res = {}
         for k, v in self._results.items():

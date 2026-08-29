@@ -20,6 +20,7 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable,
                     List,
+                    Mapping,
                     Optional,
                     Type,
                     Union)
@@ -1883,7 +1884,7 @@ class Collection:
                               keys,  # type: List[str]
                               *opts,  # type: GetAnyReplicaMultiOptions
                               **kwargs,  # type: Any
-                              ) -> MultiGetReplicaResult:
+                              ) -> MultiGetReplicaResult[GetReplicaResult]:
         """For each key in the provided list, retrieve the document associated with the key from the collection
         leveraging both active and all available replicas returning the first available.
 
@@ -1895,7 +1896,8 @@ class Collection:
 
         Returns:
             :class:`~couchbase.result.MultiGetReplicaResult`: An instance of
-            :class:`~couchbase.result.MultiGetReplicaResult`.
+            :class:`~couchbase.result.MultiGetReplicaResult`, mapping each key to a single
+            :class:`~couchbase.result.GetReplicaResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentUnretrievableException`: If the key provided does not exist on the
@@ -1963,7 +1965,7 @@ class Collection:
                                keys,  # type: List[str]
                                *opts,  # type: GetAllReplicasMultiOptions
                                **kwargs,  # type: Any
-                               ) -> MultiGetReplicaResult:
+                               ) -> MultiGetReplicaResult[List[GetReplicaResult]]:
         """For each key in the provided list, retrieve the document from the collection returning both
         active and all available replicas.
 
@@ -1975,7 +1977,8 @@ class Collection:
 
         Returns:
             :class:`~couchbase.result.MultiGetReplicaResult`: An instance of
-            :class:`~couchbase.result.MultiGetReplicaResult`.
+            :class:`~couchbase.result.MultiGetReplicaResult`, mapping each key to a list of
+            :class:`~couchbase.result.GetReplicaResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
@@ -2194,7 +2197,7 @@ class Collection:
             return self._impl.exists_multi(req, obs_handler)
 
     def insert_multi(self,
-                     keys_and_docs,  # type: Dict[str, DocumentValue]
+                     keys_and_docs,  # type: Mapping[str, DocumentValue]
                      *opts,  # type: InsertMultiOptions
                      **kwargs,  # type: Any
                      ) -> MultiMutationResult:
@@ -2202,7 +2205,7 @@ class Collection:
         failing if the document already exists.
 
         Args:
-            keys_and_docs (Dict[str, DocumentValue]): The keys and values/docs to use for the multiple insert operations.
+            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple insert operations.
             opts (:class:`~couchbase.options.InsertMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertMultiOptions`
@@ -2279,7 +2282,7 @@ class Collection:
             return self._impl.insert_multi(req, obs_handler)
 
     def upsert_multi(self,
-                     keys_and_docs,  # type: Dict[str, DocumentValue]
+                     keys_and_docs,  # type: Mapping[str, DocumentValue]
                      *opts,  # type: UpsertMultiOptions
                      **kwargs,  # type: Any
                      ) -> MultiMutationResult:
@@ -2287,7 +2290,7 @@ class Collection:
         succeeds whether or not the document already exists.
 
         Args:
-            keys_and_docs (Dict[str, DocumentValue]): The keys and values/docs to use for the multiple upsert operations.
+            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple upsert operations.
             opts (:class:`~couchbase.options.UpsertMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertMultiOptions`
@@ -2359,7 +2362,7 @@ class Collection:
             return self._impl.upsert_multi(req, obs_handler)
 
     def replace_multi(self,
-                      keys_and_docs,  # type: Dict[str, DocumentValue]
+                      keys_and_docs,  # type: Mapping[str, DocumentValue]
                       *opts,  # type: ReplaceMultiOptions
                       **kwargs,  # type: Any
                       ) -> MultiMutationResult:
@@ -2367,7 +2370,7 @@ class Collection:
         This operation fails if the document does not exist.
 
         Args:
-            keys_and_docs (Dict[str, DocumentValue]): The keys and values/docs to use for the multiple replace operations.
+            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple replace operations.
             opts (:class:`~couchbase.options.ReplaceMultiOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceMultiOptions`
