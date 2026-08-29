@@ -60,6 +60,9 @@ class ViewScanConsistency(Enum):
             return cls.NOT_BOUNDED
         elif value == 'update_after':
             return cls.UPDATE_AFTER
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid ViewScanConsistency option. "
+                     "Expected str representation of type ViewScanConsistency."))
 
 
 class ViewOrdering(Enum):
@@ -237,6 +240,9 @@ class ViewQuery:
             return ViewScanConsistency.NOT_BOUNDED
         if isinstance(value, str):
             return ViewScanConsistency.from_str(value)
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid ViewScanConsistency option. "
+                     "Expected str representation of type ViewScanConsistency."))
 
     @consistency.setter
     def consistency(self, value  # type: Union[ViewScanConsistency, str]
@@ -352,6 +358,9 @@ class ViewQuery:
             return ViewOrdering.DESCENDING
         if isinstance(value, str):
             return ViewOrdering.from_str(value)
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid ViewOrdering option. "
+                     "Expected str representation of type ViewOrdering."))
 
     @order.setter
     def order(self, value  # type: Union[ViewOrdering, str]
@@ -374,6 +383,9 @@ class ViewQuery:
             return ViewErrorMode.STOP
         if isinstance(value, str):
             return ViewErrorMode.from_str(value)
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid ViewErrorMode option. "
+                     "Expected str representation of type ViewErrorMode."))
 
     @on_error.setter
     def on_error(self, value  # type: Union[ViewErrorMode, str]

@@ -444,6 +444,9 @@ class N1QLQuery:
             return QueryScanConsistency.NOT_BOUNDED
         if isinstance(value, str):
             return QueryScanConsistency.REQUEST_PLUS if value == 'request_plus' else QueryScanConsistency.NOT_BOUNDED
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid QueryScanConsistency option. "
+                     "Expected str representation of type QueryScanConsistency."))
 
     @consistency.setter
     def consistency(self, value  # type: Union[QueryScanConsistency, str]
@@ -559,6 +562,9 @@ class N1QLQuery:
                 return QueryProfile.PHASES
             else:
                 return QueryProfile.TIMINGS
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid QueryProfile option. "
+                     "Expected str representation of type QueryProfile."))
 
     @profile.setter
     def profile(self, value  # type: Union[QueryProfile, str]

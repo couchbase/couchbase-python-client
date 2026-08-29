@@ -1150,6 +1150,9 @@ class SearchQueryBuilder:
             return SearchScanConsistency.NOT_BOUNDED
         if isinstance(value, str):
             return SearchScanConsistency.REQUEST_PLUS if value == 'request_plus' else SearchScanConsistency.NOT_BOUNDED
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid SearchScanConsistency option. "
+                     "Expected str representation of type SearchScanConsistency."))
 
     @consistency.setter
     def consistency(self, value  # type: Union[SearchScanConsistency, str]

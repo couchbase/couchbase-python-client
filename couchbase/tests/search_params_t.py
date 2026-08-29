@@ -64,6 +64,7 @@ class SearchParamTestSuite:
         'test_params_limit',
         'test_params_logging',
         'test_params_scan_consistency',
+        'test_params_uninterpretable_enum_option',
         'test_params_scope_collections',
         'test_params_serializer',
         'test_params_show_request',
@@ -940,6 +941,16 @@ class SearchParamTestSuite:
         exp_opts['scan_consistency'] = search.SearchScanConsistency.REQUEST_PLUS.value
         assert search_query.params == exp_opts
         assert search_query.consistency == search.SearchScanConsistency.REQUEST_PLUS
+
+    def test_params_uninterpretable_enum_option(self, cb_env, base_query_opts):
+        # set_option does no verification, so the getter is where an unusable value surfaces
+        q, _ = base_query_opts
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, SearchOptions()
+        )
+        search_query.set_option('scan_consistency', 5)
+        with pytest.raises(InvalidArgumentException):
+            search_query.consistency
 
     def test_params_scope_collections(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts

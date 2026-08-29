@@ -18,6 +18,7 @@ from datetime import timedelta
 
 import pytest
 
+from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
 from couchbase.serializer import DefaultJsonSerializer
@@ -52,6 +53,7 @@ class ViewsParamSuite:
         'test_params_startkey',
         'test_params_startkey_docid',
         'test_params_timeout',
+        'test_params_uninterpretable_enum_option',
     ]
 
     @pytest.fixture(scope='class')
@@ -208,6 +210,17 @@ class ViewsParamSuite:
         params = query.as_encodable()
         assert params == exp_opts
         assert query.consistency == ViewScanConsistency.REQUEST_PLUS
+
+    def test_params_uninterpretable_enum_option(self, cb_env, base_opts):
+        # set_option does no verification, so the getter is where an unusable value surfaces
+        for option, prop in (('scan_consistency', 'consistency'), ('order', 'order'), ('on_error', 'on_error')):
+            query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME)
+            query.set_option(option, 5)
+            with pytest.raises(InvalidArgumentException):
+                getattr(query, prop)
+
+        with pytest.raises(InvalidArgumentException):
+            ViewScanConsistency.from_str('not_a_scan_consistency')
 
     def test_params_serializer(self, cb_env, base_opts):
         serializer = DefaultJsonSerializer()

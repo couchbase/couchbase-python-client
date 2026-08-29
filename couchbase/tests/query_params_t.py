@@ -48,6 +48,7 @@ class QueryParamTestSuite:
         'test_params_scan_wait',
         'test_params_serializer',
         'test_params_timeout',
+        'test_params_uninterpretable_enum_option',
         'test_params_use_replica',
     ]
 
@@ -312,6 +313,14 @@ class QueryParamTestSuite:
         exp_opts = base_opts.copy()
         exp_opts['serializer'] = serializer
         assert query.params == exp_opts
+
+    def test_params_uninterpretable_enum_option(self):
+        # set_option does no verification, so the getter is where an unusable value surfaces
+        for option, prop in (('scan_consistency', 'consistency'), ('profile', 'profile')):
+            query = N1QLQuery.create_query_object('SELECT * FROM default', QueryOptions())
+            query.set_option(option, 5)
+            with pytest.raises(InvalidArgumentException):
+                getattr(query, prop)
 
     def test_params_timeout(self, base_opts):
         q_str = 'SELECT * FROM default'
