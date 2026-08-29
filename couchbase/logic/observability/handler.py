@@ -170,7 +170,7 @@ class ObservableRequestHandler:
         #   None    -> not yet checked (first call for this ObservabilityInstruments)
         #   False   -> real tracer/meter (not NoOp)
         #   <inst>  -> cached NoOp impl, ready to reuse
-        _cached_tracer = getattr(observability_instruments, '_cached_noop_tracer_impl', None)
+        _cached_tracer = observability_instruments._cached_noop_tracer_impl
         if _cached_tracer is None:
             if isinstance(observability_instruments.tracer.tracer, NoOpTracer):
                 _cached_tracer = ObservableRequestHandlerNoOpTracerImpl(op_type, observability_instruments)
@@ -178,6 +178,7 @@ class ObservableRequestHandler:
                 _cached_tracer = False
             observability_instruments._cached_noop_tracer_impl = _cached_tracer
 
+        self._tracer_impl: Union[ObservableRequestHandlerNoOpTracerImpl, ObservableRequestHandlerTracerImpl]
         if _cached_tracer is not False:
             self._tracer_impl = _cached_tracer
             self.is_noop = True
@@ -188,7 +189,7 @@ class ObservableRequestHandler:
                                                                    start_time=now)
             self.is_noop = False
 
-        _cached_meter = getattr(observability_instruments, '_cached_noop_meter_impl', None)
+        _cached_meter = observability_instruments._cached_noop_meter_impl
         if _cached_meter is None:
             if isinstance(observability_instruments.meter, NoOpMeter):
                 _cached_meter = ObservableRequestHandlerNoOpMeterImpl(op_type, observability_instruments)
@@ -196,6 +197,7 @@ class ObservableRequestHandler:
                 _cached_meter = False
             observability_instruments._cached_noop_meter_impl = _cached_meter
 
+        self._meter_impl: Union[ObservableRequestHandlerNoOpMeterImpl, ObservableRequestHandlerMeterImpl]
         if _cached_meter is not False:
             self._meter_impl = _cached_meter
         else:

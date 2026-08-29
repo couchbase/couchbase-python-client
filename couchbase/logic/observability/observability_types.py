@@ -15,10 +15,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Callable,
+                    Literal,
                     Mapping,
                     Optional,
                     Protocol,
@@ -39,6 +41,10 @@ from couchbase.logic.operation_types import (AnalyticsMgmtOperationType,
                                              StreamingOperationType,
                                              UserMgmtOperationType,
                                              ViewIndexMgmtOperationType)
+
+if TYPE_CHECKING:
+    from couchbase.logic.observability.handler import (ObservableRequestHandlerNoOpMeterImpl,
+                                                       ObservableRequestHandlerNoOpTracerImpl)
 
 
 @runtime_checkable
@@ -130,6 +136,12 @@ class ObservabilityInstruments:
     get_cluster_labels_fn: Optional[Callable[[], Mapping[str, str]]] = None
     # set to True when both tracer and meter or no-op
     is_noop: bool = False
+    # Populated on first use by ObservableRequestHandler.  Literal[False] rather than bool is what
+    # lets `is not False` narrow to the impl type, leaving no Literal[True] arm behind.
+    _cached_noop_tracer_impl: Union[ObservableRequestHandlerNoOpTracerImpl, Literal[False], None] = field(
+        default=None, repr=False, compare=False)
+    _cached_noop_meter_impl: Union[ObservableRequestHandlerNoOpMeterImpl, Literal[False], None] = field(
+        default=None, repr=False, compare=False)
 
 
 class ServiceType(Enum):
