@@ -18,10 +18,12 @@ from __future__ import annotations
 from typing import Union
 
 from couchbase.analytics import AnalyticsQuery
+from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.scope_types import (AnalyticsQueryRequest,
                                          QueryRequest,
                                          SearchQueryRequest)
+from couchbase.logic.supportability import Supportability
 from couchbase.n1ql import N1QLQuery
 from couchbase.options import AnalyticsOptions, QueryOptions
 from couchbase.search import (SearchQuery,
@@ -83,16 +85,39 @@ class ScopeRequestBuilder:
 
     def build_search_request(self,
                              index: str,
-                             query: Union[SearchQuery, SearchRequest],
+                             request: Union[SearchRequest, SearchQuery],
                              obs_handler: ObservableRequestHandler,
                              *options: object,
                              **kwargs: object) -> SearchQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
 
-        if isinstance(query, SearchQuery):
-            query_builder = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
+        if isinstance(request, SearchQuery):
+            Supportability.method_param_type_deprecated('search', 'request', 'SearchQuery', 'SearchRequest')
+            query_builder = SearchQueryBuilder.create_search_query_object(index, request, *options, **kwargs)
         else:
-            query_builder = SearchQueryBuilder.create_search_query_from_request(index, query, *options, **kwargs)
+            query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+
+        scope_name = query_builder.params.get('scope_name', None) or self._scope_name
+        req = SearchQueryRequest(query_builder, obs_handler, self._bucket_name, scope_name)
+
+        # since query is lazy executed, we wait until we submit the query to create the span
+        if num_workers:
+            req.num_workers = num_workers
+        return req
+
+    def build_search_query_request(self,
+                                   index: str,
+                                   query: SearchQuery,
+                                   obs_handler: ObservableRequestHandler,
+                                   *options: object,
+                                   **kwargs: object) -> SearchQueryRequest:
+        if isinstance(query, SearchRequest):
+            raise InvalidArgumentException(
+                message=('A SearchRequest is not a valid search_query() query. '
+                         'Pass it to search() instead.'))
+
+        num_workers = kwargs.pop('num_workers', None)
+        query_builder = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
 
         scope_name = query_builder.params.get('scope_name', None) or self._scope_name
         req = SearchQueryRequest(query_builder, obs_handler, self._bucket_name, scope_name)

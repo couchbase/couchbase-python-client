@@ -23,7 +23,7 @@ from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions,
                                ViewOptions)
-from couchbase.search import TermQuery
+from couchbase.search import SearchRequest, TermQuery
 from tests.environments.tracing import StreamingTracingEnvironment
 from tests.environments.tracing.base_tracing_environment import TracingType
 from tests.test_features import EnvironmentFeatures
@@ -221,7 +221,7 @@ class StreamingTracingTestsSuite:
         validator = cb_env.http_span_validator
         validator.reset(op_name=OpName.SearchQuery, clear_statement=True, validate_error=True)
         try:
-            [r for r in cb_env.cluster.search('not-an-index', TermQuery('auto')).rows()]
+            [r for r in cb_env.cluster.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()
@@ -234,7 +234,7 @@ class StreamingTracingTestsSuite:
                         clear_statement=True,
                         validate_error=True)
         try:
-            [r for r in cb_env.cluster.search('not-an-index', TermQuery('auto'),
+            [r for r in cb_env.cluster.search('not-an-index', SearchRequest.create(TermQuery('auto')),
                                               SearchOptions(span=parent_span)).rows()]
         except Exception:
             pass
@@ -251,7 +251,7 @@ class StreamingTracingTestsSuite:
                         scope_name=cb_env.scope.name,
                         validate_error=True)
         try:
-            [r for r in cb_env.scope.search('not-an-index', TermQuery('auto')).rows()]
+            [r for r in cb_env.scope.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()
@@ -266,7 +266,9 @@ class StreamingTracingTestsSuite:
                         scope_name=cb_env.scope.name,
                         validate_error=True)
         try:
-            [r for r in cb_env.scope.search('not-an-index', TermQuery('auto'), SearchOptions(span=parent_span)).rows()]
+            [r for r in cb_env.scope.search('not-an-index',
+                                            SearchRequest.create(TermQuery('auto')),
+                                            SearchOptions(span=parent_span)).rows()]
         except Exception:
             pass
         validator.validate_http_op(end_parent=True)

@@ -19,7 +19,7 @@ import pytest
 
 from couchbase.logic.observability import OpName
 from couchbase.management.views import DesignDocumentNamespace
-from couchbase.search import TermQuery
+from couchbase.search import SearchRequest, TermQuery
 from tests.environments.metrics import MetricsEnvironment
 from tests.environments.metrics.metrics_environment import MeterType
 from tests.test_features import EnvironmentFeatures
@@ -168,7 +168,7 @@ class StreamingMetricsTestsSuite:
         validator = cb_env.http_meter_validator
         validator.reset(op_name=OpName.SearchQuery, validate_error=True)
         try:
-            [r for r in cb_env.cluster.search('not-an-index', TermQuery('auto')).rows()]
+            [r for r in cb_env.cluster.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()
@@ -183,7 +183,7 @@ class StreamingMetricsTestsSuite:
                         scope_name=cb_env.scope.name,
                         validate_error=True)
         try:
-            [r for r in cb_env.scope.search('not-an-index', TermQuery('auto')).rows()]
+            [r for r in cb_env.scope.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()

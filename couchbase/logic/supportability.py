@@ -102,6 +102,25 @@ class Supportability:
         warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
 
     @staticmethod
+    def method_param_type_deprecated(method,  # type: str
+                                     param,  # type: str
+                                     type_,  # type: str
+                                     use_instead,  # type: str
+                                     ) -> None:
+        """Issue a `CouchbaseDeprecationWarning` indicating the provided type is deprecated for the
+        provided parameter.
+
+        Args:
+            method (str): The name of the method.
+            param (str): The name of the parameter.
+            type_ (str): The name of the type that is deprecated for that parameter.
+            use_instead (str): The name of the type to pass instead of the deprecated type.
+        """
+        message = (f"Passing a {type_} as the {param} parameter of {method} is deprecated and will be "
+                   f"removed in a future release. Use {use_instead} instead.")
+        warnings.warn(message, CouchbaseDeprecationWarning, stacklevel=2)
+
+    @staticmethod
     def method_kwarg_deprecated(kwarg,  # type: str
                                 use_instead  # type: str
                                 ) -> None:

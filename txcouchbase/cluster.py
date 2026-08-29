@@ -135,12 +135,12 @@ class Cluster:
                      ) -> Deferred[SearchResult]:
         op_type = StreamingOperationType.SearchQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_search_request(index, query, obs_handler, *options, **kwargs)
+        req = self._impl.request_builder.build_search_query_request(index, query, obs_handler, *options, **kwargs)
         return self._impl.search_deferred(req)
 
     def search(self,
                index,  # type: str
-               request,  # type: SearchRequest
+               request,  # type: Union[SearchRequest, SearchQuery]
                *options,  # type: SearchOptions
                **kwargs,  # type: Any
                ) -> Deferred[SearchResult]:

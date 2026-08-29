@@ -24,7 +24,7 @@ from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions,
                                ViewOptions)
-from couchbase.search import TermQuery
+from couchbase.search import SearchRequest, TermQuery
 from tests.environments.tracing import AsyncBaseTracingEnvironment
 from tests.environments.tracing.base_tracing_environment import TracingType
 from tests.test_features import EnvironmentFeatures
@@ -227,7 +227,7 @@ class AsyncTracingTestsSuite:
         validator = acb_env.http_span_validator
         validator.reset(op_name=OpName.SearchQuery, clear_statement=True, validate_error=True)
         try:
-            [r async for r in acb_env.cluster.search('not-an-index', TermQuery('auto')).rows()]
+            [r async for r in acb_env.cluster.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()
@@ -241,7 +241,7 @@ class AsyncTracingTestsSuite:
                         validate_error=True)
         try:
             [r async for r in acb_env.cluster.search('not-an-index',
-                                                     TermQuery('auto'),
+                                                     SearchRequest.create(TermQuery('auto')),
                                                      SearchOptions(span=parent_span)).rows()]
         except Exception:
             pass
@@ -258,7 +258,7 @@ class AsyncTracingTestsSuite:
                         scope_name=acb_env.scope.name,
                         validate_error=True)
         try:
-            [r async for r in acb_env.scope.search('not-an-index', TermQuery('auto')).rows()]
+            [r async for r in acb_env.scope.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()
@@ -274,7 +274,7 @@ class AsyncTracingTestsSuite:
                         validate_error=True)
         try:
             [r async for r in acb_env.scope.search('not-an-index',
-                                                   TermQuery('auto'),
+                                                   SearchRequest.create(TermQuery('auto')),
                                                    SearchOptions(span=parent_span)).rows()]
         except Exception:
             pass

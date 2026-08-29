@@ -449,6 +449,11 @@ class Cluster:
             :class:`~couchbase.result.SearchResult` which provides access to iterate over the search
             query results and access metadata and metrics about the search query.
 
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If a
+                :class:`~couchbase.search.SearchRequest` is provided.  Use
+                :meth:`~couchbase.cluster.Cluster.search` for a search request.
+
         Examples:
 
             .. note::
@@ -515,12 +520,12 @@ class Cluster:
         """
         op_type = StreamingOperationType.SearchQuery
         obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_search_request(index, query, obs_handler, *options, **kwargs)
+        req = self._impl.request_builder.build_search_query_request(index, query, obs_handler, *options, **kwargs)
         return self._impl.search(req)
 
     def search(self,
                index,  # type: str
-               request,  # type: SearchRequest
+               request,  # type: Union[SearchRequest, SearchQuery]
                *options,  # type: SearchOptions
                **kwargs,  # type: Any
                ) -> SearchResult:
@@ -536,7 +541,9 @@ class Cluster:
 
         Args:
             index (str): Name of the search index to use.
-            request (:class:`~couchbase.search.SearchRequest`): Type of search request to perform.
+            request (Union[:class:`~couchbase.search.SearchRequest`, :class:`~couchbase.search.SearchQuery`]): Type of
+                search request to perform.  Passing a :class:`~couchbase.search.SearchQuery` is deprecated and will be
+                removed in a future release; wrap it with :meth:`~couchbase.search.SearchRequest.create` instead.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`

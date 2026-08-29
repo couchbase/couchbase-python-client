@@ -31,6 +31,7 @@ from couchbase.logic.cluster_types import (AnalyticsQueryRequest,
                                            UpdateCredentialsRequest,
                                            WaitUntilReadyRequest)
 from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.supportability import Supportability
 from couchbase.n1ql import N1QLQuery
 from couchbase.options import forward_args
 from couchbase.search import (SearchQuery,
@@ -110,22 +111,39 @@ class ClusterRequestBuilder:
 
     def build_search_request(self,
                              index: str,
-                             query: Union[SearchQuery, SearchRequest],
+                             request: Union[SearchRequest, SearchQuery],
                              obs_handler: ObservableRequestHandler,
                              *options: object,
                              **kwargs: object) -> SearchQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
 
-        if isinstance(query, SearchQuery):
-            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_object(index,
-                                                                                   query,
-                                                                                   *options,
-                                                                                   **kwargs), obs_handler)
+        if isinstance(request, SearchQuery):
+            Supportability.method_param_type_deprecated('search', 'request', 'SearchQuery', 'SearchRequest')
+            query_builder = SearchQueryBuilder.create_search_query_object(index, request, *options, **kwargs)
         else:
-            req = SearchQueryRequest(SearchQueryBuilder.create_search_query_from_request(index,
-                                                                                         query,
-                                                                                         *options,
-                                                                                         **kwargs), obs_handler)
+            query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+
+        req = SearchQueryRequest(query_builder, obs_handler)
+        # since query is lazy executed, we wait until we submit the query to create the span
+        if num_workers:
+            req.num_workers = num_workers
+        return req
+
+    def build_search_query_request(self,
+                                   index: str,
+                                   query: SearchQuery,
+                                   obs_handler: ObservableRequestHandler,
+                                   *options: object,
+                                   **kwargs: object) -> SearchQueryRequest:
+        if isinstance(query, SearchRequest):
+            raise InvalidArgumentException(
+                message=('A SearchRequest is not a valid search_query() query. '
+                         'Pass it to search() instead.'))
+
+        num_workers = kwargs.pop('num_workers', None)
+        query_builder = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
+
+        req = SearchQueryRequest(query_builder, obs_handler)
         # since query is lazy executed, we wait until we submit the query to create the span
         if num_workers:
             req.num_workers = num_workers

@@ -20,7 +20,7 @@ import pytest_asyncio
 
 from couchbase.logic.observability import OpName
 from couchbase.management.views import DesignDocumentNamespace
-from couchbase.search import TermQuery
+from couchbase.search import SearchRequest, TermQuery
 from tests.environments.metrics import AsyncMetricsEnvironment
 from tests.environments.metrics.metrics_environment import MeterType
 from tests.test_features import EnvironmentFeatures
@@ -172,7 +172,7 @@ class StreamingMetricsTestsSuite:
         validator = acb_env.http_meter_validator
         validator.reset(op_name=OpName.SearchQuery, validate_error=True)
         try:
-            [r async for r in acb_env.cluster.search('not-an-index', TermQuery('auto')).rows()]
+            [r async for r in acb_env.cluster.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()
@@ -187,7 +187,7 @@ class StreamingMetricsTestsSuite:
                         scope_name=acb_env.scope.name,
                         validate_error=True)
         try:
-            [r async for r in acb_env.scope.search('not-an-index', TermQuery('auto')).rows()]
+            [r async for r in acb_env.scope.search('not-an-index', SearchRequest.create(TermQuery('auto'))).rows()]
         except Exception:
             pass
         validator.validate_http_op()
