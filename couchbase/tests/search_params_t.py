@@ -1390,7 +1390,8 @@ class VectorSearchParamTestSuite:
         'test_vector_search_with_prefilter',
         'test_vector_search_base64',
         'test_vector_search_invalid',
-        'test_vector_search_multiple_queries'
+        'test_vector_search_multiple_queries',
+        'test_vector_query_combination_reads_back'
     ]
 
     def test_search_request_invalid(self):
@@ -1552,6 +1553,27 @@ class VectorSearchParamTestSuite:
             VectorSearch.from_vector_query(None)
         with pytest.raises(InvalidArgumentException):
             VectorSearch.from_vector_query(1)
+
+    def test_vector_query_combination_reads_back(self, cb_env):
+        # the encoded query has always been right; the getter was reading highlight_style
+        for combination in (VectorQueryCombination.AND, VectorQueryCombination.OR):
+            vector_search = VectorSearch([VectorQuery('vector_field', self.TEST_VECTOR)],
+                                         VectorSearchOptions(vector_query_combination=combination))
+            search_query = search.SearchQueryBuilder.create_search_query_from_request(
+                cb_env.TEST_INDEX_NAME,
+                SearchRequest.create(vector_search)
+            )
+            assert search_query.vector_query_combination == combination
+
+        search_query.highlight_style = HighlightStyle.Ansi
+        assert search_query.vector_query_combination == VectorQueryCombination.OR
+
+        no_combination = search.SearchQueryBuilder.create_search_query_from_request(
+            cb_env.TEST_INDEX_NAME,
+            SearchRequest.create(VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR)))
+        )
+        no_combination.highlight_style = HighlightStyle.Ansi
+        assert no_combination.vector_query_combination is None
 
     def test_vector_search_multiple_queries(self, cb_env):
         exp_json = {

@@ -1306,7 +1306,7 @@ class SearchQueryBuilder:
 
     @property
     def vector_query_combination(self) -> Optional[VectorQueryCombination]:
-        value = self._params.get('highlight_style', None)
+        value = self._params.get('vector_query_combination', None)
         if isinstance(value, VectorQueryCombination):
             return value
         if isinstance(value, str):
