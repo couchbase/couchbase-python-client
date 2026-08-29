@@ -32,7 +32,7 @@ from couchbase.logic.observability import ObservableRequestHandler, SpanProtocol
 from couchbase.logic.options import ViewOptionsBase
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.management.views import DesignDocumentNamespace
-from couchbase.options import UnsignedInt64, ViewOptions
+from couchbase.options import ViewOptions
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 
 if TYPE_CHECKING:
@@ -108,7 +108,7 @@ class ViewMetaData:
     def debug_info(self) -> Optional[str]:
         return self._raw.get("debug_info", None)
 
-    def total_rows(self) -> Optional[UnsignedInt64]:
+    def total_rows(self) -> Optional[int]:
         return self._raw.get("total_rows", None)
 
     def __repr__(self):
@@ -117,10 +117,10 @@ class ViewMetaData:
 
 @dataclass
 class ViewRow(object):
-    key: str = None
-    id: str = None
-    value: object = None
-    document: object = None
+    key: Any = None
+    id: Optional[str] = None
+    value: Any = None
+    document: Any = None
 
     @classmethod
     def from_json(cls, json_data: Dict[str, Any]) -> ViewRow:
@@ -170,7 +170,7 @@ class ViewQuery:
                  view_name,  # type: str
                  *args,
                  **kwargs):
-        self._params = {
+        self._params: Dict[str, Any] = {
             'bucket_name': bucket_name,
             'document_name': design_doc_name,
             'view_name': view_name
