@@ -2009,7 +2009,7 @@ class TransactionQueryOptions:
             kwargs["bucket_name"] = scope.bucket_name
             kwargs["scope_name"] = scope.name
         if kwargs.get("scan_wait", None):
-            kwargs["scan_wait"] = kwargs["scan_wait"].total_seconds/1000
+            kwargs["scan_wait"] = timedelta_as_milliseconds(kwargs["scan_wait"])
         if kwargs.get("scan_consistency", None):
             kwargs["scan_consistency"] = kwargs["scan_consistency"].value
             if kwargs["scan_consistency"] == "at_plus":

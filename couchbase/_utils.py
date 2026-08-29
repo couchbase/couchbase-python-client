@@ -69,22 +69,6 @@ def timedelta_as_milliseconds(duration: timedelta) -> int:
     return int(duration.total_seconds() * 1e3 if duration else 0)
 
 
-def to_microseconds(
-    timeout  # type: Union[timedelta, float, int]
-) -> int:
-    if timeout and not isinstance(timeout, (timedelta, float, int)):
-        raise InvalidArgumentException(message=("Expected timeout to be of type "
-                                                f"Union[timedelta, float, int] instead of {timeout}"))
-    if not timeout:
-        total_us = 0
-    elif isinstance(timeout, timedelta):
-        total_us = int(timeout.total_seconds() * 1e6)
-    else:
-        total_us = int(timeout * 1e6)
-
-    return total_us
-
-
 def to_milliseconds(
     timeout  # type: Union[timedelta, float, int]
 ) -> int:

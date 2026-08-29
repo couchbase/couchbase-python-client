@@ -53,6 +53,7 @@ class ViewsParamSuite:
         'test_params_startkey',
         'test_params_startkey_docid',
         'test_params_timeout',
+        'test_params_timeout_getter',
         'test_params_uninterpretable_enum_option',
     ]
 
@@ -266,7 +267,7 @@ class ViewsParamSuite:
         query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 20000000
+        exp_opts['timeout'] = 20000
         params = query.as_encodable()
         assert params == exp_opts
 
@@ -274,7 +275,7 @@ class ViewsParamSuite:
         query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 20000000
+        exp_opts['timeout'] = 20000
         params = query.as_encodable()
         assert params == exp_opts
 
@@ -282,9 +283,17 @@ class ViewsParamSuite:
         query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 25500000
+        exp_opts['timeout'] = 25500
         params = query.as_encodable()
         assert params == exp_opts
+
+    def test_params_timeout_getter(self, cb_env):
+        opts = ViewOptions(timeout=timedelta(seconds=20))
+        query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, opts)
+        assert query.timeout == 20
+
+        query = ViewQuery.create_view_query_object('default', cb_env.DOCNAME, cb_env.TEST_VIEW_NAME, ViewOptions())
+        assert query.timeout is None
 
 
 class ClassicViewsParamTests(ViewsParamSuite):

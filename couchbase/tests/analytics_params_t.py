@@ -34,6 +34,7 @@ class AnalyticsParamTestSuite:
         'test_params_read_only',
         'test_params_serializer',
         'test_params_timeout',
+        'test_params_timeout_getter',
         'test_status'
     ]
 
@@ -117,22 +118,30 @@ class AnalyticsParamTestSuite:
         query = AnalyticsQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 120000000
+        exp_opts['timeout'] = 120000
         assert query.params == exp_opts
 
         q_opts = AnalyticsOptions(timeout=20)
         query = AnalyticsQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 20000000
+        exp_opts['timeout'] = 20000
         assert query.params == exp_opts
 
         q_opts = AnalyticsOptions(timeout=25.5)
         query = AnalyticsQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
-        exp_opts['timeout'] = 25500000
+        exp_opts['timeout'] = 25500
         assert query.params == exp_opts
+
+    def test_params_timeout_getter(self):
+        q_str = 'SELECT * FROM default'
+        query = AnalyticsQuery.create_query_object(q_str, AnalyticsOptions(timeout=timedelta(seconds=120)))
+        assert query.timeout == 120
+
+        query = AnalyticsQuery.create_query_object(q_str, AnalyticsOptions())
+        assert query.timeout is None
 
     @pytest.mark.parametrize('value, expected', [(k, v) for k, v in AnalyticsStatus.__members__.items()])
     def test_status(self, value, expected):

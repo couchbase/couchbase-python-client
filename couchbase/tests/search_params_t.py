@@ -73,6 +73,7 @@ class SearchParamTestSuite:
         'test_params_sort_invalid',
         'test_params_sort_mixed',
         'test_params_timeout',
+        'test_params_timeout_getter',
         'test_phrase_query',
         'test_prefix_query',
         'test_query_string_query',
@@ -1063,6 +1064,18 @@ class SearchParamTestSuite:
         exp_opts = base_opts.copy()
         exp_opts['timeout'] = 25500
         assert search_query.params == exp_opts
+
+    def test_params_timeout_getter(self, cb_env, base_query_opts):
+        q, _ = base_query_opts
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, SearchOptions(timeout=timedelta(seconds=20))
+        )
+        assert search_query.timeout == 20
+
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, SearchOptions()
+        )
+        assert search_query.timeout is None
 
     def test_phrase_query(self, cb_env):
         exp_json = {

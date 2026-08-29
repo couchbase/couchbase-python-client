@@ -329,7 +329,7 @@ class N1QLQuery:
         "query_context": {"query_context": lambda x: x},
         "raw": {"raw": lambda x: x},
         "scan_cap": {"scan_cap": lambda x: x},
-        "scan_wait": {"scan_wait": timedelta_as_milliseconds},
+        "scan_wait": {"scan_wait": lambda x: x},
         "metrics": {"metrics": lambda x: x},
         "flex_index": {"flex_index": lambda x: x},
         "preserve_expiry": {"preserve_expiry": lambda x: x},
@@ -409,11 +409,10 @@ class N1QLQuery:
 
     @property
     def timeout(self) -> Optional[float]:
-        value = self._params.get('timeout', None)
-        if not value:
+        total_ms = self._params.get('timeout', None)
+        if not total_ms:
             return None
-        value = value[:-1]
-        return float(value)
+        return total_ms / 1000
 
     @timeout.setter
     def timeout(self, value  # type: Union[timedelta,float,int]
@@ -606,11 +605,10 @@ class N1QLQuery:
 
     @property
     def scan_wait(self) -> Optional[float]:
-        value = self._params.get('scan_wait', None)
-        if not value:
+        total_ms = self._params.get('scan_wait', None)
+        if not total_ms:
             return None
-        value = value[:-1]
-        return float(value)
+        return total_ms / 1000
 
     @scan_wait.setter
     def scan_wait(self, value  # type: timedelta
@@ -618,11 +616,7 @@ class N1QLQuery:
         if not value:
             self._params.pop('scan_wait', 0)
         else:
-            # if using the setter, need to validate/transform timedelta, otherwise, just add the value
-            if 'scan_wait' in self._params:
-                value = timedelta_as_milliseconds(value)
-
-            self.set_option('scan_wait', value)
+            self.set_option('scan_wait', timedelta_as_milliseconds(value))
 
     @property
     def flex_index(self) -> bool:

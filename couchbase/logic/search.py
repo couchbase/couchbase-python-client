@@ -1027,11 +1027,10 @@ class SearchQueryBuilder:
 
     @property
     def timeout(self) -> Optional[float]:
-        value = self._params.get('timeout', None)
-        if not value:
+        total_ms = self._params.get('timeout', None)
+        if not total_ms:
             return None
-        value = value[:-1]
-        return float(value)
+        return total_ms / 1000
 
     @timeout.setter
     def timeout(self, value  # type: Union[timedelta,float,int]

@@ -46,8 +46,10 @@ class QueryParamTestSuite:
         'test_params_scan_cap',
         'test_params_scan_consistency',
         'test_params_scan_wait',
+        'test_params_scan_wait_direct',
         'test_params_serializer',
         'test_params_timeout',
+        'test_params_timeout_getter',
         'test_params_uninterpretable_enum_option',
         'test_params_use_replica',
     ]
@@ -291,6 +293,14 @@ class QueryParamTestSuite:
         exp_opts['scan_wait'] = 30000
         assert query.params == exp_opts
 
+    def test_params_scan_wait_direct(self):
+        # Assigning the property is a public entry point in its own right, and it has to
+        # convert on the first assignment rather than the second.
+        query = N1QLQuery('SELECT * FROM default')
+        query.scan_wait = timedelta(seconds=30)
+        assert query.params['scan_wait'] == 30000
+        assert query.scan_wait == 30
+
     def test_params_scan_consistency(self, base_opts):
         q_str = 'SELECT * FROM default'
         q_opts = QueryOptions(scan_consistency=QueryScanConsistency.REQUEST_PLUS)
@@ -344,6 +354,14 @@ class QueryParamTestSuite:
         exp_opts = base_opts.copy()
         exp_opts['timeout'] = 25500
         assert query.params == exp_opts
+
+    def test_params_timeout_getter(self):
+        q_str = 'SELECT * FROM default'
+        query = N1QLQuery.create_query_object(q_str, QueryOptions(timeout=timedelta(seconds=20)))
+        assert query.timeout == 20
+
+        query = N1QLQuery.create_query_object(q_str, QueryOptions())
+        assert query.timeout is None
 
 
 class ClassicQueryParamTests(QueryParamTestSuite):
