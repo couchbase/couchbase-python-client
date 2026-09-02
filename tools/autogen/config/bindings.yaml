@@ -613,6 +613,27 @@ cpp_core_types:
       header_file: "core/management/design_document.hxx"
       py_type: ViewDesignDocument
 
+# A std::variant carries no discriminator once it reaches Python, so each variant listed here gets
+# a generated tagged-union converter: Python sends the alternative's fields plus a `discriminator`
+# key holding its tag, and the converter dispatches on that tag.  Every alternative must also be
+# registered under cpp_core_types.  std::monostate needs no tag, since it is what an absent or None
+# value converts to.
+cpp_core_variants:
+  - core_struct: couchbase::core::management::eventing::function_url_binding
+    field: auth
+    header_file: "core/management/eventing_function.hxx"
+    discriminator: auth_type
+    input_missing_err_msg: "Expected auth to be a dict."
+    alternatives:
+      - tag: no-auth
+        core_struct: couchbase::core::management::eventing::function_url_no_auth
+      - tag: basic
+        core_struct: couchbase::core::management::eventing::function_url_auth_basic
+      - tag: digest
+        core_struct: couchbase::core::management::eventing::function_url_auth_digest
+      - tag: bearer
+        core_struct: couchbase::core::management::eventing::function_url_auth_bearer
+
 cpp_core_enum_headers:
  - Python.h
  - cpp_core_enum_conversion_macros.hxx

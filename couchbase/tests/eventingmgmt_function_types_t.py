@@ -17,7 +17,30 @@ import pytest
 
 from couchbase.management.logic.eventing_function_mgmt_types import (EventingFunction,
                                                                      EventingFunctionBucketAccess,
-                                                                     EventingFunctionBucketBinding)
+                                                                     EventingFunctionBucketBinding,
+                                                                     EventingFunctionUrlAuthBasic,
+                                                                     EventingFunctionUrlAuthBearer,
+                                                                     EventingFunctionUrlAuthDigest,
+                                                                     EventingFunctionUrlBinding,
+                                                                     EventingFunctionUrlNoAuth)
+
+# (auth, the tagged dict the binding layer exchanges, what a read back yields).
+# from_server() does not read the basic and digest passwords back, since the server
+# does not return them.
+URL_BINDING_AUTH = [
+    (EventingFunctionUrlNoAuth(),
+     {'auth_type': 'no-auth'},
+     EventingFunctionUrlNoAuth()),
+    (EventingFunctionUrlAuthBasic('username', 'password'),
+     {'auth_type': 'basic', 'username': 'username', 'password': 'password'},
+     EventingFunctionUrlAuthBasic('username')),
+    (EventingFunctionUrlAuthDigest('username', 'password'),
+     {'auth_type': 'digest', 'username': 'username', 'password': 'password'},
+     EventingFunctionUrlAuthDigest('username')),
+    (EventingFunctionUrlAuthBearer('bearer-key'),
+     {'auth_type': 'bearer', 'key': 'bearer-key'},
+     EventingFunctionUrlAuthBearer('bearer-key')),
+]
 
 
 class EventingFunctionTypesTestSuite:
@@ -26,6 +49,9 @@ class EventingFunctionTypesTestSuite:
         'test_keyspaces_default_scope_and_collection_from_server',
         'test_keyspaces_from_server',
         'test_keyspaces_round_trip',
+        'test_url_binding_auth_as_dict',
+        'test_url_binding_auth_from_server',
+        'test_url_binding_auth_round_trip',
     ]
 
     def test_keyspaces_from_server(self):
@@ -76,6 +102,39 @@ class EventingFunctionTypesTestSuite:
         assert binding.name.bucket == 'bound-bucket'
         assert binding.name.scope == 'bound-scope'
         assert binding.name.collection == 'bound-collection'
+
+    @pytest.mark.parametrize('auth, binding_auth, _', URL_BINDING_AUTH)
+    def test_url_binding_auth_as_dict(self, auth, binding_auth, _):
+        binding = EventingFunctionUrlBinding(hostname='http://localhost:5000',
+                                             alias='urlBinding',
+                                             allow_cookies=True,
+                                             validate_ssl_certificate=False,
+                                             auth=auth)
+
+        assert binding.as_dict()['auth'] == binding_auth
+
+    @pytest.mark.parametrize('_, binding_auth, expected_auth', URL_BINDING_AUTH)
+    def test_url_binding_auth_from_server(self, _, binding_auth, expected_auth):
+        binding = EventingFunctionUrlBinding.from_server({
+            'hostname': 'http://localhost:5000',
+            'alias': 'urlBinding',
+            'allow_cookies': True,
+            'validate_ssl_certificate': False,
+            'auth': binding_auth,
+        })
+
+        assert binding.alias == 'urlBinding'
+        assert binding.auth == expected_auth
+
+    @pytest.mark.parametrize('auth, _, expected_auth', URL_BINDING_AUTH)
+    def test_url_binding_auth_round_trip(self, auth, _, expected_auth):
+        binding = EventingFunctionUrlBinding(hostname='http://localhost:5000',
+                                             alias='urlBinding',
+                                             allow_cookies=True,
+                                             validate_ssl_certificate=False,
+                                             auth=auth)
+
+        assert EventingFunctionUrlBinding.from_server(binding.as_dict()).auth == expected_auth
 
 
 class ClassicEventingFunctionTypesTests(EventingFunctionTypesTestSuite):

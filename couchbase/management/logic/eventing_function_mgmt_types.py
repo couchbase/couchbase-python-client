@@ -472,19 +472,20 @@ class EventingFunctionUrlBinding:
             "validate_ssl_certificate": self.validate_ssl_certificate,
         }
 
+        # The binding layer reads auth as a tagged dict; the tag key matches the discriminator
+        # configured for the variant in tools/autogen/config/bindings.yaml.
         if isinstance(self.auth, EventingFunctionUrlNoAuth):
-            output["auth_type"] = "no-auth"
+            output["auth"] = {"auth_type": "no-auth"}
         elif isinstance(self.auth, EventingFunctionUrlAuthBasic):
-            output["auth_type"] = "basic"
-            output["username"] = self.auth.username
-            output["password"] = self.auth.password
+            output["auth"] = {"auth_type": "basic",
+                              "username": self.auth.username,
+                              "password": self.auth.password}
         elif isinstance(self.auth, EventingFunctionUrlAuthDigest):
-            output["auth_type"] = "digest"
-            output["username"] = self.auth.username
-            output["password"] = self.auth.password
+            output["auth"] = {"auth_type": "digest",
+                              "username": self.auth.username,
+                              "password": self.auth.password}
         elif isinstance(self.auth, EventingFunctionUrlAuthBearer):
-            output["auth_type"] = "bearer"
-            output["bearer_key"] = self.auth.key
+            output["auth"] = {"auth_type": "bearer", "key": self.auth.key}
 
         return output
 
@@ -496,17 +497,18 @@ class EventingFunctionUrlBinding:
             'allow_cookies': url_binding.get('allow_cookies', None),
             'validate_ssl_certificate': url_binding.get('validate_ssl_certificate', None)
         }
-        auth_type = url_binding.get('auth_type', 'no-auth')
+        auth = url_binding.get('auth', None) or {}
+        auth_type = auth.get('auth_type', 'no-auth')
         if auth_type == 'no-auth':
             input['auth'] = EventingFunctionUrlNoAuth()
         elif auth_type == 'basic':
-            username = url_binding.get('username', None)
+            username = auth.get('username', None)
             input['auth'] = EventingFunctionUrlAuthBasic(username=username)
         elif auth_type == 'digest':
-            username = url_binding.get('username', None)
+            username = auth.get('username', None)
             input['auth'] = EventingFunctionUrlAuthDigest(username=username)
         elif auth_type == 'bearer':
-            key = url_binding.get('key', None)
+            key = auth.get('key', None)
             input['auth'] = EventingFunctionUrlAuthBearer(key=key)
         return cls(**input)
 
