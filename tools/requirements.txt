@@ -1,0 +1,9 @@
+# Shared by the tools/ packages.  Install this once and every tool runs; a tool that
+# needs more than this keeps its own file, which pulls this one in with `-r`.
+#
+# The point of a single home for these is not the one install command.  Two files
+# pinning the same package is a fiction: the tools share one interpreter, so only one
+# pin can ever be the installed version, and the other is decoration that drifts
+# without anything reporting it.
+click==8.3.1
+pyyaml==6.0.3

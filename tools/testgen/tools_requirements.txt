@@ -1,0 +1,12 @@
+# Requirements for running the testgen tools.
+-r ../requirements.txt
+# The generator's formatting post-pass runs autopep8 and isort, and they are pinned in
+# dev_requirements.txt rather than here: they have to be the same versions the
+# pre-commit hooks run, or the hooks rewrite generated files and `--check` reports a
+# difference the generator cannot remove.
+
+# The CLI is click and the config and report commands render through rich.  Neither
+# ships: nothing under tools/ is packaged by setup.py, so these stay out of
+# requirements.txt and out of the wheel's install_requires.
+click~=8.1
+rich~=14.0

@@ -1,5 +1,7 @@
 # Requirements for running autogen tools
-click==8.3.1
+-r ../requirements.txt
 jinja2==3.1.6
-pyyaml==6.0.3
+# Bindings only.  The version has to match the major version of the system LLVM this
+# resolves libclang from, so it is pinned per machine rather than shared; see the
+# version-compatibility section of README.md.
 clang>=18.0.0

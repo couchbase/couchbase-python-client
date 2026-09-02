@@ -53,3 +53,8 @@ use_parentheses = true
 ensure_newline_before_comments = true
 line_length = 120
 order_by_type = true
+
+# isort infers first-party membership from what is on disk, so tools/testgen/resolver.py
+# sorts one way in a checkout that carries tests_v2 and another way in one that does
+# not.  Stating the membership makes the sort the same everywhere.
+known_first_party = ["tests_v2"]
