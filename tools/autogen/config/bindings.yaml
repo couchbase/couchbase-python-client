@@ -633,6 +633,18 @@ cpp_core_variants:
         core_struct: couchbase::core::management::eventing::function_url_auth_digest
       - tag: bearer
         core_struct: couchbase::core::management::eventing::function_url_auth_bearer
+  - core_struct: couchbase::core::range_scan_create_options
+    field: scan_type
+    header_file: "core/range_scan_options.hxx"
+    discriminator: scan_type
+    input_missing_err_msg: "Expected scan_type to be a dict."
+    alternatives:
+      - tag: range_scan
+        core_struct: couchbase::core::range_scan
+      - tag: prefix_scan
+        core_struct: couchbase::core::prefix_scan
+      - tag: sampling_scan
+        core_struct: couchbase::core::sampling_scan
 
 cpp_core_enum_headers:
  - Python.h

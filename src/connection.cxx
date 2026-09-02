@@ -585,14 +585,8 @@ Connection::handle_range_scan_op(PyObject* kwargs)
     }
 
     PyObject* pyObj_scan_type = PyDict_GetItemString(kwargs, "scan_type");
-    if (!pyObj_scan_type) {
-      return raise_invalid_argument("scan_type is required", __FILE__, __LINE__);
-    }
-    int py_scan_type = PyLong_AsLong(pyObj_scan_type);
-
-    PyObject* pyObj_scan_config = PyDict_GetItemString(kwargs, "scan_config");
-    if (!pyObj_scan_config || !PyDict_Check(pyObj_scan_config)) {
-      return raise_invalid_argument("scan_config must be a dictionary", __FILE__, __LINE__);
+    if (!pyObj_scan_type || !PyDict_Check(pyObj_scan_type)) {
+      return raise_invalid_argument("scan_type must be a dictionary", __FILE__, __LINE__);
     }
 
     PyObject* pyObj_orchestrator_opts = PyDict_GetItemString(kwargs, "orchestrator_options");
@@ -638,26 +632,13 @@ Connection::handle_range_scan_op(PyObject* kwargs)
     auto orchestrator_options =
       py_to_cbpp<couchbase::core::range_scan_orchestrator_options>(pyObj_orchestrator_opts);
 
-    std::variant<std::monostate,
-                 couchbase::core::range_scan,
-                 couchbase::core::prefix_scan,
-                 couchbase::core::sampling_scan>
-      scan_type{};
-    switch (py_scan_type) {
-      case 1: {
-        scan_type = py_to_cbpp<couchbase::core::range_scan>(pyObj_scan_config);
-        break;
-      }
-      case 2: {
-        scan_type = py_to_cbpp<couchbase::core::prefix_scan>(pyObj_scan_config);
-        break;
-      }
-      case 3: {
-        scan_type = py_to_cbpp<couchbase::core::sampling_scan>(pyObj_scan_config);
-        break;
-      }
-      default:
-        return raise_invalid_argument("scan_type must be 1, 2, or 3", __FILE__, __LINE__);
+    // The generated converter dispatches on the tag the request builder writes into the dict.
+    auto scan_type = py_to_cbpp<std::variant<std::monostate,
+                                             couchbase::core::range_scan,
+                                             couchbase::core::prefix_scan,
+                                             couchbase::core::sampling_scan>>(pyObj_scan_type);
+    if (PyErr_Occurred() != nullptr) {
+      return nullptr;
     }
 
     auto orchestrator = couchbase::core::range_scan_orchestrator(*io_,

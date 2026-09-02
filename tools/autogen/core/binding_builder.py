@@ -1022,11 +1022,11 @@ class BindingBuilder:
         return [(owner, field) for owner, fields in owners for field in fields]
 
     def check_variant_field_coverage(self) -> None:
-        """Report std::variant fields that could carry a tag but have no cpp_core_variants entry.
+        """Fail generation on a std::variant field that could carry a tag but has no entry.
 
         Such a field compiles against the generic py_to_cbpp_t<std::variant<...>>, which cannot
-        pick an alternative and raises at conversion time.  Surfacing it here makes that a
-        generation-time signal instead of a runtime one.  A variant whose alternatives are all
+        pick an alternative and raises at conversion time.  Failing here turns that into a
+        generation-time error instead of a runtime one.  A variant whose alternatives are all
         unregistered (primitives, std::monostate) has nowhere to hang a tag, so it keeps the
         generic converter by design and is annotated in the generated output.
 
@@ -1051,10 +1051,11 @@ class BindingBuilder:
                 # Nothing to dispatch on, so the generic runtime dispatch is the only option.
                 field['untagged_variant'] = True
 
-        for label, taggable in untagged:
-            print(f'WARNING: {label} is an untagged std::variant. Its alternative(s) '
-                  f'{taggable} are registered under cpp_core_types, so it should have a '
-                  'cpp_core_variants entry; without one, converting it from Python raises.')
+        if untagged:
+            details = '; '.join(f'{label} (alternative(s) {taggable})' for label, taggable in untagged)
+            raise RuntimeError(f'Untagged std::variant field(s): {details}. Their alternative(s) are '
+                               'registered under cpp_core_types, so each needs a cpp_core_variants '
+                               'entry; without one, converting the field from Python raises.')
 
         print('Finished checking std::variant field coverage.')
 

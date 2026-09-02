@@ -84,8 +84,8 @@ field that becomes an `extract_field`/`add_field` call. A variant with no `cpp_c
 falls into one of two cases:
 
 - **At least one alternative is registered under `cpp_core_types`.** It could be tagged, so the
-  missing entry is reported as a warning. Left alone it compiles and then raises the first time
-  Python converts it.
+  missing entry fails generation. Left alone it would compile and then raise the first time Python
+  converts it, so a variant field arriving from the core cannot reach a build unregistered.
 - **No alternative is registered** (primitives, `std::monostate`). There is nowhere to put a tag, so
   the generic converter is the only option. The generated call site is annotated to say so.
 

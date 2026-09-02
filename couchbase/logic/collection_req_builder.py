@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
-from enum import IntEnum
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -67,12 +66,6 @@ MUTATE_IN_SEMANTICS = {
     'upsert_doc': StoreSemantics.UPSERT,
     'replace_doc': StoreSemantics.REPLACE
 }
-
-
-class RangeScanType(IntEnum):
-    RangeScan = 1
-    PrefixScan = 2
-    SamplingScan = 3
 
 
 class CollectionRequestBuilder:
@@ -626,29 +619,27 @@ class CollectionRequestBuilder:
                     'tokens': list(token.as_dict() for token in consistent_with._sv)
                 }
 
-    def _get_scan_config(self, scan_type: ScanType) -> Dict[str, Any]:  # noqa: C901
-        scan_config = {}
+    def _get_scan_type(self, scan_type: ScanType) -> Dict[str, Any]:
+        # The binding layer reads the scan type as a tagged dict; the tag key matches the
+        # discriminator configured for the variant in tools/autogen/config/bindings.yaml.
         if isinstance(scan_type, RangeScan):
-            scan_type_val = RangeScanType.RangeScan.value
+            scan_type_dict: Dict[str, Any] = {'scan_type': 'range_scan'}
             if scan_type.start is not None:
-                scan_config['from'] = scan_type.start.to_dict()
+                scan_type_dict['from'] = scan_type.start.to_dict()
             if scan_type.end is not None:
-                scan_config['to'] = scan_type.end.to_dict()
+                scan_type_dict['to'] = scan_type.end.to_dict()
         elif isinstance(scan_type, PrefixScan):
-            scan_type_val = RangeScanType.PrefixScan.value
-            scan_config['prefix'] = scan_type.prefix
+            scan_type_dict = {'scan_type': 'prefix_scan', 'prefix': scan_type.prefix}
         elif isinstance(scan_type, SamplingScan):
-            scan_type_val = RangeScanType.SamplingScan.value
             if scan_type.limit <= 0:
                 raise InvalidArgumentException('Sampling scan limit must be positive')
-            scan_config['limit'] = scan_type.limit
+            scan_type_dict = {'scan_type': 'sampling_scan', 'limit': scan_type.limit}
             if scan_type.seed is not None:
-                scan_config['seed'] = scan_type.seed
+                scan_type_dict['seed'] = scan_type.seed
         else:
             raise InvalidArgumentException('scan_type must be Union[RangeScan, PrefixScan, SamplingScan]')
 
-        scan_config['scan_type'] = scan_type_val
-        return scan_config
+        return scan_type_dict
 
     def build_range_scan_request(self,
                                  connection: pycbc_connection,
@@ -658,15 +649,10 @@ class CollectionRequestBuilder:
         orchestrator_opts = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(orchestrator_opts)
         self._process_scan_orchestrator_ops(orchestrator_opts)
-        scan_config = self._get_scan_config(scan_type)
-        scan_type = scan_config.pop('scan_type', None)
-        if not scan_type:
-            raise InvalidArgumentException('Cannot complete range scan operation with scan_type.')
         scan_args = self._collection_dtls.get_details_as_txn_dict()
         scan_args.update({
             'transcoder': transcoder,
-            'scan_type': scan_type,
-            'scan_config': scan_config,
+            'scan_type': self._get_scan_type(scan_type),
             'orchestrator_options': orchestrator_opts,
         })
         return RangeScanRequest(connection, **scan_args)
@@ -681,15 +667,10 @@ class CollectionRequestBuilder:
         orchestrator_opts = forward_args(kwargs, *opts)
         transcoder = self._collection_dtls.get_request_transcoder(orchestrator_opts)
         self._process_scan_orchestrator_ops(orchestrator_opts)
-        scan_config = self._get_scan_config(scan_type)
-        scan_type = scan_config.pop('scan_type', None)
-        if not scan_type:
-            raise InvalidArgumentException('Cannot complete range scan operation with scan_type.')
         scan_args = self._collection_dtls.get_details_as_txn_dict()
         scan_args.update({
             'transcoder': transcoder,
-            'scan_type': scan_type,
-            'scan_config': scan_config,
+            'scan_type': self._get_scan_type(scan_type),
             'orchestrator_options': orchestrator_opts,
         })
         return AsyncRangeScanRequest(connection, self._loop, **scan_args)
