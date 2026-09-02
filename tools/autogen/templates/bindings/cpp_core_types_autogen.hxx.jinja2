@@ -62,7 +62,8 @@ struct py_to_cbpp_t<{{type.full_name}}> {
         }
         {% endif -%}
         {% for field in type.fields -%}
-        {% if field.is_required -%}
+        {% if field.py_only -%}
+        {% elif field.is_required -%}
         if (!extract_required_field<{{field.cpp_type}}>(pyObj, {{field_key(field, type)}}, cppObj.{{field.cpp_name}}, "{{type.full_name}}", __FILE__, __LINE__)) {
             return cppObj;
         }
@@ -71,6 +72,9 @@ struct py_to_cbpp_t<{{type.full_name}}> {
         {% elif field.is_ignored -%}
         // {{field.cpp_name}}
         {% else -%}
+        {% if field.untagged_variant -%}
+        // No alternative is a registered type, so this std::variant cannot carry a tag.
+        {% endif -%}
         extract_field<{{field.cpp_type}}>(pyObj, {{field_key(field, type)}}, cppObj.{{field.cpp_name}});
         {% endif -%}
         {% endfor -%}
@@ -86,9 +90,13 @@ struct py_to_cbpp_t<{{type.full_name}}> {
         }
 
         {% for field in type.fields -%}
-        {% if field.is_ignored -%}
+        {% if field.py_only -%}
+        {% elif field.is_ignored -%}
         // {{field.cpp_name}}
         {% else -%}
+        {% if field.untagged_variant -%}
+        // No alternative is a registered type, so this std::variant cannot carry a tag.
+        {% endif -%}
         add_field<{{field.cpp_type}}>(pyObj, {{field_key(field, type)}}, cppObj.{{field.cpp_name}});
         {% endif -%}
         {% endfor %}
@@ -97,6 +105,66 @@ struct py_to_cbpp_t<{{type.full_name}}> {
 };
 {% endfor %}
 
+{% for variant in cpp_variants %}
+// ==========================================================================================
+// {{variant.full_name}}
+// ==========================================================================================
+template <>
+struct py_to_cbpp_t<{{variant.full_name}}> {
+    using {{variant.name}} = {{variant.full_name}};
+
+    static inline {{variant.name}} from_py(PyObject* pyObj)
+    {
+        {{variant.name}} cppObj;
+        if (pyObj == nullptr || pyObj == Py_None) {
+            return cppObj;
+        }
+        if (!PyDict_Check(pyObj)) {
+            raise_invalid_argument("{{variant.input_missing_err_msg or ('Expected ' ~ variant.full_name ~ ' to be a dict.')}}", __FILE__, __LINE__);
+            return cppObj;
+        }
+
+        PyObject* pyObj_tag = PyDict_GetItemString(pyObj, "{{variant.discriminator}}");
+        if (pyObj_tag == nullptr) {
+            raise_invalid_argument("Expected {{variant.full_name}} to have a '{{variant.discriminator}}' key.", __FILE__, __LINE__);
+            return cppObj;
+        }
+        auto tag = py_to_cbpp<std::string>(pyObj_tag);
+        if (PyErr_Occurred() != nullptr) {
+            return cppObj;
+        }
+
+        {% for alt in variant.alternatives -%}
+        {% if not loop.first %}} else {% endif %}if (tag == "{{alt.tag}}") {
+            cppObj = py_to_cbpp<{{alt.full_name}}>(pyObj);
+        {% endfor -%}
+        } else {
+            raise_invalid_argument(("Unrecognized {{variant.discriminator}} for {{variant.full_name}}: " + tag).c_str(), __FILE__, __LINE__);
+        }
+
+        return cppObj;
+    }
+
+    static inline PyObject* to_py(const {{variant.name}}& cppObj)
+    {
+        {% for alt in variant.alternatives -%}
+        if (std::holds_alternative<{{alt.full_name}}>(cppObj)) {
+            PyObject* pyObj = cbpp_to_py<{{alt.full_name}}>(std::get<{{alt.full_name}}>(cppObj));
+            if (pyObj == nullptr) {
+                return nullptr;
+            }
+            // add_field clears the exception on failure, and this path returns null.
+            if (add_field_or_fail<std::string>(pyObj, "{{variant.discriminator}}", "{{alt.tag}}") < 0) {
+                Py_DECREF(pyObj);
+                return nullptr;
+            }
+            return pyObj;
+        }
+        {% endfor -%}
+        Py_RETURN_NONE;
+    }
+};
+{% endfor %}
 } // namespace pycbc
 
 // ====================================================================================================

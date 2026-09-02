@@ -32,7 +32,64 @@ The generation is driven by `bindings.yaml`. You can add new operations or types
 - `key_value`: Operations in the KV namespace.
 - `management`: Cluster, Bucket, and Collection management operations.
 - `cpp_core_types`: Generic structs that need conversion logic.
+- `cpp_core_variants`: `std::variant` types that need a tagged-union converter.
 - `cpp_core_enums`: Enums that need conversion logic.
+
+### std::variant fields (`cpp_core_variants`)
+
+`to_py` on a `std::variant` can dispatch on the active index, but `from_py` cannot: a Python dict
+carries no discriminator, so the generic converter in `src/cpp_types.hxx` raises at runtime rather
+than guessing. Registering the variant under `cpp_core_variants` generates a real converter instead:
+
+```yaml
+cpp_core_variants:
+  - core_struct: couchbase::core::management::eventing::function_url_binding
+    field: auth
+    header_file: "core/management/eventing_function.hxx"
+    discriminator: auth_type
+    alternatives:
+      - tag: basic
+        core_struct: couchbase::core::management::eventing::function_url_auth_basic
+```
+
+Python sends the alternative's fields and a `discriminator` key holding its tag as one flat dict,
+and the generated `from_py` dispatches on that tag. `to_py` writes the same tag back. The
+discriminator is added to each alternative's `TypedDict` as a `Literal`, and has no C++ counterpart.
+
+The alternatives are read out of the header and cross-checked against the config, so an alternative
+added or renamed in the core fails generation rather than silently dropping. Every alternative must
+also be registered under `cpp_core_types`; `std::monostate` needs no tag, since it is what an absent
+or `None` value converts to.
+
+Alternatives whose C++ type is a primitive cannot be tagged this way, since the tag needs a dict to
+live in. Those still go through the generic `to_py`, which is enough for response-only variants.
+
+#### Addressing the variant
+
+An entry addresses the variant in one of two ways, and needs exactly one of them:
+
+| Key(s) | Addresses |
+|---|---|
+| `core_struct` + `field` | a `std::variant` declared inline on a struct field, as above |
+| `core_type` | a variant behind a `using X = std::variant<...>` alias |
+
+Every other key is the same in both forms. They differ only in how the variant is located; the
+generated converter is the same either way, since it specializes on the expanded
+`std::variant<...>` and C++ aliases are transparent.
+
+#### Coverage check
+
+Nothing forces a `std::variant` field to be registered, so generation ends with a pass over every
+field that becomes an `extract_field`/`add_field` call. A variant with no `cpp_core_variants` entry
+falls into one of two cases:
+
+- **At least one alternative is registered under `cpp_core_types`.** It could be tagged, so the
+  missing entry is reported as a warning. Left alone it compiles and then raises the first time
+  Python converts it.
+- **No alternative is registered** (primitives, `std::monostate`). There is nowhere to put a tag, so
+  the generic converter is the only option. The generated call site is annotated to say so.
+
+The two cases are told apart from the parsed alternatives, so neither needs a config key.
 
 ## Post-Processing (formatting & churn)
 

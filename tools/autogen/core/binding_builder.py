@@ -4,12 +4,16 @@ import os
 from copy import deepcopy
 from typing import (Any,
                     Dict,
+                    FrozenSet,
                     List,
                     Optional,
+                    Set,
+                    Tuple,
                     Union)
 
 from tools.autogen.core.binding_autogen_types import (BindingConfigCppEnumType,
                                                       BindingConfigCppTypes,
+                                                      BindingConfigCppVariant,
                                                       BindingConfigKeyValueOperations,
                                                       BindingConfigMgmt,
                                                       BindingConfigMgmtOperations,
@@ -19,6 +23,7 @@ from tools.autogen.core.binding_autogen_types import (BindingConfigCppEnumType,
                                                       BindingConfigOpResponse,
                                                       BindingConfigStreamingOperations,
                                                       BindingCppType,
+                                                      BindingCppVariant,
                                                       BindingEnumType,
                                                       BindingEnumValue,
                                                       BindingKeyValueMultiOp,
@@ -27,6 +32,7 @@ from tools.autogen.core.binding_autogen_types import (BindingConfigCppEnumType,
                                                       BindingMgmtOp,
                                                       BindingMultiOpField,
                                                       BindingStreamingOp,
+                                                      BindingVariantAlternative,
                                                       CppField,
                                                       CppParsedType,
                                                       CppType)
@@ -67,6 +73,9 @@ class BindingBuilder:
     def __init__(self, cpp_parser_config: CppTypeParserConfig) -> None:
         self._cpp_parser = CppTypeParser(cpp_parser_config)
         self._cpp_types: List[BindingCppType] = []
+        self._cpp_variants: List[BindingCppVariant] = []
+        # Alternative sets of every tagged variant, keyed order-independently for coverage checks.
+        self._tagged_variant_alternatives: Set[FrozenSet[str]] = set()
         self._cpp_enums: List[BindingEnumType] = []
         self._kv_ops = []
         self._kv_multi_ops = []
@@ -84,6 +93,10 @@ class BindingBuilder:
     @property
     def cpp_types(self) -> List[BindingCppType]:
         return self._cpp_types
+
+    @property
+    def cpp_variants(self) -> List[BindingCppVariant]:
+        return self._cpp_variants
 
     @property
     def kv_ops(self) -> List[BindingKeyValueOp]:
@@ -853,6 +866,197 @@ class BindingBuilder:
             self._cpp_types.append(BindingCppType(**type_req_dict))
 
         print('Finished processing C++ core types.')
+
+    def resolve_cpp_variant(self, config_variant: BindingConfigCppVariant) -> Tuple[str, str, str, List[str]]:
+        """Locate a core std::variant from either config addressing form.
+
+        Returns (label, full_name, name, alternatives), where full_name is the C++ type the
+        converter specializes on and label is what error messages call it.
+        """
+        header_file = config_variant['header_file']
+        core_type = config_variant.get('core_type')
+        core_struct = config_variant.get('core_struct')
+        field = config_variant.get('field')
+
+        if (core_type is None) == (core_struct is None):
+            raise RuntimeError('A cpp_core_variants entry needs exactly one of core_type (a '
+                               '`using X = std::variant<...>` alias) or core_struct + field (an inline '
+                               f'std::variant field); got core_type={core_type}, core_struct={core_struct}.')
+
+        if core_type is not None:
+            if field is not None:
+                raise RuntimeError(f'field is only valid alongside core_struct; drop it from {core_type}.')
+            alternatives = self._cpp_parser.parse_variant_alias(header_file, core_type)
+            # The alias is transparent, so specializing on it also covers the expanded spelling
+            # that the generated call sites use.
+            return core_type, core_type, core_type.split('::')[-1], alternatives
+
+        if field is None:
+            raise RuntimeError(f'core_struct {core_struct} needs a field naming the std::variant member.')
+        alternatives = self._cpp_parser.parse_variant_field(header_file, core_struct, field)
+        # No alias to name, so specialize on the variant rebuilt from the parsed alternatives.
+        full_name = f"std::variant<{', '.join(alternatives)}>"
+        return (f'{core_struct}::{field}', full_name, f"{core_struct.split('::')[-1]}_{field}", alternatives)
+
+    def set_cpp_core_variants(self, config_cpp_variants: List[BindingConfigCppVariant]) -> None:
+        """Build the tagged-union converters for the core's std::variant types.
+
+        A std::variant carries no discriminator on the Python side, so each alternative is
+        paired with a tag that Python writes under the configured discriminator key.  Must run
+        after set_cpp_core_types, since every alternative has to already be a registered type.
+        """
+        print('\nProcessing C++ core variants...')
+        for config_variant in config_cpp_variants:
+            header_file = config_variant['header_file']
+            discriminator = config_variant['discriminator']
+            label, full_name, name, parsed_alternatives = self.resolve_cpp_variant(config_variant)
+
+            declared = [alt for alt in parsed_alternatives if alt != 'std::monostate']
+            self._tagged_variant_alternatives.add(frozenset(parsed_alternatives))
+
+            tags = {alt['core_struct']: alt['tag'] for alt in config_variant['alternatives']}
+            missing = [alt for alt in declared if alt not in tags]
+            unknown = [alt for alt in tags if alt not in declared]
+            if missing or unknown:
+                raise RuntimeError(f'Configured alternatives for {label} (header={header_file}) do not match '
+                                   f'the C++ header. Missing a tag for: {missing or None}. '
+                                   f'Configured but not declared: {unknown or None}.')
+
+            duplicate_tags = [t for t in tags.values() if list(tags.values()).count(t) > 1]
+            if duplicate_tags:
+                raise RuntimeError(f'Duplicate tag(s) {sorted(set(duplicate_tags))} configured for {label}.')
+
+            alternatives = []
+            for alt_full_name in declared:
+                alt_match = next((t for t in self._cpp_types if t.full_name == alt_full_name), None)
+                if alt_match is None:
+                    raise RuntimeError(f'{alt_full_name} is a std::variant alternative of {label} but is not '
+                                       'registered under cpp_core_types. Add it there first.')
+                tag = tags[alt_full_name]
+                self.add_variant_discriminator_field(alt_match, discriminator, tag)
+                alternatives.append(BindingVariantAlternative(tag=tag, full_name=alt_full_name))
+
+            self._cpp_variants.append(BindingCppVariant(
+                name=name,
+                full_name=full_name,
+                header=header_file,
+                discriminator=discriminator,
+                alternatives=alternatives,
+                input_missing_err_msg=config_variant.get('input_missing_err_msg', None)))
+
+        print('Finished processing C++ core variants.')
+
+    def add_variant_discriminator_field(self, cpp_type: BindingCppType, discriminator: str, tag: str) -> None:
+        """Give an alternative's TypedDict the tag its converter dispatches on.
+
+        The discriminator has no C++ counterpart, so it is marked py_only and the C++ templates
+        skip it.
+        """
+        existing = next((f for f in cpp_type.fields if f['py_name'] == discriminator), None)
+        if existing is not None:
+            if existing.get('py_only') is not True:
+                raise RuntimeError(f'Discriminator "{discriminator}" collides with a real field on '
+                                   f'{cpp_type.full_name}. Pick a discriminator the C++ struct does not declare.')
+            if existing['py_type'] != f"Literal['{tag}']":
+                raise RuntimeError(f'{cpp_type.full_name} is an alternative of two variants that share the '
+                                   f'discriminator "{discriminator}" but tag it differently '
+                                   f'({existing["py_type"]} and Literal[\'{tag}\']). The tag lives on the '
+                                   'alternative, not the pairing, so give each variant its own discriminator.')
+            return
+
+        cpp_type.fields.insert(0, {
+            'cpp_name': discriminator,
+            'cpp_type': '',
+            'py_name': discriminator,
+            'py_type': f"Literal['{tag}']",
+            'is_required': False,
+            'is_ignored': False,
+            'skip_if_empty': False,
+            'py_only': True,
+        })
+
+    @staticmethod
+    def split_variant_alternatives(cpp_type: str) -> Optional[List[str]]:
+        """Split the alternatives out of an emitted `std::variant<...>` type string.
+
+        Returns None when the type holds no variant.  Only commas at nesting depth zero split,
+        so templated alternatives stay intact.
+        """
+        marker = 'std::variant<'
+        start = cpp_type.find(marker)
+        if start < 0:
+            return None
+
+        alternatives = []
+        current = ''
+        depth = 0
+        for char in cpp_type[start + len(marker):]:
+            if char == '>' and depth == 0:
+                break
+            if char == ',' and depth == 0:
+                alternatives.append(current.strip())
+                current = ''
+                continue
+            if char == '<':
+                depth += 1
+            elif char == '>':
+                depth -= 1
+            current += char
+
+        alternatives.append(current.strip())
+        return alternatives
+
+    def iter_binding_fields(self) -> List[Tuple[str, Dict[str, Any]]]:
+        """Every field the C++ templates turn into an extract_field/add_field call."""
+        owners = [(t.full_name, t.fields) for t in self._cpp_types]
+        for op in self._kv_ops:
+            owners.append((op.request_struct_full, op.request_fields))
+            owners.append((op.response_struct_full, op.response_fields))
+        for op in self._streaming_ops:
+            owners.append((op.request_struct_full, op.request_fields))
+        for grp in self._mgmt_op_groups:
+            for op in grp.operations:
+                owners.append((op.request_struct_full, op.request_fields))
+                owners.append((op.response_struct_full, op.response_fields))
+
+        return [(owner, field) for owner, fields in owners for field in fields]
+
+    def check_variant_field_coverage(self) -> None:
+        """Report std::variant fields that could carry a tag but have no cpp_core_variants entry.
+
+        Such a field compiles against the generic py_to_cbpp_t<std::variant<...>>, which cannot
+        pick an alternative and raises at conversion time.  Surfacing it here makes that a
+        generation-time signal instead of a runtime one.  A variant whose alternatives are all
+        unregistered (primitives, std::monostate) has nowhere to hang a tag, so it keeps the
+        generic converter by design and is annotated in the generated output.
+
+        Must run after the types, variants and operations are built.
+        """
+        print('\nChecking std::variant field coverage...')
+        registered = {t.full_name for t in self._cpp_types}
+        untagged = []
+        for owner, field in self.iter_binding_fields():
+            if field.get('is_ignored') or field.get('py_only'):
+                continue
+
+            alternatives = self.split_variant_alternatives(field.get('cpp_type', ''))
+            if alternatives is None or frozenset(alternatives) in self._tagged_variant_alternatives:
+                continue
+
+            label = f"{owner}::{field['cpp_name']}"
+            taggable = [alt for alt in alternatives if alt in registered]
+            if taggable:
+                untagged.append((label, taggable))
+            else:
+                # Nothing to dispatch on, so the generic runtime dispatch is the only option.
+                field['untagged_variant'] = True
+
+        for label, taggable in untagged:
+            print(f'WARNING: {label} is an untagged std::variant. Its alternative(s) '
+                  f'{taggable} are registered under cpp_core_types, so it should have a '
+                  'cpp_core_variants entry; without one, converting it from Python raises.')
+
+        print('Finished checking std::variant field coverage.')
 
     def set_cpp_core_enum_types(self, cpp_config_enums: List[BindingConfigCppEnumType]) -> None:
         print('\nProcessing C++ core enums...')

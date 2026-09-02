@@ -418,6 +418,7 @@ class BindingGenerator:
     def build_types(self) -> None:
         self._binding_builder.set_cpp_core_enum_types(self._schema['cpp_core_enums'])
         self._binding_builder.set_cpp_core_types(self._schema['cpp_core_types'])
+        self._binding_builder.set_cpp_core_variants(self._schema.get('cpp_core_variants', []))
 
     def build_operations(self) -> None:
         self._binding_builder.build_kv_operations(self._schema['key_value'])
@@ -441,12 +442,14 @@ class BindingGenerator:
 
     def generate_cpp_core_types_template(self) -> None:
         type_headers = set([f'<{t.header}>' for t in self._binding_builder.cpp_types])
+        type_headers.update(f'<{v.header}>' for v in self._binding_builder.cpp_variants)
         timestamp = datetime.now()
         context = {
             'current_year': timestamp.year,
             'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             'type_headers': self._schema['cpp_core_type_headers'] + list(sorted(type_headers)),
             'cpp_types': [asdict(t) for t in self._binding_builder.cpp_types],
+            'cpp_variants': [asdict(v) for v in self._binding_builder.cpp_variants],
         }
         template_name = self._get_template(BindingFileType.CppCoreTypes)
         code = self._get_rendered_content(template_name, context)
@@ -643,7 +646,7 @@ class BindingGenerator:
         for t in self._binding_builder.cpp_types:
             if any(t.header.startswith(p) for p in _KV_TYPE_HEADER_PREFIXES):
                 for f in t.fields:
-                    if 'is_ignored' in f and f['is_ignored']:
+                    if f.get('is_ignored') or f.get('py_only'):
                         continue
                     keys.add(f['py_name'])
 
@@ -688,6 +691,7 @@ class BindingGenerator:
     def run(self) -> None:
         self.build_types()
         self.build_operations()
+        self._binding_builder.check_variant_field_coverage()
         self.generate_cpp_core_enums_template()
         self.generate_cpp_core_types_template()
         self.generate_operations_template()

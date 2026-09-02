@@ -125,7 +125,7 @@ class CppTypeParser:
         if self._verbose:
             print(f'Include paths={self._include_paths}')
 
-    def parse_op(self, file_path: str) -> List[CppParsedType]:
+    def _parse_translation_unit(self, file_path: str) -> Tuple[clang.cindex.TranslationUnit, str]:
         header_path = os.path.join(CXX_CLIENT_ROOT, file_path)
         index = clang.cindex.Index.create()
         suppress_warnings = ['-Wno-nullability-completeness', '-Wno-deprecated-literal-operator']
@@ -133,7 +133,10 @@ class CppTypeParser:
             args = ['-std=c++17', '-v', f'-isysroot{os.getcwd()}'] + self._include_paths + suppress_warnings
         else:
             args = ['-std=c++17', f'-isysroot{os.getcwd()}'] + self._include_paths + suppress_warnings
-        translation_unit = index.parse(header_path, args=args)
+        return index.parse(header_path, args=args), header_path
+
+    def parse_op(self, file_path: str) -> List[CppParsedType]:
+        translation_unit, header_path = self._parse_translation_unit(file_path)
 
         self._op_types = []
         self._op_enums = []
@@ -141,19 +144,96 @@ class CppTypeParser:
         return self._op_types
 
     def parse_enum(self, file_path: str) -> List[CppParsedEnum]:
-        header_path = os.path.join(CXX_CLIENT_ROOT, file_path)
-        index = clang.cindex.Index.create()
-        suppress_warnings = ['-Wno-nullability-completeness', '-Wno-deprecated-literal-operator']
-        if self._verbose is True:
-            args = ['-std=c++17', '-v', f'-isysroot{os.getcwd()}'] + self._include_paths + suppress_warnings
-        else:
-            args = ['-std=c++17', f'-isysroot{os.getcwd()}'] + self._include_paths + suppress_warnings
-        translation_unit = index.parse(header_path, args=args)
+        translation_unit, header_path = self._parse_translation_unit(file_path)
 
         self._op_types = []
         self._op_enums = []
         self.traverse(translation_unit.cursor, [], header_path)
         return self._op_enums
+
+    def parse_variant_alias(self, file_path: str, full_name: str) -> List[str]:
+        """Resolve a `using X = std::variant<...>` alias to its alternative type names.
+
+        Returns the alternatives in declaration order, which is also the variant index order.
+        """
+        translation_unit, header_path = self._parse_translation_unit(file_path)
+        alias_node = self._find_type_alias(translation_unit.cursor, [], header_path, full_name)
+        if alias_node is None:
+            raise RuntimeError(f'Unable to find C++ type alias for {full_name} (header={file_path}).')
+
+        canonical = alias_node.underlying_typedef_type.get_canonical().spelling
+        parsed = self.parse_type_str(canonical)
+        if parsed.get('name') != 'std::variant':
+            raise RuntimeError(f'{full_name} (header={file_path}) resolves to {canonical}, not a std::variant.')
+
+        return [alt['name'] for alt in parsed['of']]
+
+    def _find_type_alias(self,
+                         node: clang.cindex.Cursor,
+                         namespace: List[str],
+                         main_file: str,
+                         full_name: str) -> Optional[clang.cindex.Cursor]:
+        if node.location.file is not None and node.location.file.name != main_file:
+            return None
+
+        if node.kind == clang.cindex.CursorKind.TYPE_ALIAS_DECL:
+            if '::'.join([*namespace, node.displayname]) == full_name:
+                return node
+
+        if node.kind in (clang.cindex.CursorKind.NAMESPACE,
+                         clang.cindex.CursorKind.CLASS_DECL,
+                         clang.cindex.CursorKind.STRUCT_DECL):
+            namespace = [*namespace, node.displayname]
+
+        for child in node.get_children():
+            match = self._find_type_alias(child, namespace, main_file, full_name)
+            if match is not None:
+                return match
+
+        return None
+
+    def parse_variant_field(self, file_path: str, struct_name: str, field_name: str) -> List[str]:
+        """Resolve an inline `std::variant<...>` field declaration to its alternative type names.
+
+        Returns the alternatives in declaration order, which is also the variant index order.
+        """
+        translation_unit, header_path = self._parse_translation_unit(file_path)
+        field_node = self._find_struct_field(translation_unit.cursor, [], header_path, struct_name, field_name)
+        if field_node is None:
+            raise RuntimeError(f'Unable to find C++ field {struct_name}::{field_name} (header={file_path}).')
+
+        canonical = field_node.type.get_canonical().spelling
+        parsed = self.parse_type_str(canonical)
+        if parsed.get('name') != 'std::variant':
+            raise RuntimeError(f'{struct_name}::{field_name} (header={file_path}) is a {canonical}, '
+                               'not a std::variant.')
+
+        return [alt['name'] for alt in parsed['of']]
+
+    def _find_struct_field(self,  # noqa: C901
+                           node: clang.cindex.Cursor,
+                           namespace: List[str],
+                           main_file: str,
+                           struct_name: str,
+                           field_name: str) -> Optional[clang.cindex.Cursor]:
+        if node.location.file is not None and node.location.file.name != main_file:
+            return None
+
+        if node.kind in (clang.cindex.CursorKind.NAMESPACE,
+                         clang.cindex.CursorKind.CLASS_DECL,
+                         clang.cindex.CursorKind.STRUCT_DECL):
+            namespace = [*namespace, node.displayname]
+            if '::'.join(namespace) == struct_name:
+                return next((c for c in node.get_children()
+                             if c.kind == clang.cindex.CursorKind.FIELD_DECL
+                             and c.displayname == field_name), None)
+
+        for child in node.get_children():
+            match = self._find_struct_field(child, namespace, main_file, struct_name, field_name)
+            if match is not None:
+                return match
+
+        return None
 
     def traverse(self, node: clang.cindex.Cursor, namespace, main_file: str) -> None:  # noqa: C901
         # only scan the elements of the file we parsed

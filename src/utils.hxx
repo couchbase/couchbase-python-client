@@ -182,7 +182,7 @@ extract_legacy_span_field(PyObject* dict,
   }
 }
 
-// Shared convention for every add_* helper below (add_field, add_bool_field,
+// Shared convention for the add_* helpers below (add_field, add_bool_field,
 // add_string_field_if_not_empty): return 0 on success, -1 on failure, self-reported via
 // PyErr_WriteUnraisable (matches logger.hxx) since most callers (generated code) never check
 // the return value.
@@ -239,6 +239,21 @@ add_field(PyObject* dict, const char* key, PyObject* value)
     PyErr_WriteUnraisable(dict);
     CB_LOG_WARNING("PYCBC: Failed to set field '{}' on result dict.", key);
   }
+  return rv;
+}
+
+// The one add_* helper that does not follow the convention above: it leaves the exception set
+// so that callers returning null can propagate it.
+template<typename T>
+inline int
+add_field_or_fail(PyObject* dict, const char* key, const T& value)
+{
+  PyObject* pyObj = cbpp_to_py(value);
+  if (pyObj == nullptr) {
+    return -1;
+  }
+  int rv = PyDict_SetItemString(dict, key, pyObj);
+  Py_DECREF(pyObj);
   return rv;
 }
 

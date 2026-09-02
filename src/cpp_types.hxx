@@ -689,11 +689,11 @@ struct py_to_cbpp_t<std::variant<Types...>> {
 
   static inline std::variant<Types...> from_py(PyObject* pyObj)
   {
-    // Set a Python runtime error as we don't have a way to determine
-    // which variant type to convert to without additional context
+    // A Python object carries no discriminator, so the generic case cannot pick an alternative.
+    // Register the variant under cpp_core_variants in bindings.yaml to get a tagged converter.
     PyErr_SetString(PyExc_RuntimeError,
-                    "Cannot convert Python object to std::variant - conversion requires explicit "
-                    "type information");
+                    "Cannot convert Python object to std::variant; the variant needs a "
+                    "cpp_core_variants entry in tools/autogen/config/bindings.yaml");
     return std::variant<Types...>{};
   }
 };

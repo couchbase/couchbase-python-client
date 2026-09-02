@@ -117,6 +117,23 @@ class BindingConfigCppTypes(TypedDict):
     ignored_fields: Optional[List[str]] = None
 
 
+class BindingConfigCppVariantAlternative(TypedDict, total=False):
+    tag: str
+    core_struct: str
+
+
+class BindingConfigCppVariant(TypedDict, total=False):
+    # Addressed either by core_type (a `using X = std::variant<...>` alias) or by
+    # core_struct + field (an inline std::variant field declaration).  Exactly one form.
+    core_type: str
+    core_struct: str
+    field: str
+    header_file: str
+    discriminator: str
+    alternatives: List[BindingConfigCppVariantAlternative]
+    input_missing_err_msg: Optional[str] = None
+
+
 class BindingConfigCppEnumType(TypedDict, total=False):
     core_enum: str
     header_file: str
@@ -148,6 +165,7 @@ class BindingConfigSchema(TypedDict):
     management: BindingConfigMgmt
     cpp_core_type_headers: List[str]
     cpp_core_types: BindingConfigCppTypes
+    cpp_core_variants: List[BindingConfigCppVariant]
     cpp_core_enums: List[BindingConfigCppEnumType]
     cpp_core_enum_headers: List[str]
 
@@ -287,6 +305,22 @@ class BindingCppType:
     py_type: str
     input_missing_err_msg: Optional[str] = None
     skip_request: Optional[bool] = None
+
+
+@dataclass
+class BindingVariantAlternative:
+    tag: str
+    full_name: str                          # e.g. couchbase::core::management::eventing::function_url_auth_basic
+
+
+@dataclass
+class BindingCppVariant:
+    name: str                               # the alias name, or <struct>_<field> for an inline variant
+    full_name: str                          # the alias, or the expanded std::variant<...> for an inline variant
+    header: str
+    discriminator: str                      # Python dict key holding the alternative tag
+    alternatives: List[BindingVariantAlternative]
+    input_missing_err_msg: Optional[str] = None
 
 
 @dataclass
