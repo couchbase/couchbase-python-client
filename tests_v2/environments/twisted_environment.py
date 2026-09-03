@@ -31,7 +31,6 @@ Design notes:
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable, Generator
 from typing import (TYPE_CHECKING,
                     Any,
@@ -44,6 +43,8 @@ import pytest
 from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CouchbaseException,
+                                  DocumentNotFoundException,
+                                  InternalServerFailureException,
                                   UnAmbiguousTimeoutException)
 from tests_v2.couchbase_config import CouchbaseConfig
 from tests_v2.data_provider import DataProvider
@@ -55,7 +56,8 @@ from tests_v2.environments.test_environment import (CollectionHandle,
                                                     DocType,
                                                     SuiteRequirements,
                                                     TestEnvironment,
-                                                    TopologyFacts)
+                                                    TopologyFacts,
+                                                    check_suite_features)
 from tests_v2.skips import env_degraded, server_label
 from tests_v2.test_utils import RetryHelper
 from txcouchbase.bucket import Bucket as TwistedBucket
@@ -163,6 +165,13 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
             test_bucket_kv_endpoints=0 if kv_endpoints is None else len(kv_endpoints),
         )
 
+    def _kv_knows_current_collection(self) -> None:
+        """See the sync version."""
+        try:
+            self._rit()(self.collection.get, TestEnvironment.NOT_A_KEY)
+        except DocumentNotFoundException:
+            pass
+
     def load_data(self, num_docs: int = 50) -> None:
         """Seed num_docs of every DocType in the suite's DATA_SET; see the sync version.
 
@@ -261,15 +270,19 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
             if TwistedTestEnvironmentCollectionManager not in self._manager_registry:
                 self._no_collection_manager(collection_strategy, test_suite)
 
-            worker_id = os.environ.get('PYTEST_XDIST_WORKER', '')
-            scope_name = f'{self.TEST_SCOPE}-{worker_id}' if worker_id else self.TEST_SCOPE
-            coll_name = f'{self.TEST_COLLECTION}-{worker_id}' if worker_id else self.TEST_COLLECTION
-
             coll_mgr = self.get_manager(TwistedTestEnvironmentCollectionManager)
             self.try_n_times(
-                5, 3, coll_mgr.setup_named_collection, scope_name, coll_name,
+                5, 3, coll_mgr.drop_stale_scopes, self.named_collection_prefix(),
                 is_deferred=False,
             )
+
+            def provision() -> tuple[str, str]:
+                # Fresh names per attempt; see the sync setup().
+                names = self.new_named_collection_names()
+                coll_mgr.setup_named_collection(*names)
+                return names
+
+            scope_name, coll_name = self.try_n_times(5, 3, provision, is_deferred=False)
             named_scope = self._bucket.scope(scope_name)
             named_coll = named_scope.collection(coll_name)
             self._pool.add(CollectionHandle(
@@ -280,6 +293,7 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
                 is_clean=(collection_strategy == CollectionStrategy.NAMED_EMPTY),
             ))
             self._pool.use(coll_name)
+            self.try_n_times(10, 1, self._kv_knows_current_collection, is_deferred=False)
 
         # Before data loading; see the sync setup().
         if collect_topology:
@@ -291,18 +305,20 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
     def teardown(self,
                  collection_strategy: CollectionStrategy = CollectionStrategy.DEFAULT) -> None:
         """Purge data, drop named collections via reactor thread, teardown managers."""
-        self.try_n_times(5, 3, self.purge_data, is_deferred=False)
-
-        if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
-            handle = self._pool.current
-            if TwistedTestEnvironmentCollectionManager in self._manager_registry:
-                coll_mgr = self.get_manager(TwistedTestEnvironmentCollectionManager)
-                self.try_n_times(
-                    5, 3, coll_mgr.teardown_named_collection, handle.scope_name,
-                    is_deferred=False,
-                )
-            self._pool._handles = [self._pool._handles[0]]
-            self._pool._current_index = 0
+        try:
+            self.try_n_times(5, 3, self.purge_data, is_deferred=False)
+        finally:
+            # Dropped even when the purge fails; see the sync teardown().
+            if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
+                handle = self._pool.current
+                if TwistedTestEnvironmentCollectionManager in self._manager_registry:
+                    coll_mgr = self.get_manager(TwistedTestEnvironmentCollectionManager)
+                    self.try_n_times(
+                        5, 3, coll_mgr.teardown_named_collection, handle.scope_name,
+                        is_deferred=False,
+                    )
+                self._pool._handles = [self._pool._handles[0]]
+                self._pool._current_index = 0
 
         self._teardown_managers()
 
@@ -312,7 +328,7 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
 
     # Static, like the sync base and the async subclass, and that is not a style choice.
     # The suites call these through the class, `TestEnvironment.try_n_times(10, 1, ...)`,
-    # 25 times in collection_t and 5 in bucketmgmt_t.  The generator rewrites the class
+    # throughout collection_t and bucketmgmt_t.  The generator rewrites the class
     # name and nothing else, so an instance method here binds `self` to the first
     # positional argument: num_times becomes self, seconds_between becomes num_times, and
     # the retry loop runs a wrong number of times against a wrong delay without ever
@@ -486,7 +502,8 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
                 env_args['default_collection'] = bucket.default_collection()
                 okay = True
                 break
-            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException):
+            # See the sync environment's get_environment for what is retried.
+            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException, InternalServerFailureException):
                 continue
 
         if not okay:
@@ -519,6 +536,7 @@ def build_twisted_environment(
     **kwargs: Any,
 ) -> TwistedTestEnvironment:
     """Twisted counterpart of build_environment() for txcouchbase test suites."""
+    check_suite_features(base_env, suite_cls)
     strategy = (
         collection_strategy if collection_strategy is not None
         else suite_cls.COLLECTION_STRATEGY

@@ -82,6 +82,13 @@ VIEW_MAP_FUNCTION = """function(doc, meta) {
 }
 """
 
+# The same function under a different definition, for the one rebuild the views environment
+# allows itself.  The view engine keys an index by the definition, so this is what gets a new
+# index rather than the one already built.  The comment goes inside the body: the engine
+# compiles the source as a single function expression, and anything after the closing brace is
+# a syntax error that rejects the design document.
+REBUILT_VIEW_MAP_FUNCTION = VIEW_MAP_FUNCTION.replace('{', '{\n  // rebuilt', 1)
+
 
 # ---------------------------------------------------------------------------
 # The management suites

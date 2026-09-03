@@ -40,9 +40,13 @@ run.
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
-from couchbase.exceptions import QueryIndexAlreadyExistsException, QueryIndexNotFoundException
+from couchbase.exceptions import (InternalServerFailureException,
+                                  QueryIndexAlreadyExistsException,
+                                  QueryIndexNotFoundException)
 from tests_v2.environments.managers import TwistedTestEnvironmentQueryIndexManager
+from tests_v2.environments.query_index_mgmt_environment import index_already_dropped
 from tests_v2.environments.test_environment import CollectionStrategy
 from tests_v2.environments.twisted_environment import TwistedTestEnvironment, run_in_reactor_thread
 from tests_v2.test_features import EnvironmentFeatures, ServerFeatures
@@ -81,13 +85,28 @@ class TwistedQueryEnvironment:
             TwistedTestEnvironment.sleep(TwistedQueryEnvironment.PRIMARY_INDEX_DELAY)
 
     @staticmethod
+    def _drop_primary_index(qixm: TwistedTestEnvironmentQueryIndexManager, *args: Any, **kwargs: Any) -> None:
+        # A drop repeated while the first is still being applied can come back as GSI 5000,
+        # `Index does not exist`, instead of QueryIndexNotFoundException.  Both mean the index is
+        # gone, and the teardown loop stops only on QueryIndexNotFoundException, so the GSI form
+        # is raised as one.
+        try:
+            qixm.drop_primary_index(*args, **kwargs)
+        except InternalServerFailureException as exc:
+            if index_already_dropped(exc):
+                raise QueryIndexNotFoundException(message=str(exc)) from exc
+            raise
+
+    @staticmethod
     def _drop_primary_index_raw(cb_env: TwistedTestEnvironment) -> None:
         q_str = f'DROP PRIMARY INDEX on `{cb_env.bucket.name}`'
         for _ in range(TwistedQueryEnvironment.PRIMARY_INDEX_ROUNDS):
             try:
                 TwistedQueryEnvironment._drain(cb_env, q_str)
-            except QueryIndexNotFoundException:
-                break
+            except Exception as exc:
+                if index_already_dropped(exc):
+                    break
+                raise
             TwistedTestEnvironment.sleep(TwistedQueryEnvironment.PRIMARY_INDEX_DELAY)
 
     @staticmethod
@@ -145,7 +164,8 @@ class TwistedQueryEnvironment:
             qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
             TwistedTestEnvironment.try_n_times_till_exception(TwistedQueryEnvironment.PRIMARY_INDEX_ROUNDS,
                                                               TwistedQueryEnvironment.PRIMARY_INDEX_DELAY,
-                                                              qixm.drop_primary_index,
+                                                              TwistedQueryEnvironment._drop_primary_index,
+                                                              qixm,
                                                               cb_env.bucket.name,
                                                               is_deferred=False,
                                                               scope_name=cb_env.scope.name,
@@ -156,7 +176,8 @@ class TwistedQueryEnvironment:
                 qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
                 TwistedTestEnvironment.try_n_times_till_exception(TwistedQueryEnvironment.PRIMARY_INDEX_ROUNDS,
                                                                   TwistedQueryEnvironment.PRIMARY_INDEX_DELAY,
-                                                                  qixm.drop_primary_index,
+                                                                  TwistedQueryEnvironment._drop_primary_index,
+                                                                  qixm,
                                                                   cb_env.bucket.name,
                                                                   is_deferred=False,
                                                                   expected_exceptions=(QueryIndexNotFoundException,))

@@ -31,6 +31,12 @@ class ConsistencyChecker:
     # wait that does blow its budget overruns by one request rather than by several.
     HTTP_TIMEOUT_SECS = 5
 
+    # The cluster manager can answer one request with a 500 and the next with a 200, and every
+    # environment build runs these fetchers, so a single bad answer fails the whole class.  A
+    # 5xx or a dropped connection is asked again; a 4xx is not, since bad credentials or a
+    # wrong path will not clear.
+    HTTP_ATTEMPTS = 3
+
     # What the cluster calls each service in `/pools/default`, mapped to the SDK's public
     # vocabulary.  Only the codes that correspond to a ServiceType member are listed: `index`
     # is the GSI service, which has no member (see FEATURE_SERVICES), and `backup` likewise.
@@ -62,15 +68,23 @@ class ConsistencyChecker:
         returning HTML.  None of them is a skip, because none of them says anything about
         what the cluster supports.
         """
-        try:
-            resp = requests.get(path,
-                                auth=self._config.get_username_and_pw(),
-                                timeout=self.HTTP_TIMEOUT_SECS)
-        except requests.RequestException as ex:
-            env_degraded(stage=stage,
-                         url=path,
-                         error=type(ex).__name__,
-                         note=f'management endpoint unreachable: {ex}')
+        for attempt in range(1, self.HTTP_ATTEMPTS + 1):
+            try:
+                resp = requests.get(path,
+                                    auth=self._config.get_username_and_pw(),
+                                    timeout=self.HTTP_TIMEOUT_SECS)
+            except requests.RequestException as ex:
+                if attempt < self.HTTP_ATTEMPTS:
+                    sleep(self.RETRY_DELAY_SECS)
+                    continue
+                env_degraded(stage=stage,
+                             url=path,
+                             error=type(ex).__name__,
+                             attempts=self.HTTP_ATTEMPTS,
+                             note=f'management endpoint unreachable: {ex}')
+            if resp.status_code < 500 or attempt == self.HTTP_ATTEMPTS:
+                break
+            sleep(self.RETRY_DELAY_SECS)
         if resp.status_code != 200:
             env_degraded(stage=stage,
                          url=path,

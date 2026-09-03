@@ -52,6 +52,13 @@ from tests_v2.test_features import EnvironmentFeatures, ServerFeatures
 
 # The name the server gives a primary index created without one.
 DEFAULT_PRIMARY_INDEX_NAME = '#primary'
+# On 7.0 and 7.1 a query service stall of about two minutes can catch the primary index creates on
+# a named collection, through either manager, timing one out and holding the next for over a
+# minute.  The cause is not established.  The rerun waits long enough for the stall to pass, and
+# only a timeout reruns.
+PRIMARY_CREATE_STALL_RERUN = pytest.mark.flaky(reruns=1,
+                                               reruns_delay=60,
+                                               only_rerun=['AmbiguousTimeoutException'])
 
 
 class QueryIndexManagementSuiteBase(SuiteRequirements):
@@ -183,6 +190,7 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
                 result = cb_env.cluster.query(n1ql)
                 cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
@@ -200,6 +208,7 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
                 result = cb_env.cluster.query(n1ql)
                 cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
@@ -209,6 +218,7 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         with pytest.raises(QueryIndexAlreadyExistsException):
             qixm.create_primary_index()
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists_kwargs(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
@@ -257,11 +267,6 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   5,
-                                                   qixm.drop_index,
-                                                   self.IX_NAME,
-                                                   expected_exceptions=(QueryIndexNotFoundException,))
         qixm.create_index(self.IX_NAME,
                           self.IX_KEYS,
                           CreateQueryIndexOptions(timeout=timedelta(days=1),
@@ -485,6 +490,7 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
                 result = cb_env.cluster.query(n1ql)
                 cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
@@ -504,6 +510,7 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
                 result = cb_env.cluster.query(n1ql)
                 cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
@@ -515,6 +522,7 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
         with pytest.raises(QueryIndexAlreadyExistsException):
             qixm.create_primary_index(cb_env.bucket.name, CreatePrimaryQueryIndexOptions(**ns))
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists_kwargs(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
@@ -570,13 +578,6 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
     def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
         ns = self._namespace(cb_env)
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   5,
-                                                   qixm.drop_index,
-                                                   cb_env.bucket.name,
-                                                   self.IX_NAME,
-                                                   expected_exceptions=(QueryIndexNotFoundException,),
-                                                   **ns)
         qixm.create_index(cb_env.bucket.name,
                           self.IX_NAME,
                           self.IX_KEYS,
@@ -916,12 +917,6 @@ class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   5,
-                                                   qixm.drop_index,
-                                                   cb_env.bucket.name,
-                                                   self.IX_NAME,
-                                                   expected_exceptions=(QueryIndexNotFoundException,))
         qixm.create_index(cb_env.bucket.name,
                           self.IX_NAME,
                           self.IX_KEYS,

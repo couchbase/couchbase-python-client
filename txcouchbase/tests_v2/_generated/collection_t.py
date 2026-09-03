@@ -66,6 +66,13 @@ class CollectionTestSuite(TopologySuite):
 
     MANAGERS = [TwistedTestEnvironmentBucketManager]
     NUM_DOCS = 100
+    # A replica vbucket learns of a new collection from its active over DCP, after the
+    # management API already reports the collection present.  On a loaded cluster that has
+    # been measured at over 14s, and until then the replica answers unknown collection, which
+    # the client retries until the request times out.  The default KV budget is shorter than
+    # that, so get_all_replicas drops the late replica or, for a missing key, fails with a
+    # timeout instead of DocumentNotFoundException.
+    REPLICA_READ_TIMEOUT = timedelta(seconds=30)
 
     TEST_MANIFEST = [
         'test_document_expiry_values',
@@ -227,7 +234,8 @@ class CollectionTestSuite(TopologySuite):
     @pytest.mark.usefixtures("check_replicas_online")
     def test_get_all_replicas(self, cb_env: TwistedTestEnvironment) -> None:
         key, value = cb_env.get_existing_doc()
-        result = TwistedTestEnvironment.try_n_times(10, 3, cb_env.collection.get_all_replicas, key)
+        opts = GetAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        result = TwistedTestEnvironment.try_n_times(10, 3, cb_env.collection.get_all_replicas, key, opts)
         # make sure we can iterate over results
         while True:
             try:
@@ -241,15 +249,17 @@ class CollectionTestSuite(TopologySuite):
     @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas_online")
     def test_get_all_replicas_fail(self, cb_env: TwistedTestEnvironment) -> None:
+        opts = GetAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
         with pytest.raises(DocumentNotFoundException):
-            run_in_reactor_thread(cb_env.collection.get_all_replicas, 'not-a-key')
+            run_in_reactor_thread(cb_env.collection.get_all_replicas, 'not-a-key', opts)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas_online")
     def test_get_all_replicas_results(self, cb_env: TwistedTestEnvironment, num_replicas: int) -> None:
         key, value = cb_env.get_existing_doc()
-        result = TwistedTestEnvironment.try_n_times(10, 3, cb_env.collection.get_all_replicas, key)
+        opts = GetAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        result = TwistedTestEnvironment.try_n_times(10, 3, cb_env.collection.get_all_replicas, key, opts)
         active_cnt = 0
         replica_cnt = 0
         for res in result:

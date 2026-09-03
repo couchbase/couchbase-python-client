@@ -92,6 +92,8 @@ class ServerFeatures(Enum):
     PreserveExpiry = 'preserve_expiry'
     SearchDisableScoring = 'search_disable_scoring'
     SearchAnalyzeDocument = 'search_analyze_document'
+    SearchGocbcoreSourceType = 'search_gocbcore_source_type'
+    SearchConsistentWith = 'search_consistent_with'
     Eventing = 'eventing'
     EventingFunctionManagement = 'eventing_function_mgmt'
     RateLimiting = 'rate_limiting'
@@ -194,6 +196,8 @@ class EnvironmentFeatures:
         ServerFeatures.Search,
         ServerFeatures.SearchIndexManagement,
         ServerFeatures.SearchAnalyzeDocument,
+        ServerFeatures.SearchGocbcoreSourceType,
+        ServerFeatures.SearchConsistentWith,
         ServerFeatures.TxnQueries,
         ServerFeatures.UserGroupManagement,
         ServerFeatures.UserManagement,
@@ -239,6 +243,9 @@ class EnvironmentFeatures:
         # 7.0+
         ServerFeatures.Collections:             7.0,
         ServerFeatures.AnalyticsLinkManagement: 7.0,
+        # The search service rejects an index whose sourceType is `gocbcore` before 7.0,
+        # with `unknown sourceType`.
+        ServerFeatures.SearchGocbcoreSourceType: 7.0,
         # 7.0 is where a dataverse name may be a `a/b` path rather than a single
         # identifier, which changes both what the analytics manager accepts and how a
         # name has to be spelled to address a scope.  Named as a feature because three
@@ -263,6 +270,10 @@ class EnvironmentFeatures:
         ServerFeatures.QueryUserDefinedFunctions: 7.1,
         ServerFeatures.ScopeEventingFunctionManagement: 7.1,
         # 7.2+
+        # Before 7.2 a search with consistent_with can return without the write it waited for,
+        # and retrying does not reliably bring it.  The cause is not established.  The SDK sends
+        # the same consistency vector to every server, so the gate costs no SDK coverage.
+        ServerFeatures.SearchConsistentWith:    7.2,
         ServerFeatures.NonDedupedHistory:       7.2,
         ServerFeatures.UpdateCollection:        7.2,
         # 7.5+
@@ -337,6 +348,8 @@ class EnvironmentFeatures:
         ServerFeatures.SearchDisableScoring:      ServiceType.Search,
         ServerFeatures.SearchIndexManagement:     ServiceType.Search,
         ServerFeatures.SearchAnalyzeDocument:     ServiceType.Search,
+        ServerFeatures.SearchGocbcoreSourceType:  ServiceType.Search,
+        ServerFeatures.SearchConsistentWith:      ServiceType.Search,
         ServerFeatures.ScopeSearch:               ServiceType.Search,
         ServerFeatures.ScopeSearchIndexManagement: ServiceType.Search,
         # eventing service (`eventing`)

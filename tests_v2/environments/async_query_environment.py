@@ -30,10 +30,14 @@ both are forced by the SDK rather than chosen:
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
-from couchbase.exceptions import QueryIndexAlreadyExistsException, QueryIndexNotFoundException
+from couchbase.exceptions import (InternalServerFailureException,
+                                  QueryIndexAlreadyExistsException,
+                                  QueryIndexNotFoundException)
 from tests_v2.environments.async_environment import AsyncTestEnvironment
 from tests_v2.environments.managers import AsyncTestEnvironmentQueryIndexManager
+from tests_v2.environments.query_index_mgmt_environment import index_already_dropped
 from tests_v2.environments.test_environment import CollectionStrategy
 from tests_v2.test_features import EnvironmentFeatures, ServerFeatures
 
@@ -60,13 +64,28 @@ class AsyncQueryEnvironment:
             await AsyncTestEnvironment.sleep(AsyncQueryEnvironment.PRIMARY_INDEX_DELAY)
 
     @staticmethod
+    async def _drop_primary_index(qixm: AsyncTestEnvironmentQueryIndexManager, *args: Any, **kwargs: Any) -> None:
+        # A drop repeated while the first is still being applied can come back as GSI 5000,
+        # `Index does not exist`, instead of QueryIndexNotFoundException.  Both mean the index is
+        # gone, and the teardown loop stops only on QueryIndexNotFoundException, so the GSI form
+        # is raised as one.
+        try:
+            await qixm.drop_primary_index(*args, **kwargs)
+        except InternalServerFailureException as exc:
+            if index_already_dropped(exc):
+                raise QueryIndexNotFoundException(message=str(exc)) from exc
+            raise
+
+    @staticmethod
     async def _drop_primary_index_raw(cb_env: AsyncTestEnvironment) -> None:
         q_str = f'DROP PRIMARY INDEX on `{cb_env.bucket.name}`'
         for _ in range(AsyncQueryEnvironment.PRIMARY_INDEX_ROUNDS):
             try:
                 await cb_env.cluster.query(q_str).execute()
-            except QueryIndexNotFoundException:
-                break
+            except Exception as exc:
+                if index_already_dropped(exc):
+                    break
+                raise
             await AsyncTestEnvironment.sleep(AsyncQueryEnvironment.PRIMARY_INDEX_DELAY)
 
     @staticmethod
@@ -123,7 +142,7 @@ class AsyncQueryEnvironment:
             qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
             await AsyncTestEnvironment.try_n_times_till_exception(
                 AsyncQueryEnvironment.PRIMARY_INDEX_ROUNDS, AsyncQueryEnvironment.PRIMARY_INDEX_DELAY,
-                qixm.drop_primary_index, cb_env.bucket.name,
+                AsyncQueryEnvironment._drop_primary_index, qixm, cb_env.bucket.name,
                 scope_name=cb_env.scope.name,
                 collection_name=cb_env.collection.name,
                 expected_exceptions=(QueryIndexNotFoundException,))
@@ -132,7 +151,7 @@ class AsyncQueryEnvironment:
                 qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
                 await AsyncTestEnvironment.try_n_times_till_exception(
                     AsyncQueryEnvironment.PRIMARY_INDEX_ROUNDS, AsyncQueryEnvironment.PRIMARY_INDEX_DELAY,
-                    qixm.drop_primary_index, cb_env.bucket.name,
+                    AsyncQueryEnvironment._drop_primary_index, qixm, cb_env.bucket.name,
                     expected_exceptions=(QueryIndexNotFoundException,))
             else:
                 await AsyncQueryEnvironment._drop_primary_index_raw(cb_env)

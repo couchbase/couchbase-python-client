@@ -38,6 +38,7 @@ module's docstring and not restated here.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 from couchbase.exceptions import BucketDoesNotExistException, DesignDocumentNotFoundException
@@ -46,7 +47,9 @@ from couchbase.management.views import (DesignDocument,
                                         DesignDocumentNamespace,
                                         View)
 from couchbase.result import ViewResult
-from couchbase.views import ViewMetaData, ViewRow
+from couchbase.views import (ViewMetaData,
+                             ViewRow,
+                             ViewScanConsistency)
 from tests_v2.assert_helpers import (cb_assert_eq,
                                      cb_assert_gte,
                                      cb_assert_isinstance)
@@ -54,7 +57,8 @@ from tests_v2.environments.managers import TwistedTestEnvironmentBucketManager, 
 from tests_v2.environments.twisted_environment import TwistedTestEnvironment, run_in_reactor_thread
 from tests_v2.skips import CouchbaseTestEnvironmentException
 from tests_v2.test_features import EnvironmentFeatures, ServerFeatures
-from tests_v2.view_defs import (VIEW_DOCS,
+from tests_v2.view_defs import (REBUILT_VIEW_MAP_FUNCTION,
+                                VIEW_DOCS,
                                 VIEW_MAP_FUNCTION,
                                 VIEW_NAME,
                                 design_doc_name,
@@ -144,9 +148,10 @@ class TwistedViewsEnvironment:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def design_document() -> DesignDocument:
-        """The one design document the suites upsert, holding the one view they query."""
-        return DesignDocument(name=design_doc_name(), views={VIEW_NAME: View(map=VIEW_MAP_FUNCTION)})
+    def design_document(rebuilt: bool = False) -> DesignDocument:
+        """The one design document the suites upsert; see the sync environment for `rebuilt`."""
+        map_function = REBUILT_VIEW_MAP_FUNCTION if rebuilt else VIEW_MAP_FUNCTION
+        return DesignDocument(name=design_doc_name(), views={VIEW_NAME: View(map=map_function)})
 
     @staticmethod
     def _drop_stranded_bucket(cb_env: TwistedTestEnvironment) -> None:
@@ -196,14 +201,18 @@ class TwistedViewsEnvironment:
 
     @staticmethod
     def _wait_for_view(cb_env: TwistedTestEnvironment) -> int:
-        """Poll until the view returns the whole corpus; return the last count it gave."""
+        """Poll until the view returns the whole corpus; return the last count it gave.
+
+        See the sync version for why the poll asks for REQUEST_PLUS.
+        """
         count = 0
         for _ in range(TwistedViewsEnvironment.VIEW_WAIT_ROUNDS):
             try:
                 result = run_in_reactor_thread(cb_env.view_bucket.view_query,
                                                design_doc_name(),
                                                VIEW_NAME,
-                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                               scan_consistency=ViewScanConsistency.REQUEST_PLUS)
                 count = sum(1 for _ in result.rows())
             except DesignDocumentNotFoundException:
                 # A successful upsert does not mean every node can serve the design document
@@ -220,6 +229,29 @@ class TwistedViewsEnvironment:
             print(f'Waiting for the view: {reason}...')
             TwistedTestEnvironment.sleep(TwistedViewsEnvironment.VIEW_WAIT_DELAY)
         return count
+
+    @staticmethod
+    def _full_set_count(cb_env: TwistedTestEnvironment) -> str:
+        """The view's full_set count, for the failure message; see the sync environment."""
+        try:
+            result = run_in_reactor_thread(cb_env.view_bucket.view_query,
+                                           design_doc_name(),
+                                           VIEW_NAME,
+                                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                           full_set=True)
+            return str(sum(1 for _ in result.rows()))
+        except Exception as exc:
+            return f'unavailable, {type(exc).__name__}'
+
+    @staticmethod
+    def _stored_count(cb_env: TwistedTestEnvironment) -> str:
+        """How many corpus documents a key lookup finds, for the failure message; see the sync environment."""
+        try:
+            coll = cb_env.view_collection
+            ids = [f'{doc["id"]}' for doc in cb_env.data_provider.get_vehicles()[:VIEW_DOCS]]
+            return str(sum(1 for key in ids if run_in_reactor_thread(coll.exists, key).exists))
+        except Exception as exc:
+            return f'unavailable, {type(exc).__name__}'
 
     @staticmethod
     def setup_views(cb_env: TwistedTestEnvironment) -> None:
@@ -242,8 +274,19 @@ class TwistedViewsEnvironment:
 
             count = TwistedViewsEnvironment._wait_for_view(cb_env)
             if count < VIEW_DOCS:
+                # One new index before giving up; see the sync environment.
+                warnings.warn(f'Rebuilding the view after {count} of {VIEW_DOCS} rows')
+                TwistedTestEnvironment.try_n_times(5, 3, vixm.upsert_design_document,
+                                                   TwistedViewsEnvironment.design_document(rebuilt=True),
+                                                   DesignDocumentNamespace.DEVELOPMENT,
+                                                   is_deferred=False)
+                count = TwistedViewsEnvironment._wait_for_view(cb_env)
+            if count < VIEW_DOCS:
+                full_set = TwistedViewsEnvironment._full_set_count(cb_env)
+                stored = TwistedViewsEnvironment._stored_count(cb_env)
                 raise CouchbaseTestEnvironmentException(
-                    f'View {design_doc_name()}/{VIEW_NAME} returned {count} of {VIEW_DOCS} documents; '
+                    f'View {design_doc_name()}/{VIEW_NAME} returned {count} of {VIEW_DOCS} documents '
+                    f'after one rebuild ({full_set} with full_set, {stored} of {VIEW_DOCS} found by key); '
                     'the suite asserts exact row counts and cannot run against a partial index')
         except Exception:
             try:

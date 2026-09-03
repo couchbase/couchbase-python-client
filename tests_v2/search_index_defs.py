@@ -194,11 +194,15 @@ def ui_index_name() -> str:
 
 def ui_index_definition(source_name: str,
                         scope_name: str | None = None,
-                        collection_name: str | None = None) -> dict[str, Any]:
+                        collection_name: str | None = None,
+                        source_type: str = UI_INDEX_SOURCE_TYPE) -> dict[str, Any]:
     """A whole index definition in the shape the UI exports, for SearchIndex.from_json.
 
     This is the JSON *document*, not the params block: `name`, `type`, `sourceType` and the
     two uuids sit beside `params`, and the from-json tests read all of them.
+
+    Pass source_type='couchbase' for a server without `gocbcore`, which rejects it as an
+    unknown sourceType.
 
     Pass scope_name and collection_name for the scope-level form.  That qualifies the name
     as `<bucket>.<scope>.<index>`, which is what the UI writes for a scope-level index and
@@ -215,7 +219,7 @@ def ui_index_definition(source_name: str,
     return {
         'name': name,
         'type': 'fulltext-index',
-        'sourceType': UI_INDEX_SOURCE_TYPE,
+        'sourceType': source_type,
         'sourceName': source_name,
         'sourceUUID': UI_INDEX_SOURCE_UUID,
         'uuid': UI_INDEX_UUID,

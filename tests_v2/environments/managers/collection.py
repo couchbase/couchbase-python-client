@@ -137,6 +137,20 @@ class TestEnvironmentCollectionManager(TestEnvironmentManager):
             self._bucket_name, scope_name, coll_name
         )
 
+    def drop_stale_scopes(self, prefix: str) -> None:
+        """Drop every scope whose name starts with `prefix`.
+
+        A class whose setup fails after its scope exists, or whose teardown never runs, leaves
+        that scope behind under a name nothing will reuse.  Each NAMED class clears its
+        worker's leftovers before provisioning, so a worker holds at most one at a time.
+        """
+        for spec in self._cm.get_all_scopes():
+            if spec.name.startswith(prefix):
+                try:
+                    self._cm.drop_scope(spec.name)
+                except ScopeNotFoundException:
+                    pass
+
     def teardown_named_collection(self, scope_name: str) -> None:
         """Drop scope and wait until it is gone."""
         from tests_v2.environments.test_environment import TestEnvironment
@@ -221,6 +235,15 @@ class AsyncTestEnvironmentCollectionManager(TestEnvironmentManager):
             self._bucket_name, scope_name, coll_name
         )
 
+    async def drop_stale_scopes(self, prefix: str) -> None:
+        """Async counterpart of the sync wrapper; see that docstring."""
+        for spec in await self._cm.get_all_scopes():
+            if spec.name.startswith(prefix):
+                try:
+                    await self._cm.drop_scope(spec.name)
+                except ScopeNotFoundException:
+                    pass
+
     async def teardown_named_collection(self, scope_name: str) -> None:
         """Drop scope and wait until it is gone."""
         from tests_v2.environments.async_environment import AsyncTestEnvironment
@@ -302,6 +325,15 @@ class TwistedTestEnvironmentCollectionManager(TestEnvironmentManager):
         self._consistency.wait_until_collection_present(
             self._bucket_name, scope_name, coll_name
         )
+
+    def drop_stale_scopes(self, prefix: str) -> None:
+        """Twisted counterpart of the sync wrapper; see that docstring."""
+        for spec in self._rit(self._cm.get_all_scopes):
+            if spec.name.startswith(prefix):
+                try:
+                    self._rit(self._cm.drop_scope, spec.name)
+                except ScopeNotFoundException:
+                    pass
 
     def teardown_named_collection(self, scope_name: str) -> None:
         """Drop scope via the reactor thread and wait until it is gone."""

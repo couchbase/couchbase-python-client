@@ -45,6 +45,7 @@ tests_v2/view_defs.py; that module's docstring has the reason they are one file.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 from couchbase.exceptions import BucketDoesNotExistException, DesignDocumentNotFoundException
@@ -53,7 +54,9 @@ from couchbase.management.views import (DesignDocument,
                                         DesignDocumentNamespace,
                                         View)
 from couchbase.result import ViewResult
-from couchbase.views import ViewMetaData, ViewRow
+from couchbase.views import (ViewMetaData,
+                             ViewRow,
+                             ViewScanConsistency)
 from tests_v2.assert_helpers import (cb_assert_eq,
                                      cb_assert_gte,
                                      cb_assert_isinstance)
@@ -61,7 +64,8 @@ from tests_v2.environments.managers import TestEnvironmentBucketManager, TestEnv
 from tests_v2.environments.test_environment import SyncTestEnvironment, TestEnvironment
 from tests_v2.skips import CouchbaseTestEnvironmentException
 from tests_v2.test_features import EnvironmentFeatures, ServerFeatures
-from tests_v2.view_defs import (VIEW_DOCS,
+from tests_v2.view_defs import (REBUILT_VIEW_MAP_FUNCTION,
+                                VIEW_DOCS,
                                 VIEW_MAP_FUNCTION,
                                 VIEW_NAME,
                                 design_doc_name,
@@ -183,9 +187,14 @@ class ViewsEnvironment:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def design_document() -> DesignDocument:
-        """The one design document the suites upsert, holding the one view they query."""
-        return DesignDocument(name=design_doc_name(), views={VIEW_NAME: View(map=VIEW_MAP_FUNCTION)})
+    def design_document(rebuilt: bool = False) -> DesignDocument:
+        """The one design document the suites upsert, holding the one view they query.
+
+        `rebuilt` swaps in REBUILT_VIEW_MAP_FUNCTION, the same function under a different
+        definition, so the upsert gets a new index rather than the one already built.
+        """
+        map_function = REBUILT_VIEW_MAP_FUNCTION if rebuilt else VIEW_MAP_FUNCTION
+        return DesignDocument(name=design_doc_name(), views={VIEW_NAME: View(map=map_function)})
 
     @staticmethod
     def _drop_stranded_bucket(cb_env: SyncTestEnvironment) -> None:
@@ -237,8 +246,11 @@ class ViewsEnvironment:
     def _wait_for_view(cb_env: SyncTestEnvironment) -> int:
         """Poll until the view returns the whole corpus; return the last count it gave.
 
-        Queried with exactly the options the suite uses, so what this establishes is what the
-        suite goes on to assert.  A count that is merely *behind* keeps polling; the caller
+        Queried as the suite queries, plus REQUEST_PLUS.  The view engine indexes only what has
+        reached disk, and the suite's default consistency answers from the index as it stands, so
+        under a backed-up disk queue the count can sit short for as long as this waits.
+        REQUEST_PLUS has the server bring the index up to date first, and once it is complete
+        the suite's own queries see it.  A count that is merely *behind* keeps polling; the caller
         treats anything short of the corpus at the end as a failure, because every expected
         count in the suite is derived from the corpus being complete.  A design document the
         server cannot find yet counts as behind too, for the reason the except clause gives.
@@ -248,7 +260,8 @@ class ViewsEnvironment:
             try:
                 result = cb_env.view_bucket.view_query(design_doc_name(),
                                                        VIEW_NAME,
-                                                       namespace=DesignDocumentNamespace.DEVELOPMENT)
+                                                       namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                                       scan_consistency=ViewScanConsistency.REQUEST_PLUS)
                 count = sum(1 for _ in result.rows())
             except DesignDocumentNotFoundException:
                 # A successful upsert does not mean every node can serve the design document
@@ -265,6 +278,39 @@ class ViewsEnvironment:
             print(f'Waiting for the view: {reason}...')
             TestEnvironment.sleep(ViewsEnvironment.VIEW_WAIT_DELAY)
         return count
+
+    @staticmethod
+    def _full_set_count(cb_env: SyncTestEnvironment) -> str:
+        """How many documents the view returns over every vbucket, for the failure message.
+
+        A development view is computed over a subset of the vbuckets unless a query asks for
+        the full set, so a short count has two readings: the view covers only part of the
+        data, or the data is not all there.  This count tells them apart.  It is a diagnostic,
+        so a failure here is reported in the message rather than raised over the real one.
+        """
+        try:
+            result = cb_env.view_bucket.view_query(design_doc_name(),
+                                                   VIEW_NAME,
+                                                   namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                                   full_set=True)
+            return str(sum(1 for _ in result.rows()))
+        except Exception as exc:
+            return f'unavailable, {type(exc).__name__}'
+
+    @staticmethod
+    def _stored_count(cb_env: SyncTestEnvironment) -> str:
+        """How many of the corpus documents a key lookup finds, for the failure message.
+
+        The other half of telling a short view apart: a view short of documents the bucket
+        holds is an indexing problem, and a bucket short of them is not.  A diagnostic, like
+        _full_set_count, so a failure here is reported rather than raised.
+        """
+        try:
+            coll = cb_env.view_collection
+            ids = [f'{doc["id"]}' for doc in cb_env.data_provider.get_vehicles()[:VIEW_DOCS]]
+            return str(sum(1 for key in ids if coll.exists(key).exists))
+        except Exception as exc:
+            return f'unavailable, {type(exc).__name__}'
 
     @staticmethod
     def setup_views(cb_env: SyncTestEnvironment) -> None:
@@ -292,8 +338,23 @@ class ViewsEnvironment:
 
             count = ViewsEnvironment._wait_for_view(cb_env)
             if count < VIEW_DOCS:
+                # A count can stop short and stay there for the whole wait, REQUEST_PLUS and
+                # full_set alike, which an index that is merely behind does not do.  Whether the
+                # index or the data is what is missing is not established, so the view gets one
+                # new index, and a failure after that reports what a key lookup finds.
+                # A warning rather than a print: setup output is captured and shown only when
+                # setup fails, and a rebuild that works is the outcome worth seeing.
+                warnings.warn(f'Rebuilding the view after {count} of {VIEW_DOCS} rows')
+                TestEnvironment.try_n_times(5, 3, vixm.upsert_design_document,
+                                            ViewsEnvironment.design_document(rebuilt=True),
+                                            DesignDocumentNamespace.DEVELOPMENT)
+                count = ViewsEnvironment._wait_for_view(cb_env)
+            if count < VIEW_DOCS:
+                full_set = ViewsEnvironment._full_set_count(cb_env)
+                stored = ViewsEnvironment._stored_count(cb_env)
                 raise CouchbaseTestEnvironmentException(
-                    f'View {design_doc_name()}/{VIEW_NAME} returned {count} of {VIEW_DOCS} documents; '
+                    f'View {design_doc_name()}/{VIEW_NAME} returned {count} of {VIEW_DOCS} documents '
+                    f'after one rebuild ({full_set} with full_set, {stored} of {VIEW_DOCS} found by key); '
                     'the suite asserts exact row counts and cannot run against a partial index')
         except Exception:
             # A failure to drop is printed rather than raised, so the exception that reaches the

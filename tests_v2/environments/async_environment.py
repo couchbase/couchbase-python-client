@@ -24,7 +24,6 @@ that never need them.
 from __future__ import annotations
 
 import asyncio
-import os
 from asyncio import AbstractEventLoop
 from collections.abc import Callable, Generator
 from typing import Any
@@ -40,6 +39,8 @@ from couchbase.diagnostics import ServiceType
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CouchbaseException,
+                                  DocumentNotFoundException,
+                                  InternalServerFailureException,
                                   UnAmbiguousTimeoutException)
 from couchbase.options import TransactionConfig
 from tests_v2.couchbase_config import CouchbaseConfig
@@ -51,7 +52,8 @@ from tests_v2.environments.test_environment import (CollectionHandle,
                                                     DocType,
                                                     SuiteRequirements,
                                                     TestEnvironment,
-                                                    TopologyFacts)
+                                                    TopologyFacts,
+                                                    check_suite_features)
 from tests_v2.skips import env_degraded, server_label
 from tests_v2.test_utils import RetryHelper
 
@@ -234,6 +236,13 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
             test_bucket_kv_endpoints=0 if kv_endpoints is None else len(kv_endpoints),
         )
 
+    async def _kv_knows_current_collection(self) -> None:  # type: ignore[override]
+        """See the sync version."""
+        try:
+            await self.collection.get(TestEnvironment.NOT_A_KEY)
+        except DocumentNotFoundException:
+            pass
+
     async def load_data(self, num_docs: int = 50) -> None:  # type: ignore[override]
         """Seed num_docs of every DocType in the suite's DATA_SET; see the sync version.
 
@@ -302,16 +311,18 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
             if AsyncTestEnvironmentCollectionManager not in self._manager_registry:
                 self._no_collection_manager(collection_strategy, test_suite)
 
-            worker_id = os.environ.get('PYTEST_XDIST_WORKER', '')
-            scope_name = f'{self.TEST_SCOPE}-{worker_id}' if worker_id else self.TEST_SCOPE
-            coll_name = (
-                f'{self.TEST_COLLECTION}-{worker_id}' if worker_id else self.TEST_COLLECTION
-            )
-
             coll_mgr = self.get_manager(AsyncTestEnvironmentCollectionManager)
             await AsyncTestEnvironment.try_n_times(
-                5, 3, coll_mgr.setup_named_collection, scope_name, coll_name
+                5, 3, coll_mgr.drop_stale_scopes, self.named_collection_prefix()
             )
+
+            async def provision() -> tuple[str, str]:
+                # Fresh names per attempt; see the sync setup().
+                names = self.new_named_collection_names()
+                await coll_mgr.setup_named_collection(*names)
+                return names
+
+            scope_name, coll_name = await AsyncTestEnvironment.try_n_times(5, 3, provision)
             named_scope = self._bucket.scope(scope_name)
             named_coll = named_scope.collection(coll_name)
             self._pool.add(
@@ -324,6 +335,7 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
                 )
             )
             self._pool.use(coll_name)
+            await AsyncTestEnvironment.try_n_times(10, 1, self._kv_knows_current_collection)
 
         # Before data loading; see the sync setup().
         if collect_topology:
@@ -338,17 +350,19 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
         self,
         collection_strategy: CollectionStrategy = CollectionStrategy.DEFAULT,
     ) -> None:
-        await AsyncTestEnvironment.try_n_times(5, 3, self.purge_data)
-
-        if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
-            handle = self._pool.current
-            if AsyncTestEnvironmentCollectionManager in self._manager_registry:
-                coll_mgr = self.get_manager(AsyncTestEnvironmentCollectionManager)
-                await AsyncTestEnvironment.try_n_times(
-                    5, 3, coll_mgr.teardown_named_collection, handle.scope_name
-                )
-            self._pool._handles = [self._pool._handles[0]]
-            self._pool._current_index = 0
+        try:
+            await AsyncTestEnvironment.try_n_times(5, 3, self.purge_data)
+        finally:
+            # Dropped even when the purge fails; see the sync teardown().
+            if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
+                handle = self._pool.current
+                if AsyncTestEnvironmentCollectionManager in self._manager_registry:
+                    coll_mgr = self.get_manager(AsyncTestEnvironmentCollectionManager)
+                    await AsyncTestEnvironment.try_n_times(
+                        5, 3, coll_mgr.teardown_named_collection, handle.scope_name
+                    )
+                self._pool._handles = [self._pool._handles[0]]
+                self._pool._current_index = 0
 
         self._teardown_managers()
 
@@ -378,7 +392,8 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
                 env_args['default_collection'] = bucket.default_collection()
                 okay = True
                 break
-            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException):
+            # See the sync environment's get_environment for what is retried.
+            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException, InternalServerFailureException):
                 continue
 
         if not okay:
@@ -456,6 +471,7 @@ async def build_async_environment(
     **kwargs: Any,
 ) -> AsyncTestEnvironment:
     """Async counterpart of build_environment() for acouchbase test suites."""
+    check_suite_features(base_env, suite_cls)
     strategy = (
         collection_strategy if collection_strategy is not None
         else suite_cls.COLLECTION_STRATEGY

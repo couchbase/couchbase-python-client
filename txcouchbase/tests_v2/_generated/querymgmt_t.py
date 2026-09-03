@@ -55,6 +55,13 @@ from txcouchbase.management.queries import QueryIndex
 
 # The name the server gives a primary index created without one.
 DEFAULT_PRIMARY_INDEX_NAME = '#primary'
+# On 7.0 and 7.1 a query service stall of about two minutes can catch the primary index creates on
+# a named collection, through either manager, timing one out and holding the next for over a
+# minute.  The cause is not established.  The rerun waits long enough for the stall to pass, and
+# only a timeout reruns.
+PRIMARY_CREATE_STALL_RERUN = pytest.mark.flaky(reruns=1,
+                                               reruns_delay=60,
+                                               only_rerun=['AmbiguousTimeoutException'])
 
 
 class QueryIndexManagementSuiteBase(SuiteRequirements):
@@ -193,6 +200,7 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
                 result = run_in_reactor_thread(cb_env.cluster.query, n1ql)
                 cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary(self, cb_env: TwistedTestEnvironment) -> None:
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
@@ -212,6 +220,7 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
                 result = run_in_reactor_thread(cb_env.cluster.query, n1ql)
                 cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists(self, cb_env: TwistedTestEnvironment) -> None:
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
@@ -223,6 +232,7 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
         with pytest.raises(QueryIndexAlreadyExistsException):
             qixm.create_primary_index(cb_env.bucket.name, CreatePrimaryQueryIndexOptions(**ns))
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_primary_ignore_if_exists_kwargs(self, cb_env: TwistedTestEnvironment) -> None:
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
@@ -278,13 +288,6 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
     def test_create_secondary_indexes_condition(self, cb_env: TwistedTestEnvironment) -> None:
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         ns = self._namespace(cb_env)
-        TwistedTestEnvironment.try_n_times_till_exception(10,
-                                                          5,
-                                                          qixm.drop_index,
-                                                          cb_env.bucket.name,
-                                                          self.IX_NAME,
-                                                          expected_exceptions=(QueryIndexNotFoundException,),
-                                                          **ns, is_deferred=False)
         qixm.create_index(cb_env.bucket.name,
                           self.IX_NAME,
                           self.IX_KEYS,
@@ -624,10 +627,6 @@ class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env: TwistedTestEnvironment) -> None:
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
-        TwistedTestEnvironment.try_n_times_till_exception(
-            10, 5, qixm.drop_index, cb_env.bucket.name, self.IX_NAME,
-            expected_exceptions=(QueryIndexNotFoundException,),
-            is_deferred=False)
         qixm.create_index(cb_env.bucket.name,
                           self.IX_NAME,
                           self.IX_KEYS,

@@ -102,16 +102,20 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # exactly what the test exists to disprove.
     ('couchbase/tests_v2/connection_t.py', 'arg-type'),
     ('couchbase/tests_v2/connection_t.py', 'call-overload'),
-    # tracing_kv_multi_t hands a legacy parent span to two multi option classes, because the
-    # tracer the suite's cluster was built with is what produces the span: under
-    # TracingType.Legacy there is no other kind to hand over, which is also the position a
-    # caller who configured a deprecated tracer is in.  The multi classes annotate parent_span
-    # as RequestSpan because that is what callers should write, while maybe_get_parent_span
-    # accepts the legacy protocol with a deprecation warning, so the combination works and this
-    # suite is what guards that it keeps working.  Same shape as the PingOptions.service_types
-    # entry above: widening the annotation to promise the legacy form is the change nobody
-    # should make, so no ticket retires this; PYCBC-1922 is where the narrow shape was chosen.
-    ('couchbase/tests_v2/tracing_kv_multi_t.py', 'arg-type'),
+    # The two search request builder suites pass a SearchRequest to build_search_query_request
+    # inside pytest.raises(InvalidArgumentException), because refusing it is the behaviour
+    # under test: search() takes a request and search_query() takes a query, and the refusal
+    # is what tells the two entry points apart.  Same shape as the BucketSettings(name=None)
+    # entry above, and permanent for the same reason: widening the annotation to accept a
+    # request would erase the distinction, and a cast would assert exactly what the test
+    # exists to disprove.
+    ('couchbase/tests_v2/cluster_req_builder_t.py', 'arg-type'),
+    ('couchbase/tests_v2/scope_req_builder_t.py', 'arg-type'),
+    # collection_req_builder_t hands _get_scan_type the tag string it would have emitted for a
+    # RangeScan, inside pytest.raises(InvalidArgumentException).  Same shape again, and the
+    # near miss is the point: a caller who read the wire format rather than the api reaches
+    # the else branch, and widening the annotation to accept a str would remove it.
+    ('couchbase/tests_v2/collection_req_builder_t.py', 'arg-type'),
 }
 
 # Directory names skipped anywhere under ROOTS.

@@ -233,6 +233,9 @@ class QueryCollectionTestSuite(SuiteRequirements):
 
 class QueryTestSuite(SuiteRequirements):
     MANAGERS = [AsyncTestEnvironmentQueryIndexManager]
+    # `_default` is shared with every other suite and xdist worker, so a statement that asserts
+    # a row count filters on this run's batch.  Unfiltered, a doc another worker deletes between
+    # the index scan and the fetch drops out of the result and LIMIT 2 comes back with one row.
     COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
 
     TEST_MANIFEST = [
@@ -335,7 +338,8 @@ class QueryTestSuite(SuiteRequirements):
 
     @pytest.mark.asyncio
     async def test_query_metadata(self, cb_env: AsyncTestEnvironment) -> None:
-        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 2")
+        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` "
+                                      f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2")
         await cb_env.assert_rows_exact(result, 2)
         metadata = result.metadata()  # type: QueryMetaData
         for id_meth in (metadata.client_context_id, metadata.request_id):
@@ -353,7 +357,8 @@ class QueryTestSuite(SuiteRequirements):
 
     @pytest.mark.asyncio
     async def test_query_metadata_no_metrics(self, cb_env: AsyncTestEnvironment) -> None:
-        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 2",
+        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` "
+                                      f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2",
                                       QueryOptions(metrics=False))
         await cb_env.assert_rows_exact(result, 2)
         metadata = result.metadata()  # type: QueryMetaData
@@ -473,7 +478,8 @@ class QueryTestSuite(SuiteRequirements):
     async def test_query_with_metrics(self, cb_env: AsyncTestEnvironment) -> None:
         initial = datetime.now()
         result = cb_env.cluster.query(
-            f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 1", QueryOptions(metrics=True))
+            f"SELECT * FROM `{cb_env.bucket.name}` "
+            f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 1", QueryOptions(metrics=True))
         await cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
         metadata = result.metadata()  # type: QueryMetaData
@@ -503,13 +509,15 @@ class QueryTestSuite(SuiteRequirements):
     @pytest.mark.asyncio
     async def test_query_with_profile(self, cb_env: AsyncTestEnvironment) -> None:
         result = cb_env.cluster.query(
-            f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 1", QueryOptions(profile=QueryProfile.TIMINGS))
+            f"SELECT * FROM `{cb_env.bucket.name}` "
+            f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 1", QueryOptions(profile=QueryProfile.TIMINGS))
         await cb_env.assert_rows_exact(result, 1)
         assert result.metadata().profile() is not None
 
     @pytest.mark.asyncio
     async def test_simple_query(self, cb_env: AsyncTestEnvironment) -> None:
-        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 2")
+        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` "
+                                      f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2")
         await cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None
         # if adhoc is not set, it should be None
@@ -539,7 +547,8 @@ class QueryTestSuite(SuiteRequirements):
                              observed=cb_env.server_version_short,
                              server=server_label(cb_env.is_mock_server),
                              note='prepared-statement handling below 6.5 pending CXXCBC-174')
-        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 2",
+        result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` "
+                                      f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2",
                                       QueryOptions(adhoc=False, metrics=True))
         await cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None

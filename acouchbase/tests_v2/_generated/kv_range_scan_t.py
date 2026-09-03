@@ -482,7 +482,11 @@ class RangeScanTestSuite(SuiteRequirements):
         rows = await self._validate_result(res, limit, ids_only=True, from_sample=True,
                                            skip_content_validation=skip_content)
         compare_ids = [r.id for r in rows]
-        assert result_ids == compare_ids
+        # Only a collection nothing else writes to holds still between the two scans.  In
+        # `_default` another worker's documents land in the sample, so the seed is checked on
+        # the NAMED_EMPTY run alone.
+        if cb_env.is_clean_collection:
+            assert result_ids == compare_ids
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_range_scan_supported')

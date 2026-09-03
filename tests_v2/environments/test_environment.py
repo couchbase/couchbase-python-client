@@ -57,6 +57,8 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   CouchbaseException,
+                                  DocumentNotFoundException,
+                                  InternalServerFailureException,
                                   UnAmbiguousTimeoutException)
 from couchbase.management.buckets import (BucketType,
                                           CreateBucketSettings,
@@ -175,10 +177,11 @@ class SuiteRequirements:
     each one once, and keeps every build_environment/teardown_environment variant from carrying
     a `getattr(suite_cls, NAME, <default>)` fallback per member.
 
-    REQUIRED_FEATURES and UNSUPPORTED_PROTOCOLS are declared here for completeness, but
-    check_required_features and check_unsupported_protocols must keep reading them through
-    getattr: those fixtures are autouse for every class in the tree, including cluster-free unit
-    classes that have no reason to inherit this.
+    REQUIRED_FEATURES is enforced twice: by build_environment, before anything is created,
+    and by the autouse check_required_features fixture for any class that builds its cb_env
+    some other way.  That fixture and check_unsupported_protocols must keep reading through
+    getattr: they are autouse for every class in the tree, including cluster-free unit classes
+    that have no reason to inherit this.
     """
 
     # Manager classes the suite needs instantiated on its environment.  Read but never
@@ -287,6 +290,26 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
     NOT_A_KEY = 'not-a-key'
     TEST_SCOPE = 'test-scope'
     TEST_COLLECTION = 'test-collection'
+
+    @classmethod
+    def named_collection_prefix(cls) -> str:
+        """The scope-name prefix owned by this process: one per xdist worker."""
+        worker = os.environ.get('PYTEST_XDIST_WORKER') or 'main'
+        return f'{cls.TEST_SCOPE}-{worker}-'
+
+    @classmethod
+    def new_named_collection_names(cls) -> tuple[str, str]:
+        """A scope and collection name never used before, for one NAMED class.
+
+        A name is never reused because a scope dropped and recreated under the same name is
+        listed by the management API before KV and search have finished with the old one:
+        the first operation against the new scope then fails with an unknown scope or an
+        outdated collection.  The per-worker prefix is what lets drop_stale_scopes() clear a
+        scope this worker left behind without touching another worker's.
+        """
+        worker = os.environ.get('PYTEST_XDIST_WORKER') or 'main'
+        suffix = uuid.uuid4().hex[:8]
+        return f'{cls.named_collection_prefix()}{suffix}', f'{cls.TEST_COLLECTION}-{worker}-{suffix}'
 
     def __init__(self, **kwargs: Any) -> None:
         # The four SDK handles stay Any internally.  Only the public properties below are
@@ -665,8 +688,9 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         Raises when the manager is absent, either because the suite never registered it or
         because _setup_managers() dropped it as unsupported.  Deliberately an error and not a
         feature-unsupported skip: a suite that reaches for a manager it did not declare has
-        an authoring bug, and a suite whose feature really is unsupported should have been
-        gated by REQUIRED_FEATURES at class scope.  Skipping here would hide both.
+        an authoring bug, and a suite whose feature really is unsupported is skipped by
+        build_environment from REQUIRED_FEATURES before its fixture can get this far.
+        Skipping here would hide both.
         """
         m = self._manager_registry.get(manager_cls)
         if m is None:
@@ -684,10 +708,10 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
     def has_manager(self, manager_cls: type[TestEnvironmentManager]) -> bool:
         """True when the manager is registered, i.e. its required feature is supported here.
 
-        Suite teardown needs this. A class-scoped skip from REQUIRED_FEATURES fires only
-        after cb_env has been built, so the environment's finalizer still runs on a server
-        that supports none of what the suite needs, and cleanup that reaches for a manager
-        has to ask first rather than raise out of teardown.
+        Suite teardown needs this. A manager is dropped whenever its own required_feature is
+        unsupported, which REQUIRED_FEATURES does not have to name, so the environment's
+        finalizer can run without it and cleanup that reaches for a manager has to ask first
+        rather than raise out of teardown.
         """
         return manager_cls in self._manager_registry
 
@@ -1006,6 +1030,21 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
                      server=server_label(self.config.is_mock_server),
                      note='document never became writable')
 
+    def _kv_knows_current_collection(self) -> None:
+        """Raise until a KV node resolves the current collection.
+
+        Creating a collection returns, and the cluster manager lists it, before the KV nodes
+        learn of it, and until one does an operation fails at once with scope or collection not
+        found, unretried.  Seeding absorbs that through its own retry, so only a suite that seeds
+        nothing would meet it, on its first test.  One resolution is enough: the client caches
+        the collection id, and a node still behind then answers unknown collection, which the
+        client retries.
+        """
+        try:
+            self._current_collection.get(TestEnvironment.NOT_A_KEY)
+        except DocumentNotFoundException:
+            pass
+
     def load_data(self, num_docs: int = 50) -> None:
         """Seed num_docs of every DocType in the suite's DATA_SET.
 
@@ -1182,15 +1221,19 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
             if TestEnvironmentCollectionManager not in self._manager_registry:
                 self._no_collection_manager(collection_strategy, test_suite)
 
-            # Determine per-worker scope/collection names for xdist safety
-            worker_id = os.environ.get('PYTEST_XDIST_WORKER', '')
-            scope_name = f'{self.TEST_SCOPE}-{worker_id}' if worker_id else self.TEST_SCOPE
-            coll_name = f'{self.TEST_COLLECTION}-{worker_id}' if worker_id else self.TEST_COLLECTION
-
             coll_mgr = self.get_manager(TestEnvironmentCollectionManager)
             TestEnvironment.try_n_times(
-                5, 3, coll_mgr.setup_named_collection, scope_name, coll_name,
+                5, 3, coll_mgr.drop_stale_scopes, self.named_collection_prefix(),
             )
+
+            def provision() -> tuple[str, str]:
+                # Fresh names per attempt: retrying under the same names would drop and
+                # recreate a scope that was only just created.
+                names = self.new_named_collection_names()
+                coll_mgr.setup_named_collection(*names)
+                return names
+
+            scope_name, coll_name = TestEnvironment.try_n_times(5, 3, provision)
             named_scope = self._bucket.scope(scope_name)
             named_coll = named_scope.collection(coll_name)
             self._pool.add(CollectionHandle(
@@ -1202,6 +1245,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
             ))
             # Make the named collection the current one
             self._pool.use(coll_name)
+            TestEnvironment.try_n_times(10, 1, self._kv_knows_current_collection)
 
         # Topology facts, before data loading: the fixtures that read them can skip a whole
         # class, and there is no reason to seed a collection for a suite that is about to be
@@ -1220,18 +1264,21 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         """Full suite teardown: purge data, drop named collections, teardown managers."""
         from tests_v2.environments.managers import TestEnvironmentCollectionManager
 
-        TestEnvironment.try_n_times(5, 3, self.purge_data)
-
-        if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
-            handle = self._pool.current
-            if TestEnvironmentCollectionManager in self._manager_registry:
-                coll_mgr = self.get_manager(TestEnvironmentCollectionManager)
-                TestEnvironment.try_n_times(
-                    5, 3, coll_mgr.teardown_named_collection, handle.scope_name
-                )
-            # Reset pool to default regardless
-            self._pool._handles = [self._pool._handles[0]]
-            self._pool._current_index = 0
+        try:
+            TestEnvironment.try_n_times(5, 3, self.purge_data)
+        finally:
+            # Dropped even when the purge fails: the drop takes the scope's documents with it,
+            # and a scope left behind lingers until the next class on this worker sweeps it.
+            if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
+                handle = self._pool.current
+                if TestEnvironmentCollectionManager in self._manager_registry:
+                    coll_mgr = self.get_manager(TestEnvironmentCollectionManager)
+                    TestEnvironment.try_n_times(
+                        5, 3, coll_mgr.teardown_named_collection, handle.scope_name
+                    )
+                # Reset pool to default regardless
+                self._pool._handles = [self._pool._handles[0]]
+                self._pool._current_index = 0
 
         self._teardown_managers()
 
@@ -1402,7 +1449,10 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
                 env_args['default_collection'] = bucket.default_collection()
                 okay = True
                 break
-            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException):
+            # A timeout, or a transient 500 from the cluster manager on `/pools/default`.
+            # Anything else is raised as it is: it will not clear on a retry, and the
+            # env-degraded message below would hide what it was.
+            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException, InternalServerFailureException):
                 continue
 
         if not okay:
@@ -1509,6 +1559,17 @@ def verify_seeded_docs_readable(cb_env: SyncTestEnvironment) -> None:
 # rewrite the pair to the acouchbase or txcouchbase variant and leave the rest of the fixture
 # untouched.
 
+def check_suite_features(base_env: TestEnvironment, suite_cls: type[SuiteRequirements]) -> None:
+    """Skip the suite unless the server supports every REQUIRED_FEATURES entry.
+
+    Called first by every build_environment variant, so an unsupported suite skips before any
+    collection is created or manager set up.  The cb_env fixture body runs before the autouse
+    check_required_features can resolve it, and a body that calls get_manager for a manager
+    dropped as unsupported raises env-degraded instead of skipping.
+    """
+    EnvironmentFeatures.check_if_feature_supported(suite_cls.REQUIRED_FEATURES, base_env.server_context)
+
+
 def build_environment(base_env: TestEnvironment,
                       suite_cls: type[SuiteRequirements],
                       collection_strategy: CollectionStrategy | None = None,
@@ -1516,10 +1577,11 @@ def build_environment(base_env: TestEnvironment,
     """Construct and setup a TestEnvironment for a test suite class.
 
     Reads MANAGERS, COLLECTION_STRATEGY, CONNECTION_STRATEGY, and NUM_DOCS from
-    suite_cls, which inherits SuiteRequirements for the defaults. REQUIRED_FEATURES and
-    UNSUPPORTED_PROTOCOLS are handled separately, by check_required_features and
-    check_unsupported_protocols below.
+    suite_cls, which inherits SuiteRequirements for the defaults, and skips first on
+    REQUIRED_FEATURES; see check_suite_features.  UNSUPPORTED_PROTOCOLS is handled separately,
+    by check_unsupported_protocols below.
     """
+    check_suite_features(base_env, suite_cls)
     strategy = (
         collection_strategy if collection_strategy is not None
         else suite_cls.COLLECTION_STRATEGY

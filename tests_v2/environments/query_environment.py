@@ -26,9 +26,13 @@ its own setup path. Not pre-built ahead of time.
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
-from couchbase.exceptions import QueryIndexAlreadyExistsException, QueryIndexNotFoundException
+from couchbase.exceptions import (InternalServerFailureException,
+                                  QueryIndexAlreadyExistsException,
+                                  QueryIndexNotFoundException)
 from tests_v2.environments.managers import TestEnvironmentQueryIndexManager
+from tests_v2.environments.query_index_mgmt_environment import index_already_dropped
 from tests_v2.environments.test_environment import (CollectionStrategy,
                                                     SyncTestEnvironment,
                                                     TestEnvironment)
@@ -65,13 +69,28 @@ class QueryEnvironment:
             TestEnvironment.sleep(QueryEnvironment.PRIMARY_INDEX_DELAY)
 
     @staticmethod
+    def _drop_primary_index(qixm: TestEnvironmentQueryIndexManager, *args: Any, **kwargs: Any) -> None:
+        # A drop repeated while the first is still being applied can come back as GSI 5000,
+        # `Index does not exist`, instead of QueryIndexNotFoundException.  Both mean the index is
+        # gone, and the teardown loop stops only on QueryIndexNotFoundException, so the GSI form
+        # is raised as one.
+        try:
+            qixm.drop_primary_index(*args, **kwargs)
+        except InternalServerFailureException as exc:
+            if index_already_dropped(exc):
+                raise QueryIndexNotFoundException(message=str(exc)) from exc
+            raise
+
+    @staticmethod
     def _drop_primary_index_raw(cb_env: SyncTestEnvironment) -> None:
         q_str = f'DROP PRIMARY INDEX on `{cb_env.bucket.name}`'
         for _ in range(QueryEnvironment.PRIMARY_INDEX_ROUNDS):
             try:
                 cb_env.cluster.query(q_str).execute()
-            except QueryIndexNotFoundException:
-                break
+            except Exception as exc:
+                if index_already_dropped(exc):
+                    break
+                raise
             TestEnvironment.sleep(QueryEnvironment.PRIMARY_INDEX_DELAY)
 
     @staticmethod
@@ -129,7 +148,7 @@ class QueryEnvironment:
             qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
             TestEnvironment.try_n_times_till_exception(QueryEnvironment.PRIMARY_INDEX_ROUNDS,
                                                        QueryEnvironment.PRIMARY_INDEX_DELAY,
-                                                       qixm.drop_primary_index, cb_env.bucket.name,
+                                                       QueryEnvironment._drop_primary_index, qixm, cb_env.bucket.name,
                                                        scope_name=cb_env.scope.name,
                                                        collection_name=cb_env.collection.name,
                                                        expected_exceptions=(QueryIndexNotFoundException,))
@@ -138,7 +157,8 @@ class QueryEnvironment:
                 qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
                 TestEnvironment.try_n_times_till_exception(QueryEnvironment.PRIMARY_INDEX_ROUNDS,
                                                            QueryEnvironment.PRIMARY_INDEX_DELAY,
-                                                           qixm.drop_primary_index, cb_env.bucket.name,
+                                                           QueryEnvironment._drop_primary_index,
+                                                           qixm, cb_env.bucket.name,
                                                            expected_exceptions=(QueryIndexNotFoundException,))
             else:
                 QueryEnvironment._drop_primary_index_raw(cb_env)

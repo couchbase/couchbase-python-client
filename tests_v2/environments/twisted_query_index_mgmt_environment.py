@@ -47,6 +47,7 @@ from couchbase.management.options import (DropPrimaryQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           GetAllQueryIndexOptions)
 from tests_v2.environments.managers import TwistedTestEnvironmentQueryIndexManager
+from tests_v2.environments.query_index_mgmt_environment import index_already_dropped, index_drop_pending
 from tests_v2.environments.test_environment import CollectionStrategy
 from tests_v2.environments.twisted_environment import TwistedTestEnvironment
 
@@ -101,20 +102,21 @@ class TwistedQueryIndexManagementEnvironment:
                           qixm: TwistedTestEnvironmentQueryIndexManager,
                           scope_name: str,
                           collection_name: str) -> bool:
-        for index in TwistedQueryIndexManagementEnvironment._get_all_indexes(
-            cb_env, qixm, scope_name, collection_name
-        ):
-            TwistedQueryIndexManagementEnvironment._drop_index(
-                cb_env, qixm, index, scope_name, collection_name
-            )
+        # See the sync module: each round drops again whatever is still listed.
         for _ in range(DROP_POLL_ATTEMPTS):
-            remaining = TwistedQueryIndexManagementEnvironment._get_all_indexes(
+            remaining = list(TwistedQueryIndexManagementEnvironment._get_all_indexes(
                 cb_env, qixm, scope_name, collection_name
-            )
+            ))
             if not remaining:
                 return True
+            for index in remaining:
+                TwistedQueryIndexManagementEnvironment._drop_index(
+                    cb_env, qixm, index, scope_name, collection_name
+                )
             TwistedTestEnvironment.sleep(DROP_POLL_SECONDS)
-        return False
+        return not list(TwistedQueryIndexManagementEnvironment._get_all_indexes(
+            cb_env, qixm, scope_name, collection_name
+        ))
 
     @staticmethod
     def _get_all_indexes(cb_env: TwistedTestEnvironment,
@@ -131,14 +133,18 @@ class TwistedQueryIndexManagementEnvironment:
                     index: QueryIndex,
                     scope_name: str,
                     collection_name: str) -> None:
-        if index.is_primary:
-            opts = DropPrimaryQueryIndexOptions(scope_name=scope_name,
-                                                collection_name=collection_name)
-            if index.name != DEFAULT_PRIMARY_INDEX_NAME:
-                opts['index_name'] = index.name
-            qixm.drop_primary_index(cb_env.bucket.name, opts)
-        else:
-            qixm.drop_index(cb_env.bucket.name,
-                            index.name,
-                            DropQueryIndexOptions(scope_name=scope_name,
-                                                  collection_name=collection_name))
+        try:
+            if index.is_primary:
+                opts = DropPrimaryQueryIndexOptions(scope_name=scope_name,
+                                                    collection_name=collection_name)
+                if index.name != DEFAULT_PRIMARY_INDEX_NAME:
+                    opts['index_name'] = index.name
+                qixm.drop_primary_index(cb_env.bucket.name, opts)
+            else:
+                qixm.drop_index(cb_env.bucket.name,
+                                index.name,
+                                DropQueryIndexOptions(scope_name=scope_name,
+                                                      collection_name=collection_name))
+        except Exception as exc:
+            if not (index_already_dropped(exc) or index_drop_pending(exc)):
+                raise

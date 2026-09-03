@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from couchbase.exceptions import InternalServerFailureException, QueryIndexNotFoundException
 from couchbase.management.options import (DropPrimaryQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           GetAllQueryIndexOptions)
@@ -55,6 +56,35 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from couchbase.management.queries import QueryIndex
+
+
+def index_already_dropped(exc: Exception) -> bool:
+    """True when a cleanup drop failed only because the index is already gone.
+
+    Cleanup drops what get_all_indexes listed, and for a moment after a drop the listing can
+    still name the index.  Most servers answer the repeat drop with
+    QueryIndexNotFoundException.  7.1 can answer with a GSI 5000, `Index does not exist`,
+    which arrives as InternalServerFailureException.  Either way the index is gone, which is
+    all cleanup wants; the poll after the drops is still what proves the namespace empty.
+
+    The async and Twisted environments import this rather than keeping a copy, because the
+    rule matches server text and the three would otherwise drift.
+    """
+    if isinstance(exc, QueryIndexNotFoundException):
+        return True
+    return isinstance(exc, InternalServerFailureException) and 'Index does not exist' in str(exc)
+
+
+def index_drop_pending(exc: Exception) -> bool:
+    """True when a cleanup drop failed but the server says it may finish the drop itself.
+
+    GSI answers some drops with 5000, `Fail to Drop Index due to internal errors.  Cleanup
+    may happen in the background`, and the index then stays listed until it does.  Raising
+    leaves it there for the next suite to find and lose mid-run, so cleanup treats it as
+    not yet dropped and drops again on the next poll.
+    """
+    return (isinstance(exc, InternalServerFailureException)
+            and 'Cleanup may happen in the background' in str(exc))
 
 
 def _xfail_not_dropped(namespace: str) -> None:
@@ -95,20 +125,22 @@ class QueryIndexManagementEnvironment:
                           qixm: TestEnvironmentQueryIndexManager,
                           scope_name: str,
                           collection_name: str) -> bool:
-        for index in QueryIndexManagementEnvironment._get_all_indexes(
-            cb_env, qixm, scope_name, collection_name
-        ):
-            QueryIndexManagementEnvironment._drop_index(
-                cb_env, qixm, index, scope_name, collection_name
-            )
+        # Whatever is still listed is dropped again each round, so a drop the server left
+        # pending is retried rather than waited on.  The listing is what decides empty.
         for _ in range(DROP_POLL_ATTEMPTS):
-            remaining = QueryIndexManagementEnvironment._get_all_indexes(
+            remaining = list(QueryIndexManagementEnvironment._get_all_indexes(
                 cb_env, qixm, scope_name, collection_name
-            )
+            ))
             if not remaining:
                 return True
+            for index in remaining:
+                QueryIndexManagementEnvironment._drop_index(
+                    cb_env, qixm, index, scope_name, collection_name
+                )
             TestEnvironment.sleep(DROP_POLL_SECONDS)
-        return False
+        return not list(QueryIndexManagementEnvironment._get_all_indexes(
+            cb_env, qixm, scope_name, collection_name
+        ))
 
     @staticmethod
     def _get_all_indexes(cb_env: SyncTestEnvironment,
@@ -125,17 +157,21 @@ class QueryIndexManagementEnvironment:
                     index: QueryIndex,
                     scope_name: str,
                     collection_name: str) -> None:
-        if index.is_primary:
-            opts = DropPrimaryQueryIndexOptions(scope_name=scope_name,
-                                                collection_name=collection_name)
-            if index.name != DEFAULT_PRIMARY_INDEX_NAME:
-                opts['index_name'] = index.name
-            qixm.drop_primary_index(cb_env.bucket.name, opts)
-        else:
-            qixm.drop_index(cb_env.bucket.name,
-                            index.name,
-                            DropQueryIndexOptions(scope_name=scope_name,
-                                                  collection_name=collection_name))
+        try:
+            if index.is_primary:
+                opts = DropPrimaryQueryIndexOptions(scope_name=scope_name,
+                                                    collection_name=collection_name)
+                if index.name != DEFAULT_PRIMARY_INDEX_NAME:
+                    opts['index_name'] = index.name
+                qixm.drop_primary_index(cb_env.bucket.name, opts)
+            else:
+                qixm.drop_index(cb_env.bucket.name,
+                                index.name,
+                                DropQueryIndexOptions(scope_name=scope_name,
+                                                      collection_name=collection_name))
+        except Exception as exc:
+            if not (index_already_dropped(exc) or index_drop_pending(exc)):
+                raise
 
 
 class CollectionQueryIndexManagementEnvironment:
@@ -153,21 +189,28 @@ class CollectionQueryIndexManagementEnvironment:
             return
 
         qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
-        for index in qixm.get_all_indexes():
-            CollectionQueryIndexManagementEnvironment._drop_index(qixm, index)
         for _ in range(DROP_POLL_ATTEMPTS):
-            if not qixm.get_all_indexes():
+            remaining = list(qixm.get_all_indexes())
+            if not remaining:
                 return
+            for index in remaining:
+                CollectionQueryIndexManagementEnvironment._drop_index(qixm, index)
             TestEnvironment.sleep(DROP_POLL_SECONDS)
+        if not qixm.get_all_indexes():
+            return
         if not ignore_fail:
             _xfail_not_dropped(cb_env.fqdn)
 
     @staticmethod
     def _drop_index(qixm: TestEnvironmentCollectionQueryIndexManager, index: QueryIndex) -> None:
-        if index.is_primary:
-            opts = DropPrimaryQueryIndexOptions()
-            if index.name != DEFAULT_PRIMARY_INDEX_NAME:
-                opts['index_name'] = index.name
-            qixm.drop_primary_index(opts)
-        else:
-            qixm.drop_index(index.name)
+        try:
+            if index.is_primary:
+                opts = DropPrimaryQueryIndexOptions()
+                if index.name != DEFAULT_PRIMARY_INDEX_NAME:
+                    opts['index_name'] = index.name
+                qixm.drop_primary_index(opts)
+            else:
+                qixm.drop_index(index.name)
+        except Exception as exc:
+            if not (index_already_dropped(exc) or index_drop_pending(exc)):
+                raise

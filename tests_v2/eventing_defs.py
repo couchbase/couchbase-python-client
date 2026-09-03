@@ -62,8 +62,7 @@ META_COLLECTION_NAME = 'evt-meta'
 SIMPLE_EVT_CODE = ('function OnUpdate(doc, meta) {\n    log("Doc created/updated", meta.id);\n}'
                    '\n\nfunction OnDelete(meta, options) {\n    log("Doc deleted/expired", meta.id);\n}')
 
-# A handler the service rejects: `func` is not a keyword and OnDelete is missing.  It is
-# only useful if a test actually sends it; see the note on test_upsert_function_fail.
+# A handler the service rejects at upsert: `func` is not a keyword and OnDelete is missing.
 INVALID_EVT_CODE = 'func OnUpdate(doc, meta) {\n    log("Doc created/updated", meta.id);\n}\n\n'
 
 BUCKET_BINDING_ALIAS = 'evtFunc'

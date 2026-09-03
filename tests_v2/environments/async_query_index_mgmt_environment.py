@@ -35,6 +35,7 @@ from couchbase.management.options import (DropPrimaryQueryIndexOptions,
 from tests_v2.environments.async_environment import AsyncTestEnvironment
 from tests_v2.environments.managers import (AsyncTestEnvironmentCollectionQueryIndexManager,
                                             AsyncTestEnvironmentQueryIndexManager)
+from tests_v2.environments.query_index_mgmt_environment import index_already_dropped, index_drop_pending
 from tests_v2.environments.test_environment import CollectionStrategy
 
 # Kept in step with the sync module rather than re-tuned: a different poll budget here
@@ -88,20 +89,21 @@ class AsyncQueryIndexManagementEnvironment:
                                 qixm: AsyncTestEnvironmentQueryIndexManager,
                                 scope_name: str,
                                 collection_name: str) -> bool:
-        for index in await AsyncQueryIndexManagementEnvironment._get_all_indexes(
-            cb_env, qixm, scope_name, collection_name
-        ):
-            await AsyncQueryIndexManagementEnvironment._drop_index(
-                cb_env, qixm, index, scope_name, collection_name
-            )
+        # See the sync module: each round drops again whatever is still listed.
         for _ in range(DROP_POLL_ATTEMPTS):
-            remaining = await AsyncQueryIndexManagementEnvironment._get_all_indexes(
+            remaining = list(await AsyncQueryIndexManagementEnvironment._get_all_indexes(
                 cb_env, qixm, scope_name, collection_name
-            )
+            ))
             if not remaining:
                 return True
+            for index in remaining:
+                await AsyncQueryIndexManagementEnvironment._drop_index(
+                    cb_env, qixm, index, scope_name, collection_name
+                )
             await AsyncTestEnvironment.sleep(DROP_POLL_SECONDS)
-        return False
+        return not list(await AsyncQueryIndexManagementEnvironment._get_all_indexes(
+            cb_env, qixm, scope_name, collection_name
+        ))
 
     @staticmethod
     async def _get_all_indexes(cb_env: AsyncTestEnvironment,
@@ -118,17 +120,21 @@ class AsyncQueryIndexManagementEnvironment:
                           index: QueryIndex,
                           scope_name: str,
                           collection_name: str) -> None:
-        if index.is_primary:
-            opts = DropPrimaryQueryIndexOptions(scope_name=scope_name,
-                                                collection_name=collection_name)
-            if index.name != DEFAULT_PRIMARY_INDEX_NAME:
-                opts['index_name'] = index.name
-            await qixm.drop_primary_index(cb_env.bucket.name, opts)
-        else:
-            await qixm.drop_index(cb_env.bucket.name,
-                                  index.name,
-                                  DropQueryIndexOptions(scope_name=scope_name,
-                                                        collection_name=collection_name))
+        try:
+            if index.is_primary:
+                opts = DropPrimaryQueryIndexOptions(scope_name=scope_name,
+                                                    collection_name=collection_name)
+                if index.name != DEFAULT_PRIMARY_INDEX_NAME:
+                    opts['index_name'] = index.name
+                await qixm.drop_primary_index(cb_env.bucket.name, opts)
+            else:
+                await qixm.drop_index(cb_env.bucket.name,
+                                      index.name,
+                                      DropQueryIndexOptions(scope_name=scope_name,
+                                                            collection_name=collection_name))
+        except Exception as exc:
+            if not (index_already_dropped(exc) or index_drop_pending(exc)):
+                raise
 
 
 class AsyncCollectionQueryIndexManagementEnvironment:
@@ -144,24 +150,31 @@ class AsyncCollectionQueryIndexManagementEnvironment:
             return
 
         qixm = cb_env.get_manager(AsyncTestEnvironmentCollectionQueryIndexManager)
-        for index in await qixm.get_all_indexes():
-            await AsyncCollectionQueryIndexManagementEnvironment._drop_index(qixm, index)
         for _ in range(DROP_POLL_ATTEMPTS):
-            if not await qixm.get_all_indexes():
+            remaining = list(await qixm.get_all_indexes())
+            if not remaining:
                 return
+            for index in remaining:
+                await AsyncCollectionQueryIndexManagementEnvironment._drop_index(qixm, index)
             await AsyncTestEnvironment.sleep(DROP_POLL_SECONDS)
+        if not await qixm.get_all_indexes():
+            return
         if not ignore_fail:
             _xfail_not_dropped(cb_env.fqdn)
 
     @staticmethod
     async def _drop_index(qixm: AsyncTestEnvironmentCollectionQueryIndexManager,
                           index: QueryIndex) -> None:
-        if index.is_primary:
-            opts = DropPrimaryQueryIndexOptions()
-            if index.name != DEFAULT_PRIMARY_INDEX_NAME:
-                opts['index_name'] = index.name
-            await qixm.drop_primary_index(opts)
-        else:
-            # No options, matching the sync module exactly.  The collection-level manager
-            # is already bound to one collection, so there is no namespace to pass.
-            await qixm.drop_index(index.name)
+        try:
+            if index.is_primary:
+                opts = DropPrimaryQueryIndexOptions()
+                if index.name != DEFAULT_PRIMARY_INDEX_NAME:
+                    opts['index_name'] = index.name
+                await qixm.drop_primary_index(opts)
+            else:
+                # No options, matching the sync module exactly.  The collection-level manager
+                # is already bound to one collection, so there is no namespace to pass.
+                await qixm.drop_index(index.name)
+        except Exception as exc:
+            if not (index_already_dropped(exc) or index_drop_pending(exc)):
+                raise
