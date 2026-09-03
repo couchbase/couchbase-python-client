@@ -16,7 +16,9 @@ repos:
         files: src/.*\.(cxx|hxx)$
         exclude: ^deps/
   - repo: https://github.com/hhatto/autopep8
-    rev: v2.2.0
+    # Same rule as mypy below: keep in step with `autopep8` in dev_requirements.txt.  This
+    # hook rewrites files, so a skew means the gate reformats differently than local.
+    rev: v2.3.2
     hooks:
       - id: autopep8
         exclude: ^(deps/|src/)
@@ -39,6 +41,45 @@ repos:
             --max-line-length=120,
             --max-complexity=10
           ]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    # Keep this rev in step with `mypy` in dev_requirements.txt.  The hook runs in its own
+    # isolated env, so a skew here means the gate enforces a different mypy than the one
+    # anyone runs locally, and the two can disagree on what passes.
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        # Scope, settings and per-module overrides all live in [tool.mypy] in
+        # pyproject.toml.  Passing the four trees here as well would be redundant, but
+        # pre-commit hands the hook a list of changed files and mypy would then check
+        # only those, ignoring `files`.  --config-file plus passing no filenames keeps
+        # every run checking the whole configured scope.
+        pass_filenames: false
+        args: [--config-file=pyproject.toml]
+        # mypy runs in its own isolated env, so anything it needs to import for types has
+        # to be repeated here; it cannot see dev_requirements.txt.
+        additional_dependencies:
+          - types-requests~=2.32
+          - pytest~=8.3.5
+          - pytest-asyncio~=1.1
+          - Twisted~=24.7
+
+  - repo: local
+    hooks:
+      - id: audit-type-ignores
+        name: audit type-ignore suppressions in tests_v2
+        # mypy enforces that the annotations are right; this enforces that the escapes
+        # from them stay accountable.  Every `# type: ignore` in the tests_v2 trees has
+        # to name its error code, and has to carry the PYCBC key that will retire it
+        # unless it is permanent.  Rationale and the allowlist of permanent ones are in
+        # the module docstring.
+        entry: python tools/audit_type_ignores.py
+        language: python
+        # The script walks the configured trees itself.  Passing changed filenames would
+        # let a suppression added in one commit hide behind a later commit that does not
+        # touch that file.
+        pass_filenames: false
+        files: ^(tests_v2/|(a|tx)?couchbase/tests_v2/|tools/audit_type_ignores\.py)
+
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
     hooks:
@@ -70,6 +111,10 @@ repos:
               txcouchbase/tests/|
               couchbase/tests/|
               tests/|
+              acouchbase/tests_v2/|
+              txcouchbase/tests_v2/|
+              couchbase/tests_v2/|
+              tests_v2/|
               tools/|
               simple_acouchbase.py|
               simple_couchbase.py|

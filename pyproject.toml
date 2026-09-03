@@ -39,12 +39,74 @@ markers = [
     "pycbc_tracing: marks a test as a tracing API test",
     "pycbc_txn: marks a test as a transactions API test",
     "pycbc_slow_mgmt: marks a test as a management API test that is slow",
+    "unsupported_protocol(*protocols): skip this test under any of the given TestProtocol values",
+    "testgen_exclude(*apis, reason=...): do not generate this test for the named APIs",
 ]
 
 [tool.autopep8]
 max_line_length = 120
 in-place = true
 recursive = true
+
+[tool.mypy]
+# Kept here rather than in a separate mypy.ini so tool config stays in one file, matching
+# autopep8 / isort / pytest above.  Semantically identical to the [mypy] ini form.
+files = ["tests_v2", "couchbase/tests_v2", "acouchbase/tests_v2", "txcouchbase/tests_v2"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+# Every `# type: ignore` here suppresses a defect that is fixed somewhere other than the
+# line holding the ignore: an annotation in the SDK tree, or a test defect with a ticket of
+# its own.  Both are temporary, and neither fix is made by anyone reading this file.  This
+# turns "remember to delete it" into a hard failure naming the exact line, the moment the
+# ignore stops being needed.
+warn_unused_ignores = true
+
+# A bare `# type: ignore` silences every error the line will ever produce rather than the
+# one its author saw, so what it suppresses is whatever the file grows into.  Requiring the
+# code keeps each suppression pinned to the defect it was written for.
+#
+# `tools/audit_type_ignores.py` holds the same requirement for the test trees, and both
+# halves earn their place: the audit reads the source, so it can see that the brackets are
+# empty but not what belongs inside them.  mypy has the error in hand when it reports this,
+# so it names the code as well.
+enable_error_code = ["ignore-without-code"]
+
+# The SDK is annotated in the SDK tree, not here.  `silent` still *analyzes* these modules,
+# so attribute and arity checking against the SDK works today; it only suppresses errors
+# reported inside them.  Do not use `skip`, which would make the whole SDK `Any` and
+# defeat the point of typing cb_env at all.
+#
+# All three api trees, and each bare module name as well as its submodules.  A pattern of
+# `couchbase.*` alone does not match `couchbase` itself, and covering only the sync tree
+# leaves acouchbase and txcouchbase reporting: between them that was 410 of 876 errors on
+# the first run of this config, all of it SDK noise.
+#
+# The three `files` trees that sit inside these patterns need no counter-override.
+# `follow_imports` governs modules mypy reaches by import; a path named in `files` is
+# checked, and its errors reported, whatever it says.  Measured under mypy 2.3.0 by planting
+# a return-value error in each of the three, `_generated` included, and confirming all three
+# were reported.
+[[tool.mypy.overrides]]
+module = ["couchbase", "couchbase.*",
+          "acouchbase", "acouchbase.*",
+          "txcouchbase", "txcouchbase.*"]
+follow_imports = "silent"
+
+# `follow_imports = silent` does not suppress errors inside .pyi files: mypy always
+# processes stubs.  This one carries three pre-existing defects (a missing return type and
+# two unsolvable TypeVars).  They are real, but they are SDK stub bugs, and annotating the
+# SDK is deliberately out of scope here.  Silenced explicitly so they are a recorded
+# exclusion rather than an unexplained three-error floor.
+[[tool.mypy.overrides]]
+module = "couchbase.logic.pycbc_core._core"
+ignore_errors = true
+
+# Third-party packages that ship no stubs.  These are test-only dependencies and none of
+# them appear in an annotation we care about checking.
+[[tool.mypy.overrides]]
+module = ["faker.*", "faker_vehicle.*", "faker_vehicle", "xdist.*"]
+ignore_missing_imports = true
 
 [tool.isort]
 multi_line_output = 1

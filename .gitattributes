@@ -1,0 +1,6 @@
+# Written by `python -m tools.testgen generate --write` from the suites under
+# couchbase/tests_v2/, which is the only place any of it can be changed.  Marking it
+# keeps it out of language statistics and collapses it in review, where reading a diff
+# of machine output is never the point.
+acouchbase/tests_v2/_generated/**   linguist-generated=true
+txcouchbase/tests_v2/_generated/**  linguist-generated=true

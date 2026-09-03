@@ -1,0 +1,1122 @@
+#  Copyright 2016-2024. Couchbase, Inc.
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License")
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+# Generated for acouchbase only.  Twisted has no transactions API, and that is expressed by
+# omitting the api from this suite's `targets` in the generator config.
+
+from __future__ import annotations
+
+import json
+from collections.abc import Generator, Iterable
+from datetime import timedelta
+from typing import Any
+
+import pytest
+
+from couchbase.auth import PasswordAuthenticator
+from couchbase.cluster import Cluster
+from couchbase.durability import DurabilityLevel, ServerDurability
+from couchbase.exceptions import (BucketNotFoundException,
+                                  DocumentExistsException,
+                                  DocumentNotFoundException,
+                                  DocumentUnretrievableException,
+                                  FeatureUnavailableException,
+                                  InvalidIndexException,
+                                  ParsingFailedException,
+                                  TransactionException,
+                                  TransactionExpired,
+                                  TransactionFailed,
+                                  TransactionOperationFailed)
+from couchbase.n1ql import QueryProfile, QueryScanConsistency
+from couchbase.options import (ClusterOptions,
+                               ClusterTracingOptions,
+                               TransactionConfig,
+                               TransactionGetMultiOptions,
+                               TransactionGetMultiReplicasFromPreferredServerGroupOptions,
+                               TransactionGetOptions,
+                               TransactionInsertOptions,
+                               TransactionOptions,
+                               TransactionQueryOptions,
+                               TransactionReplaceOptions)
+from couchbase.transactions import (AttemptContext,
+                                    TransactionGetMultiMode,
+                                    TransactionGetMultiReplicasFromPreferredServerGroupMode,
+                                    TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                    TransactionGetMultiReplicasFromPreferredServerGroupSpec,
+                                    TransactionGetMultiResult,
+                                    TransactionGetMultiSpec,
+                                    TransactionKeyspace,
+                                    TransactionResult)
+from couchbase.transcoder import RawBinaryTranscoder
+from tests_v2.assert_helpers import cb_assert_eq, cb_assert_isinstance
+from tests_v2.environments.managers import TestEnvironmentQueryIndexManager
+from tests_v2.environments.query_environment import QueryEnvironment
+from tests_v2.environments.test_environment import (CollectionStrategy,
+                                                    SyncTestEnvironment,
+                                                    TestEnvironment,
+                                                    build_environment,
+                                                    teardown_environment)
+from tests_v2.manifest import validate_test_manifest
+from tests_v2.skips import (server_label,
+                            skip_known_issue,
+                            skip_mock_limitation)
+from tests_v2.suite_fixtures import TopologySuite
+from tests_v2.test_features import (EnvironmentFeatures,
+                                    ServerFeatures,
+                                    TestProtocol)
+
+# What the _assert_option_* helpers accept.  The three classes share no base, only the
+# private `_base` holding the serialized form, so the union is the type.
+TxnOptionLike = TransactionConfig | TransactionOptions | TransactionQueryOptions
+
+
+class TransactionTestSuite(TopologySuite):
+    # The query-mode tests need a primary index on whichever keyspace the run targets.
+    # The concrete class builds it (see couchbase_test_environment), which is why the
+    # query index manager has to be available here.
+    MANAGERS = [TestEnvironmentQueryIndexManager]
+
+    # Transactions themselves need 6.6+; the query, binary and server-group subsets need
+    # more, and carry their own per-test gates below.
+    REQUIRED_FEATURES = [ServerFeatures.Txns]
+
+    # Transactions are absent from a couchbase2 deployment, a different axis from the 6.6
+    # gate above: that one is the server's age, this one is how the run reaches it.  A gate
+    # rather than a deletion because the gap is expected to close.
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
+
+    # Raised from inside a lambda to prove the txn surfaces a user exception rather than
+    # swallowing or rewriting it.
+    USER_EXCEPTION_MSG = 'User raised exception.'
+
+    TEST_MANIFEST = [
+        'test_bad_query',
+        'test_binary',
+        'test_binary_kwargs',
+        'test_binary_not_supported',
+        'test_get',
+        'test_get_inner_exc_doc_not_found',
+        'test_get_lambda_raises_doc_not_found',
+        'test_get_multi_binary',
+        'test_get_multi_invalid_index',
+        'test_get_multi_not_exists',
+        'test_get_multi_options',
+        'test_get_multi_replicas_from_preferred_server_group_binary',
+        'test_get_multi_replicas_from_preferred_server_group_invalid_index',
+        'test_get_multi_replicas_from_preferred_server_group_not_exists',
+        'test_get_multi_replicas_from_preferred_server_group_options',
+        'test_get_multi_replicas_from_preferred_server_group_simple',
+        'test_get_multi_simple',
+        'test_get_replica_from_preferred_server_group_propagate_unretrievable_exc',
+        'test_get_replica_from_preferred_server_group_unretrievable',
+        'test_insert',
+        'test_insert_inner_exc_doc_exists',
+        'test_insert_lambda_raises_doc_exists',
+        'test_metadata_collection',
+        'test_metadata_collection_not_found',
+        'test_per_txn_config',
+        'test_query',
+        'test_query_inner_exc_parsing_failure',
+        'test_query_lambda_raises_parsing_failure',
+        'test_query_mode_insert',
+        'test_query_mode_remove',
+        'test_remove',
+        'test_remove_fail_bad_cas',
+        'test_replace',
+        'test_replace_fail_bad_cas',
+        'test_rollback',
+        'test_rollback_eating_exceptions',
+        'test_scope_qualifier',
+        'test_transaction_result',
+    ]
+
+    @pytest.fixture(scope='class')
+    def check_txn_queries_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.TxnQueries, cb_env.server_context)
+
+    @pytest.fixture(scope='class')
+    def check_binary_txns_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.BinaryTxns, cb_env.server_context)
+
+    @pytest.fixture(scope='class')
+    def check_binary_txns_not_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_not_supported(ServerFeatures.BinaryTxns, cb_env.server_context)
+
+    @pytest.fixture(scope='class')
+    def check_real_server(self, cb_env: SyncTestEnvironment) -> None:
+        # Distinct from a feature gate: that says the server cannot do the thing, this says
+        # the mock cannot tell the test that it cannot.  Both users below assert on a
+        # specific failure mode and get a different one from GoCAVES.  Without this they do
+        # not merely fail, they wait: the mock's answer arrives as a timeout, which is most
+        # of why the mock transaction run takes minutes.
+        if cb_env.is_mock_server:
+            # The enum renders as its .name through the taxonomy, so this reads
+            # `mock=GoCAVES` rather than the '1' an IntEnum would stringify to.
+            skip_mock_limitation(mock=cb_env.mock_server_type,
+                                 server=server_label(cb_env.is_mock_server),
+                                 note='the mock does not reproduce the failure reporting this test asserts on')
+
+    @pytest.fixture(scope='class')
+    def check_replica_read_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.SubdocReplicaRead, cb_env.server_context)
+
+    # --- Shared assertions ---
+    #
+    # Deliberately free of SDK calls: nothing here needs an await in the generated async
+    # variant, so the transformer copies them across untouched.  Helpers that do talk to the
+    # cluster (_remove_docs) are kept separate for that reason.
+
+    def _assert_option_eq(self, cfg: TxnOptionLike, key: str, expected: Any, *, ctx: str = '') -> None:
+        value = cfg._base.to_dict().get(key, None)
+        assert value is not None, f'Option {key!r} is absent from the serialized config. {ctx}'
+        cb_assert_eq(value, expected, what=f'option {key!r}', ctx=ctx)
+
+    def _assert_user_exception_wrapped(self, ex: TransactionFailed) -> None:
+        assert self.USER_EXCEPTION_MSG in str(ex), (
+            f'Expected {self.USER_EXCEPTION_MSG!r} in the failure message, got {str(ex)!r}.'
+        )
+
+    def _assert_inner_cause(self, ex: TransactionFailed, expected_exc: type[Exception]) -> None:
+        assert ex.inner_cause is not None, (
+            f'{type(ex).__name__} must report an inner cause, got None.'
+        )
+        cb_assert_isinstance(ex.inner_cause, expected_exc, what='inner cause')
+
+    def _assert_expired_or(self, ex: TransactionException, alt_reason: str) -> None:
+        # The two are racing: whether a retried op reports its own reason or the expiry that
+        # finally stopped the retries depends on timing, so either is a pass.  Typed against
+        # TransactionException because the same race decides which subclass is raised.
+        # `message` is Optional on every CouchbaseException.  Substituting '' rather than
+        # dereferencing turns a None into this assertion's own failure message instead of a
+        # TypeError from inside the check.
+        message = ex.message or ''
+        assert 'transaction expired' in message or alt_reason in message, (
+            f'Expected "transaction expired" or {alt_reason!r} in the failure message, '
+            f'got {ex.message!r}.'
+        )
+
+    def _remove_docs(self, cb_env: SyncTestEnvironment, keys: Iterable[str]) -> None:
+        # Tests that write through `ctx` rather than `cb_env` are not tracked by purge_data(),
+        # so they clean up after themselves; a doc the txn never committed is simply absent.
+        for key in keys:
+            try:
+                cb_env.collection.remove(key)
+            except DocumentNotFoundException:
+                pass
+
+    # --- Tests ---
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_bad_query(self, cb_env: SyncTestEnvironment) -> None:
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            with pytest.raises(ParsingFailedException):
+                ctx.query('this wont parse')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+    @pytest.mark.usefixtures('check_binary_txns_supported')
+    def test_binary(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value = 'bytes content'.encode('utf-8')
+        new_content = b'\xFF'
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            ctx.insert(cb_env.collection, key, value, TransactionInsertOptions(transcoder=tc))
+            get_res = ctx.get(cb_env.collection, key, TransactionGetOptions(transcoder=tc))
+            cb_assert_eq(get_res.content_as[bytes], value, what='content staged by insert')
+            replace_res = ctx.replace(get_res, new_content, TransactionReplaceOptions(transcoder=tc))
+            # replace() does not return the new content (known SDK defect), so the only
+            # thing the result can be checked against here is the cas.
+            assert get_res.cas != replace_res.cas, 'replace() must return a new cas.'
+
+        cb_env.cluster.transactions.run(txn_logic)
+        result = cb_env.collection.get(key, transcoder=tc)
+        cb_assert_eq(result.content_as[bytes], new_content, what='committed content')
+
+    @pytest.mark.usefixtures('check_binary_txns_supported')
+    def test_binary_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value = 'bytes content'.encode('utf-8')
+        new_content = b'\xFF'
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            ctx.insert(cb_env.collection, key, value, transcoder=tc)
+            get_res = ctx.get(cb_env.collection, key, transcoder=tc)
+            cb_assert_eq(get_res.content_as[bytes], value, what='content staged by insert')
+            replace_res = ctx.replace(get_res, new_content, transcoder=tc)
+            # Same defect as test_binary: replace() does not echo the new content.
+            assert get_res.cas != replace_res.cas, 'replace() must return a new cas.'
+
+        cb_env.cluster.transactions.run(txn_logic)
+        result = cb_env.collection.get(key, transcoder=tc)
+        cb_assert_eq(result.content_as[bytes], new_content, what='committed content')
+
+    @pytest.mark.usefixtures('check_binary_txns_not_supported')
+    # Binary transactions really are absent on GoCAVES, which is the situation this test
+    # covers, but the mock signals it as TransactionOperationFailed rather than the
+    # FeatureUnavailableException a real pre-7.6 server raises.  The gate above is
+    # therefore satisfied on the mock while the assertion still cannot hold.
+    @pytest.mark.usefixtures('check_real_server')
+    def test_binary_not_supported(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value = 'bytes content'.encode('utf-8')
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            ctx.insert(cb_env.collection, key, value, TransactionInsertOptions(transcoder=tc))
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_inner_cause(exc_info.value, FeatureUnavailableException)
+
+    def test_get(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc()
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            res = ctx.get(cb_env.collection, key)
+            assert res.cas > 0, 'get() must return a non-zero cas.'
+            cb_assert_eq(res.id, key, what='doc id')
+            cb_assert_eq(res.content_as[dict], value, what='doc content')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+    def test_get_lambda_raises_doc_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            with pytest.raises(DocumentNotFoundException):
+                ctx.get(cb_env.collection, key)
+
+            raise Exception(self.USER_EXCEPTION_MSG)
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_user_exception_wrapped(exc_info.value)
+
+        # A user-raised exception is terminal: the txn must not retry the lambda.
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    def test_get_inner_exc_doc_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.get(cb_env.collection, key)
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_inner_cause(exc_info.value, DocumentNotFoundException)
+
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_replica_from_preferred_server_group_unretrievable(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            with pytest.raises(DocumentUnretrievableException):
+                ctx.get_replica_from_preferred_server_group(cb_env.collection, key)
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_replica_from_preferred_server_group_propagate_unretrievable_exc(
+        self, cb_env: SyncTestEnvironment
+    ) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.get_replica_from_preferred_server_group(cb_env.collection, key)
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_inner_cause(exc_info.value, DocumentUnretrievableException)
+
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    @pytest.mark.usefixtures('check_binary_txns_supported')
+    def test_get_multi_binary(self, cb_env: SyncTestEnvironment) -> None:
+        key1 = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value1 = 'bytes content'.encode('utf-8')
+        key2, value2 = cb_env.get_new_doc()
+
+        cb_env.collection.insert(key1, value1, transcoder=tc)
+        cb_env.collection.insert(key2, value2)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = [
+                TransactionGetMultiSpec(cb_env.collection, key1, transcoder=tc),
+                TransactionGetMultiSpec(cb_env.collection, key2),
+            ]
+            res = ctx.get_multi(specs)
+            cb_assert_isinstance(res, TransactionGetMultiResult, what='get_multi result')
+            cb_assert_eq(res.content_as[bytes](0), value1, what='spec 0 content')
+            cb_assert_eq(res.content_as[dict](1), value2, what='spec 1 content')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        self._remove_docs(cb_env, [key1, key2])
+
+    def test_get_multi_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.insert(key1, value1)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = (
+                TransactionGetMultiSpec(cb_env.collection, key1),
+                TransactionGetMultiSpec(cb_env.collection, key2)
+            )
+            res = ctx.get_multi(specs)
+            cb_assert_isinstance(res, TransactionGetMultiResult, what='get_multi result')
+            assert res.exists(0) is True, 'Spec 0 was inserted and must exist.'
+            assert res.exists(1) is False, 'Spec 1 was never inserted and must not exist.'
+
+            with pytest.raises(DocumentNotFoundException):
+                res.content_as[dict](1)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        self._remove_docs(cb_env, [key1])
+
+    def test_get_multi_invalid_index(self, cb_env: SyncTestEnvironment) -> None:
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.insert(key1, value1)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = [
+                TransactionGetMultiSpec(cb_env.collection, key1),
+                TransactionGetMultiSpec(cb_env.collection, key2)
+            ]
+            res = ctx.get_multi(specs)
+            cb_assert_isinstance(res, TransactionGetMultiResult, what='get_multi result')
+            assert res.exists(0) is True, 'Spec 0 was inserted and must exist.'
+            assert res.exists(1) is False, 'Spec 1 was never inserted and must not exist.'
+            # Index 2 is past the end of a two-spec request.
+            with pytest.raises(InvalidIndexException):
+                res.content_as[dict](2)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        self._remove_docs(cb_env, [key1])
+
+    def test_get_multi_options(self, cb_env: SyncTestEnvironment) -> None:
+        key1, value1 = cb_env.get_new_doc()
+        key2, value2 = cb_env.get_new_doc()
+        cb_env.collection.insert(key1, value1)
+        cb_env.collection.insert(key2, value2)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = (
+                TransactionGetMultiSpec(cb_env.collection, key1),
+                TransactionGetMultiSpec(cb_env.collection, key2)
+            )
+            opts = TransactionGetMultiOptions(mode=TransactionGetMultiMode.DISABLE_READ_SKEW_DETECTION)
+            res = ctx.get_multi(specs, opts)
+            cb_assert_isinstance(res, TransactionGetMultiResult, what='get_multi result')
+            cb_assert_eq(res.content_as[dict](0), value1, what='spec 0 content')
+            cb_assert_eq(res.content_as[dict](1), value2, what='spec 1 content')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        self._remove_docs(cb_env, [key1, key2])
+
+    def test_get_multi_simple(self, cb_env: SyncTestEnvironment) -> None:
+        keys_and_docs = []
+        for _ in range(3):
+            key, value = cb_env.get_new_doc()
+            keys_and_docs.append((key, value))
+            cb_env.collection.insert(key, value)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = (
+                TransactionGetMultiSpec(cb_env.collection, keys_and_docs[0][0]),
+                TransactionGetMultiSpec(cb_env.collection, keys_and_docs[1][0]),
+                TransactionGetMultiSpec(cb_env.collection, keys_and_docs[2][0])
+            )
+            res = ctx.get_multi(specs)
+            cb_assert_isinstance(res, TransactionGetMultiResult, what='get_multi result')
+            for idx in range(len(keys_and_docs)):
+                assert res.exists(idx) is True, f'Spec {idx} was inserted and must exist.'
+                cb_assert_eq(res.content_as[dict](idx), keys_and_docs[idx][1],
+                             what='spec content', ctx=f'spec {idx}')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        self._remove_docs(cb_env, [kd[0] for kd in keys_and_docs])
+
+    @pytest.mark.usefixtures('check_binary_txns_supported')
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_multi_replicas_from_preferred_server_group_binary(self, cb_env: SyncTestEnvironment) -> None:
+        key1 = cb_env.get_new_doc(key_only=True)
+        tc = RawBinaryTranscoder()
+        value1 = 'bytes content'.encode('utf-8')
+        key2, value2 = cb_env.get_new_doc()
+
+        cb_env.collection.insert(key1, value1, transcoder=tc)
+        cb_env.collection.insert(key2, value2)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = [
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1, transcoder=tc),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2),
+            ]
+            res = ctx.get_multi_replicas_from_preferred_server_group(specs)
+            cb_assert_isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                 what='get_multi_replicas result')
+            cb_assert_eq(res.content_as[bytes](0), value1, what='spec 0 content')
+            cb_assert_eq(res.content_as[dict](1), value2, what='spec 1 content')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        self._remove_docs(cb_env, [key1, key2])
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_multi_replicas_from_preferred_server_group_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.insert(key1, value1)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = (
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2)
+            )
+            res = ctx.get_multi_replicas_from_preferred_server_group(specs)
+            cb_assert_isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                 what='get_multi_replicas result')
+            assert res.exists(0) is True, 'Spec 0 was inserted and must exist.'
+            assert res.exists(1) is False, 'Spec 1 was never inserted and must not exist.'
+
+            with pytest.raises(DocumentNotFoundException):
+                res.content_as[dict](1)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        self._remove_docs(cb_env, [key1])
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_multi_replicas_from_preferred_server_group_invalid_index(self, cb_env: SyncTestEnvironment) -> None:
+        key1, value1 = cb_env.get_new_doc()
+        key2 = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.insert(key1, value1)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = [
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2)
+            ]
+            res = ctx.get_multi_replicas_from_preferred_server_group(specs)
+            cb_assert_isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                 what='get_multi_replicas result')
+            assert res.exists(0) is True, 'Spec 0 was inserted and must exist.'
+            assert res.exists(1) is False, 'Spec 1 was never inserted and must not exist.'
+            # Index 2 is past the end of a two-spec request.
+            with pytest.raises(InvalidIndexException):
+                res.content_as[dict](2)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        self._remove_docs(cb_env, [key1])
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_multi_replicas_from_preferred_server_group_options(self, cb_env: SyncTestEnvironment) -> None:
+        key1, value1 = cb_env.get_new_doc()
+        key2, value2 = cb_env.get_new_doc()
+        cb_env.collection.insert(key1, value1)
+        cb_env.collection.insert(key2, value2)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = (
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key1),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key2)
+            )
+            mode = TransactionGetMultiReplicasFromPreferredServerGroupMode.DISABLE_READ_SKEW_DETECTION
+            opts = TransactionGetMultiReplicasFromPreferredServerGroupOptions(mode=mode)
+            res = ctx.get_multi_replicas_from_preferred_server_group(specs, opts)
+            cb_assert_isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                 what='get_multi_replicas result')
+            cb_assert_eq(res.content_as[dict](0), value1, what='spec 0 content')
+            cb_assert_eq(res.content_as[dict](1), value2, what='spec 1 content')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        self._remove_docs(cb_env, [key1, key2])
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    @pytest.mark.usefixtures('check_server_groups_supported')
+    def test_get_multi_replicas_from_preferred_server_group_simple(self, cb_env: SyncTestEnvironment) -> None:
+        keys_and_docs = []
+        for _ in range(3):
+            key, value = cb_env.get_new_doc()
+            keys_and_docs.append((key, value))
+            cb_env.collection.insert(key, value)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            specs = (
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, keys_and_docs[0][0]),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, keys_and_docs[1][0]),
+                TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, keys_and_docs[2][0])
+            )
+            res = ctx.get_multi_replicas_from_preferred_server_group(specs)
+            cb_assert_isinstance(res, TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                 what='get_multi_replicas result')
+            for idx in range(len(keys_and_docs)):
+                assert res.exists(idx) is True, f'Spec {idx} was inserted and must exist.'
+                cb_assert_eq(res.content_as[dict](idx), keys_and_docs[idx][1],
+                             what='spec content', ctx=f'spec {idx}')
+
+        cb_env.cluster.transactions.run(txn_logic)
+
+        self._remove_docs(cb_env, [kd[0] for kd in keys_and_docs])
+
+    def test_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc()
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            ctx.insert(cb_env.collection, key, value)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        get_result = cb_env.collection.get(key)
+        cb_assert_eq(get_result.content_as[dict], value, what='committed content')
+
+    def test_insert_lambda_raises_doc_exists(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            with pytest.raises(DocumentExistsException):
+                ctx.insert(cb_env.collection, key, value)
+
+            raise Exception(self.USER_EXCEPTION_MSG)
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_user_exception_wrapped(exc_info.value)
+
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    def test_insert_inner_exc_doc_exists(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.insert(cb_env.collection, key, value)
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_inner_cause(exc_info.value, DocumentExistsException)
+
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    @pytest.mark.parametrize('cls', [TransactionOptions, TransactionConfig])
+    def test_metadata_collection(self, cls: type[Any], cb_env: SyncTestEnvironment) -> None:
+        coll = cb_env.collection
+        cfg = cls(metadata_collection=TransactionKeyspace(coll=coll))
+        expected = f'{coll._impl.bucket_name}.{coll._impl.scope_name}.{coll.name}'
+        self._assert_option_eq(cfg, 'metadata_collection', expected)
+
+    # Creates a new connection, so allow retries.
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    # GoCAVES answers a missing metadata collection with an unambiguous timeout rather than
+    # the not-found failure this asserts on, so the assertion cannot hold there and the
+    # reruns above turn one wrong answer into several slow ones.
+    @pytest.mark.usefixtures('check_real_server')
+    def test_metadata_collection_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        metadata = TransactionKeyspace(bucket='no-bucket', scope='_default', collection='_default')
+        cluster_opts = ClusterOptions(PasswordAuthenticator(username, pw),
+                                      tracing_options=ClusterTracingOptions(enable_tracing=False),
+                                      transaction_config=TransactionConfig(metadata_collection=metadata))
+        cluster = Cluster.connect(conn_string, cluster_opts)
+        try:
+            collection = cluster.bucket(cb_env.bucket.name).default_collection()
+
+            def txn_logic(ctx: AttemptContext) -> None:
+                # The key does not matter: building the transactions object fails before
+                # the lambda ever runs.
+                ctx.get(collection, 'test-key')
+
+            with pytest.raises(BucketNotFoundException):
+                cluster.transactions.run(txn_logic)
+        finally:
+            cluster.close()
+
+    def test_per_txn_config(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            ctx.insert(cb_env.collection, key, {'some': 'thing'})
+            TestEnvironment.sleep(0.001)
+            ctx.get(cb_env.collection, key)
+
+        with pytest.raises(TransactionExpired):
+            cb_env.cluster.transactions.run(txn_logic,
+                                            TransactionOptions(timeout=timedelta(microseconds=1)))
+        res = cb_env.collection.exists(key)
+        assert res.exists is False, 'An expired txn must not leave its staged insert behind.'
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query(self, cb_env: SyncTestEnvironment) -> None:
+        coll = cb_env.collection
+        key, value = cb_env.get_new_doc()
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            location = f'default:`{coll._impl.bucket_name}`.`{coll._impl.scope_name}`.`{coll.name}`'
+            ctx.query(f'INSERT INTO {location} VALUES("{key}", {json.dumps(value)})',
+                      TransactionQueryOptions(metrics=False))
+
+        cb_env.cluster.transactions.run(txn_logic)
+        res = cb_env.collection.exists(key)
+        assert res.exists is True, 'The doc inserted by the txn query must exist after commit.'
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_lambda_raises_parsing_failure(self, cb_env: SyncTestEnvironment) -> None:
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            with pytest.raises(ParsingFailedException):
+                ctx.query('This is not N1QL!', TransactionQueryOptions(metrics=False))
+
+            raise Exception(self.USER_EXCEPTION_MSG)
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_user_exception_wrapped(exc_info.value)
+
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_inner_exc_parsing_failure(self, cb_env: SyncTestEnvironment) -> None:
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            ctx.query('This is not N1QL!', TransactionQueryOptions(metrics=False))
+
+        with pytest.raises(TransactionFailed) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic)
+        self._assert_inner_cause(exc_info.value, ParsingFailedException)
+
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_mode_insert(self, cb_env: SyncTestEnvironment) -> None:
+        coll = cb_env.collection
+        key, value = cb_env.get_new_doc()
+        key1, value1 = cb_env.get_new_doc()
+        coll.insert(key, value)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            fdqn = f'`{coll._impl.bucket_name}`.`{coll._impl.scope_name}`.`{coll.name}`'
+            statement = f'SELECT * FROM {fdqn} WHERE META().id IN $1 ORDER BY META().id ASC'
+            res = ctx.query(statement, TransactionQueryOptions(positional_parameters=[[key]]))
+            cb_assert_eq(len(res.rows()), 1, what='row count')
+            cb_assert_eq(res.rows()[0].get(f'{coll.name}', {}).get('id'), value.get('id'),
+                         what='queried doc id')
+            ctx.insert(coll, key1, value1)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        get_res = coll.get(key1)
+        assert get_res is not None, 'The doc inserted after a query must be readable.'
+        cb_assert_eq(get_res.content_as[dict], value1, what='committed content')
+
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_mode_remove(self, cb_env: SyncTestEnvironment) -> None:
+        coll = cb_env.collection
+        key, value = cb_env.get_new_doc()
+        key1, value1 = cb_env.get_new_doc()
+        coll.insert(key, value)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            ctx.insert(coll, key1, value1)
+            fdqn = f'`{coll._impl.bucket_name}`.`{coll._impl.scope_name}`.`{coll.name}`'
+            statement = f'SELECT * FROM {fdqn} WHERE META().id IN $1 ORDER BY META().id ASC'
+            res = ctx.query(statement, TransactionQueryOptions(positional_parameters=[[key, key1]]))
+            # The query sees the doc staged by this same txn, hence 2 rather than 1.
+            cb_assert_eq(len(res.rows()), 2, what='row count')
+            get_res = ctx.get(coll, key)
+            ctx.remove(get_res)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        with pytest.raises(DocumentNotFoundException):
+            coll.get(key)
+
+    def test_remove(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc()
+        cb_env.collection.insert(key, value)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            get_res = ctx.get(cb_env.collection, key)
+            ctx.remove(get_res)
+
+        cb_env.cluster.transactions.run(txn_logic)
+        result = cb_env.collection.exists(key)
+        assert result.exists is False, 'A committed remove must leave no document behind.'
+
+    def test_remove_fail_bad_cas(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        # The second op against a now-stale get result is a cas mismatch, which the txn
+        # treats as retryable, so this runs until the 2s timeout expires.
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            rem_res = ctx.get(cb_env.collection, key)
+            ctx.replace(rem_res, {'what': 'new content!'})
+            with pytest.raises(TransactionOperationFailed) as exc_info:
+                ctx.remove(rem_res)
+            self._assert_expired_or(exc_info.value, 'cas_mismatch')
+
+        with pytest.raises(TransactionExpired) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic,
+                                            TransactionOptions(timeout=timedelta(seconds=2)))
+        self._assert_expired_or(exc_info.value, 'expired in auto')
+
+        assert num_attempts > 1, f'Expected retries before expiry, saw {num_attempts} attempt(s).'
+        # The txn failed, so the doc must still hold its original content.
+        res = cb_env.collection.get(key)
+        cb_assert_eq(res.content_as[dict], value, what='content after a failed txn')
+
+    def test_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc()
+        new_value = {'some': 'thing else'}
+
+        cb_env.collection.upsert(key, value)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            get_res = ctx.get(cb_env.collection, key)
+            cb_assert_eq(get_res.content_as[dict], value, what='content before replace')
+            replace_res = ctx.replace(get_res, new_value)
+            # replace() does not return the new content (known SDK defect), so the only
+            # thing the result can be checked against here is the cas.
+            assert get_res.cas != replace_res.cas, 'replace() must return a new cas.'
+
+        cb_env.cluster.transactions.run(txn_logic)
+        result = cb_env.collection.get(key)
+        cb_assert_eq(result.content_as[dict], new_value, what='committed content')
+
+    def test_replace_fail_bad_cas(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc()
+        num_attempts = 0
+
+        # Same retry-until-timeout shape as test_remove_fail_bad_cas.
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            rem_res = ctx.get(cb_env.collection, key)
+            ctx.replace(rem_res, {'foo': 'bar'})
+            with pytest.raises(TransactionOperationFailed) as exc_info:
+                ctx.replace(rem_res, {'foo': 'baz'})
+            self._assert_expired_or(exc_info.value, 'cas_mismatch')
+
+        with pytest.raises(TransactionExpired) as exc_info:
+            cb_env.cluster.transactions.run(txn_logic,
+                                            TransactionOptions(timeout=timedelta(seconds=2)))
+        self._assert_expired_or(exc_info.value, 'expired in auto')
+
+        assert num_attempts > 1, f'Expected retries before expiry, saw {num_attempts} attempt(s).'
+        # The txn failed, so the doc must still hold its original content.
+        res = cb_env.collection.get(key)
+        cb_assert_eq(res.content_as[dict], value, what='content after a failed txn')
+
+    def test_rollback(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc()
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            res = ctx.insert(cb_env.collection, key, value)
+            assert res is not None, 'insert() must return a result.'
+            cb_assert_eq(res.id, key, what='staged doc id')
+            assert res.cas > 0, 'insert() must return a non-zero cas.'
+            raise RuntimeError('this should rollback txn')
+
+        with pytest.raises(TransactionFailed):
+            cb_env.cluster.transactions.run(txn_logic)
+
+        result = cb_env.collection.exists(key)
+        assert result.exists is False, 'A rolled-back insert must leave no document behind.'
+
+    def test_rollback_eating_exceptions(self, cb_env: SyncTestEnvironment) -> None:
+        # The name is a misnomer, kept because it is the name this coverage has always had.
+        # Nothing rolls back here, and nothing should: asserting a rollback from inside the
+        # `except` block would never run, so the expectation would never be tested at all.
+        key, value = cb_env.get_existing_doc()
+        cas = cb_env.collection.get(key).cas
+        num_attempts = 0
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            # Swallow it, as an unwary user would.  Inserting over an existing doc raises
+            # DocumentExistsException, which the core models as an `op_exception` and not a
+            # `transaction_operation_failed`; only the latter is recorded against the
+            # attempt.  So swallowing this one leaves the attempt clean and the transaction
+            # goes on to commit.  Contrast test_insert_inner_exc_doc_exists, where letting
+            # the very same error propagate does fail the transaction.
+            with pytest.raises(DocumentExistsException):
+                ctx.insert(cb_env.collection, key, {'this': 'should fail'})
+
+        txn_result = cb_env.cluster.transactions.run(txn_logic)
+        assert txn_result.unstaging_complete is True, (
+            'A txn whose only op failed and was swallowed must still commit.'
+        )
+        cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+        # The failed insert staged no mutation, so the doc must be untouched.
+        result = cb_env.collection.get(key)
+        cb_assert_eq(result.cas, cas, what='cas after a txn whose only op failed')
+        cb_assert_eq(result.content_as[dict], value, what='doc content')
+
+    def test_scope_qualifier(self, cb_env: SyncTestEnvironment) -> None:
+        skip_known_issue(ticket='CBD-5091',
+                         note='pending transactions changes')
+        cfg = TransactionQueryOptions(scope=cb_env.collection._impl._scope)
+        expected = f'default:`{cb_env.collection._impl.bucket_name}`.`{cb_env.collection._impl.scope_name}`'
+        self._assert_option_eq(cfg, 'scope_qualifier', expected)
+        bucket, scope = cfg.split_scope_qualifier()
+        cb_assert_eq(bucket, cb_env.collection._impl.bucket_name, what='split bucket name')
+        cb_assert_eq(scope, cb_env.collection._impl.scope_name, what='split scope name')
+
+    def test_transaction_result(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+
+        def txn_logic(ctx: AttemptContext) -> None:
+            ctx.insert(cb_env.collection, key, {'some': 'thing'})
+            doc = ctx.get(cb_env.collection, key)
+            ctx.replace(doc, {'some': 'thing else'})
+
+        result = cb_env.cluster.transactions.run(txn_logic)
+        cb_assert_isinstance(result, TransactionResult, what='txn result')
+        assert result.transaction_id is not None, 'A completed txn must report a transaction id.'
+        assert result.unstaging_complete is True, 'A committed txn must report unstaging complete.'
+
+
+@pytest.mark.xdist_group('default_keyspace_indexes')
+class TransactionTests(TransactionTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(TransactionTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_txn_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest) -> Generator[SyncTestEnvironment, None, None]:
+        # cb_base_txn_env, not cb_base_env: the cluster has to be built with a
+        # TransactionConfig, which is a connect-time option.
+        env = build_environment(cb_base_txn_env, TransactionTestSuite, request.param)
+
+        # The query-mode tests need a primary index over whichever keyspace this leg
+        # targets.  is_feature_supported rather than check_if_feature_supported: the
+        # latter would skip the whole class on the mock, taking with it the KV
+        # transaction coverage GoCAVES does support.  The query tests gate themselves
+        # via check_txn_queries_supported.
+        needs_query_index = EnvironmentFeatures.is_feature_supported(ServerFeatures.TxnQueries, env.server_context)
+        if needs_query_index:
+            QueryEnvironment.setup_query_indexes(env, request.param)
+
+        yield env
+
+        if needs_query_index:
+            QueryEnvironment.teardown_query_indexes(env, request.param)
+        teardown_environment(env, TransactionTestSuite, request.param)
+
+
+class TransactionOptionsUnitTests:
+    # No cb_env: every test builds an options object and asserts on what it serializes.
+    # Kept apart from TransactionTestSuite because a class-scoped autouse fixture cannot
+    # resolve a parametrized cb_env for a test that never asked for one, and mixing the two
+    # made the first such test poison the class scope for every test after it.
+
+    def _assert_option_eq(self, cfg: TxnOptionLike, key: str, expected: Any, *, ctx: str = '') -> None:
+        value = cfg._base.to_dict().get(key, None)
+        assert value is not None, f'Option {key!r} is absent from the serialized config. {ctx}'
+        cb_assert_eq(value, expected, what=f'option {key!r}', ctx=ctx)
+
+    def _assert_option_is(self, cfg: TxnOptionLike, key: str, expected: Any, *, ctx: str = '') -> None:
+        value = cfg._base.to_dict().get(key, None)
+        assert value is not None, f'Option {key!r} is absent from the serialized config. {ctx}'
+        assert value is expected, (
+            f'Option {key!r}: expected {expected!r} (identity), got {value!r}. {ctx}'
+        )
+
+    @pytest.mark.parametrize('adhoc', [True, False])
+    def test_adhoc(self, adhoc: bool) -> None:
+        cfg = TransactionQueryOptions(adhoc=adhoc)
+        self._assert_option_eq(cfg, 'adhoc', adhoc)
+
+    @pytest.mark.parametrize('cleanup', [False, True])
+    def test_cleanup_client_attempts(self, cleanup: bool) -> None:
+        cfg = TransactionConfig(cleanup_client_attempts=cleanup)
+        self._assert_option_is(cfg, 'cleanup_client_attempts', cleanup)
+
+    @pytest.mark.parametrize('cleanup', [False, True])
+    def test_cleanup_lost_attempts(self, cleanup: bool) -> None:
+        cfg = TransactionConfig(cleanup_lost_attempts=cleanup)
+        self._assert_option_is(cfg, 'cleanup_lost_attempts', cleanup)
+
+    @pytest.mark.parametrize('window', [timedelta(seconds=30), timedelta(milliseconds=500)])
+    def test_cleanup_window(self, window: timedelta) -> None:
+        cfg = TransactionConfig(cleanup_window=window)
+        self._assert_option_eq(cfg, 'cleanup_window', window.total_seconds() * 1000,
+                               ctx='serialized in milliseconds')
+
+    def test_client_context_id(self) -> None:
+        ctxid = 'somestring'
+        cfg = TransactionQueryOptions(client_context_id=ctxid)
+        self._assert_option_eq(cfg, 'client_context_id', ctxid)
+
+    @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
+    @pytest.mark.parametrize('exp', [timedelta(seconds=30), timedelta(milliseconds=100)])
+    def test_expiration_time(self, cls: type[Any], exp: timedelta) -> None:
+        cfg = cls(expiration_time=exp)
+        # CXXCBC-391 made expiration_time an invalid key: it is accepted on the way in and
+        # serialized as timeout, so both halves of that have to be checked.
+        assert cfg._base.to_dict().get('expiration_time', None) is None, (
+            'expiration_time must not survive serialization (CXXCBC-391).'
+        )
+        cfg_timeout = cfg._base.to_dict().get('timeout', None)
+        cb_assert_eq(cfg_timeout, exp.total_seconds() * 1000 * 1000 * 1000,
+                     what='timeout', ctx='serialized in nanoseconds')
+
+    def test_max_parallelism(self) -> None:
+        max_parallelism = 100
+        cfg = TransactionQueryOptions(max_parallelism=max_parallelism)
+        self._assert_option_eq(cfg, 'max_parallelism', max_parallelism)
+
+    @pytest.mark.parametrize('metrics', [True, False])
+    def test_metrics(self, metrics: bool) -> None:
+        cfg = TransactionQueryOptions(metrics=metrics)
+        self._assert_option_eq(cfg, 'metrics', metrics)
+
+    @pytest.mark.parametrize('params', [{'key1': 'thing'},
+                                        {'key1': ['an', 'array']},
+                                        {'key1': 10, 'key2': 'something else'}])
+    def test_named_params(self, params: dict[str, Any]) -> None:
+        cfg = TransactionQueryOptions(named_parameters=params)
+        cfg_params = cfg._base.to_dict().get('named_parameters', None)
+        assert cfg_params is not None, 'named_parameters is absent from the serialized config.'
+        cb_assert_isinstance(cfg_params, dict, what='named_parameters')
+        # Each value is serialized to a JSON string, so compare after decoding.
+        for k, v in params.items():
+            cb_assert_eq(json.loads(cfg_params[k]), v, what='named parameter', ctx=f'key={k!r}')
+
+    def test_pipeline_batch(self) -> None:
+        batch = 100
+        cfg = TransactionQueryOptions(pipeline_batch=batch)
+        self._assert_option_eq(cfg, 'pipeline_batch', batch)
+
+    def test_pipeline_cap(self) -> None:
+        cap = 100
+        cfg = TransactionQueryOptions(pipeline_cap=cap)
+        self._assert_option_eq(cfg, 'pipeline_cap', cap)
+
+    @pytest.mark.parametrize('params', [['a', 'b', 'c']])
+    def test_positional_params(self, params: list[Any]) -> None:
+        cfg = TransactionQueryOptions(positional_parameters=params)
+        cfg_params = cfg._base.to_dict().get('positional_parameters', None)
+        assert cfg_params is not None, 'positional_parameters is absent from the serialized config.'
+        cb_assert_isinstance(cfg_params, list, what='positional_parameters')
+        for idx, p in enumerate(cfg_params):
+            cb_assert_eq(json.loads(p), params[idx], what='positional parameter', ctx=f'index={idx}')
+
+    @pytest.mark.parametrize('profile', [QueryProfile.OFF, QueryProfile.PHASES, QueryProfile.TIMINGS])
+    def test_profile_mode(self, profile: QueryProfile) -> None:
+        cfg = TransactionQueryOptions(profile=profile)
+        self._assert_option_eq(cfg, 'profile', profile.value)
+
+    @pytest.mark.parametrize('raw', [{'key1': 'yo'}, {'key1': 5, 'key2': 'foo'}, {'key': [1, 2, 3]}])
+    def test_raw(self, raw: dict[str, Any]) -> None:
+        cfg = TransactionQueryOptions(raw=raw)
+        cfg_raw = cfg._base.to_dict().get('raw', None)
+        assert cfg_raw is not None, 'raw is absent from the serialized config.'
+        cb_assert_isinstance(cfg_raw, dict, what='raw')
+        for k in cfg_raw:
+            cb_assert_eq(json.loads(cfg_raw[k]), raw[k], what='raw value', ctx=f'key={k!r}')
+
+    @pytest.mark.parametrize('read_only', [True, False])
+    def test_read_only(self, read_only: bool) -> None:
+        cfg = TransactionQueryOptions(read_only=read_only)
+        self._assert_option_eq(cfg, 'read_only', read_only)
+
+    @pytest.mark.parametrize('cls', [TransactionQueryOptions, TransactionConfig, TransactionOptions])
+    @pytest.mark.parametrize('consistency', [QueryScanConsistency.REQUEST_PLUS,
+                                             QueryScanConsistency.NOT_BOUNDED,
+                                             QueryScanConsistency.AT_PLUS])
+    def test_scan_consistency(self, cls: type[Any], consistency: QueryScanConsistency) -> None:
+        cfg = None
+        try:
+            cfg = cls(scan_consistency=consistency)
+        except Exception:
+            # AT_PLUS is the only value these classes are expected to reject; anything
+            # else raising is a real failure.
+            if consistency != QueryScanConsistency.AT_PLUS:
+                pytest.fail(f'Unexpected exception building {cls.__name__} with '
+                            f'scan_consistency={consistency}.')
+        if cfg:
+            self._assert_option_eq(cfg, 'scan_consistency', consistency.value)
+
+    def test_scan_wait(self) -> None:
+        cfg = TransactionQueryOptions(scan_wait=timedelta(seconds=30))
+        self._assert_option_eq(cfg, 'scan_wait', 30000, ctx='serialized in milliseconds')
+
+    @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
+    @pytest.mark.parametrize('exp', [timedelta(seconds=30), timedelta(milliseconds=100)])
+    def test_timeout(self, cls: type[Any], exp: timedelta) -> None:
+        cfg = cls(timeout=exp)
+        self._assert_option_eq(cfg, 'timeout', exp.total_seconds() * 1000 * 1000 * 1000,
+                               ctx='serialized in nanoseconds')
+
+    @pytest.mark.parametrize('cls', [TransactionConfig, TransactionOptions])
+    @pytest.mark.parametrize('level', [DurabilityLevel.NONE,
+                                       DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE,
+                                       DurabilityLevel.MAJORITY,
+                                       DurabilityLevel.PERSIST_TO_MAJORITY],
+                             ids=lambda level: f'DurabilityLevel.{level.name}')
+    def test_transaction_config_durability(self, cls: type[Any], level: DurabilityLevel) -> None:
+        cfg = cls(durability=ServerDurability(level))
+        cfg_level = cfg._base.to_dict().get('durability_level', None)
+        assert cfg_level is not None, 'durability_level is absent from the serialized config.'
+        # Serialized as the enum's value, so it has to be rebuilt before comparing.
+        assert DurabilityLevel(cfg_level) is level, (
+            f'durability_level: expected {level!r}, got {DurabilityLevel(cfg_level)!r}.'
+        )

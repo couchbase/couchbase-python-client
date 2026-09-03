@@ -168,6 +168,18 @@ def pytest_addoption(parser):
     parser.addoption(
         "--txcouchbase", action="store_true", default=False, help="run txcouchbase tests"
     )
+    # Declare which server the run is meant to reach, so a config that says otherwise aborts
+    # instead of quietly running somewhere else.  Enforced in tests_v2/hooks.py, which is
+    # where the config being asserted about lives; registered here because this is an initial
+    # conftest and so is guaranteed to have added the flags before the command line is parsed.
+    parser.addoption(
+        "--real-server", action="store_true", default=False,
+        help="assert this run reaches a real cluster; fails if the config selects the mock"
+    )
+    parser.addoption(
+        "--mock", action="store_true", default=False,
+        help="assert this run reaches the GoCAVES mock; fails if the config selects a real cluster"
+    )
 
 
 def pytest_collection_modifyitems(items):  # noqa: C901

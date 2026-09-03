@@ -1,0 +1,96 @@
+# Which suites generate, and for which APIs.
+#
+# The sync suite under couchbase/tests_v2/ is the single source.  Everything here decides
+# what is made from it and where the result lands; no code in tools/testgen knows the name
+# of any suite, service or SDK feature.
+#
+# `targets` defaults to both generated APIs.  Every override below is a *capability* fact
+# about the SDK, checked rather than assumed, and each one is a one-line change if that ever
+# stops being true.  Reading the overrides is meant to be the fastest way to see where the
+# three API trees genuinely differ.
+#
+# Two mechanisms sit alongside this file and are deliberately not in it, because both are
+# facts about one class or one test rather than about a suite:
+#
+#   testgen_exclude   a decorator at the class or test it applies to, for the case where a
+#                     suite generates but one part of it cannot
+#   sidecar           a hand-written file merged into the generated output, for the case
+#                     where an API needs a test that has no sync form to be generated from
+#
+# The question that decides a sidecar is whether there is a *generated* file to merge into,
+# not whether the source has a sync counterpart.  A suite that generates nothing for an API
+# takes a standalone hand-written file rather than a sidecar; see `api_specific_surface` at
+# the foot.
+
+# Every source below is relative to the repository root and lives under this directory,
+# which is also the directory the completeness check at the foot of the file scans.
+source_dir: couchbase/tests_v2
+
+output:
+  acouchbase: acouchbase/tests_v2/_generated
+  txcouchbase: txcouchbase/tests_v2/_generated
+
+defaults:
+  targets: [acouchbase, txcouchbase]
+
+suites:
+
+  # ---- Key-value -----------------------------------------------------------------------------------
+
+  - source: couchbase/tests_v2/collection_t.py
+
+  # No Twisted KV range scan support: TxCollection has no scan() and there is no
+  # txcouchbase.kv_range_scan module.
+  - source: couchbase/tests_v2/kv_range_scan_t.py
+    targets: [acouchbase]
+
+  # ---- Streaming services --------------------------------------------------------------------------
+
+  # The sidecar carries the two acouchbase-only regression tests, PYCBC-1471 and PYCBC-1774.
+  # Both assert on asyncio semantics, so neither has a sync form to be generated from; see
+  # the file's docstring for the bar it has to clear.
+  - source: couchbase/tests_v2/query_t.py
+    sidecar:
+      acouchbase: acouchbase/tests_v2/query_additions_t.py
+
+  # ---- Transactions --------------------------------------------------------------------------------
+
+  # The twisted tree has no `transactions` property to race, and both classes carry the
+  # exclusion.  Worth generating precisely because the async tree does not inherit the guard it
+  # checks: acouchbase/logic/cluster_impl.py holds a second, independent copy of the same
+  # double-checked lock.  The suite reaches that copy without a cluster because it patches
+  # Transactions on the module the impl came from rather than on a module named in a string
+  # literal, which is the one construct here a generated copy could not have followed.
+  #
+  # The property gates on the connection before it reaches the check-then-set, so the threaded
+  # tests stub that guard out and the guard is asserted separately.  Both halves generate: the
+  # guard is a second copy in acouchbase/logic/cluster_impl.py, same as the lock it fronts.
+  - source: couchbase/tests_v2/transactions_property_race_t.py
+    targets: [acouchbase]
+
+  # No Twisted transaction support: there is no txcouchbase.transactions module.
+  - source: couchbase/tests_v2/transactions_t.py
+    targets: [acouchbase]
+
+  # ---- Management ----------------------------------------------------------------------------------
+  # One entry per manager.  This is where the API trees differ most, because a manager
+  # can be written for an API without anything ever driving it.
+
+  - source: couchbase/tests_v2/bucketmgmt_t.py
+
+  # The collection-level suite class carries a testgen_exclude for txcouchbase, which has no
+  # collection.query_indexes() to drive.  The 18 tests behind it still generate elsewhere.
+  - source: couchbase/tests_v2/querymgmt_t.py
+
+# Sources under `source_dir` that deliberately generate nothing.  Every *_t.py there has to
+# appear either in `suites` above or here, and the loader fails on one that appears in neither,
+# so adding a suite forces the decision rather than skipping it in silence.
+not_generated:
+
+  # Both trees have a connection lifecycle and neither can be written from the other's spelling
+  # of it: close_bucket is execute_close_bucket_request under acouchbase and returns a future,
+  # close_connection is a coroutine, and the connect future two of the async tests are about has
+  # no blocking form.  acouchbase carries a hand-written counterpart, not a sidecar, there being
+  # no generated file for a sidecar to merge into.  txcouchbase has neither.
+  api_specific_surface:
+    - couchbase/tests_v2/connection_lifecycle_t.py

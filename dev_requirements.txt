@@ -1,9 +1,16 @@
-autopep8~=2.3
+# autopep8 and isort rewrite files, so an exact pin matching the pre-commit hook revs
+# is what keeps local formatting and the gate from disagreeing.  The testgen generator
+# runs both as a post-pass over its output for the same reason.
+autopep8==2.3.2
+isort==5.13.2
+mypy~=2.3
 pre-commit~=4.2.0
 Faker~=37.1
 faker-vehicle~=0.2
 pytest~=8.3.5
 pytest-asyncio~=1.1
 pytest-rerunfailures~=15.1
+pytest-xdist~=3.8
 requests~=2.26
+types-requests~=2.32
 Twisted~=24.7
