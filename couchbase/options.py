@@ -1628,6 +1628,12 @@ class SearchOptions(SearchOptionsBase):
         client_context_id (str, optional): The returned client context id for this query. Defaults to None.
         disable_scoring (bool, optional): Specifies that scoring should be disabled. This improves performance but
             makes it impossible to sort based on how well a particular result scored. Defaults to False.
+
+            .. deprecated:: 4.7.0
+                Use ``scoring`` with :class:`~couchbase.search_scoring.ScoringNone` instead.
+        scoring (:class:`~couchbase.search_scoring.SearchScoring`, optional): Controls result scoring and how a
+            hybrid request combines FTS and vector results into one ranked list.
+            Cannot be combined with ``disable_scoring=True``. Defaults to None.
         include_locations (bool optional): If set to True, will include the locations in the search result.
             Defaults to False.
         sort (Sequence[Union[str, :class:`~couchbase.search.Sort`]], optional): Specifies a list of
@@ -1870,7 +1876,7 @@ class TransactionOptions:
         self._base = transaction_options(**kwargs)
 
     def __str__(self):
-        return f'TransactionOptions(base_:{self._base}'
+        return f'TransactionOptions(base_: {self._base})'
 
 
 # @TODO:  lets replace this....

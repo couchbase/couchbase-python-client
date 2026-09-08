@@ -158,3 +158,21 @@ Options
 .. module:: couchbase.options
     :noindex:
 .. autoclass:: VectorSearchOptions
+
+Score Fusion
+===============
+
+.. module:: couchbase.search_scoring
+    :noindex:
+
+.. autoclass:: SearchScoring
+    :members:
+
+.. autoclass:: ReciprocalRankFusion
+    :members:
+
+.. autoclass:: RelativeScoreFusion
+    :members:
+
+.. autoclass:: ScoringNone
+    :members:

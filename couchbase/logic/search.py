@@ -35,6 +35,7 @@ from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.logic.observability import ObservableRequestHandler, SpanProtocol
 from couchbase.logic.options import SearchOptionsBase
 from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
+from couchbase.logic.search_scoring import SearchScoring
 from couchbase.logic.supportability import Supportability
 from couchbase.logic.vector_search import VectorQueryCombination
 from couchbase.options import (SearchOptions,
@@ -922,6 +923,7 @@ class SearchQueryBuilder:
         "consistent_with": {"consistent_with": lambda x: x},
         "raw": {"raw": lambda x: x},
         "disable_scoring": {"disable_scoring": lambda x: x},
+        "scoring": {"scoring": lambda x: x},
         "scope_name": {"scope_name": lambda x: x},
         "collections": {"collections": lambda x: x},
         "include_locations": {"include_locations": lambda x: x},
@@ -1084,7 +1086,22 @@ class SearchQueryBuilder:
     @disable_scoring.setter
     def disable_scoring(self, value  # type: bool
                         ) -> None:
+        # False keeps the default behavior and does not need a warning.
+        if value:
+            Supportability.option_deprecated('disable_scoring', 'scoring')
         self.set_option('disable_scoring', value)
+
+    @property
+    def scoring(self) -> Optional[Dict[str, Any]]:
+        return self._params.get('scoring', None)
+
+    @scoring.setter
+    def scoring(self, value  # type: SearchScoring
+                ) -> None:
+        if not isinstance(value, SearchScoring):
+            raise InvalidArgumentException(message=('Expected scoring to be of type SearchScoring, i.e. '
+                                                    'ReciprocalRankFusion, RelativeScoreFusion or ScoringNone.'))
+        self.set_option('scoring', value.as_encodable())
 
     @property
     def include_locations(self) -> bool:
@@ -1346,6 +1363,19 @@ class SearchQueryBuilder:
                      ) -> None:
         self.set_option('log_response', value)
 
+    def _validate_options(self) -> None:
+        # Option order is undefined, so validate combinations after applying all options.
+        if 'scoring' in self._params and self._params.get('disable_scoring', False):
+            raise InvalidArgumentException(message='scoring cannot be used together with disable_scoring.')
+
+    @classmethod
+    def _apply_opts(cls, query, args) -> SearchQueryBuilder:
+        for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):
+            for target, transform in cls._VALID_OPTS[k].items():
+                setattr(query, target, transform(v))
+        query._validate_options()
+        return query
+
     @classmethod
     def create_search_query_object(cls,
                                    index_name,  # type: str
@@ -1363,10 +1393,7 @@ class SearchQueryBuilder:
         # metrics defaults to True
         query.metrics = args.get("metrics", True)
 
-        for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):
-            for target, transform in cls._VALID_OPTS[k].items():
-                setattr(query, target, transform(v))
-        return query
+        return cls._apply_opts(query, args)
 
     @classmethod
     def create_search_query_from_request(cls,
@@ -1404,10 +1431,7 @@ class SearchQueryBuilder:
         # show_request defaults to False
         query.show_request = args.get("show_request", False)
 
-        for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):
-            for target, transform in cls._VALID_OPTS[k].items():
-                setattr(query, target, transform(v))
-        return query
+        return cls._apply_opts(query, args)
 
     @staticmethod
     def get_search_query_args(*options, **kwargs):

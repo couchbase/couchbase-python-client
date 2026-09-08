@@ -47,6 +47,9 @@ from couchbase.search import (BooleanFieldQuery,
                               TermQuery,
                               TermRangeQuery,
                               WildcardQuery)
+from couchbase.search_scoring import (ReciprocalRankFusion,
+                                      RelativeScoreFusion,
+                                      ScoringNone)
 from couchbase.vector_search import (VectorQuery,
                                      VectorQueryCombination,
                                      VectorSearch)
@@ -269,6 +272,32 @@ class SearchCommandOptions(SdkCommandOptions):
     @staticmethod
     def get_include_locations(options):
         return SearchCommandOptions.get_simple_option(options, 'include_locations')
+
+    @staticmethod
+    def get_disable_scoring(options):
+        return SearchCommandOptions.get_simple_option(options, 'disable_scoring')
+
+    @staticmethod
+    def get_scoring(options):
+        if not options.HasField('scoring'):
+            return None
+
+        mode = options.scoring.WhichOneof('mode')
+        if mode == 'reciprocal_rank_fusion':
+            rrf = options.scoring.reciprocal_rank_fusion
+            return ReciprocalRankFusion(
+                rank_constant=rrf.rank_constant if rrf.HasField('rank_constant') else None,
+                window_size=rrf.window_size if rrf.HasField('window_size') else None
+            )
+        elif mode == 'relative_score_fusion':
+            rsf = options.scoring.relative_score_fusion
+            return RelativeScoreFusion(
+                window_size=rsf.window_size if rsf.HasField('window_size') else None
+            )
+        elif mode == 'none':
+            return ScoringNone()
+        else:
+            raise NotImplementedError(f"Search scoring mode '{mode}' not supported")
 
     @staticmethod
     def get_vector_query_combination(options):
@@ -516,6 +545,8 @@ class SearchQueryCommand(SdkCommand):
             'scan_consistency': SearchCommandOptions.get_scan_consistency(self._raw_options),
             'facets': SearchCommandOptions.get_facets(self._raw_options),
             'include_locations': SearchCommandOptions.get_include_locations(self._raw_options),
+            'disable_scoring': SearchCommandOptions.get_disable_scoring(self._raw_options),
+            'scoring': SearchCommandOptions.get_scoring(self._raw_options),
             'sort': SearchCommandOptions.get_sort(self._raw_options),
             'consistent_with': SearchCommandOptions.get_consistent_with(self._raw_options),
             'raw': SearchCommandOptions.get_raw(self._raw_options),
@@ -677,7 +708,7 @@ class SearchQueryBuilder:
         elif query_type == 'match_none':
             return MatchNoneQuery()
         else:
-            raise NotImplementedError(f"Search query type `{query_type}` not supported")
+            raise NotImplementedError(f"Search query type '{query_type}' not supported")
 
     @classmethod
     def build_match_query(cls, raw_query):

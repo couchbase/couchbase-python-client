@@ -54,6 +54,7 @@ if TYPE_CHECKING:
                                   HighlightStyle,
                                   SearchScanConsistency,
                                   Sort)
+    from couchbase.search_scoring import SearchScoring
     from couchbase.serializer import Serializer
     from couchbase.subdocument import StoreSemantics
     from couchbase.transcoder import Transcoder
@@ -1399,6 +1400,7 @@ class SearchOptionsBase(OptionsTimeoutBase):
                  raw=None,               # type: Optional[Dict[str, Any]]
                  sort=None,              # type: Optional[Union[Sequence[str], Sequence[Sort]]]
                  disable_scoring=None,   # type: Optional[bool]
+                 scoring=None,           # type: Optional[SearchScoring]
                  scope_name=None,  # type: Optional[str]
                  collections=None,       # type: Optional[List[str]]
                  include_locations=None,  # type: Optional[bool]

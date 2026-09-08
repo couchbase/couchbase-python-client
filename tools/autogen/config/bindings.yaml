@@ -404,6 +404,17 @@ cpp_core_types:
     - core_struct: couchbase::core::operations::search_response::search_facet
       header_file: "core/operations/document_search.hxx"
       skip_request: true
+    - core_struct: couchbase::core::search_scoring_none
+      header_file: "core/search_scoring.hxx"
+      py_type: SearchScoringNone
+      # This std::variant tag has no fields.
+      allow_empty_fields: true
+    - core_struct: couchbase::core::search_scoring_reciprocal_rank_fusion
+      header_file: "core/search_scoring.hxx"
+      py_type: SearchScoringReciprocalRankFusion
+    - core_struct: couchbase::core::search_scoring_relative_score_fusion
+      header_file: "core/search_scoring.hxx"
+      py_type: SearchScoringRelativeScoreFusion
     - core_struct: couchbase::core::operations::document_view_response::meta_data
       header_file: "core/operations/document_view.hxx"
       py_type: ViewMetadata
@@ -645,6 +656,17 @@ cpp_core_variants:
         core_struct: couchbase::core::prefix_scan
       - tag: sampling_scan
         core_struct: couchbase::core::sampling_scan
+  - core_type: couchbase::core::search_scoring_mode
+    header_file: "core/search_scoring.hxx"
+    discriminator: scoring_type
+    input_missing_err_msg: "Expected scoring to be a dict."
+    alternatives:
+      - tag: none
+        core_struct: couchbase::core::search_scoring_none
+      - tag: reciprocal_rank_fusion
+        core_struct: couchbase::core::search_scoring_reciprocal_rank_fusion
+      - tag: relative_score_fusion
+        core_struct: couchbase::core::search_scoring_relative_score_fusion
 
 cpp_core_enum_headers:
  - Python.h

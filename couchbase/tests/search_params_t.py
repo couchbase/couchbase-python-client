@@ -16,17 +16,26 @@
 import json
 import warnings
 from datetime import timedelta
+from typing import (Literal,
+                    get_args,
+                    get_origin,
+                    get_type_hints)
 
 import pytest
 
 import couchbase.search as search
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic.pycbc_core.binding_cpp_types import CppSearchRequest
 from couchbase.mutation_state import MutationState
 from couchbase.options import SearchOptions, VectorSearchOptions
 from couchbase.result import MutationToken
 from couchbase.search import (HighlightStyle,
                               MatchOperator,
                               SearchRequest)
+from couchbase.search_scoring import (ReciprocalRankFusion,
+                                      RelativeScoreFusion,
+                                      ScoringNone,
+                                      SearchScoring)
 from couchbase.vector_search import (VectorQuery,
                                      VectorQueryCombination,
                                      VectorSearch)
@@ -66,6 +75,12 @@ class SearchParamTestSuite:
         'test_params_scan_consistency',
         'test_params_uninterpretable_enum_option',
         'test_params_scope_collections',
+        'test_params_scoring_disable_scoring_conflict',
+        'test_params_scoring_invalid',
+        'test_params_scoring_matches_generated_bindings',
+        'test_params_scoring_none',
+        'test_params_scoring_reciprocal_rank_fusion',
+        'test_params_scoring_relative_score_fusion',
         'test_params_serializer',
         'test_params_show_request',
         'test_params_skip',
@@ -809,12 +824,26 @@ class SearchParamTestSuite:
     def test_params_disable_scoring(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
         opts = SearchOptions(disable_scoring=True)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            cb_env.TEST_INDEX_NAME, q, opts
-        )
+        warnings.resetwarnings()
+        with warnings.catch_warnings(record=True) as caught_warnings:
+            search_query = search.SearchQueryBuilder.create_search_query_object(
+                cb_env.TEST_INDEX_NAME, q, opts
+            )
         exp_opts = base_opts.copy()
         exp_opts['disable_scoring'] = True
         assert search_query.params == exp_opts
+        assert len(caught_warnings) == 1
+        assert 'Option disable_scoring is deprecated' in caught_warnings[0].message.args[0]
+
+        # False keeps the default behavior and should not warn.
+        warnings.resetwarnings()
+        with warnings.catch_warnings(record=True) as caught_warnings:
+            search_query = search.SearchQueryBuilder.create_search_query_object(
+                cb_env.TEST_INDEX_NAME, q, SearchOptions(disable_scoring=False)
+            )
+        exp_opts['disable_scoring'] = False
+        assert search_query.params == exp_opts
+        assert caught_warnings == []
 
     def test_params_explain(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
@@ -972,6 +1001,131 @@ class SearchParamTestSuite:
         assert search_query.params == exp_opts
         assert len(caught_warnings) == 1
         assert 'The scope_name option is not used by the search API.' in caught_warnings[0].message.args[0]
+
+    def test_params_scoring_reciprocal_rank_fusion(self, cb_env, base_query_opts):
+        q, base_opts = base_query_opts
+        opts = SearchOptions(scoring=ReciprocalRankFusion(rank_constant=60, window_size=200))
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts = base_opts.copy()
+        exp_opts['scoring'] = {'scoring_type': 'reciprocal_rank_fusion', 'rank_constant': 60, 'window_size': 200}
+        assert search_query.params == exp_opts
+
+        opts = SearchOptions(scoring=ReciprocalRankFusion())
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts['scoring'] = {'scoring_type': 'reciprocal_rank_fusion'}
+        assert search_query.params == exp_opts
+
+    def test_params_scoring_relative_score_fusion(self, cb_env, base_query_opts):
+        q, base_opts = base_query_opts
+        # Relative score fusion has no rank constant and omits an unset window size.
+        opts = SearchOptions(scoring=RelativeScoreFusion())
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts = base_opts.copy()
+        exp_opts['scoring'] = {'scoring_type': 'relative_score_fusion'}
+        assert search_query.params == exp_opts
+
+        opts = SearchOptions(scoring=RelativeScoreFusion(window_size=200))
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts['scoring'] = {'scoring_type': 'relative_score_fusion', 'window_size': 200}
+        assert search_query.params == exp_opts
+
+    def test_params_scoring_matches_generated_bindings(self, cb_env, base_query_opts):
+        q, _ = base_query_opts
+        alternatives = {}
+        for alt in get_args(get_type_hints(CppSearchRequest)['scoring']):
+            # NoneType has no hints and drops out here.
+            fields = get_type_hints(alt)
+            for name, annotation in fields.items():
+                if get_origin(annotation) is Literal:
+                    for tag in get_args(annotation):
+                        alternatives[tag] = (name, set(fields))
+
+        scorings = [ReciprocalRankFusion(rank_constant=60, window_size=200),
+                    RelativeScoreFusion(window_size=200),
+                    ScoringNone()]
+        for scoring in scorings:
+            search_query = search.SearchQueryBuilder.create_search_query_object(
+                cb_env.TEST_INDEX_NAME, q, SearchOptions(scoring=scoring)
+            )
+            encoded = search_query.as_encodable()['scoring']
+            claimed = [(key, fields) for tag, (key, fields) in alternatives.items()
+                       if encoded.get(key) == tag]
+            assert len(claimed) == 1, (f'{type(scoring).__name__} encodes as {encoded}, which no '
+                                       f'generated search_scoring_mode alternative claims: {alternatives}')
+            _, declared = claimed[0]
+            assert set(encoded) <= declared, (f'{type(scoring).__name__} encodes keys the generated '
+                                              f'alternative does not declare: {set(encoded) - declared}')
+
+        # Every generated alternative must have a public API type.
+        assert len(alternatives) == len(scorings)
+
+    def test_params_scoring_none(self, cb_env, base_query_opts):
+        q, base_opts = base_query_opts
+        opts = SearchOptions(scoring=ScoringNone())
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts = base_opts.copy()
+        exp_opts['scoring'] = {'scoring_type': 'none'}
+        assert search_query.params == exp_opts
+
+        with pytest.raises(TypeError):
+            SearchScoring('none')
+
+    def test_params_scoring_disable_scoring_conflict(self, cb_env, base_query_opts):
+        q, base_opts = base_query_opts
+        # These options are mutually exclusive because both write the same request field.
+        conflicting = [
+            SearchOptions(scoring=ReciprocalRankFusion(), disable_scoring=True),
+            SearchOptions(scoring=ScoringNone(), disable_scoring=True),
+        ]
+        for opts in conflicting:
+            with pytest.raises(InvalidArgumentException):
+                search.SearchQueryBuilder.create_search_query_object(
+                    cb_env.TEST_INDEX_NAME, q, opts
+                )
+
+        # False leaves scoring enabled and does not conflict.
+        opts = SearchOptions(scoring=ReciprocalRankFusion(), disable_scoring=False)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        exp_opts = base_opts.copy()
+        exp_opts['scoring'] = {'scoring_type': 'reciprocal_rank_fusion'}
+        exp_opts['disable_scoring'] = False
+        assert search_query.params == exp_opts
+
+    def test_params_scoring_invalid(self, cb_env, base_query_opts):
+        q, _ = base_query_opts
+        # Encoded values and bare strategy names are not accepted.
+        for bad in ['reciprocal_rank_fusion', {'scoring_type': 'none'}, 60]:
+            with pytest.raises(InvalidArgumentException):
+                search.SearchQueryBuilder.create_search_query_object(
+                    cb_env.TEST_INDEX_NAME, q, SearchOptions(scoring=bad)
+                )
+
+        # The shared constructor must reject bool despite it being an int subclass.
+        for bad in [True, 1.5, '60']:
+            with pytest.raises(InvalidArgumentException):
+                ReciprocalRankFusion(rank_constant=bad)
+
+        # Reject values that do not fit in the C++ uint32_t fields.
+        for bad in [-1, 0xFFFFFFFF + 1]:
+            with pytest.raises(InvalidArgumentException):
+                ReciprocalRankFusion(rank_constant=bad)
+            with pytest.raises(InvalidArgumentException):
+                RelativeScoreFusion(window_size=bad)
+
+        assert ReciprocalRankFusion(rank_constant=0, window_size=0xFFFFFFFF).as_encodable() == {
+            'scoring_type': 'reciprocal_rank_fusion', 'rank_constant': 0, 'window_size': 0xFFFFFFFF}
 
     def test_params_serializer(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
@@ -1412,6 +1566,7 @@ class VectorSearchParamTestSuite:
         'test_vector_query_invalid_vector',
         'test_vector_search',
         'test_vector_search_with_prefilter',
+        'test_vector_search_with_scoring',
         'test_vector_search_base64',
         'test_vector_search_invalid',
         'test_vector_search_multiple_queries',
@@ -1504,6 +1659,40 @@ class VectorSearchParamTestSuite:
         )
         encoded_q = cb_env.get_encoded_query(search_query)
         assert exp_json == encoded_q
+
+    def test_vector_search_with_scoring(self, cb_env):
+        exp_json = {
+            'query': {'match': 'salty beers'},
+            'index_name': cb_env.TEST_INDEX_NAME,
+            'metrics': True,
+            'show_request': False,
+            'scoring': {'scoring_type': 'reciprocal_rank_fusion', 'rank_constant': 60},
+            'vector_search': [
+                {
+                    'field': 'vector_field',
+                    'vector': self.TEST_VECTOR,
+                    'k': 3
+                }
+            ]
+        }
+
+        req = SearchRequest.create(search.MatchQuery('salty beers')).with_vector_search(
+            VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR)))
+        search_query = search.SearchQueryBuilder.create_search_query_from_request(
+            cb_env.TEST_INDEX_NAME,
+            req,
+            SearchOptions(scoring=ReciprocalRankFusion(rank_constant=60))
+        )
+        encoded_q = cb_env.get_encoded_query(search_query)
+        assert exp_json == encoded_q
+
+        # Validate conflicting options on this path as well.
+        with pytest.raises(InvalidArgumentException):
+            search.SearchQueryBuilder.create_search_query_from_request(
+                cb_env.TEST_INDEX_NAME,
+                req,
+                SearchOptions(scoring=ScoringNone(), disable_scoring=True)
+            )
 
     def test_vector_search_with_prefilter(self, cb_env):
         exp_json = {
