@@ -40,4 +40,5 @@ SDK_CAPS = [
     sdk_caps_pb.SDK_STABLE_OTEL_SEMANTIC_CONVENTIONS,
     sdk_caps_pb.SDK_STABLE_OTEL_SEMANTIC_CONVENTIONS_EMITTED_BY_DEFAULT,
     sdk_caps_pb.SDK_JWT,
+    sdk_caps_pb.SDK_QUERY_2120,
 ]
