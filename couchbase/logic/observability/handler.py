@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import contextlib
 import sys
-import time
 from dataclasses import dataclass
 from types import TracebackType
 from typing import (TYPE_CHECKING,
@@ -39,6 +38,7 @@ else:
 
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import CouchbaseException, InvalidArgumentException
+from couchbase.logic.observability._clock import now_ns
 from couchbase.logic.observability.no_op import NoOpMeter, NoOpTracer
 from couchbase.logic.observability.observability_types import (_ATTR_BUCKET_NAME,
                                                                _ATTR_CLUSTER_NAME,
@@ -162,8 +162,8 @@ class ObservableRequestHandler:
         self._processed_kv_get_all_replicas_core_span = False
 
         # Capture a single timestamp and share it between tracer and meter impls,
-        # eliminating redundant time.time_ns() calls.
-        now = time.time_ns()
+        # eliminating redundant now_ns() calls.
+        now = now_ns()
 
         # cache NoOp tracer & meter impl on the ObservabilityInstruments instance to avoid
         # a fresh allocation on every KV operation.
@@ -495,7 +495,7 @@ class ObservableRequestHandlerMeterImpl:
         self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
         self._meter = observability_instruments.meter
         self._get_cluster_labels_fn = observability_instruments.get_cluster_labels_fn
-        self._start_time = start_time if start_time is not None else time.time_ns()
+        self._start_time = start_time if start_time is not None else now_ns()
         # we need to only  worry about sub operations for DS and KV multi-ops
         self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
         self._attrs: Mapping[str, str] = {}
@@ -516,7 +516,7 @@ class ObservableRequestHandlerMeterImpl:
                     cluster_name: Optional[str] = None,
                     cluster_uuid: Optional[str] = None,
                     exc_val: Optional[BaseException] = None) -> None:
-        end_time = time.time_ns()
+        end_time = now_ns()
         if self._ignore_top_level_op:
             return
         self._process_end((end_time - self._start_time),
@@ -549,7 +549,7 @@ class ObservableRequestHandlerMeterImpl:
         self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
         _raw = self._op_name.value
         self._op_name_str = _raw[:-6] if _raw.endswith('_multi') else _raw
-        self._start_time = time.time_ns()
+        self._start_time = now_ns()
         # we need to only  worry about sub operations for DS and KV multi-ops
         self._ignore_top_level_op = isinstance(op_type, (DatastructureOperationType, KeyValueMultiOperationType))
         self._attrs: Mapping[str, str] = {}
@@ -615,7 +615,7 @@ class ObservableRequestHandlerTracerImpl:
                  observability_instruments: ObservabilityInstruments,
                  op_type_toggle: Optional[bool] = None,
                  start_time: Optional[int] = None) -> None:
-        self._start_time = start_time if start_time is not None else time.time_ns()
+        self._start_time = start_time if start_time is not None else now_ns()
         self._op_type = op_type
         # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
         # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
@@ -708,7 +708,7 @@ class ObservableRequestHandlerTracerImpl:
             self.process_end(with_error=with_error)
 
     def process_end(self, with_error: Optional[bool] = False) -> None:
-        self._end_time = time.time_ns()
+        self._end_time = now_ns()
 
         # we fall into this branch when we raise an error prior to going down into the bindings
         if (self._wrapped_span
@@ -728,7 +728,7 @@ class ObservableRequestHandlerTracerImpl:
 
     def reset(self, op_type: OpType, with_error: Optional[bool] = False) -> None:
         self.process_end(with_error=with_error)
-        self._start_time = time.time_ns()
+        self._start_time = now_ns()
         self._op_type = op_type
         # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
         # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
@@ -764,7 +764,7 @@ class WrappedSpan:
         self._op_name = op_name
         self._wrapped_tracer = wrapped_tracer
         self._collection_details = options.get('collection_details', None)
-        self._start_time = start_time or time.time_ns()
+        self._start_time = start_time or now_ns()
         # The request_span should _only_ take a SpanProtocol for the parent
         self._parent_span = options.get('parent_span', None)
         if isinstance(self._parent_span, WrappedSpan):
@@ -801,7 +801,7 @@ class WrappedSpan:
             self._set_span_attrs(**options)
             self._cluster_name: Optional[str] = None
             self._cluster_uuid: Optional[str] = None
-            self._end_time_watermark = time.time_ns()
+            self._end_time_watermark = now_ns()
         else:
             # T10: Minimal init — skip all attribute work for non-recording spans
             self._has_multiple_encoding_spans = False
@@ -852,7 +852,7 @@ class WrappedSpan:
         finally:
             # we wait to set the end time until we process the underylying
             # core span so that we can add the cluster_[name|uuid] attributes
-            self._encoding_spans.append(WrappedEncodingSpan(encoding_span, time.time_ns()))
+            self._encoding_spans.append(WrappedEncodingSpan(encoding_span, now_ns()))
 
     def maybe_create_encoding_span(self, encoding_fn: Callable[..., Tuple[bytes, int]]) -> Tuple[bytes, int]:
         # legacy operations did not create an encoding span; not support now
@@ -872,7 +872,7 @@ class WrappedSpan:
         finally:
             # we wait to set the end time until we process the underylying
             # core span so that we can add the cluster_[name|uuid] attributes
-            self._encoding_spans = WrappedEncodingSpan(encoding_span, time.time_ns())
+            self._encoding_spans = WrappedEncodingSpan(encoding_span, now_ns())
 
     def maybe_update_end_time_watermark(self, end_time: int) -> None:
         self._end_time_watermark = self._end_time_watermark if self._end_time_watermark > end_time else end_time

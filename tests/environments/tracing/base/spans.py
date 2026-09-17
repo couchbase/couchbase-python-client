@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-from time import time_ns
 from typing import (TYPE_CHECKING,
                     Any,
                     List,
@@ -24,6 +23,7 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Union)
 
+from couchbase.logic.observability._clock import now_ns
 from couchbase.logic.observability.no_op import NoOpSpan
 from couchbase.logic.observability.observability_types import OpAttributeName
 from couchbase.logic.observability.threshold_logging import (_IGNORED_MULTI_OP_SPAN_VALUES,
@@ -46,7 +46,7 @@ class LegacyTestSpan(CouchbaseSpan):
     def __init__(self, name: str, parent_span: Optional[CouchbaseSpan] = None) -> None:
         self._name = name
         self._parent_span = parent_span
-        self._start_time = time_ns()
+        self._start_time = now_ns()
         self._attributes = {}
         self._end_time = None
         self._children = []
@@ -67,7 +67,7 @@ class LegacyTestSpan(CouchbaseSpan):
         self._attributes[key] = value
 
     def finish(self) -> None:
-        self._end_time = time_ns()
+        self._end_time = now_ns()
 
 
 class NoOpTestSpan(NoOpSpan):
@@ -134,7 +134,7 @@ class TestSpan(RequestSpan):
                  start_time: Optional[int] = None) -> None:
         self._name = name
         self._parent_span = parent_span
-        self._start_time = start_time if start_time is not None else time_ns()
+        self._start_time = start_time if start_time is not None else now_ns()
         self._attributes = {}
         self._end_time = None
         self._children = []
@@ -162,7 +162,7 @@ class TestSpan(RequestSpan):
         self._status = status
 
     def end(self, end_time: Optional[int] = None) -> None:
-        self._end_time = end_time if end_time is not None else time_ns()
+        self._end_time = end_time if end_time is not None else now_ns()
 
 
 TestSpanType = Union[LegacyTestSpan, NoOpTestSpan, TestThresholdLoggingSpan, TestSpan]

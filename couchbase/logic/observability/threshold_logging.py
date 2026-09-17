@@ -24,7 +24,6 @@ from heapq import heappop, heappush
 from threading import (Event,
                        Lock,
                        Thread)
-from time import time_ns
 from typing import (Any,
                     Generic,
                     List,
@@ -35,6 +34,7 @@ from typing import (Any,
                     TypeVar,
                     Union)
 
+from couchbase.logic.observability._clock import now_ns
 from couchbase.logic.observability.observability_types import (_ATTR_DISPATCH_SPAN_NAME,
                                                                _ATTR_ENCODING_SPAN_NAME,
                                                                _ATTR_SERVICE,
@@ -314,7 +314,7 @@ class ThresholdLoggingSpan(RequestSpan):
     ) -> None:
         self._name = name
         self._parent_span = parent_span
-        self._start_time_ns = start_time if start_time is not None else time_ns()
+        self._start_time_ns = start_time if start_time is not None else now_ns()
         self._tracer = tracer
         self._events = {}
         self._status = SpanStatusCode.UNSET
@@ -442,7 +442,7 @@ class ThresholdLoggingSpan(RequestSpan):
         if self._end_time_ns is not None:
             return
 
-        self._end_time_ns = end_time if end_time is not None else time_ns()
+        self._end_time_ns = end_time if end_time is not None else now_ns()
         self._total_duration_ns = self._end_time_ns - self._start_time_ns
 
         # Encoding/dispatch spans only propagate duration to parent; no snapshot needed.
