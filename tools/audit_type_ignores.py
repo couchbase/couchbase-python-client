@@ -102,6 +102,16 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # exactly what the test exists to disprove.
     ('couchbase/tests_v2/connection_t.py', 'arg-type'),
     ('couchbase/tests_v2/connection_t.py', 'call-overload'),
+    # tracing_kv_multi_t hands a legacy parent span to two multi option classes, because the
+    # tracer the suite's cluster was built with is what produces the span: under
+    # TracingType.Legacy there is no other kind to hand over, which is also the position a
+    # caller who configured a deprecated tracer is in.  The multi classes annotate parent_span
+    # as RequestSpan because that is what callers should write, while maybe_get_parent_span
+    # accepts the legacy protocol with a deprecation warning, so the combination works and this
+    # suite is what guards that it keeps working.  Same shape as the PingOptions.service_types
+    # entry above: widening the annotation to promise the legacy form is the change nobody
+    # should make, so no ticket retires this; PYCBC-1922 is where the narrow shape was chosen.
+    ('couchbase/tests_v2/tracing_kv_multi_t.py', 'arg-type'),
     # The two search request builder suites pass a SearchRequest to build_search_query_request
     # inside pytest.raises(InvalidArgumentException), because refusing it is the behaviour
     # under test: search() takes a request and search_query() takes a query, and the refusal

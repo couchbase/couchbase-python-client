@@ -1,0 +1,410 @@
+#  Copyright 2016-2026. Couchbase, Inc.
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License")
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+from __future__ import annotations
+
+from collections.abc import Generator
+from datetime import timedelta
+from typing import Any, Optional
+
+import pytest
+
+import couchbase.subdocument as SD
+from couchbase.exceptions import (DocumentExistsException,
+                                  DocumentNotFoundException,
+                                  DocumentUnretrievableException,
+                                  InvalidArgumentException)
+from couchbase.logic.observability import OpName
+from couchbase.options import (GetOptions,
+                               InsertOptions,
+                               MutateInOptions,
+                               ReplaceOptions,
+                               UpsertOptions)
+from couchbase.transcoder import Transcoder
+from tests_v2.environments.metrics_environment import MeterType, MetricsEnvironment
+from tests_v2.environments.test_environment import (ConnectionStrategy,
+                                                    SuiteRequirements,
+                                                    SyncTestEnvironment,
+                                                    TestEnvironment,
+                                                    TestProtocol,
+                                                    build_environment,
+                                                    teardown_environment)
+from tests_v2.manifest import validate_test_manifest
+from tests_v2.metrics_validators import KeyValueMeterValidator
+from tests_v2.test_features import EnvironmentFeatures, ServerFeatures
+
+ONE_SECOND = timedelta(seconds=1)
+FIVE_SECONDS = timedelta(seconds=5)
+# Rejected by the client rather than by the server, which is the whole point of the two tests
+# that use it.
+NEGATIVE_EXPIRY = timedelta(seconds=-1)
+# A cas that belongs to no document.  Paired with a key that does not exist either, so what the
+# server refuses is the key; the value only has to be a well-formed cas.
+UNOWNED_CAS = 12345
+# `project` takes field paths.  Annotated Any so that handing it integers is the test rather
+# than something the type checker has to be told to ignore.
+INVALID_PROJECT: Any = [1, 2, 3]
+
+
+# Named so the test can catch this instead of Exception.
+class EncodingFailure(Exception):
+    pass
+
+
+class ErrorTranscoder(Transcoder):
+    # Only `encode_value` is ever reached: the suite drives one upsert, and the point is that
+    # an operation dying inside the transcoder is still measured.  `decode_value` is implemented
+    # because `Transcoder` is an ABC, not because anything calls it.
+
+    def encode_value(self, value: Any) -> tuple[bytes, int]:
+        raise EncodingFailure('transcoder error')
+
+    def decode_value(self, value: bytes, flags: Optional[int]) -> Any:
+        raise EncodingFailure('transcoder error')
+
+
+class KeyValueMetricsTestSuite(SuiteRequirements):
+    # Every test is the same three steps: clear the meter, run one operation, assert on the
+    # recorder it produced.  The suite runs twice, once per `MeterType`: `Basic` asserts on what
+    # was recorded, `NoOp` asserts the SDK never asked the meter for anything.
+    #
+    # Thirty-six named tests rather than twelve parametrized over `OpName`, covering the same
+    # thirty-six cases.  An operation reached through `getattr` has no type for the generator to
+    # read, so the generated suites would call it without awaiting it, and an unawaited
+    # coroutine records nothing: half the cases would then pass while testing nothing, `NoOp`
+    # being the half where an empty meter is the expectation.
+    #
+    # Three ways an operation can end, and the metric differs between them.  A success carries
+    # no error attribute.  A failure the server reports carries everything a success has plus
+    # `ErrorType`.  A failure the client refuses is the interesting one: the SDK builds the
+    # request span and populates the bucket, scope and collection attributes at the same point,
+    # so an operation rejected before that is still measured but carries none of the three.
+    # Only the two negative-expiry cases fail that early, which is why they alone pass
+    # `expect_collection_labels=False`.
+
+    # Observability support in CNG is pending.
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
+    # A meter is a cluster option, so the suite needs a cluster of its own.
+    CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
+    # `get_existing_doc` marks each key used and never hands it back, and twenty tests take one,
+    # so the seeded count is a real floor here rather than a default worth inheriting silently.
+    NUM_DOCS = 50
+
+    TEST_MANIFEST = [
+        'test_exists',
+        'test_get',
+        'test_get_all_replicas',
+        'test_get_all_replicas_missing_key',
+        'test_get_and_lock',
+        'test_get_and_lock_missing_key',
+        'test_get_and_touch',
+        'test_get_and_touch_missing_key',
+        'test_get_any_replica',
+        'test_get_any_replica_missing_key',
+        'test_get_invalid_project',
+        'test_get_missing_key',
+        'test_insert',
+        'test_insert_existing_key',
+        'test_insert_invalid_expiry',
+        'test_lookup_in',
+        'test_lookup_in_all_replicas',
+        'test_lookup_in_all_replicas_missing_key',
+        'test_lookup_in_any_replica',
+        'test_lookup_in_any_replica_missing_key',
+        'test_lookup_in_missing_key',
+        'test_mutate_in',
+        'test_mutate_in_invalid_preserve_expiry',
+        'test_mutate_in_missing_key',
+        'test_remove',
+        'test_remove_missing_key',
+        'test_replace',
+        'test_replace_invalid_preserve_expiry',
+        'test_replace_missing_key',
+        'test_touch',
+        'test_touch_missing_key',
+        'test_unlock',
+        'test_unlock_missing_key',
+        'test_upsert',
+        'test_upsert_encoding_error',
+        'test_upsert_invalid_expiry',
+    ]
+
+    @pytest.fixture(scope='class')
+    def check_replica_read_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.SubdocReplicaRead, cb_env.server_context)
+
+    @pytest.fixture(name='kv_validator')
+    def kv_validator_fixture(self, cb_env: SyncTestEnvironment) -> KeyValueMeterValidator:
+        # Cleared here rather than in a teardown so that each test's assertion is about its
+        # own operation: the meter is class-scoped and has already recorded every upsert
+        # `DATA_SET` seeding performed by the time the first test runs.
+        validator = MetricsEnvironment.kv_meter_validator(cb_env)
+        validator.reset()
+        return validator
+
+    # ------------------------------------------------------------------
+    # Operations that succeed
+    # ------------------------------------------------------------------
+
+    def test_exists(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.exists(key)
+        kv_validator.validate_kv_op(OpName.Exists)
+
+    def test_get(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.get(key)
+        kv_validator.validate_kv_op(OpName.Get)
+
+    def test_get_all_replicas(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.get_all_replicas(key)
+        kv_validator.validate_kv_op(OpName.GetAllReplicas)
+
+    def test_get_any_replica(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.get_any_replica(key)
+        kv_validator.validate_kv_op(OpName.GetAnyReplica)
+
+    def test_get_and_lock(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.get_and_lock(key, ONE_SECOND)
+        kv_validator.validate_kv_op(OpName.GetAndLock)
+
+    def test_get_and_touch(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.get_and_touch(key, ONE_SECOND)
+        kv_validator.validate_kv_op(OpName.GetAndTouch)
+
+    def test_touch(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.touch(key, ONE_SECOND)
+        kv_validator.validate_kv_op(OpName.Touch)
+
+    def test_insert(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_new_doc()
+        cb_env.collection.insert(key, value)
+        kv_validator.validate_kv_op(OpName.Insert)
+
+    def test_replace(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_existing_doc()
+        cb_env.collection.replace(key, value)
+        kv_validator.validate_kv_op(OpName.Replace)
+
+    def test_upsert(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_existing_doc()
+        cb_env.collection.upsert(key, value)
+        kv_validator.validate_kv_op(OpName.Upsert)
+
+    def test_remove(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_new_doc()
+        cb_env.collection.upsert(key, value)
+        # The upsert above is what makes the key removable, and it is measured like any other.
+        # Clearing here rather than relying on the fixture is what leaves only the remove.
+        kv_validator.reset()
+        cb_env.collection.remove(key)
+        kv_validator.validate_kv_op(OpName.Remove)
+
+    def test_unlock(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        result = cb_env.collection.get_and_lock(key, FIVE_SECONDS)
+        kv_validator.reset()
+        cb_env.collection.unlock(key, result.cas)
+        kv_validator.validate_kv_op(OpName.Unlock)
+
+    def test_lookup_in(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.lookup_in(key, (SD.get('batch'),))
+        kv_validator.validate_kv_op(OpName.LookupIn)
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas(self,
+                                    cb_env: SyncTestEnvironment,
+                                    kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.lookup_in_all_replicas(key, (SD.get('batch'),))
+        kv_validator.validate_kv_op(OpName.LookupInAllReplicas)
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica(self,
+                                   cb_env: SyncTestEnvironment,
+                                   kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.lookup_in_any_replica(key, (SD.get('batch'),))
+        kv_validator.validate_kv_op(OpName.LookupInAnyReplica)
+
+    def test_mutate_in(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        cb_env.collection.mutate_in(key, (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model')))
+        kv_validator.validate_kv_op(OpName.MutateIn)
+
+    # ------------------------------------------------------------------
+    # Operations that reach the server and are refused there
+    # ------------------------------------------------------------------
+
+    def test_get_missing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get(TestEnvironment.NOT_A_KEY)
+        kv_validator.validate_kv_op(OpName.Get, validate_error=True)
+
+    def test_get_all_replicas_missing_key(self,
+                                          cb_env: SyncTestEnvironment,
+                                          kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get_all_replicas(TestEnvironment.NOT_A_KEY)
+        kv_validator.validate_kv_op(OpName.GetAllReplicas, validate_error=True)
+
+    def test_get_any_replica_missing_key(self,
+                                         cb_env: SyncTestEnvironment,
+                                         kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentUnretrievableException):
+            cb_env.collection.get_any_replica(TestEnvironment.NOT_A_KEY)
+        kv_validator.validate_kv_op(OpName.GetAnyReplica, validate_error=True)
+
+    def test_get_and_lock_missing_key(self,
+                                      cb_env: SyncTestEnvironment,
+                                      kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get_and_lock(TestEnvironment.NOT_A_KEY, ONE_SECOND)
+        kv_validator.validate_kv_op(OpName.GetAndLock, validate_error=True)
+
+    def test_get_and_touch_missing_key(self,
+                                       cb_env: SyncTestEnvironment,
+                                       kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get_and_touch(TestEnvironment.NOT_A_KEY, ONE_SECOND)
+        kv_validator.validate_kv_op(OpName.GetAndTouch, validate_error=True)
+
+    def test_touch_missing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.touch(TestEnvironment.NOT_A_KEY, ONE_SECOND)
+        kv_validator.validate_kv_op(OpName.Touch, validate_error=True)
+
+    def test_insert_existing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_existing_doc()
+        with pytest.raises(DocumentExistsException):
+            cb_env.collection.insert(key, value)
+        kv_validator.validate_kv_op(OpName.Insert, validate_error=True)
+
+    def test_replace_missing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_new_doc()
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.replace(key, value)
+        kv_validator.validate_kv_op(OpName.Replace, validate_error=True)
+
+    def test_remove_missing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.remove(TestEnvironment.NOT_A_KEY)
+        kv_validator.validate_kv_op(OpName.Remove, validate_error=True)
+
+    def test_unlock_missing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.unlock(TestEnvironment.NOT_A_KEY, UNOWNED_CAS)
+        kv_validator.validate_kv_op(OpName.Unlock, validate_error=True)
+
+    def test_lookup_in_missing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.lookup_in(TestEnvironment.NOT_A_KEY, (SD.get('batch'),))
+        kv_validator.validate_kv_op(OpName.LookupIn, validate_error=True)
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_all_replicas_missing_key(self,
+                                                cb_env: SyncTestEnvironment,
+                                                kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.lookup_in_all_replicas(TestEnvironment.NOT_A_KEY, (SD.get('batch'),))
+        kv_validator.validate_kv_op(OpName.LookupInAllReplicas, validate_error=True)
+
+    @pytest.mark.usefixtures('check_replica_read_supported')
+    def test_lookup_in_any_replica_missing_key(self,
+                                               cb_env: SyncTestEnvironment,
+                                               kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentUnretrievableException):
+            cb_env.collection.lookup_in_any_replica(TestEnvironment.NOT_A_KEY, (SD.get('batch'),))
+        kv_validator.validate_kv_op(OpName.LookupInAnyReplica, validate_error=True)
+
+    def test_mutate_in_missing_key(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.mutate_in(TestEnvironment.NOT_A_KEY,
+                                        (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model')))
+        kv_validator.validate_kv_op(OpName.MutateIn, validate_error=True)
+
+    # ------------------------------------------------------------------
+    # Operations refused by the client, after the request span exists
+    # ------------------------------------------------------------------
+
+    def test_get_invalid_project(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.get(key, GetOptions(project=INVALID_PROJECT))
+        kv_validator.validate_kv_op(OpName.Get, validate_error=True)
+
+    def test_mutate_in_invalid_preserve_expiry(self,
+                                               cb_env: SyncTestEnvironment,
+                                               kv_validator: KeyValueMeterValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.mutate_in(key,
+                                        (SD.insert('make', 'New Make'),),
+                                        MutateInOptions(preserve_expiry=True))
+        kv_validator.validate_kv_op(OpName.MutateIn, validate_error=True)
+
+    def test_replace_invalid_preserve_expiry(self,
+                                             cb_env: SyncTestEnvironment,
+                                             kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_existing_doc()
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.replace(key, value, ReplaceOptions(preserve_expiry=True, expiry=FIVE_SECONDS))
+        kv_validator.validate_kv_op(OpName.Replace, validate_error=True)
+
+    def test_upsert_encoding_error(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_new_doc()
+        with pytest.raises(EncodingFailure):
+            cb_env.collection.upsert(key, value, UpsertOptions(transcoder=ErrorTranscoder()))
+        kv_validator.validate_kv_op(OpName.Upsert, validate_error=True)
+
+    # ------------------------------------------------------------------
+    # Operations refused before the request span exists
+    # ------------------------------------------------------------------
+
+    def test_insert_invalid_expiry(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_existing_doc()
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.insert(key, value, InsertOptions(expiry=NEGATIVE_EXPIRY))
+        kv_validator.validate_kv_op(OpName.Insert, validate_error=True, expect_collection_labels=False)
+
+    def test_upsert_invalid_expiry(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
+        key, value = cb_env.get_existing_doc()
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.upsert(key, value, UpsertOptions(expiry=NEGATIVE_EXPIRY))
+        kv_validator.validate_kv_op(OpName.Upsert, validate_error=True, expect_collection_labels=False)
+
+
+class KeyValueMetricsTests(KeyValueMetricsTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(KeyValueMetricsTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env', params=[MeterType.Basic, MeterType.NoOp])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env,
+                                KeyValueMetricsTestSuite,
+                                meter=MetricsEnvironment.make_meter(request.param))
+        yield env
+        teardown_environment(env, KeyValueMetricsTestSuite)

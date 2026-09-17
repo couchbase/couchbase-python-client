@@ -65,6 +65,9 @@ suites:
   - source: couchbase/tests_v2/transcoder_t.py
 
   # ---- Streaming services --------------------------------------------------------------------------
+  # Query, search, analytics and views: the four that stream rows over HTTP, which is the
+  # set metrics_streaming_t and tracing_streaming_t assert on.  kv_range_scan_t streams too
+  # but not over HTTP, so it sits with key-value.
 
   # Two per-test exclusions carry API facts, both declared at the site: the threading.Thread
   # test, as in query_t, and test_query_timeout under txcouchbase, whose Cluster has no
@@ -184,6 +187,58 @@ suites:
   - source: couchbase/tests_v2/rate_limit_t.py
     targets: [acouchbase]
 
+  # ---- Observability: metrics ----------------------------------------------------------------------
+  # Every operation in these suites is named literally rather than reached through getattr,
+  # which is what lets the transformer type the receiver of each call.
+
+  # A smaller meter suite: five key-value operations against a meter built on the deprecated
+  # couchbase.metrics bases.  The deprecation is a wrapper class with an empty body, so nothing
+  # about it is API-specific.
+  - source: couchbase/tests_v2/legacy_metrics_t.py
+
+  - source: couchbase/tests_v2/metrics_binary_t.py
+
+  # acouchbase only, for the reason datastructures_t itself is.  The operations here are named
+  # literally like the other metrics suites, and the datastructure object each one is called on
+  # is typed by the assignment above it, which is what the transformer needs to bridge them.
+  - source: couchbase/tests_v2/metrics_datastructures_t.py
+    targets: [acouchbase]
+
+  # The largest of the metrics suites, at 36 key-value operations.
+  - source: couchbase/tests_v2/metrics_kv_t.py
+
+  # The managers exist for txcouchbase too, so seven of the eight suites here generate for it.
+  # The eighth carries a class-level testgen_exclude, because there is no Twisted eventing
+  # function manager.
+  - source: couchbase/tests_v2/metrics_management_t.py
+
+  # Every service here is reachable from all three APIs, and the rows are drained through the
+  # environment helpers rather than a comprehension over rows(), which is what makes the same
+  # statement work under Twisted.
+  - source: couchbase/tests_v2/metrics_streaming_t.py
+
+  # ---- Observability: tracing ----------------------------------------------------------------------
+  # The same rule as the metrics suites above: every operation is named literally.
+
+  - source: couchbase/tests_v2/tracing_binary_t.py
+
+  # acouchbase only, for the reason datastructures_t itself is.
+  - source: couchbase/tests_v2/tracing_datastructures_t.py
+    targets: [acouchbase]
+
+  # The largest suite in the tree, at 58 named tests times four tracing types, and where naming
+  # each operation matters most: an unawaited operation produces no spans at all, so the tree
+  # walk would fail somewhere far from the cause.
+  - source: couchbase/tests_v2/tracing_kv_t.py
+
+  # As metrics_management_t: seven of the eight suites generate for txcouchbase, and the eighth
+  # carries a class-level testgen_exclude for the absent Twisted eventing function manager.
+  - source: couchbase/tests_v2/tracing_management_t.py
+
+  # Every service here is reachable from all three APIs, and the rows are drained through the
+  # environment helpers rather than a comprehension over rows().
+  - source: couchbase/tests_v2/tracing_streaming_t.py
+
 
 # Sources under `source_dir` that deliberately generate nothing.  Every *_t.py there has to
 # appear either in `suites` above or here, and the loader fails on one that appears in neither,
@@ -192,12 +247,12 @@ not_generated:
 
   # Nothing in these talks to a cluster, and each one is a single class with no TEST_MANIFEST,
   # a manifest being a parity contract and these having no other tree to be in parity with.
-  # Three shapes: build a request object, a settings object or an exception and read what it
-  # produced; feed a server-shaped dict to a `from_server` or `from_json` classmethod and read
-  # what came back; or construct a `_core` type and assert on the object model.  All of it out
-  # of modules every API imports unchanged, so a generated copy would run identical code
-  # against identical imports.  pycbc_core_t is the strongest case of that: there is one shared
-  # library, so a copy would sample the same refcounts.
+  # Four shapes: build a request object and read what it encodes to; build a meter or a tracer
+  # and read what it produced; feed a server-shaped dict to a `from_server` or `from_json`
+  # classmethod and read what came back; or construct a `_core` type and assert on the object
+  # model.  All of it out of modules every API imports unchanged, so a generated copy would run
+  # identical code against identical imports.  pycbc_core_t is the strongest case of that:
+  # there is one shared library, so a copy would sample the same refcounts.
   #
   # The decode suites are here rather than folded into the management suites they shadow
   # because what they cover is the direction a management suite cannot reach.  Driving a
@@ -211,10 +266,14 @@ not_generated:
     - couchbase/tests_v2/diagnostics_t.py
     - couchbase/tests_v2/eventingmgmt_function_types_t.py
     - couchbase/tests_v2/exceptions_t.py
+    - couchbase/tests_v2/logging_meter_t.py
+    - couchbase/tests_v2/logging_smoke_t.py
+    - couchbase/tests_v2/no_op_observability_t.py
     - couchbase/tests_v2/pycbc_core_t.py
     - couchbase/tests_v2/query_params_t.py
     - couchbase/tests_v2/scope_req_builder_t.py
     - couchbase/tests_v2/search_params_t.py
+    - couchbase/tests_v2/threshold_logging_t.py
     - couchbase/tests_v2/view_result_types_t.py
     - couchbase/tests_v2/viewmgmt_view_types_t.py
     - couchbase/tests_v2/views_params_t.py
@@ -226,6 +285,10 @@ not_generated:
     - couchbase/tests_v2/binary_collection_multi_t.py
     - couchbase/tests_v2/collection_multi_t.py
     - couchbase/tests_v2/durability_multi_t.py
+    - couchbase/tests_v2/metrics_binary_multi_t.py
+    - couchbase/tests_v2/metrics_kv_multi_t.py
+    - couchbase/tests_v2/tracing_binary_multi_t.py
+    - couchbase/tests_v2/tracing_kv_multi_t.py
 
   # stream_next is driven through a stand-in for the request object rather than through a
   # server, and the stand-in is API-specific.  acouchbase carries a hand-written counterpart,
