@@ -42,6 +42,18 @@ PYCBC_ROOT = os.path.dirname(__file__)
 CXXCBC_CACHE_DIR = os.environ.get('PYCBC_CXXCBC_CACHE_DIR', os.path.join(PYCBC_ROOT, 'deps', 'couchbase-cxx-cache'))
 ENV_TRUE = ['true', '1', 'y', 'yes', 'on']
 
+# Maps a PYCBC_SANITIZERS token to the C++ core's CMake option. The names are not derivable by
+# upper-casing the token: the core spells UBSan ENABLE_SANITIZER_UNDEFINED_BEHAVIOUR. CMake only
+# warns about an unused -D, so an unrecognized option name yields a green, uninstrumented build.
+SANITIZER_CMAKE_OPTIONS = {
+    'address': 'ENABLE_SANITIZER_ADDRESS',
+    'leak': 'ENABLE_SANITIZER_LEAK',
+    'memory': 'ENABLE_SANITIZER_MEMORY',
+    'thread': 'ENABLE_SANITIZER_THREAD',
+    'undefined': 'ENABLE_SANITIZER_UNDEFINED_BEHAVIOUR',
+    'undefined_behaviour': 'ENABLE_SANITIZER_UNDEFINED_BEHAVIOUR',
+}
+
 
 def use_py_limited_api() -> bool:
     """Return True if the extension should be built against Py_LIMITED_API (abi3).
@@ -157,8 +169,22 @@ def process_build_env_vars():  # noqa: C901
 
     sanitizers = os.getenv('PYCBC_SANITIZERS', None)
     if sanitizers:
-        for x in sanitizers.split(','):
-            cmake_extra_args += [f'-DENABLE_SANITIZER_{x.upper()}=ON']
+        for token in filter(None, (t.strip().lower() for t in sanitizers.split(','))):
+            option = SANITIZER_CMAKE_OPTIONS.get(token)
+            if option is None:
+                raise OptionError(
+                    f'PYCBC_SANITIZERS contains unrecognized sanitizer {token!r}; '
+                    f'valid tokens are {", ".join(sorted(SANITIZER_CMAKE_OPTIONS))}.'
+                )
+            cmake_extra_args += [f'-D{option}=ON']
+
+    # Selects the compiler cache the C++ core wires into CMAKE_<LANG>_COMPILER_LAUNCHER.
+    # Left unset, the core auto-detects sccache then ccache and builds uncached if neither is
+    # installed. The core ignores it under the Visual Studio generator, so a cached Windows
+    # build also needs PYCBC_CMAKE_SET_GENERATOR=Ninja.
+    cache_option = os.getenv('PYCBC_CACHE_OPTION', None)
+    if cache_option is not None:
+        cmake_extra_args += [f'-DCACHE_OPTION={cache_option}']
 
     if os.getenv('PYCBC_VERBOSE_MAKEFILE', None):
         cmake_extra_args += ['-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON']

@@ -47,12 +47,21 @@ if(WIN32)
   # MultiThreaded$<$<CONFIG:Debug>:Debug> for /MT compile flag
   # cmake-format: on
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-  add_definitions(/bigobj)
   add_definitions(-D_WIN32_WINNT=0x0601)
 endif()
 
 project(couchbase_client)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(WIN32)
+  # /bigobj is only meaningful to the C and C++ compilers, so it goes on the per-language flags
+  # rather than the directory scope. A directory-scope compile option is also handed to
+  # boringssl's ASM_NASM sources, and nasm has no "/" option syntax: it reads the flag as a
+  # second input file and fails with "more than one input file specified". These must be
+  # appended after project(), which initializes CMAKE_<LANG>_FLAGS from the cache.
+  string(APPEND CMAKE_C_FLAGS " /bigobj")
+  string(APPEND CMAKE_CXX_FLAGS " /bigobj")
+endif()
 
 get_python_version()
 message(STATUS "LOCAL_PYTHON_VERSION=${LOCAL_PYTHON_VERSION}")
@@ -326,6 +335,12 @@ if(WIN32)
     taocpp::json
     spdlog::spdlog
     hdr_histogram_static)
+
+  # RelWithDebInfo links incrementally by CMake's MSVC defaults, and link.exe writes the
+  # incremental database beside its output, which is the Python package directory and
+  # therefore the wheel. Since nothing in a release build reuses it, lets not keep it.
+  # The .pdb is unaffected: /debug produces it, independently of /INCREMENTAL.
+  target_link_options(pycbc_core PRIVATE /INCREMENTAL:NO)
 else()
   target_link_libraries(
     pycbc_core PRIVATE
