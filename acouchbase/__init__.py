@@ -25,6 +25,14 @@ class LoopValidator:
     @staticmethod
     def _get_working_loop() -> asyncio.AbstractEventLoop:
         try:
+            # A running loop belongs to the caller.  Never validate, close or replace it; closing
+            # is only ever safe for a loop this class created.
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            # Nothing is running in this thread, so fall through and resolve one.
+            pass  # nosec
+
+        try:
             # Python <= 3.13: Returns existing or auto-creates a new loop.
             # Python 3.14+: Returns existing or raises RuntimeError.
             evloop = asyncio.get_event_loop()
