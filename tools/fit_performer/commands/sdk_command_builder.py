@@ -4,6 +4,7 @@ from google.protobuf import timestamp_pb2 as timestamp
 
 from .bucket_manager_commands import BucketManagerCommandBuilder
 from .collection_manager_commands import CollectionManagerCommandBuilder
+from .eventing_function_manager_commands import EventingFunctionManagerCommandBuilder
 from .kv_commands import KvCommandBuilder
 from .query_commands import QueryCommandBuilder
 from .query_index_manager_commands import QueryIndexManagerCommandBuilder
@@ -47,6 +48,9 @@ class SdkCommandBuilder:
             if cluster_cmd_type == 'bucket_manager':
                 return BucketManagerCommandBuilder.build_command(
                     cluster_cmd.bucket_manager, **cmd_kwargs)
+            if cluster_cmd_type == 'eventing_function_manager':
+                return EventingFunctionManagerCommandBuilder.build_command(
+                    cluster_cmd.eventing_function_manager, **cmd_kwargs)
             if cluster_cmd_type == 'authenticator':
                 return UpdateAuthenticatorCommand.create_command(
                     auth_message=cluster_cmd.authenticator, **cmd_kwargs)
@@ -75,6 +79,9 @@ class SdkCommandBuilder:
                     scope_cmd.search_index_manager, **cmd_kwargs)
             if scope_cmd_type == 'search_v2':
                 return SearchCommandBuilder.build_command_v2(scope_cmd.search_v2, **cmd_kwargs)
+            if scope_cmd_type == 'eventing_function_manager':
+                return EventingFunctionManagerCommandBuilder.build_command(
+                    scope_cmd.eventing_function_manager, **cmd_kwargs)
             raise NotImplementedError(f'Scope-level command `{scope_cmd_type}` not implemented in performer')
 
         elif cmd_type == 'collection_command':

@@ -42,4 +42,7 @@ SDK_CAPS = [
     sdk_caps_pb.SDK_JWT,
     sdk_caps_pb.SDK_QUERY_2120,
     sdk_caps_pb.SDK_SEARCH_SCORE_FUSION,
+    sdk_caps_pb.SDK_EVENTING_FUNCTION_MANAGER,
+    sdk_caps_pb.SDK_EVENTING_RESUMING_FUNCTION_STATUS,
+    sdk_caps_pb.SDK_SCOPE_EVENTING_FUNCTION_MANAGER,
 ]
