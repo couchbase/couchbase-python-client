@@ -391,6 +391,16 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentCollectionQueryIndexManager)
         await qixm.create_index(self.IX_NAME, ['hello'])
         await qixm.drop_index(self.IX_NAME)
+
+        # Straight after a drop the server can still answer another drop of the same index
+        # with GSI 5000 "Index does not exist", which the core does not map to index-not-found
+        # (CXXCBC-1059), so ignore_if_not_exists does not apply and it surfaces as
+        # InternalServerFailureException.  Waiting for the index to leave the list first keeps
+        # the test on what it covers.
+        async def check_absent() -> None:
+            self._assert_index_absent(await qixm.get_all_indexes(), self.IX_NAME)
+
+        await AsyncTestEnvironment.try_n_times(10, 1, check_absent)
         await qixm.drop_index(self.IX_NAME, ignore_if_not_exists=True)
         await qixm.drop_index(self.IX_NAME, DropQueryIndexOptions(ignore_if_not_exists=True))
 
@@ -749,6 +759,12 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
         ns = self._namespace(cb_env)
         await qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'], **ns)
         await qixm.drop_index(cb_env.bucket.name, self.IX_NAME, **ns)
+
+        # CollectionQueryIndexManagementTestSuite has why this waits (CXXCBC-1059).
+        async def check_absent() -> None:
+            self._assert_index_absent(await qixm.get_all_indexes(cb_env.bucket.name, **ns), self.IX_NAME)
+
+        await AsyncTestEnvironment.try_n_times(10, 1, check_absent)
         await qixm.drop_index(cb_env.bucket.name, self.IX_NAME, ignore_if_not_exists=True, **ns)
         await qixm.drop_index(cb_env.bucket.name,
                               self.IX_NAME,
@@ -1089,6 +1105,12 @@ class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         await qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'])
         await qixm.drop_index(cb_env.bucket.name, self.IX_NAME)
+
+        # CollectionQueryIndexManagementTestSuite has why this waits (CXXCBC-1059).
+        async def check_absent() -> None:
+            self._assert_index_absent(await qixm.get_all_indexes(cb_env.bucket.name), self.IX_NAME)
+
+        await AsyncTestEnvironment.try_n_times(10, 1, check_absent)
         await qixm.drop_index(cb_env.bucket.name, self.IX_NAME, ignore_if_not_exists=True)
         await qixm.drop_index(cb_env.bucket.name,
                               self.IX_NAME,

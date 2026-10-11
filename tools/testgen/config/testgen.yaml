@@ -300,6 +300,7 @@ not_generated:
   # of it: close_bucket is execute_close_bucket_request under acouchbase and returns a future,
   # close_connection is a coroutine, and the connect future two of the async tests are about has
   # no blocking form.  acouchbase carries a hand-written counterpart, not a sidecar, there being
-  # no generated file for a sidecar to merge into.  txcouchbase has neither.
+  # no generated file for a sidecar to merge into.  txcouchbase carries a hand-written connect
+  # half only, the close rules being the acouchbase adapter's, which it wraps.
   api_specific_surface:
     - couchbase/tests_v2/connection_lifecycle_t.py

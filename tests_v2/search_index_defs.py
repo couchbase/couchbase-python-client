@@ -40,6 +40,12 @@ COLLECTION_INDEX_NAME = 'test-search-coll-index'
 MGMT_INDEX_NAME = 'test-search-mgmt-index'
 MGMT_SECONDARY_INDEX_NAME = 'test-search-mgmt-index-2'
 
+# An upsert returns before every node holds the definition, and until the node serving a read
+# has it, get_index answers index not found.  On a 7.0 cluster that has outlasted 30 seconds,
+# so a read straight after an upsert retries for up to a minute.
+INDEX_VISIBLE_ROUNDS = 20
+INDEX_VISIBLE_DELAY = 3
+
 # (field name, FTS field type).  Every other flag is identical across all six fields and
 # both indexes, so it lives in _field() rather than being repeated per row.  Types are the
 # ones the vehicle documents DataProvider seeds actually carry.

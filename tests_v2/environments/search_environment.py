@@ -54,6 +54,7 @@ test wrote the document it is looking for, or where it expects to find nothing a
 
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 from typing import Any, Union
 
@@ -102,8 +103,9 @@ class SearchEnvironment:
     # neither knowable nor stable.  Twenty is enough to prove the index is serving.
     MIN_INDEXED_DOCS = 20
 
-    # Rounds and seconds between them while waiting for the index to report documents, and
-    # the point at which a still-empty index is called a failure rather than a slow one.
+    # Two budgets.  An index reporting no documents is polled every INDEX_WAIT_DELAY seconds
+    # for up to NO_DOCS_CUTOFF seconds before it is called a failure rather than a slow one.
+    # Once it reports some, it gets INDEX_WAIT_ROUNDS more polls to reach MIN_INDEXED_DOCS.
     INDEX_WAIT_ROUNDS = 10
     INDEX_WAIT_DELAY = 3
     NO_DOCS_CUTOFF = 300
@@ -245,16 +247,23 @@ class SearchEnvironment:
         """Poll until the index reports MIN_INDEXED_DOCS documents; return what it reported.
 
         Returns 0 when the index is still empty after NO_DOCS_CUTOFF seconds, which the
-        caller treats as a failure.  An index that is merely *behind* still returns its
-        count and the suite proceeds: the row assertions are the real check.
+        caller treats as a failure.  An index that is merely *behind* returns its count
+        after INDEX_WAIT_ROUNDS polls and the suite proceeds: the row assertions are the
+        real check.
         """
-        indexed_docs = 0
-        for i in range(SearchEnvironment.INDEX_WAIT_ROUNDS):
-            if indexed_docs == 0 and i * SearchEnvironment.INDEX_WAIT_DELAY >= SearchEnvironment.NO_DOCS_CUTOFF:
-                return 0
+        deadline = time.monotonic() + SearchEnvironment.NO_DOCS_CUTOFF
+        rounds_with_docs = 0
+        while True:
             indexed_docs = TestEnvironment.try_n_times(10, 10, sixm.get_indexed_documents_count, idx_name)
             if indexed_docs >= SearchEnvironment.MIN_INDEXED_DOCS:
                 break
+            if indexed_docs == 0:
+                if time.monotonic() >= deadline:
+                    break
+            else:
+                rounds_with_docs += 1
+                if rounds_with_docs >= SearchEnvironment.INDEX_WAIT_ROUNDS:
+                    break
             print(f'Found {indexed_docs} indexed docs, waiting a bit...')
             TestEnvironment.sleep(SearchEnvironment.INDEX_WAIT_DELAY)
 

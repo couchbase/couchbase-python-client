@@ -33,7 +33,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from couchbase.exceptions import InternalServerFailureException, QueryIndexNotFoundException
+from couchbase.exceptions import (CouchbaseException,
+                                  InternalServerFailureException,
+                                  QueryIndexNotFoundException)
 from couchbase.management.options import (DropPrimaryQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           GetAllQueryIndexOptions)
@@ -73,6 +75,17 @@ def index_already_dropped(exc: Exception) -> bool:
     if isinstance(exc, QueryIndexNotFoundException):
         return True
     return isinstance(exc, InternalServerFailureException) and 'Index does not exist' in str(exc)
+
+
+def index_not_online(exc: Exception) -> bool:
+    """True when a query failed only because the index it needs exists but is not online yet.
+
+    A primary index create can return before the index serves queries, and a query in that
+    window fails with 4000, `Primary index #primary not online`, rather than returning no rows.
+    A readiness poll treats it as not ready and asks again.  Shared by the three api styles,
+    like index_already_dropped, because it matches server text.
+    """
+    return isinstance(exc, CouchbaseException) and 'not online' in str(exc)
 
 
 def index_drop_pending(exc: Exception) -> bool:

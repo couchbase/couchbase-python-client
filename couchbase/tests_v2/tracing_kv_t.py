@@ -327,13 +327,16 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(OpName.Unlock)
 
     def test_upsert_with_retries(self, cb_env: SyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
-        # The lock is held for a second and the upsert is given three, so it retries until the
-        # lock lapses and then succeeds.  A `RetryCount` above zero is the only thing in the
-        # span tree that says the SDK re-sent a request the caller made once.
+        # The lock is held for a second, so the upsert retries until the lock lapses and then
+        # succeeds.  The retry backoff grows, so the attempt that lands after the lapse can come
+        # well after the second is up; the timeout leaves room for that and costs nothing,
+        # since the upsert returns as soon as it gets through.  A `RetryCount` above zero is
+        # the only thing in the span tree that says the SDK re-sent a request the caller made
+        # once.
         key = cb_env.get_existing_doc(key_only=True)
         cb_env.collection.get_and_lock(key, ONE_SECOND)
         kv_validator.reset()
-        cb_env.collection.upsert(key, {'foo': 'bar'}, UpsertOptions(timeout=timedelta(seconds=3)))
+        cb_env.collection.upsert(key, {'foo': 'bar'}, UpsertOptions(timeout=timedelta(seconds=10)))
         kv_validator.validate_kv_op(OpName.Upsert, retry_count_gt_zero=True)
 
     # ------------------------------------------------------------------

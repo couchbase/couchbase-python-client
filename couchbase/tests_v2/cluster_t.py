@@ -29,10 +29,7 @@ from couchbase.diagnostics import (ClusterState,
                                    EndpointState,
                                    PingState,
                                    ServiceType)
-from couchbase.exceptions import (InternalServerFailureException,
-                                  InvalidArgumentException,
-                                  ParsingFailedException,
-                                  QueryIndexNotFoundException)
+from couchbase.exceptions import CouchbaseException, InvalidArgumentException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import (ClusterOptions,
                                DiagnosticsOptions,
@@ -103,10 +100,13 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
         # endpoint.  Counting them would make this test wait on the index behind the bucket
         # catching up, which is a query-consistency assertion wearing a diagnostics test's
         # clothes.
+        #
+        # The base class rather than a list of subclasses, because a planning failure such as
+        # the primary index not being online arrives as a plain CouchbaseException.
         try:
             rows = cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` LIMIT 1')
             cb_env.drain_rows(rows)
-        except (InternalServerFailureException, ParsingFailedException, QueryIndexNotFoundException):
+        except CouchbaseException:
             pass
 
         result = cluster.diagnostics(DiagnosticsOptions(report_id=report_id))

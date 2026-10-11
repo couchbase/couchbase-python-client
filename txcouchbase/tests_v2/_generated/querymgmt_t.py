@@ -421,6 +421,12 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
         ns = self._namespace(cb_env)
         qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'], **ns)
         qixm.drop_index(cb_env.bucket.name, self.IX_NAME, **ns)
+
+        # CollectionQueryIndexManagementTestSuite has why this waits (CXXCBC-1059).
+        def check_absent() -> None:
+            self._assert_index_absent(qixm.get_all_indexes(cb_env.bucket.name, **ns), self.IX_NAME)
+
+        TwistedTestEnvironment.try_n_times(10, 1, check_absent, is_deferred=False)
         qixm.drop_index(cb_env.bucket.name, self.IX_NAME, ignore_if_not_exists=True, **ns)
         qixm.drop_index(cb_env.bucket.name,
                         self.IX_NAME,
@@ -743,6 +749,12 @@ class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'])
         qixm.drop_index(cb_env.bucket.name, self.IX_NAME)
+
+        # CollectionQueryIndexManagementTestSuite has why this waits (CXXCBC-1059).
+        def check_absent() -> None:
+            self._assert_index_absent(qixm.get_all_indexes(cb_env.bucket.name), self.IX_NAME)
+
+        TwistedTestEnvironment.try_n_times(10, 1, check_absent, is_deferred=False)
         qixm.drop_index(cb_env.bucket.name, self.IX_NAME, ignore_if_not_exists=True)
         qixm.drop_index(cb_env.bucket.name,
                         self.IX_NAME,

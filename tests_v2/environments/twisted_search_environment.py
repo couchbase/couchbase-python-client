@@ -37,6 +37,7 @@ in the sync module's docstring and not restated here.
 
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 from typing import Any, Union
 
@@ -191,15 +192,20 @@ class TwistedSearchEnvironment:
     @staticmethod
     def _wait_for_indexing(sixm: _SearchIndexManager, idx_name: str) -> int:
         """Poll until the index reports MIN_INDEXED_DOCS documents; return what it reported."""
-        indexed_docs = 0
-        for i in range(TwistedSearchEnvironment.INDEX_WAIT_ROUNDS):
-            if (indexed_docs == 0
-                    and i * TwistedSearchEnvironment.INDEX_WAIT_DELAY >= TwistedSearchEnvironment.NO_DOCS_CUTOFF):
-                return 0
+        deadline = time.monotonic() + TwistedSearchEnvironment.NO_DOCS_CUTOFF
+        rounds_with_docs = 0
+        while True:
             indexed_docs = TwistedTestEnvironment.try_n_times(10, 10, sixm.get_indexed_documents_count, idx_name,
                                                               is_deferred=False)
             if indexed_docs >= TwistedSearchEnvironment.MIN_INDEXED_DOCS:
                 break
+            if indexed_docs == 0:
+                if time.monotonic() >= deadline:
+                    break
+            else:
+                rounds_with_docs += 1
+                if rounds_with_docs >= TwistedSearchEnvironment.INDEX_WAIT_ROUNDS:
+                    break
             print(f'Found {indexed_docs} indexed docs, waiting a bit...')
             TwistedTestEnvironment.sleep(TwistedSearchEnvironment.INDEX_WAIT_DELAY)
 

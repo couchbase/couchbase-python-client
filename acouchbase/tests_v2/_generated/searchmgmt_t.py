@@ -38,6 +38,7 @@ import pytest_asyncio
 
 from acouchbase.management.search import SearchIndex
 from couchbase.exceptions import (FeatureUnavailableException,
+                                  InternalServerFailureException,
                                   InvalidArgumentException,
                                   QueryIndexAlreadyExistsException,
                                   SearchIndexNotFoundException)
@@ -50,7 +51,9 @@ from tests_v2.environments.async_environment import (AsyncTestEnvironment,
 from tests_v2.environments.managers import (AsyncTestEnvironmentScopeSearchIndexManager,
                                             AsyncTestEnvironmentSearchIndexManager)
 from tests_v2.manifest import validate_test_manifest
-from tests_v2.search_index_defs import (UI_INDEX_SOURCE_TYPE,
+from tests_v2.search_index_defs import (INDEX_VISIBLE_DELAY,
+                                        INDEX_VISIBLE_ROUNDS,
+                                        UI_INDEX_SOURCE_TYPE,
                                         collection_index_params,
                                         mgmt_index_name,
                                         mgmt_secondary_index_name,
@@ -186,9 +189,19 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         # retrying until that refusal tolerates a leftover from a test whose drop did not
         # land.  The exception really is the query-named one: the core code behind it is
         # errc::common::index_exists, which every service raises.
-        await AsyncTestEnvironment.try_n_times_till_exception(
-            10, 3, sixm.upsert_index, test_idx,
-            expected_exceptions=(QueryIndexAlreadyExistsException,))
+        #
+        # Creating an index has the search service look the bucket up through the cluster
+        # manager, which can answer with a transient 500.  That surfaces here as
+        # InternalServerFailureException and leaves no index behind, so the create is made
+        # again.
+        try:
+            await AsyncTestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
+        except InternalServerFailureException:
+            await AsyncTestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
 
     @pytest_asyncio.fixture()
     async def drop_test_index(self,
@@ -264,7 +277,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         second = SearchIndex(name=mgmt_secondary_index_name(),
                              source_name=cb_env.bucket.name)
         await sixm.upsert_index(second)
-        found = await AsyncTestEnvironment.try_n_times(10, 3, sixm.get_index, second.name)
+        found = await AsyncTestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                                       sixm.get_index, second.name)
         assert isinstance(found, SearchIndex)
 
         indexes = await sixm.get_all_indexes()
@@ -387,7 +401,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                                 test_idx: SearchIndex) -> None:
         sixm = cb_env.get_manager(AsyncTestEnvironmentSearchIndexManager)
         await sixm.upsert_index(test_idx)
-        found = await AsyncTestEnvironment.try_n_times(10, 3, sixm.get_index, test_idx.name)
+        found = await AsyncTestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                                       sixm.get_index, test_idx.name)
         self._assert_round_trip(found, test_idx)
 
     @pytest.mark.asyncio
@@ -406,7 +421,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         self._assert_parsed_from_json(search_idx, definition)
 
         await sixm.upsert_index(search_idx)
-        found = await AsyncTestEnvironment.try_n_times(10, 3, sixm.get_index, search_idx.name)
+        found = await AsyncTestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                                       sixm.get_index, search_idx.name)
         self._assert_round_trip(found, search_idx)
         # The one index in this suite that names its own source type, so the one place
         # the server can be held to it.  Before 7.0 that is 'couchbase', the SearchIndex
@@ -456,9 +472,16 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                                 cb_env: AsyncTestEnvironment,
                                 test_idx: SearchIndex) -> None:
         sixm = cb_env.get_manager(AsyncTestEnvironmentScopeSearchIndexManager)
-        await AsyncTestEnvironment.try_n_times_till_exception(
-            10, 3, sixm.upsert_index, test_idx,
-            expected_exceptions=(QueryIndexAlreadyExistsException,))
+        # A transient cluster manager 500 leaves no index behind; see the collection-level
+        # fixture above.
+        try:
+            await AsyncTestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
+        except InternalServerFailureException:
+            await AsyncTestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
 
     @pytest_asyncio.fixture()
     async def drop_test_index(self,
@@ -538,7 +561,8 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                              source_name=cb_env.bucket.name,
                              params=params)
         await sixm.upsert_index(second)
-        found = await AsyncTestEnvironment.try_n_times(10, 3, sixm.get_index, second.name)
+        found = await AsyncTestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                                       sixm.get_index, second.name)
         assert isinstance(found, SearchIndex)
 
         indexes = await sixm.get_all_indexes()
@@ -647,7 +671,8 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                                 test_idx: SearchIndex) -> None:
         sixm = cb_env.get_manager(AsyncTestEnvironmentScopeSearchIndexManager)
         await sixm.upsert_index(test_idx)
-        found = await AsyncTestEnvironment.try_n_times(10, 3, sixm.get_index, test_idx.name)
+        found = await AsyncTestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                                       sixm.get_index, test_idx.name)
         self._assert_round_trip(found, test_idx)
 
     @pytest.mark.asyncio
@@ -665,7 +690,8 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         self._assert_parsed_from_json(search_idx, definition)
 
         await sixm.upsert_index(search_idx)
-        found = await AsyncTestEnvironment.try_n_times(10, 3, sixm.get_index, search_idx.name)
+        found = await AsyncTestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                                       sixm.get_index, search_idx.name)
         self._assert_round_trip(found, search_idx)
         # The one index in this suite that names its own source type, so the one place
         # the server can be held to it.

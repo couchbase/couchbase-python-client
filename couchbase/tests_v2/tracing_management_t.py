@@ -58,6 +58,7 @@ from tests_v2.environments.test_environment import (CollectionStrategy,
                                                     teardown_environment)
 from tests_v2.environments.tracing_environment import TracingEnvironment, TracingType
 from tests_v2.manifest import validate_test_manifest
+from tests_v2.search_index_defs import INDEX_VISIBLE_DELAY, INDEX_VISIBLE_ROUNDS
 from tests_v2.test_features import ServerFeatures
 from tests_v2.tracing_validators import HttpSpanValidator
 
@@ -695,7 +696,16 @@ class SearchIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
 
         # The upsert returns before every node holds the definition, so a read sent to another
         # node can still answer index not found.  Wait it out untraced; the traced read is next.
-        cb_env.try_n_times(30, 1, sixm.get_index, index.name)
+        try:
+            cb_env.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY, sixm.get_index, index.name)
+        except CouchbaseException as exc:
+            # Whether the listing has it is what separates a definition that never landed
+            # from one that reached the node serving reads later than the wait allows.
+            listed = [idx.name for idx in sixm.get_all_indexes()]
+            raise AssertionError(
+                f'Index {index.name!r} was still not readable by name after the wait; '
+                f'get_all_indexes() {"lists" if index.name in listed else "does not list"} it.'
+            ) from exc
         http_validator.reset()
         sixm.get_index(index.name)
         http_validator.validate_http_op(OpName.SearchIndexGet)

@@ -32,12 +32,13 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
-from couchbase.exceptions import (InternalServerFailureException,
+from couchbase.exceptions import (CouchbaseException,
+                                  InternalServerFailureException,
                                   QueryIndexAlreadyExistsException,
                                   QueryIndexNotFoundException)
 from tests_v2.environments.async_environment import AsyncTestEnvironment
 from tests_v2.environments.managers import AsyncTestEnvironmentQueryIndexManager
-from tests_v2.environments.query_index_mgmt_environment import index_already_dropped
+from tests_v2.environments.query_index_mgmt_environment import index_already_dropped, index_not_online
 from tests_v2.environments.test_environment import CollectionStrategy
 from tests_v2.test_features import EnvironmentFeatures, ServerFeatures
 
@@ -94,10 +95,15 @@ class AsyncQueryEnvironment:
         rows = AsyncQueryEnvironment.INDEX_LOAD_ROWS
         for _ in range(AsyncQueryEnvironment.INDEX_LOAD_ROUNDS):
             q_str = f"SELECT * FROM {query_namespace} WHERE batch LIKE '{batch}%' LIMIT {rows}"
-            result = cb_env.cluster.query(q_str)
-            count = 0
-            async for _ in result.rows():
-                count += 1
+            try:
+                result = cb_env.cluster.query(q_str)
+                count = 0
+                async for _ in result.rows():
+                    count += 1
+            except CouchbaseException as exc:
+                if not index_not_online(exc):
+                    raise
+                count = 0
             if count >= rows:
                 return
             print('Waiting for index to load, sleeping a bit...')

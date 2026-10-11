@@ -32,6 +32,7 @@ from typing import Any
 import pytest
 
 from couchbase.exceptions import (FeatureUnavailableException,
+                                  InternalServerFailureException,
                                   InvalidArgumentException,
                                   QueryIndexAlreadyExistsException,
                                   SearchIndexNotFoundException)
@@ -45,7 +46,9 @@ from tests_v2.environments.test_environment import (CollectionStrategy,
                                                     build_environment,
                                                     teardown_environment)
 from tests_v2.manifest import validate_test_manifest
-from tests_v2.search_index_defs import (UI_INDEX_SOURCE_TYPE,
+from tests_v2.search_index_defs import (INDEX_VISIBLE_DELAY,
+                                        INDEX_VISIBLE_ROUNDS,
+                                        UI_INDEX_SOURCE_TYPE,
                                         collection_index_params,
                                         mgmt_index_name,
                                         mgmt_secondary_index_name,
@@ -181,9 +184,19 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         # retrying until that refusal tolerates a leftover from a test whose drop did not
         # land.  The exception really is the query-named one: the core code behind it is
         # errc::common::index_exists, which every service raises.
-        TestEnvironment.try_n_times_till_exception(
-            10, 3, sixm.upsert_index, test_idx,
-            expected_exceptions=(QueryIndexAlreadyExistsException,))
+        #
+        # Creating an index has the search service look the bucket up through the cluster
+        # manager, which can answer with a transient 500.  That surfaces here as
+        # InternalServerFailureException and leaves no index behind, so the create is made
+        # again.
+        try:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
+        except InternalServerFailureException:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
 
     @pytest.fixture()
     def drop_test_index(self,
@@ -254,7 +267,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         second = SearchIndex(name=mgmt_secondary_index_name(),
                              source_name=cb_env.bucket.name)
         sixm.upsert_index(second)
-        found = TestEnvironment.try_n_times(10, 3, sixm.get_index, second.name)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, second.name)
         assert isinstance(found, SearchIndex)
 
         indexes = sixm.get_all_indexes()
@@ -368,7 +382,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                           test_idx: SearchIndex) -> None:
         sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
         sixm.upsert_index(test_idx)
-        found = TestEnvironment.try_n_times(10, 3, sixm.get_index, test_idx.name)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, test_idx.name)
         self._assert_round_trip(found, test_idx)
 
     @pytest.mark.usefixtures('drop_test_index_from_json')
@@ -386,7 +401,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         self._assert_parsed_from_json(search_idx, definition)
 
         sixm.upsert_index(search_idx)
-        found = TestEnvironment.try_n_times(10, 3, sixm.get_index, search_idx.name)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, search_idx.name)
         self._assert_round_trip(found, search_idx)
         # The one index in this suite that names its own source type, so the one place
         # the server can be held to it.  Before 7.0 that is 'couchbase', the SearchIndex
@@ -436,9 +452,16 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                           cb_env: SyncTestEnvironment,
                           test_idx: SearchIndex) -> None:
         sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
-        TestEnvironment.try_n_times_till_exception(
-            10, 3, sixm.upsert_index, test_idx,
-            expected_exceptions=(QueryIndexAlreadyExistsException,))
+        # A transient cluster manager 500 leaves no index behind; see the collection-level
+        # fixture above.
+        try:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
+        except InternalServerFailureException:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
 
     @pytest.fixture()
     def drop_test_index(self,
@@ -513,7 +536,8 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                              source_name=cb_env.bucket.name,
                              params=params)
         sixm.upsert_index(second)
-        found = TestEnvironment.try_n_times(10, 3, sixm.get_index, second.name)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, second.name)
         assert isinstance(found, SearchIndex)
 
         indexes = sixm.get_all_indexes()
@@ -613,7 +637,8 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
                           test_idx: SearchIndex) -> None:
         sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
         sixm.upsert_index(test_idx)
-        found = TestEnvironment.try_n_times(10, 3, sixm.get_index, test_idx.name)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, test_idx.name)
         self._assert_round_trip(found, test_idx)
 
     @pytest.mark.usefixtures('drop_test_index_from_json')
@@ -630,7 +655,8 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         self._assert_parsed_from_json(search_idx, definition)
 
         sixm.upsert_index(search_idx)
-        found = TestEnvironment.try_n_times(10, 3, sixm.get_index, search_idx.name)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, search_idx.name)
         self._assert_round_trip(found, search_idx)
         # The one index in this suite that names its own source type, so the one place
         # the server can be held to it.
