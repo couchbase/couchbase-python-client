@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,7 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import json
+from collections.abc import Generator, Sequence
 from datetime import timedelta
 from uuid import uuid4
 
@@ -26,28 +29,37 @@ from couchbase.diagnostics import (ClusterState,
                                    EndpointState,
                                    PingState,
                                    ServiceType)
-from couchbase.exceptions import (InternalServerFailureException,
-                                  InvalidArgumentException,
-                                  ParsingFailedException,
-                                  QueryIndexNotFoundException)
+from couchbase.exceptions import CouchbaseException, InvalidArgumentException
+from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import (ClusterOptions,
                                DiagnosticsOptions,
                                PingOptions)
 from couchbase.result import DiagnosticsResult, PingResult
-from tests.environments import CollectionType
-from tests.test_features import EnvironmentFeatures
+from couchbase.search import MatchQuery
+from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
+from tests.environments.test_environment import (SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.test_features import ServerFeatures
 
 
-class ClusterDiagnosticsTestSuite:
+class ClusterDiagnosticsTestSuite(SuiteRequirements):
+    # The seven ping tests have twins in bucket_t's BucketDiagnosticsTestSuite differing only
+    # in the receiver; that duplication is argued there.  What is not duplicated is how much
+    # the service-filter tests can assert: at bucket level the filter is unobservable, since
+    # an unrestricted `bucket.ping()` already reports key-value and nothing else, while at
+    # cluster level an unrestricted ping reports all seven services and a two-service request
+    # exactly those two, so this suite asserts equality where bucket_t asserts a bound.
+
+    NUM_DOCS = 0
+    REQUIRED_FEATURES = [ServerFeatures.Diagnostics]
+
     TEST_MANIFEST = [
         'test_diagnostics',
         'test_diagnostics_after_query',
         'test_diagnostics_as_json',
-        'test_multiple_close_cluster',
-        'test_operations_after_close',
-        'test_connected_property_after_close',
-        'test_streaming_operations_after_close',
-        'test_management_operations_after_close',
         'test_ping',
         'test_ping_as_json',
         'test_ping_invalid_services',
@@ -57,24 +69,15 @@ class ClusterDiagnosticsTestSuite:
         'test_ping_str_services',
     ]
 
-    @pytest.fixture(scope="class")
-    def check_diagnostics_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('diagnostics',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_diagnostics(self, cb_env):
+    def test_diagnostics(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
         report_id = str(uuid4())
-        result = cluster.diagnostics(
-            DiagnosticsOptions(report_id=report_id))
-        assert isinstance(result, DiagnosticsResult)
-        assert result.id == report_id
+        result = cluster.diagnostics(DiagnosticsOptions(report_id=report_id))
+        cb_assert_isinstance(result, DiagnosticsResult, what='cluster.diagnostics() result')
+        cb_assert_eq(result.id, report_id, what='DiagnosticsResult.id')
         assert result.sdk is not None
         assert result.version is not None
-        assert result.state != ClusterState.Offline
+        self._assert_state_matches_endpoints(result)
 
         kv_endpoints = result.endpoints[ServiceType.KeyValue]
         assert len(kv_endpoints) > 0
@@ -82,53 +85,49 @@ class ClusterDiagnosticsTestSuite:
         assert kv_endpoints[0].local is not None
         assert kv_endpoints[0].remote is not None
         assert kv_endpoints[0].last_activity_us is not None
-        assert kv_endpoints[0].state == EndpointState.Connected
-        assert kv_endpoints[0].service_type == ServiceType.KeyValue
+        cb_assert_eq(kv_endpoints[0].state, EndpointState.Connected, what='kv endpoint state')
+        cb_assert_eq(kv_endpoints[0].service_type, ServiceType.KeyValue, what='kv endpoint service')
 
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_diagnostics_after_query(self, cb_env):
+    def test_diagnostics_after_query(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
-        # lets make sure there is at least 1 row
-        key, value = cb_env.get_new_doc()
-        cb_env.collection.upsert(key, value)
-        bucket_name = cb_env.bucket.name
         report_id = str(uuid4())
-        # query should fail, but diagnostics should
-        # still return a query service type
+        # Whether the query succeeds is beside the point: a server-side failure still means a
+        # query endpoint was opened, and that endpoint appearing in the report is what is
+        # under test.  `.execute()` is not used: the rows are drained instead, which is what
+        # lets this test generate for txcouchbase, whose N1QLRequest has no execute().
+        #
+        # The rows are not counted either: a query that returns none has still opened the
+        # endpoint.  Counting them would make this test wait on the index behind the bucket
+        # catching up, which is a query-consistency assertion wearing a diagnostics test's
+        # clothes.
+        #
+        # The base class rather than a list of subclasses, because a planning failure such as
+        # the primary index not being online arrives as a plain CouchbaseException.
         try:
-            rows = cluster.query(f'SELECT * FROM `{bucket_name}` LIMIT 1').execute()
-            assert len(rows) > 0
-        except (InternalServerFailureException, ParsingFailedException, QueryIndexNotFoundException):
+            rows = cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` LIMIT 1')
+            cb_env.drain_rows(rows)
+        except CouchbaseException:
             pass
-        except Exception as e:
-            print(f'exception: {e.__class__.__name__}, {e}')
-            raise e
 
-        result = cluster.diagnostics(
-            DiagnosticsOptions(report_id=report_id))
-        assert result.id == report_id
+        result = cluster.diagnostics(DiagnosticsOptions(report_id=report_id))
+        cb_assert_eq(result.id, report_id, what='DiagnosticsResult.id')
 
-        query_diag_result = result.endpoints[ServiceType.Query]
-        assert len(query_diag_result) >= 1
-        for q in query_diag_result:
-            assert q.id is not None
-            assert q.local is not None
-            assert q.remote is not None
-            assert isinstance(q.last_activity_us, timedelta)
-            assert q.state == EndpointState.Connected
-            assert q.service_type == ServiceType.Query
+        query_endpoints = result.endpoints[ServiceType.Query]
+        assert len(query_endpoints) >= 1
+        for endpoint in query_endpoints:
+            assert endpoint.id is not None
+            assert endpoint.local is not None
+            assert endpoint.remote is not None
+            cb_assert_isinstance(endpoint.last_activity_us, timedelta, what='last_activity_us')
+            cb_assert_eq(endpoint.state, EndpointState.Connected, what='query endpoint state')
+            cb_assert_eq(endpoint.service_type, ServiceType.Query, what='query endpoint service')
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_diagnostics_as_json(self, cb_env):
+    def test_diagnostics_as_json(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
-        report_id = str(uuid4())
-        result = cluster.diagnostics(
-            DiagnosticsOptions(report_id=report_id))
-
-        assert isinstance(result, DiagnosticsResult)
+        result = cluster.diagnostics(DiagnosticsOptions(report_id=str(uuid4())))
+        cb_assert_isinstance(result, DiagnosticsResult, what='cluster.diagnostics() result')
         result_str = result.as_json()
-        assert isinstance(result_str, str)
+        cb_assert_isinstance(result_str, str, what='DiagnosticsResult.as_json()')
         result_json = json.loads(result_str)
         assert result_json['version'] is not None
         assert result_json['id'] is not None
@@ -142,135 +141,10 @@ class ClusterDiagnosticsTestSuite:
                 assert data[0]['local'] is not None
                 assert data[0]['state'] is not None
 
-    # TODO: really we could use a separate test class to test things like opening/closing buckets, cluster, etc...
-    #    i.e. things that are not query, diagnostics, etc...  For now, lets just have this here
-    # creating a new connection, allow retries
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_multiple_close_cluster(self, cb_env):
-        conn_string = cb_env.config.get_connection_string()
-        username, pw = cb_env.config.get_username_and_pw()
-        auth = PasswordAuthenticator(username, pw)
-        opts = ClusterOptions(auth)
-        cluster = Cluster.connect(conn_string, opts)
-        assert cluster._impl.connected is True
-        for _ in range(10):
-            cluster.close()
-        assert cluster._impl.connected is False
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_operations_after_close(self, cb_env):
-        conn_string = cb_env.config.get_connection_string()
-        username, pw = cb_env.config.get_username_and_pw()
-        auth = PasswordAuthenticator(username, pw)
-        opts = ClusterOptions(auth)
-        cluster = Cluster.connect(conn_string, opts)
-        assert cluster._impl.connected is True
-
-        # Close the cluster
-        cluster.close()
-        assert cluster._impl.connected is False
-
-        # Verify operations after close raise RuntimeError
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.ping()
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.diagnostics()
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.bucket(cb_env.bucket.name)
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_connected_property_after_close(self, cb_env):
-        conn_string = cb_env.config.get_connection_string()
-        username, pw = cb_env.config.get_username_and_pw()
-        auth = PasswordAuthenticator(username, pw)
-        opts = ClusterOptions(auth)
-        cluster = Cluster.connect(conn_string, opts)
-        assert cluster._impl.connected is True
-        cluster.close()
-        assert cluster._impl.connected is False
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_streaming_operations_after_close(self, cb_env):
-        """Verify all streaming operations raise RuntimeError after cluster close"""
-        from couchbase.search import MatchQuery
-
-        conn_string = cb_env.config.get_connection_string()
-        username, pw = cb_env.config.get_username_and_pw()
-        auth = PasswordAuthenticator(username, pw)
-        opts = ClusterOptions(auth)
-        cluster = Cluster.connect(conn_string, opts)
-
-        # Close the cluster
-        cluster.close()
-
-        # Test cluster.query
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.query("SELECT 1=1")
-
-        # Test cluster.analytics_query
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.analytics_query("SELECT 1=1")
-
-        # Test cluster.search
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.search_query("dummy-index", MatchQuery("test"))
-
-        # Test bucket.view_query
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            bucket = cluster.bucket(cb_env.bucket.name)
-            bucket.view_query("dummy-design", "dummy-view")
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_management_operations_after_close(self, cb_env):
-        from couchbase.management.views import DesignDocumentNamespace
-
-        conn_string = cb_env.config.get_connection_string()
-        username, pw = cb_env.config.get_username_and_pw()
-        auth = PasswordAuthenticator(username, pw)
-        opts = ClusterOptions(auth)
-        cluster = Cluster.connect(conn_string, opts)
-        bucket_name = cb_env.bucket.name
-
-        # Get bucket instance before closing (for bucket-level manager tests)
-        bucket = cluster.bucket(bucket_name)
-
-        # Close the cluster
-        cluster.close()
-        assert cluster._impl.connected is False
-
-        # Test cluster-level management APIs
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.buckets().get_all_buckets()
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.users().get_all_users()
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.query_indexes().get_all_indexes(bucket_name)
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.analytics_indexes().get_all_datasets()
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.search_indexes().get_all_indexes()
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            cluster.eventing_functions().get_all_functions()
-
-        # Test bucket-level management APIs
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            bucket.collections().get_all_scopes()
-
-        with pytest.raises(RuntimeError, match="Cannot perform operations on a closed cluster"):
-            bucket.view_indexes().get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT)
-
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping(self, cb_env):
+    def test_ping(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
         result = cluster.ping()
-        assert isinstance(result, PingResult)
+        cb_assert_isinstance(result, PingResult, what='cluster.ping() result')
 
         assert result.sdk is not None
         assert result.id is not None
@@ -278,7 +152,7 @@ class ClusterDiagnosticsTestSuite:
         assert result.endpoints is not None
         for ping_reports in result.endpoints.values():
             for report in ping_reports:
-                assert isinstance(report, EndpointPingReport)
+                cb_assert_isinstance(report, EndpointPingReport, what='ping report')
                 if report.state == PingState.OK:
                     assert report.id is not None
                     assert report.latency is not None
@@ -286,13 +160,12 @@ class ClusterDiagnosticsTestSuite:
                     assert report.local is not None
                     assert report.service_type is not None
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_as_json(self, cb_env):
+    def test_ping_as_json(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
         result = cluster.ping()
-        assert isinstance(result, PingResult)
+        cb_assert_isinstance(result, PingResult, what='cluster.ping() result')
         result_str = result.as_json()
-        assert isinstance(result_str, str)
+        cb_assert_isinstance(result_str, str, what='PingResult.as_json()')
         result_json = json.loads(result_str)
         assert result_json['version'] is not None
         assert result_json['id'] is not None
@@ -306,59 +179,226 @@ class ClusterDiagnosticsTestSuite:
                 assert data[0]['local'] is not None
                 assert data[0]['state'] is not None
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_invalid_services(self, cb_env):
+    def test_ping_invalid_services(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
+        # Suppressed rather than cast: what is under test is that the request builder rejects
+        # a bare ServiceType, and a cast would assert the opposite.
         with pytest.raises(InvalidArgumentException):
-            cluster.ping(PingOptions(service_types=ServiceType.KeyValue))
+            cluster.ping(PingOptions(service_types=ServiceType.KeyValue))  # type: ignore[call-overload]
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_mixed_services(self, cb_env):
+    def test_ping_mixed_services(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
-        services = [ServiceType.KeyValue, ServiceType.Query.value]
-        result = cluster.ping(PingOptions(service_types=services))
-        assert len(result.endpoints) >= 1
+        # `service_types` is annotated homogeneous because that is what callers should write.
+        # The request builders convert per element, so a mixed iterable works and this guards
+        # that it keeps working; the annotation declining to promise it is the point.
+        requested: list[ServiceType | str] = [ServiceType.KeyValue, ServiceType.Query.value]
+        result = cluster.ping(PingOptions(service_types=requested))  # type: ignore[arg-type]
+        self._assert_services_pinged(cb_env, result, requested)
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_report_id(self, cb_env):
+    def test_ping_report_id(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
-        report_id = uuid4()
+        report_id = str(uuid4())
         result = cluster.ping(PingOptions(report_id=report_id))
-        assert str(report_id) == result.id
+        cb_assert_eq(result.id, report_id, what='PingResult.id')
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_restrict_services(self, cb_env):
+    def test_ping_restrict_services(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
-        services = [ServiceType.KeyValue]
-        result = cluster.ping(PingOptions(service_types=services))
-        keys = list(result.endpoints.keys())
-        assert len(keys) == 1
-        assert keys[0] == ServiceType.KeyValue
+        requested = [ServiceType.KeyValue]
+        result = cluster.ping(PingOptions(service_types=requested))
+        self._assert_services_pinged(cb_env, result, requested)
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_str_services(self, cb_env):
+    def test_ping_str_services(self, cb_env: SyncTestEnvironment) -> None:
         cluster = cb_env.cluster
-        services = [ServiceType.KeyValue.value, ServiceType.Query.value]
-        result = cluster.ping(PingOptions(service_types=services))
-        assert len(result.endpoints) >= 1
+        requested = [ServiceType.KeyValue.value, ServiceType.Query.value]
+        result = cluster.ping(PingOptions(service_types=requested))
+        self._assert_services_pinged(cb_env, result, requested)
+
+    @staticmethod
+    def _assert_state_matches_endpoints(result: DiagnosticsResult) -> None:
+        # Neither `state != Offline` nor `state == Online` is the assertion to make here.
+        # Online is what a healthy cluster answers, so the second passes today, but one
+        # endpoint reconnecting turns a correct report into a failure.  Deriving the
+        # expectation from the report's own endpoints cannot flake on a transient, and
+        # unlike `!= Offline` is not satisfied by a state that ignores a dead endpoint.
+        states = [e.state for eps in result.endpoints.values() for e in eps]
+        assert states, 'diagnostics reported no endpoints at all'
+        if all(s == EndpointState.Connected for s in states):
+            expected = ClusterState.Online
+        elif any(s == EndpointState.Connected for s in states):
+            expected = ClusterState.Degraded
+        else:
+            expected = ClusterState.Offline
+        cb_assert_eq(result.state, expected, what='DiagnosticsResult.state')
+
+    @staticmethod
+    def _assert_services_pinged(cb_env: SyncTestEnvironment,
+                                result: PingResult,
+                                requested: Sequence[ServiceType | str]) -> None:
+        # `len(result.endpoints) >= 1` holds just as well when the service filter is ignored
+        # outright.  Equality is available for all three cases: `cb_env.available_services`
+        # reads the deployed service list from `/pools/default`, so the request can be
+        # intersected with it.  It is None on the mock and only there, meaning the question
+        # was not asked rather than answered empty, which leaves the upper bound plus
+        # key-value, the same limit bucket_t has everywhere.
+        allowed = {ServiceType(s) for s in requested}
+        returned = set(result.endpoints.keys())
+        assert returned <= allowed, f'pinged {returned - allowed}, which was not requested'
+        deployed = cb_env.available_services
+        if deployed is None:
+            assert ServiceType.KeyValue in returned, 'key-value was requested but not reported'
+            return
+        cb_assert_eq(returned, allowed & deployed, what='pinged services')
 
 
-class ClassicClusterDiagnosticsTests(ClusterDiagnosticsTestSuite):
+# Every test in this class opens a cluster of its own with `Cluster.connect(...)`, a
+# classmethod `txcouchbase.cluster.Cluster` does not have, so the class is excluded whole.
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Cluster has no connect() classmethod')
+class ClusterCloseTestSuite(SuiteRequirements):
+    # Separate from ClusterDiagnosticsTestSuite because these tests cannot share
+    # `cb_env.cluster` with anything: each one closes the cluster it is testing.
+    # Connectedness is read as `cluster._impl.connected`, a deliberate reach: whether a
+    # connection is open is internal state and no public property is wanted for it.  The
+    # five `flaky` markers mean "opens a connection".
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicClusterDiagnosticsTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicClusterDiagnosticsTests) if valid_test_method(meth)]
-        compare = set(ClusterDiagnosticsTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+    NUM_DOCS = 0
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+    TEST_MANIFEST = [
+        'test_connected_property_after_close',
+        'test_management_operations_after_close',
+        'test_multiple_close_cluster',
+        'test_operations_after_close',
+        'test_streaming_operations_after_close',
+    ]
 
-        cb_base_env.setup(request.param)
-        yield cb_base_env
-        cb_base_env.teardown(request.param)
+    CLOSED_CLUSTER_MSG = 'Cannot perform operations on a closed cluster'
+
+    @staticmethod
+    def _connect(cb_env: SyncTestEnvironment) -> Cluster:
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        return Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_connected_property_after_close(self, cb_env: SyncTestEnvironment) -> None:
+        cluster: Cluster = self._connect(cb_env)
+        assert cluster._impl.connected is True
+        cluster.close()
+        assert cluster._impl.connected is False
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_management_operations_after_close(self, cb_env: SyncTestEnvironment) -> None:
+        cluster: Cluster = self._connect(cb_env)
+        bucket_name = cb_env.bucket.name
+        # Taken before the close, so the bucket-level managers below are reached through a
+        # handle that was valid when it was obtained.  Asking for it afterwards would test
+        # `cluster.bucket()` instead, which test_operations_after_close already covers.
+        bucket = cluster.bucket(bucket_name)
+
+        cluster.close()
+        assert cluster._impl.connected is False
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.buckets().get_all_buckets()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.users().get_all_users()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.query_indexes().get_all_indexes(bucket_name)
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.analytics_indexes().get_all_datasets()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.search_indexes().get_all_indexes()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.eventing_functions().get_all_functions()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            bucket.collections().get_all_scopes()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            bucket.view_indexes().get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT)
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_multiple_close_cluster(self, cb_env: SyncTestEnvironment) -> None:
+        cluster: Cluster = self._connect(cb_env)
+        assert cluster._impl.connected is True
+        for _ in range(10):
+            cluster.close()
+        assert cluster._impl.connected is False
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_operations_after_close(self, cb_env: SyncTestEnvironment) -> None:
+        cluster: Cluster = self._connect(cb_env)
+        assert cluster._impl.connected is True
+
+        cluster.close()
+        assert cluster._impl.connected is False
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.ping()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.diagnostics()
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.bucket(cb_env.bucket.name)
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_streaming_operations_after_close(self, cb_env: SyncTestEnvironment) -> None:
+        cluster: Cluster = self._connect(cb_env)
+        cluster.close()
+
+        # The streaming entry points are all plain calls returning a result object in every
+        # api, so none of the four is bridged: the raise happens when the request is built,
+        # before any row is pulled.
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.query('SELECT 1=1')
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.analytics_query('SELECT 1=1')
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            cluster.search_query('dummy-index', MatchQuery('test'))
+
+        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+            bucket = cluster.bucket(cb_env.bucket.name)
+            bucket.view_query('dummy-design', 'dummy-view')
+
+
+class ClusterDiagnosticsTests(ClusterDiagnosticsTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(ClusterDiagnosticsTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, ClusterDiagnosticsTestSuite)
+        yield env
+        teardown_environment(env, ClusterDiagnosticsTestSuite)
+
+
+# The concrete class needs the marker too, not only the suite class above.  Without it the
+# generated txcouchbase file drops ClusterCloseTestSuite and keeps a subclass of it, which is
+# a NameError at import and takes the whole module with it.  Same pairing as datastructures_t.
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Cluster has no connect() classmethod')
+class ClusterCloseTests(ClusterCloseTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(ClusterCloseTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, ClusterCloseTestSuite)
+        yield env
+        teardown_environment(env, ClusterCloseTestSuite)

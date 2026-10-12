@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,12 +13,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Three suites, because the SDK offers two managers and one of them addresses three
+# namespaces: collection.query_indexes(), which takes no namespace arguments at all;
+# cluster.query_indexes() driven at a named scope and collection; and cluster
+# .query_indexes() driven at the bucket.  The bodies are near-identical apart from the call
+# shape, and that call shape is the whole point, so only the assertions and requirements
+# are shared.  Keeping every manager call lexically in the test body is also what lets the
+# generator rewrite it; see tools/testgen/README.md.
+
+from __future__ import annotations
+
+from collections.abc import Generator, Iterable
 from datetime import timedelta
 
 import pytest
 
-from couchbase.exceptions import (ParsingFailedException,
-                                  QueryIndexAlreadyExistsException,
+from couchbase.exceptions import (QueryIndexAlreadyExistsException,
                                   QueryIndexNotFoundException,
                                   WatchQueryIndexTimeoutException)
 from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
@@ -26,13 +36,107 @@ from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
                                           DropPrimaryQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           WatchQueryIndexOptions)
-from tests.environments import CollectionType
-from tests.environments.query_index_mgmt_environment import QueryIndexManagementTestEnvironment
-from tests.environments.test_environment import TestEnvironment
-from tests.test_features import EnvironmentFeatures
+from couchbase.management.queries import QueryIndex
+from tests.assert_helpers import cb_assert_eq
+from tests.environments.managers import TestEnvironmentCollectionQueryIndexManager, TestEnvironmentQueryIndexManager
+from tests.environments.query_index_mgmt_environment import (CollectionQueryIndexManagementEnvironment,
+                                                             QueryIndexManagementEnvironment)
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.test_features import EnvironmentFeatures, ServerFeatures
+
+# The name the server gives a primary index created without one.
+DEFAULT_PRIMARY_INDEX_NAME = '#primary'
+# On 7.0 and 7.1 a query service stall of about two minutes can catch the primary index creates on
+# a named collection, through either manager, timing one out and holding the next for over a
+# minute.  The cause is not established.  The rerun waits long enough for the stall to pass, and
+# only a timeout reruns.
+PRIMARY_CREATE_STALL_RERUN = pytest.mark.flaky(reruns=1,
+                                               reruns_delay=60,
+                                               only_rerun=['AmbiguousTimeoutException'])
 
 
-class CollectionQueryIndexManagementTestSuite:
+class QueryIndexManagementSuiteBase(SuiteRequirements):
+    # Declares no test methods of its own, so pytest does not collect it and the parity tool
+    # does not read it as a suite.
+
+    # QueryIndexManagement says the query service exists (5.5+, never on a mock).
+    # QueryContext says the manager API is usable, which needs 7.0: every statement it
+    # builds carries a query context.
+    REQUIRED_FEATURES = [ServerFeatures.QueryIndexManagement, ServerFeatures.QueryContext]
+
+    # These suites assert on the contents of an index list, never on query results, and
+    # every test starts by dropping every index.
+    NUM_DOCS = 0
+
+    IX_NAME = 'ix2'
+    IX_KEYS = ('fld1', 'fld2')
+    NAMED_PRIMARY = 'namedPrimary'
+    PARTITIONED_IX_NAME = 'idx_fld1'
+    PARTITION = 'HASH(`fld1`)'
+    CONDITION = '((`fld1` = 1) and (`fld2` = 2))'
+
+    @staticmethod
+    def supports_query_without_index(cb_env: SyncTestEnvironment) -> bool:
+        # A test that drops an index and re-runs the query can only expect
+        # QueryIndexNotFoundException while this is False.
+        return EnvironmentFeatures.is_feature_supported(ServerFeatures.QueryWithoutIndex, cb_env.server_context)
+
+    # --- Shared assertions ---
+    #
+    # No SDK calls in here, so the async generator copies these across untouched and every
+    # get_all_indexes() stays visible in the test body that needs it.
+
+    # get_all_indexes() is declared Iterable[QueryIndex] and each of these walks its argument
+    # more than once, so materializing up front is what makes that safe for any iterable.
+
+    def _find_index(self, indexes: Iterable[QueryIndex], index_name: str) -> QueryIndex:
+        all_indexes = list(indexes)
+        found = next((idx for idx in all_indexes if idx.name == index_name), None)
+        assert found is not None, (
+            f'Index {index_name!r} is absent. Present: {sorted(i.name for i in all_indexes)}.'
+        )
+        return found
+
+    def _assert_index_absent(self, indexes: Iterable[QueryIndex], index_name: str) -> None:
+        all_indexes = list(indexes)
+        assert not any(idx.name == index_name for idx in all_indexes), (
+            f'Index {index_name!r} is still present. Present: {sorted(i.name for i in all_indexes)}.'
+        )
+
+    def _assert_index_count(self, indexes: Iterable[QueryIndex], expected: int) -> None:
+        all_indexes = list(indexes)
+        cb_assert_eq(len(all_indexes), expected, what='index count',
+                     ctx=f'indexes={sorted(i.name for i in all_indexes)}')
+
+    def _assert_deferred(self, index: QueryIndex) -> None:
+        cb_assert_eq(index.state, 'deferred', what=f'state of index {index.name!r}')
+
+    def _assert_primary_index(self, index: QueryIndex, bucket_name: str) -> None:
+        assert index.is_primary is True, f'Index {index.name!r} is not reported as primary.'
+        cb_assert_eq(index.name, DEFAULT_PRIMARY_INDEX_NAME, what='primary index name')
+        cb_assert_eq(index.bucket_name, bucket_name, what='primary index bucket')
+
+    def _assert_partitioned(self, index: QueryIndex) -> None:
+        assert index.partition is not None, (
+            f'Index {index.name!r} reports no partition; it was created PARTITION BY HASH(fld1).'
+        )
+        cb_assert_eq(index.partition, self.PARTITION, what='index partition')
+
+
+# Excluded from txcouchbase: `txcouchbase/collection.py` defines no `query_indexes()`, and
+# txcouchbase's only query_indexes() is the cluster-level one on Cluster, so every test here
+# would fail at `collection.query_indexes()` with AttributeError.
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Collection has no query_indexes()')
+class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
+    MANAGERS = [TestEnvironmentCollectionQueryIndexManager]
+
     TEST_MANIFEST = [
         'test_create_index_no_fields',
         'test_create_named_primary',
@@ -42,8 +146,8 @@ class CollectionQueryIndexManagementTestSuite:
         'test_create_secondary_index_default_coll',
         'test_create_secondary_indexes',
         'test_create_secondary_indexes_condition',
-        'test_create_secondary_indexes_keys_kwarg',
         'test_create_secondary_indexes_ignore_if_exists',
+        'test_create_secondary_indexes_keys_kwarg',
         'test_deferred',
         'test_drop_primary',
         'test_drop_primary_ignore_if_not_exists',
@@ -55,261 +159,282 @@ class CollectionQueryIndexManagementTestSuite:
     ]
 
     @pytest.fixture()
-    def clear_all_indexes(self, cb_env):
-        cb_env.clear_all_indexes()
-
-    @staticmethod
-    def supports_query_without_index(cb_env):
-        return EnvironmentFeatures.is_feature_supported('query_without_index',
-                                                        cb_env.server_version_short,
-                                                        cb_env.mock_server_type)
+    def clear_all_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        CollectionQueryIndexManagementEnvironment.clear_all_indexes(cb_env)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_index_no_fields(self, cb_env):
-        # raises a TypeError b/c not providing fields means
-        #   create_index() is missing a required positional param
+    def test_create_index_no_fields(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        # Omitting the keys leaves create_index() short a required positional parameter,
+        # so the TypeError comes from the SDK.  The test-environment wrapper deliberately
+        # keeps keys in its *args tail so that stays true; see managers/query_index.py.
         with pytest.raises(TypeError):
-            cb_env.qixm.create_index('noFields')
+            qixm.create_index('noFields')
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_named_primary(self, cb_env):
-        ixname = 'namedPrimary'
-        cb_env.qixm.create_primary_index(CreatePrimaryQueryIndexOptions(index_name=ixname,
-                                                                        timeout=timedelta(seconds=60)))
+    def test_create_named_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_primary_index(CreatePrimaryQueryIndexOptions(index_name=self.NAMED_PRIMARY,
+                                                                 timeout=timedelta(seconds=60)))
+        self._find_index(qixm.get_all_indexes(), self.NAMED_PRIMARY)
 
-        # Ensure we can issue a query
-        n1ql = f'SELECT * FROM {cb_env.get_fqdn()} LIMIT 1'
+        # The index has to be usable, not merely listed.
+        n1ql = f'SELECT * FROM {cb_env.fqdn} LIMIT 1'
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
-        cb_env.cluster.query(n1ql).execute()
-        # Drop the primary index
-        cb_env.qixm.drop_primary_index(DropPrimaryQueryIndexOptions(index_name=ixname))
+        qixm.drop_primary_index(DropPrimaryQueryIndexOptions(index_name=self.NAMED_PRIMARY))
 
         if not self.supports_query_without_index(cb_env):
-            # Ensure we get an error when executing the query
             with pytest.raises(QueryIndexNotFoundException):
-                cb_env.cluster.query(n1ql).execute()
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary(self, cb_env):
-        cb_env.qixm.create_primary_index(CreatePrimaryQueryIndexOptions(timeout=timedelta(seconds=60)))
+    def test_create_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_primary_index(CreatePrimaryQueryIndexOptions(timeout=timedelta(seconds=60)))
+        self._find_index(qixm.get_all_indexes(), DEFAULT_PRIMARY_INDEX_NAME)
 
-        # Ensure we can issue a query
-        n1ql = f'SELECT * FROM {cb_env.get_fqdn()} LIMIT 1'
+        n1ql = f'SELECT * FROM {cb_env.fqdn} LIMIT 1'
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
-        cb_env.cluster.query(n1ql).execute()
-        # Drop the primary index
-        cb_env.qixm.drop_primary_index()
+        qixm.drop_primary_index()
 
         if not self.supports_query_without_index(cb_env):
-            # Ensure we get an error when executing the query
             with pytest.raises(QueryIndexNotFoundException):
-                cb_env.cluster.query(n1ql).execute()
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary_ignore_if_exists(self, cb_env):
-        cb_env.qixm.create_primary_index()
-        cb_env.qixm.create_primary_index(CreatePrimaryQueryIndexOptions(ignore_if_exists=True))
+    def test_create_primary_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_primary_index()
+        qixm.create_primary_index(CreatePrimaryQueryIndexOptions(ignore_if_exists=True))
 
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_primary_index()
+            qixm.create_primary_index()
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary_ignore_if_exists_kwargs(self, cb_env):
-        cb_env.qixm.create_primary_index()
-        cb_env.qixm.create_primary_index(ignore_if_exists=True)
+    def test_create_primary_ignore_if_exists_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_primary_index()
+        qixm.create_primary_index(ignore_if_exists=True)
 
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_primary_index()
+            qixm.create_primary_index()
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_index_default_coll(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(ixname,
-                                 keys,
-                                 timeout=timedelta(seconds=120),
-                                 ignore_if_exists=True)
+    # @FINDING(PYCBC-1865): this test does not cover the default collection.  The
+    # collection-level manager is bound to the environment's current collection and takes no
+    # namespace arguments, so it cannot reach `_default`.`_default` at all.  Rename it to
+    # what it covers, or cover the default collection from the cluster-level suite.
+    def test_create_secondary_index_default_coll(self, cb_env: SyncTestEnvironment) -> None:
+        # Whatever the name says, what the body covers is create-then-drop with
+        # ignore_if_exists set.
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_index(self.IX_NAME,
+                          self.IX_KEYS,
+                          timeout=timedelta(seconds=120),
+                          ignore_if_exists=True)
 
-        def check_index():
-            indexes = cb_env.qixm.get_all_indexes()
-            result = next((idx for idx in indexes if idx.name == ixname), None)
-            assert result is not None
-            return result
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(), self.IX_NAME)
+
         TestEnvironment.try_n_times(10, 5, check_index)
-        cb_env.qixm.drop_index(ixname, timeout=timedelta(seconds=120))
+        qixm.drop_index(self.IX_NAME, timeout=timedelta(seconds=120))
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(ixname,
-                                 keys=keys,
-                                 timeout=timedelta(seconds=120))
-        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
-        cb_env.cluster.query(n1ql).execute()
+    def test_create_secondary_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        # Keys positionally; test_create_secondary_indexes_keys_kwarg is the keyword form.
+        qixm.create_index(self.IX_NAME, self.IX_KEYS, timeout=timedelta(seconds=120))
+
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 5, check_index)
+
+        n1ql = ('SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.fqdn, *self.IX_KEYS))
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_condition(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
+    def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_index(self.IX_NAME,
+                          self.IX_KEYS,
+                          CreateQueryIndexOptions(timeout=timedelta(days=1),
+                                                  condition=self.CONDITION))
 
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   5,
-                                                   cb_env.qixm.drop_index,
-                                                   ixname,
-                                                   expected_exceptions=(QueryIndexNotFoundException,))
-        condition = '((`fld1` = 1) and (`fld2` = 2))'
-        cb_env.qixm.create_index(ixname,
-                                 keys,
-                                 CreateQueryIndexOptions(timeout=timedelta(days=1),
-                                                         condition=condition))
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(), self.IX_NAME)
 
-        def check_index():
-            indexes = cb_env.qixm.get_all_indexes()
-            result = next((idx for idx in indexes if idx.name == ixname), None)
-            assert result is not None
-            return result
-        result = TestEnvironment.try_n_times(10, 5, check_index)
-        assert result.condition == condition
+        found = TestEnvironment.try_n_times(10, 5, check_index)
+        cb_assert_eq(found.condition, self.CONDITION, what='index condition')
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_keys_kwarg(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(ixname,
-                                 keys=keys,
-                                 timeout=timedelta(seconds=120))
-        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
-        cb_env.cluster.query(n1ql).execute()
+    def test_create_secondary_indexes_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_index(self.IX_NAME, ['hello'])
+        qixm.create_index(self.IX_NAME, ['hello'], ignore_if_exists=True)
+        qixm.create_index(self.IX_NAME, ['hello'], CreateQueryIndexOptions(ignore_if_exists=True))
 
-    @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_ignore_if_exists(self, cb_env):
-        ixname = 'ix2'
-        cb_env.qixm.create_index(ixname, ['hello'])
-        cb_env.qixm.create_index(ixname, ['hello'], ignore_if_exists=True)
-        cb_env.qixm.create_index(ixname, ['hello'], CreateQueryIndexOptions(ignore_if_exists=True))
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_index(ixname, ['hello'])
+            qixm.create_index(self.IX_NAME, ['hello'])
+
+    @pytest.mark.usefixtures('clear_all_indexes')
+    def test_create_secondary_indexes_keys_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_index(self.IX_NAME, keys=self.IX_KEYS, timeout=timedelta(seconds=120))
+
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 5, check_index)
+
+        n1ql = ('SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.fqdn, *self.IX_KEYS))
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_deferred(self, cb_env):
-        # Create primary index
-        cb_env.qixm.create_primary_index(deferred=True)
-        ixs = cb_env.qixm.get_all_indexes()
-        assert len(ixs) == 1
-        assert ixs[0].state == 'deferred'
+    def test_deferred(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_primary_index(deferred=True)
+        indexes = qixm.get_all_indexes()
+        self._assert_index_count(indexes, 1)
+        self._assert_deferred(indexes[0])
 
-        # Create a bunch of other indexes
         for n in range(5):
-            cb_env.qixm.create_index(f'ix{n}', [f'fld{n}'], CreateQueryIndexOptions(deferred=True))
+            qixm.create_index(f'ix{n}', [f'fld{n}'], CreateQueryIndexOptions(deferred=True))
 
-        ixs = cb_env.qixm.get_all_indexes()
-        assert len(ixs) == 6
+        indexes = qixm.get_all_indexes()
+        self._assert_index_count(indexes, 6)
 
-        ix_names = list(map(lambda i: i.name, ixs))
+        index_names = [i.name for i in indexes]
+        qixm.build_deferred_indexes()
+        qixm.watch_indexes(index_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))
+        # Watching an already-built set again must also succeed, including the primary.
+        qixm.watch_indexes(index_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30),
+                                                               watch_primary=True))
 
-        cb_env.qixm.build_deferred_indexes()
-        cb_env.qixm.watch_indexes(ix_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
-        cb_env.qixm.watch_indexes(ix_names,
-                                  WatchQueryIndexOptions(timeout=timedelta(seconds=30),
-                                                         watch_primary=True))  # Should be OK again
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.watch_indexes(['idontexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
+            qixm.watch_indexes(['idontexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_primary(self, cb_env):
-        # create an index so we can drop
-        cb_env.qixm.create_primary_index(timeout=timedelta(seconds=60))
+    def test_drop_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_primary_index(timeout=timedelta(seconds=60))
+        qixm.drop_primary_index(timeout=timedelta(seconds=60))
 
-        cb_env.qixm.drop_primary_index(timeout=timedelta(seconds=60))
-        # this should fail now
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_primary_index()
+            qixm.drop_primary_index()
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_primary_ignore_if_not_exists(self, cb_env):
-        cb_env.qixm.drop_primary_index(ignore_if_not_exists=True)
-        cb_env.qixm.drop_primary_index(DropPrimaryQueryIndexOptions(ignore_if_not_exists=True))
+    def test_drop_primary_ignore_if_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.drop_primary_index(ignore_if_not_exists=True)
+        qixm.drop_primary_index(DropPrimaryQueryIndexOptions(ignore_if_not_exists=True))
+
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_primary_index()
+            qixm.drop_primary_index()
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_secondary_indexes(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(ixname, keys, timeout=timedelta(seconds=120))
+    def test_drop_secondary_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_index(self.IX_NAME, self.IX_KEYS, timeout=timedelta(seconds=120))
 
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
+        n1ql = ('SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.fqdn, *self.IX_KEYS))
 
-        # Drop the index
-        cb_env.qixm.drop_index(ixname)
-        # Issue the query again
-        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
-            cb_env.cluster.query(n1ql).execute()
+        qixm.drop_index(self.IX_NAME)
+        self._assert_index_absent(qixm.get_all_indexes(), self.IX_NAME)
+
+        # QueryIndexNotFoundException only where a query genuinely needs an index, and
+        # the statement has to parse for that expectation to mean anything: accepting
+        # ParsingFailedException alongside it passes on a malformed statement, where the
+        # missing index was never the reason the query failed.
+        if not self.supports_query_without_index(cb_env):
+            with pytest.raises(QueryIndexNotFoundException):
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env):
-        # Create it
-        ixname = 'ix2'
-        cb_env.qixm.create_index(ixname, ['hello'])
-        # Drop it
-        cb_env.qixm.drop_index(ixname)
-        cb_env.qixm.drop_index(ixname, ignore_if_not_exists=True)
-        cb_env.qixm.drop_index(ixname, DropQueryIndexOptions(ignore_if_not_exists=True))
+    def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_index(self.IX_NAME, ['hello'])
+        qixm.drop_index(self.IX_NAME)
+
+        # Straight after a drop the server can still answer another drop of the same index
+        # with GSI 5000 "Index does not exist", which the core does not map to index-not-found
+        # (CXXCBC-1059), so ignore_if_not_exists does not apply and it surfaces as
+        # InternalServerFailureException.  Waiting for the index to leave the list first keeps
+        # the test on what it covers.
+        def check_absent() -> None:
+            self._assert_index_absent(qixm.get_all_indexes(), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 1, check_absent)
+        qixm.drop_index(self.IX_NAME, ignore_if_not_exists=True)
+        qixm.drop_index(self.IX_NAME, DropQueryIndexOptions(ignore_if_not_exists=True))
+
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_index(ixname)
+            qixm.drop_index(self.IX_NAME)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_index_partition_info(self, cb_env):
-        # use query to create index w/ partition, cannot do that via manager ATM
-        n1ql = f'CREATE INDEX idx_fld1 ON {cb_env.get_fqdn()}(fld1) PARTITION BY HASH(fld1)'
-        cb_env.cluster.query(n1ql).execute()
-        ixs = cb_env.qixm.get_all_indexes()
-        idx = next((ix for ix in ixs if ix.name == "idx_fld1"), None)
-        assert idx is not None
-        assert idx.partition is not None
-        assert idx.partition == 'HASH(`fld1`)'
+    def test_index_partition_info(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        # A partitioned index has to be created by statement; the manager has no option
+        # for it.
+        n1ql = (f'CREATE INDEX {self.PARTITIONED_IX_NAME} ON {cb_env.fqdn}(fld1) '
+                f'PARTITION BY HASH(fld1)')
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
+
+        index = self._find_index(qixm.get_all_indexes(), self.PARTITIONED_IX_NAME)
+        self._assert_partitioned(index)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_list_indexes(self, cb_env):
-        # start with no indexes
-        ixs = cb_env.qixm.get_all_indexes()
-        assert len(ixs) == 0
+    def test_list_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        self._assert_index_count(qixm.get_all_indexes(), 0)
 
-        # Create the primary index
-        cb_env.qixm.create_primary_index()
-        ixs = cb_env.qixm.get_all_indexes()
-        assert len(ixs) == 1
-        assert ixs[0].is_primary is True
-        assert ixs[0].name == '#primary'
-        assert ixs[0].bucket_name == cb_env.bucket.name
+        qixm.create_primary_index()
+        indexes = qixm.get_all_indexes()
+        self._assert_index_count(indexes, 1)
+        self._assert_primary_index(indexes[0], cb_env.bucket.name)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_watch(self, cb_env):
-        # Create primary index
-        cb_env.qixm.create_primary_index(deferred=True)
-        ixs = cb_env.qixm.get_all_indexes()
-        assert len(ixs) == 1
-        assert ixs[0].state == 'deferred'
+    def test_watch(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
+        qixm.create_primary_index(deferred=True)
+        indexes = qixm.get_all_indexes()
+        self._assert_index_count(indexes, 1)
+        self._assert_deferred(indexes[0])
 
-        # Create a bunch of other indexes
         for n in range(5):
-            defer = False
-            if n % 2 == 0:
-                defer = True
-            cb_env.qixm.create_index(f'ix{n}', [f'fld{n}'], deferred=defer)
+            qixm.create_index(f'ix{n}', [f'fld{n}'], deferred=(n % 2 == 0))
 
-        ixs = cb_env.qixm.get_all_indexes()
-        assert len(ixs) == 6
-        # by not building deffered indexes, should timeout
+        indexes = qixm.get_all_indexes()
+        self._assert_index_count(indexes, 6)
+
+        # build_deferred_indexes() is deliberately not called, so the deferred half never
+        # comes online and the watch has to time out.
         with pytest.raises(WatchQueryIndexTimeoutException):
-            cb_env.qixm.watch_indexes([i.name for i in ixs],
-                                      WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
+            qixm.watch_indexes([i.name for i in indexes],
+                               WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
 
 
-class QueryIndexManagementCollectionTestSuite:
+class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
+    MANAGERS = [TestEnvironmentQueryIndexManager]
+
     TEST_MANIFEST = [
         'test_create_index_no_fields',
         'test_create_named_primary',
@@ -319,8 +444,8 @@ class QueryIndexManagementCollectionTestSuite:
         'test_create_secondary_index_default_coll',
         'test_create_secondary_indexes',
         'test_create_secondary_indexes_condition',
-        'test_create_secondary_indexes_keys_kwarg',
         'test_create_secondary_indexes_ignore_if_exists',
+        'test_create_secondary_indexes_keys_kwarg',
         'test_deferred',
         'test_drop_primary',
         'test_drop_primary_ignore_if_not_exists',
@@ -333,443 +458,372 @@ class QueryIndexManagementCollectionTestSuite:
     ]
 
     @pytest.fixture()
-    def clear_all_indexes(self, cb_env):
-        cb_env.clear_all_indexes(CollectionType.NAMED)
+    def clear_all_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        # NAMED rather than the environment's own strategy: several tests here write into
+        # `_default`.`_default` on purpose, so both namespaces have to come back empty.
+        QueryIndexManagementEnvironment.clear_all_indexes(cb_env, CollectionStrategy.NAMED)
 
     @staticmethod
-    def supports_query_without_index(cb_env):
-        return EnvironmentFeatures.is_feature_supported('query_without_index',
-                                                        cb_env.server_version_short,
-                                                        cb_env.mock_server_type)
+    def _namespace(cb_env: SyncTestEnvironment) -> dict:
+        # Read from cb_env rather than TestEnvironment.TEST_SCOPE / TEST_COLLECTION, because
+        # under xdist the provisioned names carry a per-worker suffix.
+        return {'scope_name': cb_env.scope.name, 'collection_name': cb_env.collection.name}
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_index_no_fields(self, cb_env):
-        # raises a TypeError b/c not providing fields means
-        #   create_index() is missing a required positional param
+    def test_create_index_no_fields(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        # Omitting the keys is a TypeError from the SDK, before anything reaches the
+        # server; see the note in managers/query_index.py.
         with pytest.raises(TypeError):
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     'noFields',
-                                     scope_name=cb_env.TEST_SCOPE,
-                                     collection_name=cb_env.TEST_COLLECTION)
+            qixm.create_index(cb_env.bucket.name, 'noFields', **ns)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_named_primary(self, cb_env):
-        ixname = 'namedPrimary'
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         CreatePrimaryQueryIndexOptions(index_name=ixname,
-                                                                        scope_name=cb_env.TEST_SCOPE,
-                                                                        collection_name=cb_env.TEST_COLLECTION,
-                                                                        timeout=timedelta(seconds=60)))
+    def test_create_named_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_primary_index(cb_env.bucket.name,
+                                  CreatePrimaryQueryIndexOptions(index_name=self.NAMED_PRIMARY,
+                                                                 timeout=timedelta(seconds=60),
+                                                                 **ns))
+        self._find_index(qixm.get_all_indexes(cb_env.bucket.name, **ns), self.NAMED_PRIMARY)
 
-        # Ensure we can issue a query
-        n1ql = f'SELECT * FROM {cb_env.get_fqdn()} LIMIT 1'
+        n1ql = f'SELECT * FROM {cb_env.fqdn} LIMIT 1'
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
-        cb_env.cluster.query(n1ql).execute()
-        # Drop the primary index
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name,
-                                       DropPrimaryQueryIndexOptions(index_name=ixname,
-                                                                    scope_name=cb_env.TEST_SCOPE,
-                                                                    collection_name=cb_env.TEST_COLLECTION))
+        qixm.drop_primary_index(cb_env.bucket.name,
+                                DropPrimaryQueryIndexOptions(index_name=self.NAMED_PRIMARY, **ns))
 
         if not self.supports_query_without_index(cb_env):
-            # Ensure we get an error when executing the query
             with pytest.raises(QueryIndexNotFoundException):
-                cb_env.cluster.query(n1ql).execute()
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary(self, cb_env):
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         CreatePrimaryQueryIndexOptions(scope_name=cb_env.TEST_SCOPE,
-                                                                        collection_name=cb_env.TEST_COLLECTION,
-                                                                        timeout=timedelta(seconds=60)))
+    def test_create_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_primary_index(cb_env.bucket.name,
+                                  CreatePrimaryQueryIndexOptions(timeout=timedelta(seconds=60), **ns))
+        self._find_index(qixm.get_all_indexes(cb_env.bucket.name, **ns), DEFAULT_PRIMARY_INDEX_NAME)
 
-        # Ensure we can issue a query
-        n1ql = f'SELECT * FROM {cb_env.get_fqdn()} LIMIT 1'
+        n1ql = f'SELECT * FROM {cb_env.fqdn} LIMIT 1'
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
-        cb_env.cluster.query(n1ql).execute()
-        # Drop the primary index
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name,
-                                       DropPrimaryQueryIndexOptions(scope_name=cb_env.TEST_SCOPE,
-                                                                    collection_name=cb_env.TEST_COLLECTION))
+        qixm.drop_primary_index(cb_env.bucket.name, DropPrimaryQueryIndexOptions(**ns))
 
         if not self.supports_query_without_index(cb_env):
-            # Ensure we get an error when executing the query
             with pytest.raises(QueryIndexNotFoundException):
-                cb_env.cluster.query(n1ql).execute()
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary_ignore_if_exists(self, cb_env):
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         CreatePrimaryQueryIndexOptions(scope_name=cb_env.TEST_SCOPE,
-                                                                        collection_name=cb_env.TEST_COLLECTION))
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         CreatePrimaryQueryIndexOptions(ignore_if_exists=True,
-                                                                        scope_name=cb_env.TEST_SCOPE,
-                                                                        collection_name=cb_env.TEST_COLLECTION))
+    def test_create_primary_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_primary_index(cb_env.bucket.name, CreatePrimaryQueryIndexOptions(**ns))
+        qixm.create_primary_index(cb_env.bucket.name,
+                                  CreatePrimaryQueryIndexOptions(ignore_if_exists=True, **ns))
 
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                             CreatePrimaryQueryIndexOptions(scope_name=cb_env.TEST_SCOPE,
-                                                                            collection_name=cb_env.TEST_COLLECTION))
+            qixm.create_primary_index(cb_env.bucket.name, CreatePrimaryQueryIndexOptions(**ns))
 
+    @PRIMARY_CREATE_STALL_RERUN
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary_ignore_if_exists_kwargs(self, cb_env):
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         scope_name=cb_env.TEST_SCOPE,
-                                         collection_name=cb_env.TEST_COLLECTION)
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         ignore_if_exists=True,
-                                         scope_name=cb_env.TEST_SCOPE,
-                                         collection_name=cb_env.TEST_COLLECTION)
+    def test_create_primary_ignore_if_exists_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_primary_index(cb_env.bucket.name, **ns)
+        qixm.create_primary_index(cb_env.bucket.name, ignore_if_exists=True, **ns)
 
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                             scope_name=cb_env.TEST_SCOPE,
-                                             collection_name=cb_env.TEST_COLLECTION)
+            qixm.create_primary_index(cb_env.bucket.name, **ns)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_index_default_coll(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 keys=keys,
-                                 timeout=timedelta(seconds=120),
-                                 ignore_if_exists=True)
+    def test_create_secondary_index_default_coll(self, cb_env: SyncTestEnvironment) -> None:
+        # No namespace on the create, so this one really does land in
+        # `_default`.`_default`, and the read back names that scope explicitly.
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          keys=self.IX_KEYS,
+                          timeout=timedelta(seconds=120),
+                          ignore_if_exists=True)
 
-        def check_index():
-            indexes = cb_env.qixm.get_all_indexes(cb_env.bucket.name, scope_name='_default')
-            result = next((idx for idx in indexes if idx.name == ixname), None)
-            assert result is not None
-            return result
+        def check_index() -> QueryIndex:
+            return self._find_index(
+                qixm.get_all_indexes(cb_env.bucket.name, scope_name='_default'), self.IX_NAME
+            )
+
         TestEnvironment.try_n_times(10, 5, check_index)
-        cb_env.qixm.drop_index(cb_env.bucket.name, ixname, timeout=timedelta(seconds=120))
+        qixm.drop_index(cb_env.bucket.name, self.IX_NAME, timeout=timedelta(seconds=120))
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 keys=keys,
-                                 timeout=timedelta(seconds=120),
-                                 scope_name=cb_env.TEST_SCOPE,
-                                 collection_name=cb_env.TEST_COLLECTION)
-        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
-        cb_env.cluster.query(n1ql).execute()
+    def test_create_secondary_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        # Keys positionally; test_create_secondary_indexes_keys_kwarg covers the keyword
+        # form.  Passing keys=keys in both would leave the positional form untested.
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          self.IX_KEYS,
+                          timeout=timedelta(seconds=120),
+                          **ns)
+
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(cb_env.bucket.name, **ns), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 5, check_index)
+
+        n1ql = ('SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.fqdn, *self.IX_KEYS))
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_condition(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
+    def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          self.IX_KEYS,
+                          CreateQueryIndexOptions(timeout=timedelta(days=1),
+                                                  condition=self.CONDITION,
+                                                  **ns))
 
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   5,
-                                                   cb_env.qixm.drop_index,
-                                                   cb_env.bucket.name,
-                                                   ixname,
-                                                   expected_exceptions=(QueryIndexNotFoundException,),
-                                                   scope_name=cb_env.TEST_SCOPE,
-                                                   collection_name=cb_env.TEST_COLLECTION)
-        condition = '((`fld1` = 1) and (`fld2` = 2))'
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 keys,
-                                 CreateQueryIndexOptions(timeout=timedelta(days=1),
-                                                         condition=condition,
-                                                         scope_name=cb_env.TEST_SCOPE,
-                                                         collection_name=cb_env.TEST_COLLECTION))
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(cb_env.bucket.name, **ns), self.IX_NAME)
 
-        def check_index():
-            indexes = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                                  scope_name=cb_env.TEST_SCOPE,
-                                                  collection_name=cb_env.TEST_COLLECTION)
-            result = next((idx for idx in indexes if idx.name == ixname), None)
-            assert result is not None
-            return result
-        result = TestEnvironment.try_n_times(10, 5, check_index)
-        assert result.condition == condition
+        found = TestEnvironment.try_n_times(10, 5, check_index)
+        cb_assert_eq(found.condition, self.CONDITION, what='index condition')
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_keys_kwarg(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 keys=keys,
-                                 timeout=timedelta(seconds=120),
-                                 scope_name=cb_env.TEST_SCOPE,
-                                 collection_name=cb_env.TEST_COLLECTION)
-        n1ql = "SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
-        cb_env.cluster.query(n1ql).execute()
+    def test_create_secondary_indexes_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'], **ns)
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'], ignore_if_exists=True, **ns)
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          ['hello'],
+                          CreateQueryIndexOptions(ignore_if_exists=True, **ns))
 
-    @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_ignore_if_exists(self, cb_env):
-        ixname = 'ix2'
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 ['hello'],
-                                 scope_name=cb_env.TEST_SCOPE,
-                                 collection_name=cb_env.TEST_COLLECTION)
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 ['hello'],
-                                 ignore_if_exists=True,
-                                 scope_name=cb_env.TEST_SCOPE,
-                                 collection_name=cb_env.TEST_COLLECTION)
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 ['hello'],
-                                 CreateQueryIndexOptions(ignore_if_exists=True,
-                                                         scope_name=cb_env.TEST_SCOPE,
-                                                         collection_name=cb_env.TEST_COLLECTION))
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     ixname,
-                                     ['hello'],
-                                     scope_name=cb_env.TEST_SCOPE,
-                                     collection_name=cb_env.TEST_COLLECTION)
+            qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'], **ns)
+
+    @pytest.mark.usefixtures('clear_all_indexes')
+    def test_create_secondary_indexes_keys_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          keys=self.IX_KEYS,
+                          timeout=timedelta(seconds=120),
+                          **ns)
+
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(cb_env.bucket.name, **ns), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 5, check_index)
+
+        n1ql = ('SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.fqdn, *self.IX_KEYS))
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_deferred(self, cb_env):
-        # Create primary index
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         deferred=True,
-                                         scope_name=cb_env.TEST_SCOPE,
-                                         collection_name=cb_env.TEST_COLLECTION)
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                          scope_name=cb_env.TEST_SCOPE,
-                                          collection_name=cb_env.TEST_COLLECTION)
-        assert len(ixs) == 1
-        assert ixs[0].state == 'deferred'
+    def test_deferred(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_primary_index(cb_env.bucket.name, deferred=True, **ns)
+        indexes = qixm.get_all_indexes(cb_env.bucket.name, **ns)
+        self._assert_index_count(indexes, 1)
+        self._assert_deferred(indexes[0])
 
-        # Create a bunch of other indexes
         for n in range(5):
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     'ix{0}'.format(n),
-                                     ['fld{0}'.format(n)],
-                                     CreateQueryIndexOptions(deferred=True,
-                                                             scope_name=cb_env.TEST_SCOPE,
-                                                             collection_name=cb_env.TEST_COLLECTION))
+            qixm.create_index(cb_env.bucket.name,
+                              f'ix{n}',
+                              [f'fld{n}'],
+                              CreateQueryIndexOptions(deferred=True, **ns))
 
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                          scope_name=cb_env.TEST_SCOPE,
-                                          collection_name=cb_env.TEST_COLLECTION)
-        assert len(ixs) == 6
+        indexes = qixm.get_all_indexes(cb_env.bucket.name, **ns)
+        self._assert_index_count(indexes, 6)
 
-        ix_names = list(map(lambda i: i.name, ixs))
+        index_names = [i.name for i in indexes]
+        qixm.build_deferred_indexes(cb_env.bucket.name, **ns)
+        qixm.watch_indexes(cb_env.bucket.name,
+                           index_names,
+                           WatchQueryIndexOptions(timeout=timedelta(seconds=30), **ns))
+        # Watching an already-built set again must also succeed, including the primary.
+        qixm.watch_indexes(cb_env.bucket.name,
+                           index_names,
+                           WatchQueryIndexOptions(timeout=timedelta(seconds=30),
+                                                  watch_primary=True,
+                                                  **ns))
 
-        cb_env.qixm.build_deferred_indexes(cb_env.bucket.name,
-                                           scope_name=cb_env.TEST_SCOPE,
-                                           collection_name=cb_env.TEST_COLLECTION)
-        cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                  ix_names,
-                                  WatchQueryIndexOptions(timeout=timedelta(seconds=30),
-                                                         scope_name=cb_env.TEST_SCOPE,
-                                                         collection_name=cb_env.TEST_COLLECTION))  # Should be OK
-        cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                  ix_names,
-                                  WatchQueryIndexOptions(timeout=timedelta(seconds=30),
-                                                         watch_primary=True,
-                                                         scope_name=cb_env.TEST_SCOPE,
-                                                         collection_name=cb_env.TEST_COLLECTION))  # Should be OK again
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                      ['idontexist'],
-                                      WatchQueryIndexOptions(timeout=timedelta(seconds=10),
-                                                             scope_name=cb_env.TEST_SCOPE,
-                                                             collection_name=cb_env.TEST_COLLECTION))
+            qixm.watch_indexes(cb_env.bucket.name,
+                               ['idontexist'],
+                               WatchQueryIndexOptions(timeout=timedelta(seconds=10), **ns))
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_primary(self, cb_env):
-        # create an index so we can drop
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         timeout=timedelta(seconds=60),
-                                         scope_name=cb_env.TEST_SCOPE,
-                                         collection_name=cb_env.TEST_COLLECTION)
+    def test_drop_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60), **ns)
+        qixm.drop_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60), **ns)
 
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name,
-                                       timeout=timedelta(seconds=60),
-                                       scope_name=cb_env.TEST_SCOPE,
-                                       collection_name=cb_env.TEST_COLLECTION)
-        # this should fail now
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_primary_index(cb_env.bucket.name,
-                                           scope_name=cb_env.TEST_SCOPE,
-                                           collection_name=cb_env.TEST_COLLECTION)
+            qixm.drop_primary_index(cb_env.bucket.name, **ns)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_primary_ignore_if_not_exists(self, cb_env):
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name,
-                                       ignore_if_not_exists=True,
-                                       scope_name=cb_env.TEST_SCOPE,
-                                       collection_name=cb_env.TEST_COLLECTION)
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name,
-                                       DropPrimaryQueryIndexOptions(ignore_if_not_exists=True,
-                                                                    scope_name=cb_env.TEST_SCOPE,
-                                                                    collection_name=cb_env.TEST_COLLECTION))
+    def test_drop_primary_ignore_if_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.drop_primary_index(cb_env.bucket.name, ignore_if_not_exists=True, **ns)
+        qixm.drop_primary_index(cb_env.bucket.name,
+                                DropPrimaryQueryIndexOptions(ignore_if_not_exists=True, **ns))
+
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_primary_index(cb_env.bucket.name,
-                                           scope_name=cb_env.TEST_SCOPE,
-                                           collection_name=cb_env.TEST_COLLECTION)
+            qixm.drop_primary_index(cb_env.bucket.name, **ns)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_secondary_indexes(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 keys,
-                                 timeout=timedelta(seconds=120),
-                                 scope_name=cb_env.TEST_SCOPE,
-                                 collection_name=cb_env.TEST_COLLECTION)
+    def test_drop_secondary_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          self.IX_KEYS,
+                          timeout=timedelta(seconds=120),
+                          **ns)
 
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.get_fqdn(), *keys)
+        n1ql = ('SELECT {1}, {2} FROM {0} WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.fqdn, *self.IX_KEYS))
 
-        # Drop the index
-        cb_env.qixm.drop_index(cb_env.bucket.name,
-                               ixname,
-                               scope_name=cb_env.TEST_SCOPE,
-                               collection_name=cb_env.TEST_COLLECTION)
-        # Issue the query again
-        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
-            cb_env.cluster.query(n1ql).execute()
+        qixm.drop_index(cb_env.bucket.name, self.IX_NAME, **ns)
+        self._assert_index_absent(qixm.get_all_indexes(cb_env.bucket.name, **ns), self.IX_NAME)
+
+        # QueryIndexNotFoundException only where a query needs an index, and only on a
+        # statement that parses; CollectionQueryIndexManagementTestSuite has the long form.
+        if not self.supports_query_without_index(cb_env):
+            with pytest.raises(QueryIndexNotFoundException):
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env):
-        # Create it
-        ixname = 'ix2'
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 ['hello'],
-                                 scope_name=cb_env.TEST_SCOPE,
-                                 collection_name=cb_env.TEST_COLLECTION)
-        # Drop it
-        cb_env.qixm.drop_index(cb_env.bucket.name,
-                               ixname,
-                               scope_name=cb_env.TEST_SCOPE,
-                               collection_name=cb_env.TEST_COLLECTION)
-        cb_env.qixm.drop_index(cb_env.bucket.name,
-                               ixname,
-                               ignore_if_not_exists=True,
-                               scope_name=cb_env.TEST_SCOPE,
-                               collection_name=cb_env.TEST_COLLECTION)
-        cb_env.qixm.drop_index(cb_env.bucket.name,
-                               ixname,
-                               DropQueryIndexOptions(ignore_if_not_exists=True,
-                                                     scope_name=cb_env.TEST_SCOPE,
-                                                     collection_name=cb_env.TEST_COLLECTION))
+    def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'], **ns)
+        qixm.drop_index(cb_env.bucket.name, self.IX_NAME, **ns)
+
+        # CollectionQueryIndexManagementTestSuite has why this waits (CXXCBC-1059).
+        def check_absent() -> None:
+            self._assert_index_absent(qixm.get_all_indexes(cb_env.bucket.name, **ns), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 1, check_absent)
+        qixm.drop_index(cb_env.bucket.name, self.IX_NAME, ignore_if_not_exists=True, **ns)
+        qixm.drop_index(cb_env.bucket.name,
+                        self.IX_NAME,
+                        DropQueryIndexOptions(ignore_if_not_exists=True, **ns))
+
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_index(cb_env.bucket.name,
-                                   ixname,
-                                   scope_name=cb_env.TEST_SCOPE,
-                                   collection_name=cb_env.TEST_COLLECTION)
+            qixm.drop_index(cb_env.bucket.name, self.IX_NAME, **ns)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_get_all_correct_collection(self, cb_env):
-        # create some indexes in the _default scope & collection
+    def test_get_all_correct_collection(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+
+        # Two indexes in `_default`.`_default` ...
         for i in range(2):
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     f'ix{i}',
-                                     [f'fld{i}'],
-                                     CreateQueryIndexOptions(deferred=True))
+            qixm.create_index(cb_env.bucket.name,
+                              f'ix{i}',
+                              [f'fld{i}'],
+                              CreateQueryIndexOptions(deferred=True))
 
-        # create some indexes in the test scope & collection
+        # ... and two of the same names in the test scope and collection.
         for i in range(2):
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     f'ix{i}',
-                                     [f'fld{i}'],
-                                     CreateQueryIndexOptions(deferred=True,
-                                                             scope_name=cb_env.TEST_SCOPE,
-                                                             collection_name=cb_env.TEST_COLLECTION))
+            qixm.create_index(cb_env.bucket.name,
+                              f'ix{i}',
+                              [f'fld{i}'],
+                              CreateQueryIndexOptions(deferred=True, **ns))
 
-        # all indexes in bucket (i.e. in test and _default scopes/collections)
-        all_ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
+        # Bucket-wide: every index in every scope and collection.
+        all_indexes = qixm.get_all_indexes(cb_env.bucket.name)
+        # Namespaced: only the two in the test scope and collection.
+        collection_indexes = qixm.get_all_indexes(cb_env.bucket.name, **ns)
 
-        # _should_ be only indexes in test scope & collection
-        collection_ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                                     scope_name=cb_env.TEST_SCOPE,
-                                                     collection_name=cb_env.TEST_COLLECTION)
-
-        assert len(all_ixs) != len(collection_ixs)
-        assert len(all_ixs) == 4
-        assert len(collection_ixs) == 2
+        assert len(all_indexes) != len(collection_indexes), (
+            'A namespaced get_all_indexes() returned as many indexes as the bucket-wide '
+            'one, so scope_name/collection_name were not applied.'
+        )
+        self._assert_index_count(all_indexes, 4)
+        self._assert_index_count(collection_indexes, 2)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_index_partition_info(self, cb_env):
-        # use query to create index w/ partition, cannot do that via manager ATM
-        n1ql = f'CREATE INDEX idx_fld1 ON {cb_env.get_fqdn()}(fld1) PARTITION BY HASH(fld1)'
-        cb_env.cluster.query(n1ql).execute()
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                          scope_name=cb_env.TEST_SCOPE,
-                                          collection_name=cb_env.TEST_COLLECTION)
-        idx = next((ix for ix in ixs if ix.name == "idx_fld1"), None)
-        assert idx is not None
-        assert idx.partition is not None
-        assert idx.partition == 'HASH(`fld1`)'
+    def test_index_partition_info(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        # A partitioned index has to be created by statement; the manager has no option
+        # for it.
+        n1ql = (f'CREATE INDEX {self.PARTITIONED_IX_NAME} ON {cb_env.fqdn}(fld1) '
+                f'PARTITION BY HASH(fld1)')
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
+
+        index = self._find_index(qixm.get_all_indexes(cb_env.bucket.name, **ns),
+                                 self.PARTITIONED_IX_NAME)
+        self._assert_partitioned(index)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_list_indexes(self, cb_env):
-        # start with no indexes
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                          scope_name=cb_env.TEST_SCOPE,
-                                          collection_name=cb_env.TEST_COLLECTION)
-        assert len(ixs) == 0
+    def test_list_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        self._assert_index_count(qixm.get_all_indexes(cb_env.bucket.name, **ns), 0)
 
-        # Create the primary index
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         scope_name=cb_env.TEST_SCOPE,
-                                         collection_name=cb_env.TEST_COLLECTION)
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                          scope_name=cb_env.TEST_SCOPE,
-                                          collection_name=cb_env.TEST_COLLECTION)
-        assert len(ixs) == 1
-        assert ixs[0].is_primary is True
-        assert ixs[0].name == '#primary'
-        assert ixs[0].bucket_name == cb_env.bucket.name
+        qixm.create_primary_index(cb_env.bucket.name, **ns)
+        indexes = qixm.get_all_indexes(cb_env.bucket.name, **ns)
+        self._assert_index_count(indexes, 1)
+        self._assert_primary_index(indexes[0], cb_env.bucket.name)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_watch(self, cb_env):
-        # Create primary index
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         deferred=True,
-                                         scope_name=cb_env.TEST_SCOPE,
-                                         collection_name=cb_env.TEST_COLLECTION)
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                          scope_name=cb_env.TEST_SCOPE,
-                                          collection_name=cb_env.TEST_COLLECTION)
-        assert len(ixs) == 1
-        assert ixs[0].state == 'deferred'
+    def test_watch(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        ns = self._namespace(cb_env)
+        qixm.create_primary_index(cb_env.bucket.name, deferred=True, **ns)
+        indexes = qixm.get_all_indexes(cb_env.bucket.name, **ns)
+        self._assert_index_count(indexes, 1)
+        self._assert_deferred(indexes[0])
 
-        # Create a bunch of other indexes
         for n in range(5):
-            defer = False
-            if n % 2 == 0:
-                defer = True
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     'ix{0}'.format(n),
-                                     ['fld{0}'.format(n)],
-                                     deferred=defer,
-                                     scope_name=cb_env.TEST_SCOPE,
-                                     collection_name=cb_env.TEST_COLLECTION)
+            qixm.create_index(cb_env.bucket.name,
+                              f'ix{n}',
+                              [f'fld{n}'],
+                              deferred=(n % 2 == 0),
+                              **ns)
 
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name,
-                                          scope_name=cb_env.TEST_SCOPE,
-                                          collection_name=cb_env.TEST_COLLECTION)
-        assert len(ixs) == 6
-        # by not building deffered indexes, should timeout
+        indexes = qixm.get_all_indexes(cb_env.bucket.name, **ns)
+        self._assert_index_count(indexes, 6)
+
+        # build_deferred_indexes() is deliberately not called, so the deferred half never
+        # comes online and the watch has to time out.
         with pytest.raises(WatchQueryIndexTimeoutException):
-            cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                      [i.name for i in ixs],
-                                      WatchQueryIndexOptions(timeout=timedelta(seconds=5),
-                                                             scope_name=cb_env.TEST_SCOPE,
-                                                             collection_name=cb_env.TEST_COLLECTION))
+            qixm.watch_indexes(cb_env.bucket.name,
+                               [i.name for i in indexes],
+                               WatchQueryIndexOptions(timeout=timedelta(seconds=5), **ns))
 
 
-class QueryIndexManagementTestSuite:
+class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
+    MANAGERS = [TestEnvironmentQueryIndexManager]
+
     TEST_MANIFEST = [
         'test_create_index_no_fields',
         'test_create_named_primary',
@@ -778,8 +832,8 @@ class QueryIndexManagementTestSuite:
         'test_create_primary_ignore_if_exists_kwargs',
         'test_create_secondary_indexes',
         'test_create_secondary_indexes_condition',
-        'test_create_secondary_indexes_keys_kwarg',
         'test_create_secondary_indexes_ignore_if_exists',
+        'test_create_secondary_indexes_keys_kwarg',
         'test_deferred',
         'test_drop_primary',
         'test_drop_primary_ignore_if_not_exists',
@@ -791,309 +845,345 @@ class QueryIndexManagementTestSuite:
     ]
 
     @pytest.fixture()
-    def clear_all_indexes(self, cb_env):
-        cb_env.clear_all_indexes()
-
-    @staticmethod
-    def supports_query_without_index(cb_env):
-        return EnvironmentFeatures.is_feature_supported('query_without_index',
-                                                        cb_env.server_version_short,
-                                                        cb_env.mock_server_type)
+    def clear_all_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        QueryIndexManagementEnvironment.clear_all_indexes(cb_env, CollectionStrategy.DEFAULT)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_index_no_fields(self, cb_env):
-        # raises a TypeError b/c not providing fields means
-        #   create_index() is missing a required positional param
+    def test_create_index_no_fields(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        # Omitting the keys is a TypeError from the SDK, before anything reaches the
+        # server; see the note in managers/query_index.py.
         with pytest.raises(TypeError):
-            cb_env.qixm.create_index(cb_env.bucket.name, 'noFields')
+            qixm.create_index(cb_env.bucket.name, 'noFields')
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_named_primary(self, cb_env):
-        ixname = 'namedPrimary'
-        # Try to create a _named_ primary index
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         CreatePrimaryQueryIndexOptions(index_name=ixname,
-                                                                        timeout=timedelta(seconds=60)))
+    def test_create_named_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_primary_index(cb_env.bucket.name,
+                                  CreatePrimaryQueryIndexOptions(index_name=self.NAMED_PRIMARY,
+                                                                 timeout=timedelta(seconds=60)))
+        self._find_index(qixm.get_all_indexes(cb_env.bucket.name), self.NAMED_PRIMARY)
 
-        # Ensure we can issue a query
         n1ql = f'SELECT * FROM `{cb_env.bucket.name}` LIMIT 1'
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
-        cb_env.cluster.query(n1ql).execute()
-        # Drop the primary index
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name, DropPrimaryQueryIndexOptions(index_name=ixname))
+        qixm.drop_primary_index(cb_env.bucket.name,
+                                DropPrimaryQueryIndexOptions(index_name=self.NAMED_PRIMARY))
 
         if not self.supports_query_without_index(cb_env):
-            # Ensure we get an error when executing the query
             with pytest.raises(QueryIndexNotFoundException):
-                cb_env.cluster.query(n1ql).execute()
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary(self, cb_env):
-        cb_env.qixm.create_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60))
+    def test_create_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60))
+        self._find_index(qixm.get_all_indexes(cb_env.bucket.name), DEFAULT_PRIMARY_INDEX_NAME)
 
-        # Ensure we can issue a query
         n1ql = f'SELECT * FROM `{cb_env.bucket.name}` LIMIT 1'
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
-        cb_env.cluster.query(n1ql).execute()
-        # Drop the primary index
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name)
+        qixm.drop_primary_index(cb_env.bucket.name)
 
         if not self.supports_query_without_index(cb_env):
-            # Ensure we get an error when executing the query
             with pytest.raises(QueryIndexNotFoundException):
-                cb_env.cluster.query(n1ql).execute()
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary_ignore_if_exists(self, cb_env):
-        cb_env.qixm.create_primary_index(cb_env.bucket.name)
-        cb_env.qixm.create_primary_index(cb_env.bucket.name,
-                                         CreatePrimaryQueryIndexOptions(ignore_if_exists=True))
+    def test_create_primary_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_primary_index(cb_env.bucket.name)
+        qixm.create_primary_index(cb_env.bucket.name,
+                                  CreatePrimaryQueryIndexOptions(ignore_if_exists=True))
 
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_primary_index(cb_env.bucket.name)
+            qixm.create_primary_index(cb_env.bucket.name)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_primary_ignore_if_exists_kwargs(self, cb_env):
-        cb_env.qixm.create_primary_index(cb_env.bucket.name)
-        cb_env.qixm.create_primary_index(cb_env.bucket.name, ignore_if_exists=True)
+    def test_create_primary_ignore_if_exists_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_primary_index(cb_env.bucket.name)
+        qixm.create_primary_index(cb_env.bucket.name, ignore_if_exists=True)
 
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_primary_index(cb_env.bucket.name)
+            qixm.create_primary_index(cb_env.bucket.name)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, keys=keys, timeout=timedelta(seconds=120))
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *keys)
-        cb_env.cluster.query(n1ql).execute()
+    def test_create_secondary_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        # Keys positionally; test_create_secondary_indexes_keys_kwarg covers the keyword
+        # form.  Passing keys=keys in both would leave the positional form untested.
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, self.IX_KEYS,
+                          timeout=timedelta(seconds=120))
+
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(cb_env.bucket.name), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 5, check_index)
+
+        n1ql = ('SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.bucket.name, *self.IX_KEYS))
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_condition(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
+    def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          self.IX_KEYS,
+                          CreateQueryIndexOptions(timeout=timedelta(days=1),
+                                                  condition=self.CONDITION))
 
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   5,
-                                                   cb_env.qixm.drop_index,
-                                                   cb_env.bucket.name,
-                                                   ixname,
-                                                   expected_exceptions=(QueryIndexNotFoundException,))
-        condition = '((`fld1` = 1) and (`fld2` = 2))'
-        cb_env.qixm.create_index(cb_env.bucket.name,
-                                 ixname,
-                                 keys,
-                                 CreateQueryIndexOptions(timeout=timedelta(days=1), condition=condition))
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(cb_env.bucket.name), self.IX_NAME)
 
-        def check_index():
-            indexes = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-            result = next((idx for idx in indexes if idx.name == ixname), None)
-            assert result is not None
-            return result
-        result = TestEnvironment.try_n_times(10, 5, check_index)
-        assert result.condition == condition
+        found = TestEnvironment.try_n_times(10, 5, check_index)
+        cb_assert_eq(found.condition, self.CONDITION, what='index condition')
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_keys_kwarg(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, keys=keys, timeout=timedelta(seconds=120))
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *keys)
-        cb_env.cluster.query(n1ql).execute()
+    def test_create_secondary_indexes_ignore_if_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'])
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'], ignore_if_exists=True)
+        qixm.create_index(cb_env.bucket.name,
+                          self.IX_NAME,
+                          ['hello'],
+                          CreateQueryIndexOptions(ignore_if_exists=True))
 
-    @pytest.mark.usefixtures('clear_all_indexes')
-    def test_create_secondary_indexes_ignore_if_exists(self, cb_env):
-        ixname = 'ix2'
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'])
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'], ignore_if_exists=True)
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'], CreateQueryIndexOptions(ignore_if_exists=True))
         with pytest.raises(QueryIndexAlreadyExistsException):
-            cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'])
+            qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'])
+
+    @pytest.mark.usefixtures('clear_all_indexes')
+    def test_create_secondary_indexes_keys_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, keys=self.IX_KEYS,
+                          timeout=timedelta(seconds=120))
+
+        def check_index() -> QueryIndex:
+            return self._find_index(qixm.get_all_indexes(cb_env.bucket.name), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 5, check_index)
+
+        n1ql = ('SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.bucket.name, *self.IX_KEYS))
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_deferred(self, cb_env):
-        # Create primary index
-        cb_env.qixm.create_primary_index(cb_env.bucket.name, deferred=True)
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-        assert len(ixs) == 1
-        assert ixs[0].state == 'deferred'
+    def test_deferred(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_primary_index(cb_env.bucket.name, deferred=True)
+        indexes = qixm.get_all_indexes(cb_env.bucket.name)
+        self._assert_index_count(indexes, 1)
+        self._assert_deferred(indexes[0])
 
-        # Create a bunch of other indexes
         for n in range(5):
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     'ix{0}'.format(n),
-                                     ['fld{0}'.format(n)],
-                                     CreateQueryIndexOptions(deferred=True))
+            qixm.create_index(cb_env.bucket.name,
+                              f'ix{n}',
+                              [f'fld{n}'],
+                              CreateQueryIndexOptions(deferred=True))
 
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-        assert len(ixs) == 6
+        indexes = qixm.get_all_indexes(cb_env.bucket.name)
+        self._assert_index_count(indexes, 6)
 
-        ix_names = list(map(lambda i: i.name, ixs))
+        index_names = [i.name for i in indexes]
+        qixm.build_deferred_indexes(cb_env.bucket.name)
+        qixm.watch_indexes(cb_env.bucket.name,
+                           index_names,
+                           WatchQueryIndexOptions(timeout=timedelta(seconds=30)))
+        # Watching an already-built set again must also succeed, including the primary.
+        qixm.watch_indexes(cb_env.bucket.name,
+                           index_names,
+                           WatchQueryIndexOptions(timeout=timedelta(seconds=30),
+                                                  watch_primary=True))
 
-        cb_env.qixm.build_deferred_indexes(cb_env.bucket.name)
-        cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                  ix_names,
-                                  WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
-        cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                  ix_names,
-                                  WatchQueryIndexOptions(timeout=timedelta(seconds=30),
-                                                         watch_primary=True))  # Should be OK again
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                      ['idontexist'],
-                                      WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
+            qixm.watch_indexes(cb_env.bucket.name,
+                               ['idontexist'],
+                               WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_primary(self, cb_env):
-        # create an index so we can drop
-        cb_env.qixm.create_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60))
+    def test_drop_primary(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60))
+        qixm.drop_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60))
 
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name, timeout=timedelta(seconds=60))
-        # this should fail now
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_primary_index(cb_env.bucket.name)
+            qixm.drop_primary_index(cb_env.bucket.name)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_primary_ignore_if_not_exists(self, cb_env):
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name, ignore_if_not_exists=True)
-        cb_env.qixm.drop_primary_index(cb_env.bucket.name, DropPrimaryQueryIndexOptions(ignore_if_not_exists=True))
+    def test_drop_primary_ignore_if_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.drop_primary_index(cb_env.bucket.name, ignore_if_not_exists=True)
+        qixm.drop_primary_index(cb_env.bucket.name,
+                                DropPrimaryQueryIndexOptions(ignore_if_not_exists=True))
+
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_primary_index(cb_env.bucket.name)
+            qixm.drop_primary_index(cb_env.bucket.name)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_secondary_indexes(self, cb_env):
-        ixname = 'ix2'
-        keys = ('fld1', 'fld2')
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, keys, timeout=timedelta(seconds=120))
+    def test_drop_secondary_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, self.IX_KEYS,
+                          timeout=timedelta(seconds=120))
 
-        n1ql = "SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1".format(cb_env.bucket.name, *keys)
+        n1ql = ('SELECT {1}, {2} FROM `{0}` WHERE {1}=1 AND {2}=2 LIMIT 1'
+                .format(cb_env.bucket.name, *self.IX_KEYS))
 
-        # Drop the index
-        cb_env.qixm.drop_index(cb_env.bucket.name, ixname)
+        qixm.drop_index(cb_env.bucket.name, self.IX_NAME)
+        self._assert_index_absent(qixm.get_all_indexes(cb_env.bucket.name), self.IX_NAME)
 
         if not self.supports_query_without_index(cb_env):
-            # Ensure we get an error when executing the query
             with pytest.raises(QueryIndexNotFoundException):
-                cb_env.cluster.query(n1ql).execute()
+                result = cb_env.cluster.query(n1ql)
+                cb_env.drain_rows(result)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env):
-        # Create it
-        ixname = 'ix2'
-        cb_env.qixm.create_index(cb_env.bucket.name, ixname, ['hello'])
-        # Drop it
-        cb_env.qixm.drop_index(cb_env.bucket.name, ixname)
-        cb_env.qixm.drop_index(cb_env.bucket.name, ixname, ignore_if_not_exists=True)
-        cb_env.qixm.drop_index(cb_env.bucket.name, ixname, DropQueryIndexOptions(ignore_if_not_exists=True))
+    def test_drop_secondary_indexes_ignore_if_not_exists(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_index(cb_env.bucket.name, self.IX_NAME, ['hello'])
+        qixm.drop_index(cb_env.bucket.name, self.IX_NAME)
+
+        # CollectionQueryIndexManagementTestSuite has why this waits (CXXCBC-1059).
+        def check_absent() -> None:
+            self._assert_index_absent(qixm.get_all_indexes(cb_env.bucket.name), self.IX_NAME)
+
+        TestEnvironment.try_n_times(10, 1, check_absent)
+        qixm.drop_index(cb_env.bucket.name, self.IX_NAME, ignore_if_not_exists=True)
+        qixm.drop_index(cb_env.bucket.name,
+                        self.IX_NAME,
+                        DropQueryIndexOptions(ignore_if_not_exists=True))
+
         with pytest.raises(QueryIndexNotFoundException):
-            cb_env.qixm.drop_index(cb_env.bucket.name, ixname)
+            qixm.drop_index(cb_env.bucket.name, self.IX_NAME)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_index_partition_info(self, cb_env):
-        # use query to create index w/ partition, cannot do that via manager ATM
-        n1ql = 'CREATE INDEX idx_fld1 ON `{0}`(fld1) PARTITION BY HASH(fld1)'.format(cb_env.bucket.name)
-        cb_env.cluster.query(n1ql).execute()
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-        idx = next((ix for ix in ixs if ix.name == "idx_fld1"), None)
-        assert idx is not None
-        assert idx.partition is not None
-        assert idx.partition == 'HASH(`fld1`)'
+    def test_index_partition_info(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        # A partitioned index has to be created by statement; the manager has no option
+        # for it.
+        n1ql = (f'CREATE INDEX {self.PARTITIONED_IX_NAME} ON `{cb_env.bucket.name}`(fld1) '
+                f'PARTITION BY HASH(fld1)')
+        result = cb_env.cluster.query(n1ql)
+        cb_env.drain_rows(result)
+
+        index = self._find_index(qixm.get_all_indexes(cb_env.bucket.name),
+                                 self.PARTITIONED_IX_NAME)
+        self._assert_partitioned(index)
 
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_list_indexes(self, cb_env):
-        # start with no indexes
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-        assert len(ixs) == 0
+    def test_list_indexes(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        self._assert_index_count(qixm.get_all_indexes(cb_env.bucket.name), 0)
 
-        # Create the primary index
-        cb_env.qixm.create_primary_index(cb_env.bucket.name)
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-        assert len(ixs) == 1
-        assert ixs[0].is_primary is True
-        assert ixs[0].name == '#primary'
-        assert ixs[0].bucket_name == cb_env.bucket.name
+        qixm.create_primary_index(cb_env.bucket.name)
+        indexes = qixm.get_all_indexes(cb_env.bucket.name)
+        self._assert_index_count(indexes, 1)
+        self._assert_primary_index(indexes[0], cb_env.bucket.name)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures('clear_all_indexes')
-    def test_watch(self, cb_env):
-        # Create primary index
-        cb_env.qixm.create_primary_index(cb_env.bucket.name, deferred=True)
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-        assert len(ixs) == 1
-        assert ixs[0].state == 'deferred'
+    def test_watch(self, cb_env: SyncTestEnvironment) -> None:
+        qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
+        qixm.create_primary_index(cb_env.bucket.name, deferred=True)
+        indexes = qixm.get_all_indexes(cb_env.bucket.name)
+        self._assert_index_count(indexes, 1)
+        self._assert_deferred(indexes[0])
 
-        # Create a bunch of other indexes
         for n in range(5):
-            defer = False
-            if n % 2 == 0:
-                defer = True
-            cb_env.qixm.create_index(cb_env.bucket.name,
-                                     'ix{0}'.format(n),
-                                     ['fld{0}'.format(n)],
-                                     deferred=defer)
+            qixm.create_index(cb_env.bucket.name,
+                              f'ix{n}',
+                              [f'fld{n}'],
+                              deferred=(n % 2 == 0))
 
-        ixs = cb_env.qixm.get_all_indexes(cb_env.bucket.name)
-        assert len(ixs) == 6
-        # by not building deffered indexes, should timeout
+        indexes = qixm.get_all_indexes(cb_env.bucket.name)
+        self._assert_index_count(indexes, 6)
+
+        # build_deferred_indexes() is deliberately not called, so the deferred half never
+        # comes online and the watch has to time out.
         with pytest.raises(WatchQueryIndexTimeoutException):
-            cb_env.qixm.watch_indexes(cb_env.bucket.name,
-                                      [i.name for i in ixs],
-                                      WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
+            qixm.watch_indexes(cb_env.bucket.name,
+                               [i.name for i in indexes],
+                               WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
 
 
-class ClassicQueryIndexManagementCollectionTests(QueryIndexManagementCollectionTestSuite):
+# Excluded from txcouchbase with its suite class above; without this the concrete class
+# survives and references a suite class that is no longer emitted.
+@pytest.mark.xdist_group('default_keyspace_indexes')
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Collection has no query_indexes()')
+class CollectionQueryIndexManagementTests(CollectionQueryIndexManagementTestSuite):
+
     @pytest.fixture(scope='class', autouse=True)
-    def manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicQueryIndexManagementCollectionTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicQueryIndexManagementCollectionTests) if valid_test_method(meth)]
-        test_list = set(QueryIndexManagementCollectionTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest invalid.  Missing/extra test(s): {test_list}.')
+    def manifest_validated(self) -> None:
+        validate_test_manifest(CollectionQueryIndexManagementTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, request):
-        cb_env = QueryIndexManagementTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class',
+                    name='cb_env',
+                    params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, CollectionQueryIndexManagementTestSuite, request.param)
+
+        yield env
+
+        # Leftover indexes outlive the suite on the DEFAULT leg, where nothing drops the
+        # collection afterwards, so clear before tearing the environment down.
+        TestEnvironment.try_n_times(5, 3,
+                                    CollectionQueryIndexManagementEnvironment.clear_all_indexes,
+                                    env,
+                                    ignore_fail=True)
+        teardown_environment(env, CollectionQueryIndexManagementTestSuite, request.param)
 
 
-class ClassicQueryIndexManagementTests(QueryIndexManagementTestSuite):
+@pytest.mark.xdist_group('default_keyspace_indexes')
+class QueryIndexManagementCollectionTests(QueryIndexManagementCollectionTestSuite):
+
     @pytest.fixture(scope='class', autouse=True)
-    def manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicQueryIndexManagementTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicQueryIndexManagementTests) if valid_test_method(meth)]
-        test_list = set(QueryIndexManagementTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest invalid.  Missing/extra test(s): {test_list}.')
+    def manifest_validated(self) -> None:
+        validate_test_manifest(QueryIndexManagementCollectionTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, request):
-        cb_env = QueryIndexManagementTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, QueryIndexManagementCollectionTestSuite, request.param)
+
+        yield env
+
+        TestEnvironment.try_n_times(5, 3,
+                                    QueryIndexManagementEnvironment.clear_all_indexes,
+                                    env,
+                                    request.param,
+                                    ignore_fail=True)
+        teardown_environment(env, QueryIndexManagementCollectionTestSuite, request.param)
 
 
-class ClassicCollectionQueryIndexManagementTests(CollectionQueryIndexManagementTestSuite):
+@pytest.mark.xdist_group('default_keyspace_indexes')
+class QueryIndexManagementTests(QueryIndexManagementTestSuite):
+
     @pytest.fixture(scope='class', autouse=True)
-    def manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicCollectionQueryIndexManagementTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicCollectionQueryIndexManagementTests) if valid_test_method(meth)]
-        test_list = set(CollectionQueryIndexManagementTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest invalid.  Missing/extra test(s): {test_list}.')
+    def manifest_validated(self) -> None:
+        validate_test_manifest(QueryIndexManagementTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, request):
-        cb_env = QueryIndexManagementTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param, test_suite=self.__class__.__name__)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, QueryIndexManagementTestSuite, request.param)
+
+        yield env
+
+        TestEnvironment.try_n_times(5, 3,
+                                    QueryIndexManagementEnvironment.clear_all_indexes,
+                                    env,
+                                    request.param,
+                                    ignore_fail=True)
+        teardown_environment(env, QueryIndexManagementTestSuite, request.param)

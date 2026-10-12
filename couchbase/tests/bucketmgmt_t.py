@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,6 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
+from collections.abc import Generator
 from datetime import timedelta
 
 import pytest
@@ -29,13 +32,22 @@ from couchbase.management.buckets import (BucketSettings,
                                           ConflictResolutionType,
                                           CreateBucketSettings,
                                           StorageBackend)
-from tests.environments import CollectionType
-from tests.environments.bucket_mgmt_environment import BucketManagementTestEnvironment
-from tests.environments.test_environment import TestEnvironment
-from tests.test_features import EnvironmentFeatures
+from tests.assert_helpers import cb_assert_eq
+from tests.environments.managers import TestEnvironmentBucketManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.suite_fixtures import TopologySuite
+from tests.test_features import EnvironmentFeatures, ServerFeatures
 
 
-class BucketManagementTestSuite:
+class BucketManagementTestSuite(TopologySuite):
+    MANAGERS = [TestEnvironmentBucketManager]
+    COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
+
     TEST_MANIFEST = [
         'test_bucket_backend_default',
         'test_bucket_backend_ephemeral',
@@ -61,69 +73,46 @@ class BucketManagementTestSuite:
     ]
 
     @pytest.fixture(scope='class')
-    def check_bucket_mgmt_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('bucket_mgmt',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    def check_bucket_mgmt_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.BucketManagement, cb_env.server_context)
 
     @pytest.fixture(scope='class')
-    def check_bucket_min_durability_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('bucket_min_durability',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    def check_bucket_min_durability_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.BucketMinDurability, cb_env.server_context)
 
     @pytest.fixture(scope='class')
-    def check_bucket_storage_backend_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('bucket_storage_backend',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    def check_bucket_storage_backend_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.BucketStorageBackend, cb_env.server_context)
 
     @pytest.fixture(scope='class')
-    def check_custom_conflict_resolution_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('custom_conflict_resolution',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    def check_custom_conflict_resolution_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.CustomConflictResolution, cb_env.server_context)
 
     @pytest.fixture(scope="class")
-    def check_non_deduped_history_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('non_deduped_history',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    def check_non_deduped_history_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.NonDedupedHistory, cb_env.server_context)
 
-    @pytest.fixture(scope='class')
-    def num_nodes(self, cb_env):
-        if cb_env.cluster._impl._cluster_info is None:
-            cb_env.cluster.cluster_info()
-        return len(cb_env.cluster._impl._cluster_info.nodes)
-
-    @pytest.fixture(scope='class')
-    def check_multi_node(self, num_nodes):
-        if num_nodes == 1:
-            pytest.skip('Test only for clusters with more than a single node.')
-
-    def supports_magma_128_buckets(self, cb_env):
-        return EnvironmentFeatures.supports_feature('magma_128_buckets',
-                                                    cb_env.server_version_short,
-                                                    cb_env.mock_server_type) is None
+    def supports_magma_128_buckets(self, cb_env: SyncTestEnvironment) -> bool:
+        return EnvironmentFeatures.supports_feature(ServerFeatures.Magma128Buckets, cb_env.server_context) is None
 
     @pytest.fixture()
-    def drop_bucket(self, cb_env):
+    def drop_bucket(self, cb_env: SyncTestEnvironment) -> Generator[None, None, None]:
         yield
         cb_env.drop_bucket()
 
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_backend_default(self, cb_env):
+    def test_bucket_backend_default(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100,
                 flush_enabled=False))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         if self.supports_magma_128_buckets(cb_env):
             assert bucket.storage_backend == StorageBackend.MAGMA
         else:
@@ -132,100 +121,105 @@ class BucketManagementTestSuite:
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_backend_ephemeral(self, cb_env):
+    def test_bucket_backend_ephemeral(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100,
                 bucket_type=BucketType.EPHEMERAL,
                 flush_enabled=False))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.storage_backend == StorageBackend.UNDEFINED
 
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_backend_magma(self, cb_env):
+    def test_bucket_backend_magma(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=1024,
                 flush_enabled=False,
                 storage_backend=StorageBackend.MAGMA))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.storage_backend == StorageBackend.MAGMA
 
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_backend_couchstore(self, cb_env):
+    def test_bucket_backend_couchstore(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100,
                 flush_enabled=False,
                 storage_backend=StorageBackend.COUCHSTORE))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create(self, cb_env):
+    def test_bucket_create(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
                 ram_quota_mb=100))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
+        assert cb_env.server_version_short is not None
         if cb_env.server_version_short >= 6.6:
             assert bucket['minimum_durability_level'] == DurabilityLevel.NONE
 
     @pytest.mark.usefixtures('check_bucket_min_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create_durability(self, cb_env):
+    def test_bucket_create_durability(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
         min_durability = DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE
-        cb_env.bm.create_bucket(CreateBucketSettings(name=bucket_name,
-                                                     bucket_type=BucketType.COUCHBASE,
-                                                     ram_quota_mb=100,
-                                                     minimum_durability_level=min_durability))
+        bm.create_bucket(CreateBucketSettings(name=bucket_name,
+                                              bucket_type=BucketType.COUCHBASE,
+                                              ram_quota_mb=100,
+                                              minimum_durability_level=min_durability))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket["minimum_durability_level"] == min_durability
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create_fail(self, cb_env):
+    def test_bucket_create_fail(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
         settings = CreateBucketSettings(
             name=bucket_name,
             bucket_type=BucketType.COUCHBASE,
             ram_quota_mb=100)
-        cb_env.bm.create_bucket(settings)
+        bm.create_bucket(settings)
         cb_env.consistency.wait_until_bucket_present(bucket_name)
         with pytest.raises(BucketAlreadyExistsException):
-            cb_env.bm.create_bucket(settings)
+            bm.create_bucket(settings)
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create_replica_index_false(self, cb_env):
+    def test_bucket_create_replica_index_false(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
@@ -233,15 +227,16 @@ class BucketManagementTestSuite:
                 ram_quota_mb=100,
                 replica_index=False))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.replica_index is False
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create_replica_index_true(self, cb_env):
+    def test_bucket_create_replica_index_true(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
@@ -249,43 +244,43 @@ class BucketManagementTestSuite:
                 ram_quota_mb=100,
                 replica_index=True))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.replica_index is True
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create_zero_replicas(self, cb_env):
-        """Test that explicitly setting num_replicas=0 works on any cluster (including single-node)."""
+    def test_bucket_create_zero_replicas(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
                 ram_quota_mb=100,
                 num_replicas=0))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.get('num_replicas') == 0
 
     @pytest.mark.usefixtures('check_custom_conflict_resolution_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_custom_conflict_resolution(self, cb_env):
+    def test_bucket_custom_conflict_resolution(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
         if cb_env.is_developer_preview:
-            # Create the bucket
-            cb_env.bm.create_bucket(
+            bm.create_bucket(
                 CreateBucketSettings(
                     name=bucket_name,
                     ram_quota_mb=100,
                     conflict_resolution_type=ConflictResolutionType.CUSTOM,
                     flush_enabled=False))
             cb_env.consistency.wait_until_bucket_present(bucket_name)
-            bucket = cb_env.bm.get_bucket(bucket_name)
+            bucket = bm.get_bucket(bucket_name)
             assert bucket.conflict_resolution_type == ConflictResolutionType.CUSTOM
         else:
             with pytest.raises(FeatureUnavailableException):
-                cb_env.bm.create_bucket(
+                bm.create_bucket(
                     CreateBucketSettings(
                         name=bucket_name,
                         ram_quota_mb=100,
@@ -295,9 +290,10 @@ class BucketManagementTestSuite:
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create_history_retention(self, cb_env):
+    def test_bucket_create_history_retention(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
@@ -309,7 +305,7 @@ class BucketManagementTestSuite:
             )
         )
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.history_retention_collection_default
         assert bucket.history_retention_bytes == 2**31
         assert bucket.history_retention_duration == timedelta(days=1)
@@ -317,12 +313,13 @@ class BucketManagementTestSuite:
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_create_history_retention_unsupported(self, cb_env):
+    def test_bucket_create_history_retention_unsupported(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
 
         # History retention not supported for CouchStore
         with pytest.raises(InvalidArgumentException):
-            cb_env.bm.create_bucket(
+            bm.create_bucket(
                 CreateBucketSettings(
                     name=bucket_name,
                     bucket_type=BucketType.COUCHBASE,
@@ -337,10 +334,11 @@ class BucketManagementTestSuite:
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_update_history_retention(self, cb_env):
+    def test_bucket_update_history_retention(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
 
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
@@ -349,13 +347,13 @@ class BucketManagementTestSuite:
             )
         )
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket is not None
         assert bucket.history_retention_collection_default
         assert bucket.history_retention_bytes == 0
         assert bucket.history_retention_duration == timedelta(0)
 
-        cb_env.bm.update_bucket(
+        bm.update_bucket(
             BucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
@@ -366,7 +364,7 @@ class BucketManagementTestSuite:
                 history_retention_duration=timedelta(minutes=10)
             )
         )
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.history_retention_collection_default
         assert bucket.history_retention_bytes == 2**31
         assert bucket.history_retention_duration == timedelta(minutes=10)
@@ -374,10 +372,11 @@ class BucketManagementTestSuite:
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_update_history_retention_unsupported(self, cb_env):
+    def test_bucket_update_history_retention_unsupported(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
 
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 bucket_type=BucketType.COUCHBASE,
@@ -386,14 +385,14 @@ class BucketManagementTestSuite:
             )
         )
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket is not None
         assert bucket.history_retention_collection_default is None
         assert bucket.history_retention_bytes is None
         assert bucket.history_retention_duration is None
 
         with pytest.raises(InvalidArgumentException):
-            cb_env.bm.update_bucket(
+            bm.update_bucket(
                 BucketSettings(
                     name=bucket_name,
                     bucket_type=BucketType.COUCHBASE,
@@ -407,101 +406,100 @@ class BucketManagementTestSuite:
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    def test_bucket_drop_fail(self, cb_env):
+    def test_bucket_drop_fail(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
         settings = CreateBucketSettings(
             name=bucket_name,
             bucket_type=BucketType.COUCHBASE,
             ram_quota_mb=100)
-        cb_env.bm.create_bucket(settings)
+        bm.create_bucket(settings)
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        cb_env.bm.drop_bucket(bucket_name)
+        bm.drop_bucket(bucket_name)
         cb_env.consistency.wait_until_bucket_dropped(bucket_name)
         with pytest.raises(BucketDoesNotExistException):
-            cb_env.bm.drop_bucket(bucket_name)
+            bm.drop_bucket(bucket_name)
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_flush(self, cb_env):
+    def test_bucket_flush(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100,
                 flush_enabled=True))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.flush_enabled is True
-        # flush the bucket
-        TestEnvironment.try_n_times(10, 3, cb_env.bm.flush_bucket, bucket.name)
+        TestEnvironment.try_n_times(10, 3, bm.flush_bucket, bucket.name)
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_flush_fail(self, cb_env):
+    def test_bucket_flush_fail(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100,
                 flush_enabled=False))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
-        bucket = cb_env.bm.get_bucket(bucket_name)
+        bucket = bm.get_bucket(bucket_name)
         assert bucket.flush_enabled is False
 
         with pytest.raises(BucketNotFlushableException):
-            cb_env.bm.flush_bucket(bucket_name)
+            bm.flush_bucket(bucket_name)
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_bucket_list(self, cb_env):
+    def test_bucket_list(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_names = cb_env.get_bucket_names()
         for bucket_name in bucket_names:
-            cb_env.bm.create_bucket(
+            bm.create_bucket(
                 CreateBucketSettings(
                     name=bucket_name,
                     ram_quota_mb=100))
             cb_env.consistency.wait_until_bucket_present(bucket_name)
 
-        buckets = cb_env.bm.get_all_buckets()
+        buckets = bm.get_all_buckets()
         assert set() == set(bucket_names).difference(set(map(lambda b: b.name, buckets)))
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_change_expiry(self, cb_env):
+    def test_change_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100))
         cb_env.consistency.wait_until_bucket_present(bucket_name)
 
-        # change bucket TTL
-        TestEnvironment.try_n_times(10, 3, cb_env.bm.update_bucket, BucketSettings(
+        TestEnvironment.try_n_times(10, 3, bm.update_bucket, BucketSettings(
             name=bucket_name, max_expiry=timedelta(seconds=500)))
 
-        def get_bucket_expiry_equal(name, expiry):
-            b = cb_env.bm.get_bucket(name)
-
-            if not expiry == b.max_expiry:
-                raise Exception("not equal")
+        def get_bucket_expiry_equal(name: str, expiry: timedelta) -> None:
+            # The poll is the assertion: try_n_times re-raises the final failure, so a
+            # bucket whose expiry never changes fails the test rather than passing quietly.
+            b = bm.get_bucket(name)
+            cb_assert_eq(b.max_expiry, expiry, what='bucket max_expiry')
 
         TestEnvironment.try_n_times(10, 3, get_bucket_expiry_equal, bucket_name, timedelta(seconds=500))
 
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
-    def test_cluster_sees_bucket(self, cb_env):
-        pytest.skip('Skip until seg fault root cause determined.')
+    def test_cluster_sees_bucket(self, cb_env: SyncTestEnvironment) -> None:
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
         bucket_name = cb_env.get_bucket_name()
-        # Create the bucket
-        cb_env.bm.create_bucket(
+        bm.create_bucket(
             CreateBucketSettings(
                 name=bucket_name,
                 ram_quota_mb=100))
@@ -512,24 +510,20 @@ class BucketManagementTestSuite:
         assert isinstance(b, Bucket)
 
 
+@pytest.mark.xdist_group('bucket_lifecycle')
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
-class ClassicBucketManagementTests(BucketManagementTestSuite):
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicBucketManagementTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicBucketManagementTests) if valid_test_method(meth)]
-        compare = set(BucketManagementTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+class BucketManagementTests(BucketManagementTestSuite):
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(BucketManagementTestSuite, self.__class__)
 
-        cb_env = BucketManagementTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_bucket_mgmt()
-        cb_env.setup()
-        yield cb_env
-        cb_env.teardown()
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, BucketManagementTestSuite)
+        env.init_bucket_pool()
+        yield env
+        env.teardown_bucket_pool()
+        teardown_environment(env, BucketManagementTestSuite)

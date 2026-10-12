@@ -13,6 +13,26 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Generated for all three api trees, txcouchbase included: durability reaches the wire purely
+# as an option handed to the shared request builder, and a server-side error propagates
+# through `run_in_reactor_thread` the way an argument-validation one does.
+#
+# `check_sync_durability_supported` gates 8 of the 20 tests, as a per-test fixture rather
+# than a REQUIRED_FEATURES entry: the 12 client-durability tests need no server support, so
+# a suite-wide declaration would retire all 12 against a pre-6.5 cluster.
+#
+# The topology guards are mutually exclusive by construction, so any single cluster shape
+# runs about half of these; the `_single_node` variants assert a durability requirement
+# cannot be met, which is only true on one node.  Ten tests append or prepend 'foo' to an
+# empty utf8 document and assert the result is exactly 'foo', so two drawing the same key
+# would read 'foofoo'; NUM_DOCS covers the full 20 draws rather than the ~10 any one
+# topology makes.
+
+from __future__ import annotations
+
+from collections.abc import Generator
+from datetime import timedelta
+
 import pytest
 
 from couchbase.durability import (ClientDurability,
@@ -27,13 +47,35 @@ from couchbase.options import (AppendOptions,
                                IncrementOptions,
                                PrependOptions)
 from couchbase.transcoder import RawStringTranscoder
-from tests.environments import CollectionType
-from tests.environments.binary_environment import BinaryTestEnvironment
-from tests.environments.test_environment import TestEnvironment
-from tests.test_features import EnvironmentFeatures
+from tests.environments.managers import TestEnvironmentBucketManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 DocType,
+                                                 SyncTestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.suite_fixtures import TopologySuite
+
+# CXXCBC-1056: the core gives the observe poll behind ClientDurability a fixed 5s, whatever the
+# operation timeout, so a loaded cluster can report a write ambiguous that went on to persist
+# and replicate.  Only the writes expected to succeed wait on it; drop this once the core
+# bounds the poll by the operation timeout.
+OBSERVE_DEADLINE_RERUN = pytest.mark.flaky(reruns=3, reruns_delay=1)
 
 
-class BinaryDurabilityTestSuite:
+class BinaryDurabilityTestSuite(TopologySuite):
+
+    # The bucket manager is what supplies num_replicas; without it the fixture reports a
+    # degraded environment rather than skipping, since a suite asking for a number the
+    # framework cannot produce is a wiring mistake and not a property of the cluster.
+    MANAGERS = [TestEnvironmentBucketManager]
+    DATA_SET = [DocType.UTF8_EMPTY, DocType.COUNTER]
+    NUM_DOCS = 10
+    # A multi-node PERSIST_TO_MAJORITY write waits on disk on more than one node, and the
+    # server gives up on it within the request's own timeout and reports it ambiguous.  The
+    # default KV budget is short enough that a loaded cluster crosses it, which says nothing
+    # about whether the write is durable.
+    SERVER_DURABLE_TIMEOUT = timedelta(seconds=10)
 
     TEST_MANIFEST = [
         'test_client_durable_append',
@@ -58,242 +100,202 @@ class BinaryDurabilityTestSuite:
         'test_server_durable_prepend_single_node',
     ]
 
-    @pytest.fixture(scope='class')
-    def check_has_replicas(self, num_replicas):
-        if num_replicas == 0:
-            pytest.skip('No replicas to test durability.')
-
-    @pytest.fixture(scope='class')
-    def check_multi_node(self, num_nodes):
-        if num_nodes == 1:
-            pytest.skip('Test only for clusters with more than a single node.')
-
-    @pytest.fixture(scope='class')
-    def check_single_node(self, num_nodes):
-        if num_nodes != 1:
-            pytest.skip('Test only for clusters with a single node.')
-
-    @pytest.fixture(scope='class')
-    def check_sync_durability_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('sync_durability',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.fixture(scope='class')
-    def num_replicas(self, cb_env):
-        bucket_settings = TestEnvironment.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
-        num_replicas = bucket_settings.get('num_replicas')
-        return num_replicas
-
-    @pytest.fixture(scope='class')
-    def num_nodes(self, cb_env):
-        return len(cb_env.cluster._impl.cluster_info.nodes)
+    @OBSERVE_DEADLINE_RERUN
+    @pytest.mark.usefixtures('check_multi_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_append(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        cb_env.collection.binary().append(key, 'foo', AppendOptions(durability=durability))
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == 'foo'
 
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_append(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-        cb_env.collection.binary().append(key, 'foo',  AppendOptions(durability=durability))
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo'
-
-    @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_append_fail(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_append_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
-            cb_env.collection.binary().append(key, 'foo',  AppendOptions(durability=durability))
+            cb_env.collection.binary().append(key, 'foo', AppendOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_append_single_node(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_append_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
-            cb_env.collection.binary().append(key, 'foo',  AppendOptions(durability=durability))
+            cb_env.collection.binary().append(key, 'foo', AppendOptions(durability=durability))
 
+    @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_decrement(self, cb_env, num_replicas):
-        key, value = cb_env.get_existing_doc_by_type('counter')
-        durability = ClientDurability(
-            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_decrement(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
         result = cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
         assert result.content == value - 1
 
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_decrement_fail(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('counter', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_decrement_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_decrement_single_node(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('counter', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_decrement_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
 
+    @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_increment(self, cb_env, num_replicas):
-        key, value = cb_env.get_existing_doc_by_type('counter')
-        durability = ClientDurability(
-            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_increment(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
         result = cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
         assert result.content == value + 1
 
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_increment_fail(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('counter', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_increment_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_increment_single_node(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('counter', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_increment_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
 
+    @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_prepend(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-        cb_env.collection.binary().prepend(key, 'foo',  PrependOptions(durability=durability))
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo'
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_prepend(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        cb_env.collection.binary().prepend(key, 'foo', PrependOptions(durability=durability))
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == 'foo'
 
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_prepend_fail(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_prepend_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
-            cb_env.collection.binary().prepend(key, 'foo',  PrependOptions(durability=durability))
+            cb_env.collection.binary().prepend(key, 'foo', PrependOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_client_durable_prepend_single_node(self, cb_env, num_replicas):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
-        durability = ClientDurability(
-            persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_client_durable_prepend_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
+        durability = ClientDurability(persist_to=PersistToExtended.FOUR, replicate_to=ReplicateTo(num_replicas))
         with pytest.raises(DurabilityImpossibleException):
-            cb_env.collection.binary().prepend(key, 'foo',  PrependOptions(durability=durability))
+            cb_env.collection.binary().prepend(key, 'foo', PrependOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
+    @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_append(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_append(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-        cb_env.collection.binary().append(key, 'foo',  AppendOptions(durability=durability))
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo'
+        opts = AppendOptions(durability=durability, timeout=self.SERVER_DURABLE_TIMEOUT)
+        cb_env.collection.binary().append(key, 'foo', opts)
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == 'foo'
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_append_single_node(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+    @pytest.mark.usefixtures('check_sync_durability_supported')
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_append_single_node(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
         with pytest.raises(DurabilityImpossibleException):
-            cb_env.collection.binary().append(key, 'foo',  AppendOptions(durability=durability))
+            cb_env.collection.binary().append(key, 'foo', AppendOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
+    @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_decrement(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('counter')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_decrement(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-        result = cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
+        opts = DecrementOptions(durability=durability, timeout=self.SERVER_DURABLE_TIMEOUT)
+        result = cb_env.collection.binary().decrement(key, opts)
         assert result.content == value - 1
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_decrement_single_node(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('counter', key_only=True)
+    @pytest.mark.usefixtures('check_sync_durability_supported')
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_decrement_single_node(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
+    @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_increment(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('counter')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_increment(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-        result = cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
+        opts = IncrementOptions(durability=durability, timeout=self.SERVER_DURABLE_TIMEOUT)
+        result = cb_env.collection.binary().increment(key, opts)
         assert result.content == value + 1
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_increment_single_node(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('counter', key_only=True)
+    @pytest.mark.usefixtures('check_sync_durability_supported')
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_increment_single_node(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
+    @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_prepend(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_prepend(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
-        cb_env.collection.binary().append(key, 'foo',  AppendOptions(durability=durability))
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo'
+        # `prepend`, not `append`, and the distinction is invisible from the assertion:
+        # prepending to an empty document gives the same result as appending.  So a copy of
+        # test_server_durable_append whose call was never changed passes here, leaving
+        # server-durable prepend with no success-path coverage at all.
+        opts = PrependOptions(durability=durability, timeout=self.SERVER_DURABLE_TIMEOUT)
+        cb_env.collection.binary().prepend(key, 'foo', opts)
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == 'foo'
 
-    @pytest.mark.usefixtures("check_sync_durability_supported")
-    @pytest.mark.usefixtures("check_single_node")
-    @pytest.mark.usefixtures('check_has_replicas')
-    def test_server_durable_prepend_single_node(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+    @pytest.mark.usefixtures('check_sync_durability_supported')
+    @pytest.mark.usefixtures('check_single_node')
+    @pytest.mark.usefixtures('check_replicas_configured')
+    def test_server_durable_prepend_single_node(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
         with pytest.raises(DurabilityImpossibleException):
-            cb_env.collection.binary().prepend(key, 'foo',  PrependOptions(durability=durability))
+            cb_env.collection.binary().prepend(key, 'foo', PrependOptions(durability=durability))
 
 
-class ClassicBinaryDurabilityTests(BinaryDurabilityTestSuite):
+class BinaryDurabilityTests(BinaryDurabilityTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicBinaryDurabilityTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicBinaryDurabilityTests) if valid_test_method(meth)]
-        compare = set(BinaryDurabilityTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(BinaryDurabilityTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = BinaryTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_bucket_mgmt()
-        cb_env.setup(request.param, __name__)
-
-        yield cb_env
-
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, BinaryDurabilityTestSuite, request.param)
+        yield env
+        teardown_environment(env, BinaryDurabilityTestSuite, request.param)

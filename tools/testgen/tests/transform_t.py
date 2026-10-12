@@ -85,7 +85,7 @@ def test_each_awaited_call_in_a_chain_gets_its_own_parentheses() -> None:
 def test_a_renamed_call_is_renamed_inside_its_parentheses() -> None:
     """The rename and the `(await ` share a start column, and the rename's span has to be
     written before the insertion moves it."""
-    src = ('from tests_v2.environments.test_environment import build_environment\n\n'
+    src = ('from tests.environments.test_environment import build_environment\n\n'
            'class Thing:\n\n'
            '    def test_x(self, cb_base_env) -> None:\n'
            '        c = build_environment(cb_base_env, Thing).cluster\n')

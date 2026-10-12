@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,334 +13,146 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""Analytics dataverse/dataset setup and teardown for the classic/sync suites.
+
+Same shape as query_environment.py: one module per api style, one class of static
+helpers, no TestEnvironment subclass.  build_environment() has already created the
+collection and seeded it by the time anything here runs, so this module holds only what is
+actually analytics.
+
+Two setup paths, both inherited from the suite they serve rather than chosen here:
+
+  * NAMED runs raw DDL, because a dataset in a scope-shadowing dataverse cannot be
+    expressed through the manager API.  `create_dataset(name, bucket_name)` has no
+    dataverse parameter, so the `USE <dataverse>;` prefix is the only way to say it.
+  * DEFAULT runs through the manager wrapper, one shared bucket-wide dataset.
+
+The dataset is created *after* load_data(), and the order does not matter: a dataset
+ingests the documents already in its source collection rather than only watching for new
+ones.  The row-count wait below is what makes that safe either way, since analytics
+ingestion is asynchronous whichever comes first.
+"""
 
 from __future__ import annotations
 
-import time
-from typing import Optional
+from typing import Any
 
-from couchbase.result import AnalyticsResult
-from tests.environments import CollectionType
-from tests.environments.test_environment import AsyncTestEnvironment, TestEnvironment
+from tests.environments.managers import TestEnvironmentAnalyticsIndexManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment)
+from tests.skips import env_degraded
+from tests.test_features import EnvironmentFeatures, ServerFeatures
 
 
-class AnalyticsTestEnvironment(TestEnvironment):
+class AnalyticsEnvironment:
+    """Classic/sync analytics dataverse, dataset and link setup."""
+
     DATASET_NAME = 'test-dataset'
 
-    @property
-    def fqdn(self) -> Optional[str]:
-        return f'`{self.bucket.name}`.`{self.scope.name}`.`{self.collection.name}`'
+    # Ten rows is a "the link is flowing" probe, not a completeness check: the suites
+    # assert their own counts, and ingestion is asynchronous so an exact count would be a
+    # race.  Capped against what load_data() actually seeded, so a suite that lowers
+    # NUM_DOCS below ten does not spend five sleeping rounds on a threshold it can never
+    # reach.  NAMED_EMPTY seeds nothing, and there the cap makes the wait a no-op, which
+    # is right: there is no ingestion to wait for.
+    MIN_INGESTED_ROWS = 10
 
-    def assert_rows(self,
-                    result,  # type: AnalyticsResult
-                    expected_count):
-        count = 0
-        assert isinstance(result, (AnalyticsResult,))
-        for row in result.rows():
-            assert row is not None
-            count += 1
-        assert count >= expected_count
+    @staticmethod
+    def _execute(cb_env: SyncTestEnvironment, statement: str, **kwargs: Any) -> None:
+        """Run an analytics statement for its effect, draining the rows.
 
-    def create_analytics_collections(self):
+        The drain is not optional.  `analytics_query` builds a lazy request and the
+        statement does not reach the server until the rows are iterated, so dropping the
+        result silently skips the DDL.
         """
-            Setup queries:
-                Create dataverse:
-                    CREATE DATAVERSE `default`.`test-scope` IF NOT EXISTS;
+        result = cb_env.cluster.analytics_query(statement, **kwargs)
+        for _ in result.rows():
+            pass
 
-                Create dataset:
-                    USE `default`.`test-scope`;
-                    CREATE DATASET IF NOT EXISTS `test-collection` ON `default`.`test-scope`.`test-collection`;
+    @staticmethod
+    def _dataverse(cb_env: SyncTestEnvironment) -> str:
+        """`bucket`.`scope`, the dataverse that shadows the suite's named scope."""
+        return f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
 
-                Connect Link:
-                    USE `default`.`test-scope`; CONNECT LINK Local;
-        """
+    @staticmethod
+    def _create_analytics_collections(cb_env: SyncTestEnvironment) -> None:
+        dv = AnalyticsEnvironment._dataverse(cb_env)
+        AnalyticsEnvironment._execute(cb_env, f'CREATE DATAVERSE {dv} IF NOT EXISTS;')
+        AnalyticsEnvironment._execute(
+            cb_env, f'USE {dv}; CREATE DATASET IF NOT EXISTS `{cb_env.collection.name}` ON {cb_env.fqdn}')
+        AnalyticsEnvironment._execute(cb_env, f'USE {dv}; CONNECT LINK Local;')
 
-        dv_fqdn = f'`{self.bucket.name}`.`{self.scope.name}`'
-        q_str = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
-        res = self.cluster.analytics_query(q_str)
-        [_ for _ in res.rows()]
+    @staticmethod
+    def _drop_analytics_collections(cb_env: SyncTestEnvironment) -> None:
+        dv = AnalyticsEnvironment._dataverse(cb_env)
+        AnalyticsEnvironment._execute(cb_env, f'USE {dv}; DISCONNECT LINK Local;')
+        AnalyticsEnvironment._execute(cb_env, f'USE {dv}; DROP DATASET `{cb_env.collection.name}` IF EXISTS;')
+        AnalyticsEnvironment._execute(cb_env, f'DROP DATAVERSE {dv} IF EXISTS;')
 
-        q_str = f'USE {dv_fqdn}; CREATE DATASET IF NOT EXISTS `{self.collection.name}` ON {self.fqdn}'
-        res = self.cluster.analytics_query(q_str)
-        [_ for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; CONNECT LINK Local;'
-        res = self.cluster.analytics_query(q_str)
-        [_ for _ in res.rows()]
-
-    def get_batch_id(self):
-        if hasattr(self, '_batch_id'):
-            return self._batch_id
-
-        doc = list(self._loaded_docs.values())[0]
-        self._batch_id = doc['batch']
-        return self._batch_id
-
-    def setup(self,
-              collection_type,  # type: CollectionType
-              ):
-
-        if collection_type == CollectionType.NAMED:
-            self.enable_collection_mgmt().enable_named_collections()
-            TestEnvironment.try_n_times(5, 3, self.setup_named_collections)
-            self.create_analytics_collections()
-            query_namespace = f'`{self.collection.name}`'
-            query_context = f'default:`{self.bucket.name}`.`{self.scope.name}`'
+    @staticmethod
+    def _row_count(cb_env: SyncTestEnvironment,
+                   query_namespace: str,
+                   query_context: str | None) -> int:
+        q_str = f'SELECT COUNT(1) AS doc_count FROM {query_namespace}'
+        if query_context is not None:
+            result = cb_env.cluster.analytics_query(q_str, query_context=query_context)
         else:
-            TestEnvironment.try_n_times(10,
-                                        3,
-                                        self.aixm.create_dataset,
-                                        self.DATASET_NAME,
-                                        self.bucket.name,
-                                        ignore_if_exists=True)
-            self.aixm.connect_link()
-            query_namespace = f'`{self.DATASET_NAME}`'
-            query_context = None
+            result = cb_env.cluster.analytics_query(q_str)
+        rows = list(result.rows())
+        if not rows:
+            return 0
+        return int(rows[0].get('doc_count', 0))
 
-        TestEnvironment.try_n_times(5, 3, self.load_data)
-
+    @staticmethod
+    def _wait_for_ingestion(cb_env: SyncTestEnvironment,
+                            query_namespace: str,
+                            query_context: str | None) -> None:
+        wanted = min(AnalyticsEnvironment.MIN_INGESTED_ROWS, len(cb_env.loaded_keys))
         for _ in range(5):
-            row_count_good = self._check_row_count(self.cluster,
-                                                   query_namespace,
-                                                   10,
-                                                   query_context=query_context)
+            count = AnalyticsEnvironment._row_count(cb_env, query_namespace, query_context)
+            if count >= wanted:
+                return
+            print('Waiting for the analytics dataset to ingest, sleeping a bit...')
+            TestEnvironment.sleep(5)
+        env_degraded(stage='analytics-ingest',
+                     namespace=query_namespace,
+                     wanted=wanted,
+                     got=count,
+                     note='the analytics dataset did not ingest the loaded documents')
 
-            if row_count_good:
-                break
-            print('Waiting for index to load, sleeping a bit...')
-            time.sleep(5)
+    @staticmethod
+    def setup_analytics(cb_env: SyncTestEnvironment, collection_strategy: CollectionStrategy) -> None:
+        """Create the dataset the suite queries and wait for it to hold rows.
 
-    def teardown(self,
-                 collection_type,  # type: CollectionType
-                 ):
-
-        TestEnvironment.try_n_times(5, 3, self.purge_data)
-
-        if collection_type == CollectionType.NAMED:
-            self.teardown_analytics_collections()
-            TestEnvironment.try_n_times(5, 3, self.teardown_named_collections)
+        The feature check runs first and runs here rather than in the suite, so it takes
+        the whole class with it on a mock or on a cluster with no analytics node, the same
+        way setup_query_indexes gates the query suites.  Reaching create_dataset without it
+        fails inside the manager instead, which reads as an SDK defect.
+        """
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.Analytics, cb_env.server_context)
+        # Keyed on DEFAULT rather than on NAMED, so NAMED_EMPTY takes the named path too.
+        # The branch that matters is whether there is a named scope to shadow with a
+        # dataverse, which both named strategies have and DEFAULT does not.
+        if collection_strategy == CollectionStrategy.DEFAULT:
+            aixm = cb_env.get_manager(TestEnvironmentAnalyticsIndexManager)
+            TestEnvironment.try_n_times(10, 3, aixm.create_dataset, AnalyticsEnvironment.DATASET_NAME,
+                                        cb_env.bucket.name, ignore_if_exists=True)
+            aixm.connect_link()
+            query_namespace = f'`{AnalyticsEnvironment.DATASET_NAME}`'
+            query_context = None
         else:
-            self.aixm.disconnect_link()
-            TestEnvironment.try_n_times(10,
-                                        3,
-                                        self.aixm.drop_dataset,
-                                        self.DATASET_NAME,
+            AnalyticsEnvironment._create_analytics_collections(cb_env)
+            query_namespace = f'`{cb_env.collection.name}`'
+            query_context = f'default:{AnalyticsEnvironment._dataverse(cb_env)}'
+        AnalyticsEnvironment._wait_for_ingestion(cb_env, query_namespace, query_context)
+
+    @staticmethod
+    def teardown_analytics(cb_env: SyncTestEnvironment, collection_strategy: CollectionStrategy) -> None:
+        if collection_strategy == CollectionStrategy.DEFAULT:
+            aixm = cb_env.get_manager(TestEnvironmentAnalyticsIndexManager)
+            aixm.disconnect_link()
+            TestEnvironment.try_n_times(10, 3, aixm.drop_dataset, AnalyticsEnvironment.DATASET_NAME,
                                         ignore_if_not_exists=True)
-
-    def teardown_analytics_collections(self):
-        """
-            Tear-down queries:
-                Disconnect Link:
-                    USE `default`.`test-scope`; DISCONNECT LINK Local;
-
-                Droo dataset:
-                    USE `default`.`test-scope`; DROP DATASET `test-collection` IF EXISTS;
-
-                Drop dataverse:
-                    DROP DATAVERSE `default`.`test-scope` IF EXISTS;
-        """
-        dv_fqdn = f'`{self.bucket.name}`.`{self.scope.name}`'
-        q_str = f'USE {dv_fqdn}; DISCONNECT LINK Local;'
-        res = self.cluster.analytics_query(q_str)
-        [_ for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; DROP DATASET `{self.collection.name}` IF EXISTS;'
-        res = self.cluster.analytics_query(q_str)
-        [_ for _ in res.rows()]
-
-        q_str = f'DROP DATAVERSE {dv_fqdn} IF EXISTS;'
-        res = self.cluster.analytics_query(q_str)
-        [_ for _ in res.rows()]
-
-    def _check_row_count(self,
-                         cb,
-                         query_namespace,  # type: str
-                         min_count,  # type: int
-                         query_context=None,  # type: Optional[str]
-                         ) -> bool:
-
-        q_str = f'SELECT COUNT(1) AS doc_count FROM {query_namespace}'
-        if query_context is not None:
-            result = cb.analytics_query(q_str, query_context=query_context)
         else:
-            result = cb.analytics_query(q_str)
-
-        rows = [r for r in result.rows()]
-        return len(rows) > 0 and rows[0].get('doc_count', 0) > min_count
-
-    @classmethod
-    def from_environment(cls,
-                         env  # type: TestEnvironment
-                         ) -> AnalyticsTestEnvironment:
-
-        env_args = {
-            'bucket': env.bucket,
-            'cluster': env.cluster,
-            'default_collection': env.default_collection,
-            'couchbase_config': env.config,
-            'data_provider': env.data_provider,
-        }
-
-        cb_env = cls(**env_args)
-        return cb_env
-
-
-class AsyncAnalyticsTestEnvironment(AsyncTestEnvironment):
-    DATASET_NAME = 'test-dataset'
-
-    @property
-    def fqdn(self) -> Optional[str]:
-        return f'`{self.bucket.name}`.`{self.scope.name}`.`{self.collection.name}`'
-
-    async def assert_rows(self,
-                          result,  # type: AnalyticsResult
-                          expected_count):
-        count = 0
-        assert isinstance(result, (AnalyticsResult,))
-        async for row in result.rows():
-            assert row is not None
-            count += 1
-        assert count >= expected_count
-
-    async def create_analytics_collections(self):
-        """
-            Setup queries:
-                Create dataverse:
-                    CREATE DATAVERSE `default`.`test-scope` IF NOT EXISTS;
-
-                Create dataset:
-                    USE `default`.`test-scope`;
-                    CREATE DATASET IF NOT EXISTS `test-collection` ON `default`.`test-scope`.`test-collection`;
-
-                Connect Link:
-                    USE `default`.`test-scope`; CONNECT LINK Local;
-        """
-
-        dv_fqdn = f'`{self.bucket.name}`.`{self.scope.name}`'
-        q_str = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
-        res = self.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; CREATE DATASET IF NOT EXISTS `{self.collection.name}` ON {self.fqdn}'
-        res = self.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; CONNECT LINK Local;'
-        res = self.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-    def get_batch_id(self):
-        if hasattr(self, '_batch_id'):
-            return self._batch_id
-
-        doc = list(self._loaded_docs.values())[0]
-        self._batch_id = doc['batch']
-        return self._batch_id
-
-    async def setup(self,
-                    collection_type,  # type: CollectionType
-                    ):
-
-        if collection_type == CollectionType.NAMED:
-            self.enable_collection_mgmt().enable_named_collections()
-            await AsyncTestEnvironment.try_n_times(5, 3, self.setup_named_collections)
-            await self.create_analytics_collections()
-            query_namespace = f'`{self.collection.name}`'
-            query_context = f'default:`{self.bucket.name}`.`{self.scope.name}`'
-        else:
-            await AsyncTestEnvironment.try_n_times(10,
-                                                   3,
-                                                   self.aixm.create_dataset,
-                                                   self.DATASET_NAME,
-                                                   self.bucket.name,
-                                                   ignore_if_exists=True)
-            await self.aixm.connect_link()
-            query_namespace = f'`{self.DATASET_NAME}`'
-            query_context = None
-
-        await AsyncTestEnvironment.try_n_times(5, 3, self.load_data)
-
-        for _ in range(5):
-            row_count_good = await self._check_row_count(self.cluster,
-                                                         query_namespace,
-                                                         10,
-                                                         query_context=query_context)
-
-            if row_count_good:
-                break
-            print('Waiting for index to load, sleeping a bit...')
-            await AsyncTestEnvironment.sleep(5)
-
-    async def teardown(self,
-                       collection_type,  # type: CollectionType
-                       ):
-
-        await AsyncTestEnvironment.try_n_times(5, 3, self.purge_data)
-
-        if collection_type == CollectionType.NAMED:
-            await self.teardown_analytics_collections()
-            await AsyncTestEnvironment.try_n_times(5, 3, self.teardown_named_collections)
-        else:
-            await self.aixm.disconnect_link()
-            await AsyncTestEnvironment.try_n_times(10,
-                                                   3,
-                                                   self.aixm.drop_dataset,
-                                                   self.DATASET_NAME,
-                                                   ignore_if_not_exists=True)
-
-    async def teardown_analytics_collections(self):
-        """
-            Tear-down queries:
-                Disconnect Link:
-                    USE `default`.`test-scope`; DISCONNECT LINK Local;
-
-                Droo dataset:
-                    USE `default`.`test-scope`; DROP DATASET `test-collection` IF EXISTS;
-
-                Drop dataverse:
-                    DROP DATAVERSE `default`.`test-scope` IF EXISTS;
-        """
-        dv_fqdn = f'`{self.bucket.name}`.`{self.scope.name}`'
-        q_str = f'USE {dv_fqdn}; DISCONNECT LINK Local;'
-        res = self.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'USE {dv_fqdn}; DROP DATASET `{self.collection.name}` IF EXISTS;'
-        res = self.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'DROP DATAVERSE {dv_fqdn} IF EXISTS;'
-        res = self.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-    async def _check_row_count(self,
-                               cb,
-                               query_namespace,  # type: str
-                               min_count,  # type: int
-                               query_context=None,  # type: Optional[str]
-                               ) -> bool:
-
-        q_str = f'SELECT COUNT(1) AS doc_count FROM {query_namespace}'
-        if query_context is not None:
-            result = cb.analytics_query(q_str, query_context=query_context)
-        else:
-            result = cb.analytics_query(q_str)
-
-        rows = [r async for r in result.rows()]
-        return len(rows) > 0 and rows[0].get('doc_count', 0) > min_count
-
-    @classmethod
-    def from_environment(cls,
-                         env  # type: TestEnvironment
-                         ) -> AnalyticsTestEnvironment:
-
-        env_args = {
-            'bucket': env.bucket,
-            'cluster': env.cluster,
-            'default_collection': env.default_collection,
-            'couchbase_config': env.config,
-            'data_provider': env.data_provider,
-        }
-
-        cb_env = cls(**env_args)
-        return cb_env
+            AnalyticsEnvironment._drop_analytics_collections(cb_env)

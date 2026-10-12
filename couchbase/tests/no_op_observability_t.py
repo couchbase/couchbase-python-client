@@ -13,7 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pytest
+from __future__ import annotations
+
+from typing import Optional, cast
 
 from couchbase.logic.observability.handler import (ObservableRequestHandler,
                                                    ObservableRequestHandlerMeterImpl,
@@ -23,75 +25,69 @@ from couchbase.logic.observability.handler import (ObservableRequestHandler,
 from couchbase.logic.observability.no_op import (NoOpMeter,
                                                  NoOpSpan,
                                                  NoOpTracer)
-from couchbase.logic.observability.observability_types import ObservabilityInstruments, WrappedTracer
+from couchbase.logic.observability.observability_types import (MeterProtocol,
+                                                               ObservabilityInstruments,
+                                                               TracerProtocol,
+                                                               WrappedTracer)
 from couchbase.logic.operation_types import KeyValueOperationType
+from couchbase.observability.tracing import RequestTracer
+from tests.observability_test_impls import RecordingMeter, RecordingTracer
 
 
-class NoOpTracerTestSuite:
-    TEST_MANIFEST = [
-        'test_request_span',
-        'test_request_span_with_parent',
-    ]
+def _instruments(tracer: Optional[RequestTracer] = None,
+                 meter: Optional[MeterProtocol] = None) -> ObservabilityInstruments:
+    # The cast is not about these test implementations.  `RequestTracerProtocol.request_span` declares
+    # `parent_span: Optional[RequestSpanProtocol]` while the ABC every tracer derives from
+    # declares the narrower `Optional[RequestSpan]`, so no subclass of the documented base
+    # satisfies the protocol structurally.
+    wrapped = WrappedTracer(cast(TracerProtocol, tracer if tracer is not None else NoOpTracer()), False)
+    # `is_noop` mirrors what `ClusterSettings` computes, because that flag is what lets an
+    # operation skip handler construction altogether: set wrongly, the handler takes a branch
+    # no cluster ever takes.
+    return ObservabilityInstruments(wrapped,
+                                    meter if meter is not None else NoOpMeter(),
+                                    is_noop=tracer is None and meter is None)
 
-    def test_request_span(self):
-        """The no-op tracer should return a span rather than raise."""
+
+class NoOpTracerUnitTests:
+    # No cb_env and no TEST_MANIFEST: the tracer is constructed and called directly, and
+    # `couchbase.logic.observability.no_op` holds the only definition.  Not generated for that
+    # reason.
+    #
+    # This is the tracer every cluster gets when nothing is configured, so it sits on the path
+    # of every operation and is the one tracer no observability suite can substitute.  What it
+    # owes an application that opens a parent span while tracing is off is a usable span.
+
+    def test_request_span(self) -> None:
         span = NoOpTracer().request_span('cb.get')
 
         assert isinstance(span, NoOpSpan)
         assert span.is_recording is False
         assert span.span_end is None
 
-    def test_request_span_with_parent(self):
-        """A parent span and a start time should be accepted, not rejected."""
+    def test_request_span_with_parent(self) -> None:
         parent = NoOpSpan('cb.request')
         span = NoOpTracer().request_span('cb.get', parent_span=parent, start_time=1)
 
+        # A parent and a start time are accepted and dropped: the span records nothing, so
+        # there is nothing for either to be recorded on.
         assert isinstance(span, NoOpSpan)
         assert span.is_recording is False
 
 
-class ClassicNoOpTracerTests(NoOpTracerTestSuite):
+class ObservabilityInstrumentsCacheUnitTests:
+    # No cb_env and no TEST_MANIFEST, for the reason NoOpTracerUnitTests above gives.
+    #
+    # A no-op handler is built on every operation and there is nothing per-operation about it,
+    # so one impl is shared across every op type on the same instruments.  Three cache states,
+    # and the middle one is the one worth knowing: None means not yet checked, False means the
+    # tracer or meter is real and there is nothing to cache, anything else is the cached impl.
+    # False rather than a bool is what lets `is not False` narrow to the impl type.
+    #
+    # That makes it per-instance mutable state on a dataclass whose fields otherwise describe a
+    # configuration, which is why the last test here is about equality and repr.
 
-    @pytest.fixture(scope='class', autouse=True)
-    def manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicNoOpTracerTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicNoOpTracerTests) if valid_test_method(meth)]
-        test_list = set(NoOpTracerTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest not validated.  Missing/extra tests: {test_list}.')
-
-
-class _StubTracer:
-    """Anything that is not a NoOpTracer, so the handler takes the real branch."""
-
-    def request_span(self, name, parent_span=None, start_time=None):
-        return None
-
-
-class _StubMeter:
-
-    def value_recorder(self, name, tags):
-        return None
-
-
-def _instruments(tracer=None, meter=None):
-    return ObservabilityInstruments(WrappedTracer(tracer or NoOpTracer(), False),
-                                    meter or NoOpMeter(),
-                                    is_noop=tracer is None and meter is None)
-
-
-class ObservabilityInstrumentsCacheTestSuite:
-    TEST_MANIFEST = [
-        'test_cache_is_absent_from_equality_and_repr',
-        'test_each_instruments_instance_gets_its_own_cache',
-        'test_noop_impls_are_reused_across_op_types',
-        'test_real_instruments_record_the_false_sentinel',
-    ]
-
-    def test_noop_impls_are_reused_across_op_types(self):
-        """One no-op impl per instruments, not one per operation."""
+    def test_noop_impls_are_reused_across_op_types(self) -> None:
         instruments = _instruments()
         first = ObservableRequestHandler(KeyValueOperationType.Get, instruments)
         second = ObservableRequestHandler(KeyValueOperationType.Upsert, instruments)
@@ -102,7 +98,9 @@ class ObservabilityInstrumentsCacheTestSuite:
         assert first._meter_impl is second._meter_impl
         assert first.is_noop is True and second.is_noop is True
 
-    def test_each_instruments_instance_gets_its_own_cache(self):
+    def test_each_instruments_instance_gets_its_own_cache(self) -> None:
+        # Two clusters in one process each hold their own instruments, so a cache shared
+        # across instances would hand one cluster's handler the other's impl.
         one, other = _instruments(), _instruments()
         first = ObservableRequestHandler(KeyValueOperationType.Get, one)
         second = ObservableRequestHandler(KeyValueOperationType.Get, other)
@@ -110,11 +108,12 @@ class ObservabilityInstrumentsCacheTestSuite:
         assert first._tracer_impl is not second._tracer_impl
         assert first._meter_impl is not second._meter_impl
 
-    def test_real_instruments_record_the_false_sentinel(self):
-        """False records that there is nothing to cache, which is what the impl branch reads."""
-        instruments = _instruments(tracer=_StubTracer(), meter=_StubMeter())
+    def test_real_instruments_record_the_false_sentinel(self) -> None:
+        instruments = _instruments(tracer=RecordingTracer(), meter=RecordingMeter())
         handler = ObservableRequestHandler(KeyValueOperationType.Get, instruments)
 
+        # False records that there was something to check and nothing to cache, which is what
+        # keeps the next handler on this instruments from checking again.
         assert instruments._cached_noop_tracer_impl is False
         assert instruments._cached_noop_meter_impl is False
         assert isinstance(handler._tracer_impl, ObservableRequestHandlerTracerImpl)
@@ -122,9 +121,12 @@ class ObservabilityInstrumentsCacheTestSuite:
         assert handler.is_noop is False
         assert handler.with_metrics is True
 
-    def test_cache_is_absent_from_equality_and_repr(self):
-        """The cache is per-instance state, so it must not enter the value the dataclass declares."""
-        tracer, meter = WrappedTracer(NoOpTracer(), False), NoOpMeter()
+    def test_cache_is_absent_from_equality_and_repr(self) -> None:
+        # The cache is per-instance state, so it must not enter the value the dataclass
+        # declares: two instruments configured the same way are the same configuration
+        # whether or not one of them has been used.
+        tracer = WrappedTracer(cast(TracerProtocol, NoOpTracer()), False)
+        meter = NoOpMeter()
         warmed = ObservabilityInstruments(tracer, meter, is_noop=True)
         cold = ObservabilityInstruments(tracer, meter, is_noop=True)
         ObservableRequestHandler(KeyValueOperationType.Get, warmed)
@@ -133,16 +135,3 @@ class ObservabilityInstrumentsCacheTestSuite:
         assert cold._cached_noop_tracer_impl is None
         assert warmed == cold
         assert '_cached_noop' not in repr(warmed)
-
-
-class ClassicObservabilityInstrumentsCacheTests(ObservabilityInstrumentsCacheTestSuite):
-
-    @pytest.fixture(scope='class', autouse=True)
-    def manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicObservabilityInstrumentsCacheTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicObservabilityInstrumentsCacheTests) if valid_test_method(meth)]
-        test_list = set(ObservabilityInstrumentsCacheTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest not validated.  Missing/extra tests: {test_list}.')

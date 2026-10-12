@@ -23,7 +23,7 @@ docs/_build/
 
 # tests
 tests/test_logs/
-tests_v2/test_logs/
+tests/test_logs/
 CouchbaseMock*.jar
 gocaves*
 .pytest_cache/

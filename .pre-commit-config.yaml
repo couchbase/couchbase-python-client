@@ -66,9 +66,9 @@ repos:
   - repo: local
     hooks:
       - id: audit-type-ignores
-        name: audit type-ignore suppressions in tests_v2
+        name: audit type-ignore suppressions in the test trees
         # mypy enforces that the annotations are right; this enforces that the escapes
-        # from them stay accountable.  Every `# type: ignore` in the tests_v2 trees has
+        # from them stay accountable.  Every `# type: ignore` in the test trees has
         # to name its error code, and has to carry the PYCBC key that will retire it
         # unless it is permanent.  Rationale and the allowlist of permanent ones are in
         # the module docstring.
@@ -78,7 +78,7 @@ repos:
         # let a suppression added in one commit hide behind a later commit that does not
         # touch that file.
         pass_filenames: false
-        files: ^(tests_v2/|(a|tx)?couchbase/tests_v2/|tools/audit_type_ignores\.py)
+        files: ^(tests/|(a|tx)?couchbase/tests/|tools/audit_type_ignores\.py)
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
@@ -111,10 +111,6 @@ repos:
               txcouchbase/tests/|
               couchbase/tests/|
               tests/|
-              acouchbase/tests_v2/|
-              txcouchbase/tests_v2/|
-              couchbase/tests_v2/|
-              tests_v2/|
               tools/|
               simple_acouchbase.py|
               simple_couchbase.py|

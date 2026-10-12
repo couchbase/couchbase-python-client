@@ -90,7 +90,7 @@ def _add_missing_imports(text: str, tr: SuiteTransformer) -> str:
         text = text.replace('from collections.abc import ',
                             'from collections.abc import AsyncGenerator, ', 1)
     if getattr(tr, 'needs_rit', False):
-        text = _add_import_name(text, 'tests_v2.environments.twisted_environment',
+        text = _add_import_name(text, 'tests.environments.twisted_environment',
                                 'run_in_reactor_thread')
     return '\n'.join(_dedupe_abc_import(ln) for ln in text.splitlines()) + '\n'
 

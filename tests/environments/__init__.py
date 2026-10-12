@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,26 +13,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from collections import namedtuple
-from enum import IntEnum
+from __future__ import annotations
 
+from tests.skips import CouchbaseTestEnvironmentException
 
-class CollectionType(IntEnum):
-    DEFAULT = 1
-    NAMED = 2
-
-
-class CouchbaseTestEnvironmentException(Exception):
-    """Raised when something with the test environment is incorrect."""
-
-    def __init__(self, message=None):
-        super().__init__(message)
-
-    def __repr__(self):
-        return f"{type(self).__name__}({super().__str__()})"
-
-    def __str__(self):
-        return self.__repr__()
-
-
-KVPair = namedtuple("KVPair", "key value")
+# Re-exported, not defined here.  The exception lives in tests/skips.py so that it sits
+# next to the skip categories it carries: the taxonomy only works if the "did not run, and
+# that is fine" path and the "environment is broken" path share one vocabulary.  This
+# re-export keeps `from tests.environments import CouchbaseTestEnvironmentException`
+# resolving.
+__all__ = [
+    'CouchbaseTestEnvironmentException',
+]

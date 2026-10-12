@@ -1,6 +1,6 @@
 # Which suites generate, and for which APIs.
 #
-# The sync suite under couchbase/tests_v2/ is the single source.  Everything here decides
+# The sync suite under couchbase/tests/ is the single source.  Everything here decides
 # what is made from it and where the result lands; no code in tools/testgen knows the name
 # of any suite, service or SDK feature.
 #
@@ -18,17 +18,17 @@
 #                     where an API needs a test that has no sync form to be generated from
 #
 # The question that decides a sidecar is whether there is a *generated* file to merge into,
-# not whether the source has a sync counterpart.  couchbase/tests_v2/streaming_helpers_t.py
+# not whether the source has a sync counterpart.  couchbase/tests/streaming_helpers_t.py
 # has a sync source and generates nothing, so its acouchbase counterpart is a standalone
 # hand-written file rather than a sidecar.
 
 # Every source below is relative to the repository root and lives under this directory,
 # which is also the directory the completeness check at the foot of the file scans.
-source_dir: couchbase/tests_v2
+source_dir: couchbase/tests
 
 output:
-  acouchbase: acouchbase/tests_v2/_generated
-  txcouchbase: txcouchbase/tests_v2/_generated
+  acouchbase: acouchbase/tests/_generated
+  txcouchbase: txcouchbase/tests/_generated
 
 defaults:
   targets: [acouchbase, txcouchbase]
@@ -37,32 +37,32 @@ suites:
 
   # ---- Key-value -----------------------------------------------------------------------------------
 
-  - source: couchbase/tests_v2/binary_collection_t.py
+  - source: couchbase/tests/binary_collection_t.py
 
-  - source: couchbase/tests_v2/binary_durability_t.py
+  - source: couchbase/tests/binary_durability_t.py
 
-  - source: couchbase/tests_v2/collection_t.py
+  - source: couchbase/tests/collection_t.py
 
   # txcouchbase has no datastructure support to generate against: no txcouchbase/
   # datastructures.py, and no couchbase_list/map/set/queue on its Collection.
   #
   # The deprecated list_/map_/set_/queue_ Collection methods are sync-only, so that suite class
   # carries a class-level testgen_exclude on top of the narrowed target.
-  - source: couchbase/tests_v2/datastructures_t.py
+  - source: couchbase/tests/datastructures_t.py
     targets: [acouchbase]
 
-  - source: couchbase/tests_v2/durability_t.py
+  - source: couchbase/tests/durability_t.py
 
   # No Twisted KV range scan support: TxCollection has no scan() and there is no
   # txcouchbase.kv_range_scan module.
-  - source: couchbase/tests_v2/kv_range_scan_t.py
+  - source: couchbase/tests/kv_range_scan_t.py
     targets: [acouchbase]
 
-  - source: couchbase/tests_v2/mutation_tokens_t.py
+  - source: couchbase/tests/mutation_tokens_t.py
 
-  - source: couchbase/tests_v2/subdoc_t.py
+  - source: couchbase/tests/subdoc_t.py
 
-  - source: couchbase/tests_v2/transcoder_t.py
+  - source: couchbase/tests/transcoder_t.py
 
   # ---- Streaming services --------------------------------------------------------------------------
   # Query, search, analytics and views: the four that stream rows over HTTP, which is the
@@ -72,23 +72,23 @@ suites:
   # Two per-test exclusions carry API facts, both declared at the site: the threading.Thread
   # test, as in query_t, and test_query_timeout under txcouchbase, whose Cluster has no
   # connect() classmethod.
-  - source: couchbase/tests_v2/analytics_t.py
+  - source: couchbase/tests/analytics_t.py
 
   # The sidecar carries the two acouchbase-only regression tests, PYCBC-1471 and PYCBC-1774.
   # Both assert on asyncio semantics, so neither has a sync form to be generated from; see
   # the file's docstring for the bar it has to clear.
-  - source: couchbase/tests_v2/query_t.py
+  - source: couchbase/tests/query_t.py
     sidecar:
-      acouchbase: acouchbase/tests_v2/query_additions_t.py
+      acouchbase: acouchbase/tests/query_additions_t.py
 
   # Two exclusions, one per suite class, both named test_search_query_in_thread: a
   # threading.Thread reaches into objects bound to an event loop, so it exercises the loop and
   # not the SDK.  query_t and analytics_t exclude their twins for the same reason.
-  - source: couchbase/tests_v2/search_t.py
+  - source: couchbase/tests/search_t.py
 
   # One exclusion, test_view_query_in_thread, for the reason search_t and query_t exclude
   # theirs.
-  - source: couchbase/tests_v2/views_t.py
+  - source: couchbase/tests/views_t.py
 
   # ---- Transactions --------------------------------------------------------------------------------
 
@@ -102,58 +102,58 @@ suites:
   # The property gates on the connection before it reaches the check-then-set, so the threaded
   # tests stub that guard out and the guard is asserted separately.  Both halves generate: the
   # guard is a second copy in acouchbase/logic/cluster_impl.py, same as the lock it fronts.
-  - source: couchbase/tests_v2/transactions_property_race_t.py
+  - source: couchbase/tests/transactions_property_race_t.py
     targets: [acouchbase]
 
   # No Twisted transaction support: there is no txcouchbase.transactions module.
-  - source: couchbase/tests_v2/transactions_t.py
+  - source: couchbase/tests/transactions_t.py
     targets: [acouchbase]
 
   # ---- Management ----------------------------------------------------------------------------------
   # One entry per manager.  This is where the API trees differ most, because a manager can
   # be written for an API without anything ever driving it.
 
-  - source: couchbase/tests_v2/analyticsmgmt_t.py
+  - source: couchbase/tests/analyticsmgmt_t.py
 
-  - source: couchbase/tests_v2/bucketmgmt_t.py
+  - source: couchbase/tests/bucketmgmt_t.py
 
-  - source: couchbase/tests_v2/collectionmgmt_t.py
+  - source: couchbase/tests/collectionmgmt_t.py
 
   # txcouchbase has no eventing surface to generate against.  There is no
   # txcouchbase/management/eventing.py and neither TxCluster nor TxScope has an
   # eventing_functions() accessor, so unlike view_indexes before PYCBC-1901 there is nothing
   # written and merely unreachable; see the note at the top of
-  # tests_v2/environments/managers/eventing.py.
-  - source: couchbase/tests_v2/eventingmgmt_t.py
+  # tests/environments/managers/eventing.py.
+  - source: couchbase/tests/eventingmgmt_t.py
     targets: [acouchbase]
 
   # The collection-level suite class carries a testgen_exclude for txcouchbase, which has no
   # collection.query_indexes() to drive.  The 18 tests behind it still generate elsewhere.
-  - source: couchbase/tests_v2/querymgmt_t.py
+  - source: couchbase/tests/querymgmt_t.py
 
-  - source: couchbase/tests_v2/searchmgmt_t.py
+  - source: couchbase/tests/searchmgmt_t.py
 
   # test_user_change_password is excluded from txcouchbase, and it is the only place in the tree
   # a suite reaches an SDK manager rather than a framework wrapper.  It has to: change_password
   # acts on whoever the *connection* is authenticated as, so the test builds a second cluster
   # with Cluster.connect(...), a classmethod txcouchbase.cluster.Cluster does not have.  Same
   # exclusion as query_t, for the same reason.
-  - source: couchbase/tests_v2/usermgmt_t.py
+  - source: couchbase/tests/usermgmt_t.py
 
-  - source: couchbase/tests_v2/viewmgmt_t.py
+  - source: couchbase/tests/viewmgmt_t.py
 
   # ---- Cluster, connection and credentials ---------------------------------------------------------
 
-  - source: couchbase/tests_v2/bucket_t.py
+  - source: couchbase/tests/bucket_t.py
 
   # ClusterCloseTestSuite is excluded from txcouchbase whole rather than test by test, because
   # all five of its tests open a cluster with Cluster.connect(...).  The sidecar carries the one
   # acouchbase-only close test, which asserts on the async constructor rather than on the event
   # loop: acouchbase.Cluster(...) returns unconnected where the sync one connects, so it has no
   # sync form to be generated from.
-  - source: couchbase/tests_v2/cluster_t.py
+  - source: couchbase/tests/cluster_t.py
     sidecar:
-      acouchbase: acouchbase/tests_v2/cluster_additions_t.py
+      acouchbase: acouchbase/tests/cluster_additions_t.py
 
   # Only one of connection_t's five classes generates at all.  The four cluster-free classes
   # drive ClusterSettings, which every tree imports from couchbase.logic.cluster_settings,
@@ -166,7 +166,7 @@ suites:
   # ConnectionTestSuite does generate, because what it asserts is what the *core* reports back
   # through cluster._impl.get_connection_info(), and that is per-tree code.  txcouchbase is
   # excluded at both the suite and the concrete class: every test starts from Cluster.connect.
-  - source: couchbase/tests_v2/connection_t.py
+  - source: couchbase/tests/connection_t.py
     targets: [acouchbase]
 
   # txcouchbase.Cluster has no set_authenticator, and txcouchbase/logic/cluster_impl.py has
@@ -177,14 +177,14 @@ suites:
   # JwtAuthenticatorUnitTests is excluded from the acouchbase target at the class.  It is
   # cluster-free and there is no acouchbase.auth: every tree imports JwtAuthenticator from
   # couchbase.auth, so a generated copy would run identical code against identical imports.
-  - source: couchbase/tests_v2/credentials_t.py
+  - source: couchbase/tests/credentials_t.py
     targets: [acouchbase]
 
   # Nothing about rate limiting is API-specific, but the suite drives KV, query and search
   # through a second cluster it opens itself, and txcouchbase.cluster.Cluster has no connect
   # classmethod to open one with.  That would take six of the ten tests, so the suite generates
   # for acouchbase alone rather than carrying six exclusions.
-  - source: couchbase/tests_v2/rate_limit_t.py
+  - source: couchbase/tests/rate_limit_t.py
     targets: [acouchbase]
 
   # ---- Observability: metrics ----------------------------------------------------------------------
@@ -194,50 +194,50 @@ suites:
   # A smaller meter suite: five key-value operations against a meter built on the deprecated
   # couchbase.metrics bases.  The deprecation is a wrapper class with an empty body, so nothing
   # about it is API-specific.
-  - source: couchbase/tests_v2/legacy_metrics_t.py
+  - source: couchbase/tests/legacy_metrics_t.py
 
-  - source: couchbase/tests_v2/metrics_binary_t.py
+  - source: couchbase/tests/metrics_binary_t.py
 
   # acouchbase only, for the reason datastructures_t itself is.  The operations here are named
   # literally like the other metrics suites, and the datastructure object each one is called on
   # is typed by the assignment above it, which is what the transformer needs to bridge them.
-  - source: couchbase/tests_v2/metrics_datastructures_t.py
+  - source: couchbase/tests/metrics_datastructures_t.py
     targets: [acouchbase]
 
   # The largest of the metrics suites, at 36 key-value operations.
-  - source: couchbase/tests_v2/metrics_kv_t.py
+  - source: couchbase/tests/metrics_kv_t.py
 
   # The managers exist for txcouchbase too, so seven of the eight suites here generate for it.
   # The eighth carries a class-level testgen_exclude, because there is no Twisted eventing
   # function manager.
-  - source: couchbase/tests_v2/metrics_management_t.py
+  - source: couchbase/tests/metrics_management_t.py
 
   # Every service here is reachable from all three APIs, and the rows are drained through the
   # environment helpers rather than a comprehension over rows(), which is what makes the same
   # statement work under Twisted.
-  - source: couchbase/tests_v2/metrics_streaming_t.py
+  - source: couchbase/tests/metrics_streaming_t.py
 
   # ---- Observability: tracing ----------------------------------------------------------------------
   # The same rule as the metrics suites above: every operation is named literally.
 
-  - source: couchbase/tests_v2/tracing_binary_t.py
+  - source: couchbase/tests/tracing_binary_t.py
 
   # acouchbase only, for the reason datastructures_t itself is.
-  - source: couchbase/tests_v2/tracing_datastructures_t.py
+  - source: couchbase/tests/tracing_datastructures_t.py
     targets: [acouchbase]
 
   # The largest suite in the tree, at 58 named tests times four tracing types, and where naming
   # each operation matters most: an unawaited operation produces no spans at all, so the tree
   # walk would fail somewhere far from the cause.
-  - source: couchbase/tests_v2/tracing_kv_t.py
+  - source: couchbase/tests/tracing_kv_t.py
 
   # As metrics_management_t: seven of the eight suites generate for txcouchbase, and the eighth
   # carries a class-level testgen_exclude for the absent Twisted eventing function manager.
-  - source: couchbase/tests_v2/tracing_management_t.py
+  - source: couchbase/tests/tracing_management_t.py
 
   # Every service here is reachable from all three APIs, and the rows are drained through the
   # environment helpers rather than a comprehension over rows().
-  - source: couchbase/tests_v2/tracing_streaming_t.py
+  - source: couchbase/tests/tracing_streaming_t.py
 
 
 # Sources under `source_dir` that deliberately generate nothing.  Every *_t.py there has to
@@ -259,42 +259,42 @@ not_generated:
   # manager exercises the constructors and the outbound `as_dict()`; nothing in it reads a
   # server payload back, and inbound and outbound are not the same shape.
   cluster_free:
-    - couchbase/tests_v2/analytics_params_t.py
-    - couchbase/tests_v2/bucketmgmt_bucket_settings_t.py
-    - couchbase/tests_v2/cluster_req_builder_t.py
-    - couchbase/tests_v2/collection_req_builder_t.py
-    - couchbase/tests_v2/diagnostics_t.py
-    - couchbase/tests_v2/eventingmgmt_function_types_t.py
-    - couchbase/tests_v2/exceptions_t.py
-    - couchbase/tests_v2/logging_meter_t.py
-    - couchbase/tests_v2/logging_smoke_t.py
-    - couchbase/tests_v2/no_op_observability_t.py
-    - couchbase/tests_v2/pycbc_core_t.py
-    - couchbase/tests_v2/query_params_t.py
-    - couchbase/tests_v2/scope_req_builder_t.py
-    - couchbase/tests_v2/search_params_t.py
-    - couchbase/tests_v2/threshold_logging_t.py
-    - couchbase/tests_v2/view_result_types_t.py
-    - couchbase/tests_v2/viewmgmt_view_types_t.py
-    - couchbase/tests_v2/views_params_t.py
+    - couchbase/tests/analytics_params_t.py
+    - couchbase/tests/bucketmgmt_bucket_settings_t.py
+    - couchbase/tests/cluster_req_builder_t.py
+    - couchbase/tests/collection_req_builder_t.py
+    - couchbase/tests/diagnostics_t.py
+    - couchbase/tests/eventingmgmt_function_types_t.py
+    - couchbase/tests/exceptions_t.py
+    - couchbase/tests/logging_meter_t.py
+    - couchbase/tests/logging_smoke_t.py
+    - couchbase/tests/no_op_observability_t.py
+    - couchbase/tests/pycbc_core_t.py
+    - couchbase/tests/query_params_t.py
+    - couchbase/tests/scope_req_builder_t.py
+    - couchbase/tests/search_params_t.py
+    - couchbase/tests/threshold_logging_t.py
+    - couchbase/tests/view_result_types_t.py
+    - couchbase/tests/viewmgmt_view_types_t.py
+    - couchbase/tests/views_params_t.py
 
   # Multi-operations are on the sync Collection alone: upsert_multi and its family are defined
   # in couchbase/collection.py and on neither acouchbase nor txcouchbase, so there is nothing
   # for a generated copy to call.
   sync_only_api:
-    - couchbase/tests_v2/binary_collection_multi_t.py
-    - couchbase/tests_v2/collection_multi_t.py
-    - couchbase/tests_v2/durability_multi_t.py
-    - couchbase/tests_v2/metrics_binary_multi_t.py
-    - couchbase/tests_v2/metrics_kv_multi_t.py
-    - couchbase/tests_v2/tracing_binary_multi_t.py
-    - couchbase/tests_v2/tracing_kv_multi_t.py
+    - couchbase/tests/binary_collection_multi_t.py
+    - couchbase/tests/collection_multi_t.py
+    - couchbase/tests/durability_multi_t.py
+    - couchbase/tests/metrics_binary_multi_t.py
+    - couchbase/tests/metrics_kv_multi_t.py
+    - couchbase/tests/tracing_binary_multi_t.py
+    - couchbase/tests/tracing_kv_multi_t.py
 
   # stream_next is driven through a stand-in for the request object rather than through a
   # server, and the stand-in is API-specific.  acouchbase carries a hand-written counterpart,
   # not a sidecar, there being no generated file for a sidecar to merge into.
   api_specific_fake:
-    - couchbase/tests_v2/streaming_helpers_t.py
+    - couchbase/tests/streaming_helpers_t.py
 
   # Both trees have a connection lifecycle and neither can be written from the other's spelling
   # of it: close_bucket is execute_close_bucket_request under acouchbase and returns a future,
@@ -303,4 +303,4 @@ not_generated:
   # no generated file for a sidecar to merge into.  txcouchbase carries a hand-written connect
   # half only, the close rules being the acouchbase adapter's, which it wraps.
   api_specific_surface:
-    - couchbase/tests_v2/connection_lifecycle_t.py
+    - couchbase/tests/connection_lifecycle_t.py

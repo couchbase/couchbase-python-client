@@ -1,13 +1,13 @@
 # testgen: generating the acouchbase and txcouchbase test suites
 
-Each suite under `couchbase/tests_v2/` is the single hand-written source for its
+Each suite under `couchbase/tests/` is the single hand-written source for its
 acouchbase and txcouchbase counterparts. `tools/testgen` rewrites that source into
 both, and the two generated trees are committed:
 
 ```
-couchbase/tests_v2/<suite>_t.py          the source, hand-written
-acouchbase/tests_v2/_generated/          generated, tracked, do not edit
-txcouchbase/tests_v2/_generated/         generated, tracked, do not edit
+couchbase/tests/<suite>_t.py          the source, hand-written
+acouchbase/tests/_generated/          generated, tracked, do not edit
+txcouchbase/tests/_generated/         generated, tracked, do not edit
 ```
 
 The transform is not a reformat. Under acouchbase the SDK surface is `async def`,
@@ -20,7 +20,7 @@ spelling covers both because the bridge absorbs the difference.
 ## Usage
 
 Run from the repository root, in an environment where `couchbase` is importable.
-The resolver imports `tests_v2.environments` and inspects the real SDK classes, so
+The resolver imports `tests.environments` and inspects the real SDK classes, so
 the C extension has to be built. The tool's own dependencies are in
 `tools/testgen/tools_requirements.txt`; none of them ship in the wheel.
 
@@ -55,7 +55,7 @@ the hooks, and run. So:
 
 ```
 python -m tools.testgen generate --write
-git add acouchbase/tests_v2/_generated txcouchbase/tests_v2/_generated
+git add acouchbase/tests/_generated txcouchbase/tests/_generated
 ```
 
 goes in the same commit as the source edit, and `check` is what proves it happened.
@@ -191,7 +191,7 @@ a generated test that collected, ran, and passed while asserting nothing.
   APIs agree; nothing is weakened, since `pytest.raises` asserts that some statement
   in the block raises. Both forms transform cleanly and only one works, so nothing
   reports it.
-- **Never write a prose `pytest.skip()`.** Skips go through `tests_v2.skips`, one
+- **Never write a prose `pytest.skip()`.** Skips go through `tests.skips`, one
   function per category, so that expected skips can be counted from the JUnit XML
   rather than read as sentences.
 - **Never sleep then assert.** Use `cb_assert_eventually` when you are waiting for
@@ -266,26 +266,26 @@ Each of these is a place an author might reasonably expect help and will not get
 `tools/testgen` knows the name of any suite, service or SDK feature.
 
 ```yaml
-source_dir: couchbase/tests_v2
+source_dir: couchbase/tests
 
 output:
-  acouchbase: acouchbase/tests_v2/_generated
-  txcouchbase: txcouchbase/tests_v2/_generated
+  acouchbase: acouchbase/tests/_generated
+  txcouchbase: txcouchbase/tests/_generated
 
 defaults:
   targets: [acouchbase, txcouchbase]
 
 suites:
-  - source: couchbase/tests_v2/collection_t.py
+  - source: couchbase/tests/collection_t.py
 
   # No Twisted KV range scan support: TxCollection has no scan() and there is no
   # txcouchbase.kv_range_scan module.
-  - source: couchbase/tests_v2/kv_range_scan_t.py
+  - source: couchbase/tests/kv_range_scan_t.py
     targets: [acouchbase]
 
 not_generated:
   <reason>:
-    - couchbase/tests_v2/<suite>_t.py
+    - couchbase/tests/<suite>_t.py
 ```
 
 Every narrowed `targets` list is a capability fact about the SDK, stated at the entry,

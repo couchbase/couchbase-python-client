@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,41 +13,140 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Two suites, because the SDK offers two managers over the same fourteen operations:
+# cluster.search_indexes() addresses any index in the cluster by bare name, and
+# scope.search_indexes() only the indexes created inside its own scope (7.6+).  The bodies
+# are near-identical apart from which manager the test asks cb_env for, and that difference
+# is the whole point, so only the constants and the manager-free assertions are shared.
+#
+# Nothing here asserts `res is None`: upsert, drop and the six ingest/query/plan controls
+# are all typed to return None, so asserting it can only restate the signature.  These tests
+# assert the effect, or let an exception be the failure where there is no readable effect.
+
+from __future__ import annotations
+
 import json
-import pathlib
-from os import path
+from collections.abc import Generator, Iterable
+from typing import Any
 
 import pytest
 
 from couchbase.exceptions import (FeatureUnavailableException,
+                                  InternalServerFailureException,
                                   InvalidArgumentException,
                                   QueryIndexAlreadyExistsException,
                                   SearchIndexNotFoundException)
 from couchbase.management.search import SearchIndex
-from tests.environments import CollectionType
-from tests.environments.test_environment import TestEnvironment
+from tests.assert_helpers import cb_assert_eq
+from tests.environments.managers import TestEnvironmentScopeSearchIndexManager, TestEnvironmentSearchIndexManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.search_index_defs import (INDEX_VISIBLE_DELAY,
+                                     INDEX_VISIBLE_ROUNDS,
+                                     UI_INDEX_SOURCE_TYPE,
+                                     collection_index_params,
+                                     mgmt_index_name,
+                                     mgmt_secondary_index_name,
+                                     ui_index_definition,
+                                     ui_index_name)
+from tests.test_features import EnvironmentFeatures, ServerFeatures
 
 
-class SearchIndexManagementTestSuite:
-    IDX_NAME = 'test-fts-index'
+class SearchIndexManagementSuiteBase(SuiteRequirements):
+    # Declares no test methods of its own, so pytest does not collect it as a suite.
 
-    TEST_COLLECTION_INDEX_NAME = 'test-search-coll-index'
-    TEST_COLLECTION_INDEX_PATH = path.join(pathlib.Path(__file__).parent.parent.parent,
-                                           'tests',
-                                           'test_cases',
-                                           f'{TEST_COLLECTION_INDEX_NAME}-params-new.json')
+    # Every test here asserts on index metadata, never on rows, and the index each suite
+    # builds is created and dropped per test.
+    NUM_DOCS = 0
 
-    TEST_UI_INDEX_NAME = 'test-search-index-full'
-    TEST_UI_INDEX_PATH = path.join(pathlib.Path(__file__).parent.parent.parent,
-                                   'tests',
-                                   'test_cases',
-                                   f'{TEST_UI_INDEX_NAME}.json')
+    # The field name is deliberately not one the index maps: analysis is a property of the
+    # analyzer chain, not of the mapping.
+    ANALYZE_DOC = {'field': 'I got text in here'}
 
-    TEST_UI_SCOPE_INDEX_NAME = 'test-scope-search-index-full'
-    TEST_UI_SCOPE_INDEX_PATH = path.join(pathlib.Path(__file__).parent.parent.parent,
-                                         'tests',
-                                         'test_cases',
-                                         f'{TEST_UI_SCOPE_INDEX_NAME}.json')
+    # A name no test creates.
+    MISSING_INDEX_NAME = 'not-an-index'
+
+    @staticmethod
+    def _index_names(indexes: Iterable[SearchIndex]) -> list[str]:
+        # get_all_indexes() is declared Iterable[SearchIndex] and every caller walks the
+        # names more than once, so this materializes first.  Taking a plain Iterable rather
+        # than calling the manager keeps the iteration out of the test body, where an awaited
+        # call in a comprehension has no valid async form.
+        all_indexes = list(indexes)
+        assert all(isinstance(ix, SearchIndex) for ix in all_indexes)
+        return [ix.name for ix in all_indexes]
+
+    @staticmethod
+    def _assert_analysis(analysis: dict[str, Any]) -> None:
+        assert isinstance(analysis, dict)
+        cb_assert_eq(analysis.get('status'), 'ok', what='analyze_document status')
+        sections = analysis.get('analysis')
+        assert sections is not None
+        # A list of token streams for a mapped field, a dict of them otherwise; which
+        # one comes back is the server's choice and not what this asserts on.
+        assert isinstance(sections, (list, dict))
+
+    @staticmethod
+    def _assert_parsed_from_json(idx: SearchIndex, definition: dict[str, Any]) -> None:
+        # A scope-level export names its index <bucket>.<scope>.<index>; from_json keeps
+        # the last dot-separated token, which is the name every manager call takes.
+        cb_assert_eq(idx.name, ui_index_name(), what='index name')
+        cb_assert_eq(idx.source_type, definition['sourceType'], what='source type')
+        cb_assert_eq(idx.idx_type, definition['type'], what='index type')
+        cb_assert_eq(idx.source_name, definition['sourceName'], what='source name')
+        cb_assert_eq(idx.plan_params, definition['planParams'], what='plan params')
+        # Both uuids identify the *exported* index.  Resending them would ask the server
+        # to update that one, so from_json drops them.
+        assert idx.uuid is None
+        assert idx.source_uuid is None
+        # sourceParams is null in an export, and becomes an empty dict rather than None.
+        cb_assert_eq(idx.source_params, {}, what='source params')
+
+    @staticmethod
+    def _assert_survives(found: dict[str, Any],
+                         sent: dict[str, Any],
+                         *,
+                         what: str) -> None:
+        # The server completes an index definition, it does not store it verbatim: measured
+        # on 7.6.10, an upserted definition comes back with `analysis` added to
+        # `params.mapping`, and the same happens in `params.store`.  Popping the keys you
+        # know about only postpones it.  What a caller can rely on is the other direction:
+        # what it asked for is what it gets back.
+        for key, value in sent.items():
+            assert key in found, f'{what}: {key} missing, got {sorted(found)}'
+            cb_assert_eq(found[key], value, what=f'{what}.{key}')
+
+    @staticmethod
+    def _assert_round_trip(found: SearchIndex, sent: SearchIndex) -> None:
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, sent.name, what='index name')
+        cb_assert_eq(found.idx_type, sent.idx_type, what='index type')
+        cb_assert_eq(found.source_name, sent.source_name, what='source name')
+        # `source_type` is the server's to record, not the caller's to dictate.  The
+        # SearchIndex default is the 6.x value 'couchbase'; from 7.0 the server stores
+        # 'gocbcore', so an index created with the default does not round-trip this field.
+        assert isinstance(found.source_type, str) and found.source_type
+        SearchIndexManagementSuiteBase._assert_survives(found.plan_params,
+                                                        sent.plan_params,
+                                                        what='plan params')
+        SearchIndexManagementSuiteBase._assert_survives(found.source_params,
+                                                        sent.source_params,
+                                                        what='source params')
+        for section in ('mapping', 'doc_config', 'store'):
+            SearchIndexManagementSuiteBase._assert_survives(found.params.get(section, {}),
+                                                            sent.params.get(section, {}),
+                                                            what=f'index {section}')
+
+
+class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
+    MANAGERS = [TestEnvironmentSearchIndexManager]
+    COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
+    REQUIRED_FEATURES = [ServerFeatures.SearchIndexManagement]
 
     TEST_MANIFEST = [
         'test_analyze_doc',
@@ -64,274 +163,531 @@ class SearchIndexManagementTestSuite:
         'test_plan_freeze_control',
         'test_query_control',
         'test_upsert_index',
-        'test_upsert_index_from_json'
+        'test_upsert_index_from_json',
     ]
 
-    @pytest.fixture(scope='class', name='test_idx')
-    def get_test_index(self):
-        return SearchIndex(name=self.IDX_NAME, source_name='default')
+    @pytest.fixture(scope='class')
+    def check_analyze_document_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(
+            ServerFeatures.SearchAnalyzeDocument, cb_env.server_context)
+
+    @pytest.fixture(name='test_idx')
+    def get_test_index(self, cb_env: SyncTestEnvironment) -> SearchIndex:
+        return SearchIndex(name=mgmt_index_name(), source_name=cb_env.bucket.name)
 
     @pytest.fixture()
-    def create_test_index(self, cb_env, test_idx):
-        if cb_env.use_scope_search_mgmt:
-            with open(self.TEST_COLLECTION_INDEX_PATH) as params_file:
-                input = params_file.read()
-                params_json = json.loads(input)
-                mapping_types = params_json.get('mapping', {}).get('types', {})
-                if mapping_types and 'test-scope.other-collection' in mapping_types:
-                    del params_json['mapping']['types']['test-scope.other-collection']
-                test_idx.params = params_json
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   3,
-                                                   cb_env.sixm.upsert_index,
-                                                   test_idx,
-                                                   expected_exceptions=(QueryIndexAlreadyExistsException, ))
+    def create_test_index(self,
+                          cb_env: SyncTestEnvironment,
+                          test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        # upsert_index refuses an index that already exists rather than replacing it, so
+        # retrying until that refusal tolerates a leftover from a test whose drop did not
+        # land.  The exception really is the query-named one: the core code behind it is
+        # errc::common::index_exists, which every service raises.
+        #
+        # Creating an index has the search service look the bucket up through the cluster
+        # manager, which can answer with a transient 500.  That surfaces here as
+        # InternalServerFailureException and leaves no index behind, so the create is made
+        # again.
+        try:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
+        except InternalServerFailureException:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
 
     @pytest.fixture()
-    def drop_test_index(self, cb_env, test_idx):
+    def drop_test_index(self,
+                        cb_env: SyncTestEnvironment,
+                        test_idx: SearchIndex) -> Generator[None, None, None]:
         yield
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   3,
-                                                   cb_env.sixm.drop_index,
-                                                   test_idx.name,
-                                                   expected_exceptions=(SearchIndexNotFoundException, ))
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        TestEnvironment.try_n_times_till_exception(
+            10, 3, sixm.drop_index, test_idx.name,
+            expected_exceptions=(SearchIndexNotFoundException,))
 
     @pytest.fixture()
-    def drop_test_index_from_json(self, cb_env):
+    def drop_test_index_from_json(self,
+                                  cb_env: SyncTestEnvironment
+                                  ) -> Generator[None, None, None]:
         yield
-        if cb_env.use_scope_search_mgmt:
-            idx_name = 'test-scope-search-index-from-ui'
-        else:
-            idx_name = 'test-search-index-from-ui'
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   3,
-                                                   cb_env.sixm.drop_index,
-                                                   idx_name,
-                                                   expected_exceptions=(SearchIndexNotFoundException, ))
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        TestEnvironment.try_n_times_till_exception(
+            10, 3, sixm.drop_index, ui_index_name(),
+            expected_exceptions=(SearchIndexNotFoundException,))
 
-    @pytest.fixture(scope='class', name='test_idx_json')
-    def load_index_json(self, cb_env):
-        if cb_env.use_scope_search_mgmt:
-            with open(self.TEST_UI_SCOPE_INDEX_PATH) as index_json:
-                json_obj = json.load(index_json)
-        else:
-            with open(self.TEST_UI_INDEX_PATH) as index_json:
-                json_obj = json.load(index_json)
-        # >= 7.0 sourceType = gocbcore
-        if cb_env.server_version_short <= 6.6:
-            json_obj['sourceType'] = 'couchbase'
-        return json_obj
+    @pytest.mark.usefixtures('check_analyze_document_supported')
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_analyze_doc(self,
+                         cb_env: SyncTestEnvironment,
+                         test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        # Like the document count, this can fail for a moment after index creation.
+        analysis = TestEnvironment.try_n_times(5, 2, sixm.analyze_document,
+                                               test_idx.name, self.ANALYZE_DOC)
+        self._assert_analysis(analysis)
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
-    def test_analyze_doc(self, cb_env, test_idx):
-        if cb_env.server_version_short < 6.5:
-            pytest.skip((f'FTS analyzeDoc only supported on server versions >= 6.5. '
-                        f'Using server version: {cb_env.server_version}.'))
-        doc = {"field": "I got text in here"}
-        if cb_env.use_scope_search_mgmt:
-            with pytest.raises(FeatureUnavailableException):
-                cb_env.sixm.get_index_stats(test_idx.name, doc)
-        else:
-            # like getting the doc count, this can fail immediately after index creation
-            analysis = TestEnvironment.try_n_times(5,
-                                                   2,
-                                                   cb_env.sixm.analyze_document,
-                                                   test_idx.name,
-                                                   doc)
-
-            assert analysis.get('analysis', None) is not None
-            assert isinstance(analysis.get('analysis'), (list, dict))
-            assert analysis.get('status', None) == 'ok'
-
-    @pytest.mark.usefixtures('create_test_index')
-    @pytest.mark.usefixtures('drop_test_index')
-    def test_drop_index(self, cb_env, test_idx):
-        res = TestEnvironment.try_n_times(3, 3, cb_env.sixm.get_index, test_idx.name)
-        assert isinstance(res, SearchIndex)
-        cb_env.sixm.drop_index(test_idx.name)
+    def test_drop_index(self,
+                        cb_env: SyncTestEnvironment,
+                        test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        found = TestEnvironment.try_n_times(3, 3, sixm.get_index, test_idx.name)
+        assert isinstance(found, SearchIndex)
+        sixm.drop_index(test_idx.name)
         with pytest.raises(SearchIndexNotFoundException):
-            cb_env.sixm.drop_index(test_idx.name)
+            sixm.drop_index(test_idx.name)
 
-    def test_drop_index_fail(self, cb_env, test_idx):
+    def test_drop_index_fail(self,
+                             cb_env: SyncTestEnvironment,
+                             test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
         with pytest.raises(SearchIndexNotFoundException):
-            cb_env.sixm.drop_index(test_idx.name)
+            sixm.drop_index(test_idx.name)
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
-    def test_get_all_index_stats(self, cb_env):
-        # like getting the doc count, this can fail immediately after index
-        # creation
-        stats = TestEnvironment.try_n_times(5, 2, cb_env.sixm.get_all_index_stats)
-
+    def test_get_all_index_stats(self, cb_env: SyncTestEnvironment) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        # Like the document count, this can fail for a moment after index creation.
+        stats = TestEnvironment.try_n_times(5, 2, sixm.get_all_index_stats)
         assert stats is not None
         assert isinstance(stats, dict)
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
-    def test_get_all_indexes(self, cb_env, test_idx):
-        # lets add one more
-        new_idx = SearchIndex(name='new-search-idx', source_name='default')
-        res = cb_env.sixm.upsert_index(new_idx)
-        assert res is None
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.get_index, new_idx.name)
-        assert isinstance(res, SearchIndex)
+    def test_get_all_indexes(self,
+                             cb_env: SyncTestEnvironment,
+                             test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        second = SearchIndex(name=mgmt_secondary_index_name(),
+                             source_name=cb_env.bucket.name)
+        sixm.upsert_index(second)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, second.name)
+        assert isinstance(found, SearchIndex)
 
-        indexes = cb_env.sixm.get_all_indexes()
-        assert isinstance(indexes, list)
-        assert len(indexes) >= 2
-        assert next((idx for idx in indexes if idx.name == test_idx.name), None) is not None
-        assert next((idx for idx in indexes if idx.name == new_idx.name), None) is not None
+        indexes = sixm.get_all_indexes()
+        names = self._index_names(indexes)
+        assert len(names) >= 2
+        assert test_idx.name in names, f'{test_idx.name} not among {names}'
+        assert second.name in names, f'{second.name} not among {names}'
 
-        cb_env.sixm.drop_index(new_idx.name)
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   3,
-                                                   cb_env.sixm.get_index,
-                                                   new_idx.name,
-                                                   expected_exceptions=(SearchIndexNotFoundException,))
-
-    @pytest.mark.usefixtures('create_test_index')
-    @pytest.mark.usefixtures('drop_test_index')
-    def test_get_index(self, cb_env, test_idx):
-        res = TestEnvironment.try_n_times(3, 3, cb_env.sixm.get_index, test_idx.name)
-        assert isinstance(res, SearchIndex)
-        assert res.name == test_idx.name
+        sixm.drop_index(second.name)
+        TestEnvironment.try_n_times_till_exception(
+            10, 3, sixm.get_index, second.name,
+            expected_exceptions=(SearchIndexNotFoundException,))
+        # Gone from the listing too, not merely unreachable by name.
+        remaining = sixm.get_all_indexes()
+        assert second.name not in self._index_names(remaining)
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
-    def test_get_index_doc_count(self, cb_env, test_idx):
-        # like getting the doc count, this can fail immediately after index
-        # creation
-        doc_count = TestEnvironment.try_n_times(5, 2, cb_env.sixm.get_indexed_documents_count, test_idx.name)
+    def test_get_index(self,
+                       cb_env: SyncTestEnvironment,
+                       test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        found = TestEnvironment.try_n_times(3, 3, sixm.get_index, test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
 
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_get_index_doc_count(self,
+                                 cb_env: SyncTestEnvironment,
+                                 test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        # Can fail for a moment after index creation; the count itself is whatever FTS
+        # has reached, so any int is a pass.
+        doc_count = TestEnvironment.try_n_times(5, 2, sixm.get_indexed_documents_count,
+                                                test_idx.name)
         assert doc_count is not None
         assert isinstance(doc_count, int)
 
-    def test_get_index_fail(self, cb_env):
+    def test_get_index_fail(self, cb_env: SyncTestEnvironment) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
         with pytest.raises(SearchIndexNotFoundException):
-            cb_env.sixm.get_index('not-an-index')
+            sixm.get_index(self.MISSING_INDEX_NAME)
 
-    def test_get_index_fail_no_index_name(self, cb_env):
+    def test_get_index_fail_no_index_name(self, cb_env: SyncTestEnvironment) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
         with pytest.raises(InvalidArgumentException):
-            cb_env.sixm.get_index('')
+            sixm.get_index('')
+        # Deliberately the wrong type.  Rejecting it at runtime is the guarantee under test,
+        # so the local is annotated Any rather than the call carrying a suppression.
+        no_name: Any = None
         with pytest.raises(InvalidArgumentException):
-            cb_env.sixm.get_index(None)
+            sixm.get_index(no_name)
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
-    def test_get_index_stats(self, cb_env, test_idx):
-        if cb_env.use_scope_search_mgmt:
-            with pytest.raises(FeatureUnavailableException):
-                cb_env.sixm.get_index_stats(test_idx.name)
-        else:
-            # like getting the doc count, this can fail immediately after index
-            # creation
-            stats = TestEnvironment.try_n_times(5, 2, cb_env.sixm.get_index_stats, test_idx.name)
-
-            assert stats is not None
-            assert isinstance(stats, dict)
-
-    @pytest.mark.usefixtures('create_test_index')
-    @pytest.mark.usefixtures('drop_test_index')
-    def test_ingestion_control(self, cb_env, test_idx):
-        # can't easily test this, but lets at least call them and insure we get no
-        # exceptions
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.pause_ingest, test_idx.name)
-        assert res is None
-
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.resume_ingest, test_idx.name)
-        assert res is None
+    def test_get_index_stats(self,
+                             cb_env: SyncTestEnvironment,
+                             test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        # Like the document count, this can fail for a moment after index creation.
+        stats = TestEnvironment.try_n_times(5, 2, sixm.get_index_stats, test_idx.name)
+        assert stats is not None
+        assert isinstance(stats, dict)
+        # A cluster-level manager answers this call, so a name nothing created is an
+        # index error rather than the flat refusal the scope-level suite asserts.
+        with pytest.raises(SearchIndexNotFoundException):
+            sixm.get_index_stats(self.MISSING_INDEX_NAME)
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
-    def test_plan_freeze_control(self, cb_env, test_idx):
-        # can't easily test this, but lets at least call them and insure we get no
-        # exceptions
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.freeze_plan, test_idx.name)
-        assert res is None
-
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.unfreeze_plan, test_idx.name)
-        assert res is None
+    def test_ingestion_control(self,
+                               cb_env: SyncTestEnvironment,
+                               test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        # Neither state is readable back through the manager, so what is asserted is that
+        # both calls are accepted and leave the index intact.
+        TestEnvironment.try_n_times(10, 3, sixm.pause_ingest, test_idx.name)
+        TestEnvironment.try_n_times(10, 3, sixm.resume_ingest, test_idx.name)
+        found = sixm.get_index(test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
 
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
-    def test_query_control(self, cb_env, test_idx):
-        # can't easily test this, but lets at least call them and insure we get no
-        # exceptions
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.disallow_querying, test_idx.name)
-        assert res is None
+    def test_plan_freeze_control(self,
+                                 cb_env: SyncTestEnvironment,
+                                 test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        TestEnvironment.try_n_times(10, 3, sixm.freeze_plan, test_idx.name)
+        TestEnvironment.try_n_times(10, 3, sixm.unfreeze_plan, test_idx.name)
+        found = sixm.get_index(test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
 
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.allow_querying, test_idx.name)
-        assert res is None
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_query_control(self,
+                           cb_env: SyncTestEnvironment,
+                           test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        TestEnvironment.try_n_times(10, 3, sixm.disallow_querying, test_idx.name)
+        TestEnvironment.try_n_times(10, 3, sixm.allow_querying, test_idx.name)
+        found = sixm.get_index(test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
 
     @pytest.mark.usefixtures('drop_test_index')
-    def test_upsert_index(self, cb_env, test_idx):
-        res = cb_env.sixm.upsert_index(test_idx)
-        assert res is None
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.get_index, test_idx.name)
-        assert isinstance(res, SearchIndex)
+    def test_upsert_index(self,
+                          cb_env: SyncTestEnvironment,
+                          test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        sixm.upsert_index(test_idx)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, test_idx.name)
+        self._assert_round_trip(found, test_idx)
 
     @pytest.mark.usefixtures('drop_test_index_from_json')
-    @pytest.mark.parametrize("idx_json_type", [str, dict])
-    def test_upsert_index_from_json(self, cb_env, test_idx_json, idx_json_type):
-        if idx_json_type.__name__ == 'str':
-            search_idx = SearchIndex.from_json(json.dumps(test_idx_json))
-        else:
-            search_idx = SearchIndex.from_json(test_idx_json)
-        res = cb_env.sixm.upsert_index(search_idx)
-        assert res is None
-        res = TestEnvironment.try_n_times(10, 3, cb_env.sixm.get_index, search_idx.name)
-        assert isinstance(res, SearchIndex)
-        assert res.name == search_idx.name
-        assert res.source_type == search_idx.source_type
-        assert res.idx_type == search_idx.idx_type
-        assert res.source_name == search_idx.source_name
-        res_params_store = res.params.pop('store', {})
-        search_idx_params_store = search_idx.params.pop('store', {})
-        if search_idx_params_store is not None:
-            assert res_params_store is not None
-            assert res_params_store['indexType'] == search_idx_params_store['indexType']
-            assert res_params_store['segmentVersion'] == search_idx_params_store['segmentVersion']
-        assert res.params == search_idx.params
-        assert res.plan_params == search_idx.plan_params
-        assert res.source_params == search_idx.source_params
+    @pytest.mark.parametrize('json_type', [str, dict])
+    def test_upsert_index_from_json(self,
+                                    cb_env: SyncTestEnvironment,
+                                    json_type: type) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentSearchIndexManager)
+        gocbcore = EnvironmentFeatures.is_feature_supported(ServerFeatures.SearchGocbcoreSourceType,
+                                                            cb_env.server_context)
+        source_type = UI_INDEX_SOURCE_TYPE if gocbcore else 'couchbase'
+        definition = ui_index_definition(cb_env.bucket.name, source_type=source_type)
+        source: Any = json.dumps(definition) if json_type is str else definition
+        search_idx = SearchIndex.from_json(source)
+        self._assert_parsed_from_json(search_idx, definition)
+
+        sixm.upsert_index(search_idx)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, search_idx.name)
+        self._assert_round_trip(found, search_idx)
+        # The one index in this suite that names its own source type, so the one place
+        # the server can be held to it.  Before 7.0 that is 'couchbase', the SearchIndex
+        # default, so there it cannot show the value came from the JSON.
+        cb_assert_eq(found.source_type, source_type, what='source type')
 
 
-# @pytest.mark.flaky(reruns=5, reruns_delay=1)
-class ClassicSearchIndexManagementTests(SearchIndexManagementTestSuite):
+class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
+    MANAGERS = [TestEnvironmentScopeSearchIndexManager]
+    COLLECTION_STRATEGY = CollectionStrategy.NAMED
+    REQUIRED_FEATURES = [ServerFeatures.ScopeSearchIndexManagement]
+
+    TEST_MANIFEST = [
+        'test_analyze_doc',
+        'test_drop_index',
+        'test_drop_index_fail',
+        'test_get_all_index_stats',
+        'test_get_all_indexes',
+        'test_get_index',
+        'test_get_index_doc_count',
+        'test_get_index_fail',
+        'test_get_index_fail_no_index_name',
+        'test_get_index_stats',
+        'test_ingestion_control',
+        'test_plan_freeze_control',
+        'test_query_control',
+        'test_upsert_index',
+        'test_upsert_index_from_json',
+    ]
+
+    @pytest.fixture(scope='class')
+    def check_analyze_document_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(
+            ServerFeatures.SearchAnalyzeDocument, cb_env.server_context)
+
+    @pytest.fixture(name='test_idx')
+    def get_test_index(self, cb_env: SyncTestEnvironment) -> SearchIndex:
+        # A scope-level index has to be collection-aware: its doc_config mode is
+        # scope.collection.type_field and its mapping keys name the collections.
+        params = collection_index_params(cb_env.scope.name, [cb_env.collection.name])
+        return SearchIndex(name=mgmt_index_name(),
+                           source_name=cb_env.bucket.name,
+                           params=params)
+
+    @pytest.fixture()
+    def create_test_index(self,
+                          cb_env: SyncTestEnvironment,
+                          test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        # A transient cluster manager 500 leaves no index behind; see the collection-level
+        # fixture above.
+        try:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
+        except InternalServerFailureException:
+            TestEnvironment.try_n_times_till_exception(
+                10, 3, sixm.upsert_index, test_idx,
+                expected_exceptions=(QueryIndexAlreadyExistsException,))
+
+    @pytest.fixture()
+    def drop_test_index(self,
+                        cb_env: SyncTestEnvironment,
+                        test_idx: SearchIndex) -> Generator[None, None, None]:
+        yield
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        TestEnvironment.try_n_times_till_exception(
+            10, 3, sixm.drop_index, test_idx.name,
+            expected_exceptions=(SearchIndexNotFoundException,))
+
+    @pytest.fixture()
+    def drop_test_index_from_json(self,
+                                  cb_env: SyncTestEnvironment
+                                  ) -> Generator[None, None, None]:
+        yield
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        TestEnvironment.try_n_times_till_exception(
+            10, 3, sixm.drop_index, ui_index_name(),
+            expected_exceptions=(SearchIndexNotFoundException,))
+
+    @pytest.mark.usefixtures('check_analyze_document_supported')
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_analyze_doc(self,
+                         cb_env: SyncTestEnvironment,
+                         test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        # A scope-level manager runs this like any other: get_index_stats is the only one
+        # of the fourteen it refuses.
+        analysis = TestEnvironment.try_n_times(5, 2, sixm.analyze_document,
+                                               test_idx.name, self.ANALYZE_DOC)
+        self._assert_analysis(analysis)
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_drop_index(self,
+                        cb_env: SyncTestEnvironment,
+                        test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        found = TestEnvironment.try_n_times(3, 3, sixm.get_index, test_idx.name)
+        assert isinstance(found, SearchIndex)
+        sixm.drop_index(test_idx.name)
+        with pytest.raises(SearchIndexNotFoundException):
+            sixm.drop_index(test_idx.name)
+
+    def test_drop_index_fail(self,
+                             cb_env: SyncTestEnvironment,
+                             test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        with pytest.raises(SearchIndexNotFoundException):
+            sixm.drop_index(test_idx.name)
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_get_all_index_stats(self, cb_env: SyncTestEnvironment) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        # Unlike get_index_stats, this one carries no scope context into its request, so
+        # a scope-level manager answers it with the same cluster-wide report.
+        stats = TestEnvironment.try_n_times(5, 2, sixm.get_all_index_stats)
+        assert stats is not None
+        assert isinstance(stats, dict)
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_get_all_indexes(self,
+                             cb_env: SyncTestEnvironment,
+                             test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        params = collection_index_params(cb_env.scope.name, [cb_env.collection.name])
+        second = SearchIndex(name=mgmt_secondary_index_name(),
+                             source_name=cb_env.bucket.name,
+                             params=params)
+        sixm.upsert_index(second)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, second.name)
+        assert isinstance(found, SearchIndex)
+
+        indexes = sixm.get_all_indexes()
+        names = self._index_names(indexes)
+        assert len(names) >= 2
+        assert test_idx.name in names, f'{test_idx.name} not among {names}'
+        assert second.name in names, f'{second.name} not among {names}'
+
+        sixm.drop_index(second.name)
+        TestEnvironment.try_n_times_till_exception(
+            10, 3, sixm.get_index, second.name,
+            expected_exceptions=(SearchIndexNotFoundException,))
+        # Gone from the listing too, not merely unreachable by name.
+        remaining = sixm.get_all_indexes()
+        assert second.name not in self._index_names(remaining)
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_get_index(self,
+                       cb_env: SyncTestEnvironment,
+                       test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        found = TestEnvironment.try_n_times(3, 3, sixm.get_index, test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_get_index_doc_count(self,
+                                 cb_env: SyncTestEnvironment,
+                                 test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        doc_count = TestEnvironment.try_n_times(5, 2, sixm.get_indexed_documents_count,
+                                                test_idx.name)
+        assert doc_count is not None
+        assert isinstance(doc_count, int)
+
+    def test_get_index_fail(self, cb_env: SyncTestEnvironment) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        with pytest.raises(SearchIndexNotFoundException):
+            sixm.get_index(self.MISSING_INDEX_NAME)
+
+    def test_get_index_fail_no_index_name(self, cb_env: SyncTestEnvironment) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        with pytest.raises(InvalidArgumentException):
+            sixm.get_index('')
+        no_name: Any = None
+        with pytest.raises(InvalidArgumentException):
+            sixm.get_index(no_name)
+
+    def test_get_index_stats(self, cb_env: SyncTestEnvironment) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        # The one operation of the fourteen a scope-level manager refuses, and it is the
+        # request builder that refuses, so nothing reaches the server.
+        with pytest.raises(FeatureUnavailableException):
+            sixm.get_index_stats(mgmt_index_name())
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_ingestion_control(self,
+                               cb_env: SyncTestEnvironment,
+                               test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        TestEnvironment.try_n_times(10, 3, sixm.pause_ingest, test_idx.name)
+        TestEnvironment.try_n_times(10, 3, sixm.resume_ingest, test_idx.name)
+        found = sixm.get_index(test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_plan_freeze_control(self,
+                                 cb_env: SyncTestEnvironment,
+                                 test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        TestEnvironment.try_n_times(10, 3, sixm.freeze_plan, test_idx.name)
+        TestEnvironment.try_n_times(10, 3, sixm.unfreeze_plan, test_idx.name)
+        found = sixm.get_index(test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
+
+    @pytest.mark.usefixtures('create_test_index')
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_query_control(self,
+                           cb_env: SyncTestEnvironment,
+                           test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        TestEnvironment.try_n_times(10, 3, sixm.disallow_querying, test_idx.name)
+        TestEnvironment.try_n_times(10, 3, sixm.allow_querying, test_idx.name)
+        found = sixm.get_index(test_idx.name)
+        assert isinstance(found, SearchIndex)
+        cb_assert_eq(found.name, test_idx.name, what='index name')
+
+    @pytest.mark.usefixtures('drop_test_index')
+    def test_upsert_index(self,
+                          cb_env: SyncTestEnvironment,
+                          test_idx: SearchIndex) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        sixm.upsert_index(test_idx)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, test_idx.name)
+        self._assert_round_trip(found, test_idx)
+
+    @pytest.mark.usefixtures('drop_test_index_from_json')
+    @pytest.mark.parametrize('json_type', [str, dict])
+    def test_upsert_index_from_json(self,
+                                    cb_env: SyncTestEnvironment,
+                                    json_type: type) -> None:
+        sixm = cb_env.get_manager(TestEnvironmentScopeSearchIndexManager)
+        definition = ui_index_definition(cb_env.bucket.name,
+                                         cb_env.scope.name,
+                                         cb_env.collection.name)
+        source: Any = json.dumps(definition) if json_type is str else definition
+        search_idx = SearchIndex.from_json(source)
+        self._assert_parsed_from_json(search_idx, definition)
+
+        sixm.upsert_index(search_idx)
+        found = TestEnvironment.try_n_times(INDEX_VISIBLE_ROUNDS, INDEX_VISIBLE_DELAY,
+                                            sixm.get_index, search_idx.name)
+        self._assert_round_trip(found, search_idx)
+        # The one index in this suite that names its own source type, so the one place
+        # the server can be held to it.
+        cb_assert_eq(found.source_type, UI_INDEX_SOURCE_TYPE, what='source type')
+
+
+class SearchIndexManagementTests(SearchIndexManagementTestSuite):
+
     @pytest.fixture(scope='class', autouse=True)
-    def validate_test_manifest(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicSearchIndexManagementTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicSearchIndexManagementTests) if valid_test_method(meth)]
-        test_list = set(ClassicSearchIndexManagementTests.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest invalid.  Missing/extra tests: {test_list}.')
+    def manifest_validated(self) -> None:
+        validate_test_manifest(SearchIndexManagementTestSuite, self.__class__)
 
     @pytest.fixture(scope='class', name='cb_env')
-    def couchbase_test_environment(self, cb_base_env):
-        cb_base_env.enable_search_mgmt()
-        yield cb_base_env
-        cb_base_env.disable_search_mgmt()
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, SearchIndexManagementTestSuite)
+        yield env
+        teardown_environment(env, SearchIndexManagementTestSuite)
 
 
-# @pytest.mark.flaky(reruns=5, reruns_delay=1)
-class ClassicScopeSearchIndexManagementTests(SearchIndexManagementTestSuite):
+class ScopeSearchIndexManagementTests(ScopeSearchIndexManagementTestSuite):
+
     @pytest.fixture(scope='class', autouse=True)
-    def validate_test_manifest(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicScopeSearchIndexManagementTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicScopeSearchIndexManagementTests) if valid_test_method(meth)]
-        test_list = set(ClassicScopeSearchIndexManagementTests.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest invalid.  Missing/extra tests: {test_list}.')
+    def manifest_validated(self) -> None:
+        validate_test_manifest(ScopeSearchIndexManagementTestSuite, self.__class__)
 
     @pytest.fixture(scope='class', name='cb_env')
-    def couchbase_test_environment(self, cb_base_env):
-        cb_base_env.setup(CollectionType.NAMED, num_docs=100)
-        cb_base_env.enable_scope_search_mgmt().enable_search_mgmt()
-        yield cb_base_env
-        cb_base_env.disable_search_mgmt().disable_scope_search_mgmt()
-        cb_base_env.teardown(CollectionType.NAMED)
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, ScopeSearchIndexManagementTestSuite)
+        yield env
+        teardown_environment(env, ScopeSearchIndexManagementTestSuite)

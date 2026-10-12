@@ -13,6 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Generated for both acouchbase and txcouchbase from this one file and its one
+# TEST_MANIFEST, which is what holds the three api styles to the same set of tests.  This is
+# also the suite that first exercises the populated DocType variants (BYTES, COUNTER, UTF8).
+
+from __future__ import annotations
+
+from collections.abc import Generator
+
 import pytest
 
 from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException
@@ -22,12 +30,29 @@ from couchbase.options import (DecrementOptions,
                                SignedInt64)
 from couchbase.result import CounterResult, MutationResult
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
-from tests.environments import CollectionType
-from tests.environments.binary_environment import BinaryTestEnvironment
-from tests.environments.test_environment import TestEnvironment
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 DocType,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
 
 
-class BinaryCollectionTestSuite:
+class BinaryCollectionTestSuite(SuiteRequirements):
+
+    # Both the empty and the populated variants: the append/prepend tests come in pairs, one
+    # starting from nothing and one from an existing value, and the counter tests need a doc
+    # that already holds an integer.  Counter keys for the `initial` cases are not seeded, since
+    # the point of an `initial` is that the document is absent; get_new_counter_doc_keys() mints
+    # those.
+    DATA_SET = [DocType.BYTES,
+                DocType.BYTES_EMPTY,
+                DocType.COUNTER,
+                DocType.UTF8,
+                DocType.UTF8_EMPTY]
+    NUM_DOCS = 10
 
     TEST_MANIFEST = [
         'test_append_bytes',
@@ -50,52 +75,53 @@ class BinaryCollectionTestSuite:
         'test_prepend_string',
         'test_prepend_string_nokey',
         'test_prepend_string_not_empty',
-        'test_signed_int_64',
-        'test_unsigned_int',
     ]
 
-    def test_append_bytes(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes_empty', key_only=True)
+    def test_append_bytes(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         result = cb_env.collection.binary().append(key, b'XXX')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        # make sure it really worked
-        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
-        assert result.content_as[bytes] == b'XXX'
+        stored = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
+        assert stored.content_as[bytes] == b'XXX'
 
-    def test_append_bytes_not_empty(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_append_bytes_not_empty(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
+        # b'foo', not 'foo'.  Appending the *str* to a document written through
+        # RawBinaryTranscoder and asserting `value + b'foo'` also passes, because the SDK encodes
+        # str to utf-8 on the way out, so it exercises everything except the one case this test
+        # is for: bytes appended to a non-empty binary document.
+        result = cb_env.collection.binary().append(key, b'foo')
+        assert isinstance(result, MutationResult)
+        assert result.cas is not None
+        stored = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
+        assert stored.content_as[bytes] == value + b'foo'
 
+    def test_append_string(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
         result = cb_env.collection.binary().append(key, 'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
-        assert result.content_as[bytes] == value + b'foo'
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == 'foo'
 
-    def test_append_string(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+    def test_append_string_not_empty(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.UTF8)
         result = cb_env.collection.binary().append(key, 'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        # make sure it really worked
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo'
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == value + 'foo'
 
-    def test_append_string_not_empty(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('utf8')
-        result = cb_env.collection.binary().append(key, 'foo')
-        assert isinstance(result, MutationResult)
-        assert result.cas is not None
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == value + 'foo'
-
-    def test_append_string_nokey(self, cb_env):
-        # @TODO(jc):  3.2.x SDK tests for NotStoredException
+    def test_append_string_nokey(self, cb_env: SyncTestEnvironment) -> None:
+        # Appending to an absent document raises DocumentNotFoundException.  The 3.2.x SDK
+        # raised NotStoredException here; 4.x has no such exception class at all, so there is
+        # nothing left to reconcile and the assertion below is the whole story.
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.binary().append(TestEnvironment.NOT_A_KEY, 'foo')
 
-    def test_counter_bad_delta_value(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('counter_empty')
+    def test_counter_bad_delta_value(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_counter_doc_keys(1)[0]
 
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.binary().increment(key, delta=5)
@@ -103,8 +129,8 @@ class BinaryCollectionTestSuite:
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.binary().decrement(key, delta=5)
 
-    def test_counter_bad_initial_value(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('counter_empty')
+    def test_counter_bad_initial_value(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_counter_doc_keys(1)[0]
 
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.binary().increment(key, initial=100)
@@ -112,137 +138,143 @@ class BinaryCollectionTestSuite:
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.binary().decrement(key, initial=100)
 
-    def test_counter_decrement(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('counter')
+    def test_counter_decrement(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
         result = cb_env.collection.binary().decrement(key)
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == value - 1
 
-    def test_counter_decrement_initial_value(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('counter_empty')
+    def test_counter_decrement_initial_value(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_counter_doc_keys(1)[0]
         result = cb_env.collection.binary().decrement(key, DecrementOptions(initial=SignedInt64(100)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == 100
 
-    def test_counter_decrement_non_default(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('counter')
+    def test_counter_decrement_non_default(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
         result = cb_env.collection.binary().decrement(key, DecrementOptions(delta=DeltaValue(3)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == value - 3
 
-    def test_counter_decrement_no_initial_value(self, cb_env):
+    def test_counter_decrement_no_initial_value(self, cb_env: SyncTestEnvironment) -> None:
+        # A minted key rather than a fixed literal such as 'non-existent-doc'.  On the DEFAULT
+        # strategy the collection is shared bucket-wide and written by other suites and
+        # other xdist workers, so a test whose correctness depends on one fixed key never having
+        # been written is relying on a guarantee nothing provides.
+        key = cb_env.get_new_counter_doc_keys(1)[0]
         with pytest.raises(DocumentNotFoundException):
-            cb_env.collection.binary().decrement('non-existent-doc', DecrementOptions(initial=SignedInt64(-1)))
+            cb_env.collection.binary().decrement(key, DecrementOptions(initial=SignedInt64(-1)))
 
-    def test_counter_increment(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('counter')
+    def test_counter_increment(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
         result = cb_env.collection.binary().increment(key)
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == value + 1
 
-    def test_counter_increment_initial_value(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('counter_empty')
+    def test_counter_increment_initial_value(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_counter_doc_keys(1)[0]
         result = cb_env.collection.binary().increment(key, IncrementOptions(initial=SignedInt64(100)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == 100
 
-    def test_counter_increment_non_default(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('counter')
+    def test_counter_increment_non_default(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)
         result = cb_env.collection.binary().increment(key, IncrementOptions(delta=DeltaValue(3)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
         assert result.content == value + 3
 
-    def test_counter_increment_no_initial_value(self, cb_env):
+    def test_counter_increment_no_initial_value(self, cb_env: SyncTestEnvironment) -> None:
+        # See test_counter_decrement_no_initial_value on why the key is minted.
+        key = cb_env.get_new_counter_doc_keys(1)[0]
         with pytest.raises(DocumentNotFoundException):
-            cb_env.collection.binary().increment('non-existent-doc', IncrementOptions(initial=SignedInt64(-1)))
+            cb_env.collection.binary().increment(key, IncrementOptions(initial=SignedInt64(-1)))
 
-    def test_prepend_bytes(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes_empty', key_only=True)
+    def test_prepend_bytes(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         result = cb_env.collection.binary().prepend(key, b'XXX')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        # make sure it really worked
-        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
-        assert result.content_as[bytes] == b'XXX'
+        stored = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
+        assert stored.content_as[bytes] == b'XXX'
 
-    def test_prepend_bytes_not_empty(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_prepend_bytes_not_empty(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         result = cb_env.collection.binary().prepend(key, b'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
-        assert result.content_as[bytes] == b'foo' + value
+        stored = cb_env.collection.get(key, transcoder=RawBinaryTranscoder())
+        assert stored.content_as[bytes] == b'foo' + value
 
-    def test_prepend_string(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8_empty', key_only=True)
+    def test_prepend_string(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8_EMPTY, key_only=True)
         result = cb_env.collection.binary().prepend(key, 'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        # make sure it really worked
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo'
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == 'foo'
 
-    def test_prepend_string_nokey(self, cb_env):
-        # @TODO(jc):  3.2.x SDK tests for NotStoredException
+    def test_prepend_string_nokey(self, cb_env: SyncTestEnvironment) -> None:
+        # See test_append_string_nokey on the retired NotStoredException.
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.binary().prepend(TestEnvironment.NOT_A_KEY, 'foo')
 
-    def test_prepend_string_not_empty(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('utf8')
+    def test_prepend_string_not_empty(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.UTF8)
         result = cb_env.collection.binary().prepend(key, 'foo')
         assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = cb_env.collection.get(key, transcoder=RawStringTranscoder())
-        assert result.content_as[str] == 'foo' + value
+        stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
+        assert stored.content_as[str] == 'foo' + value
 
-    def test_unsigned_int(self):
+
+class BinaryCollectionTests(BinaryCollectionTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(BinaryCollectionTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, BinaryCollectionTestSuite, request.param)
+        yield env
+        teardown_environment(env, BinaryCollectionTestSuite, request.param)
+
+
+class BinaryValueUnitTests:
+    # Split out of the suite class, following RangeScanRequestBuilderUnitTests and
+    # TransactionOptionsUnitTests.  TEST_MANIFEST is the parity contract for a suite, and two
+    # tests that construct an options value and check its bounds belong to no suite's
+    # contract; inside one, the manifest would be asserting coverage of the binary KV surface
+    # through two tests that touch none of it.
+
+    def test_unsigned_int(self) -> None:
+        # No `x = ...` on the raising calls: the assignment never happens, and flake8 reports
+        # the dead local as F841.
         with pytest.raises(InvalidArgumentException):
-            x = DeltaValue(-1)
+            DeltaValue(-1)
         with pytest.raises(InvalidArgumentException):
-            x = DeltaValue(0x7FFFFFFFFFFFFFFF + 1)
+            DeltaValue(0x7FFFFFFFFFFFFFFF + 1)
 
         x = DeltaValue(5)
         assert 5 == x.value
 
-    def test_signed_int_64(self):
+    def test_signed_int_64(self) -> None:
         with pytest.raises(InvalidArgumentException):
-            x = SignedInt64(-0x7FFFFFFFFFFFFFFF - 2)
+            SignedInt64(-0x7FFFFFFFFFFFFFFF - 2)
 
         with pytest.raises(InvalidArgumentException):
-            x = SignedInt64(0x7FFFFFFFFFFFFFFF + 1)
+            SignedInt64(0x7FFFFFFFFFFFFFFF + 1)
 
         x = SignedInt64(0x7FFFFFFFFFFFFFFF)
         assert 0x7FFFFFFFFFFFFFFF == x.value
         x = SignedInt64(-0x7FFFFFFFFFFFFFFF - 1)
         assert -0x7FFFFFFFFFFFFFFF - 1 == x.value
-
-
-class ClassicBinaryCollectionTests(BinaryCollectionTestSuite):
-
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicBinaryCollectionTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicBinaryCollectionTests) if valid_test_method(meth)]
-        compare = set(BinaryCollectionTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
-
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = BinaryTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_bucket_mgmt()
-        cb_env.setup(request.param, __name__)
-
-        yield cb_env
-
-        cb_env.teardown(request.param)

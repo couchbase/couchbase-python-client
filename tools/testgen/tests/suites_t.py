@@ -8,8 +8,8 @@ VALID = '''
 source_dir: src
 
 output:
-  acouchbase: acouchbase/tests_v2/_generated
-  txcouchbase: txcouchbase/tests_v2/_generated
+  acouchbase: acouchbase/tests/_generated
+  txcouchbase: txcouchbase/tests/_generated
 
 defaults:
   targets: [acouchbase, txcouchbase]
@@ -44,7 +44,7 @@ def test_loads_targets_output_and_sidecars(tmp_path: Path) -> None:
     cfg = load(*_tree(tmp_path, VALID))
 
     assert cfg.apis == ('acouchbase', 'txcouchbase')
-    assert cfg.output_dir('acouchbase') == 'acouchbase/tests_v2/_generated'
+    assert cfg.output_dir('acouchbase') == 'acouchbase/tests/_generated'
     both = [s.source for s in cfg.suites_for('txcouchbase')]
     assert both == ['src/both_t.py', 'src/with_sidecar_t.py']
     sidecar_suite = cfg.suites[2]

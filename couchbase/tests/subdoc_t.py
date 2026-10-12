@@ -13,12 +13,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Sub-document durability is not here: durability_t carries it, against real topology
+# fixtures, which is what a durability claim needs to mean anything.  The corpus needs
+# three document shapes nothing else seeds, `DocType.ARRAY_FIELD`, `COUNT_FIELD` and
+# `LIST_ONLY`, with their seeding rules alongside every other type in `_seed_docs`.
+
+from __future__ import annotations
+
 import types
+from collections.abc import Generator
 from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
 
 import couchbase.subdocument as SD
+from couchbase.collection import Collection
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
@@ -37,16 +47,52 @@ from couchbase.result import (GetResult,
                               LookupInReplicaResult,
                               LookupInResult,
                               MutateInResult)
-from tests.environments import CollectionType
-from tests.environments.subdoc_environment import SubdocTestEnvironment
-from tests.environments.test_environment import TestEnvironment
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 DocType,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
 from tests.mock_server import MockServerType
-from tests.test_features import EnvironmentFeatures
+from tests.skips import server_label, skip_mock_limitation
+from tests.suite_fixtures import TopologySuite
+from tests.test_features import EnvironmentFeatures, ServerFeatures
+
+# Hoisted out of the decorator below.  Inline, the same comprehension needs two `# noqa: E501`
+# to fit, and the noqa hides the expression rather than the line length.
+LOOKUP_IN_MACROS = [getattr(SD.LookupInMacro, name)()
+                    for name in SD.LookupInMacro.__dict__
+                    if isinstance(getattr(SD.LookupInMacro, name), types.FunctionType)]
 
 
-class SubDocumentTestSuite:
+class SubDocumentTestSuite(TopologySuite):
+    # TopologySuite for `check_server_groups_supported` alone.  No MANAGERS: nothing here
+    # reads `num_replicas`, so a bucket manager would add a `get_bucket` call and no more.
+
+    # VEHICLE first, and not only for readability.  get_batch_id() reads `['batch']` off the
+    # first value in the insertion-ordered cache, which a DocType.LIST_ONLY document (a bare
+    # JSON array) would answer with a TypeError.
+    DATA_SET = [DocType.VEHICLE,
+                DocType.ARRAY_FIELD,
+                DocType.COUNT_FIELD,
+                DocType.LIST_ONLY]
+
+    # Sized on the vehicle corpus, which is what binds: 52 vehicle draws once the macro
+    # tests are expanded, against 21 array, 5 count and 1 list.  NUM_DOCS is per suite
+    # rather than per type, so the other three are over-seeded.
+    NUM_DOCS = 60
+
+    # A replica vbucket learns of a new collection from its active over DCP, after the management
+    # API already reports the collection present, and on a loaded cluster that has been measured
+    # at over 14s.  Until then the replica answers unknown collection and the client retries it to
+    # the request timeout, so lookup_in_all_replicas either times out or returns an error entry
+    # for that replica.  The budget covers the lag.
+    REPLICA_READ_TIMEOUT = timedelta(seconds=30)
 
     TEST_MANIFEST = [
+        'test_array_add_append_mutate_in_macros',
+        'test_array_add_prepend_mutate_in_macros',
         'test_array_add_unique',
         'test_array_add_unique_create_parents',
         'test_array_add_unique_fail',
@@ -54,7 +100,6 @@ class SubDocumentTestSuite:
         'test_array_append',
         'test_array_append_create_parents',
         'test_array_append_multi_insert',
-        'test_array_add_append_mutate_in_macros',
         'test_array_as_document',
         'test_array_insert',
         'test_array_insert_multi_insert',
@@ -62,14 +107,13 @@ class SubDocumentTestSuite:
         'test_array_prepend',
         'test_array_prepend_create_parents',
         'test_array_prepend_multi_insert',
-        'test_array_add_prepend_mutate_in_macros',
         'test_count',
         'test_decrement',
         'test_decrement_create_parents',
+        'test_decrement_result_content',
         'test_increment',
         'test_increment_create_parents',
         'test_increment_result_content',
-        'test_decrement_result_content',
         'test_insert_create_parents',
         'test_lookup_in_all_replicas_bad_key',
         'test_lookup_in_all_replicas_exists',
@@ -78,8 +122,8 @@ class SubDocumentTestSuite:
         'test_lookup_in_all_replicas_get_bad_path',
         'test_lookup_in_all_replicas_get_full',
         'test_lookup_in_all_replicas_multiple_specs',
-        'test_lookup_in_all_replicas_with_timeout',
         'test_lookup_in_all_replicas_read_preference',
+        'test_lookup_in_all_replicas_with_timeout',
         'test_lookup_in_any_replica_bad_key',
         'test_lookup_in_any_replica_exists',
         'test_lookup_in_any_replica_exists_bad_path',
@@ -87,8 +131,8 @@ class SubDocumentTestSuite:
         'test_lookup_in_any_replica_get_bad_path',
         'test_lookup_in_any_replica_get_full',
         'test_lookup_in_any_replica_multiple_specs',
-        'test_lookup_in_any_replica_with_timeout',
         'test_lookup_in_any_replica_read_preference',
+        'test_lookup_in_any_replica_with_timeout',
         'test_lookup_in_macros',
         'test_lookup_in_multiple_specs',
         'test_lookup_in_one_path_not_found',
@@ -111,10 +155,10 @@ class SubDocumentTestSuite:
         'test_mutate_in_preserve_expiry_not_used',
         'test_mutate_in_remove',
         'test_mutate_in_remove_blank_path',
+        'test_mutate_in_replace_full_document',
         'test_mutate_in_replace_semantics',
         'test_mutate_in_replace_semantics_fail',
         'test_mutate_in_replace_semantics_kwargs',
-        'test_mutate_in_replace_full_document',
         'test_mutate_in_simple',
         'test_mutate_in_simple_spec_as_list',
         'test_mutate_in_store_semantics_fail',
@@ -123,96 +167,149 @@ class SubDocumentTestSuite:
         'test_upsert_create_parents',
     ]
 
-    @pytest.fixture(scope="class")
-    def check_preserve_expiry_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('preserve_expiry',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.fixture(scope="class")
-    def check_xattr_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('xattr',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.fixture(scope="class")
-    def skip_if_go_caves(self, cb_env):
-        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
-            pytest.skip("GoCAVES does not like this operation.")
-
-    @pytest.fixture(scope="class")
-    def check_replica_read_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('subdoc_replica_read',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    @pytest.fixture(scope='class')
+    def check_preserve_expiry_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.PreserveExpiry, cb_env.server_context)
 
     @pytest.fixture(scope='class')
-    def check_server_groups_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('server_groups',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type,
-                                                       cb_env.server_version_patch)
+    def check_xattr_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.Xattr, cb_env.server_context)
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.fixture(scope='class')
+    def check_replica_read_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.SubdocReplicaRead, cb_env.server_context)
+
+    # Each mock guard below names the operation that actually fails, which is what makes it
+    # auditable and lets it be retired one cause at a time.  A single "GoCAVES does not
+    # support this" fixture would cover 21 tests here, 10 of which pass on the mock with
+    # every guard removed.  Two narrower limitations are guarded in the test bodies.
+
+    @pytest.fixture(scope='class')
+    def skip_mock_no_subdoc_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        # All three answer path_not_found on the parent path they were asked to create.
+        # Scoped to those three ops: create_parents through array_append, array_prepend,
+        # insert and upsert all pass on the mock, so this is not a general MKDIR_P gap.
+        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
+            skip_mock_limitation(mock=cb_env.mock_server_type,
+                                 server=server_label(cb_env.is_mock_server),
+                                 note='GoCAVES does not honour create_parents for '
+                                      'array_addunique, increment or decrement')
+
+    @pytest.fixture(scope='class')
+    def skip_mock_no_array_mutation_macros(self, cb_env: SyncTestEnvironment) -> None:
+        # Reported as xattr_unknown_macro.  array_insert's variant reports path_mismatch
+        # instead, and the failing spec index cannot tell them apart: both report index 0
+        # and both have the same spec there, so the guard names the shape rather than the
+        # spec.  Read-side macros are unaffected, which is why test_lookup_in_macros has
+        # no guard.
+        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
+            skip_mock_limitation(mock=cb_env.mock_server_type,
+                                 server=server_label(cb_env.is_mock_server),
+                                 note='GoCAVES cannot expand a mutation macro inside an array '
+                                      'spec op (xattr_unknown_macro)')
+
+    @pytest.fixture(scope='class')
+    def skip_mock_no_mutate_in_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        # status_code 4 and no first_error_path, so it is the request being refused rather
+        # than any one spec.  Distinct from the preserve_expiry tests, which never reach the
+        # mock: those gate on ServerFeatures.PreserveExpiry, which wants 7.1.
+        if cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES:
+            skip_mock_limitation(mock=cb_env.mock_server_type,
+                                 server=server_label(cb_env.is_mock_server),
+                                 note='GoCAVES refuses a mutate_in that carries an expiry')
+
+    @staticmethod
+    def _skip_mock_unknown_macro(cb_env: SyncTestEnvironment, macro: Any) -> None:
+        # A helper rather than a fixture because the condition depends on a test parameter,
+        # and a static method so the generator resolves it through the in-file class map.
+        # ${Mutation.CAS} and ${Mutation.value_crc32c} both work on the mock, so guarding
+        # these two tests wholesale would throw away two thirds of their coverage.
+        if (cb_env.is_mock_server
+                and cb_env.mock_server_type == MockServerType.GoCAVES
+                and macro.value == '${Mutation.seqno}'):
+            skip_mock_limitation(mock=cb_env.mock_server_type,
+                                 server=server_label(cb_env.is_mock_server),
+                                 note='GoCAVES does not know the ${Mutation.seqno} macro')
+
+    # --- array_addunique ---
+
     @pytest.mark.parametrize('value', [True,
                                        False,
                                        3.14159,
                                        13,
                                        'foo',
                                        None])
-    def test_array_add_unique(self, cb_env, value):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_array_add_unique(self, cb_env: SyncTestEnvironment, value: Any) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         result = cb_env.collection.mutate_in(key, (SD.array_addunique('array', value),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
         assert isinstance(val['array'], list)
+        # Load-bearing rather than decorative.  The seeded array is [1, 2, 3, 4, 5], so for
+        # value=True the membership check alone cannot fail: True == 1 in Python.  Six is
+        # the seeded five plus the one this test adds.
+        assert len(val['array']) == 6
         assert value in val['array']
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_array_add_unique_create_parents(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('array')
+    @pytest.mark.usefixtures('skip_mock_no_subdoc_create_parents')
+    def test_array_add_unique_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.ARRAY_FIELD)
         cb_env.collection.upsert(key, value)
         TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         result = cb_env.collection.mutate_in(key, (
-            SD.array_addunique("new.set", "new", create_parents=True),
-            SD.array_addunique("new.set", "unique"),
-            SD.array_addunique("new.set", "set")))
+            SD.array_addunique('new.set', 'new', create_parents=True),
+            SD.array_addunique('new.set', 'unique'),
+            SD.array_addunique('new.set', 'set')))
         assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        new_set = result.content_as[dict]["new"]["set"]
+        stored = cb_env.collection.get(key)
+        new_set = stored.content_as[dict]['new']['set']
         assert isinstance(new_set, list)
-        assert "new" in new_set
-        assert "unique" in new_set
-        assert "set" in new_set
+        assert 'new' in new_set
+        assert 'unique' in new_set
+        assert 'set' in new_set
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_array_add_unique_fail(self, cb_env):
-        key = "simple-key"
+    def test_array_add_unique_fail(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
         value = {
-            "a": "aaa",
-            "b": [0, 1, 2, 3],
-            "c": [1.25, 1.5, {"nested": ["str", "array"]}],
+            'a': 'aaa',
+            'b': [0, 1, 2, 3],
+            'c': [1.25, 1.5, {'nested': ['str', 'array']}],
         }
         cb_env.collection.upsert(key, value)
         TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
 
         with pytest.raises(PathExistsException):
-            cb_env.collection.mutate_in(key, (SD.array_addunique("b", 3),))
+            cb_env.collection.mutate_in(key, (SD.array_addunique('b', 3),))
 
-        with pytest.raises(InvalidValueException):
-            cb_env.collection.mutate_in(key, (SD.array_addunique("b", [4, 5, 6]),))
-
-        with pytest.raises(InvalidValueException):
-            cb_env.collection.mutate_in(key, (SD.array_addunique("b", {"c": "d"}),))
-
+        # array_addunique needs a JSON primitive and an array to put it in, so there are two
+        # ways to get it wrong and GoCAVES implements one: it rejects a path that is not an
+        # array, which is the assertion below, but does not type-check the value or reject
+        # an array whose elements are not all primitives.  Grouping the real-server-only
+        # cases beats a whole-test skip, which would discard what the mock can assert.  The
+        # bad values go through Any-typed locals rather than a suppression.
         with pytest.raises(PathMismatchException):
-            cb_env.collection.mutate_in(key, (SD.array_addunique("c", 2),))
+            cb_env.collection.mutate_in(key, (SD.array_addunique('a', 2),))
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
+        if not (cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES):
+            bad_list: Any = [4, 5, 6]
+            with pytest.raises(InvalidValueException):
+                cb_env.collection.mutate_in(key, (SD.array_addunique('b', bad_list),))
+
+            bad_dict: Any = {'c': 'd'}
+            with pytest.raises(InvalidValueException):
+                cb_env.collection.mutate_in(key, (SD.array_addunique('b', bad_dict),))
+
+            # 'c' *is* an array, but it holds a dict.  A real server rejects this on the
+            # element type, where the 'a' case above is rejected on the path type.  Same
+            # exception, different reason, and the mock only implements the first.
+            with pytest.raises(PathMismatchException):
+                cb_env.collection.mutate_in(key, (SD.array_addunique('c', 2),))
+
+    @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
-    def test_array_add_unique_mutate_in_macros(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_array_add_unique_mutate_in_macros(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         xattr_array = 'xattr_array'
         specs = [
             SD.upsert(xattr_array, [], xattr=True),
@@ -220,15 +317,16 @@ class SubDocumentTestSuite:
             SD.array_addunique(xattr_array, SD.MutationMacro.seq_no()),
             SD.array_addunique(xattr_array, SD.MutationMacro.value_crc32c()),
         ]
-        # TODO: PYCBC-1557: Server raises invalid argument when using mutate-in macro w/ arrayaddunique.
-        # Update test if associated MB is addressed in the future.
+        # The server rejects a mutation macro used with arrayaddunique (PYCBC-1557), so the
+        # assertion is that the argument is refused.  Revisit if the associated MB lands.
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.mutate_in(key, specs)
 
-    def test_array_append(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.array_append('array', 6),))
+    # --- array_append / array_prepend / array_insert ---
+
+    def test_array_append(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.array_append('array', 6),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
@@ -236,20 +334,18 @@ class SubDocumentTestSuite:
         assert len(val['array']) == 6
         assert val['array'][5] == 6
 
-    def test_array_append_create_parents(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_array_append_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         result = cb_env.collection.mutate_in(key, (
             SD.array_append('new.array', 'Hello,', create_parents=True),
             SD.array_append('new.array', 'World!'),))
         assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['new']['array'] == [
-            'Hello,', 'World!']
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['new']['array'] == ['Hello,', 'World!']
 
-    def test_array_append_multi_insert(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.array_append('array', 8, 9, 10),))
+    def test_array_append_multi_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.array_append('array', 8, 9, 10),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
@@ -258,10 +354,10 @@ class SubDocumentTestSuite:
         assert len(app_res) == 3
         assert app_res == [8, 9, 10]
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
-    def test_array_add_append_mutate_in_macros(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_array_add_append_mutate_in_macros(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         xattr_array = 'xattr_array'
         specs = [
             SD.array_append(xattr_array, SD.MutationMacro.cas(), create_parents=True),
@@ -278,7 +374,7 @@ class SubDocumentTestSuite:
 
         res_array = res.content_as[list](0)
         assert len(res_array) == 3
-        assert all(map(lambda x: isinstance(x, str), res_array)) is True
+        assert all(isinstance(x, str) for x in res_array) is True
         res_cas = res_array[0]
         res_seqno = res_array[1]
         res_value = res_array[2]
@@ -288,10 +384,11 @@ class SubDocumentTestSuite:
         assert res_seqno.startswith('0x') is True
         assert res_value.startswith('0x') is True
 
-    def test_array_as_document(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array_only', key_only=True)
-        result = cb_env.collection.mutate_in(key, (SD.array_append(
-            '', 2), SD.array_prepend('', 0), SD.array_insert('[1]', 1),))
+    def test_array_as_document(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.LIST_ONLY, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.array_append('', 2),
+                                                   SD.array_prepend('', 0),
+                                                   SD.array_insert('[1]', 1),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[list]
@@ -301,10 +398,9 @@ class SubDocumentTestSuite:
         assert val[1] == 1
         assert val[2] == 2
 
-    def test_array_insert(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.array_insert('array.[2]', 10),))
+    def test_array_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.array_insert('array.[2]', 10),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
@@ -312,11 +408,9 @@ class SubDocumentTestSuite:
         assert len(val['array']) == 6
         assert val['array'][2] == 10
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_array_insert_multi_insert(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.array_insert('array.[3]', 6, 7, 8),))
+    def test_array_insert_multi_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.array_insert('array.[3]', 6, 7, 8),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
@@ -325,10 +419,10 @@ class SubDocumentTestSuite:
         assert len(ins_res) == 3
         assert ins_res == [6, 7, 8]
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
-    def test_array_insert_mutate_in_macros(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_array_insert_mutate_in_macros(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         xattr_array = 'xattr_array'
         specs = [
             SD.upsert(xattr_array, [], xattr=True),
@@ -346,8 +440,8 @@ class SubDocumentTestSuite:
 
         res_array = res.content_as[list](0)
         assert len(res_array) == 3
-        assert all(map(lambda x: isinstance(x, str), res_array)) is True
-        # prepending -- order is reversed
+        assert all(isinstance(x, str) for x in res_array) is True
+        # every insert goes to index 0, so the order is reversed
         res_cas = res_array[2]
         res_seqno = res_array[1]
         res_value = res_array[0]
@@ -357,10 +451,9 @@ class SubDocumentTestSuite:
         assert res_seqno.startswith('0x') is True
         assert res_value.startswith('0x') is True
 
-    def test_array_prepend(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.array_prepend('array', 0),))
+    def test_array_prepend(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.array_prepend('array', 0),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
@@ -368,20 +461,18 @@ class SubDocumentTestSuite:
         assert len(val['array']) == 6
         assert val['array'][0] == 0
 
-    def test_array_prepend_create_parents(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_array_prepend_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         result = cb_env.collection.mutate_in(key, (
             SD.array_prepend('new.array', 'World!', create_parents=True),
             SD.array_prepend('new.array', 'Hello,'),))
         assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['new']['array'] == [
-            'Hello,', 'World!']
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['new']['array'] == ['Hello,', 'World!']
 
-    def test_array_prepend_multi_insert(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.array_prepend('array', -2, -1, 0),))
+    def test_array_prepend_multi_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.array_prepend('array', -2, -1, 0),))
         assert isinstance(result, MutateInResult)
         result = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         val = result.content_as[dict]
@@ -390,10 +481,10 @@ class SubDocumentTestSuite:
         assert len(pre_res) == 3
         assert pre_res == [-2, -1, 0]
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
+    @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
-    def test_array_add_prepend_mutate_in_macros(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_array_add_prepend_mutate_in_macros(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         xattr_array = 'xattr_array'
         specs = [
             SD.array_prepend(xattr_array, SD.MutationMacro.cas(), create_parents=True),
@@ -410,8 +501,8 @@ class SubDocumentTestSuite:
 
         res_array = res.content_as[list](0)
         assert len(res_array) == 3
-        assert all(map(lambda x: isinstance(x, str), res_array)) is True
-        # prepending -- order is reversed
+        assert all(isinstance(x, str) for x in res_array) is True
+        # prepending, so the order is reversed
         res_cas = res_array[2]
         res_seqno = res_array[1]
         res_value = res_array[0]
@@ -421,77 +512,89 @@ class SubDocumentTestSuite:
         assert res_seqno.startswith('0x') is True
         assert res_value.startswith('0x') is True
 
-    def test_count(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    # --- count / increment / decrement ---
+
+    def test_count(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         result = cb_env.collection.lookup_in(key, (SD.count('array'),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[int](0) == 5
 
-    def test_decrement(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('count', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.decrement('count', 50),))
+    def test_decrement(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNT_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.decrement('count', 50),))
         assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['count'] == 50
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['count'] == 50
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_decrement_create_parents(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.decrement('new.counter', 100, create_parents=True),))
+    @pytest.mark.usefixtures('skip_mock_no_subdoc_create_parents')
+    def test_decrement_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        # COUNT_FIELD, matching the increment counterpart: neither shape has a `new` path, so
+        # drawing the same type in both is what makes the two tests comparable.
+        key = cb_env.get_existing_doc_by_type(DocType.COUNT_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key,
+                                             (SD.decrement('new.counter', 100, create_parents=True),))
         assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['new']['counter'] == -100
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['new']['counter'] == -100
 
-    def test_increment(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('count', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.increment('count', 50),))
-        assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['count'] == 150
-
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_increment_create_parents(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('count', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.increment('new.counter', 100, create_parents=True),))
-        assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['new']['counter'] == 100
-
-    def test_increment_result_content(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('count', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.increment('count', 50),))
-        assert isinstance(result, MutateInResult)
-        assert result.content_as[int](0) == 150
-
-    def test_decrement_result_content(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('count', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.decrement('count', 50),))
+    def test_decrement_result_content(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNT_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.decrement('count', 50),))
         assert isinstance(result, MutateInResult)
         assert result.content_as[int](0) == 50
 
-    def test_insert_create_parents(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('array', key_only=True)
+    def test_increment(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNT_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.increment('count', 50),))
+        assert isinstance(result, MutateInResult)
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['count'] == 150
+
+    @pytest.mark.usefixtures('skip_mock_no_subdoc_create_parents')
+    def test_increment_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNT_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key,
+                                             (SD.increment('new.counter', 100, create_parents=True),))
+        assert isinstance(result, MutateInResult)
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['new']['counter'] == 100
+
+    def test_increment_result_content(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.COUNT_FIELD, key_only=True)
+        result = cb_env.collection.mutate_in(key, (SD.increment('count', 50),))
+        assert isinstance(result, MutateInResult)
+        assert result.content_as[int](0) == 150
+
+    def test_insert_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.ARRAY_FIELD, key_only=True)
         result = cb_env.collection.mutate_in(
             key, (SD.insert('new.path', 'parents created', create_parents=True),))
         assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['new']['path'] == 'parents created'
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['new']['path'] == 'parents created'
+
+    def test_upsert_create_parents(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+        result = cb_env.collection.mutate_in(
+            key, (SD.upsert('new.path', 'parents created', create_parents=True),))
+        assert isinstance(result, MutateInResult)
+        stored = cb_env.collection.get(key)
+        assert stored.content_as[dict]['new']['path'] == 'parents created'
+
+    # --- lookup_in_all_replicas ---
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_bad_key(self, cb_env):
+    def test_lookup_in_all_replicas_bad_key(self, cb_env: SyncTestEnvironment) -> None:
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
         with pytest.raises(DocumentNotFoundException):
-            cb_env.collection.lookup_in_all_replicas('asdfgh', [SD.exists('batch')])
+            cb_env.collection.lookup_in_all_replicas(TestEnvironment.NOT_A_KEY, [SD.exists('batch')], opts)
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_exists(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        results = cb_env.collection.lookup_in_all_replicas(key, [SD.exists('batch')])
+    def test_lookup_in_all_replicas_exists(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        results = cb_env.collection.lookup_in_all_replicas(key, [SD.exists('batch')], opts)
         active_count = 0
         for result in results:
             assert isinstance(result, LookupInReplicaResult)
@@ -501,9 +604,10 @@ class SubDocumentTestSuite:
         assert active_count == 1
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_exists_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        results = cb_env.collection.lookup_in_all_replicas(key, [SD.exists('qzzxy')])
+    def test_lookup_in_all_replicas_exists_bad_path(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        results = cb_env.collection.lookup_in_all_replicas(key, [SD.exists('qzzxy')], opts)
         active_count = 0
         for result in results:
             assert isinstance(result, LookupInReplicaResult)
@@ -513,9 +617,10 @@ class SubDocumentTestSuite:
         assert active_count == 1
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_get(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        results = cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')])
+    def test_lookup_in_all_replicas_get(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        results = cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')], opts)
         active_count = 0
         for result in results:
             assert isinstance(result, LookupInReplicaResult)
@@ -525,9 +630,10 @@ class SubDocumentTestSuite:
         assert active_count == 1
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_get_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        results = cb_env.collection.lookup_in_all_replicas(key, [SD.get('qzzxy')])
+    def test_lookup_in_all_replicas_get_bad_path(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        results = cb_env.collection.lookup_in_all_replicas(key, [SD.get('qzzxy')], opts)
         active_count = 0
         for result in results:
             assert isinstance(result, LookupInReplicaResult)
@@ -538,9 +644,10 @@ class SubDocumentTestSuite:
         assert active_count == 1
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_get_full(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        results = cb_env.collection.lookup_in_all_replicas(key, [SD.get_full()])
+    def test_lookup_in_all_replicas_get_full(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        results = cb_env.collection.lookup_in_all_replicas(key, [SD.get_full()], opts)
         active_count = 0
         for result in results:
             assert isinstance(result, LookupInReplicaResult)
@@ -550,9 +657,13 @@ class SubDocumentTestSuite:
         assert active_count == 1
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_multiple_specs(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        results = cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch'), SD.exists('manufacturer.city')])
+    def test_lookup_in_all_replicas_multiple_specs(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        results = cb_env.collection.lookup_in_all_replicas(key,
+                                                           [SD.get('batch'),
+                                                            SD.exists('manufacturer.city')],
+                                                           opts)
         active_count = 0
         for result in results:
             assert isinstance(result, LookupInReplicaResult)
@@ -563,9 +674,9 @@ class SubDocumentTestSuite:
         assert active_count == 1
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_all_replicas_with_timeout(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        opts = LookupInAllReplicasOptions(timeout=timedelta(milliseconds=5000))
+    def test_lookup_in_all_replicas_with_timeout(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
+        opts = LookupInAllReplicasOptions(timeout=self.REPLICA_READ_TIMEOUT)
         results = cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')], opts)
         active_count = 0
         for result in results:
@@ -577,48 +688,48 @@ class SubDocumentTestSuite:
 
     @pytest.mark.usefixtures('check_replica_read_supported')
     @pytest.mark.usefixtures('check_server_groups_supported')
-    def test_lookup_in_all_replicas_read_preference(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        # No preferred server group was specified in the cluster options so this should raise
-        # DocumentUnretrievableException
+    def test_lookup_in_all_replicas_read_preference(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+        # No preferred server group was named in the cluster options, so asking for one is
+        # unsatisfiable and the read is expected to raise.
+        opts = LookupInAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP)
         with pytest.raises(DocumentUnretrievableException):
-            cb_env.collection.lookup_in_all_replicas(
-                key,
-                [SD.get('batch')],
-                LookupInAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
+            cb_env.collection.lookup_in_all_replicas(key, [SD.get('batch')], opts)
+
+    # --- lookup_in_any_replica ---
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_bad_key(self, cb_env):
+    def test_lookup_in_any_replica_bad_key(self, cb_env: SyncTestEnvironment) -> None:
         with pytest.raises(DocumentUnretrievableException):
-            cb_env.collection.lookup_in_any_replica('asdfgh', [SD.exists('batch')])
+            cb_env.collection.lookup_in_any_replica(TestEnvironment.NOT_A_KEY, [SD.exists('batch')])
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_exists(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_lookup_in_any_replica_exists(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         result = cb_env.collection.lookup_in_any_replica(key, [SD.exists('batch')])
         assert isinstance(result, LookupInReplicaResult)
         assert result.exists(0)
         assert result.is_replica is not None
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_exists_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_lookup_in_any_replica_exists_bad_path(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         result = cb_env.collection.lookup_in_any_replica(key, [SD.exists('qzzxy')])
         assert isinstance(result, LookupInReplicaResult)
         assert not result.exists(0)
         assert result.is_replica is not None
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_get(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_lookup_in_any_replica_get(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.lookup_in_any_replica(key, [SD.get('batch')])
         assert isinstance(result, LookupInReplicaResult)
         assert result.content_as[str](0) == value['batch']
         assert result.is_replica is not None
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_get_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_lookup_in_any_replica_get_bad_path(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         result = cb_env.collection.lookup_in_any_replica(key, [SD.get('qzzxy')])
         assert isinstance(result, LookupInReplicaResult)
         with pytest.raises(PathNotFoundException):
@@ -626,25 +737,27 @@ class SubDocumentTestSuite:
         assert result.is_replica is not None
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_get_full(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_lookup_in_any_replica_get_full(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.lookup_in_any_replica(key, [SD.get_full()])
         assert isinstance(result, LookupInReplicaResult)
         assert result.content_as[dict](0) == value
         assert result.is_replica is not None
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_multiple_specs(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        result = cb_env.collection.lookup_in_any_replica(key, [SD.get('batch'), SD.exists('manufacturer.city')])
+    def test_lookup_in_any_replica_multiple_specs(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
+        result = cb_env.collection.lookup_in_any_replica(key,
+                                                         [SD.get('batch'),
+                                                          SD.exists('manufacturer.city')])
         assert isinstance(result, LookupInReplicaResult)
         assert result.content_as[str](0) == value['batch']
         assert result.exists(1)
         assert result.is_replica is not None
 
     @pytest.mark.usefixtures('check_replica_read_supported')
-    def test_lookup_in_any_replica_with_timeout(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_lookup_in_any_replica_with_timeout(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         opts = LookupInAnyReplicaOptions(timeout=timedelta(milliseconds=5000))
         result = cb_env.collection.lookup_in_any_replica(key, [SD.get('batch')], opts)
         assert isinstance(result, LookupInReplicaResult)
@@ -653,20 +766,19 @@ class SubDocumentTestSuite:
 
     @pytest.mark.usefixtures('check_replica_read_supported')
     @pytest.mark.usefixtures('check_server_groups_supported')
-    def test_lookup_in_any_replica_read_preference(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
-        # No preferred server group was specified in the cluster options so this should raise
-        # DocumentUnretrievableException
+    def test_lookup_in_any_replica_read_preference(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+        # See test_lookup_in_all_replicas_read_preference: no preferred group is configured.
+        opts = LookupInAnyReplicaOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP)
         with pytest.raises(DocumentUnretrievableException):
-            cb_env.collection.lookup_in_any_replica(
-                key, [SD.get('batch')], LookupInAnyReplicaOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
+            cb_env.collection.lookup_in_any_replica(key, [SD.get('batch')], opts)
+
+    # --- lookup_in ---
 
     @pytest.mark.usefixtures('check_xattr_supported')
-    @pytest.mark.parametrize('macro',
-                             [getattr(SD.LookupInMacro, m)() for m in SD.LookupInMacro.__dict__.keys() if isinstance(getattr(SD.LookupInMacro, m),  # noqa: E501
-                                                                                                                     types.FunctionType)])  # noqa: E501
-    def test_lookup_in_macros(self, cb_env, macro):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    @pytest.mark.parametrize('macro', LOOKUP_IN_MACROS)
+    def test_lookup_in_macros(self, cb_env: SyncTestEnvironment, macro: str) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         macro_res = cb_env.collection.lookup_in(key, (SD.get(macro, xattr=True),))
         macro_res_value = macro_res.content_as[lambda x: x](0)
         document_res = cb_env.collection.lookup_in(key, (SD.get(SD.LookupInMacro.document(), xattr=True),))
@@ -683,9 +795,9 @@ class SubDocumentTestSuite:
             if macro_key in ['CAS', 'seqno', 'vbucket_uuid', 'value_crc32c']:
                 assert str(macro_res_value).startswith('0x')
 
-    @pytest.mark.usefixtures("check_xattr_supported")
-    def test_lookup_in_multiple_specs(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    @pytest.mark.usefixtures('check_xattr_supported')
+    def test_lookup_in_multiple_specs(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.lookup_in(key, (SD.get('$document.exptime', xattr=True),
                                                    SD.exists('manufacturer'),
                                                    SD.get('manufacturer'),
@@ -696,100 +808,108 @@ class SubDocumentTestSuite:
         assert result.content_as[dict](2) == value['manufacturer']
         assert result.content_as[str](3) == value['manufacturer']['geo']['accuracy']
 
-    def test_lookup_in_one_path_not_found(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        result = cb_env.collection.lookup_in(
-            key, (SD.exists('batch'), SD.exists('qzzxy'),))
+    def test_lookup_in_one_path_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+        result = cb_env.collection.lookup_in(key, (SD.exists('batch'), SD.exists('qzzxy'),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
         assert not result.exists(1)
-        # PYCBC-1480, update exists to follow RFC
+        # Regression guard (PYCBC-1480): exists() follows the RFC, so content_as[bool] on an
+        # exists spec reports the same answer rather than raising for the absent path.
         assert result.content_as[bool](0) is True
         assert result.content_as[bool](1) is False
 
-    def test_lookup_in_simple_exists(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_lookup_in_simple_exists(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         result = cb_env.collection.lookup_in(key, (SD.exists('batch'),))
         assert isinstance(result, LookupInResult)
         assert result.exists(0)
-        # PYCBC-1480, update exists to follow RFC
+        # Regression guard (PYCBC-1480), as above.
         assert result.content_as[bool](0) is True
 
-    def test_lookup_in_simple_exists_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_lookup_in_simple_exists_bad_path(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         result = cb_env.collection.lookup_in(key, (SD.exists('qzzxy'),))
         assert isinstance(result, LookupInResult)
         assert not result.exists(0)
         assert result.content_as[bool](0) is False
 
-    def test_lookup_in_simple_get(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    # Rerun guard (PYCBC-1311): cbdyncluster can be slow enough on the integration pipeline
+    # for this read to time out, and a retry clears it.  Scoped to this one test because
+    # that is the scope the evidence has; 1311 measured it here and nowhere else.
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_lookup_in_simple_get(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.lookup_in(key, (SD.get('batch'),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[str](0) == value['batch']
 
-    def test_lookup_in_simple_get_bad_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_lookup_in_simple_get_bad_path(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         result = cb_env.collection.lookup_in(key, (SD.get('qzzxy'),))
         assert isinstance(result, LookupInResult)
         with pytest.raises(PathNotFoundException):
             result.content_as[str](0)
 
-    def test_lookup_in_simple_get_spec_as_list(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_lookup_in_simple_get_spec_as_list(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.lookup_in(key, [SD.get('batch')])
         assert isinstance(result, LookupInResult)
         assert result.content_as[str](0) == value['batch']
 
-    def test_lookup_in_simple_long_path(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_lookup_in_simple_long_path(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
-        result = cb_env.collection.lookup_in(
-            key, (SD.get('manufacturer.geo.location.tz'),))
+        result = cb_env.collection.lookup_in(key, (SD.get('manufacturer.geo.location.tz'),))
         assert isinstance(result, LookupInResult)
         assert result.content_as[str](0) == value['manufacturer']['geo']['location']['tz']
 
-    def test_lookup_in_simple_with_timeout(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_lookup_in_simple_with_timeout(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.lookup_in(key,
                                              (SD.get('batch'),),
                                              LookupInOptions(timeout=timedelta(milliseconds=5000)))
         assert isinstance(result, LookupInResult)
         assert result.content_as[str](0) == value['batch']
 
-    def test_lookup_in_valid_path_null_content(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('vehicle')
-        value['empty_field'] = None
-        cb_env.collection.upsert(key, value)
+    def test_lookup_in_valid_path_null_content(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc()
+        # A copy, not the drawn document with a field bolted on: the seeded corpus hands
+        # values back by reference elsewhere in this suite.
+        cb_env.collection.upsert(key, {**value, 'empty_field': None})
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert 'empty_field' in res.content_as[dict]
         result = cb_env.collection.lookup_in(key, (SD.get('empty_field'), SD.get('batch')))
         assert isinstance(result, LookupInResult)
         assert result.content_as[lambda x: x](0) is None
 
-    @pytest.mark.usefixtures("check_xattr_supported")
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_expiry(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    # --- mutate_in ---
+
+    @pytest.mark.usefixtures('check_xattr_supported')
+    @pytest.mark.usefixtures('skip_mock_no_mutate_in_expiry')
+    def test_mutate_in_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         result = cb_env.collection.mutate_in(key,
-                                             (SD.upsert("make", "New Make"),
-                                              SD.replace("model", "New Model")),
+                                             (SD.upsert('make', 'New Make'),
+                                              SD.replace('model', 'New Model')),
                                              MutateInOptions(expiry=timedelta(seconds=1000)))
 
-        def cas_matches(cb, new_cas):
+        def cas_matches(cb: Collection, new_cas: int) -> None:
             r = cb.get(key)
             if new_cas != r.cas:
-                raise Exception(f"{new_cas} != {r.cas}")
+                raise Exception(f'{new_cas} != {r.cas}')
 
         TestEnvironment.try_n_times(10, 3, cas_matches, cb_env.collection, result.cas)
 
-        result = cb_env.collection.get(key, GetOptions(with_expiry=True))
-        expires_in = (result.expiry_time - datetime.now()).total_seconds()
+        stored = cb_env.collection.get(key, GetOptions(with_expiry=True))
+        # A with_expiry read that answers None is itself the failure, so state it rather than
+        # letting the subtraction below raise TypeError and report as an error.
+        assert stored.expiry_time is not None
+        expires_in = (stored.expiry_time - datetime.now()).total_seconds()
         assert expires_in > 0 and expires_in < 1021
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_insert_semantics(self, cb_env):
-        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_insert_semantics(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
 
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.get(key)
@@ -801,9 +921,16 @@ class SubDocumentTestSuite:
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_insert_semantics_kwargs(self, cb_env):
-        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_insert_semantics_fail(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
+
+        with pytest.raises(DocumentExistsException):
+            cb_env.collection.mutate_in(key,
+                                        (SD.insert('new_path', 'im new'),),
+                                        insert_doc=True)
+
+    def test_mutate_in_insert_semantics_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
 
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.get(key)
@@ -815,22 +942,13 @@ class SubDocumentTestSuite:
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_insert_semantics_fail(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-
-        with pytest.raises(DocumentExistsException):
-            cb_env.collection.mutate_in(key,
-                                        (SD.insert('new_path', 'im new'),),
-                                        insert_doc=True)
-
-    @pytest.mark.usefixtures('skip_if_go_caves')
     @pytest.mark.usefixtures('check_xattr_supported')
     @pytest.mark.parametrize('macro', [SD.MutationMacro.cas(),
                                        SD.MutationMacro.seq_no(),
                                        SD.MutationMacro.value_crc32c()])
-    def test_mutate_in_macros_insert(self, cb_env, macro):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_macros_insert(self, cb_env: SyncTestEnvironment, macro: Any) -> None:
+        self._skip_mock_unknown_macro(cb_env, macro)
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         xattr_key = 'xattr_key'
         cb_env.collection.mutate_in(key, (SD.insert(xattr_key, macro),))
         res = TestEnvironment.try_n_times(10,
@@ -843,13 +961,13 @@ class SubDocumentTestSuite:
         if 'CAS' in macro.value:
             assert res.cas == SD.convert_macro_cas_to_cas(macro_res)
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
     @pytest.mark.usefixtures('check_xattr_supported')
     @pytest.mark.parametrize('macro', [SD.MutationMacro.cas(),
                                        SD.MutationMacro.seq_no(),
                                        SD.MutationMacro.value_crc32c()])
-    def test_mutate_in_macros_replace_upsert(self, cb_env, macro):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_macros_replace_upsert(self, cb_env: SyncTestEnvironment, macro: Any) -> None:
+        self._skip_mock_unknown_macro(cb_env, macro)
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         xattr_key = 'xattr_key'
         cb_env.collection.mutate_in(key, (SD.upsert(xattr_key, macro),))
         res = TestEnvironment.try_n_times(10,
@@ -878,8 +996,8 @@ class SubDocumentTestSuite:
             assert replace_macro_res != upsert_macro_res
 
     @pytest.mark.usefixtures('check_preserve_expiry_supported')
-    def test_mutate_in_preserve_expiry(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_preserve_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key,
                                     (SD.upsert('make', 'New Make'),
@@ -907,34 +1025,32 @@ class SubDocumentTestSuite:
         assert expiry1 is not None
         assert expiry2 is not None
         assert expiry1 == expiry2
-        # if expiry was set, should be expired by now
-        TestEnvironment.sleep(3)
-        with pytest.raises(DocumentNotFoundException):
-            cb_env.collection.get(key)
+        # The expiry was preserved across the second write, so the document still goes away
+        # on the original 2s deadline.  Server-side expiry is not instantaneous, so poll to a
+        # deadline rather than sleeping a fixed margin and checking once.
+        TestEnvironment.try_n_times_till_exception(10,
+                                                   1,
+                                                   cb_env.collection.get,
+                                                   key,
+                                                   expected_exceptions=(DocumentNotFoundException,))
 
     @pytest.mark.usefixtures('check_preserve_expiry_supported')
-    def test_mutate_in_preserve_expiry_fails(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_preserve_expiry_fails(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
         with pytest.raises(InvalidArgumentException):
-            cb_env.collection.mutate_in(
-                key,
-                (SD.insert('c', 'ccc'),),
-                MutateInOptions(preserve_expiry=True),
-            )
+            cb_env.collection.mutate_in(key,
+                                        (SD.insert('c', 'ccc'),),
+                                        MutateInOptions(preserve_expiry=True))
 
         with pytest.raises(InvalidArgumentException):
-            cb_env.collection.mutate_in(
-                key,
-                (SD.replace('c', 'ccc'),),
-                MutateInOptions(
-                    expiry=timedelta(
-                        seconds=5),
-                    preserve_expiry=True),
-            )
+            cb_env.collection.mutate_in(key,
+                                        (SD.replace('c', 'ccc'),),
+                                        MutateInOptions(expiry=timedelta(seconds=5),
+                                                        preserve_expiry=True))
 
     @pytest.mark.usefixtures('check_preserve_expiry_supported')
-    def test_mutate_in_preserve_expiry_not_used(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_preserve_expiry_not_used(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key,
                                     (SD.upsert('make', 'New Make'),
@@ -960,29 +1076,30 @@ class SubDocumentTestSuite:
         assert expiry1 is not None
         assert expiry2 is not None
         assert expiry1 != expiry2
-        # if expiry was set, should be expired by now
-        TestEnvironment.sleep(3)
+        # Six seconds, and the length is the whole test.  The first write set a 5s expiry and
+        # the second cleared it, so a 3s wait ends before the original deadline and the
+        # assertion below could not fail.
+        TestEnvironment.sleep(6)
         result = cb_env.collection.get(key)
         assert isinstance(result, GetResult)
         assert result.content_as[dict]['make'] == 'Updated Make'
 
-    def test_mutate_in_remove(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_remove(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key, [SD.remove('manufacturer.geo')])
         result = cb_env.collection.get(key)
         assert 'geo' not in result.content_as[dict]['manufacturer']
 
-    def test_mutate_in_remove_blank_path(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_remove_blank_path(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key, [SD.remove('')])
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.get(key)
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_replace_semantics(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_replace_semantics(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key,
                                     (SD.upsert('new_path', 'im new'),),
@@ -991,18 +1108,16 @@ class SubDocumentTestSuite:
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict]['new_path'] == 'im new'
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_replace_semantics_fail(self, cb_env):
-        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_replace_semantics_fail(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
 
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.mutate_in(key,
                                         (SD.upsert('new_path', 'im new'),),
                                         replace_doc=True)
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_replace_semantics_kwargs(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_replace_semantics_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key,
                                     (SD.upsert('new_path', 'im new'),),
@@ -1011,8 +1126,8 @@ class SubDocumentTestSuite:
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict]['new_path'] == 'im new'
 
-    def test_mutate_in_replace_full_document(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_replace_full_document(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key,
                                     (SD.replace('', {'make': 'New Make', 'model': 'New Model'}),))
@@ -1021,46 +1136,48 @@ class SubDocumentTestSuite:
         assert res.content_as[dict]['make'] == 'New Make'
         assert res.content_as[dict]['model'] == 'New Model'
 
-    def test_mutate_in_simple(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_mutate_in_simple(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.mutate_in(key,
                                              (SD.upsert('make', 'New Make'),
                                               SD.replace('model', 'New Model')))
 
-        value['make'] = 'New Make'
-        value['model'] = 'New Model'
+        # Built, not mutated.  get_existing_doc_by_type returns the environment's cached
+        # document by reference, so `value['make'] = ...` writes into the corpus every other
+        # test in the class draws from.
+        expected = {**value, 'make': 'New Make', 'model': 'New Model'}
 
-        def cas_matches(cb, new_cas):
+        def cas_matches(cb: Collection, new_cas: int) -> None:
             r = cb.get(key)
             if new_cas != r.cas:
-                raise Exception(f"{new_cas} != {r.cas}")
+                raise Exception(f'{new_cas} != {r.cas}')
 
         TestEnvironment.try_n_times(10, 3, cas_matches, cb_env.collection, result.cas)
 
-        result = cb_env.collection.get(key)
-        assert value == result.content_as[dict]
+        stored = cb_env.collection.get(key)
+        assert expected == stored.content_as[dict]
 
-    def test_mutate_in_simple_spec_as_list(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('vehicle')
+    def test_mutate_in_simple_spec_as_list(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.VEHICLE)
         result = cb_env.collection.mutate_in(key,
                                              [SD.upsert('make', 'New Make'),
                                               SD.replace('model', 'New Model')])
 
-        value['make'] = 'New Make'
-        value['model'] = 'New Model'
+        # See test_mutate_in_simple: a copy, so the cached corpus is left alone.
+        expected = {**value, 'make': 'New Make', 'model': 'New Model'}
 
-        def cas_matches(cb, new_cas):
+        def cas_matches(cb: Collection, new_cas: int) -> None:
             r = cb.get(key)
             if new_cas != r.cas:
-                raise Exception(f"{new_cas} != {r.cas}")
+                raise Exception(f'{new_cas} != {r.cas}')
 
         TestEnvironment.try_n_times(10, 3, cas_matches, cb_env.collection, result.cas)
 
-        result = cb_env.collection.get(key)
-        assert value == result.content_as[dict]
+        stored = cb_env.collection.get(key)
+        assert expected == stored.content_as[dict]
 
-    def test_mutate_in_store_semantics_fail(self, cb_env):
-        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_store_semantics_fail(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
 
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.mutate_in(key,
@@ -1077,9 +1194,8 @@ class SubDocumentTestSuite:
                                         (SD.upsert('new_path', 'im new'),),
                                         upsert_doc=True, replace_doc=True)
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_upsert_semantics(self, cb_env):
-        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_upsert_semantics(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
 
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.get(key)
@@ -1091,9 +1207,8 @@ class SubDocumentTestSuite:
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
-    @pytest.mark.usefixtures('skip_if_go_caves')
-    def test_mutate_in_upsert_semantics_kwargs(self, cb_env):
-        key = cb_env.get_new_doc_by_type('vehicle', key_only=True)
+    def test_mutate_in_upsert_semantics_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
 
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.get(key)
@@ -1105,37 +1220,18 @@ class SubDocumentTestSuite:
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
-    def test_upsert_create_parents(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('vehicle', key_only=True)
-        result = cb_env.collection.mutate_in(
-            key, (SD.upsert('new.path', 'parents created', create_parents=True),))
-        assert isinstance(result, MutateInResult)
-        result = cb_env.collection.get(key)
-        assert result.content_as[dict]['new']['path'] == 'parents created'
 
+class SubDocumentTests(SubDocumentTestSuite):
 
-# For whatever reason GoCAVES is rather flaky w/ subdocument tests
-@pytest.mark.flaky(reruns=3, reruns_delay=1)
-class ClassicSubDocumentTests(SubDocumentTestSuite):
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(SubDocumentTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicSubDocumentTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicSubDocumentTests) if valid_test_method(meth)]
-        compare = set(SubDocumentTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
-
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = SubdocTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_bucket_mgmt()
-        cb_env.setup(request.param)
-
-        yield cb_env
-
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, SubDocumentTestSuite, request.param)
+        yield env
+        teardown_environment(env, SubDocumentTestSuite, request.param)

@@ -1,4 +1,4 @@
-"""Audit every ``# type: ignore`` in the tests_v2 trees.
+"""Audit every ``# type: ignore`` in the test trees.
 
 The test trees allow suppressions under a narrow rule, and this enforces it:
 
@@ -50,10 +50,10 @@ from typing import (List,
 # The trees audited, relative to the repo root.  The same four paths as ``files`` in
 # ``[tool.mypy]``, and a tree renamed in one has to be renamed in the other.
 ROOTS = (
-    'tests_v2',
-    'couchbase/tests_v2',
-    'acouchbase/tests_v2',
-    'txcouchbase/tests_v2',
+    'tests',
+    'couchbase/tests',
+    'acouchbase/tests',
+    'txcouchbase/tests',
 )
 
 # (path, error code) pairs allowed to carry no PYCBC key.  Add an entry only when no
@@ -64,34 +64,34 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # point at.  A cast does not work either: zope declares interface methods without
     # self, so mypy reads IReactorTime.callLater's `delay` as the receiver and every
     # argument shifts by one.
-    ('tests_v2/test_utils.py', 'attr-defined'),
+    ('tests/test_utils.py', 'attr-defined'),
     # datastructures_t iterates a CouchbaseMap inside pytest.raises(TypeError), because the
     # map deliberately implements neither __iter__ nor __aiter__: keys(), values() and
     # items() are its interface.  mypy is right about the line, and there is no ticket to
     # make it wrong.  The suppression is also the better half of the check, since
     # warn_unused_ignores fails the build if CouchbaseMap ever grows an __iter__.
-    ('couchbase/tests_v2/datastructures_t.py', 'attr-defined'),
+    ('couchbase/tests/datastructures_t.py', 'attr-defined'),
     # bucketmgmt_bucket_settings_t passes name=None to BucketSettings inside
     # pytest.raises(InvalidArgumentException), because rejecting it is the behaviour under
     # test.  mypy is right about the line and no ticket will ever make it wrong; a widened
     # annotation here would be the defect.  A cast is not the alternative it usually is,
     # since cast(str, None) asserts exactly what the test exists to disprove.
-    ('couchbase/tests_v2/bucketmgmt_bucket_settings_t.py', 'call-overload'),
+    ('couchbase/tests/bucketmgmt_bucket_settings_t.py', 'call-overload'),
     # bucket_t and cluster_t pass a bare ServiceType where PingOptions wants an iterable of
     # them, inside pytest.raises(InvalidArgumentException), because rejecting the scalar is
     # the behaviour under test.  Same shape as the BucketSettings(name=None) entry above:
     # widening the annotation to accept it would be the defect, and a cast would assert the
     # very thing the test disproves.
-    ('couchbase/tests_v2/bucket_t.py', 'call-overload'),
-    ('couchbase/tests_v2/cluster_t.py', 'call-overload'),
+    ('couchbase/tests/bucket_t.py', 'call-overload'),
+    ('couchbase/tests/cluster_t.py', 'call-overload'),
     # The inverse of the two entries above, and the reason it is permanent is the same.
     # PingOptions.service_types is annotated homogeneous, Iterable[ServiceType] or
     # Iterable[str], because that is what callers should write.  The request builders convert
     # per element, so a mixed iterable works, and test_ping_mixed_services guards that it keeps
     # working.  Widening the annotation to promise the mixed form is the change nobody should
     # make, so no ticket retires this; PYCBC-1913 is where the homogeneous shape was chosen.
-    ('couchbase/tests_v2/bucket_t.py', 'arg-type'),
-    ('couchbase/tests_v2/cluster_t.py', 'arg-type'),
+    ('couchbase/tests/bucket_t.py', 'arg-type'),
+    ('couchbase/tests/cluster_t.py', 'arg-type'),
     # connection_t's three _fail suites hand the constructors and the profile registry the
     # wrong type on purpose, because rejecting it is the behaviour under test: a dict where
     # CertificateAuthenticator wants three named paths, None and {} in place of each path, a
@@ -100,8 +100,8 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # BucketSettings(name=None) entry above, and permanent for the same reason: widening any
     # of these annotations to accept the input would be the defect, and a cast would assert
     # exactly what the test exists to disprove.
-    ('couchbase/tests_v2/connection_t.py', 'arg-type'),
-    ('couchbase/tests_v2/connection_t.py', 'call-overload'),
+    ('couchbase/tests/connection_t.py', 'arg-type'),
+    ('couchbase/tests/connection_t.py', 'call-overload'),
     # tracing_kv_multi_t hands a legacy parent span to two multi option classes, because the
     # tracer the suite's cluster was built with is what produces the span: under
     # TracingType.Legacy there is no other kind to hand over, which is also the position a
@@ -111,7 +111,7 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # suite is what guards that it keeps working.  Same shape as the PingOptions.service_types
     # entry above: widening the annotation to promise the legacy form is the change nobody
     # should make, so no ticket retires this; PYCBC-1922 is where the narrow shape was chosen.
-    ('couchbase/tests_v2/tracing_kv_multi_t.py', 'arg-type'),
+    ('couchbase/tests/tracing_kv_multi_t.py', 'arg-type'),
     # The two search request builder suites pass a SearchRequest to build_search_query_request
     # inside pytest.raises(InvalidArgumentException), because refusing it is the behaviour
     # under test: search() takes a request and search_query() takes a query, and the refusal
@@ -119,13 +119,13 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # entry above, and permanent for the same reason: widening the annotation to accept a
     # request would erase the distinction, and a cast would assert exactly what the test
     # exists to disprove.
-    ('couchbase/tests_v2/cluster_req_builder_t.py', 'arg-type'),
-    ('couchbase/tests_v2/scope_req_builder_t.py', 'arg-type'),
+    ('couchbase/tests/cluster_req_builder_t.py', 'arg-type'),
+    ('couchbase/tests/scope_req_builder_t.py', 'arg-type'),
     # collection_req_builder_t hands _get_scan_type the tag string it would have emitted for a
     # RangeScan, inside pytest.raises(InvalidArgumentException).  Same shape again, and the
     # near miss is the point: a caller who read the wire format rather than the api reaches
     # the else branch, and widening the annotation to accept a str would remove it.
-    ('couchbase/tests_v2/collection_req_builder_t.py', 'arg-type'),
+    ('couchbase/tests/collection_req_builder_t.py', 'arg-type'),
 }
 
 # Directory names skipped anywhere under ROOTS.

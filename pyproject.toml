@@ -29,15 +29,6 @@ markers = [
     "pycbc_couchbase: marks a test for the couchbase API (deselect with '-m \"not pycbc_couchbase\"')",
     "pycbc_acouchbase: marks a test for the acouchbase API (deselect with '-m \"not pycbc_acouchbase\"')",
     "pycbc_txcouchbase: marks a test for the txcouchbase API (deselect with '-m \"not pycbc_txcouchbase\"')",
-    "pycbc_core: marks a test as a pycbc_core C extension object-model test (no cluster required)",
-    "pycbc_diag: marks a test as a diagnostic API test",
-    "pycbc_kv: marks a test as a Key-Value API test",
-    "pycbc_streaming: marks a test as a streaming (query, search, analytics, or views) API test",
-    "pycbc_metrics: marks a test as a metrics API test",
-    "pycbc_mgmt: marks a test as a management API test",
-    "pycbc_misc: marks a test as a miscellaneous (connect, rate_limit) API test",
-    "pycbc_tracing: marks a test as a tracing API test",
-    "pycbc_txn: marks a test as a transactions API test",
     "pycbc_slow_mgmt: marks a test as a management API test that is slow",
     "unsupported_protocol(*protocols): skip this test under any of the given TestProtocol values",
     "testgen_exclude(*apis, reason=...): do not generate this test for the named APIs",
@@ -51,7 +42,7 @@ recursive = true
 [tool.mypy]
 # Kept here rather than in a separate mypy.ini so tool config stays in one file, matching
 # autopep8 / isort / pytest above.  Semantically identical to the [mypy] ini form.
-files = ["tests_v2", "couchbase/tests_v2", "acouchbase/tests_v2", "txcouchbase/tests_v2"]
+files = ["tests", "couchbase/tests", "acouchbase/tests", "txcouchbase/tests"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
@@ -117,6 +108,6 @@ line_length = 120
 order_by_type = true
 
 # isort infers first-party membership from what is on disk, so tools/testgen/resolver.py
-# sorts one way in a checkout that carries tests_v2 and another way in one that does
-# not.  Stating the membership makes the sort the same everywhere.
-known_first_party = ["tests_v2"]
+# sorts one way in a checkout that carries the `tests` package and another way in one
+# that does not.  Stating the membership makes the sort the same everywhere.
+known_first_party = ["tests"]

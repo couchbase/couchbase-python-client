@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,6 +13,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Two classes: `CollectionManagementTestSuite` covers create_collection and drop_collection
+# as they are spelled now, and `LegacyCollectionManagementTestSuite` covers the same two
+# through the `CollectionSpec` overload deprecated in v4.1.9, and exists to be deleted when
+# that overload is.
+#
+# The suite creates a bucket and works there rather than on the shared one: it creates and
+# drops scopes and collections by the dozen, and test_get_all_scopes counts what is on the
+# bucket, which is only a meaningful question on a bucket nothing else touches.  The bucket
+# is dropped whole at teardown, which is why there is no per-collection cleanup below.
+#
+# One call shape per test: create_collection accepts a lot of argument shapes, and folding
+# several into one body leaves a failure unable to say which shape broke.
+
+from __future__ import annotations
+
+from collections.abc import Generator
 from datetime import timedelta
 
 import pytest
@@ -29,19 +45,46 @@ from couchbase.management.collections import (CollectionSpec,
                                               CreateCollectionSettings,
                                               UpdateCollectionSettings)
 from couchbase.management.options import CreateCollectionOptions, DropCollectionOptions
-from tests.environments import CollectionType
-from tests.environments.collection_mgmt_environment import CollectionManagementTestEnvironment
-from tests.environments.test_environment import EnvironmentFeatures, TestEnvironment
+from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
+from tests.environments.managers import TestEnvironmentBucketManager, TestEnvironmentCollectionMgmtManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.skips import CouchbaseTestEnvironmentException
+from tests.test_features import EnvironmentFeatures, ServerFeatures
 
 
-class CollectionManagementTestSuite:
+class CollectionManagementTestSuite(SuiteRequirements):
+    MANAGERS = [TestEnvironmentBucketManager, TestEnvironmentCollectionMgmtManager]
+    COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
+
+    # Two tests write a document, into a collection they create themselves to watch
+    # max_expiry remove it again; nothing reads the shared corpus.
+    NUM_DOCS = 0
+
+    # BucketManagement because the suite creates a bucket to work in.  It is in
+    # FEATURES_NOT_IN_MOCK, so this is also what takes the whole class on GoCAVES.
+    REQUIRED_FEATURES = [ServerFeatures.Collections, ServerFeatures.BucketManagement]
+
+    # The scope every test uses unless it is testing scope creation itself.
+    DEFAULT_SCOPE = '_default'
+
+    # How many times a max_expiry check writes its document before it calls the setting not
+    # in force.  See _assert_doc_expires.
+    EXPIRY_WRITE_ROUNDS = 3
+
     TEST_MANIFEST = [
         'test_collection_goes_in_correct_bucket',
         'test_create_collection',
         'test_create_collection_kwargs',
+        'test_create_collection_mixed_kwargs',
+        'test_create_collection_settings_kwarg',
         'test_create_collection_with_options',
-        'test_create_collection_collection_spec_kwarg',
-        'test_create_collection_invalid_args',
+        'test_create_collection_timeout_kwarg',
         'test_create_collection_already_exists',
         'test_create_collection_bad_scope',
         'test_create_collection_max_expiry',
@@ -54,8 +97,7 @@ class CollectionManagementTestSuite:
         'test_drop_collection',
         'test_drop_collection_kwargs',
         'test_drop_collection_with_options',
-        'test_drop_collection_collection_spec_kwarg',
-        'test_drop_collection_invalid_args',
+        'test_drop_collection_timeout_kwarg',
         'test_drop_collection_not_found',
         'test_drop_collection_scope_not_found',
         'test_drop_scope',
@@ -69,6 +111,492 @@ class CollectionManagementTestSuite:
         'test_update_collection_max_expiry_bucket_default',
         'test_update_collection_max_expiry_invalid',
         'test_update_collection_max_expiry_no_expiry',
+    ]
+
+    @pytest.fixture(scope='class')
+    def check_non_deduped_history_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.NonDedupedHistory, cb_env.server_context)
+
+    @pytest.fixture(scope='class')
+    def check_update_collection_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.UpdateCollection, cb_env.server_context)
+
+    @pytest.fixture(scope='class')
+    def check_update_collection_max_expiry_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.UpdateCollectionMaxExpiry,
+                                                       cb_env.server_context)
+
+    @pytest.fixture(scope='class')
+    def check_negative_collection_max_expiry_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.NegativeCollectionMaxExpiry,
+                                                       cb_env.server_context)
+
+    @pytest.fixture()
+    def drop_bucket(self, cb_env: SyncTestEnvironment) -> Generator[None, None, None]:
+        yield
+        cb_env.drop_bucket()
+
+    # --- Shared verification ---
+
+    def _assert_present(self,
+                        cb_env: SyncTestEnvironment,
+                        scope_name: str,
+                        collection_name: str,
+                        max_expiry: timedelta | None = None) -> CollectionSpec:
+        # The wait and the read are deliberately two different things.  The consistency
+        # checker polls over REST, so it establishes the collection is there; the read goes
+        # back through the SDK manager, which is what the suite is testing.
+        cb_env.consistency.wait_until_collection_present(cb_env.collection_mgmt_bucket.name,
+                                                         scope_name,
+                                                         collection_name)
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        coll = mgr.get_collection(scope_name, collection_name)
+        assert coll is not None
+        cb_assert_eq(coll.scope_name, scope_name, what='collection scope_name')
+        if max_expiry is not None:
+            cb_assert_eq(coll.max_expiry, max_expiry, what='collection max_expiry')
+        return coll
+
+    def _assert_dropped(self,
+                        cb_env: SyncTestEnvironment,
+                        scope_name: str,
+                        collection_name: str) -> None:
+        # A drop test that calls drop and then stops establishes only that no exception came
+        # back.  Reading through the manager is what makes "it is gone" an assertion.
+        cb_env.consistency.wait_until_collection_dropped(cb_env.collection_mgmt_bucket.name,
+                                                         scope_name,
+                                                         collection_name)
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        assert mgr.get_collection(scope_name, collection_name) is None
+
+    def _assert_doc_expires(self, cb_env: SyncTestEnvironment, collection_name: str) -> None:
+        # The half of a max_expiry test the returned CollectionSpec cannot give: the spec
+        # says what the cluster recorded, this says the setting is actually in force.
+        coll = cb_env.collection_mgmt_bucket.collection(collection_name)
+        key = 'test-coll-key0'
+        # The write is inside the loop because the cluster manager reports a changed
+        # max_expiry before the data service applies it, and a doc written in that gap is
+        # stored with no expiry and never goes.  A doc written once the setting is live still
+        # has to expire, so the extra rounds absorb the lag and nothing else.
+        for attempt in range(self.EXPIRY_WRITE_ROUNDS):
+            # The collection was created moments ago, so the first writes to it can come back
+            # temp-failed; that is a race with the cluster and not the thing under test.
+            TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
+            TestEnvironment.try_n_times(10, 1, coll.get, key)
+            try:
+                # Expiry is kept in whole seconds, so a doc written with a 2s max_expiry can
+                # still be readable close to 3s later.  The loop stops at the first miss, so
+                # the margin costs a passing run nothing.
+                TestEnvironment.try_n_times_till_exception(5,
+                                                           1,
+                                                           coll.get,
+                                                           key,
+                                                           expected_exceptions=(DocumentNotFoundException,))
+                return
+            except CouchbaseTestEnvironmentException:
+                if attempt == self.EXPIRY_WRITE_ROUNDS - 1:
+                    raise
+
+    # --- create_collection ---
+
+    def test_collection_goes_in_correct_bucket(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+        # The negative is the test.  A manager that ignored which bucket it was built from would
+        # satisfy every other assertion in this file.
+        assert mgr.get_collection_in_bucket(cb_env.bucket.name, self.DEFAULT_SCOPE, collection_name) is None
+
+    def test_create_collection(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+    def test_create_collection_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(scope_name=self.DEFAULT_SCOPE, collection_name=collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+    def test_create_collection_mixed_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name=collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+    def test_create_collection_settings_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=2))
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name, settings=settings)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(seconds=2))
+
+    def test_create_collection_with_options(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        opts = CreateCollectionOptions(timeout=timedelta(seconds=30))
+
+        # Positional names, no settings, positional options.
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name, None, opts)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+        # Positional names, positional settings, positional options: the full four-argument form.
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name, CreateCollectionSettings(), opts)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+    def test_create_collection_timeout_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(scope_name=self.DEFAULT_SCOPE,
+                              collection_name=collection_name,
+                              timeout=timedelta(seconds=30))
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+    def test_create_collection_already_exists(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+        with pytest.raises(CollectionAlreadyExistsException):
+            mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+
+    def test_create_collection_bad_scope(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        with pytest.raises(ScopeNotFoundException):
+            mgr.create_collection('im-a-fake-scope', collection_name)
+
+    def test_create_collection_max_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=2))
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name, settings)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(seconds=2))
+        self._assert_doc_expires(cb_env, collection_name)
+
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_create_collection_max_expiry_default(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(seconds=0))
+
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_create_collection_max_expiry_invalid(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-20))
+        with pytest.raises(InvalidArgumentException):
+            mgr.create_collection(self.DEFAULT_SCOPE, collection_name, settings)
+
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_create_collection_max_expiry_no_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        # -1 second is the documented "never expires", distinct from 0, which means "take the
+        # bucket's".  The two are only distinguishable by reading the value back.
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-1))
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name, settings)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(seconds=-1))
+
+    # --- create_scope ---
+
+    def test_create_scope(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        scope_name = mgr.get_scope_name()
+        mgr.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.collection_mgmt_bucket.name, scope_name)
+        assert mgr.get_scope(scope_name) is not None
+
+    def test_create_scope_already_exists(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        scope_name = mgr.get_scope_name()
+        mgr.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.collection_mgmt_bucket.name, scope_name)
+        assert mgr.get_scope(scope_name) is not None
+        with pytest.raises(ScopeAlreadyExistsException):
+            mgr.create_scope(scope_name)
+
+    def test_create_scope_and_collection(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        scope_name = mgr.get_scope_name()
+        collection_name = mgr.get_collection_name()
+        mgr.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.collection_mgmt_bucket.name, scope_name)
+        assert mgr.get_scope(scope_name) is not None
+        mgr.create_collection(scope_name, collection_name)
+        self._assert_present(cb_env, scope_name, collection_name)
+
+    # --- drop_collection ---
+
+    def test_drop_collection(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+        mgr.drop_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_dropped(cb_env, self.DEFAULT_SCOPE, collection_name)
+        with pytest.raises(CollectionNotFoundException):
+            mgr.drop_collection(self.DEFAULT_SCOPE, collection_name)
+
+    def test_drop_collection_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+        mgr.drop_collection(scope_name=self.DEFAULT_SCOPE, collection_name=collection_name)
+        self._assert_dropped(cb_env, self.DEFAULT_SCOPE, collection_name)
+        with pytest.raises(CollectionNotFoundException):
+            mgr.drop_collection(scope_name=self.DEFAULT_SCOPE, collection_name=collection_name)
+
+    def test_drop_collection_with_options(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        opts = DropCollectionOptions(timeout=timedelta(seconds=30))
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+        mgr.drop_collection(self.DEFAULT_SCOPE, collection_name, opts)
+        self._assert_dropped(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+    def test_drop_collection_timeout_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name)
+        mgr.drop_collection(scope_name=self.DEFAULT_SCOPE,
+                            collection_name=collection_name,
+                            timeout=timedelta(seconds=30))
+        self._assert_dropped(cb_env, self.DEFAULT_SCOPE, collection_name)
+
+    def test_drop_collection_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        with pytest.raises(CollectionNotFoundException):
+            mgr.drop_collection(self.DEFAULT_SCOPE, 'fake-collection')
+
+    def test_drop_collection_scope_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        with pytest.raises(ScopeNotFoundException):
+            mgr.drop_collection('fake-scope', 'fake-collection')
+
+    # --- drop_scope, get_all_scopes ---
+
+    def test_drop_scope(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        scope_name = mgr.get_scope_name()
+        mgr.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.collection_mgmt_bucket.name, scope_name)
+        assert mgr.get_scope(scope_name) is not None
+        mgr.drop_scope(scope_name)
+        cb_env.consistency.wait_until_scope_dropped(cb_env.collection_mgmt_bucket.name, scope_name)
+        # Tells the name pool this one is gone, so test_get_all_scopes does not expect it back.
+        mgr.add_dropped_scope(scope_name)
+        assert mgr.get_scope(scope_name) is None
+        with pytest.raises(ScopeNotFoundException):
+            mgr.drop_scope(scope_name)
+
+    def test_drop_scope_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        with pytest.raises(ScopeNotFoundException):
+            mgr.drop_scope('some-random-scope')
+
+    def test_get_all_scopes(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        scope_names = mgr.get_scope_names()
+        scopes = mgr.get_all_scopes()
+        # Exact, because the bucket belongs to this suite: every scope on it whose name does not
+        # start with an underscore was created here and not dropped.  On the shared bucket the
+        # same arithmetic is at the mercy of whatever else has run.
+        cb_assert_eq(sum(s.name[0] != '_' for s in scopes), len(scope_names), what='non-system scope count')
+        assert any(s.name == '_default' for s in scopes)
+        for scope_name in scope_names:
+            assert any(s.name == scope_name for s in scopes)
+        for s in scopes:
+            for c in s.collections:
+                cb_assert_isinstance(c, CollectionSpec, what='get_all_scopes collection entry')
+                cb_assert_isinstance(c.name, str, what='collection name')
+                cb_assert_isinstance(c.scope_name, str, what='collection scope_name')
+                cb_assert_isinstance(c.max_expiry, timedelta, what='collection max_expiry')
+                assert c.history is None or isinstance(c.history, bool)
+
+    # --- History retention: magma only, so each of these makes a bucket of its own and the
+    # drop_bucket fixture takes it away again ---
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('drop_bucket')
+    def test_create_collection_history_retention(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        bucket_name = cb_env.get_bucket_name()
+        collection_name = 'test-collection'
+        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.MAGMA)
+        mgr.create_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name,
+                                        CreateCollectionSettings(history=True))
+        cb_env.consistency.wait_until_collection_present(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        coll = mgr.get_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        assert coll.history
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('drop_bucket')
+    def test_create_collection_history_retention_unsupported(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        bucket_name = cb_env.get_bucket_name()
+        collection_name = 'test-collection'
+        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.COUCHSTORE)
+
+        # Couchstore has no history retention, so asking for either answer is unavailable, not
+        # just asking for True.
+        with pytest.raises(FeatureUnavailableException):
+            mgr.create_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name,
+                                            CreateCollectionSettings(history=True))
+        with pytest.raises(FeatureUnavailableException):
+            mgr.create_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name,
+                                            CreateCollectionSettings(history=False))
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('drop_bucket')
+    def test_update_collection_history_retention(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        bucket_name = cb_env.get_bucket_name()
+        collection_name = 'test-collection'
+        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.MAGMA)
+        mgr.create_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name,
+                                        CreateCollectionSettings(history=False))
+        cb_env.consistency.wait_until_collection_present(bucket_name, self.DEFAULT_SCOPE, collection_name)
+
+        coll = mgr.get_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        assert not coll.history
+
+        mgr.update_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name,
+                                        UpdateCollectionSettings(history=True))
+        cb_env.consistency.wait_until_collection_has_settings(
+            bucket_name, self.DEFAULT_SCOPE, collection_name, {'history': True})
+
+        coll = mgr.get_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        assert coll.history
+
+    @pytest.mark.usefixtures('check_non_deduped_history_supported')
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('drop_bucket')
+    def test_update_collection_history_retention_unsupported(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        bucket_name = cb_env.get_bucket_name()
+        collection_name = 'test-collection'
+        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.COUCHSTORE)
+        mgr.create_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        cb_env.consistency.wait_until_collection_present(bucket_name, self.DEFAULT_SCOPE, collection_name)
+
+        coll = mgr.get_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        assert coll.history is False
+
+        with pytest.raises(FeatureUnavailableException):
+            mgr.update_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name,
+                                            UpdateCollectionSettings(history=True))
+
+        # The rejected update left the setting where it was, rather than half-applying it.
+        coll = mgr.get_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        assert coll.history is False
+
+    # --- update_collection: max_expiry ---
+
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    def test_update_collection_max_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(0))
+
+        mgr.update_collection(self.DEFAULT_SCOPE, collection_name,
+                              UpdateCollectionSettings(max_expiry=timedelta(seconds=2)))
+        cb_env.consistency.wait_until_collection_has_settings(
+            cb_env.collection_mgmt_bucket.name, self.DEFAULT_SCOPE, collection_name, {'maxTTL': 2})
+
+        coll = mgr.get_collection(self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        cb_assert_eq(coll.max_expiry, timedelta(seconds=2), what='updated collection max_expiry')
+        self._assert_doc_expires(cb_env, collection_name)
+
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_update_collection_max_expiry_bucket_default(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=5))
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name, settings)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(seconds=5))
+
+        # 0 hands the collection back to the bucket's own expiry, which is what makes this
+        # different from the -1 case below.
+        mgr.update_collection(self.DEFAULT_SCOPE, collection_name,
+                              UpdateCollectionSettings(max_expiry=timedelta(seconds=0)))
+        cb_env.consistency.wait_until_collection_has_settings(
+            cb_env.collection_mgmt_bucket.name, self.DEFAULT_SCOPE, collection_name, {'maxTTL': 0})
+
+        coll = mgr.get_collection(self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        cb_assert_eq(coll.max_expiry, timedelta(seconds=0), what='updated collection max_expiry')
+
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_update_collection_max_expiry_invalid(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(seconds=0))
+
+        with pytest.raises(InvalidArgumentException):
+            mgr.update_collection(self.DEFAULT_SCOPE, collection_name,
+                                  UpdateCollectionSettings(max_expiry=timedelta(seconds=-20)))
+
+    @pytest.mark.usefixtures('check_update_collection_supported')
+    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
+    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
+    def test_update_collection_max_expiry_no_expiry(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        collection_name = mgr.get_collection_name()
+        mgr.create_collection(self.DEFAULT_SCOPE, collection_name)
+        self._assert_present(cb_env, self.DEFAULT_SCOPE, collection_name, max_expiry=timedelta(seconds=0))
+
+        mgr.update_collection(self.DEFAULT_SCOPE, collection_name,
+                              UpdateCollectionSettings(max_expiry=timedelta(seconds=-1)))
+        cb_env.consistency.wait_until_collection_has_settings(
+            cb_env.collection_mgmt_bucket.name, self.DEFAULT_SCOPE, collection_name, {'maxTTL': -1})
+
+        coll = mgr.get_collection(self.DEFAULT_SCOPE, collection_name)
+        assert coll is not None
+        cb_assert_eq(coll.max_expiry, timedelta(seconds=-1), what='updated collection max_expiry')
+
+
+class LegacyCollectionManagementTestSuite(SuiteRequirements):
+    # Deprecated in v4.1.9 and kept until the overload is.  It is still the shape a good deal
+    # of existing user code is written in, so it needs coverage; what it does not need is to
+    # be mixed into the class above.  The two `*_invalid_args` tests live here for the same
+    # reason: both are about mixing the deprecated form with the current one, so they have
+    # nothing left to test once the overload is gone.
+
+    MANAGERS = [TestEnvironmentBucketManager, TestEnvironmentCollectionMgmtManager]
+    COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
+    NUM_DOCS = 0
+    REQUIRED_FEATURES = [ServerFeatures.Collections, ServerFeatures.BucketManagement]
+
+    DEFAULT_SCOPE = '_default'
+
+    TEST_MANIFEST = [
+        'test_create_collection_collection_spec_kwarg',
+        'test_create_collection_invalid_args',
+        'test_drop_collection_collection_spec_kwarg',
+        'test_drop_collection_invalid_args',
+        'test_deprecated_collection_goes_in_correct_bucket',
         'test_deprecated_create_collection',
         'test_deprecated_create_collection_already_exists',
         'test_deprecated_create_collection_bad_scope',
@@ -79,668 +607,203 @@ class CollectionManagementTestSuite:
         'test_deprecated_drop_collection_scope_not_found',
     ]
 
-    @pytest.fixture(scope="class")
-    def check_non_deduped_history_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('non_deduped_history',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.fixture(scope="class")
-    def check_update_collection_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('update_collection',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.fixture(scope="class")
-    def check_update_collection_max_expiry_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('update_collection_max_expiry',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.fixture(scope="class")
-    def check_negative_collection_max_expiry_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('negative_collection_max_expiry',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.fixture()
-    def drop_bucket(self, cb_env):
-        yield
-        cb_env.drop_bucket()
-
-    def test_collection_goes_in_correct_bucket(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        # make sure it actually is in the other-bucket
-        assert cb_env.get_collection(scope_name, collection_name) is not None
-        # also be sure this isn't in the default bucket
-        assert cb_env.get_collection(scope_name,
-                                     collection_name,
-                                     bucket_name=cb_env.bucket.name) is None
-
-    def test_create_collection(self, cb_env):
-        # create a collection under default_ scope
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
-        coll = cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name)
-        assert coll.scope_name == scope_name
+    def _assert_present(self, cb_env: SyncTestEnvironment, spec: CollectionSpec) -> CollectionSpec:
+        cb_env.consistency.wait_until_collection_present(cb_env.collection_mgmt_bucket.name, spec.scope_name, spec.name)
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        coll = mgr.get_collection(spec.scope_name, spec.name)
         assert coll is not None
+        cb_assert_eq(coll.scope_name, spec.scope_name, what='collection scope_name')
+        return coll
 
-    def test_create_collection_kwargs(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.cm.create_collection(scope_name=scope_name, collection_name=collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
-        coll = cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name)
-        assert coll is not None
-        assert coll.scope_name == scope_name
+    def test_create_collection_collection_spec_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name())
+        mgr.create_collection(collection=spec)
+        self._assert_present(cb_env, spec)
 
-        # mixed: positional scope_name, keyword collection_name
-        collection_name = cb_env.get_collection_name()
-        cb_env.cm.create_collection(scope_name, collection_name=collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
-        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
-
-        # settings passed as a keyword alongside positional names
-        if not cb_env.is_mock_server:
-            collection_name = cb_env.get_collection_name()
-            settings = CreateCollectionSettings(max_expiry=timedelta(seconds=2))
-            cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings=settings)
-            cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-            coll_spec = cb_env.get_collection(scope_name, collection_name)
-            assert coll_spec is not None
-            assert coll_spec.max_expiry == timedelta(seconds=2)
-
-    def test_create_collection_with_options(self, cb_env):
-        scope_name = '_default'
-        opts = CreateCollectionOptions(timeout=timedelta(seconds=30))
-
-        # positional names + positional options
-        collection_name = cb_env.get_collection_name()
-        cb_env.cm.create_collection(scope_name, collection_name, None, opts)
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
-        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
-
-        # positional names + positional settings + positional options
-        collection_name = cb_env.get_collection_name()
-        settings = CreateCollectionSettings()
-        cb_env.cm.create_collection(scope_name, collection_name, settings, opts)
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
-        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
-
-        # kwargs path + timeout as a raw keyword
-        collection_name = cb_env.get_collection_name()
-        cb_env.cm.create_collection(scope_name=scope_name,
-                                    collection_name=collection_name,
-                                    timeout=timedelta(seconds=30))
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
-        assert cb_env.get_collection(scope_name, collection_name, bucket_name=cb_env.bucket.name) is not None
-
-    def test_create_collection_collection_spec_kwarg(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        spec = CollectionSpec(collection_name)
-        cb_env.test_bucket_cm.create_collection(collection=spec)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
-        assert cb_env.get_collection('_default', collection_name) is not None
-
-    def test_create_collection_invalid_args(self, cb_env):
+    def test_create_collection_invalid_args(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
         spec = CollectionSpec('coll', 'scope')
-        # CollectionSpec passed positionally + as 'collection' keyword
+
+        # A CollectionSpec positionally and again as the `collection` keyword.
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection(spec, collection=spec)
-        # CollectionSpec form mixed with new-style keyword(s)
+            mgr.create_collection(spec, collection=spec)
+        # The deprecated form mixed with a current-signature keyword.
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection(spec, scope_name='_default')
+            mgr.create_collection(spec, scope_name=self.DEFAULT_SCOPE)
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection(spec, settings=CreateCollectionSettings())
+            mgr.create_collection(spec, settings=CreateCollectionSettings())
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection(collection=spec, collection_name='c')
-        # 'collection' kwarg + positional args
+            mgr.create_collection(collection=spec, collection_name='c')
+        # The `collection` keyword alongside positional arguments.
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection('_default', collection=spec)
-        # Duplicate scope_name / collection_name / settings
+            mgr.create_collection(self.DEFAULT_SCOPE, collection=spec)
+        # The same name given twice, positionally and by keyword.
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection('_default', scope_name='_default')
+            mgr.create_collection(self.DEFAULT_SCOPE, scope_name=self.DEFAULT_SCOPE)
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection('_default', 'c', collection_name='c')
+            mgr.create_collection(self.DEFAULT_SCOPE, 'c', collection_name='c')
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection('_default', 'c', CreateCollectionSettings(),
-                                        settings=CreateCollectionSettings())
-        # settings= kwarg with the wrong type
+            mgr.create_collection(self.DEFAULT_SCOPE, 'c', CreateCollectionSettings(),
+                                  settings=CreateCollectionSettings())
+        # settings= holding something that is not a settings object.
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.create_collection('_default', 'c', settings='not-a-settings')
+            mgr.create_collection(self.DEFAULT_SCOPE, 'c', settings='not-a-settings')
 
-    def test_create_collection_already_exists(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        # verify the collection exists w/in other-bucket
-        assert cb_env.get_collection(scope_name, collection_name) is not None
-        # now, it will fail if we try to create it again...
-        with pytest.raises(CollectionAlreadyExistsException):
-            cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
+    def test_drop_collection_collection_spec_kwarg(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name())
+        mgr.create_collection(spec)
+        self._assert_present(cb_env, spec)
+        mgr.drop_collection(collection=spec)
+        cb_env.consistency.wait_until_collection_dropped(cb_env.collection_mgmt_bucket.name, spec.scope_name, spec.name)
+        assert mgr.get_collection(spec.scope_name, spec.name) is None
 
-    def test_create_collection_bad_scope(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        scope_name = 'im-a-fake-scope'
-        with pytest.raises(ScopeNotFoundException):
-            cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-
-    def test_create_collection_max_expiry(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=2))
-
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=2)
-
-        # pop a doc in with no ttl, verify it goes away...
-        coll = cb_env.test_bucket.collection(collection_name)
-        key = 'test-coll-key0'
-        # we _can_ get a temp fail here, as we just created the collection.  So we
-        # retry the upsert.
-        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
-        TestEnvironment.try_n_times(10, 1, coll.get, key)
-        TestEnvironment.try_n_times_till_exception(4,
-                                                   1,
-                                                   coll.get,
-                                                   key,
-                                                   expected_exceptions=(DocumentNotFoundException,))
-
-    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
-    def test_create_collection_max_expiry_default(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=0)
-
-    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
-    def test_create_collection_max_expiry_invalid(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-20))
-
-        with pytest.raises(InvalidArgumentException):
-            cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
-
-    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
-    def test_create_collection_max_expiry_no_expiry(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=-1))
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=-1)
-
-    def test_create_scope(self, cb_env):
-        scope_name = cb_env.get_scope_name()
-        cb_env.test_bucket_cm.create_scope(scope_name)
-        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
-
-        assert cb_env.get_scope(scope_name) is not None
-
-    def test_create_scope_already_exists(self, cb_env):
-        scope_name = cb_env.get_scope_name()
-        cb_env.test_bucket_cm.create_scope(scope_name)
-        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
-
-        assert cb_env.get_scope(scope_name) is not None
-        with pytest.raises(ScopeAlreadyExistsException):
-            cb_env.test_bucket_cm.create_scope(scope_name)
-
-    def test_create_scope_and_collection(self, cb_env):
-        scope_name = cb_env.get_scope_name()
-        collection_name = cb_env.get_collection_name()
-        cb_env.test_bucket_cm.create_scope(scope_name)
-        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
-
-        assert cb_env.get_scope(scope_name) is not None
-
-        collection = CollectionSpec(collection_name, scope_name)
-        cb_env.test_bucket_cm.create_collection(collection)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-
-        assert cb_env.get_collection(collection.scope_name, collection.name) is not None
-
-    def test_drop_collection(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        # verify the collection exists w/in other-bucket
-        assert cb_env.get_collection(scope_name, collection_name) is not None
-        # attempt to drop it again will raise CollectionNotFoundException
-        cb_env.test_bucket_cm.drop_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
-        with pytest.raises(CollectionNotFoundException):
-            cb_env.test_bucket_cm.drop_collection(scope_name, collection_name)
-
-    def test_drop_collection_kwargs(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        assert cb_env.get_collection(scope_name, collection_name) is not None
-        cb_env.test_bucket_cm.drop_collection(scope_name=scope_name, collection_name=collection_name)
-        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
-        with pytest.raises(CollectionNotFoundException):
-            cb_env.test_bucket_cm.drop_collection(scope_name=scope_name, collection_name=collection_name)
-
-    def test_drop_collection_with_options(self, cb_env):
-        scope_name = '_default'
-        opts = DropCollectionOptions(timeout=timedelta(seconds=30))
-
-        # positional names + positional options
-        collection_name = cb_env.get_collection_name()
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        cb_env.test_bucket_cm.drop_collection(scope_name, collection_name, opts)
-        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
-
-        # kwargs path + timeout as a raw keyword
-        collection_name = cb_env.get_collection_name()
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        cb_env.test_bucket_cm.drop_collection(scope_name=scope_name,
-                                              collection_name=collection_name,
-                                              timeout=timedelta(seconds=30))
-        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, scope_name, collection_name)
-
-    def test_drop_collection_collection_spec_kwarg(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        spec = CollectionSpec(collection_name)
-        cb_env.test_bucket_cm.create_collection(spec)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
-        cb_env.test_bucket_cm.drop_collection(collection=spec)
-        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, '_default', collection_name)
-
-    def test_drop_collection_invalid_args(self, cb_env):
+    def test_drop_collection_invalid_args(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
         spec = CollectionSpec('coll', 'scope')
-        # CollectionSpec passed positionally + as 'collection' keyword
+
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.drop_collection(spec, collection=spec)
-        # CollectionSpec form mixed with new-style keyword(s)
+            mgr.drop_collection(spec, collection=spec)
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.drop_collection(spec, scope_name='_default')
+            mgr.drop_collection(spec, scope_name=self.DEFAULT_SCOPE)
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.drop_collection(collection=spec, collection_name='c')
-        # 'collection' kwarg + positional args
+            mgr.drop_collection(collection=spec, collection_name='c')
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.drop_collection('_default', collection=spec)
-        # Duplicate scope_name / collection_name
+            mgr.drop_collection(self.DEFAULT_SCOPE, collection=spec)
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.drop_collection('_default', scope_name='_default')
+            mgr.drop_collection(self.DEFAULT_SCOPE, scope_name=self.DEFAULT_SCOPE)
         with pytest.raises(InvalidArgumentException):
-            cb_env.cm.drop_collection('_default', 'c', collection_name='c')
+            mgr.drop_collection(self.DEFAULT_SCOPE, 'c', collection_name='c')
 
-    def test_drop_collection_not_found(self, cb_env):
-        collection_name = 'fake-collection'
-        scope_name = '_default'
-        with pytest.raises(CollectionNotFoundException):
-            cb_env.test_bucket_cm.drop_collection(scope_name, collection_name)
+    def test_deprecated_collection_goes_in_correct_bucket(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name())
+        mgr.create_collection(spec)
+        self._assert_present(cb_env, spec)
+        assert mgr.get_collection_in_bucket(cb_env.bucket.name, spec.scope_name, spec.name) is None
 
-    def test_drop_collection_scope_not_found(self, cb_env):
-        collection_name = 'fake-collection'
-        scope_name = 'fake-scope'
-        with pytest.raises(ScopeNotFoundException):
-            cb_env.test_bucket_cm.drop_collection(scope_name, collection_name)
+    def test_deprecated_create_collection(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name())
+        # A CollectionSpec built with no scope names the default one, which is the behaviour the
+        # replacement signature spells out by requiring scope_name.
+        cb_assert_eq(spec.scope_name, self.DEFAULT_SCOPE, what='CollectionSpec default scope_name')
+        mgr.create_collection(spec)
+        self._assert_present(cb_env, spec)
 
-    def test_drop_scope(self, cb_env):
-        scope_name = cb_env.get_scope_name()
-        cb_env.test_bucket_cm.create_scope(scope_name)
-        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
-        assert cb_env.get_scope(scope_name) is not None
-        cb_env.test_bucket_cm.drop_scope(scope_name)
-        cb_env.consistency.wait_until_scope_dropped(cb_env.test_bucket.name, scope_name)
-        cb_env.add_dropped_scope(scope_name)
-        with pytest.raises(ScopeNotFoundException):
-            cb_env.test_bucket_cm.drop_scope(scope_name)
-
-    def test_drop_scope_not_found(self, cb_env):
-        with pytest.raises(ScopeNotFoundException):
-            cb_env.test_bucket_cm.drop_scope('some-random-scope')
-
-    def test_get_all_scopes(self, cb_env):
-        scope_names = cb_env.get_scope_names()
-        scopes = cb_env.test_bucket_cm.get_all_scopes()
-        assert (sum(s.name[0] != '_' for s in scopes) == len(scope_names))
-        # should have a _default scope
-        assert any(map(lambda s: s.name == '_default', scopes))
-        for scope_name in scope_names:
-            assert any(map(lambda s: s.name == scope_name, scopes))
-        for s in scopes:
-            for c in s.collections:
-                assert isinstance(c, CollectionSpec)
-                assert isinstance(c.name, str)
-                assert isinstance(c.scope_name, str)
-                assert isinstance(c.max_expiry, timedelta)
-                assert c.history is None or isinstance(c.history, bool)
-
-    @pytest.mark.usefixtures('check_non_deduped_history_supported')
-    @pytest.mark.usefixtures('drop_bucket')
-    def test_create_collection_history_retention(self, cb_env):
-        bucket_name = cb_env.get_bucket_name()
-        scope_name = '_default'
-        collection_name = 'test-collection'
-
-        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.MAGMA)
-        bucket = TestEnvironment.try_n_times(3, 5, cb_env.cluster.bucket, bucket_name)
-        cm = bucket.collections()
-
-        cm.create_collection(scope_name, collection_name, CreateCollectionSettings(history=True))
-        cb_env.consistency.wait_until_collection_present(bucket.name, scope_name, collection_name)
-
-        collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name=bucket_name)
-        assert collection_spec is not None
-        assert collection_spec.history
-
-    @pytest.mark.usefixtures('check_non_deduped_history_supported')
-    @pytest.mark.usefixtures('drop_bucket')
-    def test_create_collection_history_retention_unsupported(self, cb_env):
-        bucket_name = cb_env.get_bucket_name()
-        scope_name = '_default'
-        collection_name = 'test-collection'
-
-        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.COUCHSTORE)
-        bucket = TestEnvironment.try_n_times(3, 5, cb_env.cluster.bucket, bucket_name)
-        cm = bucket.collections()
-
-        # Couchstore does not support history retention
-        with pytest.raises(FeatureUnavailableException):
-            cm.create_collection(
-                scope_name, collection_name, CreateCollectionSettings(history=True))
-
-        with pytest.raises(FeatureUnavailableException):
-            cm.create_collection(
-                scope_name, collection_name, CreateCollectionSettings(history=False))
-
-    @pytest.mark.usefixtures('check_non_deduped_history_supported')
-    @pytest.mark.usefixtures('check_update_collection_supported')
-    @pytest.mark.usefixtures('drop_bucket')
-    def test_update_collection_history_retention(self, cb_env):
-        bucket_name = cb_env.get_bucket_name()
-        scope_name = '_default'
-        collection_name = 'test-collection'
-
-        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.MAGMA)
-        bucket = TestEnvironment.try_n_times(3, 5, cb_env.cluster.bucket, bucket_name)
-        cm = bucket.collections()
-
-        cm.create_collection(scope_name, collection_name, CreateCollectionSettings(history=False))
-        cb_env.consistency.wait_until_collection_present(bucket.name, scope_name, collection_name)
-
-        collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name=bucket_name)
-        assert collection_spec is not None
-        assert not collection_spec.history
-
-        cm.update_collection(scope_name, collection_name, UpdateCollectionSettings(history=True))
-        cb_env.consistency.wait_until_collection_has_settings(
-            bucket.name, scope_name, collection_name, {'history': True})
-
-        collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name=bucket_name)
-        assert collection_spec is not None
-        assert collection_spec.history
-
-    @pytest.mark.usefixtures('check_non_deduped_history_supported')
-    @pytest.mark.usefixtures('check_update_collection_supported')
-    @pytest.mark.usefixtures('drop_bucket')
-    def test_update_collection_history_retention_unsupported(self, cb_env):
-        bucket_name = cb_env.get_bucket_name()
-        scope_name = '_default'
-        collection_name = 'test-collection'
-
-        cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.COUCHSTORE)
-        bucket = TestEnvironment.try_n_times(3, 5, cb_env.cluster.bucket, bucket_name)
-        cm = bucket.collections()
-
-        cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(bucket_name, scope_name, collection_name)
-
-        collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name)
-        assert collection_spec is not None
-        assert collection_spec.history is False
-
-        # Couchstore does not support history retention
-        with pytest.raises(FeatureUnavailableException):
-            cm.update_collection(scope_name, collection_name, UpdateCollectionSettings(history=True))
-
-        # Collection history retention setting remains unchanged
-        collection_spec = cb_env.get_collection(scope_name, collection_name, bucket_name)
-        assert collection_spec is not None
-        assert collection_spec.history is False
-
-    @pytest.mark.usefixtures('check_update_collection_supported')
-    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
-    def test_update_collection_max_expiry(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(0)
-
-        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=2))
-        cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
-        cb_env.consistency.wait_until_collection_has_settings(
-            cb_env.test_bucket.name, scope_name, collection_name, {'maxTTL': 2})
-
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=2)
-
-        # pop a doc in with no ttl, verify it goes away...
-        coll = cb_env.test_bucket.collection(collection_name)
-        key = 'test-coll-key0'
-        # we _can_ get a temp fail here, as we just created the collection.  So we
-        # retry the upsert.
-        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
-        TestEnvironment.try_n_times(10, 1, coll.get, key)
-        TestEnvironment.try_n_times_till_exception(4,
-                                                   1,
-                                                   coll.get,
-                                                   key,
-                                                   expected_exceptions=(DocumentNotFoundException,))
-
-    @pytest.mark.usefixtures('check_update_collection_supported')
-    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
-    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
-    def test_update_collection_max_expiry_bucket_default(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        settings = CreateCollectionSettings(max_expiry=timedelta(seconds=5))
-
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name, settings)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=5)
-
-        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=0))
-        cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
-        cb_env.consistency.wait_until_collection_has_settings(
-            cb_env.test_bucket.name, scope_name, collection_name, {'maxTTL': 0})
-
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=0)
-
-    @pytest.mark.usefixtures('check_update_collection_supported')
-    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
-    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
-    def test_update_collection_max_expiry_invalid(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=0)
-
-        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=-20))
-        with pytest.raises(InvalidArgumentException):
-            cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
-
-    @pytest.mark.usefixtures('check_update_collection_supported')
-    @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
-    @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')
-    def test_update_collection_max_expiry_no_expiry(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection expiry.")
-
-        collection_name = cb_env.get_collection_name()
-        scope_name = '_default'
-        cb_env.test_bucket_cm.create_collection(scope_name, collection_name)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=0)
-
-        settings = UpdateCollectionSettings(max_expiry=timedelta(seconds=-1))
-        cb_env.test_bucket_cm.update_collection(scope_name, collection_name, settings)
-        cb_env.consistency.wait_until_collection_has_settings(
-            cb_env.test_bucket.name, scope_name, collection_name, {'maxTTL': -1})
-        coll_spec = cb_env.get_collection(scope_name, collection_name)
-        assert coll_spec is not None
-        assert coll_spec.max_expiry == timedelta(seconds=-1)
-
-    def test_deprecated_create_collection(self, cb_env):
-        # create a collection under default_ scope
-        collection_name = cb_env.get_collection_name()
-        collection = CollectionSpec(collection_name)
-        cb_env.cm.create_collection(collection)
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, '_default', collection_name)
-        coll = cb_env.get_collection(collection.scope_name, collection.name, bucket_name=cb_env.bucket.name)
-        assert collection.scope_name == '_default'
-        assert coll is not None
-
-    def test_deprecated_create_collection_already_exists(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        collection = CollectionSpec(collection_name)
-        cb_env.test_bucket_cm.create_collection(collection)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
-        # verify the collection exists w/in other-bucket
-        assert cb_env.get_collection(collection.scope_name, collection.name) is not None
-        # now, it will fail if we try to create it again...
+    def test_deprecated_create_collection_already_exists(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name())
+        mgr.create_collection(spec)
+        self._assert_present(cb_env, spec)
         with pytest.raises(CollectionAlreadyExistsException):
-            cb_env.test_bucket_cm.create_collection(collection)
+            mgr.create_collection(spec)
 
-    def test_deprecated_create_collection_bad_scope(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        collection = CollectionSpec(collection_name, 'im-a-fake-scope')
+    def test_deprecated_create_collection_bad_scope(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name(), 'im-a-fake-scope')
         with pytest.raises(ScopeNotFoundException):
-            cb_env.test_bucket_cm.create_collection(collection)
+            mgr.create_collection(spec)
 
-    def test_deprecated_create_collection_max_ttl(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("CAVES doesn't support collection TTL.")
+    def test_deprecated_create_collection_max_ttl(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name(), max_ttl=timedelta(seconds=2))
+        mgr.create_collection(spec)
+        coll = self._assert_present(cb_env, spec)
+        # max_ttl on the way in, max_expiry on the way out: the deprecated spelling of the same
+        # setting, so the round trip is the thing worth asserting.
+        cb_assert_eq(coll.max_expiry, timedelta(seconds=2), what='collection max_expiry from max_ttl')
 
-        collection_name = cb_env.get_collection_name()
-        collection = CollectionSpec(collection_name, max_ttl=timedelta(seconds=2))
-
-        cb_env.test_bucket_cm.create_collection(collection)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
-        assert cb_env.get_collection(collection.scope_name, collection.name) is not None
-
-        # pop a doc in with no ttl, verify it goes away...
-        coll = cb_env.test_bucket.collection(collection.name)
+        collection = cb_env.collection_mgmt_bucket.collection(spec.name)
         key = 'test-coll-key0'
-        # we _can_ get a temp fail here, as we just created the collection.  So we
-        # retry the upsert.
-        TestEnvironment.try_n_times(10, 1, coll.upsert, key, {'some': 'thing'})
-        TestEnvironment.try_n_times(10, 1, coll.get, key)
+        TestEnvironment.try_n_times(10, 1, collection.upsert, key, {'some': 'thing'})
+        TestEnvironment.try_n_times(10, 1, collection.get, key)
         TestEnvironment.try_n_times_till_exception(4,
                                                    1,
-                                                   coll.get,
+                                                   collection.get,
                                                    key,
                                                    expected_exceptions=(DocumentNotFoundException,))
 
-    def test_deprecated_create_scope_and_collection(self, cb_env):
-        scope_name = cb_env.get_scope_name()
-        collection_name = cb_env.get_collection_name()
-        cb_env.test_bucket_cm.create_scope(scope_name)
-        cb_env.consistency.wait_until_scope_present(cb_env.test_bucket.name, scope_name)
-        assert cb_env.get_scope(scope_name) is not None
-        collection = CollectionSpec(collection_name, scope_name)
-        cb_env.test_bucket_cm.create_collection(collection)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, scope_name, collection_name)
-        assert cb_env.get_collection(collection.scope_name, collection.name) is not None
+    def test_deprecated_create_scope_and_collection(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        scope_name = mgr.get_scope_name()
+        mgr.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.collection_mgmt_bucket.name, scope_name)
+        assert mgr.get_scope(scope_name) is not None
+        spec = CollectionSpec(mgr.get_collection_name(), scope_name)
+        mgr.create_collection(spec)
+        self._assert_present(cb_env, spec)
 
-    def test_deprecated_drop_collection(self, cb_env):
-        collection_name = cb_env.get_collection_name()
-        collection = CollectionSpec(collection_name)
-        cb_env.test_bucket_cm.create_collection(collection)
-        cb_env.consistency.wait_until_collection_present(cb_env.test_bucket.name, '_default', collection_name)
-        # verify the collection exists w/in other-bucket
-        assert cb_env.get_collection(collection.scope_name, collection.name) is not None
-        # attempt to drop it again will raise CollectionNotFoundException
-        cb_env.test_bucket_cm.drop_collection(collection)
-        cb_env.consistency.wait_until_collection_dropped(cb_env.test_bucket.name, '_default', collection_name)
+    def test_deprecated_drop_collection(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        spec = CollectionSpec(mgr.get_collection_name())
+        mgr.create_collection(spec)
+        self._assert_present(cb_env, spec)
+        mgr.drop_collection(spec)
+        cb_env.consistency.wait_until_collection_dropped(cb_env.collection_mgmt_bucket.name, spec.scope_name, spec.name)
+        assert mgr.get_collection(spec.scope_name, spec.name) is None
         with pytest.raises(CollectionNotFoundException):
-            cb_env.test_bucket_cm.drop_collection(collection)
+            mgr.drop_collection(spec)
 
-    def test_deprecated_drop_collection_not_found(self, cb_env):
-        collection = CollectionSpec('fake-collection')
+    def test_deprecated_drop_collection_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
         with pytest.raises(CollectionNotFoundException):
-            cb_env.test_bucket_cm.drop_collection(collection)
+            mgr.drop_collection(CollectionSpec('fake-collection'))
 
-    def test_deprecated_drop_collection_scope_not_found(self, cb_env):
-        collection = CollectionSpec('fake-collection', 'fake-scope')
+    def test_deprecated_drop_collection_scope_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        mgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
         with pytest.raises(ScopeNotFoundException):
-            cb_env.test_bucket_cm.drop_collection(collection)
+            mgr.drop_collection(CollectionSpec('fake-collection', 'fake-scope'))
 
 
-class ClassicCollectionManagementTests(CollectionManagementTestSuite):
+@pytest.mark.xdist_group('bucket_lifecycle')
+class CollectionManagementTests(CollectionManagementTestSuite):
 
     @pytest.fixture(scope='class', autouse=True)
-    def validate_test_manifest(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicCollectionManagementTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicCollectionManagementTests) if valid_test_method(meth)]
-        test_list = set(CollectionManagementTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if test_list:
-            pytest.fail(f'Test manifest invalid.  Missing/extra tests: {test_list}.')
+    def manifest_validated(self) -> None:
+        validate_test_manifest(CollectionManagementTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env):
-        cb_env = CollectionManagementTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_bucket_mgmt().enable_collection_mgmt()
-        cb_env.setup()
-        yield cb_env
-        cb_env.teardown()
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, CollectionManagementTestSuite)
+        env.init_bucket_pool()
+        mgr = env.get_manager(TestEnvironmentCollectionMgmtManager)
+        # Reserved, not merely issued: the drop_bucket fixture drops whichever pool name is
+        # outstanding rather than the one the test made.
+        bucket_name = env.reserve_bucket_name()
+        env.create_bucket(bucket_name)
+        collection_mgmt_bucket = mgr.use_bucket(bucket_name)
+        env.set_collection_mgmt_bucket(collection_mgmt_bucket)
+        yield env
+        # Drops the suite's bucket along with every bucket a history retention test left behind,
+        # and every scope and collection inside them.
+        env.teardown_bucket_pool()
+        teardown_environment(env, CollectionManagementTestSuite)
+
+
+@pytest.mark.xdist_group('bucket_lifecycle')
+class LegacyCollectionManagementTests(LegacyCollectionManagementTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(LegacyCollectionManagementTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, LegacyCollectionManagementTestSuite)
+        env.init_bucket_pool()
+        mgr = env.get_manager(TestEnvironmentCollectionMgmtManager)
+        # Reserved, not merely issued: the drop_bucket fixture drops whichever pool name is
+        # outstanding rather than the one the test made.
+        bucket_name = env.reserve_bucket_name()
+        env.create_bucket(bucket_name)
+        collection_mgmt_bucket = mgr.use_bucket(bucket_name)
+        env.set_collection_mgmt_bucket(collection_mgmt_bucket)
+        yield env
+        env.teardown_bucket_pool()
+        teardown_environment(env, LegacyCollectionManagementTestSuite)

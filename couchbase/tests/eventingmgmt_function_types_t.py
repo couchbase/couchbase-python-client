@@ -13,8 +13,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
+from typing import Any
+
 import pytest
 
+from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.logic.eventing_function_mgmt_types import (EventingFunction,
                                                                      EventingFunctionBucketAccess,
                                                                      EventingFunctionBucketBinding,
@@ -24,9 +29,11 @@ from couchbase.management.logic.eventing_function_mgmt_types import (EventingFun
                                                                      EventingFunctionUrlBinding,
                                                                      EventingFunctionUrlNoAuth)
 
-# (auth, the tagged dict the binding layer exchanges, what a read back yields).
-# from_server() does not read the basic and digest passwords back, since the server
-# does not return them.
+FULL_KEYSPACE = {'bucket': 'meta-bucket', 'scope': 'meta-scope', 'collection': 'meta-collection'}
+DEFAULT_KEYSPACE = {'bucket': 'meta-bucket', 'scope': '_default', 'collection': '_default'}
+
+# (built, exchanged, read back).  The third column is not the first for basic and digest: the
+# server does not return their passwords, so `from_server` cannot put one back.
 URL_BINDING_AUTH = [
     (EventingFunctionUrlNoAuth(),
      {'auth_type': 'no-auth'},
@@ -43,26 +50,32 @@ URL_BINDING_AUTH = [
 ]
 
 
-class EventingFunctionTypesTestSuite:
-    TEST_MANIFEST = [
-        'test_bucket_binding_keyspace_from_server',
-        'test_keyspaces_default_scope_and_collection_from_server',
-        'test_keyspaces_from_server',
-        'test_keyspaces_round_trip',
-        'test_url_binding_auth_as_dict',
-        'test_url_binding_auth_from_server',
-        'test_url_binding_auth_round_trip',
-    ]
+def _function(**overrides: Any) -> EventingFunction:
+    return EventingFunction.from_server({'name': 'test-function', **overrides})
 
-    def test_keyspaces_from_server(self):
-        server_dict = {
-            'name': 'test-function',
-            'metadata_keyspace': {'bucket': 'meta-bucket', 'scope': 'meta-scope',
-                                  'collection': 'meta-collection'},
-            'source_keyspace': {'bucket': 'src-bucket', 'scope': 'src-scope',
-                                'collection': 'src-collection'},
-        }
-        func = EventingFunction.from_server(server_dict)
+
+def _url_binding(auth: Any) -> EventingFunctionUrlBinding:
+    return EventingFunctionUrlBinding(hostname='http://localhost:5000',
+                                      alias='urlBinding',
+                                      allow_cookies=True,
+                                      validate_ssl_certificate=False,
+                                      auth=auth)
+
+
+class EventingFunctionTypesUnitTests:
+    # No cb_env and no TEST_MANIFEST: every test feeds a server-shaped dict to a `from_server`
+    # classmethod, and `couchbase.management.logic.eventing_function_mgmt_types` holds the only
+    # definitions.  Not generated for that reason.
+    #
+    # Decoding is the half `eventingmgmt_t` cannot reach: it builds keyspaces and bindings as
+    # fixtures and hands them to management calls, which exercises the constructors and the
+    # outbound `as_dict()` and never reads a payload back.  The inbound and outbound spellings
+    # differ in two separate places, neither visible to a suite that only writes.
+
+    def test_keyspaces_from_server(self) -> None:
+        func = _function(metadata_keyspace=FULL_KEYSPACE,
+                         source_keyspace={'bucket': 'src-bucket', 'scope': 'src-scope',
+                                          'collection': 'src-collection'})
 
         assert func.metadata_keyspace.bucket == 'meta-bucket'
         assert func.metadata_keyspace.scope == 'meta-scope'
@@ -71,25 +84,30 @@ class EventingFunctionTypesTestSuite:
         assert func.source_keyspace.scope == 'src-scope'
         assert func.source_keyspace.collection == 'src-collection'
 
-    def test_keyspaces_default_scope_and_collection_from_server(self):
-        server_dict = {
-            'name': 'test-function',
-            'metadata_keyspace': {'bucket': 'meta-bucket', 'scope': '_default',
-                                  'collection': '_default'},
-        }
-        func = EventingFunction.from_server(server_dict)
+    def test_keyspaces_default_scope_and_collection_from_server(self) -> None:
+        # The server names the default scope and collection explicitly; the SDK reports them
+        # as absent, so `scope` reads None rather than the string '_default'.
+        func = _function(metadata_keyspace=DEFAULT_KEYSPACE)
 
         assert func.metadata_keyspace.bucket == 'meta-bucket'
         assert func.metadata_keyspace.scope is None
         assert func.metadata_keyspace.collection is None
 
-    def test_keyspaces_round_trip(self):
-        keyspace = {'bucket': 'meta-bucket', 'scope': 'meta-scope', 'collection': 'meta-collection'}
-        func = EventingFunction.from_server({'name': 'test-function', 'metadata_keyspace': keyspace})
+    def test_keyspaces_round_trip(self) -> None:
+        func = _function(metadata_keyspace=FULL_KEYSPACE)
 
-        assert func.as_dict()['metadata_keyspace'] == keyspace
+        assert func.as_dict()['metadata_keyspace'] == FULL_KEYSPACE
 
-    def test_bucket_binding_keyspace_from_server(self):
+    def test_a_default_keyspace_does_not_round_trip(self) -> None:
+        # The consequence of the test above: decoding drops the two '_default' names and
+        # `as_dict()` omits what is None, so a function read and written back names the bucket
+        # alone.  That is safe only because absent and '_default' mean the same thing to the
+        # server, which is not something this decode can promise.
+        func = _function(metadata_keyspace=DEFAULT_KEYSPACE)
+
+        assert func.as_dict()['metadata_keyspace'] == {'bucket': 'meta-bucket'}
+
+    def test_bucket_binding_keyspace_from_server(self) -> None:
         binding = EventingFunctionBucketBinding.from_server({
             'alias': 'alias',
             'access': 'r',
@@ -103,18 +121,46 @@ class EventingFunctionTypesTestSuite:
         assert binding.name.scope == 'bound-scope'
         assert binding.name.collection == 'bound-collection'
 
-    @pytest.mark.parametrize('auth, binding_auth, _', URL_BINDING_AUTH)
-    def test_url_binding_auth_as_dict(self, auth, binding_auth, _):
-        binding = EventingFunctionUrlBinding(hostname='http://localhost:5000',
-                                             alias='urlBinding',
-                                             allow_cookies=True,
-                                             validate_ssl_certificate=False,
-                                             auth=auth)
+    @pytest.mark.parametrize('access, expected, written',
+                             [('r', EventingFunctionBucketAccess.ReadOnly, 'read_only'),
+                              ('read_only', EventingFunctionBucketAccess.ReadOnly, 'read_only'),
+                              ('rw', EventingFunctionBucketAccess.ReadWrite, 'read_write'),
+                              ('read_write', EventingFunctionBucketAccess.ReadWrite, 'read_write')])
+    def test_bucket_access_reads_either_spelling_and_writes_the_long_one(
+            self,
+            access: str,
+            expected: EventingFunctionBucketAccess,
+            written: str) -> None:
+        # Three spellings for two values: the enum member's own value is the short form,
+        # decoding accepts either, and `to_str()` always emits the long one.  So reading the
+        # enum value is not the same as reading what will be sent.
+        binding = EventingFunctionBucketBinding.from_server(
+            {'alias': 'alias', 'access': access, 'name': {'bucket': 'bound-bucket'}})
 
-        assert binding.as_dict()['auth'] == binding_auth
+        assert binding.access is expected
+        assert binding.as_dict()['access'] == written
+
+    def test_bucket_access_rejects_an_unknown_value(self) -> None:
+        with pytest.raises(InvalidArgumentException) as exc_info:
+            EventingFunctionBucketAccess.from_server('write_only')
+
+        assert 'write_only' in str(exc_info.value)
+
+    # The four auth kinds, read three ways: out, in, and out and back.  Separate tests because
+    # the table's first and third columns differ for two of the four, so one round-trip test
+    # could not say which half dropped the password.
+    @pytest.mark.parametrize('auth, binding_auth, _', URL_BINDING_AUTH)
+    def test_url_binding_auth_as_dict(self,
+                                      auth: Any,
+                                      binding_auth: dict[str, Any],
+                                      _: Any) -> None:
+        assert _url_binding(auth).as_dict()['auth'] == binding_auth
 
     @pytest.mark.parametrize('_, binding_auth, expected_auth', URL_BINDING_AUTH)
-    def test_url_binding_auth_from_server(self, _, binding_auth, expected_auth):
+    def test_url_binding_auth_from_server(self,
+                                          _: Any,
+                                          binding_auth: dict[str, Any],
+                                          expected_auth: Any) -> None:
         binding = EventingFunctionUrlBinding.from_server({
             'hostname': 'http://localhost:5000',
             'alias': 'urlBinding',
@@ -127,23 +173,10 @@ class EventingFunctionTypesTestSuite:
         assert binding.auth == expected_auth
 
     @pytest.mark.parametrize('auth, _, expected_auth', URL_BINDING_AUTH)
-    def test_url_binding_auth_round_trip(self, auth, _, expected_auth):
-        binding = EventingFunctionUrlBinding(hostname='http://localhost:5000',
-                                             alias='urlBinding',
-                                             allow_cookies=True,
-                                             validate_ssl_certificate=False,
-                                             auth=auth)
+    def test_url_binding_auth_round_trip(self,
+                                         auth: Any,
+                                         _: Any,
+                                         expected_auth: Any) -> None:
+        binding = _url_binding(auth)
 
         assert EventingFunctionUrlBinding.from_server(binding.as_dict()).auth == expected_auth
-
-
-class ClassicEventingFunctionTypesTests(EventingFunctionTypesTestSuite):
-    @pytest.fixture(scope='class', autouse=True)
-    def validate_test_manifest(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicEventingFunctionTypesTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicEventingFunctionTypesTests) if valid_test_method(meth)]
-        manifest_invalid = set(EventingFunctionTypesTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if manifest_invalid:
-            pytest.fail(f'Test manifest not validated.  Missing/extra tests: {manifest_invalid}.')

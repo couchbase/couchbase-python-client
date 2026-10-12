@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,50 +13,111 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import re
+from collections.abc import Generator
+from datetime import datetime
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
+from couchbase.auth import AuthDomain
 from couchbase.exceptions import (AuthenticationException,
+                                  CouchbaseException,
                                   FeatureUnavailableException,
                                   GroupNotFoundException,
                                   InvalidArgumentException,
                                   UserNotFoundException)
-from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import (DropUserOptions,
                                           GetUserOptions,
                                           UpsertUserOptions)
 from couchbase.management.users import (Group,
                                         Role,
-                                        User)
-from couchbase.options import ClusterOptions
-from tests.environments.test_environment import TestEnvironment
-from tests.environments.user_mgmt_environment import UserManagementTestEnvironment
-from tests.test_features import EnvironmentFeatures
+                                        RoleAndOrigins,
+                                        User,
+                                        UserAndMetadata)
+from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
+from tests.environments.managers import TestEnvironmentCollectionMgmtManager, TestEnvironmentUserManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.test_features import EnvironmentFeatures, ServerFeatures
 
 
-class UserManagementTestSuite:
+@pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
+                             reason='Group and User are couchbase.management.users in every api tree')
+class UserManagementUnitTests:
+    # No TEST_MANIFEST: the manifest is a parity contract between api trees, and Group
+    # and User have no per-tree form.  Every case is a key the server may omit, which the
+    # suite below cannot reach: it drives a cluster that always answers with the key.
+
+    def test_create_group_absent_roles_key(self) -> None:
+        # PYCBC-1921.  A group holding no roles is a valid response, so an absent key is an
+        # empty set and not a KeyError.
+        assert Group.create_group({'name': 'test-group'}).roles == set()
+
+    def test_create_group_keeps_ldap_reference(self) -> None:
+        # The wire name and the property name differ, which is the whole of what can go wrong.
+        group = Group.create_group({'name': 'test-group',
+                                    'roles': [],
+                                    'ldap_group_ref': 'cn=test,ou=groups'})
+        assert group.ldap_group_reference == 'cn=test,ou=groups'
+
+    def test_create_user_assigns_roles(self) -> None:
+        raw = {'username': 'test-user', 'roles': [{'name': 'data_reader', 'bucket': 'default'}]}
+        assert sorted(r.name for r in User.create_user(raw).roles) == ['data_reader']
+        assert User.create_user({'username': 'test-user'}).roles == set()
+
+    def test_group_as_dict_without_roles(self) -> None:
+        # Outbound rather than inbound: a group with no roles still sends the key, because the
+        # server reads an absent `roles` as "leave them alone" rather than as "remove them".
+        assert Group(name='test-group').as_dict()['roles'] == []
+
+
+class UserManagementTestSuite(SuiteRequirements):
+    # The collection manager is here for test_user_scopes_collections alone.  The SDK mirror
+    # rather than the provisioning wrapper, which drops and recreates the scope it is given.
+    MANAGERS = [TestEnvironmentUserManager, TestEnvironmentCollectionMgmtManager]
+    COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
+
+    # A role names a bucket, a scope and a collection, and never anything inside them.
+    NUM_DOCS = 0
+
+    # Groups arrived in 6.5 and collections in 7.0, both gated per-test below.
+    # UserManagement is in FEATURES_NOT_IN_MOCK, which is what takes the class on GoCAVES.
+    REQUIRED_FEATURES = [ServerFeatures.UserManagement]
+
+    # Fixed names, safe because the cleanup fixture below drops all of them.
+    TEST_USERNAME = 'custom-user'
+    TEST_PASSWORD = 's3cr3t'
+    CHANGE_PASSWORD_USERNAME = 'change-password-user'
+    TEST_GROUP_NAME = 'my-test-group'
+    SECOND_GROUP_NAME = 'my-test-group-1'
+    ADMIN_GROUP_NAME = 'admin-test-group'
+
+    # Names no test creates.
+    MISSING_USERNAME = 'keith'
+    MISSING_GROUP_NAME = 'fred'
+
     TEST_MANIFEST = [
-        'test_create_group_absent_roles_key',
-        'test_create_group_keeps_ldap_reference',
-        'test_create_user_assigns_roles',
         'test_default_domain',
-        'test_drop_missing_group',
-        'test_drop_missing_user',
         'test_external_nopassword',
         'test_external_user',
         'test_get_all_groups',
         'test_get_roles',
         'test_get_roles_all_valid',
         'test_group',
-        'test_group_as_dict_without_roles',
         'test_group_feature_not_found',
         'test_internal_user',
         'test_internal_user_fail',
         'test_internal_user_kwargs',
         'test_invalid_domain_raises_argument_error',
+        'test_drop_missing_group',
+        'test_drop_missing_user',
         'test_missing_group',
         'test_missing_user',
         'test_user_and_groups',
@@ -66,688 +127,602 @@ class UserManagementTestSuite:
     ]
 
     @pytest.fixture(scope='class')
-    def check_collections_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('collections',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    def check_collections_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.Collections, cb_env.server_context)
 
     @pytest.fixture(scope='class')
-    def check_user_groups_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('user_group_mgmt',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
+    def check_user_groups_supported(self, cb_env: SyncTestEnvironment) -> None:
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.UserGroupManagement, cb_env.server_context)
 
-    def test_create_group_absent_roles_key(self):
-        # A group with no roles at all is a valid response, not a missing key.
-        assert Group.create_group({'name': 'test-group'}).roles == set()
+    @pytest.fixture(autouse=True)
+    def cleanup_users_and_groups(self, cb_env: SyncTestEnvironment) -> Generator[None, None, None]:
+        # Autouse: what this cleans up is left behind by a test that failed, and which test
+        # that will be cannot be declared in advance.  FeatureUnavailableException because a
+        # server older than 6.5 has no groups to drop.  @FINDING(PYCBC-1910): dropping
+        # something absent raises bare CouchbaseException rather than the not-found type,
+        # because the shared error map carries only the wording the get endpoints return.
+        yield
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        for username, domain in ((self.TEST_USERNAME, 'local'),
+                                 (self.TEST_USERNAME, 'external'),
+                                 (self.CHANGE_PASSWORD_USERNAME, 'local')):
+            TestEnvironment.try_n_times_till_exception(
+                3, 1, umgr.drop_user, username, domain_name=domain,
+                expected_exceptions=(UserNotFoundException, CouchbaseException))
+        for group_name in (self.TEST_GROUP_NAME, self.SECOND_GROUP_NAME, self.ADMIN_GROUP_NAME):
+            TestEnvironment.try_n_times_till_exception(
+                3, 1, umgr.drop_group, group_name,
+                expected_exceptions=(GroupNotFoundException, FeatureUnavailableException,
+                                     CouchbaseException))
 
-    def test_create_group_keeps_ldap_reference(self):
-        group = Group.create_group({'name': 'test-group',
-                                    'roles': [],
-                                    'ldap_group_ref': 'cn=test,ou=groups'})
-        assert group.ldap_group_reference == 'cn=test,ou=groups'
+    # --- Shared verification ---
 
-    def test_create_user_assigns_roles(self):
-        raw_data = {'username': 'test-user',
-                    'roles': [{'name': 'data_reader', 'bucket': 'default'}]}
-        assert sorted(r.name for r in User.create_user(raw_data).roles) == ['data_reader']
-        # A user with no roles at all is a valid response, not a missing key.
-        assert User.create_user({'username': 'test-user'}).roles == set()
-
-    def test_group_as_dict_without_roles(self):
-        assert Group(name='test-group').as_dict()['roles'] == []
-
-    def test_default_domain(self, cb_env):
-
-        username = 'custom-user'
-        password = 's3cr3t'
-        roles = [
-            Role(name='data_reader', bucket='default'),
-            Role(name='data_writer', bucket='default')
-        ]
-
-        cb_env.um.upsert_user(User(username=username, password=password, roles=roles))
-
-        cb_env.consistency.wait_until_user_present(username)
-        user_metadata = cb_env.um.get_user(username)
-        assert user_metadata is not None
-
-        # handle 7.0 roles w/ scopes/collections
-        test_roles = roles
-        collections_supported = EnvironmentFeatures.is_feature_supported('collections',
-                                                                         cb_env.server_version_short,
-                                                                         cb_env.mock_server_type)
-        if collections_supported:
-            test_roles = []
-            for r in roles:
-                test_roles.append(
-                    Role(name=r.name,
-                         bucket=r.bucket,
-                         scope='*',
-                         collection='*'))
-
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=test_roles)
-
-        users_metadata = cb_env.um.get_all_users()
-        assert users_metadata is not None
-        result = all(
-            map(lambda um: cb_env.validate_user_and_metadata(um),
-                users_metadata))
-        assert result is True
-
-        cb_env.um.drop_user(username)
-
-    def test_external_nopassword(self, cb_env):
-
-        username = 'custom-user'
-        password = 's3cr3t'
-        roles = [
-            Role(name='data_reader', bucket='default'),
-            Role(name='data_writer', bucket='default')
-        ]
-
-        # password with external generates argument error
-        with pytest.raises(InvalidArgumentException):
-            cb_env.um.upsert_user(User(username=username,
-                                       password=password,
-                                       roles=roles),
-                                  domain_name='external')
-
-        with pytest.raises(InvalidArgumentException):
-            cb_env.um.upsert_user(User(username=username,
-                                       password=password,
-                                       roles=None),
-                                  domain_name='external')
-
-        with pytest.raises(InvalidArgumentException):
-            cb_env.um.upsert_user(User(username=username, password=password, roles=[]),
-                                  domain_name='external')
-
-        # Should not raise
-        cb_env.um.upsert_user(
-            User(username=username, password=None, roles=roles),
-            UpsertUserOptions(domain_name='external'))
-
-        cb_env.consistency.wait_until_user_present(username, domain='external')
-        cb_env.um.drop_user(username, domain_name='external')
-        cb_env.consistency.wait_until_user_dropped(username, domain='external')
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_external_user(self, cb_env):
-        """
-            test_external_user()
-            Tests create, retrieve, update and removal
-            of external (domain_name='external')
-            Uses *UserOptions() for options
-        """
-
-        username = 'custom-user'
-        roles = [
-            Role(name='data_reader', bucket='default'),
-            Role(name='data_writer', bucket='default')
-        ]
-        initial_user = User(username=username, roles=roles)
-        # create user
-        cb_env.um.upsert_user(initial_user, UpsertUserOptions(domain_name='external'))
-        cb_env.consistency.wait_until_user_present(username, 'external')
-
-        # get user
-        user_metadata = cb_env.um.get_user(username, GetUserOptions(domain_name='external'))
-
-        # handle 7.0 roles w/ scopes/collections
-        test_roles = roles
-        collections_supported = EnvironmentFeatures.is_feature_supported('collections',
-                                                                         cb_env.server_version_short,
-                                                                         cb_env.mock_server_type)
-        if collections_supported:
-            test_roles = []
-            for r in roles:
-                test_roles.append(
-                    Role(name=r.name,
-                         bucket=r.bucket,
-                         scope='*',
-                         collection='*'))
-
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=test_roles)
-
-        # update user
-        user = user_metadata.user
-        user.roles = Role('admin')
-
-        cb_env.um.upsert_user(user, UpsertUserOptions(domain_name='external'))
-
-        # get user and verify updates
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    username,
-                                                    GetUserOptions(domain_name='external'))
-
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=user.roles)
-        user_update = user_metadata.user
-        assert initial_user != user_update
-
-        # remove user
-        cb_env.um.drop_user(username, DropUserOptions(domain_name='external'))
-        cb_env.consistency.wait_until_user_dropped(username, 'external')
-        with pytest.raises(UserNotFoundException):
-            cb_env.um.get_user(username, GetUserOptions(domain_name='external'))
-
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    @pytest.mark.usefixtures('check_user_groups_supported')
-    def test_get_all_groups(self, cb_env):
-        roles = [
-            Role(name='data_reader', bucket='*'),
-            Role(name='data_writer', bucket='*')
-        ]
-        fresh_group = Group(name='my-test-group',
-                            roles=roles,
-                            description='test group description')
-        cb_env.um.upsert_group(fresh_group)
-        cb_env.consistency.wait_until_group_present(fresh_group.name)
-        admin_group = Group('admin-test-group', roles=[Role(name='admin')])
-        cb_env.um.upsert_group(admin_group)
-        cb_env.consistency.wait_until_group_present(admin_group.name)
-        all_groups = cb_env.um.get_all_groups()
-        # NOTE: we could well have other groups on this server, apart from the one we added, so
-        # lets be ok with there being more of them.  However, the one we added
-        # _MUST_ be there.
-        assert len(all_groups) >= 2
-        admin_group_dict = admin_group.as_dict()
-        found = False
-        for g in all_groups:
-            if admin_group_dict == g.as_dict():
-                found = True
-
-        cb_env.um.drop_group('my-test-group')
-        cb_env.um.drop_group('admin-test-group')
-        assert found is True
-
-    # @TODO: is this test useful?
-    # @pytest.mark.usefixtures('check_user_groups_supported')
-    # def test_timeout(self, cb_env):
-    #     with pytest.raises(AmbiguousTimeoutException):
-    #         cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
-
-    def test_get_roles(self, cb_env):
-        roles = cb_env.um.get_roles()
-        admin_desc = re.compile(
-            r'.*all cluster features.*web console.*read and write all data.*$')
-        for rad in reversed(roles):
-            desc_matches = admin_desc.match(rad.description)
-            if desc_matches:
-                assert rad.role.name == 'admin'
-                assert rad.display_name == 'Full Admin'
-                return
-        pytest.fail('No admin role found')
-
-    # see PYCBC-1030
-    def test_get_roles_all_valid(self, cb_env):
-        roles = cb_env.um.get_roles()
+    @staticmethod
+    def _expected_roles(cb_env: SyncTestEnvironment, roles: list[Role]) -> list[Role]:
+        # From 7.0 every role is scope- and collection-qualified: a role naming only a bucket
+        # reads back wildcarded on both, one naming a bucket and a scope on the collection
+        # alone, and a role with no bucket is cluster-wide and comes back as sent.
+        if not EnvironmentFeatures.is_feature_supported(ServerFeatures.Collections, cb_env.server_context):
+            return list(roles)
+        expected = []
         for r in roles:
-            assert r is not None
+            if r.bucket is None:
+                expected.append(r)
+            elif r.scope is None:
+                expected.append(Role(name=r.name, bucket=r.bucket, scope='*', collection='*'))
+            elif r.collection is None:
+                expected.append(Role(name=r.name, bucket=r.bucket, scope=r.scope, collection='*'))
+            else:
+                expected.append(r)
+        return expected
 
-    @pytest.mark.usefixtures('check_user_groups_supported')
-    def test_group(self, cb_env):
-        roles = Role(name='admin')
-        test_group = Group(name='my-test-group',
-                           roles=roles,
-                           description='test group description')
-        # add group
-        cb_env.um.upsert_group(test_group)
-        cb_env.consistency.wait_until_group_present(test_group.name)
+    @staticmethod
+    def _assert_user(user: User, user_roles: list[Role] | None = None) -> None:
+        # The password is write-only; the server never returns it.
+        assert user.username is not None
+        if user.groups:
+            for group_name in user.groups:
+                cb_assert_isinstance(group_name, str, what='user group name')
+        cb_assert_isinstance(user.roles, set, what='user roles')
+        assert user.roles is not None
+        for role in user.roles:
+            cb_assert_isinstance(role, Role, what='user role')
+        if user_roles is not None:
+            cb_assert_eq(user.roles, set(user_roles), what='roles held directly by the user')
 
-        # get group
-        result = cb_env.um.get_group(test_group.name)
-        cb_env.validate_group(result, test_group.roles)
+    @classmethod
+    def _assert_user_and_metadata(cls,
+                                  user_metadata: UserAndMetadata,
+                                  user_roles: list[Role] | None = None,
+                                  group_roles: list[Role] | None = None) -> None:
+        # `effective_roles` is the union of the user's own roles and its groups', each entry
+        # tagged with where it came from, which is what lets the two arguments be checked
+        # apart.  Both are given wildcarded, as group roles are wildcarded like a user's own.
+        assert user_metadata is not None
+        cb_assert_isinstance(user_metadata.domain, AuthDomain, what='user metadata domain')
+        # Per the RFC the user property hands back a mutable copy, so two reads returning the
+        # same object would mean the copy is not being made.
+        assert user_metadata.user is not user_metadata.user
+        user = user_metadata.user
+        cb_assert_isinstance(user, User, what='user metadata user')
+        assert user is not None
+        cls._assert_user(user, user_roles)
 
-        # remove group
-        cb_env.um.drop_group(test_group.name)
-        cb_env.consistency.wait_until_group_dropped(test_group.name)
-        with pytest.raises(GroupNotFoundException):
-            cb_env.um.get_group(test_group.name)
+        effective_roles = user_metadata.effective_roles
+        cb_assert_isinstance(effective_roles, list, what='effective roles')
+        assert effective_roles is not None
+        if user_metadata.password_changed:
+            cb_assert_isinstance(user_metadata.password_changed, datetime, what='password_changed')
+        if user_metadata.external_groups:
+            for group_name in user_metadata.external_groups:
+                cb_assert_isinstance(group_name, str, what='external group name')
 
-    def test_group_feature_not_found(self, cb_env):
-        groups_supported = EnvironmentFeatures.is_feature_supported('user_group_mgmt',
-                                                                    cb_env.server_version_short,
-                                                                    cb_env.mock_server_type)
-        if groups_supported:
-            pytest.skip(f'Only test on server versions < 6.5. Using server version: {cb_env.server_version}')
+        # One pass, so every entry is checked for carrying a role at all.  An entry with no
+        # origins is the user's own: some versions omit the list rather than writing 'user'.
+        from_user: set[Role] = set()
+        from_groups: set[Role] = set()
+        for role_and_origins in effective_roles:
+            cb_assert_isinstance(role_and_origins, RoleAndOrigins, what='effective role')
+            role = role_and_origins.role
+            assert role is not None, 'effective role carrying no role'
+            origins = role_and_origins.origins
+            if not origins or any(o.type == 'user' for o in origins):
+                from_user.add(role)
+            else:
+                from_groups.add(role)
 
-        roles = Role(name='admin')
-        test_group = Group(name='my-test-group',
-                           roles=roles,
-                           description='test group description')
+        if user_roles is not None:
+            cb_assert_eq(from_user, set(user_roles), what='effective roles originating with the user')
 
-        with pytest.raises(FeatureUnavailableException):
-            cb_env.um.upsert_group(test_group)
-        with pytest.raises(FeatureUnavailableException):
-            cb_env.um.get_all_groups()
-        with pytest.raises(FeatureUnavailableException):
-            cb_env.um.get_group(test_group.name)
-        with pytest.raises(FeatureUnavailableException):
-            cb_env.um.drop_group(test_group.name)
+        if group_roles is not None:
+            # Compared, not counted: a length check passes on a group contributing the wrong
+            # roles in the right number.
+            cb_assert_eq(from_groups, set(group_roles), what='effective roles inherited from groups')
+
+    @staticmethod
+    def _assert_group(group: Group, roles: set[Role] | None = None) -> None:
+        assert group.name is not None
+        if group.description:
+            cb_assert_isinstance(group.description, str, what='group description')
+        group_roles = group.roles
+        cb_assert_isinstance(group_roles, set, what='group roles')
+        assert group_roles is not None
+        for role in group_roles:
+            cb_assert_isinstance(role, Role, what='group role')
+        if group.ldap_group_reference:
+            cb_assert_isinstance(group.ldap_group_reference, str, what='ldap group reference')
+        if roles is not None:
+            cb_assert_eq(group_roles, set(roles), what='group roles')
+
+    def _bucket_roles(self, cb_env: SyncTestEnvironment) -> list[Role]:
+        return [Role(name='data_reader', bucket=cb_env.bucket.name),
+                Role(name='data_writer', bucket=cb_env.bucket.name)]
+
+    # --- Users, local domain ---
+
+    def test_default_domain(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = self._bucket_roles(cb_env)
+        umgr.upsert_user(User(username=self.TEST_USERNAME,
+                              password=self.TEST_PASSWORD,
+                              roles=roles))
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME)
+
+        user_metadata = umgr.get_user(self.TEST_USERNAME)
+        self._assert_user_and_metadata(user_metadata, user_roles=self._expected_roles(cb_env, roles))
+
+        users_metadata = list(umgr.get_all_users())
+        usernames = []
+        for um in users_metadata:
+            self._assert_user_and_metadata(um)
+            assert um.user is not None
+            usernames.append(um.user.username)
+        # A shape assertion over the list is satisfied by an empty one.
+        assert self.TEST_USERNAME in usernames
+
+        umgr.drop_user(self.TEST_USERNAME)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_internal_user(self, cb_env):
-        """
-            test_internal_user()
-            Tests create, retrieve, update and removal
-            of internal (domain_name='local')
-            Uses *UserOptions() for options
-        """
+    def test_internal_user(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = self._bucket_roles(cb_env)
+        initial_user = User(username=self.TEST_USERNAME,
+                            roles=roles,
+                            password=self.TEST_PASSWORD)
 
-        username = 'custom-user'
-        password = 's3cr3t'
-        roles = [
-            Role(name='data_reader', bucket='default'),
-            Role(name='data_writer', bucket='default')
-        ]
-        initial_user = User(username=username, roles=roles, password=password)
+        umgr.upsert_user(User(username=self.TEST_USERNAME,
+                              roles=roles,
+                              password=self.TEST_PASSWORD),
+                         UpsertUserOptions(domain_name='local'))
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME)
 
-        # create user
-        cb_env.um.upsert_user(User(username=username, roles=roles, password=password),
-                              UpsertUserOptions(domain_name='local'))
-        cb_env.consistency.wait_until_user_present(username)
+        user_metadata = umgr.get_user(self.TEST_USERNAME, GetUserOptions(domain_name='local'))
+        self._assert_user_and_metadata(user_metadata, user_roles=self._expected_roles(cb_env, roles))
 
-        # get user
-        user_metadata = cb_env.um.get_user(username, GetUserOptions(domain_name='local'))
-
-        # handle 7.0 roles w/ scopes/collections
-        test_roles = roles
-        collections_supported = EnvironmentFeatures.is_feature_supported('collections',
-                                                                         cb_env.server_version_short,
-                                                                         cb_env.mock_server_type)
-        if collections_supported:
-            test_roles = []
-            for r in roles:
-                test_roles.append(
-                    Role(name=r.name,
-                         bucket=r.bucket,
-                         scope='*',
-                         collection='*'))
-
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=test_roles)
-
-        # update user
         user = user_metadata.user
-        user.roles = Role('admin')
+        assert user is not None
+        admin_role = Role('admin')
+        user.roles = admin_role
         user.password = 's3cr3t_pa33w0rd'
+        umgr.upsert_user(user, UpsertUserOptions(domain_name='local'))
 
-        cb_env.um.upsert_user(user, UpsertUserOptions(domain_name='local'))
-
-        # get user and verify updates
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    username,
+        user_metadata = TestEnvironment.try_n_times(5, 1, umgr.get_user, self.TEST_USERNAME,
                                                     GetUserOptions(domain_name='local'))
+        self._assert_user_and_metadata(user_metadata, user_roles=[admin_role])
+        assert initial_user != user_metadata.user
 
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=user.roles)
-        user_update = user_metadata.user
-        assert initial_user != user_update
-
-        # remove user
-        cb_env.um.drop_user(username, DropUserOptions(domain_name='local'))
-        cb_env.consistency.wait_until_user_dropped(username)
-        with pytest.raises((UserNotFoundException)):
-            cb_env.um.get_user(username, GetUserOptions(domain_name='local'))
-
-    def test_internal_user_fail(self, cb_env):
-        """
-            test_internal_user()
-            Tests create, retrieve, update and removal
-            of internal (domain_name='local')
-            Uses *UserOptions() for options
-        """
-
-        username = 'custom-user'
-        password = 's3cr3t'
-        roles = [
-            Role(name='data_reader', bucket='not-a-bucket'),
-            Role(name='data_writer', bucket='not-a-bucket')
-        ]
-
-        # create user
-        with pytest.raises(InvalidArgumentException):
-            cb_env.um.upsert_user(User(username=username, roles=roles, password=password),
-                                  UpsertUserOptions(domain_name='local'))
+        umgr.drop_user(self.TEST_USERNAME, DropUserOptions(domain_name='local'))
+        cb_env.consistency.wait_until_user_dropped(self.TEST_USERNAME)
+        with pytest.raises(UserNotFoundException):
+            umgr.get_user(self.TEST_USERNAME, GetUserOptions(domain_name='local'))
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_internal_user_kwargs(self, cb_env):
-        """
-            test_internal_user_kwargs()
-            Tests create, retrieve, update and removal
-            of internal (domain_name='local')
-            Uses kwargs for options
-        """
+    def test_internal_user_kwargs(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = self._bucket_roles(cb_env)
+        initial_user = User(username=self.TEST_USERNAME,
+                            roles=roles,
+                            password=self.TEST_PASSWORD)
 
-        username = 'custom-user'
-        password = 's3cr3t'
-        roles = [
-            Role(name='data_reader', bucket='default'),
-            Role(name='data_writer', bucket='default')
-        ]
-        initial_user = User(username=username, roles=roles, password=password)
+        umgr.upsert_user(initial_user, domain_name='local')
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME)
 
-        # create user
-        cb_env.um.upsert_user(initial_user, domain_name='local')
-        cb_env.consistency.wait_until_user_present(username)
+        user_metadata = umgr.get_user(self.TEST_USERNAME, domain_name='local')
+        self._assert_user_and_metadata(user_metadata, user_roles=self._expected_roles(cb_env, roles))
 
-        # get single user
-        user_metadata = cb_env.um.get_user(username, domain_name='local')
-
-        # handle 7.0 roles w/ scopes/collections
-        test_roles = roles
-        collections_supported = EnvironmentFeatures.is_feature_supported('collections',
-                                                                         cb_env.server_version_short,
-                                                                         cb_env.mock_server_type)
-        if collections_supported:
-            test_roles = []
-            for r in roles:
-                test_roles.append(
-                    Role(name=r.name,
-                         bucket=r.bucket,
-                         scope='*',
-                         collection='*'))
-
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=test_roles)
-
-        # update user
         user = user_metadata.user
-        user.roles = Role('admin')
+        assert user is not None
+        admin_role = Role('admin')
+        user.roles = admin_role
         user.password = 's3cr3t_pa33w0rd'
+        umgr.upsert_user(user, domain_name='local')
 
-        cb_env.um.upsert_user(user, domain_name='local')
-
-        # get user and verify updates
-        user_metadata = TestEnvironment.try_n_times(5,
-                                                    1,
-                                                    cb_env.um.get_user,
-                                                    username,
+        user_metadata = TestEnvironment.try_n_times(5, 1, umgr.get_user, self.TEST_USERNAME,
                                                     domain_name='local')
+        self._assert_user_and_metadata(user_metadata, user_roles=[admin_role])
+        assert initial_user != user_metadata.user
 
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=user.roles)
-        user_update = user_metadata.user
-        assert initial_user != user_update
-
-        # remove user
-        cb_env.um.drop_user(username, domain_name='local')
-        cb_env.consistency.wait_until_user_dropped(username)
+        umgr.drop_user(self.TEST_USERNAME, domain_name='local')
+        cb_env.consistency.wait_until_user_dropped(self.TEST_USERNAME)
         with pytest.raises(UserNotFoundException):
-            cb_env.um.get_user(username, domain_name='local')
+            umgr.get_user(self.TEST_USERNAME, domain_name='local')
 
-    def test_invalid_domain_raises_argument_error(self, cb_env):
-
-        username = 'custom-user'
-        password = 's3cr3t'
-        roles = [
-            Role(name='data_reader', bucket='default'),
-            Role(name='data_writer', bucket='default')
-        ]
-
-        # invalid domain generates argument error
+    def test_internal_user_fail(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = [Role(name='data_reader', bucket='not-a-bucket'),
+                 Role(name='data_writer', bucket='not-a-bucket')]
         with pytest.raises(InvalidArgumentException):
-            cb_env.um.get_all_users(domain_name='fake-domain')
+            umgr.upsert_user(User(username=self.TEST_USERNAME,
+                                  roles=roles,
+                                  password=self.TEST_PASSWORD),
+                             UpsertUserOptions(domain_name='local'))
 
-        with pytest.raises(InvalidArgumentException):
-            cb_env.um.get_user(username, domain_name='fake-domain')
+    def test_user_display_name(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        user = User(username=self.TEST_USERNAME,
+                    display_name='Custom User',
+                    roles=self._bucket_roles(cb_env),
+                    password=self.TEST_PASSWORD)
+        umgr.upsert_user(user, UpsertUserOptions(domain_name='local'))
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME)
 
-        with pytest.raises(InvalidArgumentException):
-            cb_env.um.upsert_user(User(username=username,
-                                       password=password,
-                                       roles=roles),
-                                  domain_name='fake-domain')
+        user_metadata = umgr.get_user(self.TEST_USERNAME, GetUserOptions(domain_name='local'))
+        assert user_metadata.user is not None
+        cb_assert_eq(user_metadata.user.display_name, user.display_name, what='user display_name')
 
-        with pytest.raises(InvalidArgumentException):
-            cb_env.um.drop_user(username, domain_name='fake-domain')
+        umgr.drop_user(self.TEST_USERNAME, DropUserOptions(domain_name='local'))
 
-    @pytest.mark.usefixtures('check_user_groups_supported')
-    def test_missing_group(self, cb_env):
-        with pytest.raises(GroupNotFoundException):
-            cb_env.um.get_group('fred')
-
-    def test_missing_user(self, cb_env):
+    def test_missing_user(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
         with pytest.raises(UserNotFoundException):
-            cb_env.um.get_user('keith')
+            umgr.get_user(self.MISSING_USERNAME)
 
-    @pytest.mark.usefixtures('check_user_groups_supported')
-    def test_drop_missing_group(self, cb_env):
-        with pytest.raises(GroupNotFoundException):
-            cb_env.um.drop_group('fred')
+    def test_drop_missing_user(self, cb_env: SyncTestEnvironment) -> None:
+        # @FINDING(PYCBC-1910): the pair to test_missing_user.  `get_user` on the same name
+        # raises UserNotFoundException; this raises bare CouchbaseException, because the
+        # delete endpoint answers "User was not found." where get answers "Unknown user."
+        # and the shared error map carries only the second.  Asserted as the base class, so
+        # the test survives the fix and tightens then.
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        with pytest.raises(CouchbaseException):
+            umgr.drop_user(self.MISSING_USERNAME)
 
-    def test_drop_missing_user(self, cb_env):
-        with pytest.raises(UserNotFoundException):
-            cb_env.um.drop_user('keith')
+    def test_invalid_domain_raises_argument_error(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = self._bucket_roles(cb_env)
 
-    @pytest.mark.usefixtures('check_user_groups_supported')
-    def test_user_and_groups(self, cb_env):
-        user_roles = [
-            Role(name='query_select', bucket='default'),
-            Role(name='fts_searcher', bucket='default')
-        ]
-        group_roles = [
-            Role(name='data_reader', bucket='*'),
-            Role(name='data_writer', bucket='*')
-        ]
-        groups = [
-            Group(name='my-test-group',
-                  roles=group_roles,
-                  description='test group description'),
-            Group(name='my-test-group-1',
-                  roles=Role(name='admin'),
-                  description='test group description')
-        ]
+        with pytest.raises(InvalidArgumentException):
+            umgr.get_all_users(domain_name='fake-domain')
 
-        # add groups
-        for group in groups:
-            cb_env.um.upsert_group(group)
-            cb_env.consistency.wait_until_group_present(group.name)
-        user_groups = list(map(lambda g: g.name, groups))
+        with pytest.raises(InvalidArgumentException):
+            umgr.get_user(self.TEST_USERNAME, domain_name='fake-domain')
 
-        # add user
-        test_user = User(username='custom-user',
-                         roles=user_roles,
-                         groups=user_groups,
-                         password='s3cr3t')
-        cb_env.um.upsert_user(test_user, domain_name='local')
-        cb_env.consistency.wait_until_user_present(test_user.username)
+        with pytest.raises(InvalidArgumentException):
+            umgr.upsert_user(User(username=self.TEST_USERNAME,
+                                  password=self.TEST_PASSWORD,
+                                  roles=roles),
+                             domain_name='fake-domain')
 
-        # get user
-        user_metadata = cb_env.um.get_user(test_user.username, domain_name='local')
+        with pytest.raises(InvalidArgumentException):
+            umgr.drop_user(self.TEST_USERNAME, domain_name='fake-domain')
 
-        # handle 7.0 roles w/ scopes/collections
-        test_roles = user_roles
-        collections_supported = EnvironmentFeatures.is_feature_supported('collections',
-                                                                         cb_env.server_version_short,
-                                                                         cb_env.mock_server_type)
-        if collections_supported:
-            test_roles = []
-            for r in user_roles:
-                test_roles.append(
-                    Role(name=r.name,
-                         bucket=r.bucket,
-                         scope='*',
-                         collection='*'))
+    # --- Users, external domain ---
 
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata,
-                                          user_roles=test_roles,
-                                          groups=groups)
+    def test_external_nopassword(self, cb_env: SyncTestEnvironment) -> None:
+        # Three ways of asking, because the SDK checks the password before anything else and
+        # each of these could have been the one that reached the check.
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = self._bucket_roles(cb_env)
 
-        # remove group
-        remove_group = groups.pop()
-        cb_env.um.drop_group(remove_group.name)
-        cb_env.consistency.wait_until_group_dropped(remove_group.name)
-        with pytest.raises(GroupNotFoundException):
-            cb_env.um.get_group(remove_group.name)
+        with pytest.raises(InvalidArgumentException):
+            umgr.upsert_user(User(username=self.TEST_USERNAME,
+                                  password=self.TEST_PASSWORD,
+                                  roles=roles),
+                             domain_name='external')
 
-        # get user to verify roles from removed group are removed
-        user_metadata = cb_env.um.get_user(test_user.username, domain_name='local')
+        with pytest.raises(InvalidArgumentException):
+            umgr.upsert_user(User(username=self.TEST_USERNAME, password=self.TEST_PASSWORD, roles=None),
+                             domain_name='external')
 
-        # handle 7.0 roles w/ scopes/collections
-        if collections_supported:
-            test_roles = []
-            for r in user_roles:
-                test_roles.append(Role(name=r.name,
-                                       bucket=r.bucket,
-                                       scope='*',
-                                       collection='*'))
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata,
-                                          user_roles=test_roles,
-                                          groups=groups)
+        with pytest.raises(InvalidArgumentException):
+            umgr.upsert_user(User(username=self.TEST_USERNAME,
+                                  password=self.TEST_PASSWORD,
+                                  roles=[]),
+                             domain_name='external')
 
-        # cleanup
-        cb_env.um.drop_user(test_user.username, domain_name='local')
-        for group in groups:
-            cb_env.um.drop_group(group.name)
+        umgr.upsert_user(User(username=self.TEST_USERNAME,
+                              password=None,
+                              roles=roles),
+                         UpsertUserOptions(domain_name='external'))
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME, domain='external')
 
-    # creating a new connection, allow retries
+        # Waiting and then dropping never establishes the user was there to be read.
+        user_metadata = umgr.get_user(self.TEST_USERNAME, GetUserOptions(domain_name='external'))
+        self._assert_user_and_metadata(user_metadata, user_roles=self._expected_roles(cb_env, roles))
+
+        umgr.drop_user(self.TEST_USERNAME, domain_name='external')
+        cb_env.consistency.wait_until_user_dropped(self.TEST_USERNAME, domain='external')
+
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_user_change_password(self, cb_env):
-        username = 'change-password-user'
-        admin_role = Role(name='admin')
+    def test_external_user(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = self._bucket_roles(cb_env)
+        initial_user = User(username=self.TEST_USERNAME, roles=roles)
+
+        umgr.upsert_user(initial_user, UpsertUserOptions(domain_name='external'))
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME, domain='external')
+
+        user_metadata = umgr.get_user(self.TEST_USERNAME, GetUserOptions(domain_name='external'))
+        self._assert_user_and_metadata(user_metadata, user_roles=self._expected_roles(cb_env, roles))
+
+        user = user_metadata.user
+        assert user is not None
+        admin_role = Role('admin')
+        user.roles = admin_role
+        umgr.upsert_user(user, UpsertUserOptions(domain_name='external'))
+
+        user_metadata = TestEnvironment.try_n_times(5, 1, umgr.get_user, self.TEST_USERNAME,
+                                                    GetUserOptions(domain_name='external'))
+        self._assert_user_and_metadata(user_metadata, user_roles=[admin_role])
+        assert initial_user != user_metadata.user
+
+        umgr.drop_user(self.TEST_USERNAME, DropUserOptions(domain_name='external'))
+        cb_env.consistency.wait_until_user_dropped(self.TEST_USERNAME, domain='external')
+        with pytest.raises(UserNotFoundException):
+            umgr.get_user(self.TEST_USERNAME, GetUserOptions(domain_name='external'))
+
+    # --- Roles ---
+
+    def test_get_roles(self, cb_env: SyncTestEnvironment) -> None:
+        # Searched by name.  Searching by description and asserting the name can only fail by
+        # matching a different role, and reports nothing found when the wording changed.
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = list(umgr.get_roles())
+        admin = next((rad for rad in roles if rad.role is not None and rad.role.name == 'admin'), None)
+        assert admin is not None, 'no admin role in get_roles()'
+        cb_assert_eq(admin.display_name, 'Full Admin', what='admin role display_name')
+        assert admin.description is not None
+        admin_desc = re.compile(r'.*all cluster features.*web console.*read and write all data.*$')
+        assert admin_desc.match(admin.description) is not None
+
+    def test_get_roles_all_valid(self, cb_env: SyncTestEnvironment) -> None:
+        # Regression guard (PYCBC-1030): a role the deserializer could not build came back as
+        # None and nothing between here and the caller noticed.
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        roles = list(umgr.get_roles())
+        assert len(roles) > 0
+        for rad in roles:
+            assert rad is not None
+            assert rad.role is not None
+
+    # --- Groups ---
+
+    @pytest.mark.usefixtures('check_user_groups_supported')
+    def test_group(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        test_group = Group(name=self.TEST_GROUP_NAME,
+                           roles=Role(name='admin'),
+                           description='test group description')
+        umgr.upsert_group(test_group)
+        cb_env.consistency.wait_until_group_present(self.TEST_GROUP_NAME)
+
+        result = umgr.get_group(self.TEST_GROUP_NAME)
+        # `admin` names no bucket, so it comes back exactly as sent; see _expected_roles.
+        self._assert_group(result, test_group.roles)
+        cb_assert_eq(result.name, test_group.name, what='group name')
+        cb_assert_eq(result.description, test_group.description, what='group description')
+
+        umgr.drop_group(self.TEST_GROUP_NAME)
+        cb_env.consistency.wait_until_group_dropped(self.TEST_GROUP_NAME)
+        with pytest.raises(GroupNotFoundException):
+            umgr.get_group(self.TEST_GROUP_NAME)
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    @pytest.mark.usefixtures('check_user_groups_supported')
+    def test_get_all_groups(self, cb_env: SyncTestEnvironment) -> None:
+        # The cluster may carry groups this suite knows nothing about, so the list is not
+        # expected to hold only these two.  What it must hold is both of them, unchanged.
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        fresh_group = Group(name=self.TEST_GROUP_NAME,
+                            roles=[Role(name='data_reader', bucket='*'),
+                                   Role(name='data_writer', bucket='*')],
+                            description='test group description')
+        umgr.upsert_group(fresh_group)
+        cb_env.consistency.wait_until_group_present(self.TEST_GROUP_NAME)
+        admin_group = Group(self.ADMIN_GROUP_NAME, roles=[Role(name='admin')])
+        umgr.upsert_group(admin_group)
+        cb_env.consistency.wait_until_group_present(self.ADMIN_GROUP_NAME)
+
+        all_groups = {g.name: g for g in umgr.get_all_groups()}
+        assert len(all_groups) >= 2
+        # Not `as_dict() == as_dict()`: roles are held in a set and rendered as a list, so
+        # whole-dict equality compares two arbitrary orderings.
+        for expected in (fresh_group, admin_group):
+            assert expected.name in all_groups, f'{expected.name} missing from get_all_groups()'
+            returned = all_groups[expected.name]
+            assert expected.roles is not None
+            self._assert_group(returned, set(self._expected_roles(cb_env, list(expected.roles))))
+            cb_assert_eq(returned.description, expected.description,
+                         what=f'group {expected.name} description')
+            cb_assert_eq(returned.ldap_group_reference, expected.ldap_group_reference,
+                         what=f'group {expected.name} ldap_group_reference')
+
+        umgr.drop_group(self.TEST_GROUP_NAME)
+        umgr.drop_group(self.ADMIN_GROUP_NAME)
+
+    @pytest.mark.usefixtures('check_user_groups_supported')
+    def test_missing_group(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        with pytest.raises(GroupNotFoundException):
+            umgr.get_group(self.MISSING_GROUP_NAME)
+
+    @pytest.mark.usefixtures('check_user_groups_supported')
+    def test_drop_missing_group(self, cb_env: SyncTestEnvironment) -> None:
+        # @FINDING(PYCBC-1910): "Group was not found." from the delete endpoint against
+        # "Unknown group." from get, one shared map carrying only the latter.
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        with pytest.raises(CouchbaseException):
+            umgr.drop_group(self.MISSING_GROUP_NAME)
+
+    def test_group_feature_not_found(self, cb_env: SyncTestEnvironment) -> None:
+        # The one test here that never runs against a supported server.  The SDK still raises
+        # FeatureUnavailableException on an older cluster and this pins it, so deleting it
+        # would be a decision about which servers are supported rather than about the test.
+        if EnvironmentFeatures.is_feature_supported(ServerFeatures.UserGroupManagement, cb_env.server_context):
+            pytest.skip(f'Groups arrived in 6.5 and this pins the SDK behaviour before that; '
+                        f'server is {cb_env.server_version}.')
+
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        test_group = Group(name=self.TEST_GROUP_NAME,
+                           roles=Role(name='admin'),
+                           description='test group description')
+        with pytest.raises(FeatureUnavailableException):
+            umgr.upsert_group(test_group)
+        with pytest.raises(FeatureUnavailableException):
+            umgr.get_all_groups()
+        with pytest.raises(FeatureUnavailableException):
+            umgr.get_group(self.TEST_GROUP_NAME)
+        with pytest.raises(FeatureUnavailableException):
+            umgr.drop_group(self.TEST_GROUP_NAME)
+
+    @pytest.mark.usefixtures('check_user_groups_supported')
+    def test_user_and_groups(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        user_roles = [Role(name='query_select', bucket=cb_env.bucket.name),
+                      Role(name='fts_searcher', bucket=cb_env.bucket.name)]
+        group_roles = [Role(name='data_reader', bucket='*'),
+                       Role(name='data_writer', bucket='*')]
+        group_names = [self.TEST_GROUP_NAME, self.SECOND_GROUP_NAME]
+        groups = [Group(name=self.TEST_GROUP_NAME,
+                        roles=group_roles,
+                        description='test group description'),
+                  Group(name=self.SECOND_GROUP_NAME,
+                        roles=Role(name='admin'),
+                        description='test group description')]
+
+        for group, group_name in zip(groups, group_names):
+            umgr.upsert_group(group)
+            cb_env.consistency.wait_until_group_present(group_name)
+
+        test_user = User(username=self.TEST_USERNAME,
+                         roles=user_roles,
+                         groups=group_names,
+                         password=self.TEST_PASSWORD)
+        umgr.upsert_user(test_user, domain_name='local')
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME)
+
+        expected_roles = self._expected_roles(cb_env, user_roles)
+        expected_group_roles = self._expected_roles(cb_env, group_roles + [Role(name='admin')])
+        user_metadata = umgr.get_user(self.TEST_USERNAME, domain_name='local')
+        self._assert_user_and_metadata(user_metadata,
+                                       user_roles=expected_roles,
+                                       group_roles=expected_group_roles)
+
+        groups.pop()
+        removed_group_name = group_names.pop()
+        umgr.drop_group(removed_group_name)
+        cb_env.consistency.wait_until_group_dropped(removed_group_name)
+        with pytest.raises(GroupNotFoundException):
+            umgr.get_group(removed_group_name)
+
+        # The admin group was the one dropped, so only the first group's roles should still
+        # be reaching the user.
+        expected_group_roles = self._expected_roles(cb_env, group_roles)
+        user_metadata = umgr.get_user(self.TEST_USERNAME, domain_name='local')
+        self._assert_user_and_metadata(user_metadata,
+                                       user_roles=expected_roles,
+                                       group_roles=expected_group_roles)
+
+        umgr.drop_user(self.TEST_USERNAME, domain_name='local')
+        for group_name in group_names:
+            umgr.drop_group(group_name)
+
+    # --- Scopes and collections in a role ---
+
+    @pytest.mark.usefixtures('check_collections_supported')
+    def test_user_scopes_collections(self, cb_env: SyncTestEnvironment) -> None:
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        cmgr = cb_env.get_manager(TestEnvironmentCollectionMgmtManager)
+        scope_name = cmgr.get_scope_name()
+        collection_name = cmgr.get_collection_name()
+
+        cmgr.create_scope(scope_name)
+        cb_env.consistency.wait_until_scope_present(cb_env.bucket.name, scope_name)
+        cmgr.create_collection(scope_name, collection_name)
+        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
+
+        roles = [Role(name='data_reader', bucket=cb_env.bucket.name, scope=scope_name),
+                 Role(name='data_writer',
+                      bucket=cb_env.bucket.name,
+                      scope=scope_name,
+                      collection=collection_name)]
+        umgr.upsert_user(User(username=self.TEST_USERNAME,
+                              roles=roles,
+                              password=self.TEST_PASSWORD),
+                         domain_name='local')
+        cb_env.consistency.wait_until_user_present(self.TEST_USERNAME)
+
+        user_metadata = umgr.get_user(self.TEST_USERNAME, domain_name='local')
+        self._assert_user_and_metadata(user_metadata, user_roles=self._expected_roles(cb_env, roles))
+
+        umgr.drop_user(self.TEST_USERNAME)
+        cmgr.drop_scope(scope_name)
+
+    # --- Changing a password ---
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    @pytest.mark.testgen_exclude('txcouchbase',
+                                 reason='txcouchbase.Cluster has no connect() classmethod')
+    def test_user_change_password(self, cb_env: SyncTestEnvironment) -> None:
+        # change_password acts on the connection: it changes the password of whoever the
+        # connection is authenticated as, so this needs a cluster of its own.  Both waits are
+        # bounded because an unbounded retry hangs rather than fails, and the flaky marker
+        # cannot rerun a test that has not finished.
+        from couchbase.auth import PasswordAuthenticator
+        from couchbase.cluster import Cluster
+        from couchbase.options import ClusterOptions
+        umgr = cb_env.get_manager(TestEnvironmentUserManager)
+        conn_string = cb_env.config.get_connection_string()
         original_password = 'original_password'
         new_password = 'new_password'
 
-        change_password_user = User(username=username,
-                                    display_name="Change Password User",
-                                    roles=admin_role,
-                                    password=original_password)
-        # Upsert user
-        cb_env.um.upsert_user(change_password_user, UpsertUserOptions(domain_name="local"))
-        cb_env.consistency.wait_until_user_present(username)
+        umgr.upsert_user(User(username=self.CHANGE_PASSWORD_USERNAME,
+                              display_name='Change Password User',
+                              roles=Role(name='admin'),
+                              password=original_password),
+                         UpsertUserOptions(domain_name='local'))
+        cb_env.consistency.wait_until_user_present(self.CHANGE_PASSWORD_USERNAME)
 
-        # Authenticate as change-password-user.
-        # Done in a while loop to emulate retry
-        auth = PasswordAuthenticator(username, original_password)
-        new_cluster = None
-        while True:
-            try:
-                new_cluster = Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr, ClusterOptions(auth))
-            except AuthenticationException:
-                continue
-            break
+        original_auth = ClusterOptions(PasswordAuthenticator(self.CHANGE_PASSWORD_USERNAME, original_password))
+        new_auth = ClusterOptions(PasswordAuthenticator(self.CHANGE_PASSWORD_USERNAME, new_password))
 
-        # Change password
-        new_cluster.users().change_password(new_password)
+        # Annotated because try_n_times returns Any: the generated async form needs the type
+        # to know that change_password below is a coroutine.
+        cluster: Cluster = TestEnvironment.try_n_times(10, 1, Cluster.connect, conn_string, original_auth)
+        cluster.users().change_password(new_password)
 
-        # Assert can authenticate using new password
-        success_auth = PasswordAuthenticator(username, new_password)
-        while True:
-            try:
-                success_cluster = Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr,
-                                                  ClusterOptions(success_auth))
-            except AuthenticationException:
-                continue
-            success_cluster.close()
-            break
-
-        # Assert cannot authenticate using old password
-        fail_auth = PasswordAuthenticator(username, original_password)
-        with pytest.raises(AuthenticationException):
-            Cluster.connect(cb_env.cluster._impl.cluster_settings.connstr, ClusterOptions(fail_auth))
-
+        new_cluster: Cluster = TestEnvironment.try_n_times(10, 1, Cluster.connect, conn_string, new_auth)
         new_cluster.close()
 
-    def test_user_display_name(self, cb_env):
-        roles = [
-            Role(name='data_reader', bucket='default'),
-            Role(name='data_writer', bucket='default')
-        ]
-        user = User(username='custom-user',
-                    display_name="Custom User",
-                    roles=roles,
-                    password='s3cr3t')
+        # The old password is retried until it raises rather than asserted once: the change
+        # has to propagate before it stops being accepted.
+        TestEnvironment.try_n_times_till_exception(
+            10, 1, Cluster.connect, conn_string, original_auth,
+            expected_exceptions=(AuthenticationException,))
 
-        # create user
-        cb_env.um.upsert_user(user, UpsertUserOptions(domain_name='local'))
-        cb_env.consistency.wait_until_user_present(user.username)
-
-        # get user
-        user_metadata = cb_env.um.get_user(user.username, GetUserOptions(domain_name='local'))
-
-        assert user_metadata.user.display_name == user.display_name
-
-        cb_env.um.drop_user(user.username, DropUserOptions(domain_name='local'))
-
-    @pytest.mark.usefixtures('check_collections_supported')
-    def test_user_scopes_collections(self, cb_env):
-
-        if cb_env.cm is None:
-            cm = cb_env.bucket.collections()
-        else:
-            cm = cb_env.cm
-
-        scope_name = 'um-test-scope'
-        collection_name = 'test-collection'
-
-        cm.create_scope(scope_name)
-        cb_env.consistency.wait_until_scope_present(cb_env.bucket.name, scope_name)
-
-        collection = CollectionSpec(collection_name, scope_name=scope_name)
-        cm.create_collection(collection)
-        cb_env.consistency.wait_until_collection_present(cb_env.bucket.name, scope_name, collection_name)
-
-        username = 'custom-user'
-        password = 's3cr3t'
-        roles = [
-            Role(name='data_reader', bucket='default', scope='um-test-scope'),
-            Role(name='data_writer',
-                 bucket='default',
-                 scope='um-test-scope',
-                 collection='test-collection')
-        ]
-        initial_user = User(username=username, roles=roles, password=password)
-
-        # create user
-        cb_env.um.upsert_user(initial_user, domain_name='local')
-        cb_env.consistency.wait_until_user_present(username)
-
-        # get single user
-        user_metadata = cb_env.um.get_user(username, domain_name='local')
-
-        test_roles = []
-        for r in roles:
-            if not r.collection:
-                test_roles.append(Role(name=r.name,
-                                       bucket=r.bucket,
-                                       scope=r.scope,
-                                       collection='*'))
-            else:
-                test_roles.append(r)
-
-        assert user_metadata is not None
-        cb_env.validate_user_and_metadata(user_metadata, user_roles=test_roles)
-
-        cb_env.um.drop_user(username)
-        cm.drop_collection(collection)
-        cm.drop_scope('um-test-scope')
+        cluster.close()
 
 
-class ClassicUserManagementTests(UserManagementTestSuite):
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicUserManagementTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicUserManagementTests) if valid_test_method(meth)]
-        compare = set(UserManagementTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+class UserManagementTests(UserManagementTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(UserManagementTestSuite, self.__class__)
 
     @pytest.fixture(scope='class', name='cb_env')
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = UserManagementTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup()
-        yield cb_env
-        cb_env.teardown()
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, UserManagementTestSuite)
+        yield env
+        teardown_environment(env, UserManagementTestSuite)

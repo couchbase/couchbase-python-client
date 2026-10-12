@@ -16,152 +16,12 @@
 import pytest
 
 pytest_plugins = [
-    # "tests.helpers"
+    'tests.hooks',
     'tests.couchbase_config',
-    'tests.environments.test_environment'
+    'tests.environments.test_environment',
+    'tests.environments.async_environment',
+    'tests.environments.twisted_environment',
 ]
-
-_DIAGNOSTIC_TESTS = [
-    "acouchbase/tests/bucket_t.py::BucketDiagnosticsTests",
-    "acouchbase/tests/cluster_t.py::ClusterDiagnosticsTests",
-    "couchbase/tests/bucket_t.py::ClassicBucketDiagnosticsTests",
-    "couchbase/tests/cluster_t.py::ClassicClusterDiagnosticsTests",
-]
-
-_KV_TESTS = [
-    "acouchbase/tests/collection_t.py::CollectionTests",
-    "acouchbase/tests/subdoc_t.py::SubDocumentTests",
-    "acouchbase/tests/mutation_tokens_t.py::MutationTokensEnabledTests",
-    "acouchbase/tests/binary_collection_t.py::BinaryCollectionTests",
-    "acouchbase/tests/datastructures_t.py::DatastructuresTests",
-    "acouchbase/tests/transcoder_t.py::DefaultTranscoderTests",
-    "couchbase/tests/collection_t.py::ClassicCollectionTests",
-    "couchbase/tests/collection_multi_t.py::ClassicCollectionMultiTests",
-    "couchbase/tests/subdoc_t.py::ClassicSubDocumentTests",
-    "couchbase/tests/mutation_tokens_t.py::ClassicMutationTokensEnabledTests",
-    "couchbase/tests/binary_collection_t.py::ClassicBinaryCollectionTests",
-    "couchbase/tests/binary_collection_multi_t.py::ClassicBinaryCollectionMultiTests",
-    "couchbase/tests/datastructures_t.py::ClassicDatastructuresTests",
-    "couchbase/tests/datastructures_t.py::ClassicLegacyDatastructuresTests",
-    "couchbase/tests/transcoder_t.py::ClassicDefaultTranscoderTests",
-    "txcouchbase/tests/collection_t.py::CollectionTests",
-    "txcouchbase/tests/subdoc_t.py::SubDocumentTests",
-    "txcouchbase/tests/mutation_tokens_t.py::MutationTokensEnabledTests",
-    "txcouchbase/tests/binary_collection_t.py::BinaryCollectionTests",
-    "txcouchbase/tests/transcoder_t.py::DefaultTranscoderTests",
-]
-
-_STREAMING_TESTS = [
-    "acouchbase/tests/query_t.py::ClassicQueryTests",
-    "acouchbase/tests/query_t.py::ClassicQueryCollectionTests",
-    "acouchbase/tests/analytics_t.py::ClassicAnalyticsTests",
-    "acouchbase/tests/analytics_t.py::ClassicAnalyticsCollectionTests",
-    "acouchbase/tests/search_t.py::ClassicSearchTests",
-    "acouchbase/tests/search_t.py::ClassicSearchCollectionTests",
-    "acouchbase/tests/views_t.py::ClassicViewsTests",
-    "acouchbase/tests/streaming_helpers_t.py::AsyncStreamingAnextTests",
-    "couchbase/tests/analytics_params_t.py::ClassicAnalyticsParamTests",
-    "couchbase/tests/analytics_t.py::ClassicAnalyticsTests",
-    "couchbase/tests/analytics_t.py::ClassicAnalyticsCollectionTests",
-    "couchbase/tests/query_params_t.py::ClassicQueryParamTests",
-    "couchbase/tests/query_t.py::ClassicQueryTests",
-    "couchbase/tests/query_t.py::ClassicQueryCollectionTests",
-    "couchbase/tests/search_params_t.py::ClassicSearchParamTests",
-    "couchbase/tests/search_params_t.py::ClassicVectorSearchParamTests",
-    "couchbase/tests/search_t.py::ClassicSearchTests",
-    "couchbase/tests/search_t.py::ClassicSearchCollectionTests",
-    "couchbase/tests/views_t.py::ClassicViewsTests",
-    "couchbase/tests/streaming_helpers_t.py::ClassicStreamingNextTests",
-]
-
-_MGMT_TESTS = [
-    "acouchbase/tests/analyticsmgmt_t.py::AnalyticsManagementTests",
-    "acouchbase/tests/analyticsmgmt_t.py::AnalyticsManagementLinksTests",
-    "acouchbase/tests/bucketmgmt_t.py::BucketManagementTests",
-    "acouchbase/tests/collectionmgmt_t.py::CollectionManagementTests",
-    "acouchbase/tests/eventingmgmt_t.py::EventingManagementTests",
-    "acouchbase/tests/eventingmgmt_t.py::ScopeEventingManagementTests",
-    "acouchbase/tests/querymgmt_t.py::QueryIndexManagementTests",
-    "acouchbase/tests/querymgmt_t.py::QueryIndexCollectionManagementTests",
-    "acouchbase/tests/searchmgmt_t.py::SearchIndexManagementTests",
-    "acouchbase/tests/usermgmt_t.py::UserManagementTests",
-    "acouchbase/tests/viewmgmt_t.py::ViewIndexManagementTests",
-    "couchbase/tests/analyticsmgmt_t.py::ClassicAnalyticsManagementTests",
-    "couchbase/tests/analyticsmgmt_t.py::ClassicAnalyticsManagementLinksTests",
-    "couchbase/tests/bucketmgmt_t.py::ClassicBucketManagementTests",
-    "couchbase/tests/collectionmgmt_t.py::ClassicCollectionManagementTests",
-    "couchbase/tests/eventingmgmt_t.py::ClassicEventingManagementTests",
-    "couchbase/tests/eventingmgmt_t.py::ClassicScopeEventingManagementTests",
-    "couchbase/tests/querymgmt_t.py::ClassicQueryIndexManagementTests",
-    "couchbase/tests/querymgmt_t.py::ClassicQueryIndexCollectionManagementTests",
-    "couchbase/tests/searchmgmt_t.py::ClassicSearchIndexManagementTests",
-    "couchbase/tests/usermgmt_t.py::ClassicUserManagementTests",
-    "couchbase/tests/viewmgmt_t.py::ClassicViewIndexManagementTests"
-]
-
-_SLOW_MGMT_TESTS = [
-    "acouchbase/tests/eventingmgmt_t.py::EventingManagementTests",
-    "acouchbase/tests/eventingmgmt_t.py::ScopeEventingManagementTests",
-    "couchbase/tests/eventingmgmt_t.py::ClassicEventingManagementTests",
-    "couchbase/tests/eventingmgmt_t.py::ClassicScopeEventingManagementTests",
-]
-
-_MISC_TESTS = [
-    "acouchbase/tests/rate_limit_t.py::RateLimitTests",
-    "acouchbase/tests/transactions_property_race_t.py::TransactionsPropertyRaceTests",
-    "couchbase/tests/connection_t.py::ClassicConnectionTests",
-    "couchbase/tests/rate_limit_t.py::ClassicRateLimitTests",
-    "couchbase/tests/transactions_property_race_t.py::ClassicTransactionsPropertyRaceTests",
-]
-
-_TRACING_TESTS = [
-    "acouchbase/tests/tracing_tests/binary_t.py::AsyncBinaryTracingTests",
-    "acouchbase/tests/tracing_tests/datastructures_t.py::AsyncDataStructuresTracingTests",
-    "acouchbase/tests/tracing_tests/kv_t.py::AsyncKeyValueTracingTests",
-    "acouchbase/tests/tracing_tests/management_t.py::AsyncManagementTracingTests",
-    "acouchbase/tests/tracing_tests/streaming_t.py::AsyncStreamingTracingTests",
-    "couchbase/tests/tracing_tests/datastructures_t.py::ClassicDataStructuresTracingTests",
-    "couchbase/tests/tracing_tests/kv_t.py::ClassicKeyValueTracingTests",
-    "couchbase/tests/tracing_tests/kv_multi_t.py::ClassicKeyValueMultiTracingTests",
-    "couchbase/tests/tracing_tests/binary_t.py::ClassicBinaryTracingTests",
-    "couchbase/tests/tracing_tests/binary_multi_t.py::ClassicBinaryMultiTracingTests",
-    "couchbase/tests/tracing_tests/streaming_t.py::ClassicStreamingTracingTests",
-    "couchbase/tests/tracing_tests/management_t.py::ClassicManagementTracingTests",
-]
-
-_METRICS_TESTS = [
-    "acouchbase/tests/metrics_tests/binary_t.py::AsyncBinaryMetricsTests",
-    "acouchbase/tests/metrics_tests/datastructures_t.py::AsyncDataStructuresMetricsTests",
-    "acouchbase/tests/metrics_tests/kv_t.py::AsyncKeyValueMetricsTests",
-    "acouchbase/tests/metrics_tests/management_t.py::AsyncManagementMetricsTests",
-    "acouchbase/tests/metrics_tests/streaming_t.py::AsyncStreamingMetricsTests",
-    "couchbase/tests/metrics_tests/datastructures_t.py::ClassicDataStructuresMetricsTests",
-    "couchbase/tests/metrics_tests/kv_t.py::ClassicKeyValueMetricsTests",
-    "couchbase/tests/metrics_tests/kv_multi_t.py::ClassicKeyValueMultiMetricsTests",
-    "couchbase/tests/metrics_tests/binary_t.py::ClassicBinaryMetricsTests",
-    "couchbase/tests/metrics_tests/binary_multi_t.py::ClassicBinaryMultiMetricsTests",
-    "couchbase/tests/metrics_tests/streaming_t.py::ClassicStreamingMetricsTests",
-    "couchbase/tests/metrics_tests/management_t.py::ClassicManagementMetricsTests",
-]
-
-_CORE_TESTS = [
-    "couchbase/tests/pycbc_core_t.py::ClassicPycbcCoreTypeTests",
-]
-
-_TXNS_TESTS = [
-    "acouchbase/tests/transactions_t.py::ClassicTransactionTests",
-    "couchbase/tests/transactions_t.py:ClassicTransactionTests",
-]
-
-
-@pytest.fixture(name="couchbase_config", scope="session")
-def get_config(couchbase_test_config):
-    if couchbase_test_config.mock_server_enabled:
-        print("Mock server enabled!")
-    if couchbase_test_config.real_server_enabled:
-        print("Real server enabled!")
-
-    return couchbase_test_config
 
 
 def pytest_addoption(parser):
@@ -169,7 +29,7 @@ def pytest_addoption(parser):
         "--txcouchbase", action="store_true", default=False, help="run txcouchbase tests"
     )
     # Declare which server the run is meant to reach, so a config that says otherwise aborts
-    # instead of quietly running somewhere else.  Enforced in tests_v2/hooks.py, which is
+    # instead of quietly running somewhere else.  Enforced in tests/hooks.py, which is
     # where the config being asserted about lives; registered here because this is an initial
     # conftest and so is guaranteed to have added the flags before the command line is parsed.
     parser.addoption(
@@ -182,37 +42,15 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_collection_modifyitems(items):  # noqa: C901
+_API_MARKERS = {
+    'couchbase': pytest.mark.pycbc_couchbase,
+    'acouchbase': pytest.mark.pycbc_acouchbase,
+    'txcouchbase': pytest.mark.pycbc_txcouchbase,
+}
+
+
+def pytest_collection_modifyitems(items):
     for item in items:
-        item_details = item.nodeid.split('::')
-
-        item_api = item_details[0].split('/')
-        if item_api[0] == 'couchbase':
-            item.add_marker(pytest.mark.pycbc_couchbase)
-        elif item_api[0] == 'acouchbase':
-            item.add_marker(pytest.mark.pycbc_acouchbase)
-        elif item_api[0] == 'txcouchbase':
-            item.add_marker(pytest.mark.pycbc_txcouchbase)
-
-        test_class_path = '::'.join(item_details[:-1])
-        if test_class_path in _DIAGNOSTIC_TESTS:
-            item.add_marker(pytest.mark.pycbc_diag)
-        elif test_class_path in _KV_TESTS:
-            item.add_marker(pytest.mark.pycbc_kv)
-        elif test_class_path in _STREAMING_TESTS:
-            item.add_marker(pytest.mark.pycbc_streaming)
-        elif test_class_path in _METRICS_TESTS:
-            item.add_marker(pytest.mark.pycbc_metrics)
-        elif test_class_path in _MGMT_TESTS:
-            item.add_marker(pytest.mark.pycbc_mgmt)
-        elif test_class_path in _MISC_TESTS:
-            item.add_marker(pytest.mark.pycbc_misc)
-        elif test_class_path in _TRACING_TESTS:
-            item.add_marker(pytest.mark.pycbc_tracing)
-        elif test_class_path in _TXNS_TESTS:
-            item.add_marker(pytest.mark.pycbc_txn)
-        elif test_class_path in _CORE_TESTS:
-            item.add_marker(pytest.mark.pycbc_core)
-
-        if test_class_path in _SLOW_MGMT_TESTS:
-            item.add_marker(pytest.mark.pycbc_slow_mgmt)
+        marker = _API_MARKERS.get(item.nodeid.split('/', 1)[0])
+        if marker is not None:
+            item.add_marker(marker)

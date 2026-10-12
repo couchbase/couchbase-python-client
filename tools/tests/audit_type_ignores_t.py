@@ -11,7 +11,7 @@ from tools.audit_type_ignores import (MissingRoots,
 
 def _tree(base: pathlib.Path) -> pathlib.Path:
     """A root holding one suppression, and a generated copy of it."""
-    root = base / 'couchbase' / 'tests_v2'
+    root = base / 'couchbase' / 'tests'
     (root / '_generated').mkdir(parents=True)
     (root / 'bucket_t.py').write_text('x = 1  # type: ignore[assignment]  # PYCBC-1877\n')
     (root / '_generated' / 'bucket_t.py').write_text(
@@ -48,7 +48,7 @@ def test_the_trees_that_are_there_are_audited(tmp_path: pathlib.Path) -> None:
 def test_a_list_of_codes_is_specific_and_each_code_needs_its_own_reason(
         tmp_path: pathlib.Path) -> None:
     """mypy accepts `[a, b]`, and reading only the first code would call it bare."""
-    root = tmp_path / 'couchbase' / 'tests_v2'
+    root = tmp_path / 'couchbase' / 'tests'
     root.mkdir(parents=True)
     (root / 'x_t.py').write_text('def f(self) -> None:  # type: ignore[override, arg-type]\n'
                                  'def g(self) -> None:  # type: ignore[override,arg-type]  # PYCBC-1877\n'

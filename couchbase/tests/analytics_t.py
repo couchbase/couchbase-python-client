@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,8 +13,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Two suite classes over two different analytics topologies, which is why this is not one
+# class parametrized on CollectionStrategy.  `AnalyticsCollectionTestSuite` runs NAMED,
+# where the environment creates a dataverse shadowing the suite's scope, so a scope-level
+# query carries an implicit query context; `AnalyticsTestSuite` runs DEFAULT against one
+# bucket-wide dataset with no dataverse and no context.  Setup for both is in
+# tests/environments/analytics_environment.py, and setup_analytics gates on
+# ServerFeatures.Analytics before it creates anything.
+#
+# Where an analytics error surfaces differs by api, and the two error tests are written for
+# that: sync and acouchbase build a lazy request, so a DatasetNotFoundException arrives on
+# iteration, while Twisted executes at call time and errbacks.  Both put the call inside the
+# `pytest.raises` block along with the iteration.
+
+from __future__ import annotations
+
 import threading
+from collections.abc import Callable, Generator
 from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
 
@@ -26,11 +43,26 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DatasetNotFoundException,
                                   DataverseNotFoundException)
 from couchbase.options import AnalyticsOptions, UnsignedInt64
-from tests.environments import CollectionType
-from tests.environments.analytics_environment import AnalyticsTestEnvironment
+from couchbase.result import AnalyticsResult
+from couchbase.scope import Scope
+from tests.environments.analytics_environment import AnalyticsEnvironment
+from tests.environments.managers import TestEnvironmentAnalyticsIndexManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 DocType,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.test_features import EnvironmentFeatures, ServerFeatures
 
 
-class AnalyticsCollectionTestSuite:
+class AnalyticsCollectionTestSuite(SuiteRequirements):
+    # No MANAGERS.  The NAMED setup path runs raw DDL through cluster.analytics_query,
+    # because a dataset in a scope-shadowing dataverse cannot be expressed through the
+    # manager API: create_dataset(name, bucket_name) has no dataverse parameter.
+    COLLECTION_STRATEGY = CollectionStrategy.NAMED
+
     TEST_MANIFEST = [
         'test_analytics_metadata',
         'test_analytics_query_in_thread',
@@ -45,9 +77,10 @@ class AnalyticsCollectionTestSuite:
         'test_scope_query_with_positional_params_in_options',
     ]
 
-    def test_analytics_metadata(self, cb_env):
-        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2')
-        cb_env.assert_rows(result, 2)
+    def test_analytics_metadata(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2'
+        result = cb_env.scope.analytics_query(q_str)
+        cb_env.assert_rows_exact(result, 2)
         metadata = result.metadata()  # type: AnalyticsMetaData
         assert isinstance(metadata, AnalyticsMetaData)
         for id_meth in (metadata.client_context_id, metadata.request_id):
@@ -62,10 +95,18 @@ class AnalyticsCollectionTestSuite:
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
 
-    def test_analytics_query_in_thread(self, cb_env):
-        results = [None]
+    # Driven by a plain threading.Thread, so it has no async analogue: acouchbase and
+    # txcouchbase objects are bound to an event loop (a reactor under Twisted), and calling
+    # into them from a foreign thread exercises the loop, not the SDK.
+    @pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
+                                 reason='drives a threading.Thread; no async analogue')
+    def test_analytics_query_in_thread(self, cb_env: SyncTestEnvironment) -> None:
+        results: list[Any] = [None]
 
-        def run_test(scope, collection_name, assert_fn, results):
+        def run_test(scope: Scope,
+                     collection_name: str,
+                     assert_fn: Callable[[AnalyticsResult, int], None],
+                     results: list[Any]) -> None:
             try:
                 result = scope.analytics_query(f"SELECT * FROM `{collection_name}` LIMIT 2")
                 assert_fn(result, 2)
@@ -78,17 +119,18 @@ class AnalyticsCollectionTestSuite:
                 results[0] = True
 
         t = threading.Thread(target=run_test,
-                             args=(cb_env.scope, cb_env.collection.name, cb_env.assert_rows, results))
+                             args=(cb_env.scope, cb_env.collection.name, cb_env.assert_rows_exact, results))
         t.start()
         t.join()
 
         assert len(results) == 1
         assert results[0] is True
 
-    def test_analytics_with_metrics(self, cb_env):
+    def test_analytics_with_metrics(self, cb_env: SyncTestEnvironment) -> None:
         initial = datetime.now()
-        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 1')
-        cb_env.assert_rows(result, 1)
+        q_str = f'SELECT * FROM `{cb_env.collection.name}` LIMIT 1'
+        result = cb_env.scope.analytics_query(q_str)
+        cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
         metadata = result.metadata()  # type: AnalyticsMetaData
         metrics = metadata.metrics()
@@ -112,76 +154,88 @@ class AnalyticsCollectionTestSuite:
         assert isinstance(metrics.processed_objects(), UnsignedInt64)
         assert metrics.error_count() == UnsignedInt64(0)
 
-    def test_bad_query_context(self, cb_env):
-        # test w/ no context
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.collection.name} `LIMIT 2')
-        # @TODO: DatasetNotFoundException
+    def test_bad_query_context(self, cb_env: SyncTestEnvironment) -> None:
+        # The closing backtick is one character late, so the dataset this asks for is named
+        # with a trailing space.  Left as it stands: the assertion holds either way, because
+        # without a query context the cluster cannot see the scope-shadowing dataverse, but
+        # moving the backtick runs a lookup this test has never made.
+        q_str = f'SELECT * FROM `{cb_env.collection.name} `LIMIT 2'
         with pytest.raises(DatasetNotFoundException):
-            cb_env.assert_rows(result, 2)
+            result = cb_env.cluster.analytics_query(q_str)
+            cb_env.assert_rows_exact(result, 2)
 
-        # test w/ bad scope
         q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
-        result = cb_env.cluster.analytics_query(
-            f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', AnalyticsOptions(query_context=q_context))
-        # @TODO: DataverseNotFoundException
+        q_str = f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2'
+        a_opts = AnalyticsOptions(query_context=q_context)
         with pytest.raises(DataverseNotFoundException):
-            cb_env.assert_rows(result, 2)
+            result = cb_env.cluster.analytics_query(q_str, a_opts)
+            cb_env.assert_rows_exact(result, 2)
 
-    def test_bad_scope_query(self, cb_env):
+    def test_bad_scope_query(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = f'SELECT * FROM {cb_env.fqdn} LIMIT 2'
         q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
-        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
-                                              AnalyticsOptions(query_context=q_context))
+        a_opts = AnalyticsOptions(query_context=q_context)
         with pytest.raises(DataverseNotFoundException):
-            cb_env.assert_rows(result, 2)
+            result = cb_env.scope.analytics_query(q_str, a_opts)
+            cb_env.assert_rows_exact(result, 2)
 
         q_context = f'default:`fake-bucket`.`{cb_env.scope.name}`'
-        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
-                                              query_context=q_context)
         with pytest.raises(DataverseNotFoundException):
-            cb_env.assert_rows(result, 2)
+            result = cb_env.scope.analytics_query(q_str, query_context=q_context)
+            cb_env.assert_rows_exact(result, 2)
 
-    def test_cluster_query_context(self, cb_env):
+    def test_cluster_query_context(self, cb_env: SyncTestEnvironment) -> None:
         q_context = f'default:`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        # test with QueryOptions
+        q_str = f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2'
         a_opts = AnalyticsOptions(query_context=q_context)
-        result = cb_env.cluster.analytics_query(
-            f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', a_opts)
-        cb_env.assert_rows(result, 2)
+        result = cb_env.cluster.analytics_query(q_str, a_opts)
+        cb_env.assert_rows_exact(result, 2)
 
-        # test with kwargs
-        result = cb_env.cluster.analytics_query(
-            f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', query_context=q_context)
-        cb_env.assert_rows(result, 2)
+        result = cb_env.cluster.analytics_query(q_str, query_context=q_context)
+        cb_env.assert_rows_exact(result, 2)
 
-    def test_query_fully_qualified(self, cb_env):
+    def test_query_fully_qualified(self, cb_env: SyncTestEnvironment) -> None:
         result = cb_env.cluster.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2')
-        cb_env.assert_rows(result, 2)
+        cb_env.assert_rows_exact(result, 2)
 
-    def test_scope_query(self, cb_env):
-        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2')
-        cb_env.assert_rows(result, 2)
+    def test_scope_query(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2'
+        result = cb_env.scope.analytics_query(q_str)
+        cb_env.assert_rows_exact(result, 2)
 
-    def test_scope_query_fqdn(self, cb_env):
-        # @TODO:  look into this...
-        if cb_env.server_version_short >= 7.1:
-            pytest.skip("Analytics scope query format not allowed on server versions >= 7.1")
+    def test_scope_query_fqdn(self, cb_env: SyncTestEnvironment) -> None:
+        # The analytics service stopped accepting a three-part name from a scope-level query
+        # at 7.1, so this runs on 7.0 and below.  Through the gate rather than a bare
+        # pytest.skip, so the version rule lives in the table all the others are in.
+        EnvironmentFeatures.check_if_feature_supported(ServerFeatures.AnalyticsScopeQueryFqdn,
+                                                       cb_env.server_context)
+        q_str = f'SELECT * FROM {cb_env.fqdn} LIMIT 2'
+        result = cb_env.scope.analytics_query(q_str, query_context='')
+        cb_env.assert_rows_exact(result, 2)
 
-        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2', query_context='')
-        cb_env.assert_rows(result, 2)
+    def test_scope_query_with_named_params_in_options(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{cb_env.collection.name}` '
+                 'WHERE batch LIKE $batch LIMIT 1')
+        a_opts = AnalyticsOptions(named_parameters={'batch': f'{cb_env.get_batch_id()}%'})
+        result = cb_env.scope.analytics_query(q_str, a_opts)
+        cb_env.assert_rows_exact(result, 1)
 
-    def test_scope_query_with_named_params_in_options(self, cb_env):
-        q_str = f'SELECT * FROM `{cb_env.collection.name}` WHERE batch LIKE $batch LIMIT 1'
-        result = cb_env.scope.analytics_query(q_str,
-                                              AnalyticsOptions(named_parameters={'batch': f'{cb_env.get_batch_id()}%'}))
-        cb_env.assert_rows(result, 1)
-
-    def test_scope_query_with_positional_params_in_options(self, cb_env):
-        result = cb_env.scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` WHERE batch LIKE $1 LIMIT 1',
-                                              AnalyticsOptions(positional_parameters=[f'{cb_env.get_batch_id()}%']))
-        cb_env.assert_rows(result, 1)
+    def test_scope_query_with_positional_params_in_options(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{cb_env.collection.name}` '
+                 'WHERE batch LIKE $1 LIMIT 1')
+        a_opts = AnalyticsOptions(positional_parameters=[f'{cb_env.get_batch_id()}%'])
+        result = cb_env.scope.analytics_query(q_str, a_opts)
+        cb_env.assert_rows_exact(result, 1)
 
 
-class AnalyticsTestSuite:
+class AnalyticsTestSuite(SuiteRequirements):
+    MANAGERS = [TestEnvironmentAnalyticsIndexManager]
+    COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
+    # Declared rather than inherited: six of these tests filter on `type` = 'vehicle', which
+    # only DocType.VEHICLE documents carry.  The NAMED suite above filters on `batch`, which
+    # every DocType has.
+    DATA_SET = [DocType.VEHICLE]
+
     TEST_MANIFEST = [
         'test_analytics_metadata',
         'test_analytics_query_in_thread',
@@ -198,11 +252,12 @@ class AnalyticsTestSuite:
         'test_simple_query',
     ]
 
-    def test_analytics_metadata(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 2')
-        cb_env.assert_rows(result, 2)
+    def test_analytics_metadata(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` LIMIT 2'
+        result = cb_env.cluster.analytics_query(q_str)
+        cb_env.assert_rows_exact(result, 2)
         metadata = result.metadata()  # type: AnalyticsMetaData
-        isinstance(metadata, AnalyticsMetaData)
+        assert isinstance(metadata, AnalyticsMetaData)
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -215,10 +270,16 @@ class AnalyticsTestSuite:
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
 
-    def test_analytics_query_in_thread(self, cb_env):
-        results = [None]
+    # Same exclusion, and the same reason, as its twin in the collection suite above.
+    @pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
+                                 reason='drives a threading.Thread; no async analogue')
+    def test_analytics_query_in_thread(self, cb_env: SyncTestEnvironment) -> None:
+        results: list[Any] = [None]
 
-        def run_test(cluster, dataset_name, assert_fn, results):
+        def run_test(cluster: Any,
+                     dataset_name: str,
+                     assert_fn: Callable[[AnalyticsResult, int], None],
+                     results: list[Any]) -> None:
             try:
                 result = cluster.analytics_query(f"SELECT * FROM `{dataset_name}` LIMIT 2")
                 assert_fn(result, 2)
@@ -231,17 +292,21 @@ class AnalyticsTestSuite:
                 results[0] = True
 
         t = threading.Thread(target=run_test,
-                             args=(cb_env.cluster, cb_env.DATASET_NAME, cb_env.assert_rows, results))
+                             args=(cb_env.cluster,
+                                   AnalyticsEnvironment.DATASET_NAME,
+                                   cb_env.assert_rows_exact,
+                                   results))
         t.start()
         t.join()
 
         assert len(results) == 1
         assert results[0] is True
 
-    def test_analytics_with_metrics(self, cb_env):
+    def test_analytics_with_metrics(self, cb_env: SyncTestEnvironment) -> None:
         initial = datetime.now()
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 1')
-        cb_env.assert_rows(result, 1)
+        q_str = f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` LIMIT 1'
+        result = cb_env.cluster.analytics_query(q_str)
+        cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
         metadata = result.metadata()  # type: AnalyticsMetaData
         metrics = metadata.metrics()
@@ -265,67 +330,86 @@ class AnalyticsTestSuite:
         assert isinstance(metrics.processed_objects(), UnsignedInt64)
         assert metrics.error_count() == UnsignedInt64(0)
 
-    def test_query_large_result_set(self, cb_env):
-        # Prior to PYCBC-1685, this would raise a StopIteration b/c the timeout was
-        # reached on the Python side prior to the C++ core returning the result set.
-        # It is difficult to determine the timeout value in the Jenkins environment,
-        # so allow an AmbiguousTimeoutException.
+    def test_query_large_result_set(self, cb_env: SyncTestEnvironment) -> None:
+        # Prior to PYCBC-1685 this raised StopIteration, because the timeout was reached on
+        # the Python side before the C++ core returned the result set.  The timeout value is
+        # hard to pin down on Jenkins, so an AmbiguousTimeoutException is allowed.
         count = 100000
         statement = f'SELECT {{"x1": 1, "x2": 2, "x3": 3}} FROM range(1, {count}) r;'
         try:
             result = cb_env.cluster.analytics_query(statement, timeout=timedelta(seconds=2))
-            row_count = [1 for _ in result.rows()]
-            assert len(row_count) == count
+            # Counted by hand rather than with a comprehension: `[1 for _ in result.rows()]`
+            # needs `async for` inside the brackets under acouchbase, which the generator
+            # reports and deliberately does not rewrite.
+            row_count = 0
+            for _ in result.rows():
+                row_count += 1
+            assert row_count == count
         except AmbiguousTimeoutException:
             pass
 
-    def test_query_named_parameters(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
-                                                AnalyticsOptions(named_parameters={'atype': 'vehicle'}))
-        cb_env.assert_rows(result, 1)
+    def test_query_named_parameters(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $atype LIMIT 1')
+        a_opts = AnalyticsOptions(named_parameters={'atype': 'vehicle'})
+        result = cb_env.cluster.analytics_query(q_str, a_opts)
+        cb_env.assert_rows_exact(result, 1)
 
-    def test_query_named_parameters_no_options(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
-                                                atype='vehicle')
-        cb_env.assert_rows(result, 1)
+    def test_query_named_parameters_no_options(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $atype LIMIT 1')
+        result = cb_env.cluster.analytics_query(q_str, atype='vehicle')
+        cb_env.assert_rows_exact(result, 1)
 
-    def test_query_named_parameters_override(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
-                                                AnalyticsOptions(named_parameters={'atype': 'abcdefg'}),
-                                                atype='vehicle')
-        cb_env.assert_rows(result, 1)
+    def test_query_named_parameters_override(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $atype LIMIT 1')
+        a_opts = AnalyticsOptions(named_parameters={'atype': 'abcdefg'})
+        result = cb_env.cluster.analytics_query(q_str, a_opts, atype='vehicle')
+        cb_env.assert_rows_exact(result, 1)
 
-    def test_query_positional_params(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
-                                                AnalyticsOptions(positional_parameters=["vehicle"]))
-        cb_env.assert_rows(result, 1)
+    def test_query_positional_params(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $1 LIMIT 1')
+        a_opts = AnalyticsOptions(positional_parameters=["vehicle"])
+        result = cb_env.cluster.analytics_query(q_str, a_opts)
+        cb_env.assert_rows_exact(result, 1)
 
-    def test_query_positional_params_no_option(self, cb_env):
-        result = cb_env.cluster.analytics_query(
-            f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1', 'vehicle')
-        cb_env.assert_rows(result, 1)
+    def test_query_positional_params_no_option(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $1 LIMIT 1')
+        result = cb_env.cluster.analytics_query(q_str, 'vehicle')
+        cb_env.assert_rows_exact(result, 1)
 
-    def test_query_positional_params_override(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
-                                                AnalyticsOptions(positional_parameters=['abcdefg']), 'vehicle')
-        cb_env.assert_rows(result, 1)
+    def test_query_positional_params_override(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $1 LIMIT 1')
+        a_opts = AnalyticsOptions(positional_parameters=['abcdefg'])
+        result = cb_env.cluster.analytics_query(q_str, a_opts, 'vehicle')
+        cb_env.assert_rows_exact(result, 1)
 
-    def test_query_raw_options(self, cb_env):
-        # via raw, we should be able to pass any option
-        # if using named params, need to match full name param in query
-        # which is different for when we pass in name_parameters via their specific
-        # query option (i.e. include the $ when using raw)
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $atype LIMIT $1',
-                                                AnalyticsOptions(raw={'$atype': 'vehicle', 'args': [1]}))
-        cb_env.assert_rows(result, 1)
+    def test_query_raw_options(self, cb_env: SyncTestEnvironment) -> None:
+        # Through raw, any option can be passed; a named parameter has to match the full
+        # name in the query, including the $ that the dedicated option adds for you.
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $atype LIMIT $1')
+        a_opts = AnalyticsOptions(raw={'$atype': 'vehicle', 'args': [1]})
+        result = cb_env.cluster.analytics_query(q_str, a_opts)
+        cb_env.assert_rows_exact(result, 1)
 
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` WHERE `type` = $1 LIMIT 1',
-                                                AnalyticsOptions(raw={'args': ['vehicle']}))
-        cb_env.assert_rows(result, 1)
+        q_str = (f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` '
+                 'WHERE `type` = $1 LIMIT 1')
+        a_opts = AnalyticsOptions(raw={'args': ['vehicle']})
+        result = cb_env.cluster.analytics_query(q_str, a_opts)
+        cb_env.assert_rows_exact(result, 1)
 
     # creating a new connection, allow retries
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    def test_query_timeout(self, cb_env):
+    # Excluded from txcouchbase: `txcouchbase.cluster.Cluster` has no `connect` classmethod,
+    # so the generated `Cluster.connect(...)` would not resolve.
+    @pytest.mark.testgen_exclude('txcouchbase',
+                                 reason='txcouchbase.Cluster has no connect() classmethod')
+    def test_query_timeout(self, cb_env: SyncTestEnvironment) -> None:
         from couchbase.auth import PasswordAuthenticator
         from couchbase.cluster import Cluster
         from couchbase.options import (ClusterOptions,
@@ -334,8 +418,8 @@ class AnalyticsTestSuite:
         conn_string = cb_env.config.get_connection_string()
         username, pw = cb_env.config.get_username_and_pw()
         auth = PasswordAuthenticator(username, pw)
-        # Prior to PYCBC-1521, this test would fail as each request would override the cluster level analytics_timeout.
-        # If a timeout was not provided in the request, the default 75s timeout would be used.
+        # Prior to PYCBC-1521 each request overrode the cluster-level analytics_timeout, and
+        # a request that named none fell back to the default 75s.
         timeout_opts = ClusterTimeoutOptions(analytics_timeout=timedelta(seconds=1))
         cluster_opts = ClusterOptions(auth,
                                       timeout_options=timeout_opts,
@@ -346,57 +430,51 @@ class AnalyticsTestSuite:
         q_str = 'SELECT sleep("some value", 1500) AS some_field;'
         with pytest.raises(AmbiguousTimeoutException):
             res = cluster.analytics_query(q_str)
-            [r for r in res.rows()]
+            for _ in res.rows():
+                pass
 
-        # if we override the timeout w/in the request the query should succeed.
         res = cluster.analytics_query(q_str, timeout=timedelta(seconds=2))
-        rows = [r for r in res.rows()]
+        rows = []
+        for r in res.rows():
+            rows.append(r)
         assert len(rows) > 0
 
-    def test_simple_query(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{cb_env.DATASET_NAME}` LIMIT 1')
-        cb_env.assert_rows(result, 1)
+    def test_simple_query(self, cb_env: SyncTestEnvironment) -> None:
+        q_str = f'SELECT * FROM `{AnalyticsEnvironment.DATASET_NAME}` LIMIT 1'
+        result = cb_env.cluster.analytics_query(q_str)
+        cb_env.assert_rows_exact(result, 1)
 
 
-class ClassicAnalyticsCollectionTests(AnalyticsCollectionTestSuite):
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicAnalyticsCollectionTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicAnalyticsCollectionTests) if valid_test_method(meth)]
-        compare = set(AnalyticsCollectionTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+class AnalyticsCollectionTests(AnalyticsCollectionTestSuite):
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(AnalyticsCollectionTestSuite, self.__class__)
 
-        cb_env = AnalyticsTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_analytics_mgmt()
-        cb_env.setup(request.param)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, AnalyticsCollectionTestSuite)
+        AnalyticsEnvironment.setup_analytics(env, AnalyticsCollectionTestSuite.COLLECTION_STRATEGY)
+        yield env
+        AnalyticsEnvironment.teardown_analytics(env, AnalyticsCollectionTestSuite.COLLECTION_STRATEGY)
+        teardown_environment(env, AnalyticsCollectionTestSuite)
 
 
-class ClassicAnalyticsTests(AnalyticsTestSuite):
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicAnalyticsTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicAnalyticsTests) if valid_test_method(meth)]
-        compare = set(AnalyticsTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+@pytest.mark.xdist_group('default_dataverse')
+class AnalyticsTests(AnalyticsTestSuite):
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(AnalyticsTestSuite, self.__class__)
 
-        cb_env = AnalyticsTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_analytics_mgmt()
-        cb_env.setup(request.param)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, AnalyticsTestSuite)
+        AnalyticsEnvironment.setup_analytics(env, AnalyticsTestSuite.COLLECTION_STRATEGY)
+        yield env
+        AnalyticsEnvironment.teardown_analytics(env, AnalyticsTestSuite.COLLECTION_STRATEGY)
+        teardown_environment(env, AnalyticsTestSuite)

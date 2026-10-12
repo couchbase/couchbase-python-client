@@ -13,6 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
+from typing import Any, cast
+
 import pytest
 
 from couchbase.exceptions import InvalidArgumentException
@@ -22,6 +26,7 @@ from couchbase.kv_range_scan import (PrefixScan,
                                      ScanTerm)
 from couchbase.logic.collection_req_builder import CollectionRequestBuilder
 from couchbase.logic.collection_types import CollectionDetails
+from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.transcoder import JSONTranscoder
 
 # (the scan, the tagged dict the binding layer reads it as).
@@ -41,46 +46,42 @@ SCAN_TYPES = [
 ]
 
 
-def request_builder():
-    details = CollectionDetails('default', 'test-scope', 'test-collection', JSONTranscoder())
-    return CollectionRequestBuilder(details)
+def _request_builder() -> CollectionRequestBuilder:
+    return CollectionRequestBuilder(
+        CollectionDetails('default', 'test-scope', 'test-collection', JSONTranscoder()))
 
 
-class CollectionRequestBuilderTestSuite:
-    TEST_MANIFEST = [
-        'test_range_scan_request_carries_the_tagged_scan_type',
-        'test_sampling_scan_rejects_a_non_positive_limit',
-        'test_scan_type_rejects_an_unknown_scan',
-        'test_scan_type_tagged_dict',
-    ]
+class CollectionRequestBuilderUnitTests:
+    # No cb_env and no TEST_MANIFEST: every test builds a `CollectionRequestBuilder` directly
+    # and reads the scan arguments it would hand the core.  Not generated either, since all
+    # three trees tag a scan through this one builder.
+    #
+    # `kv_range_scan_t` drives real scans, which reaches the tagging only for the types a
+    # server accepts and not at all on a build without the feature.  The rejections below have
+    # no live form: `scan()` never gets as far as a request.
 
     @pytest.mark.parametrize('scan, tagged', SCAN_TYPES)
-    def test_scan_type_tagged_dict(self, scan, tagged):
-        assert request_builder()._get_scan_type(scan) == tagged
+    def test_scan_type_tagged_dict(self, scan: Any, tagged: dict[str, Any]) -> None:
+        assert _request_builder()._get_scan_type(scan) == tagged
 
-    def test_scan_type_rejects_an_unknown_scan(self):
+    def test_scan_type_rejects_an_unknown_scan(self) -> None:
+        # The string is the tag `_get_scan_type` emits for a RangeScan, so this is the near
+        # miss rather than an arbitrary bad value.
         with pytest.raises(InvalidArgumentException):
-            request_builder()._get_scan_type('range_scan')
+            _request_builder()._get_scan_type('range_scan')  # type: ignore[arg-type]
 
     @pytest.mark.parametrize('limit', [0, -10])
-    def test_sampling_scan_rejects_a_non_positive_limit(self, limit):
+    def test_sampling_scan_rejects_a_non_positive_limit(self, limit: int) -> None:
+        # `SamplingScan(0)` constructs; the limit is checked here, on the way out.
         with pytest.raises(InvalidArgumentException):
-            request_builder()._get_scan_type(SamplingScan(limit))
+            _request_builder()._get_scan_type(SamplingScan(limit))
 
-    def test_range_scan_request_carries_the_tagged_scan_type(self):
-        req = request_builder().build_range_scan_request(None, PrefixScan('prefix'))
+    def test_range_scan_request_carries_the_tagged_scan_type(self) -> None:
+        # The builder stores the connection on the request and never reads it, so None stands
+        # in for one.  A cast rather than an ignore, because that is the whole claim.
+        req = _request_builder().build_range_scan_request(cast(pycbc_connection, None),
+                                                          PrefixScan('prefix'))
 
         assert req._scan_args['scan_type'] == {'scan_type': 'prefix_scan', 'prefix': 'prefix'}
+        # `scan_config` is a `_core` key the Python builder has never set.
         assert 'scan_config' not in req._scan_args
-
-
-class ClassicCollectionRequestBuilderTests(CollectionRequestBuilderTestSuite):
-    @pytest.fixture(scope='class', autouse=True)
-    def validate_test_manifest(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicCollectionRequestBuilderTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicCollectionRequestBuilderTests) if valid_test_method(meth)]
-        manifest_invalid = set(CollectionRequestBuilderTestSuite.TEST_MANIFEST).symmetric_difference(method_list)
-        if manifest_invalid:
-            pytest.fail(f'Test manifest not validated.  Missing/extra tests: {manifest_invalid}.')

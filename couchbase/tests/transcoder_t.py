@@ -13,9 +13,27 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Six suites, one per transcoder, plus one for passing a transcoder per operation rather
+# than taking the collection's default.
+#
+# Four of the six need a collection whose default transcoder is not JSON, since that is the
+# subject: they call `collection.upsert(key, value)` with no transcoder argument.  Those
+# four declare `ConnectionStrategy.NEW_CONNECTION` and pass `transcoder=` to
+# build_environment, so the transcoder arrives through ClusterOptions, which is the public
+# API.  `collection._impl._set_default_transcoder(...)` would instead be a private call that
+# misses collections taken after the fixture ran, and it mutates objects the session-scoped
+# base environment shares with every other suite in the worker.  The cost is 8 extra cluster
+# connections per api tree.
+#
+# Documents are drawn from the seeded corpus through the framework's DocType draws, rather
+# than hard-coded keys in a collection other pytest workers write to at the same time.
+
+from __future__ import annotations
+
 import json
+from collections.abc import Generator
 from datetime import timedelta
-from typing import Any, Tuple
+from typing import Any, Optional
 
 import pytest
 
@@ -26,33 +44,57 @@ from couchbase.exceptions import (DocumentLockedException,
 from couchbase.options import (GetAndLockOptions,
                                GetAndTouchOptions,
                                GetOptions,
-                               ReplaceOptions)
+                               InsertOptions,
+                               ReplaceOptions,
+                               UpsertOptions)
 from couchbase.transcoder import (JSONTranscoder,
                                   LegacyTranscoder,
                                   RawBinaryTranscoder,
                                   RawJSONTranscoder,
                                   RawStringTranscoder,
                                   Transcoder)
-from tests.environments import CollectionType
-from tests.environments.test_environment import TestEnvironment
-from tests.environments.transcoder_environment import FakeTestObj, TranscoderTestEnvironment
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 ConnectionStrategy,
+                                                 DocType,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 TestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+
+# A bytes value that is not text and not JSON, for the RawBinaryTranscoder hex tests.
+HEX_CONTENT = bytes.fromhex('ff0102030405060708090a0b0c0d0e0f'
+                            '101112131415161718191a1b1c1d1e1f'
+                            '202122232425262728292a2b2c2d2e2f'
+                            '303132333435363738393a3b3c3d3e3f')
+
+
+class FakeTestObj:
+    # LegacyTranscoder pickles anything it does not recognize, so the assertions read
+    # attributes back off the decoded instance.  Class attributes rather than instance
+    # state: a pickle round trip of an object with no instance dict is the narrowest case.
+    PROP = 'fake prop'
+    PROP1 = 12345
 
 
 class ZeroFlagsTranscoder(Transcoder):
-    def encode_value(self,
-                     value,  # type: Any
-                     ) -> Tuple[bytes, int]:
+    # Documents written by other sdks, and by anything predating flags, arrive with flags 0.
+    # Both JSONTranscoder and LegacyTranscoder are expected to fall back to a JSON decode
+    # there rather than refuse the document, and this is how the suites write such a document.
+
+    def encode_value(self, value: Any) -> tuple[bytes, int]:
         return json.dumps(value, ensure_ascii=False).encode('utf-8'), 0
 
-    def decode_value(self,
-                     value,  # type: bytes
-                     flags  # type: int
-                     ) -> Any:
-        # ignoring flags...only for test purposes
+    def decode_value(self, value: bytes, flags: Optional[int]) -> Any:
+        # Ignoring flags is the point of the class, not an oversight.
         return json.loads(value.decode('utf-8'))
 
 
-class DefaultTranscoderTestSuite:
+class DefaultTranscoderTestSuite(SuiteRequirements):
+    DATA_SET = [DocType.BYTES, DocType.SIMPLE, DocType.UTF8]
+    NUM_DOCS = 10
+
     TEST_MANIFEST = [
         'test_default_tc_binary_insert',
         'test_default_tc_binary_replace',
@@ -68,45 +110,56 @@ class DefaultTranscoderTestSuite:
         'test_default_tc_string_upsert',
     ]
 
-    def test_default_tc_binary_insert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_default_tc_binary_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         with pytest.raises(ValueFormatException):
             cb_env.collection.insert(key, value)
 
-    def test_default_tc_binary_replace(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_default_tc_binary_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         with pytest.raises(ValueFormatException):
             cb_env.collection.replace(key, value)
 
-    def test_default_tc_binary_upsert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_default_tc_binary_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         with pytest.raises(ValueFormatException):
             cb_env.collection.upsert(key, value)
 
-    def test_default_tc_bytearray_upsert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_default_tc_bytearray_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         with pytest.raises(ValueFormatException):
             cb_env.collection.upsert(key, bytearray(value))
 
-    def test_default_tc_decoding(self):
+    def test_default_tc_decoding(self) -> None:
+        # No cb_env: this is JSONTranscoder's own decode contract, which needs no cluster.
+        # Kept in the suite rather than split into a unit class, because the transcoder is
+        # what this suite's manifest claims to cover.  pytest only parametrizes a test that
+        # requests the parametrized fixture, so this runs once either way.
         tc = JSONTranscoder()
         content = {'foo': 'bar'}
         value, flags = tc.encode_value(content)
         assert flags == FMT_JSON
-        decoded = tc.decode_value(value, None)
+        # The sdk annotates decode_value's `flags` as int while its own implementation
+        # branches on `flags=[0 | None] special case` and handles both, so None is a
+        # supported input and the annotation is what is wrong.  Widened here rather than
+        # suppressed per call; PYCBC-1886 corrects it, drop the widening once it lands.
+        no_flags: Any = None
+        decoded = tc.decode_value(value, no_flags)
         assert content == decoded
         decoded = tc.decode_value(value, 0)
         assert content == decoded
 
-    def test_default_tc_flags_zero(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('json')
+    def test_default_tc_flags_zero(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.SIMPLE)
         cb_env.collection.upsert(key, value, transcoder=ZeroFlagsTranscoder())
         res = cb_env.collection.get(key)
+        # isinstance on res.value, the decoded value itself, rather than on content_as[dict],
+        # which would re-decode.
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]
 
-    def test_default_tc_json_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_default_tc_json_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         cb_env.collection.insert(key, value)
 
         res = cb_env.collection.get(key)
@@ -115,18 +168,20 @@ class DefaultTranscoderTestSuite:
         assert isinstance(result, dict)
         assert result == value
 
-    def test_default_tc_json_replace(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('json')
-        value['new_content'] = 'new content!'
-        cb_env.collection.replace(key, value)
+    def test_default_tc_json_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.SIMPLE)
+        # A copy, not `value['new_content'] = ...`: get_existing_doc_by_type hands back a live
+        # reference into the environment's loaded-document cache.
+        new_value = {**value, 'new_content': 'new content!'}
+        cb_env.collection.replace(key, new_value)
         res = cb_env.collection.get(key)
         result = res.content_as[dict]
         assert result is not None
         assert isinstance(result, dict)
-        assert result == value
+        assert result == new_value
 
-    def test_default_tc_json_upsert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('json')
+    def test_default_tc_json_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.SIMPLE)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         result = res.content_as[dict]
@@ -134,8 +189,8 @@ class DefaultTranscoderTestSuite:
         assert isinstance(result, dict)
         assert result == value
 
-    def test_default_tc_string_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('utf8')
+    def test_default_tc_string_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         result = res.content_as[str]
@@ -143,9 +198,9 @@ class DefaultTranscoderTestSuite:
         assert isinstance(result, str)
         assert result == value
 
-    def test_default_tc_string_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8', key_only=True)
-        new_content = "new string content"
+    def test_default_tc_string_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8, key_only=True)
+        new_content = 'new string content'
         cb_env.collection.replace(key, new_content)
         res = cb_env.collection.get(key)
         result = res.content_as[str]
@@ -153,8 +208,8 @@ class DefaultTranscoderTestSuite:
         assert isinstance(result, str)
         assert result == new_content
 
-    def test_default_tc_string_upsert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('utf8')
+    def test_default_tc_string_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.UTF8)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         result = res.content_as[str]
@@ -163,7 +218,14 @@ class DefaultTranscoderTestSuite:
         assert result == value
 
 
-class KeyValueOpTranscoderTestSuite:
+class KeyValueOpTranscoderTestSuite(SuiteRequirements):
+    # Every test here writes through a Raw transcoder and then reads without one, so the read
+    # fails: that pairing is the subject.  The seeded BYTES corpus is already written through
+    # RawBinaryTranscoder, which is why the read-side tests can draw rather than write first.
+
+    DATA_SET = [DocType.BYTES]
+    NUM_DOCS = 10
+
     TEST_MANIFEST = [
         'test_get',
         'test_get_and_lock',
@@ -173,8 +235,8 @@ class KeyValueOpTranscoderTestSuite:
         'test_upsert',
     ]
 
-    def test_get(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_get(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         tc = RawBinaryTranscoder()
         with pytest.raises(ValueFormatException):
             cb_env.collection.get(key).content_as[bytes]
@@ -182,8 +244,8 @@ class KeyValueOpTranscoderTestSuite:
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
 
-    def test_get_and_touch(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_get_and_touch(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         tc = RawBinaryTranscoder()
         with pytest.raises(ValueFormatException):
             cb_env.collection.get_and_touch(key, timedelta(seconds=30)).content_as[bytes]
@@ -193,57 +255,67 @@ class KeyValueOpTranscoderTestSuite:
                                               GetAndTouchOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   3,
+        # expected_exceptions as a keyword.  Passed positionally it lands in *args and is
+        # forwarded to collection.get(), where forward_args reads only options[0] and drops
+        # it, leaving the wait to accept any exception as proof the document expired.
+        TestEnvironment.try_n_times_till_exception(10, 3,
                                                    cb_env.collection.get,
                                                    key,
-                                                   GetOptions(transcoder=tc), DocumentNotFoundException)
+                                                   GetOptions(transcoder=tc),
+                                                   expected_exceptions=(DocumentNotFoundException,))
 
-    def test_get_and_lock(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_get_and_lock(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         tc = RawBinaryTranscoder()
         with pytest.raises(ValueFormatException):
             cb_env.collection.get_and_lock(key, timedelta(seconds=1)).content_as[bytes]
 
-        # lets get another doc
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+        # A second document, because the failed read above still took the lock on the first:
+        # the decode raises client-side, after the server has locked it.
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         res = cb_env.collection.get_and_lock(key,
                                              timedelta(seconds=3),
                                              GetAndLockOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
-        # upsert should definitely fail
         with pytest.raises(DocumentLockedException):
             cb_env.collection.upsert(key, value, transcoder=tc)
-        # but succeed eventually
         TestEnvironment.try_n_times(10, 1, cb_env.collection.upsert, key, value, transcoder=tc)
 
-    def test_insert(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8', key_only=True)
-        # use RawStringTranscoder() so that get() fails as expected
-        # since get() w/o passing in transcoder uses the default JSONTranscoder()
+    def test_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
+        # insert, and a minted key so that insert is what the document needs.
+        # `upsert(key, value, InsertOptions(...))` is accepted by the sdk and exercises
+        # upsert, which is the easy way for a test named for insert never to call it.
+        cb_env.collection.insert(key, value, InsertOptions(transcoder=RawStringTranscoder()))
         with pytest.raises(ValueFormatException):
             cb_env.collection.get(key).content_as[bytes]
 
-    def test_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
-        # use RawBinaryTranscoder() so that get() fails as expected
-        # since get() w/o passing in transcoder uses the default JSONTranscoder()
+    def test_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES, key_only=True)
+        # RawBinaryTranscoder on the write, nothing on the read: get() without a transcoder uses
+        # the default JSONTranscoder, which refuses binary flags.
         tc = RawBinaryTranscoder()
         new_content = 'some new bytes content'.encode('utf-8')
         cb_env.collection.replace(key, new_content, ReplaceOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
             cb_env.collection.get(key).content_as[bytes]
 
-    def test_upsert(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
-        # use RawBinaryTranscoder() so that get() fails as expected
-        # since get() w/o passing in transcoder uses the default JSONTranscoder()
+    def test_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
+        # The write is half the test; see test_insert.
+        cb_env.collection.upsert(key, value, UpsertOptions(transcoder=RawBinaryTranscoder()))
         with pytest.raises(ValueFormatException):
             cb_env.collection.get(key).content_as[bytes]
 
 
-class LegacyTranscoderTestSuite:
+class LegacyTranscoderTestSuite(SuiteRequirements):
+    CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
+    # Only BYTES is drawn from.  The json, obj, string and bytes-insert tests all mint their
+    # document, and minting needs no seeded corpus of that type.
+    DATA_SET = [DocType.BYTES]
+    NUM_DOCS = 10
+
     TEST_MANIFEST = [
         'test_legacy_tc_bytes_insert',
         'test_legacy_tc_bytes_replace',
@@ -261,15 +333,15 @@ class LegacyTranscoderTestSuite:
         'test_legacy_tc_string_upsert',
     ]
 
-    def test_legacy_tc_bytes_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('bytes')
+    def test_legacy_tc_bytes_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
-    def test_legacy_tc_bytes_replace(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_legacy_tc_bytes_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         cb_env.collection.upsert(key, value)
         new_content = 'new string content'.encode('utf-8')
         cb_env.collection.replace(key, new_content)
@@ -277,101 +349,116 @@ class LegacyTranscoderTestSuite:
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
-    def test_legacy_tc_bytes_upsert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('bytes')
+    def test_legacy_tc_bytes_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
-    def test_legacy_tc_decoding(self):
+    def test_legacy_tc_decoding(self) -> None:
+        # No cb_env; see test_default_tc_decoding for why it stays in the suite.
         tc = LegacyTranscoder()
         content = {'foo': 'bar'}
         value, flags = tc.encode_value(content)
         assert flags == FMT_JSON
-        decoded = tc.decode_value(value, None)
+        # Any for the reason on test_default_tc_decoding above; retires with PYCBC-1886.
+        no_flags: Any = None
+        decoded = tc.decode_value(value, no_flags)
         assert content == decoded
         decoded = tc.decode_value(value, 0)
         assert content == decoded
 
-    def test_legacy_tc_flags_zero(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('json')
+    def test_legacy_tc_flags_zero(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         cb_env.collection.upsert(key, value, transcoder=ZeroFlagsTranscoder())
         res = cb_env.collection.get(key)
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]
 
-    def test_legacy_tc_json_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_legacy_tc_json_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]
 
-    def test_legacy_tc_json_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('json')
+    def test_legacy_tc_json_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES, key_only=True)
+        _, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         cb_env.collection.replace(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]
 
-    def test_legacy_tc_json_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_legacy_tc_json_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]
 
-    def test_legacy_tc_obj_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('obj')
+    def test_legacy_tc_obj_insert(self, cb_env: SyncTestEnvironment) -> None:
+        # get_new_doc(key_only=True) is a fresh key tracked for teardown, which is all this
+        # needs: FakeTestObj is not a DocType, because nothing seeds it.
+        key = cb_env.get_new_doc(key_only=True)
+        # Typed Any deliberately.  The sdk annotates the value parameter as a JSON union, and
+        # LegacyTranscoder's whole purpose is that it pickles values outside it; what a
+        # collection accepts is a property of its transcoder, so no one union can be right
+        # for all of them.  PYCBC-1887 replaces it with DocumentValue.
+        value: Any = FakeTestObj()
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, FakeTestObj)
         assert value.PROP == res.value.PROP
         assert value.PROP1 == res.value.PROP1
 
-    def test_legacy_tc_obj_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('obj')
+    def test_legacy_tc_obj_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES, key_only=True)
+        value: Any = FakeTestObj()  # Any per test_legacy_tc_obj_insert; retires with PYCBC-1887.
         cb_env.collection.replace(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, FakeTestObj)
         assert value.PROP == res.value.PROP
         assert value.PROP1 == res.value.PROP1
 
-    def test_legacy_tc_obj_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('obj')
+    def test_legacy_tc_obj_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        value: Any = FakeTestObj()  # Any per test_legacy_tc_obj_insert; retires with PYCBC-1887.
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, FakeTestObj)
         assert value.PROP == res.value.PROP
         assert value.PROP1 == res.value.PROP1
 
-    def test_legacy_tc_string_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('utf8')
+    def test_legacy_tc_string_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
-    def test_legacy_tc_string_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('utf8')
+    def test_legacy_tc_string_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES, key_only=True)
+        _, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.replace(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
-    def test_legacy_tc_string_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('utf8')
+    def test_legacy_tc_string_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
 
-class RawBinaryTranscoderTestSuite:
+class RawBinaryTranscoderTestSuite(SuiteRequirements):
+    CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
+    DATA_SET = [DocType.BYTES, DocType.SIMPLE, DocType.UTF8]
+    NUM_DOCS = 10
+
     TEST_MANIFEST = [
         'test_raw_binary_tc_bytes_insert',
         'test_raw_binary_tc_bytes_replace',
@@ -387,85 +474,89 @@ class RawBinaryTranscoderTestSuite:
         'test_raw_binary_tc_string_upsert',
     ]
 
-    def test_raw_binary_tc_bytes_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('bytes')
+    def test_raw_binary_tc_bytes_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
-    def test_raw_binary_tc_bytes_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
+    def test_raw_binary_tc_bytes_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES, key_only=True)
         new_content = 'new string content'.encode('utf-8')
         cb_env.collection.replace(key, new_content)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
-    def test_raw_binary_tc_bytes_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('bytes')
+    def test_raw_binary_tc_bytes_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
-    def test_raw_binary_tc_hex_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('hex')
-        cb_env.collection.insert(key, value)
+    def test_raw_binary_tc_hex_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.insert(key, HEX_CONTENT)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
-        assert value == res.content_as[bytes]
+        assert HEX_CONTENT == res.content_as[bytes]
 
-    def test_raw_binary_tc_hex_replace(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('hex')
-        cb_env.collection.upsert(key, value)
+    def test_raw_binary_tc_hex_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.upsert(key, HEX_CONTENT)
         new_content = b'\xFF'
         cb_env.collection.replace(key, new_content)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
-    def test_raw_binary_tc_hex_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('hex')
-        cb_env.collection.upsert(key, value)
+    def test_raw_binary_tc_hex_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.upsert(key, HEX_CONTENT)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
-        assert value == res.content_as[bytes]
+        assert HEX_CONTENT == res.content_as[bytes]
 
-    def test_raw_binary_tc_json_insert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('json')
+    def test_raw_binary_tc_json_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.insert(key, value)
 
-    def test_raw_binary_tc_json_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('json')
+    def test_raw_binary_tc_json_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES, key_only=True)
+        _, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.replace(key, value)
 
-    def test_raw_binary_tc_json_upsert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('json')
+    def test_raw_binary_tc_json_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.upsert(key, value)
 
-    def test_raw_binary_tc_string_upsert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('utf8')
-        with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, value)
-
-    def test_raw_binary_tc_string_insert(self, cb_env):
-        key, value = cb_env.get_existing_doc_by_type('utf8')
+    def test_raw_binary_tc_string_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.UTF8)
         with pytest.raises(ValueFormatException):
             cb_env.collection.insert(key, value)
 
-    def test_raw_binary_tc_string_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('bytes', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('utf8')
+    def test_raw_binary_tc_string_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.BYTES, key_only=True)
+        _, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         with pytest.raises(ValueFormatException):
             cb_env.collection.replace(key, value)
 
+    def test_raw_binary_tc_string_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_existing_doc_by_type(DocType.UTF8)
+        with pytest.raises(ValueFormatException):
+            cb_env.collection.upsert(key, value)
 
-class RawJsonTranscoderTestSuite:
+
+class RawJsonTranscoderTestSuite(SuiteRequirements):
+    CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
+    DATA_SET = [DocType.SIMPLE, DocType.UTF8]
+    NUM_DOCS = 10
+
     TEST_MANIFEST = [
         'test_pass_through',
         'test_raw_json_tc_bytes_insert',
@@ -479,80 +570,82 @@ class RawJsonTranscoderTestSuite:
         'test_raw_json_tc_string_upsert',
     ]
 
-    def test_pass_through(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_pass_through(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         json_str = json.dumps(value)
         cb_env.collection.upsert(key, json_str)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
-        # should not be equal
         assert res.content_as[bytes] != value
         decoded = json.loads(res.content_as[bytes].decode('utf-8'))
-        # should be good now
         assert decoded == value
 
-    def test_raw_json_tc_bytes_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('bytes')
+    def test_raw_json_tc_bytes_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
-    def test_raw_json_tc_bytes_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('json', key_only=True)
+    def test_raw_json_tc_bytes_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.SIMPLE, key_only=True)
         new_content = 'new string content'.encode('utf-8')
         cb_env.collection.replace(key, new_content)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
-    def test_raw_json_tc_bytes_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('bytes')
+    def test_raw_json_tc_bytes_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
-    def test_raw_json_tc_json_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_raw_json_tc_json_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.insert(key, value)
 
-    def test_raw_json_tc_json_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('json')
+    def test_raw_json_tc_json_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8, key_only=True)
+        _, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.replace(key, value)
 
-    def test_raw_json_tc_json_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_raw_json_tc_json_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.upsert(key, value)
 
-    def test_raw_json_tc_string_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('utf8')
+    def test_raw_json_tc_string_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes].decode('utf-8')
 
-    def test_raw_json_tc_string_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8', key_only=True)
-        new_content = "new string content"
+    def test_raw_json_tc_string_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8, key_only=True)
+        new_content = 'new string content'
         cb_env.collection.replace(key, new_content)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes].decode('utf-8')
 
-    def test_raw_json_tc_string_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('utf8')
+    def test_raw_json_tc_string_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes].decode('utf-8')
 
 
-class RawStringTranscoderTestSuite:
+class RawStringTranscoderTestSuite(SuiteRequirements):
+    CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
+    DATA_SET = [DocType.UTF8]
+    NUM_DOCS = 10
+
     TEST_MANIFEST = [
         'test_raw_string_tc_bytes_insert',
         'test_raw_string_tc_bytes_replace',
@@ -565,216 +658,164 @@ class RawStringTranscoderTestSuite:
         'test_raw_string_tc_string_upsert',
     ]
 
-    def test_raw_string_tc_bytes_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('bytes')
+    def test_raw_string_tc_bytes_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         with pytest.raises(ValueFormatException):
             cb_env.collection.insert(key, value)
 
-    def test_raw_string_tc_bytes_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('bytes')
+    def test_raw_string_tc_bytes_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8, key_only=True)
+        _, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         with pytest.raises(ValueFormatException):
             cb_env.collection.replace(key, value)
 
-    def test_raw_string_tc_bytes_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('bytes')
+    def test_raw_string_tc_bytes_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.BYTES)
         with pytest.raises(ValueFormatException):
             cb_env.collection.upsert(key, value)
 
-    def test_raw_string_tc_json_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_raw_string_tc_json_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.insert(key, value)
 
-    def test_raw_string_tc_json_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8', key_only=True)
-        _, value = cb_env.get_new_doc_by_type('json')
+    def test_raw_string_tc_json_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8, key_only=True)
+        _, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.replace(key, value)
 
-    def test_raw_string_tc_json_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('json')
+    def test_raw_string_tc_json_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.SIMPLE)
         with pytest.raises(ValueFormatException):
             cb_env.collection.upsert(key, value)
 
-    def test_raw_string_tc_string_insert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('utf8')
+    def test_raw_string_tc_string_insert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.insert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
-    def test_raw_string_tc_string_replace(self, cb_env):
-        key = cb_env.get_existing_doc_by_type('utf8', key_only=True)
-        new_content = "new string content"
+    def test_raw_string_tc_string_replace(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_existing_doc_by_type(DocType.UTF8, key_only=True)
+        new_content = 'new string content'
         cb_env.collection.replace(key, new_content)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, str)
         assert new_content == res.content_as[str]
 
-    def test_raw_string_tc_string_upsert(self, cb_env):
-        key, value = cb_env.get_new_doc_by_type('utf8')
+    def test_raw_string_tc_string_upsert(self, cb_env: SyncTestEnvironment) -> None:
+        key, value = cb_env.get_new_doc_by_type(DocType.UTF8)
         cb_env.collection.upsert(key, value)
         res = cb_env.collection.get(key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
 
-class ClassicDefaultTranscoderTests(DefaultTranscoderTestSuite):
+class DefaultTranscoderTests(DefaultTranscoderTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicDefaultTranscoderTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicDefaultTranscoderTests) if valid_test_method(meth)]
-        compare = set(DefaultTranscoderTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(DefaultTranscoderTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, DefaultTranscoderTestSuite, request.param)
+        yield env
+        teardown_environment(env, DefaultTranscoderTestSuite, request.param)
 
 
 class KeyValueOpTranscoderTests(KeyValueOpTranscoderTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(KeyValueOpTranscoderTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(KeyValueOpTranscoderTests) if valid_test_method(meth)]
-        compare = set(KeyValueOpTranscoderTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(KeyValueOpTranscoderTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, KeyValueOpTranscoderTestSuite, request.param)
+        yield env
+        teardown_environment(env, KeyValueOpTranscoderTestSuite, request.param)
 
 
-class ClassicLegacyTranscoderTests(LegacyTranscoderTestSuite):
+class LegacyTranscoderTests(LegacyTranscoderTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicLegacyTranscoderTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(LegacyTranscoderTestSuite) if valid_test_method(meth)]
-        compare = set(ClassicLegacyTranscoderTests.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(LegacyTranscoderTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        cb_env.default_collection._impl._set_default_transcoder(LegacyTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(LegacyTranscoder())
-        yield cb_env
-        cb_env.teardown(request.param)
-        # reset the transcoder
-        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env,
+                                LegacyTranscoderTestSuite,
+                                request.param,
+                                transcoder=LegacyTranscoder())
+        yield env
+        teardown_environment(env, LegacyTranscoderTestSuite, request.param)
 
 
-class ClassicRawBinaryTranscoderTests(RawBinaryTranscoderTestSuite):
+class RawBinaryTranscoderTests(RawBinaryTranscoderTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicRawBinaryTranscoderTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(RawBinaryTranscoderTestSuite) if valid_test_method(meth)]
-        compare = set(ClassicRawBinaryTranscoderTests.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(RawBinaryTranscoderTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        cb_env.default_collection._impl._set_default_transcoder(RawBinaryTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(RawBinaryTranscoder())
-        yield cb_env
-        cb_env.teardown(request.param)
-        # reset the transcoder
-        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env,
+                                RawBinaryTranscoderTestSuite,
+                                request.param,
+                                transcoder=RawBinaryTranscoder())
+        yield env
+        teardown_environment(env, RawBinaryTranscoderTestSuite, request.param)
 
 
-class ClassicRawJsonTranscoderTests(RawJsonTranscoderTestSuite):
+class RawJsonTranscoderTests(RawJsonTranscoderTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicRawJsonTranscoderTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(RawJsonTranscoderTestSuite) if valid_test_method(meth)]
-        compare = set(ClassicRawJsonTranscoderTests.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(RawJsonTranscoderTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        cb_env.default_collection._impl._set_default_transcoder(RawJSONTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(RawJSONTranscoder())
-        yield cb_env
-        cb_env.teardown(request.param)
-        # reset the transcoder
-        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env,
+                                RawJsonTranscoderTestSuite,
+                                request.param,
+                                transcoder=RawJSONTranscoder())
+        yield env
+        teardown_environment(env, RawJsonTranscoderTestSuite, request.param)
 
 
-class ClassicRawStringTranscoderTests(RawStringTranscoderTestSuite):
+class RawStringTranscoderTests(RawStringTranscoderTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicRawStringTranscoderTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(RawStringTranscoderTestSuite) if valid_test_method(meth)]
-        compare = set(ClassicRawStringTranscoderTests.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(RawStringTranscoderTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT, CollectionType.NAMED])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = TranscoderTestEnvironment.from_environment(cb_base_env)
-        cb_env.setup(request.param)
-        cb_env.default_collection._impl._set_default_transcoder(RawStringTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(RawStringTranscoder())
-        yield cb_env
-        cb_env.teardown(request.param)
-        # reset the transcoder
-        cb_env.default_collection._impl._set_default_transcoder(JSONTranscoder())
-        if cb_env.named_collection:
-            cb_env.named_collection._impl._set_default_transcoder(JSONTranscoder())
+    @pytest.fixture(scope='class', name='cb_env', params=[CollectionStrategy.DEFAULT, CollectionStrategy.NAMED])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env,
+                                RawStringTranscoderTestSuite,
+                                request.param,
+                                transcoder=RawStringTranscoder())
+        yield env
+        teardown_environment(env, RawStringTranscoderTestSuite, request.param)

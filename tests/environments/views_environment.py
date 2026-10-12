@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,412 +13,367 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""View bucket setup, teardown and row validation for the classic/sync views suites.
+
+One module per api style, one class of static helpers, no TestEnvironment subclass.
+
+**The suite owns a bucket, not a collection, and that is what makes this environment different
+from every other one in the package.**  A view is a property of a bucket: a design document
+upserted into the shared test bucket is visible to every other suite in the run and is dropped
+from underneath them at teardown.  So setup creates `test-view-bucket`, seeds it, builds the
+design document on it and drops the whole bucket afterwards, which is also why the suite is
+gated on BucketManagement as well as ViewIndexManagement.  Both are in FEATURES_NOT_IN_MOCK, so
+the gate takes the whole class on GoCAVES rather than failing inside a manager.
+
+**Nothing is loaded into the shared bucket at all.**  The suite declares NUM_DOCS = 0, so
+build_environment seeds nothing, and _load_view_data() puts the corpus where the view can see
+it.  A suite that seeded both would pay for fifty writes it never reads.
+
+**Setup establishes the row count the suite then asserts exactly.**  _wait_for_view() polls the
+view with the same options the tests use until it returns the whole corpus, and raises naming
+the shortfall if it never does.  That is what lets every assertion here be assert_rows_exact
+with no loose form anywhere: the suite creates and drops its own bucket, so nothing outside it
+can add a row, and the one remaining unknown (has the view finished indexing?) is answered once,
+in setup, instead of being absorbed by a `>=` in fifty places.  A loose form costs real
+coverage here in two distinct ways: asking for 10 rows out of a corpus of 50 cannot notice 40
+missing, and an expectation computed from the smallest view key is only right when that key
+falls in one of the three ten-document groups, which is three runs in four.
+
+The design document, the map function and the key arithmetic the suite asserts on are all in
+tests/view_defs.py; that module's docstring has the reason they are one file.
+"""
 
 from __future__ import annotations
 
-import pathlib
-import time
-from os import path
-from textwrap import wrap
-from typing import List, Optional
+import warnings
+from typing import Any
 
-from couchbase.exceptions import (AmbiguousTimeoutException,
-                                  DesignDocumentNotFoundException,
-                                  UnAmbiguousTimeoutException)
+from couchbase.exceptions import BucketDoesNotExistException, DesignDocumentNotFoundException
 from couchbase.management.buckets import CreateBucketSettings, StorageBackend
 from couchbase.management.views import (DesignDocument,
                                         DesignDocumentNamespace,
                                         View)
 from couchbase.result import ViewResult
-from tests.environments import CollectionType
-from tests.environments.test_environment import AsyncTestEnvironment, TestEnvironment
+from couchbase.views import (ViewMetaData,
+                             ViewRow,
+                             ViewScanConsistency)
+from tests.assert_helpers import (cb_assert_eq,
+                                  cb_assert_gte,
+                                  cb_assert_isinstance)
+from tests.environments.managers import TestEnvironmentBucketManager, TestEnvironmentViewIndexManager
+from tests.environments.test_environment import SyncTestEnvironment, TestEnvironment
+from tests.skips import CouchbaseTestEnvironmentException
+from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.view_defs import (REBUILT_VIEW_MAP_FUNCTION,
+                             VIEW_DOCS,
+                             VIEW_MAP_FUNCTION,
+                             VIEW_NAME,
+                             design_doc_name,
+                             view_bucket_name)
 
 
-class ViewsTestEnvironment(TestEnvironment):
+class ViewsEnvironment:
+    """Classic/sync view bucket setup, teardown and row validation."""
 
-    TEST_VIEW_NAME = 'test-view'
-    TEST_VIEW_PATH = path.join(pathlib.Path(__file__).parent.parent,
-                               'test_cases',
-                               f'{TEST_VIEW_NAME}-new.txt')
+    # The bucket the suite creates.  100MB is the smallest quota the server accepts;
+    # COUCHSTORE is not a preference but a requirement, since views are unsupported on Magma.
+    VIEW_BUCKET_RAM_MB = 100
+    VIEW_BUCKET_BACKEND = StorageBackend.COUCHSTORE
 
-    DOCNAME = 'test-ddoc'
+    # Rounds and seconds between them while waiting for the view to return the whole corpus.
+    # Indexing starts on the first query, so the first round is expected to come back short.
+    VIEW_WAIT_ROUNDS = 12
+    VIEW_WAIT_DELAY = 5
 
-    @property
-    def view_bucket(self):
-        return self._view_bucket
+    # ------------------------------------------------------------------
+    # Row and metadata validation
+    # ------------------------------------------------------------------
 
-    @property
-    def view_collection(self):
-        return self._view_collection
+    @staticmethod
+    def _validate_row(row: ViewRow) -> None:
+        """Everything true of every row this design document emits.
 
-    @property
-    def test_ddoc(self):
-        return self._test_ddoc
+        The value is the trimmed copy the map function builds, so its three keys are as much a
+        part of the view's contract as the key is, and checking them here is what lets the
+        per-test assertions be about the *query* rather than about the fixture.
+        """
+        cb_assert_isinstance(row, ViewRow, what='view row')
+        cb_assert_isinstance(row.id, str, what='view row id')
+        cb_assert_isinstance(row.key, str, what='view row key')
+        # Bound and asserted with a plain `assert` because the three lines below index it, and
+        # ViewRow.value is annotated `object`; only the assert form narrows it for the gate.
+        value = row.value
+        assert isinstance(value, dict), f'view row value: expected a dict, got {type(value).__name__!r}'
+        cb_assert_eq(value['id'], row.id, what='view row value id')
+        cb_assert_eq(value['type'], 'vehicle', what='view row value type')
+        cb_assert_isinstance(value['batch'], str, what='view row value batch')
 
-    @property
-    def num_docs(self) -> int:
-        return self._num_docs
+    @staticmethod
+    def _validate_metadata(result: ViewResult, expected_count: int) -> None:
+        meta = result.metadata()
+        cb_assert_isinstance(meta, ViewMetaData, what='view result metadata')
+        # total_rows() counts what the view holds, not what this query returned, so it stays
+        # `>=` even where the row count itself is exact: most queries here carry a key filter.
+        total_rows = meta.total_rows()
+        assert total_rows is not None, 'view result metadata carried no total_rows'
+        # int() rather than comparing directly, and not for tidiness.  total_rows() is annotated
+        # Optional[UnsignedInt64] while it returns the plain int the server sent, and
+        # UnsignedInt64 defines no comparison operators at all, so the natural spelling of this
+        # line is rejected by a type checker and would be a TypeError if the annotation were
+        # ever made true.  int() is correct either way.  SearchMetrics.total_rows() is annotated
+        # int and needs none of this.
+        cb_assert_gte(int(total_rows), expected_count, what='view metadata total_rows')
 
-    def add_test_ddoc(self):
-        TestEnvironment.try_n_times(3,
-                                    5,
-                                    self.vixm.upsert_design_document,
-                                    self.test_ddoc,
-                                    DesignDocumentNamespace.DEVELOPMENT)
-
-    def assert_rows(self,
-                    result,  # type: ViewResult
-                    expected_count,
-                    return_rows=False):
-        assert isinstance(result, ViewResult)
-        rows = []
+    @staticmethod
+    def _drain(result: ViewResult, expected_count: int) -> list[ViewRow]:
+        """Validate every row and the metadata in one pass, and return the rows."""
+        cb_assert_isinstance(result, ViewResult, what='result passed to _drain')
+        rows: list[ViewRow] = []
         for row in result.rows():
-            assert row is not None
+            assert row is not None, f'view result yielded a None row at index {len(rows)}'
+            ViewsEnvironment._validate_row(row)
             rows.append(row)
-        assert len(rows) >= expected_count
+        ViewsEnvironment._validate_metadata(result, expected_count)
+        return rows
 
-        if return_rows is True:
-            return rows
+    @staticmethod
+    def assert_rows_exact(result: ViewResult, expected_count: int) -> list[ViewRow]:
+        """Assert the result yields exactly expected_count validated rows, and return them.
 
-    def create_test_ddoc(self):
-        view_data = None
-        with open(self.TEST_VIEW_PATH) as view_file:
-            view_data = view_file.read()
+        The only assertion helper here, and the absence of a loose counterpart is deliberate.
+        SearchEnvironment carries both because a bucket-wide FTS index sees documents another
+        suite seeded; a view over a bucket this suite created and will drop sees nothing it did
+        not write, so every count in the suite is knowable and `at_least` would only ever be
+        hiding one that had gone wrong.
+        """
+        rows = ViewsEnvironment._drain(result, expected_count)
+        cb_assert_eq(len(rows), expected_count, what='view rows returned')
+        return rows
 
-        view = View(map=view_data)
-        self._test_ddoc = DesignDocument(name=self.DOCNAME, views={self.TEST_VIEW_NAME: view})
+    @staticmethod
+    def row_value(row: ViewRow) -> dict[str, Any]:
+        """The emitted value as the dict this design document always makes it.
 
-    def drop_ddoc(self, from_prod=False):
-        if from_prod is True:
-            TestEnvironment.try_n_times_till_exception(10,
-                                                       3,
-                                                       self.vixm.drop_design_document,
-                                                       self.test_ddoc.name,
-                                                       DesignDocumentNamespace.PRODUCTION,
-                                                       expected_exceptions=(DesignDocumentNotFoundException, ))
-        TestEnvironment.try_n_times_till_exception(10,
-                                                   3,
-                                                   self.vixm.drop_design_document,
-                                                   self.test_ddoc.name,
-                                                   DesignDocumentNamespace.DEVELOPMENT,
-                                                   expected_exceptions=(DesignDocumentNotFoundException, ))
+        `ViewRow.value` is annotated `object`, which is honest about a view emitting arbitrary
+        JSON and useless to a caller that knows its own map function: indexing it is a type
+        error.  Narrowing once, here, beats an isinstance line at every call site, and it puts
+        the claim next to _validate_row, which has already checked the same thing for every row
+        the suite sees.
 
-    def get_batch_id(self):
-        if hasattr(self, '_batch_id'):
-            return self._batch_id
+        The rest of the dataclass is annotated the same way and worse: `key` and `id` are
+        declared `str` with a default of None, so the annotations say a field cannot be None
+        while the class hands one out.  All four belong to one fix in one file.
+        """
+        value = row.value
+        assert isinstance(value, dict), f'view row value: expected a dict, got {type(value).__name__!r}'
+        return value
 
-        doc = list(self._loaded_docs.values())[0]
-        self._batch_id = doc['batch']
-        return self._batch_id
+    @staticmethod
+    def drain(result: ViewResult) -> None:
+        """Consume the result without asserting anything about it.
 
-    def get_keys(self) -> List[str]:
-        keys = wrap(self._batch_id, 2)
-        # Regression guard (PYCBC-1898): a duplicate slice collapses two docid decades
-        # into a single view key.  DataProvider guarantees distinctness; failing here
-        # reports that directly instead of as a fifty-line docid diff further down.
-        assert len(set(keys)) == len(keys), f'batch id {self._batch_id} yields duplicate view keys'
-        return keys
+        For the two tests whose subject is an exception.  Which statement raises is api-dependent:
+        a view query is lazy under sync and acouchbase, so nothing reaches the server until the
+        rows are pulled, while the Twisted call is bridged and can errback on its own.  A missing
+        design document in fact surfaces from the iteration under all three, arriving as an error
+        row in the stream, but the suite keeps the call and the drain together inside the
+        pytest.raises block so that one pair of statements is correct whichever of them fails.
+        """
+        for _ in result.rows():
+            pass
 
-    def get_docids_by_key(self, key: str) -> List[str]:
-        keys = self.get_keys()
-        key_idx = keys.index(key)
-        if key_idx == 0:
-            return [f'{self._batch_id}::{i}' for i in range(10)]
-        elif key_idx == 1:
-            return [f'{self._batch_id}::{i}' for i in range(10, 20)]
-        elif key_idx == 2:
-            return [f'{self._batch_id}::{i}' for i in range(20, 30)]
-        else:
-            return [f'{self._batch_id}::{i}' for i in range(30, self.num_docs)]
+    # ------------------------------------------------------------------
+    # Bucket and design document lifecycle
+    # ------------------------------------------------------------------
 
-    def load_view_data(self, num_docs=50):
+    @staticmethod
+    def design_document(rebuilt: bool = False) -> DesignDocument:
+        """The one design document the suites upsert, holding the one view they query.
 
-        for v in self.data_provider.get_vehicles()[:num_docs]:
-            for _ in range(3):
-                try:
-                    key = f'{v["id"]}'
-                    _ = self.view_collection.upsert(key, v)
-                    self._loaded_docs[key] = v
-                    break
-                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
-                    time.sleep(3)
-                    continue
-                except Exception as ex:
-                    print(ex)
-                    raise
+        `rebuilt` swaps in REBUILT_VIEW_MAP_FUNCTION, the same function under a different
+        definition, so the upsert gets a new index rather than the one already built.
+        """
+        map_function = REBUILT_VIEW_MAP_FUNCTION if rebuilt else VIEW_MAP_FUNCTION
+        return DesignDocument(name=design_doc_name(), views={VIEW_NAME: View(map=map_function)})
 
-        self._doc_types = ['vehicle']
+    @staticmethod
+    def _drop_stranded_bucket(cb_env: SyncTestEnvironment) -> None:
+        """Remove a view bucket an earlier run left behind, if there is one.
 
-    def setup(self,
-              collection_type,  # type: CollectionType
-              test_suite=None,  # type: Optional[str]
-              num_docs=50,  # type: Optional[int]
-              ):
-
-        self._num_docs = num_docs
-        if test_suite == 'ClassicViewsParamTests':
+        Nothing else will drop it.  A yield fixture only runs its teardown half if it got as far
+        as yielding, so a setup that raises leaves the bucket in place, and a process that is
+        killed outright runs neither half.  setup_views cleans up the failures it can see; what
+        is left for this is the ones it cannot, a SIGINT or a crash between the create and the
+        yield.  Without it the next run fails at create_bucket with BucketAlreadyExistsException,
+        which says nothing at all about why the run before it stopped.
+        """
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
+        bucket_name = view_bucket_name()
+        try:
+            bm.get_bucket(bucket_name)
+        except BucketDoesNotExistException:
             return
-        elif test_suite == 'ClassicViewIndexManagementTests':
-            self.enable_views_mgmt()
-            self.create_test_ddoc()
-            TestEnvironment.try_n_times(5, 3, self.load_data, num_docs=num_docs)
-        else:
-            self.create_test_ddoc()
-            self.add_test_ddoc()
-            TestEnvironment.try_n_times(5, 3, self.load_view_data, num_docs=num_docs)
+        print(f'Bucket {bucket_name} was left behind by an earlier run; dropping it.')
+        bm.drop_bucket(bucket_name)
+        cb_env.consistency.wait_until_bucket_dropped(bucket_name)
 
-            for _ in range(5):
-                try:
-                    row_count_good = self._check_row_count(num_docs)
-                except DesignDocumentNotFoundException:
-                    row_count_good = False
-                if row_count_good:
-                    break
-                print('Waiting for view to load, sleeping a bit...')
-                time.sleep(5)
+    @staticmethod
+    def _create_view_bucket(cb_env: SyncTestEnvironment) -> None:
+        ViewsEnvironment._drop_stranded_bucket(cb_env)
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
+        bucket_name = view_bucket_name()
+        bm.create_bucket(CreateBucketSettings(name=bucket_name,
+                                              ram_quota_mb=ViewsEnvironment.VIEW_BUCKET_RAM_MB,
+                                              flush_enabled=False,
+                                              storage_backend=ViewsEnvironment.VIEW_BUCKET_BACKEND))
+        cb_env.consistency.wait_until_bucket_healthy(bucket_name)
+        bucket = cb_env.cluster.bucket(bucket_name)
+        cb_env.set_view_bucket(bucket, bucket.default_collection())
 
-    def setup_view_bucket(self):
-        self._view_bucket_name = 'test-view-bucket'
-        self.bm.create_bucket(CreateBucketSettings(name=self._view_bucket_name,
-                                                   ram_quota_mb=100,
-                                                   flush_enabled=False,
-                                                   storage_backend=StorageBackend.COUCHSTORE))
-        self.consistency.wait_until_bucket_present(self._view_bucket_name)
-        self._view_bucket = self.cluster.bucket(self._view_bucket_name)
-        self._view_collection = self._view_bucket.default_collection()
+    @staticmethod
+    def _load_view_data(cb_env: SyncTestEnvironment) -> None:
+        """Seed the view bucket with the corpus the map function partitions.
 
-    def teardown(self,
-                 collection_type,  # type: CollectionType
-                 test_suite=None,  # type: Optional[str]
-                 ):
-        if test_suite == 'ClassicViewsParamTests':
-            return
-        elif test_suite == 'ClassicViewIndexManagementTests':
-            self.disable_views_mgmt()
-            TestEnvironment.try_n_times(5, 3, self.purge_data)
-        else:
-            self.bm.drop_bucket(self._view_bucket_name)
-            self.consistency.wait_until_bucket_dropped(self._view_bucket_name)
-            self.drop_ddoc()
+        The documents are the seeded vehicles, taken in order, so their ids run `<batch>::0`
+        through `<batch>::49` and the four view keys hold 10, 10, 10 and 20 of them.  Order is
+        what makes that true, which is why this iterates get_vehicles() rather than drawing.
+        """
+        coll = cb_env.view_collection
+        for doc in cb_env.data_provider.get_vehicles()[:VIEW_DOCS]:
+            TestEnvironment.try_n_times(3, 3, coll.upsert, f'{doc["id"]}', doc)
 
-    def _check_row_count(self,
-                         min_count  # type: int
-                         ) -> bool:
-        view_result = self.view_bucket.view_query(self.DOCNAME,
-                                                  self.TEST_VIEW_NAME,
-                                                  limit=min_count,
-                                                  namespace=DesignDocumentNamespace.DEVELOPMENT)
+    @staticmethod
+    def _wait_for_view(cb_env: SyncTestEnvironment) -> int:
+        """Poll until the view returns the whole corpus; return the last count it gave.
+
+        Queried as the suite queries, plus REQUEST_PLUS.  The view engine indexes only what has
+        reached disk, and the suite's default consistency answers from the index as it stands, so
+        under a backed-up disk queue the count can sit short for as long as this waits.
+        REQUEST_PLUS has the server bring the index up to date first, and once it is complete
+        the suite's own queries see it.  A count that is merely *behind* keeps polling; the caller
+        treats anything short of the corpus at the end as a failure, because every expected
+        count in the suite is derived from the corpus being complete.  A design document the
+        server cannot find yet counts as behind too, for the reason the except clause gives.
+        """
         count = 0
-        for _ in view_result:
-            count += 1
-        return count >= min_count
-
-    @classmethod
-    def from_environment(cls,
-                         env  # type: TestEnvironment
-                         ) -> ViewsTestEnvironment:
-
-        env_args = {
-            'bucket': env.bucket,
-            'cluster': env.cluster,
-            'default_collection': env.default_collection,
-            'couchbase_config': env.config,
-            'data_provider': env.data_provider,
-        }
-
-        cb_env = cls(**env_args)
-        return cb_env
-
-
-class AsyncViewsTestEnvironment(AsyncTestEnvironment):
-
-    TEST_VIEW_NAME = 'test-view'
-    TEST_VIEW_PATH = path.join(pathlib.Path(__file__).parent.parent,
-                               'test_cases',
-                               f'{TEST_VIEW_NAME}-new.txt')
-
-    DOCNAME = 'test-ddoc'
-
-    @property
-    def view_bucket(self):
-        return self._view_bucket
-
-    @property
-    def view_collection(self):
-        return self._view_collection
-
-    @property
-    def test_ddoc(self):
-        return self._test_ddoc
-
-    @property
-    def num_docs(self) -> int:
-        return self._num_docs
-
-    async def add_test_ddoc(self):
-        await AsyncTestEnvironment.try_n_times(3,
-                                               5,
-                                               self.vixm.upsert_design_document,
-                                               self.test_ddoc,
-                                               DesignDocumentNamespace.DEVELOPMENT)
-
-    async def assert_rows(self,
-                          result,  # type: ViewResult
-                          expected_count,
-                          return_rows=False):
-        assert isinstance(result, ViewResult)
-        rows = []
-        async for row in result.rows():
-            assert row is not None
-            rows.append(row)
-        assert len(rows) >= expected_count
-
-        if return_rows is True:
-            return rows
-
-    def create_test_ddoc(self):
-        view_data = None
-        with open(self.TEST_VIEW_PATH) as view_file:
-            view_data = view_file.read()
-
-        view = View(map=view_data)
-        self._test_ddoc = DesignDocument(name=self.DOCNAME, views={self.TEST_VIEW_NAME: view})
-
-    async def drop_ddoc(self, from_prod=False):
-        if from_prod is True:
-            await AsyncTestEnvironment.try_n_times_till_exception(10,
-                                                                  3,
-                                                                  self.vixm.drop_design_document,
-                                                                  self.test_ddoc.name,
-                                                                  DesignDocumentNamespace.PRODUCTION,
-                                                                  expected_exceptions=(DesignDocumentNotFoundException, ))  # noqa: E501
-        await AsyncTestEnvironment.try_n_times_till_exception(10,
-                                                              3,
-                                                              self.vixm.drop_design_document,
-                                                              self.test_ddoc.name,
-                                                              DesignDocumentNamespace.DEVELOPMENT,
-                                                              expected_exceptions=(DesignDocumentNotFoundException, ))
-
-    def get_batch_id(self):
-        if hasattr(self, '_batch_id'):
-            return self._batch_id
-
-        doc = list(self._loaded_docs.values())[0]
-        self._batch_id = doc['batch']
-        return self._batch_id
-
-    def get_keys(self) -> List[str]:
-        keys = wrap(self._batch_id, 2)
-        # Regression guard (PYCBC-1898): a duplicate slice collapses two docid decades
-        # into a single view key.  DataProvider guarantees distinctness; failing here
-        # reports that directly instead of as a fifty-line docid diff further down.
-        assert len(set(keys)) == len(keys), f'batch id {self._batch_id} yields duplicate view keys'
-        return keys
-
-    def get_docids_by_key(self, key: str) -> List[str]:
-        keys = self.get_keys()
-        key_idx = keys.index(key)
-        if key_idx == 0:
-            return [f'{self._batch_id}::{i}' for i in range(10)]
-        elif key_idx == 1:
-            return [f'{self._batch_id}::{i}' for i in range(10, 20)]
-        elif key_idx == 2:
-            return [f'{self._batch_id}::{i}' for i in range(20, 30)]
-        else:
-            return [f'{self._batch_id}::{i}' for i in range(30, self.num_docs)]
-
-    async def load_view_data(self, num_docs=50):
-
-        for v in self.data_provider.get_vehicles()[:num_docs]:
-            for _ in range(3):
-                try:
-                    key = f'{v["id"]}'
-                    _ = await self.view_collection.upsert(key, v)
-                    self._loaded_docs[key] = v
+        for _ in range(ViewsEnvironment.VIEW_WAIT_ROUNDS):
+            try:
+                result = cb_env.view_bucket.view_query(design_doc_name(),
+                                                       VIEW_NAME,
+                                                       namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                                       scan_consistency=ViewScanConsistency.REQUEST_PLUS)
+                count = sum(1 for _ in result.rows())
+            except DesignDocumentNotFoundException:
+                # A successful upsert does not mean every node can serve the design document
+                # yet, and the 404 that comes back until it propagates says the same thing a
+                # short row count does.  It belongs in this loop rather than ending the run:
+                # otherwise the first query can arrive at a node the document has not reached,
+                # and the whole suite errors out in the one situation the poll exists for.
+                count = 0
+                reason = f'design document {design_doc_name()} is not on every node yet'
+            else:
+                if count >= VIEW_DOCS:
                     break
-                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
-                    await self.sleep(3)
-                    continue
-                except Exception as ex:
-                    print(ex)
-                    raise
+                reason = f'the view returned {count} of {VIEW_DOCS} rows'
+            print(f'Waiting for the view: {reason}...')
+            TestEnvironment.sleep(ViewsEnvironment.VIEW_WAIT_DELAY)
+        return count
 
-        self._doc_types = ['vehicle']
+    @staticmethod
+    def _full_set_count(cb_env: SyncTestEnvironment) -> str:
+        """How many documents the view returns over every vbucket, for the failure message.
 
-    async def setup(self,
-                    collection_type,  # type: CollectionType
-                    test_suite=None,  # type: Optional[str]
-                    num_docs=50,  # type: Optional[int]
-                    ):
-        self._num_docs = num_docs
-        if test_suite == 'ClassicViewsParamTests':
-            return
-        elif test_suite == 'ClassicViewIndexManagementTests':
-            self.enable_views_mgmt()
-            self.create_test_ddoc()
-            await AsyncTestEnvironment.try_n_times(5, 3, self.load_data, num_docs=num_docs)
-        else:
-            self.create_test_ddoc()
-            await self.add_test_ddoc()
-            await AsyncTestEnvironment.try_n_times(5, 3, self.load_view_data, num_docs=num_docs)
+        A development view is computed over a subset of the vbuckets unless a query asks for
+        the full set, so a short count has two readings: the view covers only part of the
+        data, or the data is not all there.  This count tells them apart.  It is a diagnostic,
+        so a failure here is reported in the message rather than raised over the real one.
+        """
+        try:
+            result = cb_env.view_bucket.view_query(design_doc_name(),
+                                                   VIEW_NAME,
+                                                   namespace=DesignDocumentNamespace.DEVELOPMENT,
+                                                   full_set=True)
+            return str(sum(1 for _ in result.rows()))
+        except Exception as exc:
+            return f'unavailable, {type(exc).__name__}'
 
-            for _ in range(5):
-                row_count_good = await self._check_row_count(5)
-                if row_count_good:
-                    break
-                print('Waiting for view to load, sleeping a bit...')
-                await AsyncTestEnvironment.sleep(5)
+    @staticmethod
+    def _stored_count(cb_env: SyncTestEnvironment) -> str:
+        """How many of the corpus documents a key lookup finds, for the failure message.
 
-    async def setup_view_bucket(self):
-        self._view_bucket_name = 'test-view-bucket'
-        await self.bm.create_bucket(CreateBucketSettings(name=self._view_bucket_name,
-                                                         ram_quota_mb=100,
-                                                         flush_enabled=False,
-                                                         storage_backend=StorageBackend.COUCHSTORE))
-        self.consistency.wait_until_bucket_present(self._view_bucket_name)
-        self._view_bucket = self.cluster.bucket(self._view_bucket_name)
-        await self._view_bucket.on_connect()
-        self._view_collection = self._view_bucket.default_collection()
+        The other half of telling a short view apart: a view short of documents the bucket
+        holds is an indexing problem, and a bucket short of them is not.  A diagnostic, like
+        _full_set_count, so a failure here is reported rather than raised.
+        """
+        try:
+            coll = cb_env.view_collection
+            ids = [f'{doc["id"]}' for doc in cb_env.data_provider.get_vehicles()[:VIEW_DOCS]]
+            return str(sum(1 for key in ids if coll.exists(key).exists))
+        except Exception as exc:
+            return f'unavailable, {type(exc).__name__}'
 
-    async def teardown(self,
-                       collection_type,  # type: CollectionType
-                       test_suite=None,  # type: Optional[str]
-                       ):
-        if test_suite == 'ClassicViewsParamTests':
-            return
-        elif test_suite == 'ClassicViewIndexManagementTests':
-            self.disable_views_mgmt()
-            await AsyncTestEnvironment.try_n_times(5, 3, self.purge_data)
-        else:
-            await self.bm.drop_bucket(self._view_bucket_name)
-            self.consistency.wait_until_bucket_dropped(self._view_bucket_name)
-            await self.drop_ddoc()
+    @staticmethod
+    def setup_views(cb_env: SyncTestEnvironment) -> None:
+        """Create the bucket, seed it, build the design document and wait for the view.
 
-    async def _check_row_count(self,
-                               min_count  # type: int
-                               ) -> bool:
+        The feature check runs first and runs here rather than in the suite, so it takes the
+        whole class with it on a mock or a server without bucket management, the same way
+        setup_search and setup_query_indexes gate theirs.
+        """
+        EnvironmentFeatures.check_if_feature_supported(
+            [ServerFeatures.BucketManagement, ServerFeatures.ViewIndexManagement], cb_env.server_context)
 
-        view_result = self.view_bucket.view_query(self.DOCNAME,
-                                                  self.TEST_VIEW_NAME,
-                                                  limit=min_count,
-                                                  namespace=DesignDocumentNamespace.DEVELOPMENT)
-        count = 0
-        async for _ in view_result:
-            count += 1
-        return count >= min_count
+        ViewsEnvironment._create_view_bucket(cb_env)
+        # The bucket exists from here on, and every remaining step can fail.  Anything that does
+        # has to take the bucket with it: this is a fixture setup, so a raise from here never
+        # reaches the teardown half that would otherwise drop it.
+        try:
+            ViewsEnvironment._load_view_data(cb_env)
 
-    @classmethod
-    def from_environment(cls,
-                         env  # type: TestEnvironment
-                         ) -> ViewsTestEnvironment:
+            vixm = cb_env.get_manager(TestEnvironmentViewIndexManager)
+            vixm.use_bucket(cb_env.view_bucket)
+            TestEnvironment.try_n_times(5, 3, vixm.upsert_design_document,
+                                        ViewsEnvironment.design_document(),
+                                        DesignDocumentNamespace.DEVELOPMENT)
 
-        env_args = {
-            'bucket': env.bucket,
-            'cluster': env.cluster,
-            'default_collection': env.default_collection,
-            'couchbase_config': env.config,
-            'data_provider': env.data_provider,
-        }
+            count = ViewsEnvironment._wait_for_view(cb_env)
+            if count < VIEW_DOCS:
+                # A count can stop short and stay there for the whole wait, REQUEST_PLUS and
+                # full_set alike, which an index that is merely behind does not do.  Whether the
+                # index or the data is what is missing is not established, so the view gets one
+                # new index, and a failure after that reports what a key lookup finds.
+                # A warning rather than a print: setup output is captured and shown only when
+                # setup fails, and a rebuild that works is the outcome worth seeing.
+                warnings.warn(f'Rebuilding the view after {count} of {VIEW_DOCS} rows')
+                TestEnvironment.try_n_times(5, 3, vixm.upsert_design_document,
+                                            ViewsEnvironment.design_document(rebuilt=True),
+                                            DesignDocumentNamespace.DEVELOPMENT)
+                count = ViewsEnvironment._wait_for_view(cb_env)
+            if count < VIEW_DOCS:
+                full_set = ViewsEnvironment._full_set_count(cb_env)
+                stored = ViewsEnvironment._stored_count(cb_env)
+                raise CouchbaseTestEnvironmentException(
+                    f'View {design_doc_name()}/{VIEW_NAME} returned {count} of {VIEW_DOCS} documents '
+                    f'after one rebuild ({full_set} with full_set, {stored} of {VIEW_DOCS} found by key); '
+                    'the suite asserts exact row counts and cannot run against a partial index')
+        except Exception:
+            # A failure to drop is printed rather than raised, so the exception that reaches the
+            # run is the one worth debugging.
+            try:
+                ViewsEnvironment.teardown_views(cb_env)
+            except Exception as drop_exc:
+                print(f'Could not drop {view_bucket_name()} after a failed setup: {drop_exc}')
+            raise
 
-        cb_env = cls(**env_args)
-        return cb_env
+    @staticmethod
+    def teardown_views(cb_env: SyncTestEnvironment) -> None:
+        """Drop the bucket, which takes the design document and the corpus with it.
+
+        The design document is deliberately *not* dropped first.  It lives on the bucket being
+        dropped, so a separate drop is either redundant or, if it runs after, addressed at a
+        bucket that no longer exists.
+        """
+        bucket_name = view_bucket_name()
+        bm = cb_env.get_manager(TestEnvironmentBucketManager)
+        TestEnvironment.try_n_times(5, 3, bm.drop_bucket, bucket_name)
+        cb_env.consistency.wait_until_bucket_dropped(bucket_name)

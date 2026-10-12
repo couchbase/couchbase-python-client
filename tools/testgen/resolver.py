@@ -138,7 +138,7 @@ def _load_manager_classes() -> dict[str, Any]:
     existed the same binding produced a blocker naming the missing class; nothing about the
     resolution path changed, only whether the lookup succeeds.
     """
-    from tests_v2.environments import managers
+    from tests.environments import managers
     return {n: getattr(managers, n) for n in dir(managers) if n.endswith('Manager')}
 
 
@@ -147,9 +147,9 @@ def _load_manager_classes() -> dict[str, Any]:
 # as helper classes would add TestEnvironment and SyncTestEnvironment to every model under
 # names no generated file ever uses.  Excluded by name rather than by omission from a list,
 # so that the discovery below stays exhaustive.
-CORE_ENV_MODULES = {'tests_v2.environments.test_environment',
-                    'tests_v2.environments.async_environment',
-                    'tests_v2.environments.twisted_environment'}
+CORE_ENV_MODULES = {'tests.environments.test_environment',
+                    'tests.environments.async_environment',
+                    'tests.environments.twisted_environment'}
 
 
 def _load_helper_classes() -> dict[str, Any]:
@@ -179,7 +179,7 @@ def _load_helper_classes() -> dict[str, Any]:
     import importlib
     import pkgutil
 
-    import tests_v2.environments as env_pkg
+    import tests.environments as env_pkg
 
     out: dict[str, Any] = {}
     for info in pkgutil.iter_modules(env_pkg.__path__):
@@ -217,7 +217,7 @@ def _load_async_classes() -> dict[str, Any]:
     from acouchbase.management.views import ViewIndexManager
     from acouchbase.scope import AsyncScope
     from acouchbase.transactions.transactions import AttemptContext, Transactions
-    from tests_v2.environments.async_environment import AsyncTestEnvironment
+    from tests.environments.async_environment import AsyncTestEnvironment
     return {
         'AsyncCluster': AsyncCluster,
         'AsyncClusterImpl': AsyncClusterImpl,
@@ -326,7 +326,7 @@ CALL_RETURN_TYPES = {
     # `pytest.raises(RuntimeError)` would instead see an un-awaited coroutine and no raise.
     #
     # Suites reach these directly only when the manager has to hang off a cluster the test
-    # opened itself; everything else in tests_v2 goes through cb_env.get_manager(), which the
+    # opened itself; every other suite goes through cb_env.get_manager(), which the
     # manager: pseudo-type already handles.
     ('AsyncCluster', 'analytics_indexes'): 'AnalyticsIndexManager',
     ('AsyncCluster', 'buckets'): 'BucketManager',
@@ -689,10 +689,10 @@ MODELS = {
         # build_async_environment(...) and teardown_async_environment(...), both
         # `async def`, and an unawaited build hands every test a coroutine object in place
         # of cb_env.
-        function_modules=('tests_v2.environments.async_environment',
-                          'tests_v2.environments.test_environment',
-                          'tests_v2.assert_helpers',
-                          'tests_v2.manifest'),
+        function_modules=('tests.environments.async_environment',
+                          'tests.environments.test_environment',
+                          'tests.assert_helpers',
+                          'tests.manifest'),
     ),
     'txcouchbase': Model(
         api='txcouchbase',
@@ -707,10 +707,10 @@ MODELS = {
         pure_env_methods=TX_PURE_ENV_METHODS,
         needs_override=TX_NEEDS_OVERRIDE,
         bridge_tokens=('Deferred',),
-        function_modules=('tests_v2.environments.twisted_environment',
-                          'tests_v2.environments.test_environment',
-                          'tests_v2.assert_helpers',
-                          'tests_v2.manifest'),
+        function_modules=('tests.environments.twisted_environment',
+                          'tests.environments.test_environment',
+                          'tests.assert_helpers',
+                          'tests.manifest'),
     ),
 }
 
@@ -725,7 +725,7 @@ for _m in MODELS.values():
 
 
 def _load_twisted_classes() -> dict[str, Any]:
-    from tests_v2.environments.twisted_environment import TwistedTestEnvironment
+    from tests.environments.twisted_environment import TwistedTestEnvironment
     from txcouchbase.binary_collection import BinaryCollection
     from txcouchbase.bucket import TxBucket
     from txcouchbase.cluster import Cluster as TxCluster

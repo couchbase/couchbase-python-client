@@ -1,4 +1,4 @@
-"""Rewrite a sync suite in couchbase/tests_v2 into its acouchbase or txcouchbase form.
+"""Rewrite a sync suite in couchbase/tests into its acouchbase or txcouchbase form.
 
 Two choices here are load-bearing.
 
@@ -114,7 +114,7 @@ API_MODULES = {
 
 # Root of the shared test-framework package.  Every module under it must be declared in
 # ENV_MODULE_MAP for every api, identity included; see the blocker in rewrite_imports().
-ENV_PACKAGE = 'tests_v2.environments'
+ENV_PACKAGE = 'tests.environments'
 
 ENV_MODULE_MAP = {
     'acouchbase': {
@@ -123,29 +123,29 @@ ENV_MODULE_MAP = {
         # AsyncTestEnvironmentBucketManager).  Without an entry here rewrite_imports()
         # skips the statement entirely, the body still gets the rewritten name, and the
         # generated file raises NameError at import, once per rewritten name.
-        'tests_v2.environments.managers': 'tests_v2.environments.managers',
-        'tests_v2.environments.test_environment': 'tests_v2.environments.async_environment',
-        'tests_v2.environments.query_environment': 'tests_v2.environments.async_query_environment',
-        'tests_v2.environments.query_index_mgmt_environment':
-            'tests_v2.environments.async_query_index_mgmt_environment',
-        'tests_v2.environments.analytics_environment':
-            'tests_v2.environments.async_analytics_environment',
-        'tests_v2.environments.search_environment': 'tests_v2.environments.async_search_environment',
-        'tests_v2.environments.views_environment': 'tests_v2.environments.async_views_environment',
-        'tests_v2.environments.eventing_environment': 'tests_v2.environments.async_eventing_environment',
+        'tests.environments.managers': 'tests.environments.managers',
+        'tests.environments.test_environment': 'tests.environments.async_environment',
+        'tests.environments.query_environment': 'tests.environments.async_query_environment',
+        'tests.environments.query_index_mgmt_environment':
+            'tests.environments.async_query_index_mgmt_environment',
+        'tests.environments.analytics_environment':
+            'tests.environments.async_analytics_environment',
+        'tests.environments.search_environment': 'tests.environments.async_search_environment',
+        'tests.environments.views_environment': 'tests.environments.async_views_environment',
+        'tests.environments.eventing_environment': 'tests.environments.async_eventing_environment',
         # The first environment module that maps to itself, and it is not an oversight.  Every
         # other one here has an asyncio twin because it drives the SDK; this one issues
         # management REST calls and nothing else, so there is no api-specific form of it to
         # name.  Still an entry rather than an omission, for the reason stated above the
         # managers line: omission is the blocker.
-        'tests_v2.environments.rate_limit_environment': 'tests_v2.environments.rate_limit_environment',
+        'tests.environments.rate_limit_environment': 'tests.environments.rate_limit_environment',
         # Api-independent: they build names, index definitions and view-key arithmetic out of
         # strings, with no SDK call anywhere in either, so all three trees import the same
         # module.  Identity entries rather than omissions, because omission is the blocker
         # below.
-        'tests_v2.search_index_defs': 'tests_v2.search_index_defs',
-        'tests_v2.view_defs': 'tests_v2.view_defs',
-        'tests_v2.eventing_defs': 'tests_v2.eventing_defs',
+        'tests.search_index_defs': 'tests.search_index_defs',
+        'tests.view_defs': 'tests.view_defs',
+        'tests.eventing_defs': 'tests.eventing_defs',
         # Identity, and for a different reason than the three above: these two *are*
         # environment modules, and they are still shared.  Nothing in either awaits.  A meter
         # and a tracer are both configured through the shared couchbase.options.ClusterOptions
@@ -153,28 +153,28 @@ ENV_MODULE_MAP = {
         # cluster._impl.observability_instruments, which all three hold under that name.  So
         # there is no async or twisted counterpart to name, and writing one would be three
         # copies of the same handful of statements.
-        'tests_v2.environments.metrics_environment': 'tests_v2.environments.metrics_environment',
-        'tests_v2.environments.tracing_environment': 'tests_v2.environments.tracing_environment',
+        'tests.environments.metrics_environment': 'tests.environments.metrics_environment',
+        'tests.environments.tracing_environment': 'tests.environments.tracing_environment',
     },
     # No eventing entries here, and the omission is deliberate.  txcouchbase has no eventing
     # surface to wrap, so there is no twisted eventing environment to name and no txcouchbase
     # suite that imports one.  If a suite is ever retargeted here it hits the blocker below,
     # which is the loud failure this map is shaped to produce.
     'txcouchbase': {
-        'tests_v2.environments.managers': 'tests_v2.environments.managers',
-        'tests_v2.environments.test_environment': 'tests_v2.environments.twisted_environment',
-        'tests_v2.environments.analytics_environment':
-            'tests_v2.environments.twisted_analytics_environment',
-        'tests_v2.environments.query_environment': 'tests_v2.environments.twisted_query_environment',
-        'tests_v2.environments.query_index_mgmt_environment':
-            'tests_v2.environments.twisted_query_index_mgmt_environment',
-        'tests_v2.environments.search_environment': 'tests_v2.environments.twisted_search_environment',
-        'tests_v2.environments.views_environment': 'tests_v2.environments.twisted_views_environment',
-        'tests_v2.search_index_defs': 'tests_v2.search_index_defs',
-        'tests_v2.view_defs': 'tests_v2.view_defs',
+        'tests.environments.managers': 'tests.environments.managers',
+        'tests.environments.test_environment': 'tests.environments.twisted_environment',
+        'tests.environments.analytics_environment':
+            'tests.environments.twisted_analytics_environment',
+        'tests.environments.query_environment': 'tests.environments.twisted_query_environment',
+        'tests.environments.query_index_mgmt_environment':
+            'tests.environments.twisted_query_index_mgmt_environment',
+        'tests.environments.search_environment': 'tests.environments.twisted_search_environment',
+        'tests.environments.views_environment': 'tests.environments.twisted_views_environment',
+        'tests.search_index_defs': 'tests.search_index_defs',
+        'tests.view_defs': 'tests.view_defs',
         # Identity, for the reason given at the acouchbase entries above.
-        'tests_v2.environments.metrics_environment': 'tests_v2.environments.metrics_environment',
-        'tests_v2.environments.tracing_environment': 'tests_v2.environments.tracing_environment',
+        'tests.environments.metrics_environment': 'tests.environments.metrics_environment',
+        'tests.environments.tracing_environment': 'tests.environments.tracing_environment',
     },
 }
 
@@ -1204,7 +1204,7 @@ class SuiteTransformer:
         """A shared-framework module with no entry for this api is a blocker.
 
         ENV_MODULE_MAP is meant to be an *exhaustive* declaration for the
-        tests_v2.environments package: an api-specific module names its counterpart, a
+        tests.environments package: an api-specific module names its counterpart, a
         genuinely shared one names itself.  Silence means the question was never asked.
 
         Falling through does not leave the file unchanged, which is what makes it
@@ -1283,7 +1283,7 @@ class SuiteTransformer:
 
 
 class AsyncTransformer(SuiteTransformer):
-    """couchbase/tests_v2 -> acouchbase/tests_v2.  The base class is this transform."""
+    """couchbase/tests -> acouchbase/tests.  The base class is this transform."""
 
     api = 'acouchbase'
     name_map = ACB_NAME_MAP
@@ -1291,7 +1291,7 @@ class AsyncTransformer(SuiteTransformer):
 
 
 class TwistedTransformer(SuiteTransformer):
-    """couchbase/tests_v2 -> txcouchbase/tests_v2.
+    """couchbase/tests -> txcouchbase/tests.
 
     Not the async transform with different names in it.  Three things are structurally
     different, and each one is a place the async version would have produced a file that

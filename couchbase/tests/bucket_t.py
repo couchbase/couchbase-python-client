@@ -1,4 +1,4 @@
-#  Copyright 2016-2023. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,7 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import json
+from collections.abc import Generator, Sequence
 from uuid import uuid4
 
 import pytest
@@ -24,11 +27,27 @@ from couchbase.diagnostics import (EndpointPingReport,
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import PingOptions
 from couchbase.result import PingResult
-from tests.environments import CollectionType
-from tests.test_features import EnvironmentFeatures
+from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
+from tests.environments.test_environment import (SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.manifest import validate_test_manifest
+from tests.test_features import ServerFeatures
 
 
-class BucketDiagnosticsTestSuite:
+class BucketDiagnosticsTestSuite(SuiteRequirements):
+    # Every test here has a twin in cluster_t's ClusterDiagnosticsTestSuite differing only in
+    # the receiver.  The duplication is deliberate twice over: the two pings are separate
+    # implementations rather than one behind two names, and a shared base parameterised on
+    # the receiver could not be generated, because an untyped receiver resolves SYNC by
+    # omission and would emit every acouchbase call unawaited.  Diagnostics is in
+    # EnvironmentFeatures.BASIC_FEATURES, so REQUIRED_FEATURES cannot currently skip
+    # anything; declared anyway, because it becomes live the day that stops being true.
+
+    NUM_DOCS = 0
+    REQUIRED_FEATURES = [ServerFeatures.Diagnostics]
+
     TEST_MANIFEST = [
         'test_ping',
         'test_ping_as_json',
@@ -39,17 +58,10 @@ class BucketDiagnosticsTestSuite:
         'test_ping_str_services',
     ]
 
-    @pytest.fixture(scope="class")
-    def check_diagnostics_supported(self, cb_env):
-        EnvironmentFeatures.check_if_feature_supported('diagnostics',
-                                                       cb_env.server_version_short,
-                                                       cb_env.mock_server_type)
-
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping(self, cb_env):
+    def test_ping(self, cb_env: SyncTestEnvironment) -> None:
         bucket = cb_env.bucket
         result = bucket.ping()
-        assert isinstance(result, PingResult)
+        cb_assert_isinstance(result, PingResult, what='bucket.ping() result')
 
         assert result.sdk is not None
         assert result.id is not None
@@ -57,7 +69,7 @@ class BucketDiagnosticsTestSuite:
         assert result.endpoints is not None
         for ping_reports in result.endpoints.values():
             for report in ping_reports:
-                assert isinstance(report, EndpointPingReport)
+                cb_assert_isinstance(report, EndpointPingReport, what='ping report')
                 if report.state == PingState.OK:
                     assert report.id is not None
                     assert report.latency is not None
@@ -65,13 +77,12 @@ class BucketDiagnosticsTestSuite:
                     assert report.local is not None
                     assert report.service_type is not None
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_as_json(self, cb_env):
+    def test_ping_as_json(self, cb_env: SyncTestEnvironment) -> None:
         bucket = cb_env.bucket
         result = bucket.ping()
-        assert isinstance(result, PingResult)
+        cb_assert_isinstance(result, PingResult, what='bucket.ping() result')
         result_str = result.as_json()
-        assert isinstance(result_str, str)
+        cb_assert_isinstance(result_str, str, what='PingResult.as_json()')
         result_json = json.loads(result_str)
         assert result_json['version'] is not None
         assert result_json['id'] is not None
@@ -85,59 +96,68 @@ class BucketDiagnosticsTestSuite:
                 assert data[0]['local'] is not None
                 assert data[0]['state'] is not None
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_invalid_services(self, cb_env):
+    def test_ping_invalid_services(self, cb_env: SyncTestEnvironment) -> None:
         bucket = cb_env.bucket
+        # A bare ServiceType where an iterable of them belongs.  Suppressed rather than cast:
+        # the point of the test is that the request builder rejects it, and a cast would
+        # assert the opposite.
         with pytest.raises(InvalidArgumentException):
-            bucket.ping(PingOptions(service_types=ServiceType.KeyValue))
+            bucket.ping(PingOptions(service_types=ServiceType.KeyValue))  # type: ignore[call-overload]
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_mixed_services(self, cb_env):
+    def test_ping_mixed_services(self, cb_env: SyncTestEnvironment) -> None:
         bucket = cb_env.bucket
-        services = [ServiceType.KeyValue, ServiceType.Query.value]
-        result = bucket.ping(PingOptions(service_types=services))
-        assert len(result.endpoints) >= 1
+        # Deliberately mixed, and deliberately suppressed.  `service_types` is annotated as
+        # homogeneous, either all ServiceType or all str, because that is what callers should
+        # write.  The request builders convert per element, so a mixed iterable works and this
+        # guards that it keeps working; the annotation declining to promise it is the point.
+        requested: list[ServiceType | str] = [ServiceType.KeyValue, ServiceType.Query.value]
+        result = bucket.ping(PingOptions(service_types=requested))  # type: ignore[arg-type]
+        self._assert_services_within(result, requested)
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_report_id(self, cb_env):
+    def test_ping_report_id(self, cb_env: SyncTestEnvironment) -> None:
         bucket = cb_env.bucket
-        report_id = uuid4()
+        report_id = str(uuid4())
         result = bucket.ping(PingOptions(report_id=report_id))
-        assert str(report_id) == result.id
+        cb_assert_eq(result.id, report_id, what='PingResult.id')
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_restrict_services(self, cb_env):
+    def test_ping_restrict_services(self, cb_env: SyncTestEnvironment) -> None:
         bucket = cb_env.bucket
-        services = [ServiceType.KeyValue]
-        result = bucket.ping(PingOptions(service_types=services))
+        result = bucket.ping(PingOptions(service_types=[ServiceType.KeyValue]))
         keys = list(result.endpoints.keys())
-        assert len(keys) == 1
-        assert keys[0] == ServiceType.KeyValue
+        cb_assert_eq(len(keys), 1, what='number of pinged services')
+        cb_assert_eq(keys[0], ServiceType.KeyValue, what='pinged service')
 
-    @pytest.mark.usefixtures('check_diagnostics_supported')
-    def test_ping_str_services(self, cb_env):
+    def test_ping_str_services(self, cb_env: SyncTestEnvironment) -> None:
         bucket = cb_env.bucket
-        services = [ServiceType.KeyValue.value, ServiceType.Query.value]
-        result = bucket.ping(PingOptions(service_types=services))
-        assert len(result.endpoints) >= 1
+        requested = [ServiceType.KeyValue.value, ServiceType.Query.value]
+        result = bucket.ping(PingOptions(service_types=requested))
+        self._assert_services_within(result, requested)
+
+    @staticmethod
+    def _assert_services_within(result: PingResult,
+                                requested: Sequence[ServiceType | str]) -> None:
+        # `len(result.endpoints) >= 1` holds just as well when the service filter is ignored
+        # outright.  What the filter promises is an upper bound, so that is what is checked,
+        # together with the one service a bucket is guaranteed to report.  That proves less
+        # than it looks: an unrestricted `bucket.ping()` reports key_value and nothing else,
+        # so no assertion available here can tell a working filter from an ignored one.
+        # cluster.ping() is where it becomes observable, and cluster_t asserts it there.
+        allowed = {ServiceType(s) for s in requested}
+        returned = set(result.endpoints.keys())
+        assert returned <= allowed, f'pinged {returned - allowed}, which was not requested'
+        assert ServiceType.KeyValue in returned, 'key-value was requested but not reported'
 
 
-class ClassicBucketDiagnosticsTests(BucketDiagnosticsTestSuite):
+class BucketDiagnosticsTests(BucketDiagnosticsTestSuite):
 
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicBucketDiagnosticsTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicBucketDiagnosticsTests) if valid_test_method(meth)]
-        compare = set(BucketDiagnosticsTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(BucketDiagnosticsTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_base_env.setup(request.param)
-        yield cb_base_env
-        cb_base_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, BucketDiagnosticsTestSuite)
+        yield env
+        teardown_environment(env, BucketDiagnosticsTestSuite)

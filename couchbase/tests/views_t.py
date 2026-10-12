@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2024. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,22 +13,68 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# One suite class, because a view is a bucket-level thing: there is no scope-level view
+# query to put beside it the way search_t has one.  Setup lives in
+# tests/environments/views_environment.py, which creates the bucket, seeds it, upserts
+# the design document and waits for the view to return the whole corpus.
+#
+# ServerFeatures.Views is not what this suite requires, and that is a trap worth naming: it
+# sits in BASIC_FEATURES and is deliberately unmapped in FEATURE_SERVICES, because views
+# ride the data nodes rather than a service of their own, so requiring it would read as
+# "runs anywhere, including the mock".  What it needs is the two managers it drives.
+#
+# Every row count here is exact, and the environment is what makes that possible: the suite
+# owns its bucket outright and setup does not return until the view reports the whole
+# corpus.  The expected keys, orderings and counts are computed in tests/view_defs.py
+# rather than written down, because the fixture and the expectations restate one fact and
+# PYCBC-1898 is what it costs when the two copies drift.
+
+from __future__ import annotations
+
 import json
 import threading
+from collections.abc import Callable, Generator
+from typing import Any
 
 import pytest
 
 from couchbase.exceptions import DesignDocumentNotFoundException, InvalidArgumentException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
-from couchbase.views import (ViewMetaData,
-                             ViewOrdering,
-                             ViewRow)
-from tests.environments import CollectionType
-from tests.environments.views_environment import ViewsTestEnvironment
+from couchbase.result import ViewResult
+from couchbase.views import ViewOrdering, ViewRow
+from tests.environments.managers import TestEnvironmentBucketManager, TestEnvironmentViewIndexManager
+from tests.environments.test_environment import (CollectionStrategy,
+                                                 SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 build_environment,
+                                                 teardown_environment)
+from tests.environments.views_environment import ViewsEnvironment
+from tests.manifest import validate_test_manifest
+from tests.test_features import ServerFeatures
+from tests.view_defs import (VIEW_DOCS,
+                             VIEW_NAME,
+                             design_doc_name,
+                             docids_for_key,
+                             docids_in_view_order,
+                             view_key_size,
+                             view_keys)
+
+DEVELOPMENT = DesignDocumentNamespace.DEVELOPMENT
 
 
-class ViewsTestSuite:
+class ViewsTestSuite(SuiteRequirements):
+    # The bucket manager creates and drops the suite's own bucket; the view index manager is
+    # re-pointed at that bucket once it exists and upserts the design document onto it.
+    MANAGERS = [TestEnvironmentBucketManager, TestEnvironmentViewIndexManager]
+    COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
+    # Nothing is seeded into the shared bucket.  The corpus this suite queries goes into the
+    # bucket it creates, which is where the view can see it; seeding both would pay for fifty
+    # writes nothing reads.
+    NUM_DOCS = 0
+    # Not ServerFeatures.Views; see the note at the top of this file for why that is a trap.
+    REQUIRED_FEATURES = [ServerFeatures.ViewIndexManagement, ServerFeatures.BucketManagement]
+
     TEST_MANIFEST = [
         'test_bad_view_query',
         'test_view_query',
@@ -36,108 +82,88 @@ class ViewsTestSuite:
         'test_view_query_descending',
         'test_view_query_endkey_docid',
         'test_view_query_in_thread',
+        'test_view_query_inclusive_end',
         'test_view_query_key',
         'test_view_query_keys',
+        'test_view_query_limit_and_skip',
         'test_view_query_raw',
         'test_view_query_raw_fail',
         'test_view_query_startkey_docid',
     ]
 
-    def test_bad_view_query(self, cb_env):
-        view_result = cb_env.view_bucket.view_query('fake-ddoc',
-                                                    'fake-view',
-                                                    limit=10,
-                                                    namespace=DesignDocumentNamespace.DEVELOPMENT)
-
+    def test_bad_view_query(self, cb_env: SyncTestEnvironment) -> None:
+        # Both statements sit inside the raises block because which one raises is api-dependent:
+        # sync and acouchbase build a lazy request and fail from the iteration, while the Twisted
+        # call is bridged and can errback on its own.  A missing design document happens to
+        # surface from the iteration under all three, and the test has no reason to depend on it.
         with pytest.raises(DesignDocumentNotFoundException):
-            [r for r in view_result]
+            result = cb_env.view_bucket.view_query('fake-ddoc',
+                                                   'fake-view',
+                                                   limit=10,
+                                                   namespace=DEVELOPMENT)
+            ViewsEnvironment.drain(result)
 
-    def test_view_query(self, cb_env):
-        expected_count = 10
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    full_set=True,
-                                                    namespace=DesignDocumentNamespace.DEVELOPMENT)
+    def test_view_query(self, cb_env: SyncTestEnvironment) -> None:
+        # The whole corpus, because nothing filters it.  Asking for ten rows here returns
+        # fifty, which a `>=` assertion cannot tell apart from ten.
+        result = cb_env.view_bucket.view_query(design_doc_name(),
+                                               VIEW_NAME,
+                                               full_set=True,
+                                               namespace=DEVELOPMENT)
+        ViewsEnvironment.assert_rows_exact(result, VIEW_DOCS)
 
-        cb_env.assert_rows(view_result, expected_count)
+    def test_view_query_ascending(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        result = cb_env.view_bucket.view_query(design_doc_name(),
+                                               VIEW_NAME,
+                                               namespace=DEVELOPMENT,
+                                               order=ViewOrdering.ASCENDING)
+        rows = ViewsEnvironment.assert_rows_exact(result, VIEW_DOCS)
+        assert [r.id for r in rows] == docids_in_view_order(batch_id)
 
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
+    def test_view_query_descending(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        result = cb_env.view_bucket.view_query(design_doc_name(),
+                                               VIEW_NAME,
+                                               namespace=DEVELOPMENT,
+                                               order=ViewOrdering.DESCENDING)
+        rows = ViewsEnvironment.assert_rows_exact(result, VIEW_DOCS)
+        # Both levels reverse, not just the outer one: keys descend and so do the document ids
+        # within each key.  A hand-written expectation gets the inner half wrong.
+        expected = docids_in_view_order(batch_id, descending=True)
+        assert [r.id for r in rows] == expected
 
-    def test_view_query_ascending(self, cb_env):
-        # set the batch id
-        cb_env.get_batch_id()
-        keys = cb_env.get_keys()
-        expected_docids = [i for k in sorted(keys)
-                           for i in sorted(cb_env.get_docids_by_key(k))]
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    namespace=DesignDocumentNamespace.DEVELOPMENT,
-                                                    order=ViewOrdering.ASCENDING)
-
-        rows = cb_env.assert_rows(view_result, cb_env.num_docs, return_rows=True)
-        row_ids = list(map(lambda r: r.id, rows))
-        assert row_ids == expected_docids
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= cb_env.num_docs
-
-    def test_view_query_descending(self, cb_env):
-        # set the batch id
-        cb_env.get_batch_id()
-        keys = cb_env.get_keys()
-        expected_docids = [i for k in sorted(keys, reverse=True)
-                           for i in sorted(cb_env.get_docids_by_key(k), reverse=True)]
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    namespace=DesignDocumentNamespace.DEVELOPMENT,
-                                                    order=ViewOrdering.DESCENDING)
-
-        rows = cb_env.assert_rows(view_result, cb_env.num_docs, return_rows=True)
-        row_ids = list(map(lambda r: r.id, rows))
-        assert row_ids == expected_docids
-
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= cb_env.num_docs
-
-    def test_view_query_endkey_docid(self, cb_env):
-        # set the batch id
-        cb_env.get_batch_id()
-        keys = cb_env.get_keys()
-        # take the 2nd-smallest key so that we can purposefully select results of previous key group
-        key_idx = keys.index(sorted(keys)[1])
-        key = keys[key_idx]
-        key_docids = cb_env.get_docids_by_key(key)
-        # purposefully select a docid in the middle of key group
-        endkey_docid = key_docids[4]
-        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
+    def test_view_query_endkey_docid(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        keys = sorted(view_keys(batch_id))
+        # The second-smallest key, so the result spans one whole key group and part of the next.
+        key = keys[1]
+        endkey_docid = docids_for_key(batch_id, key)[4]
+        opts = ViewOptions(namespace=DEVELOPMENT,
                            endkey=key,
                            endkey_docid=endkey_docid)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
-        # all docs w/in first key (10 docs) + half of docs w/in next key (5 docs)
-        expected_count = 15
-        rows = cb_env.assert_rows(view_result, expected_count, True)
-        # last doc in results should be the endkey and endkey_docid
+        result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+        # Everything under the smallest key, then five rows under this one.  Computed, because
+        # a literal 15 assumes the smallest key names one of the three ten-document groups; the
+        # fourth holds twenty, and which sorts first is a property of a random batch id.
+        expected_count = view_key_size(batch_id, keys[0]) + 5
+        rows = ViewsEnvironment.assert_rows_exact(result, expected_count)
         assert rows[-1].key == key
         assert rows[-1].id == endkey_docid
 
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
+    @pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
+                                 reason='drives a threading.Thread; no async analogue')
+    def test_view_query_in_thread(self, cb_env: SyncTestEnvironment) -> None:
+        results: list[Any] = [None]
 
-    def test_view_query_in_thread(self, cb_env):
-        results = [None]
-
-        def run_test(bucket, doc_name, view_name, opts, assert_fn, results):
+        def run_test(bucket: Any,
+                     assert_fn: Callable[[ViewResult, int], list[ViewRow]],
+                     results: list[Any]) -> None:
             try:
-                result = bucket.view_query(doc_name, view_name, opts)
-                assert_fn(result, opts['limit'])
-                assert result.metadata() is not None
+                expected_count = 5
+                opts = ViewOptions(limit=expected_count, namespace=DEVELOPMENT)
+                result = bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+                assert_fn(result, expected_count)
             except AssertionError:
                 results[0] = False
             except Exception as ex:
@@ -145,171 +171,129 @@ class ViewsTestSuite:
             else:
                 results[0] = True
 
-        expected_count = 5
-        opts = ViewOptions(limit=expected_count,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT)
         t = threading.Thread(target=run_test,
                              args=(cb_env.view_bucket,
-                                   cb_env.DOCNAME,
-                                   cb_env.TEST_VIEW_NAME,
-                                   opts,
-                                   cb_env.assert_rows,
+                                   ViewsEnvironment.assert_rows_exact,
                                    results))
         t.start()
         t.join()
 
-        assert len(results) == 1
+        # Only the flag is worth asserting.  `results` is a one-element list this test built
+        # four lines up, so its length restates the literal rather than the thread's outcome.
         assert results[0] is True
 
-    def test_view_query_key(self, cb_env):
-        batch_id = cb_env.get_batch_id()
-        expected_count = 10
-        keys = cb_env.get_keys()
-        key = keys[0]
-        docids = cb_env.get_docids_by_key(key)
-        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           key=key)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
+    def test_view_query_inclusive_end(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        keys = sorted(view_keys(batch_id))
+        opts = ViewOptions(namespace=DEVELOPMENT,
+                           endkey=keys[1],
+                           inclusive_end=False)
+        result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+        # Excluding the end key leaves exactly the group before it, which is the assertion the
+        # option deserves: an inclusive query over the same range returns both groups.
+        rows = ViewsEnvironment.assert_rows_exact(result, view_key_size(batch_id, keys[0]))
+        assert {r.key for r in rows} == {keys[0]}
 
-        rows = cb_env.assert_rows(view_result, expected_count, True)
+    def test_view_query_key(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        key = view_keys(batch_id)[0]
+        docids = docids_for_key(batch_id, key)
+        opts = ViewOptions(namespace=DEVELOPMENT, key=key)
+        result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+        rows = ViewsEnvironment.assert_rows_exact(result, len(docids))
         for row in rows:
-            assert isinstance(row, ViewRow)
-            assert isinstance(row.id, str)
-            assert isinstance(row.key, str)
-            assert isinstance(row.value, dict)
             assert row.key == key
-            assert row.value['batch'] == batch_id
-            assert row.value['id'] in docids
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
+            value = ViewsEnvironment.row_value(row)
+            assert value['batch'] == batch_id
+            assert value['id'] in docids
 
-    def test_view_query_keys(self, cb_env):
-        keys = cb_env.get_keys()
-        expected_keys = keys[:2]
-        expected_count = 20
-        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,
-                           keys=expected_keys)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
+    def test_view_query_keys(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        # `keys` is declared List[JSONType] and list is invariant, so a list[str] does not
+        # match it; annotating the local is the narrow way to say so.  PYCBC-1903 widens the
+        # parameter to a Sequence, after which this annotation can go.
+        requested: list[Any] = view_keys(batch_id)[:2]
+        expected_count = sum(view_key_size(batch_id, k) for k in requested)
+        opts = ViewOptions(namespace=DEVELOPMENT, keys=requested)
+        result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+        rows = ViewsEnvironment.assert_rows_exact(result, expected_count)
+        # The two requested keys and no others.  Asserting that each row's key is in the full
+        # list of four is something no row the view returns can fail.
+        assert {r.key for r in rows} == set(requested)
 
-        rows = cb_env.assert_rows(view_result, expected_count, True)
-        assert all(map(lambda r: r.key in expected_keys, rows)) is True
+    def test_view_query_limit_and_skip(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        skip, limit = 10, 5
+        opts = ViewOptions(namespace=DEVELOPMENT,
+                           limit=limit,
+                           skip=skip,
+                           order=ViewOrdering.ASCENDING)
+        result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+        rows = ViewsEnvironment.assert_rows_exact(result, limit)
+        # A window into the known ordering, which is what makes skip worth a test: a count alone
+        # cannot tell a skip of ten from a skip of none.
+        expected = docids_in_view_order(batch_id)[skip:skip + limit]
+        assert [r.id for r in rows] == expected
 
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    def test_view_query_raw(self, cb_env):
-        # set the batch id
-        cb_env.get_batch_id()
-        keys = cb_env.get_keys()
-        # take the largest key so that we can purposefully narrow the result to 1 record
-        key_idx = keys.index(max(keys))
-        key = keys[key_idx]
-        key_docids = cb_env.get_docids_by_key(key)
-        # purposefully use the last doc w/in the key
-        startkey_docid = key_docids[-1]
-        # execute a query so we can have pagination
-        opts = ViewOptions(limit=5,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
-        # need to iterate over the result to execute the query
-        [r for r in view_result]
+    def test_view_query_raw(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        # The largest key sorts last, so starting at the last document under it leaves exactly
+        # one row in the whole view.
+        key = max(view_keys(batch_id))
+        startkey_docid = docids_for_key(batch_id, key)[-1]
         raw = {
             'limit': '5',
             'startkey': json.dumps(key),
             'startkey_docid': startkey_docid,
-            'full_set': 'true'
+            'full_set': 'true',
         }
-        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT, raw=raw)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
-        # expect only a single record to be returned
-        expected_count = 1
-        rows = cb_env.assert_rows(view_result, expected_count, True)
+        opts = ViewOptions(namespace=DEVELOPMENT, raw=raw)
+        result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+        rows = ViewsEnvironment.assert_rows_exact(result, 1)
         assert rows[0].key == key
         assert rows[0].id == startkey_docid
 
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
-
-    def test_view_query_raw_fail(self, cb_env):
+    def test_view_query_raw_fail(self, cb_env: SyncTestEnvironment) -> None:
         raw = {
             'limit': '5',
-            # this will fail as it is not encoded JSON
+            # Rejected because it is not encoded JSON, which is what this test is about.
             'startkey': 'view-key',
-            'startkey_docid': 'fake-doc-id'
+            'startkey_docid': 'fake-doc-id',
         }
-        opts = ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT, raw=raw)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
+        opts = ViewOptions(namespace=DEVELOPMENT, raw=raw)
         with pytest.raises(InvalidArgumentException):
-            [r for r in view_result]
+            result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+            ViewsEnvironment.drain(result)
 
-    def test_view_query_startkey_docid(self, cb_env):
-        # set the batch id
-        cb_env.get_batch_id()
-        keys = cb_env.get_keys()
-        # take the largest key so that we can purposefully narrow the result to 1 record
-        key_idx = keys.index(max(keys))
-        key = keys[key_idx]
-        key_docids = cb_env.get_docids_by_key(key)
-        # purposefully use the last doc w/in the key
-        startkey_docid = key_docids[-1]
-        # execute a query so we can have pagination
+    def test_view_query_startkey_docid(self, cb_env: SyncTestEnvironment) -> None:
+        batch_id = cb_env.data_provider.vehicle_batch_id
+        key = max(view_keys(batch_id))
+        startkey_docid = docids_for_key(batch_id, key)[-1]
         opts = ViewOptions(limit=5,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
-        # need to iterate over the result to execute the query
-        [r for r in view_result]
-        opts = ViewOptions(limit=5,
-                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           namespace=DEVELOPMENT,
                            startkey=key,
                            startkey_docid=startkey_docid)
-        view_result = cb_env.view_bucket.view_query(cb_env.DOCNAME,
-                                                    cb_env.TEST_VIEW_NAME,
-                                                    opts)
-        # expect only a single record to be returned
-        expected_count = 1
-        rows = cb_env.assert_rows(view_result, expected_count, True)
+        result = cb_env.view_bucket.view_query(design_doc_name(), VIEW_NAME, opts)
+        # Same window as the raw test above, asked for through the typed options instead, which
+        # is the pair worth having: one proves the encoder, the other proves the raw passthrough.
+        rows = ViewsEnvironment.assert_rows_exact(result, 1)
         assert rows[0].key == key
         assert rows[0].id == startkey_docid
 
-        metadata = view_result.metadata()
-        assert isinstance(metadata, ViewMetaData)
-        assert metadata.total_rows() >= expected_count
 
+@pytest.mark.xdist_group('bucket_lifecycle')
+class ViewsTests(ViewsTestSuite):
 
-class ClassicViewsTests(ViewsTestSuite):
-    @pytest.fixture(scope='class')
-    def test_manifest_validated(self):
-        def valid_test_method(meth):
-            attr = getattr(ClassicViewsTests, meth)
-            return callable(attr) and not meth.startswith('__') and meth.startswith('test')
-        method_list = [meth for meth in dir(ClassicViewsTests) if valid_test_method(meth)]
-        compare = set(ViewsTestSuite.TEST_MANIFEST).difference(method_list)
-        return compare
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(ViewsTestSuite, self.__class__)
 
-    @pytest.fixture(scope='class', name='cb_env', params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, cb_base_env, test_manifest_validated, request):
-        if test_manifest_validated:
-            pytest.fail(f'Test manifest not validated.  Missing tests: {test_manifest_validated}.')
-
-        cb_env = ViewsTestEnvironment.from_environment(cb_base_env)
-        cb_env.enable_bucket_mgmt()
-        cb_env.setup_view_bucket()
-        cb_env.enable_views_mgmt(cb_env.view_bucket)
-        cb_env.setup(request.param)
-        yield cb_env
-        cb_env.teardown(request.param)
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, ViewsTestSuite)
+        ViewsEnvironment.setup_views(env)
+        yield env
+        ViewsEnvironment.teardown_views(env)
+        teardown_environment(env, ViewsTestSuite)
