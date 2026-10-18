@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Generator
 from datetime import timedelta
 from types import MappingProxyType
@@ -119,6 +120,7 @@ class CollectionMultiTestSuite(TopologySuite):
         'test_multi_replace_invalid_input',
         'test_multi_replace_key_opts',
         'test_multi_replace_simple',
+        'test_multi_result_keys_not_interned',
         'test_multi_touch_fail',
         'test_multi_touch_invalid_input',
         'test_multi_touch_simple',
@@ -473,6 +475,22 @@ class CollectionMultiTestSuite(TopologySuite):
         for k, v in keys_and_docs.items():
             r = cb_env.collection.get(k)
             assert r.content_as[dict] == v
+
+    def test_multi_result_keys_not_interned(self, cb_env: SyncTestEnvironment) -> None:
+        # PYCBC-1967: multi-op result keys must not be interned. Interned keys are immortal on
+        # Python 3.12+, so every distinct key passed through a *_multi op would never be freed.
+        keys = list(cb_env.get_docs(2).keys()) + list(self.FAKE_DOCS.keys())
+        res = cb_env.collection.get_multi(keys)
+        returned = list(res.results.keys()) + list(res.exceptions.keys())
+        assert sorted(returned) == sorted(keys)
+        # getattr, not hasattr: sys._is_immortal only exists (and is only in the stubs) on 3.14+.
+        is_immortal = getattr(sys, '_is_immortal', None)
+        for k in returned:
+            # k.encode().decode() is an equal but distinct str; sys.intern() returns k itself
+            # only when k is already in the interned table, i.e. the C extension interned it.
+            assert sys.intern(k.encode().decode()) is not k
+            if is_immortal is not None:
+                assert is_immortal(k) is False
 
     def test_multi_touch_fail(self, cb_env: SyncTestEnvironment) -> None:
         keys = list(self.FAKE_DOCS.keys())
