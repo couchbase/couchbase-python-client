@@ -554,15 +554,24 @@ Connection::execute_multi_op(PyObject* arg)
     if (PyObject_TypeCheck(res, &pycbc_exception_type)) {
       all_okay = false;
     }
-    int rc = PyDict_SetItemString(multi_result->raw_result, s.key_str.c_str(), res);
+    // Not PyDict_SetItemString: it interns the key, and interned keys are immortal on 3.12+.
+    PyObject* pyObj_key =
+      PyUnicode_FromStringAndSize(s.key_str.data(), static_cast<Py_ssize_t>(s.key_str.size()));
+    if (pyObj_key == nullptr) {
+      Py_DECREF(res);
+      Py_DECREF(pyObj_multi_result);
+      return nullptr;
+    }
+    int rc = PyDict_SetItem(multi_result->raw_result, pyObj_key, res);
+    Py_DECREF(pyObj_key);
     Py_DECREF(res);
     if (rc < 0) {
       Py_DECREF(pyObj_multi_result);
       return nullptr;
     }
   }
-  if (PyDict_SetItemString(multi_result->raw_result, "all_okay", all_okay ? Py_True : Py_False) <
-      0) {
+  if (PyDict_SetItem(
+        multi_result->raw_result, pycbc::keys::all_okay, all_okay ? Py_True : Py_False) < 0) {
     Py_DECREF(pyObj_multi_result);
     return nullptr;
   }
