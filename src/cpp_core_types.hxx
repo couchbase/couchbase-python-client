@@ -78,10 +78,10 @@ struct py_to_cbpp_t<couchbase::core::document_id> {
       return nullptr;
     }
 
-    add_field(dict, "bucket", id.bucket());
-    add_field(dict, "scope", id.scope());
-    add_field(dict, "collection", id.collection());
-    add_field(dict, "key", id.key());
+    add_field(dict, pycbc::keys::bucket, id.bucket());
+    add_field(dict, pycbc::keys::scope, id.scope());
+    add_field(dict, pycbc::keys::collection, id.collection());
+    add_field(dict, pycbc::keys::key, id.key());
 
     return dict;
   }
@@ -125,10 +125,10 @@ struct py_to_cbpp_t<couchbase::mutation_token> {
       return nullptr;
     }
 
-    add_field(dict, "partition_id", static_cast<unsigned long>(token.partition_id()));
-    add_field(dict, "partition_uuid", token.partition_uuid());
-    add_field(dict, "sequence_number", token.sequence_number());
-    add_field(dict, "bucket_name", token.bucket_name());
+    add_field(dict, pycbc::keys::partition_id, static_cast<unsigned long>(token.partition_id()));
+    add_field(dict, pycbc::keys::partition_uuid, token.partition_uuid());
+    add_field(dict, pycbc::keys::sequence_number, token.sequence_number());
+    add_field(dict, pycbc::keys::bucket_name, token.bucket_name());
 
     return dict;
   }
@@ -262,7 +262,7 @@ struct py_to_cbpp_t<couchbase::core::query_context> {
     }
 
     add_field(dict, "bucket_name", cppObj.bucket_name());
-    add_field(dict, "bucket_name", cppObj.scope_name());
+    add_field(dict, "scope_name", cppObj.scope_name());
     return dict;
   }
 
@@ -303,14 +303,14 @@ struct py_to_cbpp_t<std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>>
     }
 
     for (const auto& [key, value] : wrapperSpan->uint_tags()) {
-      add_field<std::uint64_t>(attributesObj, key.c_str(), value);
+      add_field<std::uint64_t>(attributesObj, key, value);
     }
     for (const auto& [key, value] : wrapperSpan->string_tags()) {
-      add_field<std::string>(attributesObj, key.c_str(), value);
+      add_field<std::string>(attributesObj, key, value);
     }
-    add_field(spanObj, "attributes", attributesObj);
+    add_field(spanObj, pycbc::keys::attributes, attributesObj);
     add_field<std::vector<std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>>>(
-      spanObj, "children", wrapperSpan->children());
+      spanObj, pycbc::keys::children, wrapperSpan->children());
     return spanObj;
   }
 
@@ -324,9 +324,11 @@ struct py_to_cbpp_t<std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>>
     if (pyObj == nullptr) {
       return nullptr;
     }
-    add_field<std::string>(pyObj, "name", wrapperSpan->name());
-    add_field<std::chrono::system_clock::time_point>(pyObj, "start", wrapperSpan->start_time());
-    add_field<std::chrono::system_clock::time_point>(pyObj, "end", wrapperSpan->end_time());
+    add_field<std::string>(pyObj, pycbc::keys::name, wrapperSpan->name());
+    add_field<std::chrono::system_clock::time_point>(
+      pyObj, pycbc::keys::start, wrapperSpan->start_time());
+    add_field<std::chrono::system_clock::time_point>(
+      pyObj, pycbc::keys::end, wrapperSpan->end_time());
 
     PyObject* attributesObj = PyDict_New();
     if (attributesObj == nullptr) {
@@ -334,17 +336,17 @@ struct py_to_cbpp_t<std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>>
       return nullptr;
     }
     for (const auto& [key, value] : wrapperSpan->uint_tags()) {
-      add_field<std::uint64_t>(attributesObj, key.c_str(), value);
+      add_field<std::uint64_t>(attributesObj, key, value);
     }
     for (const auto& [key, value] : wrapperSpan->string_tags()) {
-      add_field<std::string>(attributesObj, key.c_str(), value);
+      add_field<std::string>(attributesObj, key, value);
     }
-    add_field(pyObj, "attributes", attributesObj);
+    add_field(pyObj, pycbc::keys::attributes, attributesObj);
 
     // some operations in the C++ core handle sub-operations (e.g. replicas, etc.)
     if (!wrapperSpan->children().empty()) {
       add_field<std::vector<std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>>>(
-        pyObj, "children", wrapperSpan->children());
+        pyObj, pycbc::keys::children, wrapperSpan->children());
     }
     return pyObj;
   }

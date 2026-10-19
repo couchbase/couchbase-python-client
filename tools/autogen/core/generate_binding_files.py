@@ -47,7 +47,20 @@ _KV_TYPE_HEADER_PREFIXES = (
 # Hard-coded strings from connection.hxx & operations_autogen.hxx not covered by field names above
 _KV_EXTRA_KEYS = {
     'all_okay', 'callback', 'errback', 'wrapper_span_name',
-    'bucket', 'scope', 'collection', 'key', 'parent_span'
+    'bucket', 'scope', 'collection', 'key', 'parent_span',
+    # mutation_token and wrapper_sdk_span converters (cpp_core_types.hxx)
+    'partition_id', 'partition_uuid', 'bucket_name', 'attributes', 'children',
+    # error contexts (error_contexts.hxx)
+    'context_type', 'scope_name', 'collection_name', 'opaque', 'status_code',
+    'client_context_id', 'method', 'path', 'http_status', 'http_body', 'hostname', 'port',
+    'last_dispatched_to', 'last_dispatched_from', 'retry_attempts', 'retry_reasons',
+    'first_error_path', 'first_error_index', 'deleted', 'first_error_code',
+    'first_error_message', 'statement', 'parameters', 'index_name', 'query',
+    'design_document_name', 'view_name', 'query_string',
+    # exception info (exceptions.hxx, exceptions.cxx)
+    'cinfo', 'message', 'exc_info',
+    # range scan items (result.cxx) and stream end results (connection.hxx)
+    'scan_item', 'metadata', 'facets',
 }
 
 

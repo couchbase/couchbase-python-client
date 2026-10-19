@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Python.h"
+#include "pycbc_dict_keys.hxx"
 #include "pytype_utils.hxx"
 #include <core/error_context/analytics.hxx>
 #include <core/error_context/http.hxx>
@@ -224,7 +225,7 @@ build_exc_info_dict(const char* file, int line, const char* message)
     Py_DECREF(exc_info);
     return nullptr;
   }
-  int rv = PyDict_SetItemString(exc_info, "cinfo", pyObj_cinfo);
+  int rv = PyDict_SetItem(exc_info, pycbc::keys::cinfo, pyObj_cinfo);
   Py_DECREF(pyObj_cinfo);
   if (rv < 0) {
     Py_DECREF(exc_info);
@@ -237,7 +238,7 @@ build_exc_info_dict(const char* file, int line, const char* message)
       Py_DECREF(exc_info);
       return nullptr;
     }
-    rv = PyDict_SetItemString(exc_info, "message", msg_str);
+    rv = PyDict_SetItem(exc_info, pycbc::keys::message, msg_str);
     Py_DECREF(msg_str);
     if (rv < 0) {
       Py_DECREF(exc_info);

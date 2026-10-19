@@ -303,7 +303,8 @@ pycbc_scan_iterator__iternext__(PyObject* self)
     return nullptr;
   }
   pycbc_result* res = reinterpret_cast<pycbc_result*>(pyObj);
-  add_field<couchbase::core::range_scan_item>(res->raw_result, "scan_item", result.value());
+  add_field<couchbase::core::range_scan_item>(
+    res->raw_result, pycbc::keys::scan_item, result.value());
   return reinterpret_cast<PyObject*>(res);
 }
 

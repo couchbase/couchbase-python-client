@@ -467,7 +467,7 @@ raise_cached_exception(PyObject* cached_exc, const char* message, const char* fi
     Py_DECREF(kwargs);
     return nullptr;
   }
-  int rv = PyDict_SetItemString(kwargs, "message", pyObj_message);
+  int rv = PyDict_SetItem(kwargs, pycbc::keys::message, pyObj_message);
   Py_DECREF(pyObj_message);
   if (rv < 0) {
     Py_DECREF(args);
@@ -481,7 +481,7 @@ raise_cached_exception(PyObject* cached_exc, const char* message, const char* fi
     Py_DECREF(kwargs);
     return nullptr;
   }
-  rv = PyDict_SetItemString(kwargs, "exc_info", exc_info);
+  rv = PyDict_SetItem(kwargs, pycbc::keys::exc_info, exc_info);
   Py_DECREF(exc_info);
   if (rv < 0) {
     Py_DECREF(args);

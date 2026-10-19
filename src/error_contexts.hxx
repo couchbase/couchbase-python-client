@@ -42,25 +42,26 @@ template<typename T>
 void
 build_kv_error_context(PyObject* error_context, const T& ctx)
 {
-  add_string_field_if_not_empty(error_context, "key", ctx.id());
-  add_string_field_if_not_empty(error_context, "bucket_name", ctx.bucket());
-  add_string_field_if_not_empty(error_context, "scope_name", ctx.scope());
-  add_string_field_if_not_empty(error_context, "collection_name", ctx.collection());
-  add_field(error_context, "opaque", ctx.opaque());
-  add_field(error_context, "status_code", ctx.status_code());
+  add_string_field_if_not_empty(error_context, pycbc::keys::key, ctx.id());
+  add_string_field_if_not_empty(error_context, pycbc::keys::bucket_name, ctx.bucket());
+  add_string_field_if_not_empty(error_context, pycbc::keys::scope_name, ctx.scope());
+  add_string_field_if_not_empty(error_context, pycbc::keys::collection_name, ctx.collection());
+  add_field(error_context, pycbc::keys::opaque, ctx.opaque());
+  add_field(error_context, pycbc::keys::status_code, ctx.status_code());
 }
 
 template<typename T>
 void
 build_base_http_error_context(PyObject* error_context, const T& ctx)
 {
-  add_string_field_if_not_empty(error_context, "client_context_id", ctx.client_context_id);
-  add_string_field_if_not_empty(error_context, "method", ctx.method);
-  add_string_field_if_not_empty(error_context, "path", ctx.path);
-  add_field(error_context, "http_status", ctx.http_status);
-  add_string_field_if_not_empty(error_context, "http_body", ctx.http_body);
-  add_string_field_if_not_empty(error_context, "hostname", ctx.hostname);
-  add_field(error_context, "port", ctx.port);
+  add_string_field_if_not_empty(
+    error_context, pycbc::keys::client_context_id, ctx.client_context_id);
+  add_string_field_if_not_empty(error_context, pycbc::keys::method, ctx.method);
+  add_string_field_if_not_empty(error_context, pycbc::keys::path, ctx.path);
+  add_field(error_context, pycbc::keys::http_status, ctx.http_status);
+  add_string_field_if_not_empty(error_context, pycbc::keys::http_body, ctx.http_body);
+  add_string_field_if_not_empty(error_context, pycbc::keys::hostname, ctx.hostname);
+  add_field(error_context, pycbc::keys::port, ctx.port);
 }
 
 // KV contexts use methods with (), HTTP contexts use direct field access
@@ -68,20 +69,20 @@ template<typename T>
 void
 add_base_retry_fields_method(PyObject* error_context, const T& ctx)
 {
-  add_field(error_context, "last_dispatched_to", ctx.last_dispatched_to());
-  add_field(error_context, "last_dispatched_from", ctx.last_dispatched_from());
-  add_field(error_context, "retry_attempts", ctx.retry_attempts());
-  add_field(error_context, "retry_reasons", ctx.retry_reasons());
+  add_field(error_context, pycbc::keys::last_dispatched_to, ctx.last_dispatched_to());
+  add_field(error_context, pycbc::keys::last_dispatched_from, ctx.last_dispatched_from());
+  add_field(error_context, pycbc::keys::retry_attempts, ctx.retry_attempts());
+  add_field(error_context, pycbc::keys::retry_reasons, ctx.retry_reasons());
 }
 
 template<typename T>
 void
 add_base_retry_fields_direct(PyObject* error_context, const T& ctx)
 {
-  add_field(error_context, "last_dispatched_to", ctx.last_dispatched_to);
-  add_field(error_context, "last_dispatched_from", ctx.last_dispatched_from);
-  add_field(error_context, "retry_attempts", ctx.retry_attempts);
-  add_field(error_context, "retry_reasons", ctx.retry_reasons);
+  add_field(error_context, pycbc::keys::last_dispatched_to, ctx.last_dispatched_to);
+  add_field(error_context, pycbc::keys::last_dispatched_from, ctx.last_dispatched_from);
+  add_field(error_context, pycbc::keys::retry_attempts, ctx.retry_attempts);
+  add_field(error_context, pycbc::keys::retry_reasons, ctx.retry_reasons);
 }
 
 template<>
@@ -101,7 +102,7 @@ build_exception_from_context(const couchbase::core::key_value_error_context& ctx
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString("KeyValueErrorContext");
-  PyDict_SetItemString(error_context, "context_type", pyObj_tmp);
+  PyDict_SetItem(error_context, pycbc::keys::context_type, pyObj_tmp);
   Py_DECREF(pyObj_tmp);
 
   build_kv_error_context(error_context, ctx);
@@ -138,15 +139,15 @@ build_exception_from_context(const couchbase::core::subdocument_error_context& c
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString("SubdocumentErrorContext");
-  PyDict_SetItemString(error_context, "context_type", pyObj_tmp);
+  PyDict_SetItem(error_context, pycbc::keys::context_type, pyObj_tmp);
   Py_DECREF(pyObj_tmp);
 
   // Subdocument inherits from key_value_error_context
   build_kv_error_context(error_context, ctx);
 
-  add_field(error_context, "first_error_path", ctx.first_error_path());
-  add_field(error_context, "first_error_index", ctx.first_error_index());
-  add_bool_field(error_context, "deleted", ctx.deleted());
+  add_field(error_context, pycbc::keys::first_error_path, ctx.first_error_path());
+  add_field(error_context, pycbc::keys::first_error_index, ctx.first_error_index());
+  add_bool_field(error_context, pycbc::keys::deleted, ctx.deleted());
 
   add_base_retry_fields_method(error_context, ctx);
 
@@ -182,13 +183,14 @@ build_exception_from_context(const couchbase::core::error_context::analytics& ct
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString("AnalyticsErrorContext");
-  PyDict_SetItemString(error_context, "context_type", pyObj_tmp);
+  PyDict_SetItem(error_context, pycbc::keys::context_type, pyObj_tmp);
   Py_DECREF(pyObj_tmp);
 
-  add_field(error_context, "first_error_code", ctx.first_error_code);
-  add_string_field_if_not_empty(error_context, "first_error_message", ctx.first_error_message);
-  add_string_field_if_not_empty(error_context, "statement", ctx.statement);
-  add_field(error_context, "parameters", ctx.parameters);
+  add_field(error_context, pycbc::keys::first_error_code, ctx.first_error_code);
+  add_string_field_if_not_empty(
+    error_context, pycbc::keys::first_error_message, ctx.first_error_message);
+  add_string_field_if_not_empty(error_context, pycbc::keys::statement, ctx.statement);
+  add_field(error_context, pycbc::keys::parameters, ctx.parameters);
 
   build_base_http_error_context(error_context, ctx);
   add_base_retry_fields_direct(error_context, ctx);
@@ -224,12 +226,12 @@ build_exception_from_context(const couchbase::core::error_context::search& ctx,
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString("SearchErrorContext");
-  PyDict_SetItemString(error_context, "context_type", pyObj_tmp);
+  PyDict_SetItem(error_context, pycbc::keys::context_type, pyObj_tmp);
   Py_DECREF(pyObj_tmp);
 
-  add_string_field_if_not_empty(error_context, "index_name", ctx.index_name);
-  add_string_field_if_not_empty(error_context, "query", ctx.query);
-  add_field(error_context, "parameters", ctx.parameters);
+  add_string_field_if_not_empty(error_context, pycbc::keys::index_name, ctx.index_name);
+  add_string_field_if_not_empty(error_context, pycbc::keys::query, ctx.query);
+  add_field(error_context, pycbc::keys::parameters, ctx.parameters);
 
   build_base_http_error_context(error_context, ctx);
   add_base_retry_fields_direct(error_context, ctx);
@@ -265,12 +267,13 @@ build_exception_from_context(const couchbase::core::error_context::view& ctx,
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString("ViewErrorContext");
-  PyDict_SetItemString(error_context, "context_type", pyObj_tmp);
+  PyDict_SetItem(error_context, pycbc::keys::context_type, pyObj_tmp);
   Py_DECREF(pyObj_tmp);
 
-  add_string_field_if_not_empty(error_context, "design_document_name", ctx.design_document_name);
-  add_string_field_if_not_empty(error_context, "view_name", ctx.view_name);
-  add_field(error_context, "query_string", ctx.query_string);
+  add_string_field_if_not_empty(
+    error_context, pycbc::keys::design_document_name, ctx.design_document_name);
+  add_string_field_if_not_empty(error_context, pycbc::keys::view_name, ctx.view_name);
+  add_field(error_context, pycbc::keys::query_string, ctx.query_string);
 
   build_base_http_error_context(error_context, ctx);
   add_base_retry_fields_direct(error_context, ctx);
@@ -306,14 +309,16 @@ build_exception_from_context(const couchbase::core::error_context::query& ctx,
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString("QueryErrorContext");
-  PyDict_SetItemString(error_context, "context_type", pyObj_tmp);
+  PyDict_SetItem(error_context, pycbc::keys::context_type, pyObj_tmp);
   Py_DECREF(pyObj_tmp);
 
-  add_string_field_if_not_empty(error_context, "statement", ctx.statement);
-  add_field(error_context, "parameters", ctx.parameters);
-  add_string_field_if_not_empty(error_context, "client_context_id", ctx.client_context_id);
-  add_field(error_context, "first_error_code", ctx.first_error_code);
-  add_string_field_if_not_empty(error_context, "first_error_message", ctx.first_error_message);
+  add_string_field_if_not_empty(error_context, pycbc::keys::statement, ctx.statement);
+  add_field(error_context, pycbc::keys::parameters, ctx.parameters);
+  add_string_field_if_not_empty(
+    error_context, pycbc::keys::client_context_id, ctx.client_context_id);
+  add_field(error_context, pycbc::keys::first_error_code, ctx.first_error_code);
+  add_string_field_if_not_empty(
+    error_context, pycbc::keys::first_error_message, ctx.first_error_message);
 
   build_base_http_error_context(error_context, ctx);
   add_base_retry_fields_direct(error_context, ctx);
@@ -349,7 +354,7 @@ build_exception_from_context(const couchbase::core::error_context::http& ctx,
   }
 
   PyObject* pyObj_tmp = PyUnicode_FromString("HTTPErrorContext");
-  PyDict_SetItemString(error_context, "context_type", pyObj_tmp);
+  PyDict_SetItem(error_context, pycbc::keys::context_type, pyObj_tmp);
   Py_DECREF(pyObj_tmp);
 
   build_base_http_error_context(error_context, ctx);

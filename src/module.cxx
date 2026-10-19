@@ -134,6 +134,12 @@ PyInit__core(void)
     return nullptr;
   }
 
+  // First, so later init steps (and their error paths) can use the cached keys.
+  if (init_pycbc_dict_keys() < 0) {
+    Py_DECREF(module);
+    return nullptr;
+  }
+
   if (pycbc::add_connection_type(module) < 0) {
     Py_DECREF(module);
     return nullptr;
@@ -176,11 +182,6 @@ PyInit__core(void)
 
   // Cache exception classes for efficient access
   if (pycbc::cache_exception_classes() < 0) {
-    Py_DECREF(module);
-    return nullptr;
-  }
-
-  if (init_pycbc_dict_keys() < 0) {
     Py_DECREF(module);
     return nullptr;
   }

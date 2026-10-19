@@ -22,6 +22,7 @@
 #include "cpp_types.hxx"
 #include "deprecated_tracing.hxx"
 #include "exceptions.hxx"
+#include "pycbc_dict_keys.hxx"
 #include "pytocbpp_defs.hxx"
 #include "pytype_utils.hxx"
 #include <chrono>
@@ -242,6 +243,42 @@ add_field(PyObject* dict, const char* key, PyObject* value)
   return rv;
 }
 
+// value is a new reference; always consumed (DECREF'd) on both success and failure.
+inline int
+add_field(PyObject* dict, PyObject* interned_key, PyObject* value)
+{
+  if (value == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: An interned-key field value was null when adding to result dict.");
+    return -1;
+  }
+  int rv = PyDict_SetItem(dict, interned_key, value);
+  Py_DECREF(value);
+  if (rv < 0) {
+    PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set an interned-key field on result dict.");
+  }
+  return rv;
+}
+
+// For keys only known at runtime (e.g. span tag names); skips the intern lookup that
+// PyDict_SetItemString does.
+template<typename T>
+inline int
+add_field(PyObject* dict, const std::string& key, const T& value)
+{
+  PyObject* pyObj_key =
+    PyUnicode_FromStringAndSize(key.data(), static_cast<Py_ssize_t>(key.size()));
+  if (pyObj_key == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to convert key '{}' for result dict.", key);
+    return -1;
+  }
+  int rv = add_field(dict, pyObj_key, value);
+  Py_DECREF(pyObj_key);
+  return rv;
+}
+
 // The one add_* helper that does not follow the convention above: it leaves the exception set
 // so that callers returning null can propagate it.
 template<typename T>
@@ -285,6 +322,39 @@ add_string_field_if_not_empty(PyObject* dict, const char* key, const std::string
   if (rv < 0) {
     PyErr_WriteUnraisable(dict);
     CB_LOG_WARNING("PYCBC: Failed to set string field '{}' on result dict.", key);
+  }
+  return rv;
+}
+
+inline int
+add_bool_field(PyObject* dict, PyObject* interned_key, bool value)
+{
+  int rv = PyDict_SetItem(dict, interned_key, value ? Py_True : Py_False);
+  if (rv < 0) {
+    PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set an interned-key bool field on result dict.");
+  }
+  return rv;
+}
+
+inline int
+add_string_field_if_not_empty(PyObject* dict, PyObject* interned_key, const std::string& value)
+{
+  if (value.empty()) {
+    return 0;
+  }
+  PyObject* pyObj =
+    PyUnicode_FromStringAndSize(value.data(), static_cast<Py_ssize_t>(value.size()));
+  if (pyObj == nullptr) {
+    PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to convert an interned-key string field for result dict.");
+    return -1;
+  }
+  int rv = PyDict_SetItem(dict, interned_key, pyObj);
+  Py_DECREF(pyObj);
+  if (rv < 0) {
+    PyErr_WriteUnraisable(dict);
+    CB_LOG_WARNING("PYCBC: Failed to set an interned-key string field on result dict.");
   }
   return rv;
 }

@@ -216,7 +216,7 @@ private:
 
     PyObject* metadata = cbpp_to_py(resp.meta);
     if (metadata) {
-      PyDict_SetItemString(result_dict, "metadata", metadata);
+      PyDict_SetItem(result_dict, pycbc::keys::metadata, metadata);
       Py_DECREF(metadata);
     }
 
@@ -224,7 +224,7 @@ private:
     if constexpr (std::is_same_v<Response, couchbase::core::operations::search_response>) {
       PyObject* facets = cbpp_to_py(resp.facets);
       if (facets) {
-        PyDict_SetItemString(result_dict, "facets", facets);
+        PyDict_SetItem(result_dict, pycbc::keys::facets, facets);
         Py_DECREF(facets);
       }
     }
