@@ -21,23 +21,23 @@ metadata:
     - name: _core
       filename: _core.pyi
       templates: pycbc_core.pyi.jinja2
-      output_path: "couchbase/logic/pycbc_core"
+      output_path: "couchbase/protocol/classic/_pycbc_core"
     - name: binding_cpp_types
       filename: binding_cpp_types.py
       templates: binding_cpp_types.py.jinja2
-      output_path: "couchbase/logic/pycbc_core"
+      output_path: "couchbase/protocol/classic/_pycbc_core"
     - name: binding_map_types
       filename: binding_map_types.py
       templates: binding_map_types.py.jinja2
-      output_path: "couchbase/logic/pycbc_core"
+      output_path: "couchbase/protocol/classic/_pycbc_core"
     - name: operation_types
       filename: operation_types.py
       templates: operation_types.py.jinja2
       output_path: "couchbase/logic"
     - name: binding_map
-      filename: binding_map.py
+      filename: _binding_map.py
       templates: binding_map.py.jinja2
-      output_path: "couchbase/logic"
+      output_path: "couchbase/protocol/classic"
     - name: pycbc_dict_keys_hxx
       filename: pycbc_dict_keys.hxx
       templates: pycbc_dict_keys.hxx.jinja2

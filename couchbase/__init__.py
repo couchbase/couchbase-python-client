@@ -19,7 +19,7 @@ try:
     # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
     # This is particularly helpful on M1 macs (PYCBC-1386).
     import ssl  # noqa: F401 # nopep8 # isort:skip # noqa: E402
-    import couchbase.logic.pycbc_core  # noqa: F401 # nopep8 # isort:skip # noqa: E402
+    import couchbase.protocol.classic._pycbc_core  # noqa: F401 # nopep8 # isort:skip # noqa: E402
 except ImportError:
     import os  # nopep8 # isort:skip # noqa: E402
     import sys  # nopep8 # isort:skip # noqa: E402
@@ -55,15 +55,15 @@ except Exception:  # nosec
 
 
 # Import logging configuration - auto-configures on import
-import couchbase.logic.logging_config  # nopep8 # isort:skip # noqa: F401, E402
+import couchbase.protocol.classic._logging_config  # nopep8 # isort:skip # noqa: F401, E402
 
 # Import public API functions
-from couchbase.logic.logging_config import (  # nopep8 # isort:skip # noqa: F401, E402
+from couchbase.protocol.classic._logging_config import (  # nopep8 # isort:skip # noqa: F401, E402
     configure_logging,
     enable_protocol_logger_to_save_network_traffic_to_file,
 )
 
-from couchbase.logic.pycbc_core.core_metadata import (  # nopep8 # isort:skip # noqa: F401, E402
+from couchbase.protocol.classic._pycbc_core.core_metadata import (  # nopep8 # isort:skip # noqa: F401, E402
     get_metadata,
     get_transactions_protocol,
 )

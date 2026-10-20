@@ -31,7 +31,7 @@ if TYPE_CHECKING:
                                    DecrementOptions,
                                    IncrementOptions,
                                    PrependOptions)
-    from txcouchbase.logic.collection_impl import TxCollectionImpl
+    from txcouchbase.protocol.classic._collection_impl import TxCollectionImpl
 
 
 class BinaryCollection:

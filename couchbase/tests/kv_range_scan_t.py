@@ -29,10 +29,10 @@ from couchbase.kv_range_scan import (PrefixScan,
                                      RangeScan,
                                      SamplingScan,
                                      ScanTerm)
-from couchbase.logic.collection_req_builder import CollectionRequestBuilder
-from couchbase.logic.collection_types import CollectionDetails
 from couchbase.mutation_state import MutationState
 from couchbase.options import ScanOptions
+from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
+from couchbase.protocol.classic._collection_types import CollectionDetails
 from couchbase.result import (MutationToken,
                               ScanResult,
                               ScanResultIterable)

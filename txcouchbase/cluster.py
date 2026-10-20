@@ -35,12 +35,12 @@ from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 from txcouchbase.bucket import Bucket
-from txcouchbase.logic.cluster_impl import TxClusterImpl
 from txcouchbase.management.analytics import AnalyticsIndexManager
 from txcouchbase.management.buckets import BucketManager
 from txcouchbase.management.queries import QueryIndexManager
 from txcouchbase.management.search import SearchIndexManager
 from txcouchbase.management.users import UserManager
+from txcouchbase.protocol.classic._cluster_impl import TxClusterImpl
 
 if TYPE_CHECKING:
     from datetime import timedelta

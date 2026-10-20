@@ -19,18 +19,17 @@ from typing import (TYPE_CHECKING,
                     Any,
                     List)
 
+from couchbase.common.management.buckets import BucketType  # noqa: F401
+from couchbase.common.management.buckets import CompressionMode  # noqa: F401
+from couchbase.common.management.buckets import ConflictResolutionType  # noqa: F401
+from couchbase.common.management.buckets import EjectionMethod  # noqa: F401
+from couchbase.common.management.buckets import EvictionPolicyType  # noqa: F401
+from couchbase.common.management.buckets import StorageBackend  # noqa: F401
+from couchbase.common.management.buckets import (BucketDescribeResult,
+                                                 BucketSettings,
+                                                 CreateBucketSettings)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import BucketMgmtOperationType
-from couchbase.management.logic.bucket_mgmt_impl import BucketMgmtImpl
-from couchbase.management.logic.bucket_mgmt_types import BucketType  # noqa: F401
-from couchbase.management.logic.bucket_mgmt_types import CompressionMode  # noqa: F401
-from couchbase.management.logic.bucket_mgmt_types import ConflictResolutionType  # noqa: F401
-from couchbase.management.logic.bucket_mgmt_types import EjectionMethod  # noqa: F401
-from couchbase.management.logic.bucket_mgmt_types import EvictionPolicyType  # noqa: F401
-from couchbase.management.logic.bucket_mgmt_types import StorageBackend  # noqa: F401
-from couchbase.management.logic.bucket_mgmt_types import (BucketDescribeResult,
-                                                          BucketSettings,
-                                                          CreateBucketSettings)
 
 # @TODO:  lets deprecate import of options from couchbase.management.buckets
 from couchbase.management.options import (BucketDescribeOptions,
@@ -40,10 +39,11 @@ from couchbase.management.options import (BucketDescribeOptions,
                                           GetAllBucketOptions,
                                           GetBucketOptions,
                                           UpdateBucketOptions)
+from couchbase.protocol.classic._management._bucket_mgmt_impl import BucketMgmtImpl
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class BucketManager:

@@ -34,9 +34,9 @@ import pytest
 
 import couchbase.search as search
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.pycbc_core.binding_cpp_types import CppSearchRequest
 from couchbase.mutation_state import MutationState
 from couchbase.options import SearchOptions, VectorSearchOptions
+from couchbase.protocol.classic._pycbc_core.binding_cpp_types import CppSearchRequest
 from couchbase.result import MutationToken
 from couchbase.search import (HighlightStyle,
                               MatchOperator,

@@ -21,8 +21,8 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap)
 from couchbase.logic.n1ql import QueryRequestLogic
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.streaming import stream_next
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class N1QLRequest(QueryRequestLogic):

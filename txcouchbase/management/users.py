@@ -21,16 +21,16 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.common.management.users import (Group,
+                                               RoleAndDescription,
+                                               User,
+                                               UserAndMetadata)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import UserMgmtOperationType
-from couchbase.management.logic.user_mgmt_types import (Group,
-                                                        RoleAndDescription,
-                                                        User,
-                                                        UserAndMetadata)
-from txcouchbase.management.logic.user_mgmt_impl import TxUserMgmtImpl
+from txcouchbase.protocol.classic._management._user_mgmt_impl import TxUserMgmtImpl
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (ChangePasswordOptions,
                                               DropGroupOptions,

@@ -24,15 +24,15 @@ from typing import (TYPE_CHECKING,
 from couchbase.exceptions import (ErrorMapper,
                                   TransactionExpired,
                                   TransactionFailed)
-from couchbase.logic.pycbc_core import create_transactions, destroy_transactions
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
+from couchbase.protocol.classic._pycbc_core import create_transactions, destroy_transactions
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.transactions.transaction_result import TransactionResult
 from couchbase.transcoder import JSONTranscoder
 
 if TYPE_CHECKING:
     from acouchbase.transactions import AttemptContext as AsyncAttemptContext
-    from couchbase.logic.pycbc_core import pycbc_connection
     from couchbase.options import TransactionConfig
+    from couchbase.protocol.classic._pycbc_core import pycbc_connection
     from couchbase.serializer import Serializer
     from couchbase.transactions import AttemptContext as BlockingAttemptContext
 

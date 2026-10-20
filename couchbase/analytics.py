@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from couchbase.common._supportability import Supportability
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
                                   CouchbaseException,
@@ -26,9 +27,8 @@ from couchbase.logic.analytics import AnalyticsScanConsistency  # noqa: F401
 from couchbase.logic.analytics import AnalyticsStatus  # noqa: F401
 from couchbase.logic.analytics import AnalyticsWarning  # noqa: F401
 from couchbase.logic.analytics import AnalyticsRequestLogic
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.streaming import stream_next
-from couchbase.logic.supportability import Supportability
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class AnalyticsRequest(AnalyticsRequestLogic):

@@ -14,8 +14,8 @@ from typing import (TYPE_CHECKING,
 from google.protobuf import timestamp_pb2 as timestamp_pb
 
 from couchbase.cluster import Cluster
+from couchbase.common.search_queries import GeoBoundingBoxQuery, GeoDistanceQuery
 from couchbase.exceptions import CouchbaseException
-from couchbase.logic.search_queries import GeoBoundingBoxQuery, GeoDistanceQuery
 from couchbase.options import SearchOptions, VectorSearchOptions
 from couchbase.scope import Scope
 from couchbase.search import (BooleanFieldQuery,

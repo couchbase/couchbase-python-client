@@ -24,12 +24,11 @@ from typing import Any
 
 import pytest
 
-from acouchbase.logic.cluster_impl import AsyncClusterImpl
+from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.cluster import Cluster
+from couchbase.common._cluster_settings import ClusterSettings
 from couchbase.exceptions import InvalidArgumentException, UnAmbiguousTimeoutException
-from couchbase.logic.cluster_impl import ClusterImpl
-from couchbase.logic.cluster_settings import ClusterSettings
 from couchbase.options import (CONFIG_PROFILES,
                                ClusterMetricsOptions,
                                ClusterOptions,
@@ -40,6 +39,7 @@ from couchbase.options import (CONFIG_PROFILES,
                                IpProtocol,
                                KnownConfigProfiles,
                                TLSVerifyMode)
+from couchbase.protocol.classic._cluster_impl import ClusterImpl
 from couchbase.serializer import DefaultJsonSerializer
 from couchbase.transcoder import JSONTranscoder
 from tests.environments.test_environment import (SuiteRequirements,
@@ -47,7 +47,7 @@ from tests.environments.test_environment import (SuiteRequirements,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
-from txcouchbase.logic.cluster_impl import TxClusterImpl
+from txcouchbase.protocol.classic._cluster_impl import TxClusterImpl
 
 CONNSTR = 'couchbase://localhost'
 USER_AGENT = f'python/{platform.python_version()}'

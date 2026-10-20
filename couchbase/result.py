@@ -46,8 +46,8 @@ from couchbase.exceptions import (CouchbaseException,
                                   ErrorMapper,
                                   InvalidArgumentException)
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.logic.pycbc_core import pycbc_result
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
+from couchbase.protocol.classic._pycbc_core import pycbc_result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
 from couchbase.transcoder import Transcoder
 

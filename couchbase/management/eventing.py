@@ -19,28 +19,27 @@ from typing import (TYPE_CHECKING,
                     Any,
                     List)
 
+from couchbase.common.management.eventing import EventingFunctionBucketAccess  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionBucketBinding  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionConstantBinding  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionDcpBoundary  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionDeploymentStatus  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionKeyspace  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionLanguageCompatibility  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionLogLevel  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionProcessingStatus  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionSettings  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionState  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionUrlAuthBasic  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionUrlAuthBearer  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionUrlAuthDigest  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionUrlBinding  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionUrlNoAuth  # noqa: F401
+from couchbase.common.management.eventing import (EventingFunction,
+                                                  EventingFunctionsStatus,
+                                                  EventingFunctionStatus)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import EventingFunctionMgmtOperationType
-from couchbase.management.logic.eventing_function_mgmt_impl import EventingFunctionMgmtImpl
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionBucketAccess  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionBucketBinding  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionConstantBinding  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionDcpBoundary  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionDeploymentStatus  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionKeyspace  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionLanguageCompatibility  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionLogLevel  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionProcessingStatus  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionSettings  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionState  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionUrlAuthBasic  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionUrlAuthBearer  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionUrlAuthDigest  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionUrlBinding  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunctionUrlNoAuth  # noqa: F401
-from couchbase.management.logic.eventing_function_mgmt_types import (EventingFunction,
-                                                                     EventingFunctionsStatus,
-                                                                     EventingFunctionStatus)
 
 # @TODO:  lets deprecate import of options from couchbase.management.eventing
 from couchbase.management.options import (DeployFunctionOptions,
@@ -52,10 +51,11 @@ from couchbase.management.options import (DeployFunctionOptions,
                                           ResumeFunctionOptions,
                                           UndeployFunctionOptions,
                                           UpsertFunctionOptions)
+from couchbase.protocol.classic._management._eventing_function_mgmt_impl import EventingFunctionMgmtImpl
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class EventingFunctionManager:

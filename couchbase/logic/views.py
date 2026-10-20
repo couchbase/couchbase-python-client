@@ -30,9 +30,9 @@ from couchbase._utils import to_milliseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.logic.observability import ObservableRequestHandler, SpanProtocol
 from couchbase.logic.options import ViewOptionsBase
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 
 if TYPE_CHECKING:

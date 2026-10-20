@@ -19,16 +19,15 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Iterable)
 
+from couchbase.common.management.users import Origin  # noqa: F401
+from couchbase.common.management.users import Role  # noqa: F401
+from couchbase.common.management.users import RoleAndOrigins  # noqa: F401
+from couchbase.common.management.users import (Group,
+                                               RoleAndDescription,
+                                               User,
+                                               UserAndMetadata)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import UserMgmtOperationType
-from couchbase.management.logic.user_mgmt_impl import UserMgmtImpl
-from couchbase.management.logic.user_mgmt_types import Origin  # noqa: F401
-from couchbase.management.logic.user_mgmt_types import Role  # noqa: F401
-from couchbase.management.logic.user_mgmt_types import RoleAndOrigins  # noqa: F401
-from couchbase.management.logic.user_mgmt_types import (Group,
-                                                        RoleAndDescription,
-                                                        User,
-                                                        UserAndMetadata)
 
 # @TODO:  lets deprecate import of options from couchbase.management.users
 from couchbase.management.options import (ChangePasswordOptions,
@@ -41,10 +40,11 @@ from couchbase.management.options import (ChangePasswordOptions,
                                           GetUserOptions,
                                           UpsertGroupOptions,
                                           UpsertUserOptions)
+from couchbase.protocol.classic._management._user_mgmt_impl import UserMgmtImpl
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class UserManager:

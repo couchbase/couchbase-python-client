@@ -24,8 +24,8 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap)
 from couchbase.logic.analytics import AnalyticsQuery  # noqa: F401
 from couchbase.logic.analytics import AnalyticsRequestLogic
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.streaming import stream_anext
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class AsyncAnalyticsRequest(AnalyticsRequestLogic):

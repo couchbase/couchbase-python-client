@@ -29,11 +29,6 @@ else:
 
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import CollectionMgmtOperationType
-from couchbase.management.logic.collection_mgmt_impl import CollectionMgmtImpl
-from couchbase.management.logic.collection_mgmt_req_types import (CollectionSpec,
-                                                                  CreateCollectionSettings,
-                                                                  ScopeSpec,
-                                                                  UpdateCollectionSettings)
 
 # @TODO:  lets deprecate import of options from couchbase.management.collections
 from couchbase.management.options import (CreateCollectionOptions,
@@ -42,10 +37,15 @@ from couchbase.management.options import (CreateCollectionOptions,
                                           DropScopeOptions,
                                           GetAllScopesOptions,
                                           UpdateCollectionOptions)
+from couchbase.protocol.classic._management._collection_mgmt_impl import CollectionMgmtImpl
+from couchbase.protocol.classic._management._collection_mgmt_types import (CollectionSpec,
+                                                                           CreateCollectionSettings,
+                                                                           ScopeSpec,
+                                                                           UpdateCollectionSettings)
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class CollectionManager:

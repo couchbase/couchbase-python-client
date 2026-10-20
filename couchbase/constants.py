@@ -14,9 +14,9 @@
 #  limitations under the License.
 
 # flake8: noqa
-from couchbase.logic.pycbc_core import (FMT_BYTES,
-                                        FMT_COMMON_MASK,
-                                        FMT_JSON,
-                                        FMT_LEGACY_MASK,
-                                        FMT_PICKLE,
-                                        FMT_UTF8)
+from couchbase.protocol.classic._pycbc_core import (FMT_BYTES,
+                                                    FMT_COMMON_MASK,
+                                                    FMT_JSON,
+                                                    FMT_LEGACY_MASK,
+                                                    FMT_PICKLE,
+                                                    FMT_UTF8)

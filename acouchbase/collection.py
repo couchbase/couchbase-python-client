@@ -24,8 +24,8 @@ from acouchbase.datastructures import (CouchbaseList,
                                        CouchbaseMap,
                                        CouchbaseQueue,
                                        CouchbaseSet)
-from acouchbase.logic.collection_impl import AsyncCollectionImpl
 from acouchbase.management.queries import CollectionQueryIndexManager
+from acouchbase.protocol.classic._collection_impl import AsyncCollectionImpl
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.result import (ExistsResult,

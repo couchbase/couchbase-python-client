@@ -32,7 +32,7 @@ from typing import (Any,
 from urllib.parse import quote
 
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.pycbc_core import pycbc_exception
+from couchbase.protocol.classic._pycbc_core import pycbc_exception
 
 JSONType = Union[str, int, float, bool,
                  None, Mapping[str, Any], Sequence[Any]]

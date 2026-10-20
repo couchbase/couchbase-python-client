@@ -21,15 +21,15 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.common.management.buckets import (BucketDescribeResult,
+                                                 BucketSettings,
+                                                 CreateBucketSettings)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import BucketMgmtOperationType
-from couchbase.management.logic.bucket_mgmt_types import (BucketDescribeResult,
-                                                          BucketSettings,
-                                                          CreateBucketSettings)
-from txcouchbase.management.logic.bucket_mgmt_impl import TxBucketMgmtImpl
+from txcouchbase.protocol.classic._management._bucket_mgmt_impl import TxBucketMgmtImpl
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (BucketDescribeOptions,
                                               CreateBucketOptions,

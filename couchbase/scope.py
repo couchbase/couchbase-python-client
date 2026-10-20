@@ -22,12 +22,12 @@ from typing import (TYPE_CHECKING,
 from couchbase.collection import Collection
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.logic.scope_impl import ScopeImpl
 from couchbase.management.eventing import ScopeEventingFunctionManager
 from couchbase.management.search import ScopeSearchIndexManager
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions)
+from couchbase.protocol.classic._scope_impl import ScopeImpl
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)

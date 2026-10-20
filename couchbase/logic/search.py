@@ -31,22 +31,22 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 from couchbase._utils import is_null_or_empty, to_milliseconds
+from couchbase.common._supportability import Supportability
+from couchbase.common.search_scoring import SearchScoring
+from couchbase.common.vector_search import VectorQueryCombination
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.logic.observability import ObservableRequestHandler, SpanProtocol
 from couchbase.logic.options import SearchOptionsBase
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.logic.search_scoring import SearchScoring
-from couchbase.logic.supportability import Supportability
-from couchbase.logic.vector_search import VectorQueryCombination
 from couchbase.options import (SearchOptions,
                                UnsignedInt32,
                                UnsignedInt64)
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 
 if TYPE_CHECKING:
-    from couchbase.logic.search_queries import SearchQuery
-    from couchbase.logic.search_request import SearchRequest
-    from couchbase.logic.vector_search import VectorSearch
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
+    from couchbase.common.vector_search import VectorSearch
     from couchbase.mutation_state import MutationState  # noqa: F401
 
 """
@@ -1411,7 +1411,7 @@ class SearchQueryBuilder:
         search_query = request.search_query
         if search_query is None:
             # avoid circular import
-            from couchbase.logic.search_queries import MatchNoneQuery
+            from couchbase.common.search_queries import MatchNoneQuery
             search_query = MatchNoneQuery()
 
         # only set query vector_query_combination if applicable

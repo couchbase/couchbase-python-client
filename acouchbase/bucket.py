@@ -18,9 +18,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from acouchbase.collection import Collection
-from acouchbase.logic.bucket_impl import AsyncBucketImpl
 from acouchbase.management.collections import CollectionManager
 from acouchbase.management.views import ViewIndexManager
+from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
 from acouchbase.scope import Scope
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType

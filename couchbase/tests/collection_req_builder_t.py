@@ -24,9 +24,9 @@ from couchbase.kv_range_scan import (PrefixScan,
                                      RangeScan,
                                      SamplingScan,
                                      ScanTerm)
-from couchbase.logic.collection_req_builder import CollectionRequestBuilder
-from couchbase.logic.collection_types import CollectionDetails
-from couchbase.logic.pycbc_core import pycbc_connection
+from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
+from couchbase.protocol.classic._collection_types import CollectionDetails
+from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.transcoder import JSONTranscoder
 
 # (the scan, the tagged dict the binding layer reads it as).

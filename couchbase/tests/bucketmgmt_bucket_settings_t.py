@@ -20,16 +20,16 @@ from typing import Any
 
 import pytest
 
+from couchbase.common.management.buckets import (BucketSettings,
+                                                 BucketType,
+                                                 CompressionMode,
+                                                 ConflictResolutionType,
+                                                 CreateBucketSettings,
+                                                 EvictionPolicyType,
+                                                 StorageBackend)
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.management.logic.bucket_mgmt_req_builder import BucketMgmtRequestBuilder
-from couchbase.management.logic.bucket_mgmt_types import (BucketSettings,
-                                                          BucketType,
-                                                          CompressionMode,
-                                                          ConflictResolutionType,
-                                                          CreateBucketSettings,
-                                                          EvictionPolicyType,
-                                                          StorageBackend)
+from couchbase.protocol.classic._management._bucket_mgmt_req_builder import BucketMgmtRequestBuilder
 
 
 def _optional_property_names() -> list[str]:

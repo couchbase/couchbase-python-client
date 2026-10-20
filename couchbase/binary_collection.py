@@ -30,7 +30,6 @@ from couchbase.result import (CounterResult,
                               MutationResult)
 
 if TYPE_CHECKING:
-    from couchbase.logic.collection_impl import CollectionImpl
     from couchbase.options import (AppendMultiOptions,
                                    AppendOptions,
                                    DecrementMultiOptions,
@@ -39,6 +38,7 @@ if TYPE_CHECKING:
                                    IncrementOptions,
                                    PrependMultiOptions,
                                    PrependOptions)
+    from couchbase.protocol.classic._collection_impl import CollectionImpl
 
 
 class BinaryCollection:

@@ -25,7 +25,7 @@ from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.result import CounterResult, MutationResult
 
 if TYPE_CHECKING:
-    from acouchbase.logic.collection_impl import AsyncCollectionImpl
+    from acouchbase.protocol.classic._collection_impl import AsyncCollectionImpl
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    IncrementOptions,

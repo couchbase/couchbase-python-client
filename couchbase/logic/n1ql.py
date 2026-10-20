@@ -31,8 +31,8 @@ from couchbase._utils import (JSONType,
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.logic.observability import ObservableRequestHandler, SpanProtocol
 from couchbase.logic.options import QueryOptionsBase
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.options import QueryOptions, UnsignedInt64
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 
 if TYPE_CHECKING:

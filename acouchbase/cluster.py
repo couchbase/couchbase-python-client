@@ -23,13 +23,13 @@ from typing import (TYPE_CHECKING,
 
 from acouchbase import get_event_loop  # noqa: F401
 from acouchbase.bucket import AsyncBucket
-from acouchbase.logic.cluster_impl import AsyncClusterImpl
 from acouchbase.management.analytics import AnalyticsIndexManager
 from acouchbase.management.buckets import BucketManager
 from acouchbase.management.eventing import EventingFunctionManager
 from acouchbase.management.queries import QueryIndexManager
 from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
+from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from acouchbase.transactions import Transactions
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,

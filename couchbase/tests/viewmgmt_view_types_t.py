@@ -19,9 +19,9 @@ from typing import Any
 
 import pytest
 
-from couchbase.management.logic.view_index_mgmt_types import (DesignDocument,
-                                                              DesignDocumentNamespace,
-                                                              View)
+from couchbase.common.management.views import (DesignDocument,
+                                               DesignDocumentNamespace,
+                                               View)
 
 MAP_FN = 'function(doc, meta) { emit(meta.id, null); }'
 DDOC_NAME = 'test-ddoc'
@@ -37,7 +37,7 @@ def _design_document(**overrides: Any) -> DesignDocument:
 
 class ViewTypesUnitTests:
     # No cb_env and no TEST_MANIFEST: every test feeds a server-shaped dict to a `from_json`
-    # classmethod, and `couchbase.management.logic.view_index_mgmt_types` holds the only
+    # classmethod, and `couchbase.common.management.views` holds the only
     # definitions.  Not generated for that reason.
     #
     # Decoding is the half `viewmgmt_t` cannot reach: it builds `View(...)` objects to hand to

@@ -206,7 +206,6 @@ def _load_async_classes() -> dict[str, Any]:
                                            CouchbaseMap,
                                            CouchbaseQueue,
                                            CouchbaseSet)
-    from acouchbase.logic.cluster_impl import AsyncClusterImpl
     from acouchbase.management.analytics import AnalyticsIndexManager
     from acouchbase.management.buckets import BucketManager
     from acouchbase.management.collections import CollectionManager
@@ -215,6 +214,7 @@ def _load_async_classes() -> dict[str, Any]:
     from acouchbase.management.search import SearchIndexManager
     from acouchbase.management.users import UserManager
     from acouchbase.management.views import ViewIndexManager
+    from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
     from acouchbase.scope import AsyncScope
     from acouchbase.transactions.transactions import AttemptContext, Transactions
     from tests.environments.async_environment import AsyncTestEnvironment

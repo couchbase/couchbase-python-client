@@ -21,21 +21,21 @@ from typing import TYPE_CHECKING, List
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
-from acouchbase.management.logic.eventing_function_mgmt_impl import AsyncEventingFunctionMgmtImpl
+from acouchbase.protocol.classic._management._eventing_function_mgmt_impl import AsyncEventingFunctionMgmtImpl
+from couchbase.common.management.eventing import EventingFunction, EventingFunctionsStatus
 from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
-from couchbase.management.logic.eventing_function_mgmt_types import EventingFunction, EventingFunctionsStatus
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
-    from couchbase.management.logic.eventing_function_mgmt_types import (DeployFunctionRequest,
-                                                                         DropFunctionRequest,
-                                                                         GetAllFunctionsRequest,
-                                                                         GetFunctionRequest,
-                                                                         GetFunctionsStatusRequest,
-                                                                         PauseFunctionRequest,
-                                                                         ResumeFunctionRequest,
-                                                                         UndeployFunctionRequest,
-                                                                         UpsertFunctionRequest)
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
+    from couchbase.common.management.eventing import (DeployFunctionRequest,
+                                                      DropFunctionRequest,
+                                                      GetAllFunctionsRequest,
+                                                      GetFunctionRequest,
+                                                      GetFunctionsStatusRequest,
+                                                      PauseFunctionRequest,
+                                                      ResumeFunctionRequest,
+                                                      UndeployFunctionRequest,
+                                                      UpsertFunctionRequest)
 
 
 class TxEventingFunctionMgmtImpl(AsyncEventingFunctionMgmtImpl):

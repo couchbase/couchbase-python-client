@@ -22,13 +22,13 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.common.management.search import SearchIndex
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import SearchIndexMgmtOperationType
-from couchbase.management.logic.search_index_mgmt_types import SearchIndex
-from txcouchbase.management.logic.search_index_mgmt_impl import TxSearchIndexMgmtImpl
+from txcouchbase.protocol.classic._management._search_index_mgmt_impl import TxSearchIndexMgmtImpl
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (AllowQueryingSearchIndexOptions,
                                               AnalyzeDocumentSearchIndexOptions,

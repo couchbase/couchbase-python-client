@@ -20,15 +20,15 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 from acouchbase.collection import Collection
-from acouchbase.logic.scope_impl import AsyncScopeImpl
 from acouchbase.management.eventing import ScopeEventingFunctionManager
 from acouchbase.management.search import ScopeSearchIndexManager
+from acouchbase.protocol.classic._scope_impl import AsyncScopeImpl
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.logic.pycbc_core import pycbc_connection
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions)
+from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)

@@ -20,10 +20,9 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
+from couchbase.common.management.search import SearchIndex
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import SearchIndexMgmtOperationType
-from couchbase.management.logic.search_index_mgmt_impl import SearchIndexMgmtImpl
-from couchbase.management.logic.search_index_mgmt_types import SearchIndex
 
 # @TODO:  lets deprecate import of options from couchbase.management.search
 from couchbase.management.options import (AllowQueryingSearchIndexOptions,
@@ -40,10 +39,11 @@ from couchbase.management.options import (AllowQueryingSearchIndexOptions,
                                           ResumeIngestSearchIndexOptions,
                                           UnfreezePlanSearchIndexOptions,
                                           UpsertSearchIndexOptions)
+from couchbase.protocol.classic._management._search_index_mgmt_impl import SearchIndexMgmtImpl
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class SearchIndexManager:

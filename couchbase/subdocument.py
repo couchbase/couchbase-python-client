@@ -23,6 +23,7 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Union)
 
+from couchbase.common._supportability import Supportability
 from couchbase.exceptions import (CouchbaseException,
                                   DeltaInvalidException,
                                   DocumentNotFoundException,
@@ -38,7 +39,6 @@ from couchbase.exceptions import (CouchbaseException,
                                   PathTooDeepException,
                                   SubdocCantInsertValueException,
                                   ValueTooDeepException)
-from couchbase.logic.supportability import Supportability
 
 if TYPE_CHECKING:
     from couchbase._utils import JSONType

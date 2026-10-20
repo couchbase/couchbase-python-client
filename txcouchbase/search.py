@@ -20,9 +20,9 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.search import FullTextSearchRequestLogic
 from couchbase.logic.streaming import stream_next
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class FullTextSearchRequest(FullTextSearchRequestLogic):

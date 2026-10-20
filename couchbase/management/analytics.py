@@ -21,19 +21,18 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     Optional)
 
+from couchbase.common.management.analytics import AnalyticsEncryptionLevel  # noqa: F401
+from couchbase.common.management.analytics import AnalyticsLinkType  # noqa: F401
+from couchbase.common.management.analytics import AzureBlobExternalAnalyticsLink  # noqa: F401
+from couchbase.common.management.analytics import CouchbaseAnalyticsEncryptionSettings  # noqa: F401
+from couchbase.common.management.analytics import CouchbaseRemoteAnalyticsLink  # noqa: F401
+from couchbase.common.management.analytics import S3ExternalAnalyticsLink  # noqa: F401
+from couchbase.common.management.analytics import (AnalyticsDataset,
+                                                   AnalyticsDataType,
+                                                   AnalyticsIndex,
+                                                   AnalyticsLink)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import AnalyticsMgmtOperationType
-from couchbase.management.logic.analytics_mgmt_impl import AnalyticsMgmtImpl
-from couchbase.management.logic.analytics_mgmt_types import AnalyticsEncryptionLevel  # noqa: F401
-from couchbase.management.logic.analytics_mgmt_types import AnalyticsLinkType  # noqa: F401
-from couchbase.management.logic.analytics_mgmt_types import AzureBlobExternalAnalyticsLink  # noqa: F401
-from couchbase.management.logic.analytics_mgmt_types import CouchbaseAnalyticsEncryptionSettings  # noqa: F401
-from couchbase.management.logic.analytics_mgmt_types import CouchbaseRemoteAnalyticsLink  # noqa: F401
-from couchbase.management.logic.analytics_mgmt_types import S3ExternalAnalyticsLink  # noqa: F401
-from couchbase.management.logic.analytics_mgmt_types import (AnalyticsDataset,
-                                                             AnalyticsDataType,
-                                                             AnalyticsIndex,
-                                                             AnalyticsLink)
 
 # @TODO:  lets deprecate import of options from couchbase.management.analytics
 from couchbase.management.options import (ConnectLinkOptions,
@@ -51,10 +50,11 @@ from couchbase.management.options import (ConnectLinkOptions,
                                           GetLinksAnalyticsOptions,
                                           GetPendingMutationsOptions,
                                           ReplaceLinkAnalyticsOptions)
+from couchbase.protocol.classic._management._analytics_mgmt_impl import AnalyticsMgmtImpl
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class AnalyticsIndexManager:

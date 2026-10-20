@@ -24,12 +24,12 @@ from typing import (Any,
 
 import pytest
 
+from couchbase.common._observability.threshold_logging import (ThresholdLoggingReporter,
+                                                               ThresholdLoggingSpan,
+                                                               ThresholdLoggingTracer)
 from couchbase.logic.observability.observability_types import (DispatchAttributeName,
                                                                OpAttributeName,
                                                                ServiceType)
-from couchbase.logic.observability.threshold_logging import (ThresholdLoggingReporter,
-                                                             ThresholdLoggingSpan,
-                                                             ThresholdLoggingTracer)
 from couchbase.logic.options import ClusterTracingOptionsBase
 from tests.manifest import validate_test_manifest
 from tests.observability_test_impls import RecordingReporter

@@ -34,6 +34,7 @@ from typing import (TYPE_CHECKING,
 from couchbase._utils import (timedelta_as_milliseconds,
                               timedelta_as_timestamp,
                               validate_int)
+from couchbase.common._supportability import Supportability
 from couchbase.durability import DurabilityParser
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.options import AcceptableInts  # noqa: F401
@@ -85,10 +86,9 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      VectorSearchOptionsBase,
                                      ViewOptionsBase,
                                      WaitUntilReadyOptionsBase)
-from couchbase.logic.pycbc_core import (transaction_config,
-                                        transaction_options,
-                                        transaction_query_options)
-from couchbase.logic.supportability import Supportability
+from couchbase.protocol.classic._pycbc_core import (transaction_config,
+                                                    transaction_options,
+                                                    transaction_query_options)
 from couchbase.serializer import DefaultJsonSerializer
 
 # allows for imports only during type checking and not during runtime -- :)

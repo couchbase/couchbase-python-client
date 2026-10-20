@@ -22,10 +22,10 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.streaming import stream_anext
 from couchbase.logic.views import ViewQuery  # noqa: F401
 from couchbase.logic.views import ViewRequestLogic, ViewRow
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class AsyncViewRequest(ViewRequestLogic):

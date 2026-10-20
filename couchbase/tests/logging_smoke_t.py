@@ -51,11 +51,11 @@ class LoggingSmokeTestSuite:
     ]
 
     def test_import_logging_config_module(self) -> None:
-        import couchbase.logic.logging_config
-        assert couchbase.logic.logging_config is not None
+        import couchbase.protocol.classic._logging_config
+        assert couchbase.protocol.classic._logging_config is not None
 
     def test_import_core_metadata_module(self) -> None:
-        from couchbase.logic.pycbc_core import core_metadata
+        from couchbase.protocol.classic._pycbc_core import core_metadata
         assert core_metadata is not None
 
     def test_configure_logging_callable(self) -> None:
@@ -108,17 +108,17 @@ class LoggingSmokeTestSuite:
         # Both entries are restored afterwards.  A re-import binds a *new* module object to
         # sys.modules while every module that did `from ... import X` keeps the old one, so
         # leaving the new object in place hands a split identity to whatever runs next.
-        fresh_imports = ['couchbase.logic.logging_config',
-                         'couchbase.logic.pycbc_core.core_metadata']
+        fresh_imports = ['couchbase.protocol.classic._logging_config',
+                         'couchbase.protocol.classic._pycbc_core.core_metadata']
         saved = {name: sys.modules[name] for name in fresh_imports if name in sys.modules}
         try:
             for name in fresh_imports:
                 sys.modules.pop(name, None)
 
-            import couchbase.logic.logging_config
-            assert couchbase.logic.logging_config is not None
+            import couchbase.protocol.classic._logging_config
+            assert couchbase.protocol.classic._logging_config is not None
 
-            from couchbase.logic.pycbc_core import core_metadata
+            from couchbase.protocol.classic._pycbc_core import core_metadata
             assert core_metadata is not None
         finally:
             for name in fresh_imports:

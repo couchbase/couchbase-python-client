@@ -27,8 +27,8 @@ from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 from txcouchbase.collection import Collection
-from txcouchbase.logic.scope_impl import TxScopeImpl
 from txcouchbase.management.search import ScopeSearchIndexManager
+from txcouchbase.protocol.classic._scope_impl import TxScopeImpl
 
 if TYPE_CHECKING:
     from couchbase._utils import JSONType

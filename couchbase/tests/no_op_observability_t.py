@@ -17,14 +17,14 @@ from __future__ import annotations
 
 from typing import Optional, cast
 
+from couchbase.common._observability.no_op import (NoOpMeter,
+                                                   NoOpSpan,
+                                                   NoOpTracer)
 from couchbase.logic.observability.handler import (ObservableRequestHandler,
                                                    ObservableRequestHandlerMeterImpl,
                                                    ObservableRequestHandlerNoOpMeterImpl,
                                                    ObservableRequestHandlerNoOpTracerImpl,
                                                    ObservableRequestHandlerTracerImpl)
-from couchbase.logic.observability.no_op import (NoOpMeter,
-                                                 NoOpSpan,
-                                                 NoOpTracer)
 from couchbase.logic.observability.observability_types import (MeterProtocol,
                                                                ObservabilityInstruments,
                                                                TracerProtocol,
@@ -51,7 +51,7 @@ def _instruments(tracer: Optional[RequestTracer] = None,
 
 class NoOpTracerUnitTests:
     # No cb_env and no TEST_MANIFEST: the tracer is constructed and called directly, and
-    # `couchbase.logic.observability.no_op` holds the only definition.  Not generated for that
+    # `couchbase.common._observability.no_op` holds the only definition.  Not generated for that
     # reason.
     #
     # This is the tracer every cluster gets when nothing is configured, so it sits on the path

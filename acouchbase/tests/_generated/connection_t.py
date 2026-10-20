@@ -29,14 +29,14 @@ import pytest_asyncio
 
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.logic.cluster_impl import ClusterImpl
-from couchbase.logic.cluster_settings import ClusterSettings
+from couchbase.common._cluster_settings import ClusterSettings
 from couchbase.options import (CONFIG_PROFILES,
                                ClusterOptions,
                                ConfigProfile,
                                IpProtocol,
                                KnownConfigProfiles,
                                TLSVerifyMode)
+from couchbase.protocol.classic._cluster_impl import ClusterImpl
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   SuiteRequirements,
                                                   build_async_environment,

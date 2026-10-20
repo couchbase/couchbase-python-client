@@ -19,15 +19,15 @@ from typing import (TYPE_CHECKING,
                     Any,
                     List)
 
-from acouchbase.management.logic.eventing_function_mgmt_impl import AsyncEventingFunctionMgmtImpl
+from acouchbase.protocol.classic._management._eventing_function_mgmt_impl import AsyncEventingFunctionMgmtImpl
+from couchbase.common.management.eventing import (EventingFunction,
+                                                  EventingFunctionsStatus,
+                                                  EventingFunctionStatus)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import EventingFunctionMgmtOperationType
-from couchbase.management.logic.eventing_function_mgmt_types import (EventingFunction,
-                                                                     EventingFunctionsStatus,
-                                                                     EventingFunctionStatus)
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (DeployFunctionOptions,
                                               DropFunctionOptions,

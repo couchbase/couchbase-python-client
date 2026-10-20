@@ -25,11 +25,10 @@ from typing import (TYPE_CHECKING,
                     Tuple,
                     Union)
 
+from couchbase.common._supportability import Supportability
 from couchbase.exceptions import (CouchbaseException,
                                   ErrorMapper,
                                   TransactionsErrorContext)
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.logic.supportability import Supportability
 from couchbase.options import (TransactionGetMultiOptions,
                                TransactionGetMultiReplicasFromPreferredServerGroupOptions,
                                TransactionGetOptions,
@@ -37,6 +36,7 @@ from couchbase.options import (TransactionGetMultiOptions,
                                TransactionInsertOptions,
                                TransactionQueryOptions,
                                TransactionReplaceOptions)
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
 
 from .transaction_get_result import TransactionGetResult
@@ -50,10 +50,10 @@ from .transactions_get_multi import (TransactionGetMultiReplicasFromPreferredSer
 if TYPE_CHECKING:
     from couchbase._utils import JSONType
     from couchbase.collection import Collection
-    from couchbase.logic.cluster_impl import ClusterImpl
-    from couchbase.logic.pycbc_core import transaction_options
-    from couchbase.logic.pycbc_core.pycbc_core_types import TransactionsCapsuleType
     from couchbase.options import TransactionOptions
+    from couchbase.protocol.classic._cluster_impl import ClusterImpl
+    from couchbase.protocol.classic._pycbc_core import transaction_options
+    from couchbase.protocol.classic._pycbc_core.pycbc_core_types import TransactionsCapsuleType
     from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)

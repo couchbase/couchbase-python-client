@@ -42,7 +42,7 @@ package_data = {}
 # some more Windows tomfoolery...
 if platform.system() == 'Windows':
     # glob so both build modes match: _core.pyd (abi3) and _core.cp3XY-win_amd64.pyd
-    package_data = {'couchbase.logic.pycbc_core': ['_core*.pyd']}
+    package_data = {'couchbase.protocol.classic._pycbc_core': ['_core*.pyd']}
 
 # request installing cmake from PyPI if no CMake executable was found.
 # otherwise, we want to use the system executable.
@@ -63,7 +63,7 @@ extras_require = {
 
 setup(name='couchbase',
       version=PYCBC_VERSION,
-      ext_modules=[CMakeExtension('couchbase.logic.pycbc_core._core',
+      ext_modules=[CMakeExtension('couchbase.protocol.classic._pycbc_core._core',
                                   py_limited_api=use_py_limited_api())],
       cmdclass={'build': BuildCommand,
                 'build_ext': CMakeBuildExt,

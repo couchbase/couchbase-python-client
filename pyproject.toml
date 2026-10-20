@@ -90,7 +90,7 @@ follow_imports = "silent"
 # SDK is deliberately out of scope here.  Silenced explicitly so they are a recorded
 # exclusion rather than an unexplained three-error floor.
 [[tool.mypy.overrides]]
-module = "couchbase.logic.pycbc_core._core"
+module = "couchbase.protocol.classic._pycbc_core._core"
 ignore_errors = true
 
 # Third-party packages that ship no stubs.  These are test-only dependencies and none of

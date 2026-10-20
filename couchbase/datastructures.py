@@ -36,8 +36,8 @@ from couchbase.exceptions import (CasMismatchException,
                                   UnAmbiguousTimeoutException)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import DatastructureOperationType, KeyValueOperationType
-from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.options import MutateInOptions
+from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.subdocument import (array_addunique,
                                    array_append,
                                    array_prepend,
@@ -51,8 +51,8 @@ from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from couchbase._utils import JSONType
-    from couchbase.logic.collection_impl import CollectionImpl
     from couchbase.logic.observability import WrappedSpan
+    from couchbase.protocol.classic._collection_impl import CollectionImpl
     from couchbase.result import LookupInResult
 
 

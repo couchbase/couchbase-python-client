@@ -17,20 +17,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from couchbase.common.kv_range_scan import PrefixScan  # noqa: F401
+from couchbase.common.kv_range_scan import RangeScan  # noqa: F401
+from couchbase.common.kv_range_scan import SamplingScan  # noqa: F401
+from couchbase.common.kv_range_scan import ScanTerm  # noqa: F401
+from couchbase.common.kv_range_scan import ScanType  # noqa: F401
+from couchbase.common.kv_range_scan import RangeScanRequestLogic
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
                                   CouchbaseException,
                                   ExceptionMap,
                                   RangeScanCompletedException)
-from couchbase.logic.kv_range_scan import PrefixScan  # noqa: F401
-from couchbase.logic.kv_range_scan import RangeScan  # noqa: F401
-from couchbase.logic.kv_range_scan import SamplingScan  # noqa: F401
-from couchbase.logic.kv_range_scan import ScanTerm  # noqa: F401
-from couchbase.logic.kv_range_scan import ScanType  # noqa: F401
-from couchbase.logic.kv_range_scan import RangeScanRequestLogic
 
 if TYPE_CHECKING:
-    from couchbase.logic.pycbc_core import pycbc_connection
+    from couchbase.protocol.classic._pycbc_core import pycbc_connection
 
 
 class RangeScanRequest(RangeScanRequestLogic):

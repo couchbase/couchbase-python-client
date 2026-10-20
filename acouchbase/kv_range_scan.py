@@ -19,15 +19,15 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
+from couchbase.common.kv_range_scan import RangeScanRequestLogic
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
                                   CouchbaseException,
                                   ExceptionMap,
                                   RangeScanCompletedException)
-from couchbase.logic.kv_range_scan import RangeScanRequestLogic
 
 if TYPE_CHECKING:
-    from couchbase.logic.pycbc_core import pycbc_connection
+    from couchbase.protocol.classic._pycbc_core import pycbc_connection
 
 
 class AsyncRangeScanRequest(RangeScanRequestLogic):

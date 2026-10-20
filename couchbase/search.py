@@ -13,13 +13,38 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from couchbase.common._supportability import Supportability
+from couchbase.common.search_queries import BooleanFieldQuery  # noqa: F401
+from couchbase.common.search_queries import BooleanQuery  # noqa: F401
+from couchbase.common.search_queries import ConjunctionQuery  # noqa: F401
+from couchbase.common.search_queries import DateRangeQuery  # noqa: F401
+from couchbase.common.search_queries import DisjunctionQuery  # noqa: F401
+from couchbase.common.search_queries import DocIdQuery  # noqa: F401
+from couchbase.common.search_queries import GeoBoundingBoxQuery  # noqa: F401
+from couchbase.common.search_queries import GeoDistanceQuery  # noqa: F401
+from couchbase.common.search_queries import GeoPolygonQuery  # noqa: F401
+from couchbase.common.search_queries import MatchAllQuery  # noqa: F401
+from couchbase.common.search_queries import MatchNoneQuery  # noqa: F401
+from couchbase.common.search_queries import MatchOperator  # noqa: F401
+from couchbase.common.search_queries import MatchPhraseQuery  # noqa: F401
+from couchbase.common.search_queries import MatchQuery  # noqa: F401
+from couchbase.common.search_queries import NumericRangeQuery  # noqa: F401
+from couchbase.common.search_queries import PhraseQuery  # noqa: F401
+from couchbase.common.search_queries import PrefixQuery  # noqa: F401
+from couchbase.common.search_queries import QueryStringQuery  # noqa: F401
+from couchbase.common.search_queries import RawQuery  # noqa: F401
+from couchbase.common.search_queries import RegexQuery  # noqa: F401
+from couchbase.common.search_queries import SearchQuery  # noqa: F401
+from couchbase.common.search_queries import TermQuery  # noqa: F401
+from couchbase.common.search_queries import TermRangeQuery  # noqa: F401
+from couchbase.common.search_queries import WildcardQuery  # noqa: F401
+from couchbase.common.search_request import SearchRequest  # noqa: F401
 from couchbase.exceptions import NoChildrenException  # noqa: F401
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.search import DateFacet  # noqa: F401
 from couchbase.logic.search import Facet  # noqa: F401
 from couchbase.logic.search import HighlightStyle  # noqa: F401
@@ -43,33 +68,8 @@ from couchbase.logic.search import SortID  # noqa: F401
 from couchbase.logic.search import SortScore  # noqa: F401
 from couchbase.logic.search import TermFacet  # noqa: F401
 from couchbase.logic.search import FullTextSearchRequestLogic
-from couchbase.logic.search_queries import BooleanFieldQuery  # noqa: F401
-from couchbase.logic.search_queries import BooleanQuery  # noqa: F401
-from couchbase.logic.search_queries import ConjunctionQuery  # noqa: F401
-from couchbase.logic.search_queries import DateRangeQuery  # noqa: F401
-from couchbase.logic.search_queries import DisjunctionQuery  # noqa: F401
-from couchbase.logic.search_queries import DocIdQuery  # noqa: F401
-from couchbase.logic.search_queries import GeoBoundingBoxQuery  # noqa: F401
-from couchbase.logic.search_queries import GeoDistanceQuery  # noqa: F401
-from couchbase.logic.search_queries import GeoPolygonQuery  # noqa: F401
-from couchbase.logic.search_queries import MatchAllQuery  # noqa: F401
-from couchbase.logic.search_queries import MatchNoneQuery  # noqa: F401
-from couchbase.logic.search_queries import MatchOperator  # noqa: F401
-from couchbase.logic.search_queries import MatchPhraseQuery  # noqa: F401
-from couchbase.logic.search_queries import MatchQuery  # noqa: F401
-from couchbase.logic.search_queries import NumericRangeQuery  # noqa: F401
-from couchbase.logic.search_queries import PhraseQuery  # noqa: F401
-from couchbase.logic.search_queries import PrefixQuery  # noqa: F401
-from couchbase.logic.search_queries import QueryStringQuery  # noqa: F401
-from couchbase.logic.search_queries import RawQuery  # noqa: F401
-from couchbase.logic.search_queries import RegexQuery  # noqa: F401
-from couchbase.logic.search_queries import SearchQuery  # noqa: F401
-from couchbase.logic.search_queries import TermQuery  # noqa: F401
-from couchbase.logic.search_queries import TermRangeQuery  # noqa: F401
-from couchbase.logic.search_queries import WildcardQuery  # noqa: F401
-from couchbase.logic.search_request import SearchRequest  # noqa: F401
 from couchbase.logic.streaming import stream_next
-from couchbase.logic.supportability import Supportability
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class FullTextSearchRequest(FullTextSearchRequestLogic):

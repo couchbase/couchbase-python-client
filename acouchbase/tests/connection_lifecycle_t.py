@@ -38,7 +38,7 @@ import pytest
 import pytest_asyncio
 
 from acouchbase.cluster import Cluster
-from acouchbase.logic.cluster_impl import AsyncClusterImpl
+from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import DocumentNotFoundException
 from couchbase.options import ClusterOptions

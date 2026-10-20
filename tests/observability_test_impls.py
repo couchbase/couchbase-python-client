@@ -68,18 +68,18 @@ from typing import (TYPE_CHECKING,
                     Union,
                     cast)
 
+from couchbase.common._observability._clock import now_ns
+from couchbase.common._observability.no_op import (NoOpMeter,
+                                                   NoOpSpan,
+                                                   NoOpTracer)
+from couchbase.common._observability.threshold_logging import (_IGNORED_MULTI_OP_SPAN_VALUES,
+                                                               _IGNORED_PARENT_SPAN_VALUES,
+                                                               ThresholdLoggingSpan,
+                                                               ThresholdLoggingSpanSnapshot,
+                                                               ThresholdLoggingTracer)
 from couchbase.logic.observability import (OpAttributeName,
                                            OpName,
                                            ServiceType)
-from couchbase.logic.observability._clock import now_ns
-from couchbase.logic.observability.no_op import (NoOpMeter,
-                                                 NoOpSpan,
-                                                 NoOpTracer)
-from couchbase.logic.observability.threshold_logging import (_IGNORED_MULTI_OP_SPAN_VALUES,
-                                                             _IGNORED_PARENT_SPAN_VALUES,
-                                                             ThresholdLoggingSpan,
-                                                             ThresholdLoggingSpanSnapshot,
-                                                             ThresholdLoggingTracer)
 from couchbase.metrics import CouchbaseMeter, CouchbaseValueRecorder
 from couchbase.observability.metrics import ValueRecorder
 from couchbase.observability.tracing import (RequestSpan,

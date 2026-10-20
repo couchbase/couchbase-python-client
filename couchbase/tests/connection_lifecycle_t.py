@@ -18,8 +18,8 @@ from __future__ import annotations
 import pytest
 
 from couchbase.auth import PasswordAuthenticator
-from couchbase.logic.cluster_impl import ClusterImpl
 from couchbase.options import ClusterOptions
+from couchbase.protocol.classic._cluster_impl import ClusterImpl
 
 BUCKET_NAME = 'default'
 CONNSTR = 'couchbase://localhost'

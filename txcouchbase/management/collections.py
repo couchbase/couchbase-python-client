@@ -31,20 +31,20 @@ from twisted.internet.defer import Deferred
 
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import CollectionMgmtOperationType
-from couchbase.management.logic.collection_mgmt_req_types import (CollectionSpec,
-                                                                  CreateCollectionSettings,
-                                                                  ScopeSpec,
-                                                                  UpdateCollectionSettings)
 from couchbase.management.options import (CreateCollectionOptions,
                                           CreateScopeOptions,
                                           DropCollectionOptions,
                                           DropScopeOptions,
                                           GetAllScopesOptions,
                                           UpdateCollectionOptions)
-from txcouchbase.management.logic.collection_mgmt_impl import TxCollectionMgmtImpl
+from couchbase.protocol.classic._management._collection_mgmt_types import (CollectionSpec,
+                                                                           CreateCollectionSettings,
+                                                                           ScopeSpec,
+                                                                           UpdateCollectionSettings)
+from txcouchbase.protocol.classic._management._collection_mgmt_impl import TxCollectionMgmtImpl
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
 
 

@@ -25,8 +25,8 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap)
 from couchbase.logic.n1ql import N1QLQuery  # noqa: F401
 from couchbase.logic.n1ql import QueryRequestLogic
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.streaming import stream_anext
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 logger = logging.getLogger(__name__)
 

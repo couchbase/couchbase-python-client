@@ -36,10 +36,11 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Unpack
 
+from couchbase.common._observability._clock import now_ns
+from couchbase.common._observability.no_op import NoOpMeter, NoOpTracer
+from couchbase.common._supportability import Supportability
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import CouchbaseException, InvalidArgumentException
-from couchbase.logic.observability._clock import now_ns
-from couchbase.logic.observability.no_op import NoOpMeter, NoOpTracer
 from couchbase.logic.observability.observability_types import (_ATTR_BUCKET_NAME,
                                                                _ATTR_CLUSTER_NAME,
                                                                _ATTR_CLUSTER_UUID,
@@ -72,14 +73,13 @@ from couchbase.logic.observability.observability_types import (_ATTR_BUCKET_NAME
                                                                SpanProtocol,
                                                                WrappedTracer)
 from couchbase.logic.operation_types import DatastructureOperationType, KeyValueMultiOperationType
-from couchbase.logic.supportability import Supportability
 from couchbase.observability.tracing import SpanAttributeValue, SpanStatusCode
 
 if TYPE_CHECKING:
-    from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
-    from couchbase.logic.pycbc_core import pycbc_result as PycbcCoreResult
-    from couchbase.logic.pycbc_core import pycbc_streamed_result as PycbcCoreStreamedResult
-    from couchbase.logic.pycbc_core.binding_cpp_types import CppWrapperSdkChildSpan, CppWrapperSdkSpan
+    from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
+    from couchbase.protocol.classic._pycbc_core import pycbc_result as PycbcCoreResult
+    from couchbase.protocol.classic._pycbc_core import pycbc_streamed_result as PycbcCoreStreamedResult
+    from couchbase.protocol.classic._pycbc_core.binding_cpp_types import CppWrapperSdkChildSpan, CppWrapperSdkSpan
 
 
 class CollectionDetails(TypedDict):

@@ -23,9 +23,9 @@ from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.result import PingResult, ViewResult
 from txcouchbase.collection import Collection
-from txcouchbase.logic.bucket_impl import TxBucketImpl
 from txcouchbase.management.collections import CollectionManager
 from txcouchbase.management.views import ViewIndexManager
+from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
 from txcouchbase.scope import Scope
 
 if TYPE_CHECKING:

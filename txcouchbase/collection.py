@@ -32,7 +32,7 @@ from couchbase.result import (ExistsResult,
                               MutateInResult,
                               MutationResult)
 from txcouchbase.binary_collection import BinaryCollection
-from txcouchbase.logic.collection_impl import TxCollectionImpl
+from txcouchbase.protocol.classic._collection_impl import TxCollectionImpl
 
 if TYPE_CHECKING:
     from datetime import timedelta

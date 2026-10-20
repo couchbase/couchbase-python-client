@@ -20,21 +20,21 @@ from typing import (TYPE_CHECKING,
                     Optional)
 
 from couchbase.exceptions import ErrorMapper
-from couchbase.logic.pycbc_core import create_new_attempt_context, create_transaction_context
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.logic.pycbc_core import (transaction_commit,
-                                        transaction_get_multi_op,
-                                        transaction_op,
-                                        transaction_operations,
-                                        transaction_query_op,
-                                        transaction_rollback)
 from couchbase.options import TransactionOptions
+from couchbase.protocol.classic._pycbc_core import create_new_attempt_context, create_transaction_context
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
+from couchbase.protocol.classic._pycbc_core import (transaction_commit,
+                                                    transaction_get_multi_op,
+                                                    transaction_op,
+                                                    transaction_operations,
+                                                    transaction_query_op,
+                                                    transaction_rollback)
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
-    from couchbase.logic.pycbc_core import transaction_options
-    from couchbase.logic.pycbc_core.pycbc_core_types import TransactionsCapsuleType
+    from couchbase.protocol.classic._pycbc_core import transaction_options
+    from couchbase.protocol.classic._pycbc_core.pycbc_core_types import TransactionsCapsuleType
     from couchbase.transcoder import Transcoder
 
 log = logging.getLogger(__name__)

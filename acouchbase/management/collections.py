@@ -27,20 +27,21 @@ if sys.version_info >= (3, 13):
 else:
     from typing_extensions import deprecated
 
-from acouchbase.management.logic.collection_mgmt_impl import AsyncCollectionMgmtImpl
+from acouchbase.protocol.classic._management._collection_mgmt_impl import AsyncCollectionMgmtImpl
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import CollectionMgmtOperationType
-from couchbase.management.logic.collection_mgmt_impl import CollectionSpec, ScopeSpec
-from couchbase.management.logic.collection_mgmt_req_types import CreateCollectionSettings, UpdateCollectionSettings
 from couchbase.management.options import (CreateCollectionOptions,
                                           CreateScopeOptions,
                                           DropCollectionOptions,
                                           DropScopeOptions,
                                           GetAllScopesOptions,
                                           UpdateCollectionOptions)
+from couchbase.protocol.classic._management._collection_mgmt_impl import CollectionSpec, ScopeSpec
+from couchbase.protocol.classic._management._collection_mgmt_types import (CreateCollectionSettings,
+                                                                           UpdateCollectionSettings)
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
 
 
@@ -188,7 +189,8 @@ class CollectionManager:
             scope_name (str): The name of the scope the collection is in.
             collection_name (str): The name of the collection that will be updated
             settings (:class:`~.UpdateCollectionSettings`, optional): Settings to apply for the collection
-            options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this operation.
+            options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this
+                operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:

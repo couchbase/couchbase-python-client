@@ -19,15 +19,15 @@ from typing import Any
 
 import pytest
 
+from couchbase.common.management.eventing import (EventingFunction,
+                                                  EventingFunctionBucketAccess,
+                                                  EventingFunctionBucketBinding,
+                                                  EventingFunctionUrlAuthBasic,
+                                                  EventingFunctionUrlAuthBearer,
+                                                  EventingFunctionUrlAuthDigest,
+                                                  EventingFunctionUrlBinding,
+                                                  EventingFunctionUrlNoAuth)
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.management.logic.eventing_function_mgmt_types import (EventingFunction,
-                                                                     EventingFunctionBucketAccess,
-                                                                     EventingFunctionBucketBinding,
-                                                                     EventingFunctionUrlAuthBasic,
-                                                                     EventingFunctionUrlAuthBearer,
-                                                                     EventingFunctionUrlAuthDigest,
-                                                                     EventingFunctionUrlBinding,
-                                                                     EventingFunctionUrlNoAuth)
 
 FULL_KEYSPACE = {'bucket': 'meta-bucket', 'scope': 'meta-scope', 'collection': 'meta-collection'}
 DEFAULT_KEYSPACE = {'bucket': 'meta-bucket', 'scope': '_default', 'collection': '_default'}
@@ -64,7 +64,7 @@ def _url_binding(auth: Any) -> EventingFunctionUrlBinding:
 
 class EventingFunctionTypesUnitTests:
     # No cb_env and no TEST_MANIFEST: every test feeds a server-shaped dict to a `from_server`
-    # classmethod, and `couchbase.management.logic.eventing_function_mgmt_types` holds the only
+    # classmethod, and `couchbase.common.management.eventing` holds the only
     # definitions.  Not generated for that reason.
     #
     # Decoding is the half `eventingmgmt_t` cannot reach: it builds keyspaces and bindings as

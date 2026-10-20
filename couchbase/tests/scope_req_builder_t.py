@@ -20,17 +20,17 @@ from typing import Any, cast
 
 import pytest
 
+from couchbase.common._observability.no_op import NoOpMeter, NoOpTracer
+from couchbase.common._supportability import CouchbaseDeprecationWarning
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability.handler import ObservableRequestHandler
-from couchbase.logic.observability.no_op import NoOpMeter, NoOpTracer
 from couchbase.logic.observability.observability_types import (ObservabilityInstruments,
                                                                TracerProtocol,
                                                                WrappedTracer)
 from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.logic.scope_req_builder import ScopeRequestBuilder
-from couchbase.logic.scope_types import SearchQueryRequest
-from couchbase.logic.supportability import CouchbaseDeprecationWarning
 from couchbase.options import SearchOptions
+from couchbase.protocol.classic._scope_req_builder import ScopeRequestBuilder
+from couchbase.protocol.classic._scope_types import SearchQueryRequest
 from couchbase.search import (SearchQuery,
                               SearchRequest,
                               TermQuery)

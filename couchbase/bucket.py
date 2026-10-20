@@ -18,12 +18,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from couchbase.collection import Collection
-from couchbase.logic.bucket_impl import BucketImpl
+from couchbase.common._supportability import Supportability
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.logic.supportability import Supportability
 from couchbase.management.collections import CollectionManager
 from couchbase.management.views import ViewIndexManager
+from couchbase.protocol.classic._bucket_impl import BucketImpl
 from couchbase.result import PingResult, ViewResult
 from couchbase.scope import Scope
 

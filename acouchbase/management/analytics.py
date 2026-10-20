@@ -21,16 +21,16 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     Optional)
 
-from acouchbase.management.logic.analytics_mgmt_impl import AsyncAnalyticsMgmtImpl
+from acouchbase.protocol.classic._management._analytics_mgmt_impl import AsyncAnalyticsMgmtImpl
+from couchbase.common.management.analytics import (AnalyticsDataset,
+                                                   AnalyticsDataType,
+                                                   AnalyticsIndex,
+                                                   AnalyticsLink)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import AnalyticsMgmtOperationType
-from couchbase.management.logic.analytics_mgmt_types import (AnalyticsDataset,
-                                                             AnalyticsDataType,
-                                                             AnalyticsIndex,
-                                                             AnalyticsLink)
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (ConnectLinkOptions,
                                               CreateAnalyticsIndexOptions,

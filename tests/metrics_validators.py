@@ -43,10 +43,10 @@ from typing import (Any,
                     Optional,
                     Union)
 
+from couchbase.common._observability.no_op import NoOpMeter
 from couchbase.logic.observability import (CollectionDetails,
                                            OpAttributeName,
                                            OpName)
-from couchbase.logic.observability.no_op import NoOpMeter
 from tests.observability_ops import service_for
 from tests.observability_test_impls import (InertMeter,
                                             RecordingMeter,

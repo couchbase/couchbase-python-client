@@ -19,11 +19,10 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Iterable)
 
+from couchbase.common.management.views import View  # noqa: F401
+from couchbase.common.management.views import DesignDocument, DesignDocumentNamespace
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import MgmtOperationType, ViewIndexMgmtOperationType
-from couchbase.management.logic.view_index_mgmt_impl import ViewIndexMgmtImpl
-from couchbase.management.logic.view_index_mgmt_types import View  # noqa: F401
-from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
 
 # @TODO:  lets deprecate import of options from couchbase.management.views
 from couchbase.management.options import (DropDesignDocumentOptions,
@@ -31,10 +30,11 @@ from couchbase.management.options import (DropDesignDocumentOptions,
                                           GetDesignDocumentOptions,
                                           PublishDesignDocumentOptions,
                                           UpsertDesignDocumentOptions)
+from couchbase.protocol.classic._management._view_index_mgmt_impl import ViewIndexMgmtImpl
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class ViewIndexManager:

@@ -52,8 +52,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
     Without the flag `pytest_configure` never calls `init_reactor()`, so the reactor is
     installed but never started and the first SDK call of every test raises
-    `RuntimeError: Reactor is not running.` from `txcouchbase/logic/cluster_impl.py`, about
-    twenty frames down, through `acouchbase/logic/client_adapter.py`.  Nothing in that
+    `RuntimeError: Reactor is not running.` from `txcouchbase/protocol/classic/_cluster_impl.py`, about
+    twenty frames down, through `acouchbase/protocol/classic/_client_adapter.py`.  Nothing in that
     traceback names the flag, or even the test harness, so it reads as an SDK defect in the
     async client rather than as a mistyped command line.  Every test in the tree fails that
     way, identically, which is the shape of a real regression and not of operator error.

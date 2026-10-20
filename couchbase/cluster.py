@@ -24,16 +24,16 @@ from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
 from couchbase.bucket import Bucket
-from couchbase.logic.cluster_impl import ClusterImpl
+from couchbase.common._supportability import Supportability
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.logic.supportability import Supportability
 from couchbase.management.analytics import AnalyticsIndexManager
 from couchbase.management.buckets import BucketManager
 from couchbase.management.eventing import EventingFunctionManager
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.users import UserManager
+from couchbase.protocol.classic._cluster_impl import ClusterImpl
 from couchbase.result import (AnalyticsResult,
                               ClusterInfoResult,
                               DiagnosticsResult,

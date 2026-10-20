@@ -26,6 +26,7 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 from couchbase.binary_collection import BinaryCollection
+from couchbase.common._supportability import Supportability
 from couchbase.datastructures import (CouchbaseList,
                                       CouchbaseMap,
                                       CouchbaseQueue,
@@ -36,13 +37,10 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   PathNotFoundException,
                                   QueueEmpty)
-from couchbase.logic.collection_impl import CollectionImpl
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import (DatastructureOperationType,
                                              KeyValueMultiOperationType,
                                              KeyValueOperationType)
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.logic.supportability import Supportability
 from couchbase.management.queries import CollectionQueryIndexManager
 from couchbase.options import (ExistsMultiOptions,
                                GetAllReplicasMultiOptions,
@@ -57,6 +55,8 @@ from couchbase.options import (ExistsMultiOptions,
                                TouchMultiOptions,
                                UnlockMultiOptions,
                                UpsertMultiOptions)
+from couchbase.protocol.classic._collection_impl import CollectionImpl
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
@@ -85,7 +85,6 @@ if TYPE_CHECKING:
     from couchbase._utils import DocumentValue, JSONType
     from couchbase.kv_range_scan import ScanType
     from couchbase.logic.observability import WrappedSpan
-    from couchbase.logic.pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.options import (ExistsOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
@@ -101,6 +100,7 @@ if TYPE_CHECKING:
                                    TouchOptions,
                                    UnlockOptions,
                                    UpsertOptions)
+    from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.result import MultiResultType
     from couchbase.scope import Scope
     from couchbase.subdocument import Spec

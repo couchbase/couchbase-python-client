@@ -21,13 +21,13 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
+from couchbase.common.management.views import DesignDocument, DesignDocumentNamespace
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import MgmtOperationType, ViewIndexMgmtOperationType
-from couchbase.management.logic.view_index_mgmt_types import DesignDocument, DesignDocumentNamespace
-from txcouchbase.management.logic.view_index_mgmt_impl import TxViewIndexMgmtImpl
+from txcouchbase.protocol.classic._management._view_index_mgmt_impl import TxViewIndexMgmtImpl
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (DropDesignDocumentOptions,
                                               GetAllDesignDocumentsOptions,

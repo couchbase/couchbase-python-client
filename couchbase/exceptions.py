@@ -25,7 +25,7 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 if TYPE_CHECKING:
-    from couchbase.logic.pycbc_core import pycbc_exception
+    from couchbase.protocol.classic._pycbc_core import pycbc_exception
 
 
 class CouchbaseErrorCategory(Enum):

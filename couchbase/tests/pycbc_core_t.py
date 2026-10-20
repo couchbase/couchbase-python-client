@@ -26,7 +26,7 @@ from typing import Any, NamedTuple
 import pytest
 
 import couchbase
-from couchbase.logic.pycbc_core import _core
+from couchbase.protocol.classic._pycbc_core import _core
 
 
 class _CoreType(NamedTuple):
@@ -80,7 +80,7 @@ _SUBCLASS_SCRIPT = """
 import json
 import sys
 
-from couchbase.logic.pycbc_core import _core
+from couchbase.protocol.classic._pycbc_core import _core
 
 base = getattr(_core, sys.argv[1])
 ctor_kwargs = json.loads(sys.argv[2])

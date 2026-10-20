@@ -13,14 +13,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from couchbase.common._observability.logging_meter import LoggingMeter
+from couchbase.common._observability.no_op import (NoOpMeter,
+                                                   NoOpSpan,
+                                                   NoOpTracer,
+                                                   NoOpValueRecorder)
+from couchbase.common._observability.threshold_logging import ThresholdLoggingTracer
+
 from .handler import (CollectionDetails,
                       ObservableRequestHandler,
                       WrappedSpan)
-from .logging_meter import LoggingMeter
-from .no_op import (NoOpMeter,
-                    NoOpSpan,
-                    NoOpTracer,
-                    NoOpValueRecorder)
 from .observability_types import (DispatchAttributeName,
                                   LegacySpanProtocol,
                                   LegacyTracerProtocol,
@@ -34,7 +36,6 @@ from .observability_types import (DispatchAttributeName,
                                   SpanProtocol,
                                   TracerProtocol,
                                   WrappedTracer)
-from .threshold_logging import ThresholdLoggingTracer
 
 __all__ = [
     'CollectionDetails',

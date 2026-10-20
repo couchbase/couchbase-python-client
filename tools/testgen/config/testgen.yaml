@@ -94,14 +94,14 @@ suites:
 
   # The twisted tree has no `transactions` property to race, and both classes carry the
   # exclusion.  Worth generating precisely because the async tree does not inherit the guard it
-  # checks: acouchbase/logic/cluster_impl.py holds a second, independent copy of the same
+  # checks: acouchbase/protocol/classic/_cluster_impl.py holds a second, independent copy of the same
   # double-checked lock.  The suite reaches that copy without a cluster because it patches
   # Transactions on the module the impl came from rather than on a module named in a string
   # literal, which is the one construct here a generated copy could not have followed.
   #
   # The property gates on the connection before it reaches the check-then-set, so the threaded
   # tests stub that guard out and the guard is asserted separately.  Both halves generate: the
-  # guard is a second copy in acouchbase/logic/cluster_impl.py, same as the lock it fronts.
+  # guard is a second copy in acouchbase/protocol/classic/_cluster_impl.py, same as the lock it fronts.
   - source: couchbase/tests/transactions_property_race_t.py
     targets: [acouchbase]
 
@@ -156,7 +156,7 @@ suites:
       acouchbase: acouchbase/tests/cluster_additions_t.py
 
   # Only one of connection_t's five classes generates at all.  The four cluster-free classes
-  # drive ClusterSettings, which every tree imports from couchbase.logic.cluster_settings,
+  # drive ClusterSettings, which every tree imports from couchbase.common._cluster_settings,
   # through three thin constructors that forward *options, **kwargs to it identically.
   # Generating them would be 125 tests per tree to check three one-line calls, so the file
   # states that contract once instead, in
@@ -169,7 +169,7 @@ suites:
   - source: couchbase/tests/connection_t.py
     targets: [acouchbase]
 
-  # txcouchbase.Cluster has no set_authenticator, and txcouchbase/logic/cluster_impl.py has
+  # txcouchbase.Cluster has no set_authenticator, and txcouchbase/protocol/classic/_cluster_impl.py has
   # neither update_credentials nor get_connection_info, so there is nothing for a generated
   # copy to call.  Listed with one target rather than carrying a testgen_exclude because both
   # of its classes would be excluded and one of them for a different reason.

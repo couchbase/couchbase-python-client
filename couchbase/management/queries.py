@@ -21,7 +21,6 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import MgmtOperationType, QueryIndexMgmtOperationType
-from couchbase.management.logic.query_index_mgmt_impl import QueryIndex, QueryIndexMgmtImpl
 
 # @TODO:  lets deprecate import of options from couchbase.management.queries
 from couchbase.management.options import (BuildDeferredQueryIndexOptions,
@@ -31,10 +30,11 @@ from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           GetAllQueryIndexOptions,
                                           WatchQueryIndexOptions)
+from couchbase.protocol.classic._management._query_index_mgmt_impl import QueryIndex, QueryIndexMgmtImpl
 
 if TYPE_CHECKING:
-    from couchbase.logic.client_adapter import ClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class QueryIndexManager:

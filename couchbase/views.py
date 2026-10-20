@@ -18,7 +18,6 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
-from couchbase.logic.pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.logic.streaming import stream_next
 from couchbase.logic.views import ViewErrorMode  # noqa: F401
 from couchbase.logic.views import ViewMetaData  # noqa: F401
@@ -26,6 +25,7 @@ from couchbase.logic.views import ViewOrdering  # noqa: F401
 from couchbase.logic.views import ViewQuery  # noqa: F401
 from couchbase.logic.views import ViewScanConsistency  # noqa: F401
 from couchbase.logic.views import ViewRequestLogic, ViewRow
+from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 
 class ViewRequest(ViewRequestLogic):

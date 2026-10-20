@@ -19,13 +19,13 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Iterable)
 
-from acouchbase.management.logic.query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
+from acouchbase.protocol.classic._management._query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import MgmtOperationType, QueryIndexMgmtOperationType
-from couchbase.management.logic.query_index_mgmt_req_types import QueryIndex
+from couchbase.protocol.classic._management._query_index_mgmt_types import QueryIndex
 
 if TYPE_CHECKING:
-    from acouchbase.logic.client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.logic.observability import ObservabilityInstruments
     from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                               CreatePrimaryQueryIndexOptions,

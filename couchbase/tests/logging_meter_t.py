@@ -23,7 +23,7 @@ from typing import (ClassVar,
 
 import pytest
 
-from couchbase.logic.observability.logging_meter import LoggingMeter, LoggingMeterReporter
+from couchbase.common._observability.logging_meter import LoggingMeter, LoggingMeterReporter
 from couchbase.logic.observability.observability_types import (OpAttributeName,
                                                                OpName,
                                                                ServiceType)

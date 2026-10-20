@@ -14,7 +14,7 @@
 #  limitations under the License.
 
 
-from couchbase.logic.supportability import Supportability
+from couchbase.common._supportability import Supportability
 from couchbase.observability.metrics import Meter, ValueRecorder
 
 
