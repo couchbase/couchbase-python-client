@@ -1,0 +1,68 @@
+#  Copyright 2016-2026. Couchbase, Inc.
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License")
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+# !! AUTO-GENERATED from tools/autogen/config/operations.yaml: DO NOT EDIT MANUALLY !!
+# Regenerate with `python -m tools.autogen operations generate --write`.
+
+"""Every operation the SDK performs, one `Op` member each, with the facts both protocols read.
+
+A member is what a user calls and a trace names, not a binding call.  Its `.value` is the
+operation's canonical name; the span and metric name is `span_name`, and is None for an
+operation that is not traced.
+"""
+
+from __future__ import annotations
+
+from enum import Enum
+
+
+class ServiceType(Enum):
+{% for name, value in services.items() %}
+    {{ name }} = '{{ value }}'
+{% endfor %}
+
+
+class OpKind(Enum):
+{% for name, about in kinds.items() %}
+    # {{ about }}
+    {{ name }} = '{{ snake(name) }}'
+{% endfor %}
+
+
+class Op(Enum):
+    span_name: str | None
+    kind: OpKind
+    service: ServiceType | None
+    # On a KeyValueMulti member, the operation each key is; None on every other.
+    single: Op | None
+
+    def __new__(cls,
+                value: str,
+                span_name: str | None,
+                kind: OpKind,
+                service: ServiceType | None,
+                single: str | None = None) -> Op:
+        member = object.__new__(cls)
+        member._value_ = value
+        member.span_name = span_name
+        member.kind = kind
+        member.service = service
+        # The table defines a single before any multi naming it, so it is already a member here.
+        member.single = cls[single] if single is not None else None
+        return member
+
+{% for member in members %}
+{{ member }}
+{% endfor %}

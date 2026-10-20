@@ -1,0 +1,255 @@
+# Every operation the SDK performs, one row each, rendered into `couchbase/common/_operations.py`
+# as the `Op` enum.
+#
+# A row is what a user calls and a trace names, not a binding call: the binding vocabulary is
+# classic's and stays in `bindings.yaml`.  So a binding call one operation chooses between
+# (the three analytics link types, the legacy durability variants) is not a row, and a binding
+# call two operations share (search index control, one call for pause and resume) is two.
+#
+# A row's name is its `Op` member and, in snake case, its `.value`, the canonical operation
+# name.  Each group sets `kind` and `service` for its rows.  The other columns:
+#
+#   span      the span and metric operation name.  `name` on a group means each row's span is
+#             its `.value`; a group without it lists each row's span, and a row whose span is
+#             `null` is not traced or metered.
+#   single    on a KeyValueMulti row, the row each key's operation is.
+
+kinds:
+  KeyValue: one key, one request
+  KeyValueMulti: one KeyValue operation over many keys, metered per key
+  Datastructure: a list, map, queue or set operation, built from KeyValue operations and metered as those
+  Streaming: a request whose rows are streamed back
+  Management: a request to a management service, or a composite of them
+  Cluster: connection lifecycle and health, not traced
+
+services:
+  Analytics: analytics
+  Eventing: eventing
+  KeyValue: kv
+  Management: management
+  Query: query
+  Search: search
+  Transactions: transactions
+  Views: views
+
+groups:
+  - kind: KeyValue
+    service: KeyValue
+    span: name
+    ops:
+      Append: {}
+      Decrement: {}
+      Exists: {}
+      Get: {}
+      GetAllReplicas: {}
+      GetAndLock: {}
+      GetAndTouch: {}
+      GetAnyReplica: {}
+      Increment: {}
+      Insert: {}
+      LookupIn: {}
+      LookupInAllReplicas: {}
+      LookupInAnyReplica: {}
+      MutateIn: {}
+      Prepend: {}
+      Remove: {}
+      Replace: {}
+      Touch: {}
+      Unlock: {}
+      Upsert: {}
+
+  - kind: KeyValueMulti
+    service: KeyValue
+    span: name
+    ops:
+      AppendMulti: {single: Append}
+      DecrementMulti: {single: Decrement}
+      ExistsMulti: {single: Exists}
+      GetMulti: {single: Get}
+      GetAllReplicasMulti: {single: GetAllReplicas}
+      GetAndLockMulti: {single: GetAndLock}
+      GetAnyReplicaMulti: {single: GetAnyReplica}
+      IncrementMulti: {single: Increment}
+      InsertMulti: {single: Insert}
+      PrependMulti: {single: Prepend}
+      RemoveMulti: {single: Remove}
+      ReplaceMulti: {single: Replace}
+      TouchMulti: {single: Touch}
+      UnlockMulti: {single: Unlock}
+      UpsertMulti: {single: Upsert}
+
+  - kind: Datastructure
+    service: KeyValue
+    span: name
+    ops:
+      ListAppend: {}
+      ListClear: {}
+      ListGetAll: {}
+      ListGetAt: {}
+      ListIndexOf: {}
+      ListPrepend: {}
+      ListRemoveAt: {}
+      ListSetAt: {}
+      ListSize: {}
+      MapAdd: {}
+      MapClear: {}
+      MapExists: {}
+      MapGet: {}
+      MapGetAll: {}
+      MapItems: {}
+      MapKeys: {}
+      MapRemove: {}
+      MapSize: {}
+      MapValues: {}
+      QueueClear: {}
+      QueuePop: {}
+      QueuePush: {}
+      QueueSize: {}
+      SetAdd: {}
+      SetClear: {}
+      SetContains: {}
+      SetRemove: {}
+      SetSize: {}
+      SetValues: {}
+
+  - kind: Streaming
+    service: KeyValue
+    ops:
+      RangeScan: {span: null}
+
+  - kind: Streaming
+    service: Analytics
+    span: name
+    ops:
+      AnalyticsQuery: {}
+
+  - kind: Streaming
+    service: Query
+    span: name
+    ops:
+      Query: {}
+
+  - kind: Streaming
+    service: Search
+    span: name
+    ops:
+      SearchQuery: {}
+
+  - kind: Streaming
+    service: Views
+    span: name
+    ops:
+      ViewQuery: {}
+
+  - kind: Management
+    service: Analytics
+    ops:
+      AnalyticsDatasetCreate: {span: manager_analytics_create_dataset}
+      AnalyticsDatasetDrop: {span: manager_analytics_drop_dataset}
+      AnalyticsDatasetGetAll: {span: manager_analytics_get_all_datasets}
+      AnalyticsDataverseCreate: {span: manager_analytics_create_dataverse}
+      AnalyticsDataverseDrop: {span: manager_analytics_drop_dataverse}
+      AnalyticsGetPendingMutations: {span: manager_analytics_get_pending_mutations}
+      AnalyticsIndexCreate: {span: manager_analytics_create_index}
+      AnalyticsIndexDrop: {span: manager_analytics_drop_index}
+      AnalyticsIndexGetAll: {span: manager_analytics_get_all_indexes}
+      AnalyticsLinkConnect: {span: manager_analytics_connectlink}
+      AnalyticsLinkCreate: {span: manager_analytics_create_link}
+      AnalyticsLinkDisconnect: {span: manager_analytics_disconnect_link}
+      AnalyticsLinkDrop: {span: manager_analytics_drop_link}
+      AnalyticsLinkGetAll: {span: manager_analytics_get_all_links}
+      AnalyticsLinkReplace: {span: manager_analytics_replace_link}
+
+  - kind: Management
+    service: Management
+    ops:
+      BucketCreate: {span: manager_buckets_create_bucket}
+      BucketDescribe: {span: manager_buckets_describe_bucket}
+      BucketDrop: {span: manager_buckets_drop_bucket}
+      BucketFlush: {span: manager_buckets_flush_bucket}
+      BucketGet: {span: manager_buckets_get_bucket}
+      BucketGetAll: {span: manager_buckets_get_all_buckets}
+      BucketUpdate: {span: manager_buckets_update_bucket}
+      ClusterDescribe: {span: null}
+      ClusterDeveloperPreviewEnable: {span: null}
+      CollectionCreate: {span: manager_collections_create_collection}
+      CollectionDrop: {span: manager_collections_drop_collection}
+      CollectionUpdate: {span: manager_collections_update_collection}
+      ScopeCreate: {span: manager_collections_create_scope}
+      ScopeDrop: {span: manager_collections_drop_scope}
+      ScopeGetAll: {span: manager_collections_get_all_scopes}
+      ChangePassword: {span: manager_users_change_password}
+      GroupDrop: {span: manager_users_drop_group}
+      GroupGet: {span: manager_users_get_group}
+      GroupGetAll: {span: manager_users_get_all_groups}
+      GroupUpsert: {span: manager_users_upsert_group}
+      RoleGetAll: {span: manager_users_get_all_roles}
+      UserDrop: {span: manager_users_drop_user}
+      UserGet: {span: manager_users_get_user}
+      UserGetAll: {span: manager_users_get_all_users}
+      UserUpsert: {span: manager_users_upsert_user}
+
+  - kind: Management
+    service: Eventing
+    ops:
+      EventingDeployFunction: {span: manager_eventing_deploy_function}
+      EventingDropFunction: {span: manager_eventing_drop_function}
+      EventingGetAllFunctions: {span: manager_eventing_get_all_functions}
+      EventingGetFunction: {span: manager_eventing_get_function}
+      EventingGetStatus: {span: manager_eventing_functions_status}
+      EventingPauseFunction: {span: manager_eventing_pause_function}
+      EventingResumeFunction: {span: manager_eventing_resume_function}
+      EventingUndeployFunction: {span: manager_eventing_undeploy_function}
+      EventingUpsertFunction: {span: manager_eventing_upsert_function}
+
+  - kind: Management
+    service: Query
+    ops:
+      QueryIndexBuild: {span: manager_query_build_indexes}
+      QueryIndexBuildDeferred: {span: manager_query_build_deferred_indexes}
+      QueryIndexCreate: {span: manager_query_create_index}
+      QueryIndexDrop: {span: manager_query_drop_index}
+      QueryIndexGetAll: {span: manager_query_get_all_indexes}
+      QueryIndexGetAllDeferred: {span: manager_query_get_all_deferred_indexes}
+      QueryIndexWatchIndexes: {span: manager_query_watch_indexes}
+
+  - kind: Management
+    service: Search
+    ops:
+      SearchGetStats: {span: manager_search_get_stats}
+      SearchIndexAllowQuerying: {span: manager_search_allow_querying}
+      SearchIndexAnalyzeDocument: {span: manager_search_analyze_document}
+      SearchIndexDisallowQuerying: {span: manager_search_disallow_querying}
+      SearchIndexDrop: {span: manager_search_drop_index}
+      SearchIndexFreezePlan: {span: manager_search_freeze_plan}
+      SearchIndexGet: {span: manager_search_get_index}
+      SearchIndexGetAll: {span: manager_search_get_all_indexes}
+      SearchIndexGetDocumentsCount: {span: manager_search_get_indexed_documents_count}
+      SearchIndexGetStats: {span: manager_search_get_index_stats}
+      SearchIndexPauseIngest: {span: manager_search_pause_ingest}
+      SearchIndexResumeIngest: {span: manager_search_resume_ingest}
+      SearchIndexUnfreezePlan: {span: manager_search_unfreeze_plan}
+      SearchIndexUpsert: {span: manager_search_upsert_index}
+
+  - kind: Management
+    service: Views
+    ops:
+      ViewIndexDrop: {span: manager_views_drop_design_document}
+      ViewIndexGet: {span: manager_views_get_design_document}
+      ViewIndexGetAll: {span: manager_views_get_all_design_documents}
+      ViewIndexPublish: {span: manager_views_publish_design_document}
+      ViewIndexUpsert: {span: manager_views_upsert_design_document}
+
+  - kind: Cluster
+    ops:
+      Close: {span: null}
+      CloseBucket: {span: null}
+      Connect: {span: null}
+      Diagnostics: {span: null}
+      GetClusterLabels: {span: null}
+      GetConnectionInfo: {span: null}
+      GetDefaultTimeouts: {span: null}
+      OpenBucket: {span: null}
+      Ping: {span: null}
+      UpdateCredentials: {span: null}
+      WaitUntilReady: {span: null}
