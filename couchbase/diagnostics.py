@@ -33,14 +33,9 @@ class ClusterState(Enum):
     Offline = "offline"
 
 
-class ServiceType(Enum):
-    Analytics = "analytics"
-    KeyValue = "key_value"
-    Eventing = "eventing"
-    Management = "management"
-    Query = "query"
-    Search = "search"
-    View = "view"
+# BRIDGE: the final ServiceType, bound here for the code that imports it from this module.  Removed by
+# PYCBC-1994.
+from couchbase.common.diagnostics import ServiceType  # noqa: E402
 
 
 class PingState(Enum):

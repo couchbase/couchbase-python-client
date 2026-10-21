@@ -24,7 +24,6 @@ from typing import (Any,
                     Generic,
                     List,
                     Optional,
-                    Tuple,
                     Union)
 
 if sys.version_info >= (3, 13):
@@ -32,6 +31,7 @@ if sys.version_info >= (3, 13):
 else:
     from typing_extensions import TypeVar
 
+import couchbase.common.result as _common_result
 from acouchbase.analytics import AsyncAnalyticsRequest
 from acouchbase.n1ql import AsyncN1QLRequest
 from acouchbase.search import AsyncFullTextSearchRequest
@@ -611,7 +611,9 @@ class MultiExistsResult:
         return f'MultiExistsResult( {", ".join(output_results)} )'
 
 
-class MutationResult(Result):
+# BRIDGE: also a final MutationResult, so code annotated with the final class accepts this one.  Removed
+# by PYCBC-2001.
+class MutationResult(Result, _common_result.MutationResult):
     def __init__(self,
                  orig,  # type: pycbc_result
                  key=None,        # type: Optional[str]
@@ -708,59 +710,9 @@ class MultiMutationResult:
 MultiResultType = Union[MultiGetResult, MultiMutationResult]
 
 
-class MutationToken:
-    def __init__(self, token  # type: Dict[str, Union[str, int]]
-                 ):
-        self._token = token
-
-    @property
-    def partition_id(self) -> int:
-        """
-            int:  The token's partition id.
-        """
-        return self._token['partition_id']
-
-    @property
-    def partition_uuid(self) -> int:
-        """
-            int:  The token's partition uuid.
-        """
-        return self._token['partition_uuid']
-
-    @property
-    def sequence_number(self) -> int:
-        """
-            int:  The token's sequence number.
-        """
-        return self._token['sequence_number']
-
-    @property
-    def bucket_name(self) -> str:
-        """
-            str:  The token's bucket name.
-        """
-        return self._token['bucket_name']
-
-    def as_tuple(self) -> Tuple[int, int, int, str]:
-        return (self.partition_id, self.partition_uuid,
-                self.sequence_number, self.bucket_name)
-
-    def as_dict(self) -> Dict[str, Union[str, int]]:
-        return self._token
-
-    def __repr__(self):
-        return "MutationToken:{}".format(self._token)
-
-    def __hash__(self):
-        return hash(self.as_tuple())
-
-    def __eq__(self, other):
-        if not isinstance(other, MutationToken):
-            return False
-        return (self.partition_id == other.partition_id
-                and self.partition_uuid == other.partition_uuid
-                and self.sequence_number == other.sequence_number
-                and self.bucket_name == other.bucket_name)
+# BRIDGE: the final MutationToken, bound here for the code that imports it from this module.  Removed by
+# PYCBC-1994.
+from couchbase.common.result import MutationToken  # noqa: E402
 
 
 class LookupInResult(Result):

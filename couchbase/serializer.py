@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,44 +13,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
-from abc import ABC, abstractmethod
-from typing import Any
+"""The `couchbase.serializer` import path.
 
+The declarations live in `couchbase.common.serializer`, which every API shares, and are re-exported
+here.
+"""
 
-class Serializer(ABC):
-    """Interface a Custom Serializer must implement
-    """
+__all__ = [
+    'DefaultJsonSerializer',
+    'Serializer',
+]
 
-    @abstractmethod
-    def serialize(self,
-                  value  # type: Any
-                  ) -> bytes:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def deserialize(self,
-                    value  # type: bytes
-                    ) -> Any:
-        raise NotImplementedError()
-
-    @classmethod
-    def __subclasshook__(cls, subclass):
-        return (hasattr(subclass, 'serialize') and
-                callable(subclass.serialize) and
-                hasattr(subclass, 'deserialize') and
-                callable(subclass.deserialize))
-
-
-class DefaultJsonSerializer(Serializer):
-    def serialize(self,
-                  value,  # type: Any
-                  ) -> bytes:
-
-        return json.dumps(value, ensure_ascii=False).encode('utf-8')
-
-    def deserialize(self,
-                    value  # type: bytes
-                    ) -> Any:
-
-        return json.loads(value.decode('utf-8'))
+from couchbase.common.serializer import DefaultJsonSerializer  # noqa: F401
+from couchbase.common.serializer import Serializer  # noqa: F401
