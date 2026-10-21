@@ -106,6 +106,7 @@ class TransactionTestSuite:
         'test_rollback',
         'test_rollback_eating_exceptions',
         'test_scan_consistency',
+        'test_scan_wait',
         'test_scope_qualifier',
         'test_timeout',
         'test_transaction_config_durability',
@@ -1021,6 +1022,12 @@ class TransactionTestSuite:
             cfg_consistency = cfg._base.to_dict().get('scan_consistency', None)
             assert cfg_consistency is not None
             assert cfg_consistency == consistency.value
+
+    def test_scan_wait(self):
+        cfg = TransactionQueryOptions(scan_wait=timedelta(seconds=30))
+        cfg_scan_wait = cfg._base.to_dict().get('scan_wait', None)
+        assert cfg_scan_wait is not None
+        assert cfg_scan_wait == 30000
 
     def test_scope_qualifier(self, cb_env):
         pytest.skip('CBD-5091: Pending Transactions changes')
