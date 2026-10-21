@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
 import warnings
 from datetime import timedelta
 
@@ -68,6 +69,8 @@ class SearchParamTestSuite:
         'test_params_show_request',
         'test_params_skip',
         'test_params_sort',
+        'test_params_sort_invalid',
+        'test_params_sort_mixed',
         'test_params_timeout',
         'test_phrase_query',
         'test_prefix_query',
@@ -1004,6 +1007,23 @@ class SearchParamTestSuite:
         params = search_query.params
         params['sort'] = search_query.sort
         assert params == exp_opts
+
+    def test_params_sort_invalid(self, cb_env, base_query_opts):
+        q, _ = base_query_opts
+        opts = SearchOptions(sort=[1, 2])
+        with pytest.raises(InvalidArgumentException):
+            search.SearchQueryBuilder.create_search_query_object(
+                cb_env.TEST_INDEX_NAME, q, opts
+            )
+
+    def test_params_sort_mixed(self, cb_env, base_query_opts):
+        q, _ = base_query_opts
+        opts = SearchOptions(sort=['f1', search.SortScore()])
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            cb_env.TEST_INDEX_NAME, q, opts
+        )
+        specs = [json.loads(s) for s in search_query.as_encodable()['sort_specs']]
+        assert specs == ['f1', {'by': 'score'}]
 
     def test_params_timeout(self, cb_env, base_query_opts):
         q, base_opts = base_query_opts
