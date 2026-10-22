@@ -18,6 +18,7 @@ from __future__ import annotations
 import sys
 import threading
 from collections.abc import Callable, Generator
+from datetime import timedelta
 from time import time_ns
 from typing import (Any,
                     ClassVar,
@@ -35,11 +36,11 @@ from tests.observability_test_impls import RecordingReporter
 
 # 0.5ms, which the tracer converts to 500us.  Every duration in this file is chosen to sit
 # clearly on one side of it, so nothing here depends on how the boundary itself is rounded.
-KV_THRESHOLD_MS = 0.5
+KV_THRESHOLD = timedelta(milliseconds=0.5)
 
 # The reporter's own emit interval, long enough that it never fires during a test.  Only the
 # queue-draining tests need it: the recording reporter has no interval at all.
-NO_AUTO_EMIT_S = 100_000
+NO_AUTO_EMIT = timedelta(seconds=100)
 
 
 class ThresholdLoggingTestSuite:
@@ -63,6 +64,7 @@ class ThresholdLoggingTestSuite:
         'test_high_concurrency_mixed_operations',
         'test_ignore_below_threshold',
         'test_multiple_services',
+        'test_reads_every_tracing_option',
         'test_sequential_multi_dispatch_accumulation',
         'test_span_conversion_with_all_attributes',
         'test_span_end_is_idempotent',
@@ -76,10 +78,8 @@ class ThresholdLoggingTestSuite:
         tracers: list[ThresholdLoggingTracer] = []
 
         def _make(config: dict[str, Any]) -> ThresholdLoggingTracer:
-            # ThresholdLoggingTracer declares ClusterTracingOptionsBase, which is a dict
-            # subclass whose constructor takes the *public* option names and converts them.
-            # The tracer reads the converted names, which is what these configs already spell,
-            # so the mapping goes in as-is.
+            # The tracer reads the tracing options under the keys a caller writes, which is what
+            # these configs spell, so they go in as they are.
             tracer = ThresholdLoggingTracer(cast(ClusterTracingOptionsBase, config))
             tracer._reporter.stop()
             tracers.append(tracer)
@@ -114,8 +114,8 @@ class ThresholdLoggingTestSuite:
         self,
         make_recording_tracer: Callable[[dict[str, Any]], tuple[ThresholdLoggingTracer, RecordingReporter]],
     ) -> None:
-        tracer, reporter = make_recording_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                                                  'threshold_sample_size': 10})
+        tracer, reporter = make_recording_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                                                  'tracing_threshold_queue_size': 10})
 
         start_ns = time_ns() - 10_000_000
         span = self.kv_span(tracer, 'test_operation', start_ns)
@@ -131,8 +131,8 @@ class ThresholdLoggingTestSuite:
         self,
         make_recording_tracer: Callable[[dict[str, Any]], tuple[ThresholdLoggingTracer, RecordingReporter]],
     ) -> None:
-        tracer, reporter = make_recording_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                                                  'threshold_sample_size': 10})
+        tracer, reporter = make_recording_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                                                  'tracing_threshold_queue_size': 10})
 
         start_ns = time_ns() - 10_000_000
         span = self.kv_span(tracer, 'test_operation', start_ns)
@@ -144,8 +144,8 @@ class ThresholdLoggingTestSuite:
         self,
         make_recording_tracer: Callable[[dict[str, Any]], tuple[ThresholdLoggingTracer, RecordingReporter]],
     ) -> None:
-        tracer, reporter = make_recording_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                                                  'threshold_sample_size': 10})
+        tracer, reporter = make_recording_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                                                  'tracing_threshold_queue_size': 10})
 
         parent_start_ns = time_ns() - 1_000_000
         parent = self.kv_span(tracer, 'parent_operation', parent_start_ns)
@@ -168,8 +168,8 @@ class ThresholdLoggingTestSuite:
         self,
         make_recording_tracer: Callable[[dict[str, Any]], tuple[ThresholdLoggingTracer, RecordingReporter]],
     ) -> None:
-        tracer, reporter = make_recording_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                                                  'threshold_sample_size': 10})
+        tracer, reporter = make_recording_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                                                  'tracing_threshold_queue_size': 10})
 
         start_ns = time_ns() - 10_000_000
         span = self.kv_span(tracer, 'test_operation', start_ns)
@@ -185,9 +185,9 @@ class ThresholdLoggingTestSuite:
         self,
         make_tracer: Callable[[dict[str, Any]], ThresholdLoggingTracer],
     ) -> None:
-        tracer = make_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                              'threshold_sample_size': 3,
-                              'threshold_emit_interval': NO_AUTO_EMIT_S})
+        tracer = make_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                              'tracing_threshold_queue_size': 3,
+                              'tracing_threshold_queue_flush_interval': NO_AUTO_EMIT})
 
         operations = [('replace', 1000), ('insert', 1100), ('upsert', 1050),
                       ('get', 1200), ('remove', 1150)]
@@ -217,10 +217,10 @@ class ThresholdLoggingTestSuite:
         self,
         make_tracer: Callable[[dict[str, Any]], ThresholdLoggingTracer],
     ) -> None:
-        tracer = make_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                              'query_threshold': KV_THRESHOLD_MS,
-                              'threshold_sample_size': 10,
-                              'threshold_emit_interval': NO_AUTO_EMIT_S})
+        tracer = make_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                              'tracing_threshold_query': KV_THRESHOLD,
+                              'tracing_threshold_queue_size': 10,
+                              'tracing_threshold_queue_flush_interval': NO_AUTO_EMIT})
 
         now = time_ns()
 
@@ -245,13 +245,34 @@ class ThresholdLoggingTestSuite:
         assert sorted(item['operation_name'] for item in kv_items) == ['insert', 'replace']
         assert sorted(item['operation_name'] for item in query_items) == ['query1', 'query2']
 
+    def test_reads_every_tracing_option(
+        self,
+        make_tracer: Callable[[dict[str, Any]], ThresholdLoggingTracer],
+    ) -> None:
+        tracer = make_tracer({'tracing_threshold_kv': timedelta(milliseconds=1),
+                              'tracing_threshold_view': timedelta(milliseconds=2),
+                              'tracing_threshold_query': timedelta(milliseconds=3),
+                              'tracing_threshold_search': timedelta(milliseconds=4),
+                              'tracing_threshold_analytics': timedelta(milliseconds=5),
+                              'tracing_threshold_eventing': timedelta(milliseconds=6),
+                              'tracing_threshold_management': timedelta(milliseconds=7),
+                              'tracing_threshold_queue_size': 8,
+                              'tracing_threshold_queue_flush_interval': timedelta(seconds=9)})
+
+        assert tracer._service_thresholds_us == {ServiceType.KeyValue: 1000, ServiceType.Views: 2000,
+                                                 ServiceType.Query: 3000, ServiceType.Search: 4000,
+                                                 ServiceType.Analytics: 5000, ServiceType.Eventing: 6000,
+                                                 ServiceType.Management: 7000}
+        assert tracer._sample_size == 8
+        assert tracer._emit_interval == timedelta(seconds=9)
+
     def test_span_conversion_with_all_attributes(
         self,
         make_tracer: Callable[[dict[str, Any]], ThresholdLoggingTracer],
     ) -> None:
-        tracer = make_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                              'threshold_sample_size': 10,
-                              'threshold_emit_interval': NO_AUTO_EMIT_S})
+        tracer = make_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                              'tracing_threshold_queue_size': 10,
+                              'tracing_threshold_queue_flush_interval': NO_AUTO_EMIT})
 
         op_start_ns = time_ns() - 1_000_000
         encode_start_ns = op_start_ns + 100_000
@@ -311,9 +332,9 @@ class ThresholdLoggingTestSuite:
     ) -> None:
         # The shape `_build_core_spans` produces: the C++ I/O callback thread creates and ends
         # each child in turn, so the parent sees them sequentially rather than all at once.
-        tracer = make_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                              'threshold_sample_size': 10,
-                              'threshold_emit_interval': NO_AUTO_EMIT_S})
+        tracer = make_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                              'tracing_threshold_queue_size': 10,
+                              'tracing_threshold_queue_flush_interval': NO_AUTO_EMIT})
 
         parent_start_ns = time_ns() - 3_000_000
         parent = self.kv_span(tracer, 'upsert', parent_start_ns)
@@ -346,8 +367,8 @@ class ThresholdLoggingTestSuite:
         # loop, and the switch interval is dropped to its minimum so an ordering assumption that
         # only holds by luck gets many chances to fail.  The asyncio-driven version lives in
         # `acouchbase/tests/`, because what it exercises is those two calls themselves.
-        tracer, reporter = make_recording_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                                                  'threshold_sample_size': 200})
+        tracer, reporter = make_recording_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                                                  'tracing_threshold_queue_size': 200})
 
         iterations = 200
         original_interval = sys.getswitchinterval()
@@ -390,8 +411,8 @@ class ThresholdLoggingTestSuite:
         self,
         make_recording_tracer: Callable[[dict[str, Any]], tuple[ThresholdLoggingTracer, RecordingReporter]],
     ) -> None:
-        tracer, reporter = make_recording_tracer({'key_value_threshold': KV_THRESHOLD_MS,
-                                                  'threshold_sample_size': 50})
+        tracer, reporter = make_recording_tracer({'tracing_threshold_kv': KV_THRESHOLD,
+                                                  'tracing_threshold_queue_size': 50})
 
         exceptions: list[tuple[int, Exception]] = []
         completed: list[int] = []

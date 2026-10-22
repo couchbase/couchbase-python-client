@@ -15,14 +15,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from acouchbase.analytics import AsyncAnalyticsRequest
 from acouchbase.n1ql import AsyncN1QLRequest
+from acouchbase.protocol.classic._collection_impl import AsyncCollectionImpl
 from acouchbase.search import AsyncFullTextSearchRequest
-from couchbase.common._cluster_settings import StreamingTimeouts
-from couchbase.logic.observability import ObservabilityInstruments
-from couchbase.protocol.classic._cluster_impl import ClusterSettings
+from couchbase.common._cluster_settings import ClusterSettings
+from couchbase.common._observability import ObservabilityInstruments
+from couchbase.protocol.classic._cluster_types import StreamingTimeouts
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._scope_req_builder import ScopeRequestBuilder
 from couchbase.result import (AnalyticsResult,
@@ -34,21 +35,27 @@ from couchbase.transcoder import Transcoder
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
-    from acouchbase.bucket import AsyncBucket
+    from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
+    from couchbase.common.protocol import CouchbaseProtocol
     from couchbase.protocol.classic._scope_types import (AnalyticsQueryRequest,
                                                          QueryRequest,
                                                          SearchQueryRequest)
-    from txcouchbase.bucket import TxBucket
 
 
 class AsyncScopeImpl:
 
-    def __init__(self, scope_name: str, bucket: Union[AsyncBucket, TxBucket]) -> None:
+    def __init__(self, scope_name: str, bucket_impl: AsyncBucketImpl) -> None:
         self._scope_name = scope_name
-        self._bucket_impl = bucket._impl
+        self._bucket_impl = bucket_impl
         # needed for the CollectionImpl
-        self._client_adapter = bucket._impl._client_adapter
+        self._client_adapter: AsyncClientAdapter = bucket_impl._client_adapter
         self._request_builder = ScopeRequestBuilder(self._bucket_impl.bucket_name, self._scope_name)
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._client_adapter.couchbase_protocol
 
     @property
     def bucket_name(self) -> str:
@@ -93,7 +100,12 @@ class AsyncScopeImpl:
         """
         **INTERNAL**
         """
-        return self.cluster_settings.streaming_timeouts
+        return self._bucket_impl.streaming_timeouts
+
+    @property
+    def kv_durable_timeout(self) -> int | None:
+        """**INTERNAL**"""
+        return self._bucket_impl.kv_durable_timeout
 
     @property
     def observability_instruments(self) -> ObservabilityInstruments:
@@ -106,22 +118,9 @@ class AsyncScopeImpl:
     def name(self) -> str:
         return self._scope_name
 
-    def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
-        self._client_adapter._ensure_not_closed()
-        self._client_adapter._ensure_connected()
-        # If the analytics_query was provided a timeout we will use that value for the streaming timeout
-        # when the streaming object is created in the bindings.  If the analytics_query does not specify a
-        # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
-        # also does not specify an analytics_timeout we set the streaming_timeout to
-        # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
-        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
-                                                                                self.loop,
-                                                                                req.analytics_query.params,
-                                                                                default_serializer=self.default_serializer,  # noqa: E501
-                                                                                streaming_timeout=streaming_timeout,
-                                                                                obs_handler=req.obs_handler,
-                                                                                num_workers=req.num_workers))
+    def collection(self, name: str) -> AsyncCollectionImpl:
+        """**INTERNAL**"""
+        return AsyncCollectionImpl(name, self)
 
     def query(self, req: QueryRequest) -> QueryResult:
         self._client_adapter._ensure_not_closed()
@@ -139,6 +138,23 @@ class AsyncScopeImpl:
                                                                   streaming_timeout=streaming_timeout,
                                                                   obs_handler=req.obs_handler,
                                                                   num_workers=req.num_workers))
+
+    def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
+        self._client_adapter._ensure_not_closed()
+        self._client_adapter._ensure_connected()
+        # If the analytics_query was provided a timeout we will use that value for the streaming timeout
+        # when the streaming object is created in the bindings.  If the analytics_query does not specify a
+        # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
+        # also does not specify an analytics_timeout we set the streaming_timeout to
+        # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
+        streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
+        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
+                                                                                self.loop,
+                                                                                req.analytics_query.params,
+                                                                                default_serializer=self.default_serializer,  # noqa: E501
+                                                                                streaming_timeout=streaming_timeout,
+                                                                                obs_handler=req.obs_handler,
+                                                                                num_workers=req.num_workers))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
         self._client_adapter._ensure_not_closed()

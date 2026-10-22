@@ -15,6 +15,11 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'AsyncCollection',
+    'Collection',
+]
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Iterable)
@@ -25,7 +30,6 @@ from acouchbase.datastructures import (CouchbaseList,
                                        CouchbaseQueue,
                                        CouchbaseSet)
 from acouchbase.management.queries import CollectionQueryIndexManager
-from acouchbase.protocol.classic._collection_impl import AsyncCollectionImpl
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import KeyValueOperationType
 from couchbase.result import (ExistsResult,
@@ -41,7 +45,8 @@ if TYPE_CHECKING:
     from datetime import timedelta
 
     from acouchbase.scope import AsyncScope
-    from couchbase._utils import DocumentValue
+    from couchbase.common._interfaces._collection import AsyncCollectionInterface
+    from couchbase.common._utils import DocumentValue
     from couchbase.kv_range_scan import ScanType
     from couchbase.options import (ExistsOptions,
                                    GetAllReplicasOptions,
@@ -66,7 +71,7 @@ if TYPE_CHECKING:
 class AsyncCollection:
 
     def __init__(self, scope: AsyncScope, name: str) -> None:
-        self._impl = AsyncCollectionImpl(name, scope)
+        self._impl: AsyncCollectionInterface = scope._impl.collection(name)
 
     @property
     def name(self) -> str:
@@ -711,7 +716,7 @@ class AsyncCollection:
         Args:
             key (str): The key for the document to unlock.
             cas (int): The CAS of the document, used to validate lock ownership.
-            opts (:class:`couchbaseoptions.UnlockOptions`): Optional parameters for this operation.
+            opts (:class:`~couchbase.options.UnlockOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockOptions`
 

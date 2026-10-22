@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
@@ -29,6 +30,7 @@ from acouchbase.kv_range_scan import AsyncRangeScanRequest
 from couchbase.common._transforms import timedelta_as_milliseconds
 from couchbase.common.options import DeltaValue as DeltaValueBase
 from couchbase.common.options import SignedInt64 as SignedInt64Base
+from couchbase.common.subdocument import StoreSemantics, SubDocOp
 from couchbase.constants import FMT_BYTES
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
@@ -43,15 +45,10 @@ from couchbase.logic.operation_types import KeyValueOperationCode
 from couchbase.mutation_state import MutationState
 from couchbase.protocol.classic._collection_types import CollectionDetails
 from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
-from couchbase.subdocument import (StoreSemantics,
-                                   SubDocOp,
-                                   build_lookup_in_path_flags,
-                                   build_mutate_in_path_flags)
+from couchbase.subdocument import build_lookup_in_path_flags, build_mutate_in_path_flags
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
-    from asyncio import AbstractEventLoop
-
     from couchbase._utils import DocumentValue
     from couchbase.protocol.classic._pycbc_core import pycbc_connection
     from couchbase.subdocument import Spec
@@ -71,9 +68,8 @@ MUTATE_IN_SEMANTICS = {
 
 class CollectionRequestBuilder:
 
-    def __init__(self, collection_details: CollectionDetails, loop: Optional[AbstractEventLoop] = None) -> None:
+    def __init__(self, collection_details: CollectionDetails) -> None:
         self._collection_dtls = collection_details
-        self._loop = loop
 
     def _create_kv_request(self,
                            opcode: int,
@@ -642,40 +638,6 @@ class CollectionRequestBuilder:
 
         return scan_type_dict
 
-    def build_range_scan_request(self,
-                                 connection: pycbc_connection,
-                                 scan_type: ScanType,
-                                 *opts: object,
-                                 **kwargs: object) -> RangeScanRequest:
-        orchestrator_opts = forward_args(kwargs, *opts)
-        transcoder = self._collection_dtls.get_request_transcoder(orchestrator_opts)
-        self._process_scan_orchestrator_ops(orchestrator_opts)
-        scan_args = self._collection_dtls.get_details_as_txn_dict()
-        scan_args.update({
-            'transcoder': transcoder,
-            'scan_type': self._get_scan_type(scan_type),
-            'orchestrator_options': orchestrator_opts,
-        })
-        return RangeScanRequest(connection, **scan_args)
-
-    def build_range_scan_async_request(self,
-                                       connection: pycbc_connection,
-                                       scan_type: ScanType,
-                                       *opts: object,
-                                       **kwargs: object) -> AsyncRangeScanRequest:
-        if not self._loop:
-            raise RuntimeError('Cannot create a range scan request if an event loop is not running.')
-        orchestrator_opts = forward_args(kwargs, *opts)
-        transcoder = self._collection_dtls.get_request_transcoder(orchestrator_opts)
-        self._process_scan_orchestrator_ops(orchestrator_opts)
-        scan_args = self._collection_dtls.get_details_as_txn_dict()
-        scan_args.update({
-            'transcoder': transcoder,
-            'scan_type': self._get_scan_type(scan_type),
-            'orchestrator_options': orchestrator_opts,
-        })
-        return AsyncRangeScanRequest(connection, self._loop, **scan_args)
-
     def build_remove_request(self,
                              key: str,
                              obs_handler: Optional[ObservableRequestHandler],
@@ -825,3 +787,39 @@ class CollectionRequestBuilder:
             if v is not None:
                 setattr(req, k, v)
         return req
+
+    def build_range_scan_request(self,
+                                 connection: pycbc_connection,
+                                 scan_type: ScanType,
+                                 *opts: object,
+                                 **kwargs: object) -> RangeScanRequest:
+        orchestrator_opts = forward_args(kwargs, *opts)
+        transcoder = self._collection_dtls.get_request_transcoder(orchestrator_opts)
+        self._process_scan_orchestrator_ops(orchestrator_opts)
+        scan_args = self._collection_dtls.get_details_as_txn_dict()
+        scan_args.update({
+            'transcoder': transcoder,
+            'scan_type': self._get_scan_type(scan_type),
+            'orchestrator_options': orchestrator_opts,
+        })
+        return RangeScanRequest(connection, **scan_args)
+
+    def build_range_scan_async_request(self,
+                                       connection: pycbc_connection,
+                                       scan_type: ScanType,
+                                       *opts: object,
+                                       **kwargs: object) -> AsyncRangeScanRequest:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            raise RuntimeError('Cannot create a range scan request if an event loop is not running.') from None
+        orchestrator_opts = forward_args(kwargs, *opts)
+        transcoder = self._collection_dtls.get_request_transcoder(orchestrator_opts)
+        self._process_scan_orchestrator_ops(orchestrator_opts)
+        scan_args = self._collection_dtls.get_details_as_txn_dict()
+        scan_args.update({
+            'transcoder': transcoder,
+            'scan_type': self._get_scan_type(scan_type),
+            'orchestrator_options': orchestrator_opts,
+        })
+        return AsyncRangeScanRequest(connection, loop, **scan_args)

@@ -30,9 +30,10 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-from couchbase.common._option_diagnostics import check_options
+from couchbase.common._option_diagnostics import check_options, mode_of
 from couchbase.common._option_spec import BLOCKS, BlockSpec
 from couchbase.common._supportability import Supportability
+from couchbase.common.protocol import CouchbaseProtocol
 
 
 def merge(arg_vars: dict[str, Any] | None, *options: dict[str, Any] | None) -> dict[str, Any]:
@@ -86,6 +87,21 @@ def accepted(stated: dict[str, Any], block: str) -> dict[str, Any]:
         stated = resolve_deprecated(entry, stated)
     return {key: value for key, value in stated.items()
             if value is not None and (key in entry.keys or not entry.refuses_unknown)}
+
+
+def accepted_args(opt_type: type[dict[str, Any]],
+                  arg_vars: dict[str, Any] | None,
+                  *options: dict,
+                  protocol: CouchbaseProtocol) -> dict[str, Any]:
+    """The connection path: merge, judge, and keep what the entry accepts.
+
+    The mode is read out of the same mapping being judged, which is what makes it settable on
+    the very object whose keys it governs.  Reading one key before judging the rest costs
+    nothing, so nothing forces the dial to live anywhere else.
+    """
+    merged = merge(arg_vars, *options)
+    check_options(opt_type.__name__, merged, mode_of(merged), protocol=protocol)
+    return accepted(merged, opt_type.__name__)
 
 
 def transaction_args(block: str, options: dict[str, Any]) -> dict[str, Any]:

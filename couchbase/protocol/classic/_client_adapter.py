@@ -15,25 +15,24 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from typing import (TYPE_CHECKING,
                     Any,
-                    Dict,
-                    List,
-                    Optional,
-                    Union)
+                    cast)
 
-from couchbase.exceptions import (CouchbaseException,
-                                  ErrorMapper,
-                                  InternalSDKException)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import KeyValueMultiOperationCode, KeyValueOperationCode
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._registry import CLOSED_CLUSTER_MSG
+from couchbase.common.exceptions import CouchbaseException, InternalSDKException
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.protocol.classic._binding_map import BindingMap
 from couchbase.protocol.classic._bucket_types import CloseBucketRequest, OpenBucketRequest
 from couchbase.protocol.classic._cluster_types import CloseConnectionRequest
+from couchbase.protocol.classic._error_mapping import ErrorMapper
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 if TYPE_CHECKING:
+    from couchbase.common.option_enums import OptionValidationMode
     from couchbase.protocol.classic._bucket_types import BucketRequest
     from couchbase.protocol.classic._cluster_types import ClusterRequest, CreateConnectionRequest
     from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
@@ -44,10 +43,13 @@ class ClientAdapter:
 
     def __init__(self, connect_req: CreateConnectionRequest, **kwargs: Any) -> None:
         num_io_threads = connect_req.options.get('num_io_threads', None)
-        self._connection = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
+        conn = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
+        self._connection: pycbc_connection | None = conn
         self._closed = False
         self._connect_req = connect_req
-        self._binding_map = BindingMap(self._connection)
+        self._binding_map = BindingMap(conn)
+        self._couchbase_protocol = CouchbaseProtocol.CLASSIC
+        self._option_validation: OptionValidationMode | None = kwargs.pop('option_validation', None)
         # for testing we sometimes want to skip the actual C++ core connection
         if not (kwargs.get('skip_connect', None) == 'TEST_SKIP_CONNECT'):
             self._execute_connect_request()
@@ -58,6 +60,16 @@ class ClientAdapter:
         return self._binding_map
 
     @property
+    def option_validation(self) -> OptionValidationMode | None:
+        """**INTERNAL**"""
+        return self._option_validation
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._couchbase_protocol
+
+    @property
     def connected(self) -> bool:
         """**INTERNAL**"""
         return self._connection is not None and self._connection.connected
@@ -65,12 +77,13 @@ class ClientAdapter:
     @property
     def connection(self) -> pycbc_connection:
         """**INTERNAL**"""
+        if self._connection is None:
+            raise RuntimeError(CLOSED_CLUSTER_MSG)
         return self._connection
 
     def _ensure_not_closed(self) -> None:
         if self._closed:
-            raise RuntimeError(
-                'Cannot perform operations on a closed cluster. Create a new cluster instance to reconnect.')
+            raise RuntimeError(CLOSED_CLUSTER_MSG)
 
     def _ensure_connected(self) -> None:
         if not self.connected:
@@ -106,13 +119,14 @@ class ClientAdapter:
         return ret
 
     def execute_collection_request(self,
-                                   opcode: Union[KeyValueOperationCode, KeyValueMultiOperationCode],
-                                   req: Union[List[PycbcCoreKeyValueRequest], PycbcCoreKeyValueRequest],
-                                   obs_handler: Optional[ObservableRequestHandler] = None) -> Any:
+                                   opcode: int,
+                                   req: list[PycbcCoreKeyValueRequest] | PycbcCoreKeyValueRequest,
+                                   obs_handler: ObservableRequestHandler | None = None) -> Any:
         """**INTERNAL**"""
         self._ensure_not_closed()
         try:
-            ret = self._binding_map.kv_ops[opcode](req)
+            kv_op: Callable[[Any], Any] = self._binding_map.kv_ops[opcode]
+            ret = kv_op(req)
             # pycbc_result and pycbc_exception have a core_span member
             if obs_handler and hasattr(ret, 'core_span'):
                 obs_handler.process_core_span(ret.core_span)
@@ -135,7 +149,7 @@ class ClientAdapter:
 
     def execute_mgmt_request(self,
                              req: MgmtRequest,
-                             obs_handler: Optional[ObservableRequestHandler] = None) -> Any:
+                             obs_handler: ObservableRequestHandler | None = None) -> Any:
         """**INTERNAL**"""
         self._ensure_not_closed()
         req_dict = req.req_to_dict(obs_handler)
@@ -159,9 +173,10 @@ class ClientAdapter:
         if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
 
-    def _execute_req(self, binding_method: str, req_dict: Dict[str, Any]) -> Any:
+    def _execute_req(self, binding_method: str, req_dict: dict[str, Any]) -> Any:
         try:
-            return self._binding_map.op_map[binding_method](**req_dict)
+            op_map = cast(Mapping[str, Callable[..., Any]], self._binding_map.op_map)
+            return op_map[binding_method](**req_dict)
         except KeyError as e:
             msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
             raise InternalSDKException(message=msg) from None

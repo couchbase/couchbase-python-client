@@ -15,6 +15,11 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'Scope',
+    'TxScope',
+]
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Union)
@@ -28,10 +33,10 @@ from couchbase.result import (AnalyticsResult,
                               SearchResult)
 from txcouchbase.collection import Collection
 from txcouchbase.management.search import ScopeSearchIndexManager
-from txcouchbase.protocol.classic._scope_impl import TxScopeImpl
 
 if TYPE_CHECKING:
-    from couchbase._utils import JSONType
+    from couchbase.common._interfaces._scope import TxScopeInterface
+    from couchbase.common._utils import JSONType
     from couchbase.options import (AnalyticsOptions,
                                    QueryOptions,
                                    SearchOptions)
@@ -40,18 +45,33 @@ if TYPE_CHECKING:
 
 
 class Scope:
+
     def __init__(self, bucket: TxBucket, scope_name: str):
-        self._impl = TxScopeImpl(scope_name, bucket)
+        self._impl: TxScopeInterface = bucket._impl.scope(scope_name)
 
     @property
     def name(self) -> str:
+        """
+            str: The name of this :class:`~.Scope` instance.
+        """
         return self._impl.name
 
     @property
     def bucket_name(self) -> str:
+        """
+            str: The name of the bucket in which this :class:`~.Scope` instance belongs.
+        """
         return self._impl.bucket_name
 
     def collection(self, name: str) -> Collection:
+        """Creates a :class:`~.collection.Collection` instance of the specified collection.
+
+        Args:
+            name (str): Name of the collection to reference.
+
+        Returns:
+            :class:`~.collection.Collection`: A :class:`~.collection.Collection` instance of the specified collection.
+        """
         return Collection(self, name)
 
     def query(

@@ -20,6 +20,7 @@ import json
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import Enum
 from heapq import heappop, heappush
 from threading import (Event,
@@ -43,6 +44,8 @@ from couchbase.common._observability.observability_types import (_ATTR_DISPATCH_
                                                                  _DISP_SERVER_DURATION,
                                                                  _DISP_SERVER_PORT)
 from couchbase.common._operations import ServiceType
+from couchbase.common._transforms import validate_int
+from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.observability.tracing import (RequestSpan,
                                                     RequestTracer,
                                                     SpanAttributes,
@@ -484,22 +487,36 @@ class ThresholdLoggingSpan(RequestSpan):
             self._tracer.check_threshold(snapshot)
 
 
+def _duration(settings: Mapping[str, Any], key: str, default: timedelta) -> timedelta:
+    value = settings.get(key)
+    if value is None:
+        return default
+    if not isinstance(value, timedelta):
+        raise InvalidArgumentException(message=f'Expected {key} to be a timedelta instead of {type(value)}')
+    return value
+
+
+def _microseconds(settings: Mapping[str, Any], key: str, default: timedelta) -> int:
+    return _duration(settings, key, default) // timedelta(microseconds=1)
+
+
 class ThresholdLoggingTracer(RequestTracer):
 
     def __init__(self, config: ClusterTracingOptions | None = None) -> None:
         settings: Mapping[str, Any] = config if config is not None else {}
-        self._emit_interval_ms: int = settings.get('threshold_emit_interval', 10000)
-        self._sample_size: int = settings.get('threshold_sample_size', 10)
-        self._service_thresholds = {
-            ServiceType.KeyValue: settings.get('key_value_threshold', 500),
-            ServiceType.Query: settings.get('query_threshold', 1000),
-            ServiceType.Search: settings.get('search_threshold', 1000),
-            ServiceType.Analytics: settings.get('analytics_threshold', 1000),
-            ServiceType.Management: settings.get('management_threshold', 1000),
-            ServiceType.Eventing: settings.get('eventing_threshold', 1000),
-            ServiceType.Views: settings.get('view_threshold', 1000),
+        self._emit_interval = _duration(settings, 'tracing_threshold_queue_flush_interval', timedelta(seconds=10))
+        self._sample_size: int = validate_int(settings.get('tracing_threshold_queue_size', 10))
+        self._service_thresholds_us = {
+            ServiceType.KeyValue: _microseconds(settings, 'tracing_threshold_kv', timedelta(milliseconds=500)),
+            ServiceType.Query: _microseconds(settings, 'tracing_threshold_query', timedelta(seconds=1)),
+            ServiceType.Search: _microseconds(settings, 'tracing_threshold_search', timedelta(seconds=1)),
+            ServiceType.Analytics: _microseconds(settings, 'tracing_threshold_analytics', timedelta(seconds=1)),
+            ServiceType.Management: _microseconds(settings, 'tracing_threshold_management', timedelta(seconds=1)),
+            ServiceType.Eventing: _microseconds(settings, 'tracing_threshold_eventing', timedelta(seconds=1)),
+            ServiceType.Views: _microseconds(settings, 'tracing_threshold_view', timedelta(seconds=1)),
         }
-        self._reporter = ThresholdLoggingReporter(interval=self._emit_interval_ms / 1000, max_size=self._sample_size)
+        self._reporter = ThresholdLoggingReporter(interval=self._emit_interval.total_seconds(),
+                                                  max_size=self._sample_size)
         self._reporter.start()
 
     def close(self) -> None:
@@ -592,9 +609,4 @@ class ThresholdLoggingTracer(RequestTracer):
         return threshold_log_record
 
     def _get_service_type_threshold(self, service_type: ServiceType) -> int:
-        base_threshold = 0
-        if service_type in self._service_thresholds:
-            base_threshold = self._service_thresholds[service_type]
-
-        # convert to micros
-        return base_threshold * 1000
+        return self._service_thresholds_us.get(service_type, 0)

@@ -15,19 +15,20 @@
 
 from __future__ import annotations
 
-import platform
 import warnings
 from collections.abc import Generator
-from copy import copy
 from datetime import timedelta
-from typing import Any
+from typing import (Any,
+                    NoReturn,
+                    Protocol,
+                    runtime_checkable)
 
 import pytest
 
-from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.common._cluster_settings import ClusterSettings
+from couchbase.common.warnings import CouchbaseDeprecationWarning, CouchbaseOptionWarning
 from couchbase.exceptions import InvalidArgumentException, UnAmbiguousTimeoutException
 from couchbase.options import (CONFIG_PROFILES,
                                ClusterMetricsOptions,
@@ -39,78 +40,75 @@ from couchbase.options import (CONFIG_PROFILES,
                                IpProtocol,
                                KnownConfigProfiles,
                                TLSVerifyMode)
-from couchbase.protocol.classic._cluster_impl import ClusterImpl
-from couchbase.serializer import DefaultJsonSerializer
-from couchbase.transcoder import JSONTranscoder
 from tests.environments.test_environment import (SuiteRequirements,
                                                  SyncTestEnvironment,
+                                                 TestProtocol,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
-from txcouchbase.protocol.classic._cluster_impl import TxClusterImpl
 
 CONNSTR = 'couchbase://localhost'
-USER_AGENT = f'python/{platform.python_version()}'
 
-# The timeout and tracing groups drive the same cases through two spellings, so the case
-# lists are shared: two copies can stop agreeing without anything reporting it.
-TIMEOUT_CASES: list[tuple[dict[str, Any], dict[str, Any]]] = [
-    ({'bootstrap_timeout': timedelta(seconds=30)}, {'bootstrap_timeout': 30000}),
-    ({'resolve_timeout': timedelta(seconds=30)}, {'resolve_timeout': 30000}),
-    ({'connect_timeout': timedelta(seconds=30)}, {'connect_timeout': 30000}),
-    ({'kv_timeout': timedelta(seconds=30)}, {'key_value_timeout': 30000}),
-    ({'kv_durable_timeout': timedelta(seconds=30)}, {'key_value_durable_timeout': 30000}),
-    ({'views_timeout': timedelta(seconds=30)}, {'view_timeout': 30000}),
-    ({'query_timeout': timedelta(seconds=30)}, {'query_timeout': 30000}),
-    ({'analytics_timeout': timedelta(seconds=30)}, {'analytics_timeout': 30000}),
-    ({'search_timeout': timedelta(seconds=30)}, {'search_timeout': 30000}),
-    ({'management_timeout': timedelta(seconds=30)}, {'management_timeout': 30000}),
-    ({'dns_srv_timeout': timedelta(seconds=30)}, {'dns_srv_timeout': 30000}),
-    ({'idle_http_connection_timeout': timedelta(seconds=30)}, {'idle_http_connection_timeout': 30000}),
-    ({'config_idle_redial_timeout': timedelta(seconds=30)}, {'config_idle_redial_timeout': 30000}),
-    ({'bootstrap_timeout': timedelta(seconds=60),
-      'kv_timeout': timedelta(seconds=5),
-      'query_timeout': timedelta(seconds=30),
-      'search_timeout': timedelta(seconds=120),
-      'management_timeout': timedelta(seconds=60)},
-     {'bootstrap_timeout': 60000,
-      'key_value_timeout': 5000,
-      'query_timeout': 30000,
-      'search_timeout': 120000,
-      'management_timeout': 60000}),
+# Every timeout a cluster takes, alone and then together.  The parse keeps each as it was given;
+# what each is sent as is classic_connect_options_t's.
+TIMEOUT_CASES: list[dict[str, Any]] = [{name: timedelta(seconds=30)} for name in (
+    'bootstrap_timeout', 'resolve_timeout', 'connect_timeout', 'kv_timeout', 'kv_durable_timeout', 'views_timeout',
+    'query_timeout', 'analytics_timeout', 'search_timeout', 'management_timeout', 'dns_srv_timeout',
+    'idle_http_connection_timeout', 'config_idle_redial_timeout')] + [
+    {'bootstrap_timeout': timedelta(seconds=60),
+     'kv_timeout': timedelta(seconds=5),
+     'query_timeout': timedelta(seconds=30),
+     'search_timeout': timedelta(seconds=120),
+     'management_timeout': timedelta(seconds=60)},
 ]
 
+# The tracing group drives these through two spellings, so the list is shared: two copies can
+# stop agreeing without anything reporting it.  The two orphan settings on ClusterTracingOptions
+# are rehomed to the orphan block under the keys that replaced them.
 TRACING_CASES: list[tuple[dict[str, Any], dict[str, Any]]] = [
-    ({'tracing_threshold_kv': timedelta(milliseconds=30)}, {'key_value_threshold': 30}),
-    ({'tracing_threshold_view': timedelta(milliseconds=30)}, {'view_threshold': 30}),
-    ({'tracing_threshold_query': timedelta(milliseconds=30)}, {'query_threshold': 30}),
-    ({'tracing_threshold_search': timedelta(milliseconds=30)}, {'search_threshold': 30}),
-    ({'tracing_threshold_analytics': timedelta(milliseconds=30)}, {'analytics_threshold': 30}),
-    ({'tracing_threshold_eventing': timedelta(milliseconds=30)}, {'eventing_threshold': 30}),
-    ({'tracing_threshold_management': timedelta(milliseconds=30)}, {'management_threshold': 30}),
-    ({'tracing_threshold_queue_size': 20}, {'threshold_sample_size': 20}),
-    ({'tracing_threshold_queue_flush_interval': timedelta(seconds=30)}, {'threshold_emit_interval': 30000}),
+    ({'tracing_threshold_kv': timedelta(milliseconds=30)}, {'tracing_threshold_kv': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_view': timedelta(milliseconds=30)}, {'tracing_threshold_view': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_query': timedelta(milliseconds=30)}, {'tracing_threshold_query': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_search': timedelta(milliseconds=30)},
+     {'tracing_threshold_search': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_analytics': timedelta(milliseconds=30)},
+     {'tracing_threshold_analytics': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_eventing': timedelta(milliseconds=30)},
+     {'tracing_threshold_eventing': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_management': timedelta(milliseconds=30)},
+     {'tracing_threshold_management': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_queue_size': 20}, {'tracing_threshold_queue_size': 20}),
+    ({'tracing_threshold_queue_flush_interval': timedelta(seconds=30)},
+     {'tracing_threshold_queue_flush_interval': timedelta(seconds=30)}),
     ({'tracing_orphaned_queue_size': 20}, {'orphan_sample_size': 20}),
-    ({'tracing_orphaned_queue_flush_interval': timedelta(seconds=30)}, {'orphan_emit_interval': 30000}),
+    ({'tracing_orphaned_queue_flush_interval': timedelta(seconds=30)}, {'orphan_emit_interval': timedelta(seconds=30)}),
     ({'enable_tracing': True,
       'tracing_threshold_kv': timedelta(milliseconds=60),
       'tracing_threshold_query': timedelta(milliseconds=5),
       'tracing_threshold_management': timedelta(milliseconds=30),
       'tracing_threshold_queue_size': 20},
-     {'enable_tracing': True,
-      'key_value_threshold': 60,
-      'query_threshold': 5,
-      'management_threshold': 30,
-      'threshold_sample_size': 20}),
+     {'tracing_enable_tracing': True,
+      'tracing_threshold_kv': timedelta(milliseconds=60),
+      'tracing_threshold_query': timedelta(milliseconds=5),
+      'tracing_threshold_management': timedelta(milliseconds=30),
+      'tracing_threshold_queue_size': 20}),
 ]
 
 
+def _no_histogram(**kwargs: Any) -> NoReturn:
+    raise AssertionError('parsing a cluster\'s options recorded a value')
+
+
 def _settings(connstr: str, *options: ClusterOptions, **kwargs: Any) -> ClusterSettings:
-    # `skip_connect` stops the client adapter opening a connection, so everything built on
-    # this is cluster-free.  The read goes to `cluster_settings`, the INTERNAL property,
-    # rather than `ClusterImpl._get_connection_opts`, which returns a union every call site
-    # has to narrow and has no other caller in the repo.
-    return ClusterImpl(connstr, *options, skip_connect='TEST_SKIP_CONNECT', **kwargs).cluster_settings
+    # The parse every protocol's cluster runs, built without one.  It constructs the meter
+    # but records nothing, so the histogram factory a protocol supplies is never called.
+    return ClusterSettings.build_cluster_settings(connstr, *options, _histogram_factory=_no_histogram, **kwargs)
+
+
+@runtime_checkable
+class _ClassicClusterImpl(Protocol):
+    # What ConnectionTestSuite reads off classic's cluster impl, past the interface the facade holds it as.
+    def get_connection_info(self) -> dict[str, Any]: ...
 
 
 @pytest.mark.testgen_exclude('acouchbase',
@@ -118,8 +116,8 @@ def _settings(connstr: str, *options: ClusterOptions, **kwargs: Any) -> ClusterS
 class ClusterAuthUnitTests:
     # No cb_env and no TEST_MANIFEST: nothing here connects, and the manifest is a parity
     # contract between api trees.  There is no `acouchbase.auth` or `txcouchbase.auth`, and
-    # all three impls forward to the one `ClusterSettings.build_cluster_settings`, which
-    # test_every_api_tree_parses_a_connection_the_same_way below asserts once.
+    # every api tree's cluster parses its options with the one
+    # `ClusterSettings.build_cluster_settings`, which these call directly.
 
     CERT_AUTH = {'cert_path': 'path/to/a/cert',
                  'key_path': 'path/to/a/key',
@@ -135,7 +133,7 @@ class ClusterAuthUnitTests:
 
     def test_cluster_auth_fail(self) -> None:
         with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR)
+            _settings(CONNSTR)
 
     def test_cluster_cert_auth(self) -> None:
         auth = CertificateAuthenticator(**self.CERT_AUTH)
@@ -157,13 +155,12 @@ class ClusterAuthUnitTests:
             with pytest.raises(InvalidArgumentException):
                 CertificateAuthenticator(**auth_copy)
 
-        # trust_store_path is already in the authenticator, so repeating it as a cluster
-        # option is the conflict, not the value.
+    def test_cluster_cert_auth_ts_on_both(self) -> None:
         auth = CertificateAuthenticator(**self.CERT_AUTH)
-        with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR, ClusterOptions(auth), trust_store_path=self.TS_PATH)
-        with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR, authenticator=auth, trust_store_path=self.TS_PATH)
+        with pytest.raises(InvalidArgumentException, match='trust_store_path'):
+            _settings(CONNSTR, ClusterOptions(auth), trust_store_path='path/to/other')
+        with pytest.raises(InvalidArgumentException, match='trust_store_path'):
+            _settings(CONNSTR, authenticator=auth, trust_store_path='path/to/other')
 
     def test_cluster_cert_auth_ts_connstr(self) -> None:
         expected_auth = {'cert_path': 'path/to/a/cert', 'key_path': 'path/to/a/key'}
@@ -269,6 +266,28 @@ class ClusterAuthUnitTests:
                              allowed_sasl_mechanisms=['SCRAM-SHA512', 'SCRAM-SHA256'])
         assert _settings(f'{CONNSTR}{connstr_suffix}', ClusterOptions(auth)).auth == expected_auth
 
+    @pytest.mark.parametrize('connstr_suffix',
+                             ['?allowed_sasl_mechanisms=SCRAM-SHA512&sasl_mech_force=PLAIN',
+                              '?sasl_mech_force=PLAIN&allowed_sasl_mechanisms=SCRAM-SHA512'])
+    def test_cluster_sasl_mech_legacy_beats_current(self, connstr_suffix: str) -> None:
+        auth = self._pw_auth()
+        expected_auth = dict(auth.as_dict(), allowed_sasl_mechanisms=['PLAIN'])
+        with pytest.warns(CouchbaseOptionWarning, match='sasl_mech_force applies'):
+            settings = _settings(f'{CONNSTR}{connstr_suffix}', ClusterOptions(auth))
+        assert settings.auth == expected_auth
+
+    @pytest.mark.parametrize('connstr_suffix', ['?sasl_mech_force=PLAIN', '?allowed_sasl_mechanisms=PLAIN'])
+    def test_cluster_sasl_mech_alone_does_not_warn(self, connstr_suffix: str) -> None:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', CouchbaseOptionWarning)
+            settings = _settings(f'{CONNSTR}{connstr_suffix}', ClusterOptions(self._pw_auth()))
+        assert settings.auth['allowed_sasl_mechanisms'] == ['PLAIN']
+
+    def test_cluster_sasl_mech_authenticator_beats_connstr(self) -> None:
+        auth = self._pw_auth(allowed_sasl_mechanisms=['SCRAM-SHA256'])
+        connstr = f'{CONNSTR}?allowed_sasl_mechanisms=SCRAM-SHA512&sasl_mech_force=PLAIN'
+        assert _settings(connstr, ClusterOptions(auth)).auth['allowed_sasl_mechanisms'] == ['SCRAM-SHA256']
+
 
 @pytest.mark.testgen_exclude('acouchbase',
                              reason='drives ClusterSettings, which every api tree imports from couchbase')
@@ -285,178 +304,76 @@ class ClusterOptionsUnitTests:
     def _auth(cls) -> PasswordAuthenticator:
         return PasswordAuthenticator(cls.USERNAME, cls.PASSWORD)
 
-    @classmethod
-    def _conn_options(cls, *options: ClusterOptions, **kwargs: Any) -> dict[str, Any]:
-        return dict(_settings(CONNSTR, *options, **kwargs).cluster_options)
-
-    def test_cluster_options(self) -> None:
-        opts: dict[str, Any] = {
-            'enable_tls': True,
-            'enable_mutation_tokens': True,
-            'enable_tcp_keep_alive': True,
-            'ip_protocol': IpProtocol.Any,
-            'enable_dns_srv': True,
-            'show_queries': True,
-            'enable_unordered_execution': True,
-            'enable_clustermap_notification': True,
-            'enable_compression': True,
-            'enable_tracing': True,
-            'enable_metrics': True,
-            'enable_orphan_reporting': True,
-            'network': 'external',
-            'tls_verify': TLSVerifyMode.NO_VERIFY,
-            'disable_mozilla_ca_certificates': False,
-            'serializer': DefaultJsonSerializer(),
-            'transcoder': JSONTranscoder(),
-            'tcp_keep_alive_interval': timedelta(seconds=30),
-            'config_poll_interval': timedelta(seconds=30),
-            'config_poll_floor': timedelta(seconds=30),
-            'max_http_connections': 10,
-            'num_io_threads': 1,
-            'dump_configuration': True,
-            'preferred_server_group': 'group1',
-            'enable_app_telemetry': True,
-            'app_telemetry_endpoint': 'ws://localhost:8093',
-            'app_telemetry_backoff': timedelta(seconds=10),
-            'app_telemetry_ping_interval': timedelta(seconds=60),
-            'app_telemetry_ping_timeout': timedelta(seconds=5),
-            'enable_lazy_connections': True,
-        }
-
-        expected_opts = copy(opts)
-        # serializer and transcoder stay on the Python side; the core never sees either.
-        del expected_opts['serializer'], expected_opts['transcoder']
-        for key in ('tcp_keep_alive_interval', 'config_poll_interval', 'config_poll_floor',
-                    'app_telemetry_backoff', 'app_telemetry_ping_interval', 'app_telemetry_ping_timeout'):
-            expected_opts[key] = int(opts[key].total_seconds() * 1000)
-        del expected_opts['ip_protocol']
-        expected_opts['use_ip_protocol'] = 'any'
-        expected_opts['tls_verify'] = 'none'
-        # The three observability switches are nested rather than flat, and tracing's key is
-        # renamed on the way: enable_tracing becomes setup_sdk_tracing.
-        del expected_opts['enable_metrics'], expected_opts['enable_orphan_reporting'], expected_opts['enable_tracing']
-        expected_opts['metrics_options'] = {'enable_metrics': True}
-        expected_opts['orphan_reporting_options'] = {'enable_orphan_reporting': True}
-        expected_opts['setup_sdk_tracing'] = True
-
-        for cluster_opts in (self._conn_options(ClusterOptions(self._auth(), **opts)),
-                             self._conn_options(ClusterOptions(self._auth()), **opts)):
-            assert cluster_opts.pop('user_agent_extra', None) == USER_AGENT
-            assert cluster_opts == expected_opts
-
-    def test_every_api_tree_parses_a_connection_the_same_way(self) -> None:
-        # All three impls forward `*options, **kwargs` to the single
-        # `ClusterSettings.build_cluster_settings` and none touches the result, so a generated
-        # copy of the 120-odd tests above would exercise one parser through three wrappers.
-        # `TxClusterImpl` inherits its constructor, so it is here to catch an override.
-        options = ClusterOptions(self._auth(),
-                                 enable_tls=True,
-                                 tls_verify=TLSVerifyMode.NO_VERIFY,
-                                 ip_protocol=IpProtocol.Any,
-                                 max_http_connections=10,
-                                 timeout_options=ClusterTimeoutOptions(kv_timeout=timedelta(seconds=5)),
-                                 tracing_options=ClusterTracingOptions(
-                                     tracing_threshold_kv=timedelta(milliseconds=30)),
-                                 metrics_options=ClusterMetricsOptions(enable_metrics=True))
-        connstr = f'{CONNSTR}?sasl_mech_force=PLAIN&num_io_threads=1'
-        fields = ['connstr', 'auth', 'cluster_options', 'metrics_options', 'orphan_options',
-                  'streaming_timeouts', 'timeout_options', 'tracing_options']
-
-        # One options object across all three, which also pins that building a cluster does
-        # not consume it: build_cluster_settings pops from a copy, not from what it was given.
-        settings = [impl(connstr, options, skip_connect='TEST_SKIP_CONNECT').cluster_settings
-                    for impl in (ClusterImpl, AsyncClusterImpl, TxClusterImpl)]
-        sync_settings = settings[0]
-        for field in fields:
-            expected = getattr(sync_settings, field)
-            for other in settings[1:]:
-                assert getattr(other, field) == expected, field
-
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'enable_metrics': True, 'emit_interval': timedelta(seconds=30)},
-                               {'enable_metrics': True, 'metrics_emit_interval': 30000})])
+                               {'metrics_enable_metrics': True, 'metrics_emit_interval': timedelta(seconds=30)})])
     def test_cluster_metrics_options(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
-        cluster_opts = self._conn_options(ClusterOptions(self._auth(),
-                                                         metrics_options=ClusterMetricsOptions(**opts)))
-        assert cluster_opts.get('metrics_options') == expected_opts
+        settings = _settings(CONNSTR, ClusterOptions(self._auth(), metrics_options=ClusterMetricsOptions(**opts)))
+        assert settings.metrics_options == expected_opts
 
     @pytest.mark.parametrize('opts', [{'enable_metrics': 1}, {'metrics_emit_interval': 30}])
     def test_cluster_metrics_options_fail(self, opts: dict[str, Any]) -> None:
         with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
+            _settings(CONNSTR, ClusterOptions(self._auth()), **opts)
         with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), metrics_options=opts))  # type: ignore[arg-type]
+            _settings(CONNSTR, ClusterOptions(self._auth(), metrics_options=opts))  # type: ignore[arg-type]
 
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'enable_metrics': True, 'metrics_emit_interval': timedelta(seconds=30)},
-                               {'enable_metrics': True, 'metrics_emit_interval': 30000})])
+                               {'metrics_enable_metrics': True, 'metrics_emit_interval': timedelta(seconds=30)})])
     def test_cluster_metrics_options_kwargs(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
-        cluster_opts = self._conn_options(ClusterOptions(self._auth()), **opts)
-        assert cluster_opts.get('metrics_options') == expected_opts
+        settings = _settings(CONNSTR, ClusterOptions(self._auth()), **opts)
+        assert settings.metrics_options == expected_opts
 
     @pytest.mark.parametrize('opts, cluster_opts, expected_opts',
                              [(None,
                                {'enable_metrics': False, 'logging_meter_emit_interval': timedelta(seconds=60)},
-                               {'enable_metrics': False, 'metrics_emit_interval': 60000}),
+                               {'metrics_enable_metrics': False, 'metrics_emit_interval': timedelta(seconds=60)}),
                               ({'enable_metrics': True, 'emit_interval': timedelta(seconds=60)},
                                {'enable_metrics': False, 'logging_meter_emit_interval': timedelta(seconds=30)},
-                               {'enable_metrics': True, 'metrics_emit_interval': 60000})])
+                               {'metrics_enable_metrics': True, 'metrics_emit_interval': timedelta(seconds=60)})])
     def test_cluster_metrics_options_override(self,
                                               opts: dict[str, Any] | None,
                                               cluster_opts: dict[str, Any],
                                               expected_opts: dict[str, Any]) -> None:
         metrics_options = ClusterMetricsOptions(**opts) if opts else None
-        conn_opts = self._conn_options(ClusterOptions(self._auth(),
-                                                      metrics_options=metrics_options,
-                                                      **cluster_opts))
-        # The deprecated flat name is consumed rather than forwarded, so its absence is as
-        # much the assertion as the merged value is.
-        assert 'logging_meter_emit_interval' not in conn_opts
-        assert conn_opts.get('metrics_options') == expected_opts
+        settings = _settings(CONNSTR, ClusterOptions(self._auth(), metrics_options=metrics_options, **cluster_opts))
+        # The deprecated flat name is consumed rather than left among the plain options, so its
+        # absence is as much the assertion as the merged value is.
+        assert 'logging_meter_emit_interval' not in settings.cluster_options
+        assert settings.metrics_options == expected_opts
 
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'enable_orphan_reporting': True,
                                 'emit_interval': timedelta(seconds=30),
                                 'sample_size': 20},
-                               {'enable_orphan_reporting': True,
-                                'orphan_emit_interval': 30000,
+                               {'orphan_enable_orphan_reporting': True,
+                                'orphan_emit_interval': timedelta(seconds=30),
                                 'orphan_sample_size': 20})])
     def test_cluster_orphan_reporting_options(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
-        cluster_opts = self._conn_options(
-            ClusterOptions(self._auth(), orphan_reporting_options=ClusterOrphanReportingOptions(**opts)))
-        assert cluster_opts.get('orphan_reporting_options') == expected_opts
-
-    @pytest.mark.parametrize('opts', [{'enable_orphan_reporting': 1},
-                                      {'orphan_emit_interval': 30},
-                                      {'orphan_sample_size': 35.1}])
-    def test_cluster_orphan_reporting_options_fail(self, opts: dict[str, Any]) -> None:
-        with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
-        with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), orphan_reporting_options=opts))  # type: ignore[arg-type]
+        orphan_opts = ClusterOrphanReportingOptions(**opts)
+        settings = _settings(CONNSTR, ClusterOptions(self._auth(), orphan_reporting_options=orphan_opts))
+        assert settings.orphan_options == expected_opts
 
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'enable_orphan_reporting': True,
                                 'orphan_emit_interval': timedelta(seconds=30),
                                 'orphan_sample_size': 20},
-                               {'enable_orphan_reporting': True,
-                                'orphan_emit_interval': 30000,
+                               {'orphan_enable_orphan_reporting': True,
+                                'orphan_emit_interval': timedelta(seconds=30),
                                 'orphan_sample_size': 20})])
     def test_cluster_orphan_reporting_options_kwargs(self,
                                                      opts: dict[str, Any],
                                                      expected_opts: dict[str, Any]) -> None:
-        cluster_opts = self._conn_options(ClusterOptions(self._auth()), **opts)
-        assert cluster_opts.get('orphan_reporting_options') == expected_opts
+        assert _settings(CONNSTR, ClusterOptions(self._auth()), **opts).orphan_options == expected_opts
 
     @pytest.mark.parametrize('opts, cluster_opts, tracing_opts, expected_opts',
                              [(None,
                                {'enable_orphan_reporting': False},
                                {'tracing_orphaned_queue_flush_interval': timedelta(seconds=60),
                                 'tracing_orphaned_queue_size': 50},
-                               {'enable_orphan_reporting': False,
-                                'orphan_emit_interval': 60000,
+                               {'orphan_enable_orphan_reporting': False,
+                                'orphan_emit_interval': timedelta(seconds=60),
                                 'orphan_sample_size': 50}),
                               ({'enable_orphan_reporting': True,
                                 'emit_interval': timedelta(seconds=60),
@@ -464,8 +381,8 @@ class ClusterOptionsUnitTests:
                                {'enable_orphan_reporting': False},
                                {'tracing_orphaned_queue_flush_interval': timedelta(seconds=30),
                                 'tracing_orphaned_queue_size': 20},
-                               {'enable_orphan_reporting': True,
-                                'orphan_emit_interval': 60000,
+                               {'orphan_enable_orphan_reporting': True,
+                                'orphan_emit_interval': timedelta(seconds=60),
                                 'orphan_sample_size': 50})])
     def test_cluster_orphan_reporting_options_override(self,
                                                        opts: dict[str, Any] | None,
@@ -473,64 +390,40 @@ class ClusterOptionsUnitTests:
                                                        tracing_opts: dict[str, Any],
                                                        expected_opts: dict[str, Any]) -> None:
         # The two orphan settings that live on ClusterTracingOptions are rehomed here rather
-        # than forwarded, so a tracing_options block holding only those leaves nothing behind.
-        conn_opts = self._conn_options(
-            ClusterOptions(self._auth(),
-                           orphan_reporting_options=ClusterOrphanReportingOptions(**opts) if opts else None,
-                           tracing_options=ClusterTracingOptions(**tracing_opts),
-                           **cluster_opts))
-        assert conn_opts.get('tracing_options') is None
-        assert conn_opts.get('orphan_reporting_options') == expected_opts
+        # than kept, so a tracing_options block holding only those leaves nothing behind.
+        options = ClusterOptions(self._auth(),
+                                 orphan_reporting_options=ClusterOrphanReportingOptions(**opts) if opts else None,
+                                 tracing_options=ClusterTracingOptions(**tracing_opts),
+                                 **cluster_opts)
+        settings = _settings(CONNSTR, options)
+        assert 'tracing_options' not in settings.cluster_options
+        assert settings.orphan_options == expected_opts
 
-    @pytest.mark.parametrize('opts, expected_opts', TIMEOUT_CASES)
-    def test_cluster_timeout_options(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
-        cluster_opts = self._conn_options(ClusterOptions(self._auth(),
-                                                         timeout_options=ClusterTimeoutOptions(**opts)))
-        assert cluster_opts.get('timeout_options') == expected_opts
+    @pytest.mark.parametrize('opts', TIMEOUT_CASES)
+    def test_cluster_timeout_options(self, opts: dict[str, Any]) -> None:
+        settings = _settings(CONNSTR, ClusterOptions(self._auth(), timeout_options=ClusterTimeoutOptions(**opts)))
+        assert settings.timeout_options == opts
 
-    @pytest.mark.parametrize('opts', [{name: 30} for name, _ in
-                                      [('bootstrap_timeout', 0), ('resolve_timeout', 0), ('connect_timeout', 0),
-                                       ('kv_timeout', 0), ('kv_durable_timeout', 0), ('views_timeout', 0),
-                                       ('query_timeout', 0), ('analytics_timeout', 0), ('search_timeout', 0),
-                                       ('management_timeout', 0), ('dns_srv_timeout', 0),
-                                       ('idle_http_connection_timeout', 0), ('config_idle_redial_timeout', 0)]]
-                             + [{'bootstrap_timeout': 60000,
-                                 'kv_timeout': 5000,
-                                 'query_timeout': 30000,
-                                 'search_timeout': 120000,
-                                 'management_timeout': 60000}])
-    def test_cluster_timeout_options_fail(self, opts: dict[str, Any]) -> None:
-        # An int is the wrong type whatever its magnitude, which is the last case: 60000 reads
-        # like a plausible millisecond count and is rejected for the same reason 30 is.
-        with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
-        with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), timeout_options=opts))  # type: ignore[arg-type]
-
-    @pytest.mark.parametrize('opts, expected_opts', TIMEOUT_CASES)
-    def test_cluster_timeout_options_kwargs(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
-        cluster_opts = self._conn_options(ClusterOptions(self._auth()), **opts)
-        assert cluster_opts.get('timeout_options') == expected_opts
+    @pytest.mark.parametrize('opts', TIMEOUT_CASES)
+    def test_cluster_timeout_options_kwargs(self, opts: dict[str, Any]) -> None:
+        assert _settings(CONNSTR, ClusterOptions(self._auth()), **opts).timeout_options == opts
 
     @staticmethod
     def _assert_expected_tracing(settings: ClusterSettings, expected_opts: dict[str, Any]) -> None:
-        # The two orphan settings are rehomed into `orphan_reporting_options` and go to the
-        # core.  Every other one stays on the Python side in `cluster_settings.tracing_options`
-        # and the core is handed no tracing block at all, on both paths.
-        assert settings.cluster_options.get('tracing_options') is None
+        # The two orphan settings are rehomed into `orphan_options`.  Every other one stays in
+        # `tracing_options`, and none is left among the plain options, on both paths.
+        assert 'tracing_options' not in settings.cluster_options
         if 'orphan_sample_size' in expected_opts or 'orphan_emit_interval' in expected_opts:
-            assert settings.cluster_options.get('orphan_reporting_options') == expected_opts
+            assert settings.orphan_options == expected_opts
         else:
-            assert settings.cluster_options.get('orphan_reporting_options') is None
-            # enable_tracing is written whether or not the caller asked for it, so it goes into
-            # a copy: writing it into the parametrize case dict mutates a list two tests share.
-            assert settings.tracing_options == dict(expected_opts, enable_tracing=True)
+            assert not settings.orphan_options
+            # The switch is written whether or not the caller asked for it, so it goes into a
+            # copy: writing it into the parametrize case dict mutates a list two tests share.
+            assert settings.tracing_options == dict(expected_opts, tracing_enable_tracing=True)
 
     @pytest.mark.parametrize('opts, expected_opts', TRACING_CASES)
     def test_cluster_tracing_options(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
-        settings = _settings(CONNSTR, ClusterOptions(self._auth(),
-                                                     tracing_options=ClusterTracingOptions(**opts)))
+        settings = _settings(CONNSTR, ClusterOptions(self._auth(), tracing_options=ClusterTracingOptions(**opts)))
         self._assert_expected_tracing(settings, expected_opts)
 
     @pytest.mark.parametrize('opts', [{'enable_tracing': 1},
@@ -542,7 +435,6 @@ class ClusterOptionsUnitTests:
                                       {'tracing_threshold_eventing': 30},
                                       {'tracing_threshold_management': 30},
                                       {'tracing_threshold_queue_flush_interval': 30},
-                                      {'tracing_orphaned_queue_flush_interval': 30},
                                       {'tracing_threshold_kv': 60000,
                                        'tracing_threshold_query': 5000,
                                        'tracing_threshold_search': 30000,
@@ -550,29 +442,26 @@ class ClusterOptionsUnitTests:
                                        'tracing_threshold_queue_flush_interval': 60000}])
     def test_cluster_tracing_options_fail(self, opts: dict[str, Any]) -> None:
         with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
+            _settings(CONNSTR, ClusterOptions(self._auth()), **opts)
         with pytest.raises(InvalidArgumentException):
-            ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), tracing_options=opts))  # type: ignore[arg-type]
+            _settings(CONNSTR, ClusterOptions(self._auth(), tracing_options=opts))  # type: ignore[arg-type]
 
     @pytest.mark.parametrize('opts, expected_opts', TRACING_CASES)
     def test_cluster_tracing_options_kwargs(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
-        settings = _settings(CONNSTR, ClusterOptions(self._auth()), **opts)
-        self._assert_expected_tracing(settings, expected_opts)
+        self._assert_expected_tracing(_settings(CONNSTR, ClusterOptions(self._auth()), **opts), expected_opts)
 
     @pytest.mark.parametrize('tracing_opts, cluster_opts, expected_opts',
-                             [(None, {'enable_tracing': False}, {'enable_tracing': False}),
-                              ({'enable_tracing': True}, {'enable_tracing': False}, {'enable_tracing': True})])
+                             [(None, {'enable_tracing': False}, {'tracing_enable_tracing': False}),
+                              ({'enable_tracing': True}, {'enable_tracing': False}, {'tracing_enable_tracing': True})])
     def test_cluster_tracing_options_override(self,
                                               tracing_opts: dict[str, Any] | None,
                                               cluster_opts: dict[str, Any],
                                               expected_opts: dict[str, Any]) -> None:
-        settings = _settings(CONNSTR,
-                             ClusterOptions(self._auth(),
-                                            tracing_options=ClusterTracingOptions(**tracing_opts)
-                                            if tracing_opts else None,
-                                            **cluster_opts))
-        assert settings.cluster_options.get('tracing_options') is None
+        options = ClusterOptions(self._auth(),
+                                 tracing_options=ClusterTracingOptions(**tracing_opts) if tracing_opts else None,
+                                 **cluster_opts)
+        settings = _settings(CONNSTR, options)
+        assert 'tracing_options' not in settings.cluster_options
         assert settings.tracing_options == expected_opts
 
 
@@ -630,7 +519,6 @@ class ConnectionStringUnitTests:
                                           'http://fqdn?key=value',
                                           'couchbases://fqdn'])
     def test_valid_connection_strings(self, conn_str: str) -> None:
-        expected_opts = {'timeout_options': {'bootstrap_timeout': 1000}, 'setup_sdk_tracing': True}
         if conn_str == '10.0.0.1:8091':
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
@@ -638,14 +526,13 @@ class ConnectionStringUnitTests:
             # A bare host and port with no scheme is the deprecated spelling, and it is the
             # only one of the eleven that warns.
             assert len(caught) == 1
-            assert issubclass(caught[-1].category, DeprecationWarning)
+            assert issubclass(caught[-1].category, CouchbaseDeprecationWarning)
             assert 'deprecated' in str(caught[-1].message)
         else:
             settings = _settings(conn_str, authenticator=self.AUTH, bootstrap_timeout=timedelta(seconds=1))
 
-        cluster_options = dict(settings.cluster_options)
-        assert cluster_options.pop('user_agent_extra', None) == USER_AGENT
-        assert cluster_options == expected_opts
+        assert settings.cluster_options == {}
+        assert settings.timeout_options == {'bootstrap_timeout': timedelta(seconds=1)}
         # The query string is consumed into options and does not survive on the connstr.
         assert settings.connstr == conn_str.split('?')[0]
 
@@ -660,31 +547,54 @@ class ConnectionStringUnitTests:
          ('couchbase://10.0.0.1?an_invalid_option=10', {})])
     def test_connection_string_options(self, conn_str: str, expected_opts: dict[str, Any]) -> None:
         settings = _settings(conn_str, authenticator=self.AUTH)
-        cluster_options = dict(settings.cluster_options)
-        assert cluster_options.pop('user_agent_extra', None) == USER_AGENT
         # An unrecognised query option is dropped rather than raising, which is the last case.
-        assert cluster_options == dict(expected_opts, setup_sdk_tracing=True)
+        assert settings.cluster_options == expected_opts
         assert settings.connstr == conn_str.split('?')[0]
+
+    def test_connection_string_duration_and_the_same_timedelta_send_the_same(self) -> None:
+        for value, delta in (('0', timedelta(0)), ('1500us', timedelta(microseconds=1500))):
+            from_connstr = _settings(f'couchbase://10.0.0.1?kv_timeout={value}', authenticator=self.AUTH)
+            from_code = _settings('couchbase://10.0.0.1',
+                                  ClusterOptions(self.AUTH, timeout_options=ClusterTimeoutOptions(kv_timeout=delta)))
+            assert from_connstr.timeout_options == from_code.timeout_options
+
+    # A sign, a bare decimal, a unit Go's time.ParseDuration lacks, a capital or a space.
+    @pytest.mark.parametrize('value', ['soon', '-5', '1.5', '1d', '1M', '5MS', '5%20ms', '%205ms'])
+    def test_connection_string_value_that_is_not_a_duration(self, value: str) -> None:
+        with pytest.raises(InvalidArgumentException, match='is not a duration'):
+            _settings(f'couchbase://10.0.0.1?kv_timeout={value}', authenticator=self.AUTH)
+
+    @pytest.mark.parametrize('value', ['999999999999h', '99999999999999999999'])
+    def test_connection_string_duration_too_long(self, value: str) -> None:
+        with pytest.raises(InvalidArgumentException, match=f'kv_timeout={value} .* longer than'):
+            _settings(f'couchbase://10.0.0.1?kv_timeout={value}', authenticator=self.AUTH)
+
+    def test_connection_string_empty_duration_sets_nothing(self) -> None:
+        settings = _settings('couchbase://10.0.0.1?kv_timeout=', authenticator=self.AUTH)
+
+        assert settings.timeout_options == {}
 
 
 @pytest.mark.testgen_exclude('txcouchbase',
                              reason='txcouchbase.Cluster has no connect() classmethod')
 class ConnectionTestSuite(SuiteRequirements):
-    # The rest of this file asserts what the SDK hands the core.  These seven assert what
-    # comes back out of `cluster._impl.get_connection_info()`, which is the only reason any
-    # of them needs a connection; it is INTERNAL in both impls, the same deliberate reach
-    # cluster_t makes for `cluster._impl.connected`.  Not generated for txcouchbase, whose
+    # The rest of this file asserts what the SDK makes of a cluster's options.  These eight
+    # assert what comes back out of `get_connection_info()` on classic's cluster impl, which is the only
+    # reason any of them needs a connection, and which makes the suite classic-only: no
+    # protocol-neutral interface carries it.  Not generated for txcouchbase, whose
     # Cluster has no `connect` classmethod.  Every test closes in a `finally`: since
     # PYCBC-1915 a connection left open leaks observability reporter threads, and this file
-    # opens eight.  The `flaky(reruns=5)` markers mean "opens a connection", not "observed
+    # opens twelve.  The `flaky(reruns=5)` markers mean "opens a connection", not "observed
     # flaky".
 
     NUM_DOCS = 0
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
 
     TEST_MANIFEST = [
         'test_cluster_ldap_auth_real',
         'test_cluster_legacy_sasl_mech_force_real',
         'test_cluster_options_core_round_trip',
+        'test_cluster_orphan_reporting_core_round_trip',
         'test_cluster_sasl_mech_default',
         'test_custom_config_profile',
         'test_wan_config_profile',
@@ -712,13 +622,19 @@ class ConnectionTestSuite(SuiteRequirements):
         username, pw = cb_env.config.get_username_and_pw()
         return PasswordAuthenticator(username, pw, **kwargs)
 
+    @staticmethod
+    def _connection_info(cluster: Cluster) -> dict[str, Any]:
+        impl = cluster._impl
+        assert isinstance(impl, _ClassicClusterImpl)
+        return impl.get_connection_info()
+
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_cluster_ldap_auth_real(self, cb_env: SyncTestEnvironment) -> None:
         username, pw = cb_env.config.get_username_and_pw()
         auth = PasswordAuthenticator.ldap_compatible(username, pw)
         cluster: Cluster = self._connect(cb_env, ClusterOptions(auth))
         try:
-            credentials = cluster._impl.get_connection_info()['credentials']
+            credentials = self._connection_info(cluster)['credentials']
             assert credentials['allowed_sasl_mechanisms'] == ['PLAIN']
         finally:
             cluster.close()
@@ -730,7 +646,7 @@ class ConnectionTestSuite(SuiteRequirements):
                                          ClusterOptions(self._pw_auth(cb_env)),
                                          connstr=f'{conn_string}?sasl_mech_force=PLAIN')
         try:
-            credentials = cluster._impl.get_connection_info()['credentials']
+            credentials = self._connection_info(cluster)['credentials']
             assert credentials['allowed_sasl_mechanisms'] == ['PLAIN']
         finally:
             cluster.close()
@@ -739,7 +655,7 @@ class ConnectionTestSuite(SuiteRequirements):
     def test_cluster_sasl_mech_default(self, cb_env: SyncTestEnvironment) -> None:
         cluster: Cluster = self._connect(cb_env, ClusterOptions(self._pw_auth(cb_env)))
         try:
-            credentials = cluster._impl.get_connection_info()['credentials']
+            credentials = self._connection_info(cluster)['credentials']
             # The empty list is normalized in, not sent: the binding's cluster_credentials
             # to_py omits the field when the vector is empty as well as when it is unset, so
             # `[]` says the connection restricts no mechanism.  PYCBC-1925 fixed reading it
@@ -793,10 +709,41 @@ class ConnectionTestSuite(SuiteRequirements):
 
         cluster: Cluster = self._connect(cb_env, ClusterOptions(self._pw_auth(cb_env), **opts))
         try:
-            client_opts = cluster._impl.get_connection_info()
+            client_opts = self._connection_info(cluster)
             for key, expected_value in expected.items():
                 assert client_opts.get(key) == expected_value, (
                     f'Expected {key}={expected_value!r}, got {client_opts.get(key)!r}')
+        finally:
+            cluster.close()
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    @pytest.mark.parametrize('opts, expected',
+                             [({}, {'enable_orphan_reporting': True,
+                                    'orphan_sample_size': 64,
+                                    'orphan_emit_interval': 10000}),
+                              ({'orphan_reporting_options': ClusterOrphanReportingOptions(
+                                  enable_orphan_reporting=False,
+                                  sample_size=5,
+                                  emit_interval=timedelta(seconds=3))},
+                               {'enable_orphan_reporting': False,
+                                'orphan_sample_size': 5,
+                                'orphan_emit_interval': 3000}),
+                              ({'enable_orphan_reporting': False,
+                                'tracing_options': ClusterTracingOptions(
+                                    tracing_orphaned_queue_size=5,
+                                    tracing_orphaned_queue_flush_interval=timedelta(seconds=3))},
+                               {'enable_orphan_reporting': False,
+                                'orphan_sample_size': 5,
+                                'orphan_emit_interval': 3000})])
+    def test_cluster_orphan_reporting_core_round_trip(self,
+                                                      cb_env: SyncTestEnvironment,
+                                                      opts: dict[str, Any],
+                                                      expected: dict[str, Any]) -> None:
+        # PYCBC-1960.  The first case is the core's defaults, the last the deprecated spelling on the
+        # tracing block.
+        cluster: Cluster = self._connect(cb_env, ClusterOptions(self._pw_auth(cb_env), **opts))
+        try:
+            assert self._connection_info(cluster).get('orphan_reporting_options') == expected
         finally:
             cluster.close()
 
@@ -828,7 +775,7 @@ class ConnectionTestSuite(SuiteRequirements):
             opts.apply_profile('test_profile')
             cluster: Cluster = self._connect(cb_env, opts)
             try:
-                timeout_opts = cluster._impl.get_connection_info()['timeout_options']
+                timeout_opts = self._connection_info(cluster)['timeout_options']
                 for key, expected_value in expected_opts.items():
                     assert timeout_opts[key] == expected_value, key
             finally:
@@ -847,7 +794,7 @@ class ConnectionTestSuite(SuiteRequirements):
         opts.apply_profile(profile)
         cluster: Cluster = self._connect(cb_env, opts)
         try:
-            timeout_opts = cluster._impl.get_connection_info()['timeout_options']
+            timeout_opts = self._connection_info(cluster)['timeout_options']
             for key, expected_value in self.WAN_TIMEOUTS.items():
                 assert timeout_opts[key] == expected_value, key
         finally:
@@ -862,7 +809,7 @@ class ConnectionTestSuite(SuiteRequirements):
                                          ClusterOptions.create_options_with_profile(
                                              self._pw_auth(cb_env), profile))
         try:
-            timeout_opts = cluster._impl.get_connection_info()['timeout_options']
+            timeout_opts = self._connection_info(cluster)['timeout_options']
             for key, expected_value in self.WAN_TIMEOUTS.items():
                 assert timeout_opts[key] == expected_value, key
         finally:

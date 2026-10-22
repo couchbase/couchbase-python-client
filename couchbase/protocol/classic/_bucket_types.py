@@ -15,30 +15,36 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, fields
 from typing import (TYPE_CHECKING,
                     Any,
-                    Callable,
-                    Dict,
-                    List,
-                    Optional,
-                    Set)
+                    Optional)
 
+from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import BucketOperationType, StreamingOperationType
+from couchbase.logic.operation_types import StreamingOperationType
+from couchbase.protocol.classic._bindings import ConnectionBinding
 
 if TYPE_CHECKING:
     from couchbase.views import ViewQuery
 
-_FIELDS_CACHE: Dict[type, List] = {}
+
+class BucketOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    Ping = 'PingOptions'
+
+
+_FIELDS_CACHE: dict[type, list] = {}
 
 
 @dataclass
-class BucketRequest:
+class BucketRequest(ABC):
 
     def req_to_dict(self,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+                    callback: Callable[..., None] | None = None,
+                    errback: Callable[..., None] | None = None) -> dict[str, Any]:
         cls = type(self)
         cached_fields = _FIELDS_CACHE.get(cls)
         if cached_fields is None:
@@ -59,6 +65,11 @@ class BucketRequest:
 
         return op_kwargs
 
+    @property
+    @abstractmethod
+    def binding_method(self) -> str:
+        raise NotImplementedError
+
 
 @dataclass
 class CloseBucketRequest(BucketRequest):
@@ -66,7 +77,7 @@ class CloseBucketRequest(BucketRequest):
 
     @property
     def binding_method(self) -> str:
-        return BucketOperationType.CloseBucket.value
+        return ConnectionBinding.CloseBucket.value
 
 
 @dataclass
@@ -75,19 +86,19 @@ class OpenBucketRequest(BucketRequest):
 
     @property
     def binding_method(self) -> str:
-        return BucketOperationType.OpenBucket.value
+        return ConnectionBinding.OpenBucket.value
 
 
 @dataclass
 class PingRequest(BucketRequest):
-    services: Set[str]
-    bucket_name: Optional[str] = None
-    report_id: Optional[str] = None
-    timeout: Optional[int] = None
+    services: set[str]
+    bucket_name: str | None = None
+    report_id: str | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return BucketOperationType.Ping.value
+        return ConnectionBinding.Ping.value
 
 
 @dataclass

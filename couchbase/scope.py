@@ -15,6 +15,10 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'Scope',
+]
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Union)
@@ -27,21 +31,21 @@ from couchbase.management.search import ScopeSearchIndexManager
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions)
-from couchbase.protocol.classic._scope_impl import ScopeImpl
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 
 if TYPE_CHECKING:
-    from couchbase._utils import JSONType
     from couchbase.bucket import Bucket
+    from couchbase.common._interfaces._scope import ScopeInterface
+    from couchbase.common._utils import JSONType
     from couchbase.search import SearchQuery, SearchRequest
 
 
 class Scope:
 
     def __init__(self, bucket: Bucket, scope_name: str) -> None:
-        self._impl = ScopeImpl(scope_name, bucket)
+        self._impl: ScopeInterface = bucket._impl.scope(scope_name)
 
     @property
     def name(self) -> str:

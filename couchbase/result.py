@@ -15,7 +15,39 @@
 
 from __future__ import annotations
 
-import json
+__all__ = [
+    'AnalyticsResult',
+    'ClusterInfoResult',
+    'ContentProxy',
+    'ContentSubdocProxy',
+    'CounterResult',
+    'DiagnosticsResult',
+    'ExistsResult',
+    'GetReplicaResult',
+    'GetResult',
+    'LookupInReplicaResult',
+    'LookupInResult',
+    'MultiCounterResult',
+    'MultiExistsResult',
+    'MultiGetReplicaResult',
+    'MultiGetResult',
+    'MultiMutationResult',
+    'MultiResult',
+    'MultiResultType',
+    'MutateInResult',
+    'MutationResult',
+    'MutationToken',
+    'OperationResult',
+    'PingResult',
+    'QueryResult',
+    'Result',
+    'ScanResult',
+    'ScanResultIterable',
+    'SearchResult',
+    'ValueResult',
+    'ViewResult',
+]
+
 import sys
 from copy import copy
 from datetime import datetime
@@ -24,24 +56,21 @@ from typing import (Any,
                     Generic,
                     List,
                     Optional,
+                    Protocol,
+                    TypeVar,
                     Union)
-
-if sys.version_info >= (3, 13):
-    from typing import TypeVar
-else:
-    from typing_extensions import TypeVar
 
 import couchbase.common.result as _common_result
 from acouchbase.analytics import AsyncAnalyticsRequest
 from acouchbase.n1ql import AsyncN1QLRequest
 from acouchbase.search import AsyncFullTextSearchRequest
 from acouchbase.views import AsyncViewRequest
+from couchbase.common._supportability import Supportability
+from couchbase.common.result import ClusterInfoResult  # noqa: F401
+from couchbase.common.result import DiagnosticsResult  # noqa: F401
+from couchbase.common.result import MutationToken  # noqa: F401
+from couchbase.common.result import PingResult  # noqa: F401
 from couchbase.constants import FMT_JSON
-from couchbase.diagnostics import (ClusterState,
-                                   EndpointDiagnosticsReport,
-                                   EndpointPingReport,
-                                   EndpointState,
-                                   ServiceType)
 from couchbase.exceptions import (CouchbaseException,
                                   ErrorMapper,
                                   InvalidArgumentException)
@@ -50,6 +79,256 @@ from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreE
 from couchbase.protocol.classic._pycbc_core import pycbc_result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
 from couchbase.transcoder import Transcoder
+
+_ExecuteT = TypeVar('_ExecuteT', covariant=True)
+_FinalT = TypeVar('_FinalT', covariant=True)
+
+
+class _Rows(Protocol[_ExecuteT, _FinalT]):
+    """What a result reads from its rows on either API: the drain, and what follows the rows."""
+
+    def execute(self) -> _ExecuteT: ...
+
+    def final_metadata(self) -> _FinalT | None: ...
+
+
+class HttpResult:
+    """
+    .. deprecated:: 4.7.0
+        Nothing in the SDK returns one.
+    """
+
+    def __init__(self, orig: object) -> None:
+        Supportability.type_deprecated('HttpResult', message='Nothing in the SDK returns one.')
+        self._orig = orig
+
+
+class ScanResultIterable:
+    def __init__(
+        self,
+        scan_request
+    ):
+        self._request = scan_request
+
+    def rows(self):
+        """The rows which have been returned by the query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
+        # avoid circular import
+        from acouchbase.kv_range_scan import AsyncRangeScanRequest  # noqa: F811
+        if isinstance(self._request, AsyncRangeScanRequest):
+            return self.__aiter__()
+        return self.__iter__()
+
+    def cancel_scan(self):
+        self._request.cancel_scan()
+
+    def __iter__(self):
+        return self._request.__iter__()
+
+    def __aiter__(self):
+        return self._request.__aiter__()
+
+    def __repr__(self):
+        return "ScanResultIterable:{}".format(self._request)
+
+
+class QueryResult:
+    def __init__(
+        self,
+        n1ql_request
+    ):
+        self._request = n1ql_request
+
+    def rows(self):
+        """The rows which have been returned by the query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
+        if isinstance(self._request, AsyncN1QLRequest):
+            return self.__aiter__()
+        return self.__iter__()
+
+    def execute(self):
+        """Convenience method to execute the query.
+
+        Returns:
+            List[Any]:  A list of query results.
+
+        Example:
+            q_rows = cluster.query('SELECT * FROM `travel-sample` WHERE country LIKE 'United%' LIMIT 2;').execute()
+
+        """
+        return self._request.execute()
+
+    def metadata(self):
+        """The meta-data which has been returned by the query.
+
+        Returns:
+            :class:`~couchbase.n1ql.QueryMetaData`: An instance of :class:`~couchbase.n1ql.QueryMetaData`.
+        """
+        return self._request.metadata()
+
+    def __iter__(self):
+        return self._request.__iter__()
+
+    def __aiter__(self):
+        return self._request.__aiter__()
+
+    def __repr__(self):
+        return "QueryResult:{}".format(self._request)
+
+
+class AnalyticsResult:
+    def __init__(
+        self,
+        analytics_request
+    ):
+        self._request = analytics_request
+
+    def __repr__(self):
+        return "AnalyticsResult:{}".format(self._request)
+
+    def rows(self):
+        """The rows which have been returned by the analytics query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
+        if isinstance(self._request, AsyncAnalyticsRequest):
+            return self.__aiter__()
+        return self.__iter__()
+
+    def metadata(self):
+        """The meta-data which has been returned by the analytics query.
+
+        Returns:
+            :class:`~couchbase.analytics.AnalyticsMetaData`: An instance of
+            :class:`~couchbase.analytics.AnalyticsMetaData`.
+        """
+        return self._request.metadata()
+
+    def __iter__(self):
+        return self._request.__iter__()
+
+    def __aiter__(self):
+        return self._request.__aiter__()
+
+
+class SearchResult:
+    def __init__(
+        self,
+        search_request
+    ):
+        self._request = search_request
+
+    def __repr__(self):
+        return "SearchResult:{}".format(self._request)
+
+    def rows(self):
+        """The rows which have been returned by the search query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
+        if isinstance(self._request, AsyncFullTextSearchRequest):
+            return self.__aiter__()
+        return self.__iter__()
+
+    def metadata(self):
+        """The meta-data which has been returned by the search query.
+
+        Returns:
+            :class:`~couchbase.search.SearchMetaData`: An instance of
+            :class:`~couchbase.search.SearchMetaData`.
+        """
+        return self._request.metadata()
+
+    def result_rows(self):
+        return self._request.result_rows()
+
+    def facets(self):
+        return self._request.result_facets()
+
+    def __iter__(self):
+        return self._request.__iter__()
+
+    def __aiter__(self):
+        return self._request.__aiter__()
+
+
+class ViewResult:
+    def __init__(
+        self,
+        search_request
+    ):
+        self._request = search_request
+
+    def __repr__(self):
+        return "ViewResult:{}".format(self._request)
+
+    def rows(self):
+        """The rows which have been returned by the view query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
+        if isinstance(self._request, AsyncViewRequest):
+            return self.__aiter__()
+        return self.__iter__()
+
+    def metadata(self):
+        """The meta-data which has been returned by the view query.
+
+        Returns:
+            :class:`~couchbase.views.ViewMetaData`: An instance of
+            :class:`~couchbase.views.ViewMetaData`.
+        """
+        return self._request.metadata()
+
+    def __iter__(self):
+        return self._request.__iter__()
+
+    def __aiter__(self):
+        return self._request.__aiter__()
 
 
 class Result:
@@ -175,153 +454,6 @@ class ContentSubdocProxy:
         :return: the content cast to the given type, if possible
         """
         return lambda index: self._parse_content_at_index(index, type_)
-
-
-class DiagnosticsResult(Result):
-
-    def __init__(
-        self,
-        orig,  # type: pycbc_result
-    ):
-        super().__init__(orig)
-        svc_endpoints = self._orig.raw_result.get('services', None)
-        self._endpoints = {}
-        if svc_endpoints:
-            for service, endpoints in svc_endpoints.items():
-                service_type = ServiceType(service)
-                self._endpoints[service_type] = []
-                for endpoint in endpoints:
-                    self._endpoints[service_type].append(
-                        EndpointDiagnosticsReport(service_type, endpoint))
-
-    @property
-    def id(self) -> str:
-        """
-            str: The unique identifier for this report.
-        """
-        return self._orig.raw_result.get("id", None)
-
-    @property
-    def version(self) -> int:
-        """
-            int: The version number of this report.
-        """
-        return self._orig.raw_result.get("version", None)
-
-    @property
-    def sdk(self) -> str:
-        """
-            str: The name of the SDK which generated this report.
-        """
-        return self._orig.raw_result.get("sdk", None)
-
-    @property
-    def endpoints(self) -> Dict[ServiceType, List[EndpointDiagnosticsReport]]:
-        """
-            Dict[ServiceType, List[EndpointDiagnosticsReport]]: A map of service endpoints and their diagnostic status.
-        """
-        return self._endpoints
-
-    @property
-    def state(self) -> ClusterState:
-        """
-            :class:`~couchbase.diagnostics.ClusterState`: The cluster state.
-        """
-        num_found = 0
-        num_connected = 0
-        for endpoints in self._endpoints.values():
-            for endpoint in endpoints:
-                num_found += 1
-                if endpoint.state == EndpointState.Connected:
-                    num_connected += 1
-
-        if num_found == num_connected:
-            return ClusterState.Online
-        if num_connected > 0:
-            return ClusterState.Degraded
-        return ClusterState.Offline
-
-    def as_json(self) -> str:
-        """Returns a JSON formatted diagnostics report.
-
-        Returns:
-            str: JSON formatted diagnostics report.
-        """
-        return_val = {
-            'version': self.version,
-            'id': self.id,
-            'sdk': self.sdk,
-            'services': {k.value: list(map(lambda epr: epr.as_dict(), v)) for k, v in self.endpoints.items()}
-        }
-
-        return json.dumps(return_val)
-
-    def __repr__(self):
-        return "DiagnosticsResult:{}".format(self._orig)
-
-
-class PingResult(Result):
-
-    def __init__(
-        self,
-        orig,  # type: pycbc_result
-    ):
-        super().__init__(orig)
-        svc_endpoints = self._orig.raw_result.get('services', None)
-        self._endpoints = {}
-        if svc_endpoints:
-            for service, endpoints in svc_endpoints.items():
-                service_type = ServiceType(service)
-                self._endpoints[service_type] = []
-                for endpoint in endpoints:
-                    self._endpoints[service_type].append(
-                        EndpointPingReport(service_type, endpoint))
-
-    @property
-    def id(self) -> str:
-        """
-            str: The unique identifier for this report.
-        """
-        return self._orig.raw_result.get("id", None)
-
-    @property
-    def version(self) -> int:
-        """
-            int: The version number of this report.
-        """
-        return self._orig.raw_result.get("version", None)
-
-    @property
-    def sdk(self) -> str:
-        """
-            str: The name of the SDK which generated this report.
-        """
-        return self._orig.raw_result.get("sdk", None)
-
-    @property
-    def endpoints(self) -> Dict[ServiceType, List[EndpointPingReport]]:
-        """
-            Dict[ServiceType, List[EndpointPingReport]]: A map of service endpoints and their ping status.
-        """
-        return self._endpoints
-
-    def as_json(self) -> str:
-        """Returns a JSON formatted diagnostics report.
-
-        Returns:
-            str: JSON formatted diagnostics report.
-        """
-        return_val = {
-            'version': self.version,
-            'id': self.id,
-            'sdk': self.sdk,
-            'services': {k.value: list(map(lambda epr: epr.as_dict(), v)) for k, v in self.endpoints.items()}
-        }
-
-        return json.dumps(return_val)
-
-    def __repr__(self):
-        return "PingResult:{}".format(self._orig)
 
 
 class GetReplicaResult(Result):
@@ -463,9 +595,13 @@ class MultiResult:
 # get_any_replica_multi maps each key to a single GetReplicaResult, get_all_replicas_multi maps
 # each key to a list of them.  Defaulted to Any so that a bare MultiGetReplicaResult annotation
 # keeps meaning what it means today.
-ReplicaValueType = TypeVar('ReplicaValueType',
-                           bound=Union[GetReplicaResult, List[GetReplicaResult]],
-                           default=Any)
+if sys.version_info >= (3, 13):
+    from typing import TypeVar as _DefaultedTypeVar
+else:
+    from typing_extensions import TypeVar as _DefaultedTypeVar
+ReplicaValueType = _DefaultedTypeVar('ReplicaValueType',
+                                     bound=Union[GetReplicaResult, List[GetReplicaResult]],
+                                     default=Any)
 
 
 class MultiGetReplicaResult(MultiResult, Generic[ReplicaValueType]):
@@ -710,11 +846,6 @@ class MultiMutationResult:
 MultiResultType = Union[MultiGetResult, MultiMutationResult]
 
 
-# BRIDGE: the final MutationToken, bound here for the code that imports it from this module.  Removed by
-# PYCBC-1994.
-from couchbase.common.result import MutationToken  # noqa: E402
-
-
 class LookupInResult(Result):
     def exists(self,  # type: LookupInResult
                index  # type: int
@@ -899,126 +1030,6 @@ class MultiCounterResult:
         return f'MultiCounterResult( {", ".join(output_results)} )'
 
 
-class ClusterInfoResult:
-    def __init__(
-        self,
-        orig  # type: pycbc_result
-    ):
-        self._orig = orig
-        # version string should be X.Y.Z-XXXX-YYYY
-        self._server_version_raw = None
-        self._server_version = None
-        self._server_version_short = None
-        self._server_build = None
-        self._is_enterprise = None
-
-    @property
-    def nodes(self) -> Optional[Dict[str, Any]]:
-        return self._orig.raw_result.get('info', {}).get('nodes', None)
-
-    @property
-    def server_version(self) -> Optional[str]:
-        if not self._server_version:
-            self._set_server_version()
-
-        if self._server_version_raw:
-            self._server_version = self._server_version_raw[:10]
-
-        return self._server_version
-
-    @property
-    def server_version_short(self) -> Optional[float]:
-        """
-            Optional[float]: The version of the connected Couchbase Server in Major.Minor form.
-        """
-        if not self._server_version_short:
-            self._set_server_version()
-
-        if self._server_version_raw:
-            self._server_version_short = float(self._server_version_raw[:3])
-
-        return self._server_version_short
-
-    @property
-    def server_version_full(self) -> Optional[str]:
-        """
-            Optional[str]: The full version details of the connected Couchbase Server.
-        """
-        if not self._server_version_raw:
-            self._set_server_version()
-
-        return self._server_version_raw
-
-    @property
-    def server_version_build(self) -> Optional[int]:
-        """
-            Optional[int]: The build version of the connected Couchbase Server.
-        """
-        if not self._server_build:
-            self._set_server_version()
-
-        if self._server_version_raw:
-            tokens = self._server_version_raw.split("-")
-            if len(tokens) == 3:
-                self._server_build = int(tokens[1])
-
-        return self._server_build
-
-    @property
-    def is_enterprise(self) -> Optional[bool]:
-        """
-            bool: True if connected Couchbase Server is Enterprise edition, false otherwise.
-        """
-        if not self._is_enterprise:
-            self._set_server_version()
-
-        if self._server_version_raw:
-            tokens = self._server_version_raw.split("-")
-            if len(tokens) == 3:
-                self._is_enterprise = tokens[2].upper() == "ENTERPRISE"
-
-        return self._is_enterprise
-
-    @property
-    def is_community(self) -> Optional[bool]:
-        """
-            bool: True if connected Couchbase Server is Community edition, false otherwise.
-        """
-        if not self._is_community:
-            self._set_server_version()
-
-        if self._server_version_raw:
-            tokens = self._server_version_raw.split("-")
-            if len(tokens) == 3:
-                self._is_community = tokens[2].upper() == "COMMUNITY"
-
-        return self._is_community
-
-    def _set_server_version(self):
-        version = None
-        for n in self.nodes:
-            v = n["version"]
-            if version is None:
-                version = v
-            elif v != version:
-                # mixed versions -- not supported
-                version = None
-                break
-
-        self._server_version_raw = version
-
-    def __repr__(self):
-        return "ClusterInfoResult:{}".format(self._orig)
-
-
-class HttpResult:
-    def __init__(
-        self,
-        orig  # type: pycbc_result
-    ):
-        self._orig = orig
-
-
 class ScanResult(Result):
 
     def __init__(self, orig, ids_only, transcoder):
@@ -1084,234 +1095,6 @@ class ScanResult(Result):
 
     def __repr__(self):
         return f"ScanResult:{self._orig.raw_result['scan_item']}"
-
-
-class ScanResultIterable:
-    def __init__(
-        self,
-        scan_request
-    ):
-        self._request = scan_request
-
-    def rows(self):
-        """The rows which have been returned by the query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
-
-        Returns:
-            Iterable: Either an iterable or async iterable.
-        """
-        # avoid circular import
-        from acouchbase.kv_range_scan import AsyncRangeScanRequest  # noqa: F811
-        if isinstance(self._request, AsyncRangeScanRequest):
-            return self.__aiter__()
-        return self.__iter__()
-
-    def cancel_scan(self):
-        self._request.cancel_scan()
-
-    def __iter__(self):
-        return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
-
-    def __repr__(self):
-        return "ScanResultIterable:{}".format(self._request)
-
-
-class QueryResult:
-    def __init__(
-        self,
-        n1ql_request
-    ):
-        self._request = n1ql_request
-
-    def rows(self):
-        """The rows which have been returned by the query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
-
-        Returns:
-            Iterable: Either an iterable or async iterable.
-        """
-        if isinstance(self._request, AsyncN1QLRequest):
-            return self.__aiter__()
-        return self.__iter__()
-
-    def execute(self):
-        """Convenience method to execute the query.
-
-        Returns:
-            List[Any]:  A list of query results.
-
-        Example:
-            q_rows = cluster.query('SELECT * FROM `travel-sample` WHERE country LIKE 'United%' LIMIT 2;').execute()
-
-        """
-        return self._request.execute()
-
-    def metadata(self):
-        """The meta-data which has been returned by the query.
-
-        Returns:
-            :class:`~couchbase.n1ql.QueryMetaData`: An instance of :class:`~couchbase.n1ql.QueryMetaData`.
-        """
-        return self._request.metadata()
-
-    def __iter__(self):
-        return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
-
-    def __repr__(self):
-        return "QueryResult:{}".format(self._request)
-
-
-class AnalyticsResult:
-    def __init__(
-        self,
-        analytics_request
-    ):
-        self._request = analytics_request
-
-    def __repr__(self):
-        return "AnalyticsResult:{}".format(self._request)
-
-    def rows(self):
-        """The rows which have been returned by the analytics query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
-
-        Returns:
-            Iterable: Either an iterable or async iterable.
-        """
-        if isinstance(self._request, AsyncAnalyticsRequest):
-            return self.__aiter__()
-        return self.__iter__()
-
-    def metadata(self):
-        """The meta-data which has been returned by the analytics query.
-
-        Returns:
-            :class:`~couchbase.analytics.AnalyticsMetaData`: An instance of
-            :class:`~couchbase.analytics.AnalyticsMetaData`.
-        """
-        return self._request.metadata()
-
-    def __iter__(self):
-        return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
-
-
-class SearchResult:
-    def __init__(
-        self,
-        search_request
-    ):
-        self._request = search_request
-
-    def __repr__(self):
-        return "SearchResult:{}".format(self._request)
-
-    def rows(self):
-        """The rows which have been returned by the search query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
-
-        Returns:
-            Iterable: Either an iterable or async iterable.
-        """
-        if isinstance(self._request, AsyncFullTextSearchRequest):
-            return self.__aiter__()
-        return self.__iter__()
-
-    def metadata(self):
-        """The meta-data which has been returned by the search query.
-
-        Returns:
-            :class:`~couchbase.search.SearchMetaData`: An instance of
-            :class:`~couchbase.search.SearchMetaData`.
-        """
-        return self._request.metadata()
-
-    def result_rows(self):
-        return self._request.result_rows()
-
-    def facets(self):
-        return self._request.result_facets()
-
-    def __iter__(self):
-        return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
-
-
-class ViewResult:
-    def __init__(
-        self,
-        search_request
-    ):
-        self._request = search_request
-
-    def __repr__(self):
-        return "ViewResult:{}".format(self._request)
-
-    def rows(self):
-        """The rows which have been returned by the view query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
-
-        Returns:
-            Iterable: Either an iterable or async iterable.
-        """
-        if isinstance(self._request, AsyncViewRequest):
-            return self.__aiter__()
-        return self.__iter__()
-
-    def metadata(self):
-        """The meta-data which has been returned by the view query.
-
-        Returns:
-            :class:`~couchbase.views.ViewMetaData`: An instance of
-            :class:`~couchbase.views.ViewMetaData`.
-        """
-        return self._request.metadata()
-
-    def __iter__(self):
-        return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
 
 
 class OperationResult:

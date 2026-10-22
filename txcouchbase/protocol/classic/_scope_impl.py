@@ -26,19 +26,24 @@ from couchbase.result import (AnalyticsResult,
                               SearchResult)
 from txcouchbase.analytics import AnalyticsRequest
 from txcouchbase.n1ql import N1QLRequest
+from txcouchbase.protocol.classic._collection_impl import TxCollectionImpl
 from txcouchbase.search import FullTextSearchRequest
 
 if TYPE_CHECKING:
     from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                            QueryRequest,
                                                            SearchQueryRequest)
-    from txcouchbase.bucket import TxBucket
+    from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
 
 
 class TxScopeImpl(AsyncScopeImpl):
 
-    def __init__(self, scope_name: str, bucket: TxBucket) -> None:
-        super().__init__(scope_name, bucket)
+    def __init__(self, scope_name: str, bucket_impl: TxBucketImpl) -> None:
+        super().__init__(scope_name, bucket_impl)
+
+    def collection(self, name: str) -> TxCollectionImpl:
+        """**INTERNAL**"""
+        return TxCollectionImpl(name, self)
 
     def analytics_query_deferred(self, req: AnalyticsQueryRequest) -> Deferred[AnalyticsResult]:
         if not self.connected:

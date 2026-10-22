@@ -15,6 +15,11 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'AsyncScope',
+    'Scope',
+]
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Union)
@@ -22,20 +27,20 @@ from typing import (TYPE_CHECKING,
 from acouchbase.collection import Collection
 from acouchbase.management.eventing import ScopeEventingFunctionManager
 from acouchbase.management.search import ScopeSearchIndexManager
-from acouchbase.protocol.classic._scope_impl import AsyncScopeImpl
+from couchbase.common._supportability import Supportability
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions)
-from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 
 if TYPE_CHECKING:
     from acouchbase.bucket import AsyncBucket
-    from couchbase._utils import JSONType
+    from couchbase.common._interfaces._scope import AsyncScopeInterface
+    from couchbase.common._utils import JSONType
     from couchbase.search import SearchQuery, SearchRequest
 
 
@@ -52,13 +57,16 @@ class AsyncScope:
     """
 
     def __init__(self, bucket: AsyncBucket, scope_name: str) -> None:
-        self._impl = AsyncScopeImpl(scope_name, bucket)
+        self._impl: AsyncScopeInterface = bucket._impl.scope(scope_name)
 
     @property
-    def connection(self) -> pycbc_connection:
+    def connection(self) -> object:
         """
         **INTERNAL**
+
+        .. deprecated:: 4.7.0
         """
+        Supportability.class_property_deprecated('AsyncScope.connection')
         return self._impl.connection
 
     @property
@@ -82,8 +90,9 @@ class AsyncScope:
             name (str): Name of the collection to reference.
 
         Returns:
-            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the specified collection.
-        """  # noqa: E501
+            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the
+            specified collection.
+        """
         return Collection(self, name)
 
     def query(self,

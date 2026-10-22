@@ -15,17 +15,22 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'Collection',
+]
+
+from collections.abc import Mapping
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     Iterable,
                     List,
-                    Mapping,
                     Optional,
                     Type,
                     Union)
 
 from couchbase.binary_collection import BinaryCollection
+from couchbase.common import options
 from couchbase.common._supportability import Supportability
 from couchbase.datastructures import (CouchbaseList,
                                       CouchbaseMap,
@@ -55,7 +60,6 @@ from couchbase.options import (ExistsMultiOptions,
                                TouchMultiOptions,
                                UnlockMultiOptions,
                                UpsertMultiOptions)
-from couchbase.protocol.classic._collection_impl import CollectionImpl
 from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
@@ -82,7 +86,9 @@ from couchbase.subdocument import upsert as subdoc_upsert
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import DocumentValue, JSONType
+    from couchbase._utils import JSONType
+    from couchbase.common._interfaces._collection import CollectionInterface
+    from couchbase.common._utils import DocumentValue
     from couchbase.kv_range_scan import ScanType
     from couchbase.logic.observability import WrappedSpan
     from couchbase.options import (LookupInAllReplicasOptions,
@@ -98,7 +104,7 @@ if TYPE_CHECKING:
 class Collection:
 
     def __init__(self, scope: Scope, name: str) -> None:
-        self._impl = CollectionImpl(name, scope)
+        self._impl: CollectionInterface = scope._impl.collection(name)
 
     @property
     def name(self) -> str:
@@ -1125,49 +1131,6 @@ class Collection:
 
         """
         return CouchbaseList(key, self._impl)
-
-    # @TODO(PYCBC-1732) - remove in 4.7 dot-minor
-    def _execute_deprecated_ds_func(self,
-                                    fn: DatastructureCallable,
-                                    req: PycbcCoreKeyValueRequest,
-                                    obs_handler: ObservableRequestHandler,
-                                    parent_span: WrappedSpan,
-                                    create: Optional[bool] = False,
-                                    create_type: Optional[Union[Type[dict], Type[list]]] = None,
-                                    wrap_missing_path: Optional[bool] = True,
-                                    path_value: Optional[Any] = None,
-                                    transcoder: Optional[Transcoder] = None) -> Any:
-        try:
-            fn_args = [req]
-            if transcoder:
-                fn_args.append(transcoder)
-            fn_args.append(obs_handler)
-            return fn(*fn_args)
-        except DocumentNotFoundException as ex:
-            if create:
-                orig_opt_type = obs_handler.op_type
-                obs_handler.reset(KeyValueOperationType.Insert, exc_val=ex)
-                try:
-                    ins_req = self._impl.request_builder.build_insert_request(req.key,
-                                                                              create_type(),
-                                                                              obs_handler,
-                                                                              span=parent_span)
-                    self._impl.insert(ins_req, obs_handler)
-                except DocumentExistsException:
-                    pass
-                obs_handler.reset(orig_opt_type)
-                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
-                                           parent_span=parent_span)
-                fn_args = [req]
-                if transcoder:
-                    fn_args.append(transcoder)
-                fn_args.append(obs_handler)
-                return fn(*fn_args)
-            else:
-                raise
-        except PathNotFoundException:
-            if wrap_missing_path and path_value:
-                raise IndexError(path_value)
 
     def list_append(self,
                     key: str,
@@ -2587,6 +2550,49 @@ class Collection:
     def default_name():
         return "_default"
 
+    # @TODO(PYCBC-1732) - remove in 4.7 dot-minor
+    def _execute_deprecated_ds_func(self,
+                                    fn: DatastructureCallable,
+                                    req: PycbcCoreKeyValueRequest,
+                                    obs_handler: ObservableRequestHandler,
+                                    parent_span: WrappedSpan,
+                                    create: Optional[bool] = False,
+                                    create_type: Optional[Union[Type[dict], Type[list]]] = None,
+                                    wrap_missing_path: Optional[bool] = True,
+                                    path_value: Optional[Any] = None,
+                                    transcoder: Optional[Transcoder] = None) -> Any:
+        try:
+            fn_args = [req]
+            if transcoder:
+                fn_args.append(transcoder)
+            fn_args.append(obs_handler)
+            return fn(*fn_args)
+        except DocumentNotFoundException as ex:
+            if create:
+                orig_opt_type = obs_handler.op_type
+                obs_handler.reset(KeyValueOperationType.Insert, exc_val=ex)
+                try:
+                    ins_req = self._impl.request_builder.build_insert_request(req.key,
+                                                                              create_type(),
+                                                                              obs_handler,
+                                                                              span=parent_span)
+                    self._impl.insert(ins_req, obs_handler)
+                except DocumentExistsException:
+                    pass
+                obs_handler.reset(orig_opt_type)
+                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
+                                           parent_span=parent_span)
+                fn_args = [req]
+                if transcoder:
+                    fn_args.append(transcoder)
+                fn_args.append(obs_handler)
+                return fn(*fn_args)
+            else:
+                raise
+        except PathNotFoundException:
+            if wrap_missing_path and path_value:
+                raise IndexError(path_value)
+
 
 """
 ** DEPRECATION NOTICE **
@@ -2600,137 +2606,143 @@ Instead use:
 
 """
 
-from couchbase.logic.options import AppendOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import DecrementOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.common.options import DeltaValue as DeltaValueBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import DurabilityOptionBlockBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import ExistsOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAllReplicasOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAndLockOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAndTouchOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAnyReplicaOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetOptionsBase    # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import IncrementOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import InsertOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import LookupInOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import OptionsTimeoutBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import PrependOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import RemoveOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import ReplaceOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import TouchOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import UnlockOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import UpsertOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.scope import Scope as ScopeBase  # nopep8 # isort:skip # noqa: E402
-
 from couchbase.options import ConstrainedInt  # nopep8 # isort:skip # noqa: E402, F401
 from couchbase.options import SignedInt64  # nopep8 # isort:skip # noqa: E402, F401
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.scope')
-class Scope(ScopeBase):   # noqa: F811
+def __getattr__(name: str) -> object:
+    # couchbase.scope imports Collection from here, so the deprecated Scope is built on first
+    # lookup rather than at import, or importing couchbase.scope first is a circular ImportError.
+    if name == 'Scope':
+        from couchbase.scope import Scope as ScopeBase
+
+        @Supportability.import_deprecated('couchbase.collection', 'couchbase.scope')
+        class Scope(ScopeBase):
+            pass
+
+        globals()['Scope'] = Scope
+        return Scope
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')   # noqa: F811
+class AppendOptions(options.AppendOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')   # noqa: F811
-class AppendOptions(AppendOptionsBase):  # noqa: F811
+class DecrementOptions(options.DecrementOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')   # noqa: F811
-class DecrementOptions(DecrementOptionsBase):  # noqa: F811
-    pass
-
-
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')   # noqa: F811
-class DeltaValue(DeltaValueBase):  # noqa: F811
+class DeltaValue(options.DeltaValue):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class DurabilityOptionBlock(DurabilityOptionBlockBase):  # noqa: F811
+class DurabilityOptionBlock(dict):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class ExistsOptions(ExistsOptionsBase):  # noqa: F811
+class ExistsOptions(options.ExistsOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class GetAllReplicasOptions(GetAllReplicasOptionsBase):  # noqa: F811
+class GetAllReplicasOptions(options.GetAllReplicasOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class GetAndTouchOptions(GetAndTouchOptionsBase):  # noqa: F811
+class GetAndTouchOptions(options.GetAndTouchOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class GetAndLockOptions(GetAndLockOptionsBase):  # noqa: F811
+class GetAndLockOptions(options.GetAndLockOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class GetAnyReplicaOptions(GetAnyReplicaOptionsBase):  # noqa: F811
+class GetAnyReplicaOptions(options.GetAnyReplicaOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class GetOptions(GetOptionsBase):  # noqa: F811
+class GetOptions(options.GetOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class IncrementOptions(IncrementOptionsBase):  # noqa: F811
+class IncrementOptions(options.IncrementOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class InsertOptions(InsertOptionsBase):  # noqa: F811
+class InsertOptions(options.InsertOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class LookupInOptions(LookupInOptionsBase):  # noqa: F811
+class LookupInOptions(options.LookupInOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class OptionsTimeout(OptionsTimeoutBase):  # noqa: F811
+class OptionsTimeout(dict):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class PrependOptions(PrependOptionsBase):  # noqa: F811
+class PrependOptions(options.PrependOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class RemoveOptions(RemoveOptionsBase):  # noqa: F811
+class RemoveOptions(options.RemoveOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class ReplaceOptions(ReplaceOptionsBase):  # noqa: F811
+class ReplaceOptions(options.ReplaceOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class TouchOptions(TouchOptionsBase):  # noqa: F811
+class TouchOptions(options.TouchOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class UnlockOptions(UnlockOptionsBase):  # noqa: F811
+class UnlockOptions(options.UnlockOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
-class UpsertOptions(UpsertOptionsBase):  # noqa: F811
+class UpsertOptions(options.UpsertOptions):  # noqa: F811
     pass
 
 
 @Supportability.class_deprecated('couchbase.collection.Collection')
 class CBCollection(Collection):
-    pass
+    """
+    .. deprecated:: 4.0.0
+        Use :class:`~couchbase.collection.Collection` instead.
+    """
+
+
+from couchbase.logic.options import ExistsOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAllReplicasOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAndLockOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAndTouchOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAnyReplicaOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import InsertOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import LookupInOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import RemoveOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import ReplaceOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import TouchOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import UnlockOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import UpsertOptionsBase  # nopep8 # isort:skip # noqa: E402

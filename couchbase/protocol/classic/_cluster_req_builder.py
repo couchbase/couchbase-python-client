@@ -20,13 +20,17 @@ from typing import TYPE_CHECKING, Union
 
 from couchbase.analytics import AnalyticsQuery
 from couchbase.common._supportability import Supportability
-from couchbase.diagnostics import ClusterState, ServiceType
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic._legacy_options import forward_args
+from couchbase.common.diagnostics import ClusterState, ServiceType
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.option_enums import OptionValidationMode
+from couchbase.common.options import (DiagnosticsOptions,
+                                      PingOptions,
+                                      WaitUntilReadyOptions)
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.n1ql import N1QLQuery
 from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                        ClusterInfoRequest,
+                                                       ClusterOptionsBlock,
                                                        DiagnosticsRequest,
                                                        GetConnectionInfoRequest,
                                                        PingRequest,
@@ -34,6 +38,7 @@ from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                        SearchQueryRequest,
                                                        UpdateCredentialsRequest,
                                                        WaitUntilReadyRequest)
+from couchbase.protocol.classic._wire import forward_args
 from couchbase.search import (SearchQuery,
                               SearchQueryBuilder,
                               SearchRequest)
@@ -46,8 +51,8 @@ if TYPE_CHECKING:
 
 class ClusterRequestBuilder:
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, option_validation: OptionValidationMode | None = None) -> None:
+        self._option_validation = option_validation
 
     def build_analytics_query_request(self,
                                       statement: str,
@@ -64,9 +69,10 @@ class ClusterRequestBuilder:
     def build_cluster_info_request(self) -> ClusterInfoRequest:
         return ClusterInfoRequest()
 
-    def build_diagnostics_request(self, *options: object, **kwargs: object) -> DiagnosticsRequest:
-        # TODO: OptionsProcessor
-        final_args = forward_args(kwargs, *options)
+    def build_diagnostics_request(self,
+                                  options: DiagnosticsOptions | None = None,
+                                  **kwargs: object) -> DiagnosticsRequest:
+        final_args = forward_args(kwargs, options, block=ClusterOptionsBlock.Diagnostics, mode=self._option_validation)
         timeout = final_args.pop('timeout', None)
         req = DiagnosticsRequest(**final_args)
         if timeout:
@@ -76,9 +82,8 @@ class ClusterRequestBuilder:
     def build_get_connection_info_request(self) -> GetConnectionInfoRequest:
         return GetConnectionInfoRequest()
 
-    def build_ping_request(self, *options: object, **kwargs: object) -> PingRequest:
-        # TODO: OptionsProcessor
-        final_args = forward_args(kwargs, *options)
+    def build_ping_request(self, options: PingOptions | None = None, **kwargs: object) -> PingRequest:
+        final_args = forward_args(kwargs, options, block=ClusterOptionsBlock.Ping, mode=self._option_validation)
         timeout = final_args.pop('timeout', None)
 
         service_types = final_args.pop('service_types', None)
@@ -150,15 +155,16 @@ class ClusterRequestBuilder:
         return req
 
     def build_update_credential_request(
-            self, authenticator: Union[CertificateAuthenticator, JwtAuthenticator, PasswordAuthenticator]
+            self, authenticator: CertificateAuthenticator | JwtAuthenticator | PasswordAuthenticator
     ) -> UpdateCredentialsRequest:
         return UpdateCredentialsRequest(authenticator.as_dict())
 
     def build_wait_until_ready_request(self,
                                        timeout: timedelta,
-                                       *options: object,
+                                       options: WaitUntilReadyOptions | None = None,
                                        **kwargs: object) -> WaitUntilReadyRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=ClusterOptionsBlock.WaitUntilReady,
+                                  mode=self._option_validation)
         service_types = final_args.get("service_types", None)
         if not service_types:
             service_types = [ServiceType(st.value) for st in ServiceType]

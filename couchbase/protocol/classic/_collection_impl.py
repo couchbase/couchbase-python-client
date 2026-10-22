@@ -15,21 +15,26 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     Iterable,
-                    Iterator,
                     List,
-                    Optional)
+                    Optional,
+                    TypeVar)
 
-from couchbase.exceptions import (ErrorMapper,
-                                  InvalidArgumentException,
-                                  UnAmbiguousTimeoutException)
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._observability import (KeyspaceDetails,
+                                             ObservabilityInstruments,
+                                             ObservableRequestHandler)
+from couchbase.common.exceptions import (CouchbaseException,
+                                         InvalidArgumentException,
+                                         UnAmbiguousTimeoutException)
+from couchbase.protocol.classic._capabilities import CAPABILITIES
 from couchbase.protocol.classic._collection_multi_req_builder import CollectionMultiRequestBuilder
 from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
 from couchbase.protocol.classic._collection_types import CollectionDetails
+from couchbase.protocol.classic._error_mapping import ErrorMapper
 from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.result import (CounterResult,
@@ -49,24 +54,92 @@ from couchbase.result import (CounterResult,
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
+    from couchbase.common.protocol import CouchbaseProtocol
     from couchbase.kv_range_scan import RangeScanRequest
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
     from couchbase.protocol.classic._collection_multi_types import (KeyValueMultiRequest,
                                                                     KeyValueMultiWithTranscoderRequest)
-    from couchbase.protocol.classic._pycbc_core import pycbc_connection
-    from couchbase.scope import Scope
+    from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_result
+    from couchbase.protocol.classic._scope_impl import ScopeImpl
+
+
+def _resolve_sub_op_error(value: Any,
+                          obs_handler: ObservableRequestHandler | None,
+                          return_exceptions: bool) -> CouchbaseException:
+    exc = ErrorMapper.build_exception(value) if isinstance(value, PycbcCoreException) else value
+    if obs_handler:
+        obs_handler.process_multi_sub_op(value, exc_val=exc)
+    if not return_exceptions:
+        raise exc
+    return exc
+
+
+ResultT = TypeVar('ResultT')
+
+
+def _decode_replicas(stream: Any, build: Callable[[Any], ResultT]) -> Iterator[ResultT]:
+    """Build each replica as the core's stream yields it; the stream ends with a None."""
+    while True:
+        try:
+            res = next(stream)
+        except StopIteration:
+            # this is a timeout from pulling a result from the queue, kill the generator
+            raise UnAmbiguousTimeoutException('Timeout reached waiting for result in queue.') from None
+        if isinstance(res, PycbcCoreException):
+            raise ErrorMapper.build_exception(res)
+        if res is None:
+            return
+        yield build(res)
+
+
+def _parse_sub_ops(ret: pycbc_result,
+                   obs_handler: ObservableRequestHandler | None,
+                   return_exceptions: bool,
+                   build: Callable[[str, Any], ResultT]
+                   ) -> tuple[dict[str, ResultT | CouchbaseException], bool]:
+    """Record, map and build every key of a multi operation in one pass, in key order.
+
+    A multi operation reports one outcome per key, so the core hands its errors back as values
+    rather than raising. Each becomes its ``CouchbaseException`` here and each success is built
+    with ``build``; with ``return_exceptions`` false the first error is raised, after every key
+    before it has been recorded.
+    """
+    all_ok = ret.multi_resp_all_okay is True
+    results: dict[str, ResultT | CouchbaseException] = {}
+    for k, v in ret.raw_result.items():
+        # pycbc_result and pycbc_exception have a core_span member
+        if obs_handler and hasattr(v, 'core_span'):
+            obs_handler.process_core_span(v.core_span)
+        if isinstance(v, (CouchbaseException, PycbcCoreException)):
+            results[k] = _resolve_sub_op_error(v, obs_handler, return_exceptions)
+            continue
+        if obs_handler:
+            obs_handler.process_multi_sub_op(v)
+        results[k] = build(k, v)
+    return results, all_ok
 
 
 class CollectionImpl:
 
-    def __init__(self, collection_name: str, scope: Scope) -> None:
-        self._scope = scope
-        self._client_adapter = scope._impl._client_adapter
-        self._collection_details = CollectionDetails(self._scope._impl.bucket_name,
-                                                     self._scope._impl.name,
+    capabilities = CAPABILITIES
+
+    def __init__(self, collection_name: str, scope_impl: ScopeImpl) -> None:
+        self._scope_impl = scope_impl
+        self._client_adapter: ClientAdapter = scope_impl._client_adapter
+        cluster_settings = scope_impl.cluster_settings
+        self._collection_details = CollectionDetails(scope_impl.bucket_name,
+                                                     scope_impl.name,
                                                      collection_name,
-                                                     self._scope._impl.cluster_settings.default_transcoder)
+                                                     cluster_settings.default_transcoder,
+                                                     default_serializer=cluster_settings.default_serializer,
+                                                     option_validation=cluster_settings.option_validation)
         self._multi_request_builder = CollectionMultiRequestBuilder(self._collection_details)
         self._request_builder = CollectionRequestBuilder(self._collection_details)
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._client_adapter.couchbase_protocol
 
     @property
     def bucket_name(self) -> str:
@@ -81,10 +154,6 @@ class CollectionImpl:
         **INTERNAL**
         """
         return self._client_adapter.connection
-
-    @property
-    def multi_request_builder(self) -> CollectionMultiRequestBuilder:
-        return self._multi_request_builder
 
     @property
     def name(self) -> str:
@@ -107,35 +176,25 @@ class CollectionImpl:
     @property
     def observability_instruments(self) -> ObservabilityInstruments:
         """**INTERNAL**"""
-        return self._scope._impl.cluster_settings.observability_instruments
+        return self._scope_impl.observability_instruments
 
-    def append(self,
-               req: PycbcCoreKeyValueRequest,
-               obs_handler: ObservableRequestHandler) -> MutationResult:
+    @property
+    def keyspace(self) -> KeyspaceDetails:
+        return self._collection_details.get_details_as_dict()
+
+    def get(self,
+            req: PycbcCoreKeyValueRequest,
+            transcoder: Transcoder,
+            obs_handler: ObservableRequestHandler) -> GetResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
+        return GetResult(ret, transcoder=transcoder, key=req.key)
 
-    def append_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
-
-    def decrement(self,
-                  req: PycbcCoreKeyValueRequest,
-                  obs_handler: ObservableRequestHandler) -> CounterResult:
+    def get_any_replica(self,
+                        req: PycbcCoreKeyValueRequest,
+                        transcoder: Transcoder,
+                        obs_handler: ObservableRequestHandler) -> GetReplicaResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return CounterResult(ret, key=req.key)
-
-    def decrement_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiCounterResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
-        return MultiCounterResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
-
-    def exists(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> ExistsResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return ExistsResult(ret, key=req.key)
-
-    def exists_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiExistsResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
-        return MultiExistsResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
+        return GetReplicaResult(ret, transcoder=transcoder, key=req.key)
 
     def get_all_replicas(self,
                          req: PycbcCoreKeyValueRequest,
@@ -160,6 +219,117 @@ class CollectionImpl:
                     yield GetReplicaResult(res, transcoder=transcoder, key=req.key)
 
         return _decode_replicas()
+
+    def exists(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> ExistsResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return ExistsResult(ret, key=req.key)
+
+    def insert(self,
+               req: PycbcCoreKeyValueRequest,
+               obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    def upsert(self,
+               req: PycbcCoreKeyValueRequest,
+               obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    def replace(self,
+                req: PycbcCoreKeyValueRequest,
+                obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    def remove(self,
+               req: PycbcCoreKeyValueRequest,
+               obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    def touch(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    def get_and_touch(self,
+                      req: PycbcCoreKeyValueRequest,
+                      transcoder: Transcoder,
+                      obs_handler: ObservableRequestHandler) -> GetResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return GetResult(ret, transcoder=transcoder, key=req.key)
+
+    def get_and_lock(self,
+                     req: PycbcCoreKeyValueRequest,
+                     transcoder: Transcoder,
+                     obs_handler: ObservableRequestHandler) -> GetResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return GetResult(ret, transcoder=transcoder, key=req.key)
+
+    def unlock(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> None:
+        self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+
+    def lookup_in(self,
+                  req: PycbcCoreKeyValueRequest,
+                  transcoder: Transcoder,
+                  obs_handler: ObservableRequestHandler) -> LookupInResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return LookupInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
+
+    def lookup_in_any_replica(self,
+                              req: PycbcCoreKeyValueRequest,
+                              transcoder: Transcoder,
+                              obs_handler: ObservableRequestHandler) -> LookupInReplicaResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return LookupInReplicaResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
+
+    def lookup_in_all_replicas(self,
+                               req: PycbcCoreKeyValueRequest,
+                               transcoder: Transcoder,
+                               obs_handler: ObservableRequestHandler) -> Iterable[LookupInReplicaResult]:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+
+        def _decode_replicas() -> Iterator[LookupInReplicaResult]:
+            while True:
+                try:
+                    res = next(ret)
+                except StopIteration:
+                    # this is a timeout from pulling a result from the queue, kill the generator
+                    raise UnAmbiguousTimeoutException('Timeout reached waiting for result in queue.') from None
+                else:
+                    if isinstance(res, PycbcCoreException):
+                        raise ErrorMapper.build_exception(res)
+                    # should only be None once all replicas have been retrieved
+                    if res is None:
+                        return
+
+                    yield LookupInReplicaResult(res, transcoder=transcoder, is_subdoc=True, key=req.key)
+        return _decode_replicas()
+
+    def mutate_in(self,
+                  req: PycbcCoreKeyValueRequest,
+                  obs_handler: ObservableRequestHandler) -> MutateInResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        transcoder = self._collection_details.default_transcoder
+        return MutateInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
+
+    def get_multi(self,
+                  req: KeyValueMultiWithTranscoderRequest,
+                  obs_handler: ObservableRequestHandler) -> MultiGetResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
+        return MultiGetResult(ret,
+                              return_exceptions=req.return_exceptions,
+                              transcoders=req.key_transcoders,
+                              obs_handler=obs_handler)
+
+    def get_any_replica_multi(self,
+                              req: KeyValueMultiWithTranscoderRequest,
+                              obs_handler: ObservableRequestHandler) -> MultiGetReplicaResult[GetReplicaResult]:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
+        return MultiGetReplicaResult(ret,
+                                     return_exceptions=req.return_exceptions,
+                                     transcoders=req.key_transcoders,
+                                     obs_handler=obs_handler)
 
     def get_all_replicas_multi(self,  # noqa: C901
                                req: KeyValueMultiWithTranscoderRequest,
@@ -215,13 +385,6 @@ class CollectionImpl:
             return MultiGetReplicaResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
         return MultiGetReplicaResult(ret, return_exceptions=req.return_exceptions)
 
-    def get_and_lock(self,
-                     req: PycbcCoreKeyValueRequest,
-                     transcoder: Transcoder,
-                     obs_handler: ObservableRequestHandler) -> GetResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return GetResult(ret, transcoder=transcoder, key=req.key)
-
     def get_and_lock_multi(self,
                            req: KeyValueMultiWithTranscoderRequest,
                            obs_handler: ObservableRequestHandler) -> MultiGetResult:
@@ -231,154 +394,31 @@ class CollectionImpl:
                               transcoders=req.key_transcoders,
                               obs_handler=obs_handler)
 
-    def get_and_touch(self,
-                      req: PycbcCoreKeyValueRequest,
-                      transcoder: Transcoder,
-                      obs_handler: ObservableRequestHandler) -> GetResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return GetResult(ret, transcoder=transcoder, key=req.key)
-
-    def get_any_replica(self,
-                        req: PycbcCoreKeyValueRequest,
-                        transcoder: Transcoder,
-                        obs_handler: ObservableRequestHandler) -> GetReplicaResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return GetReplicaResult(ret, transcoder=transcoder, key=req.key)
-
-    def get_any_replica_multi(self,
-                              req: KeyValueMultiWithTranscoderRequest,
-                              obs_handler: ObservableRequestHandler) -> MultiGetReplicaResult[GetReplicaResult]:
+    def exists_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiExistsResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
-        return MultiGetReplicaResult(ret,
-                                     return_exceptions=req.return_exceptions,
-                                     transcoders=req.key_transcoders,
-                                     obs_handler=obs_handler)
-
-    def get(self,
-            req: PycbcCoreKeyValueRequest,
-            transcoder: Transcoder,
-            obs_handler: ObservableRequestHandler) -> GetResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return GetResult(ret, transcoder=transcoder, key=req.key)
-
-    def get_multi(self,
-                  req: KeyValueMultiWithTranscoderRequest,
-                  obs_handler: ObservableRequestHandler) -> MultiGetResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
-        return MultiGetResult(ret,
-                              return_exceptions=req.return_exceptions,
-                              transcoders=req.key_transcoders,
-                              obs_handler=obs_handler)
-
-    def increment(self,
-                  req: PycbcCoreKeyValueRequest,
-                  obs_handler: ObservableRequestHandler) -> CounterResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return CounterResult(ret, key=req.key)
-
-    def increment_multi(self,
-                        req: KeyValueMultiRequest,
-                        obs_handler: ObservableRequestHandler) -> MultiCounterResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
-        return MultiCounterResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
-
-    def insert(self,
-               req: PycbcCoreKeyValueRequest,
-               obs_handler: ObservableRequestHandler) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
+        return MultiExistsResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
     def insert_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
         return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def lookup_in(self,
-                  req: PycbcCoreKeyValueRequest,
-                  transcoder: Transcoder,
-                  obs_handler: ObservableRequestHandler) -> LookupInResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return LookupInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
-
-    def lookup_in_all_replicas(self,
-                               req: PycbcCoreKeyValueRequest,
-                               transcoder: Transcoder,
-                               obs_handler: ObservableRequestHandler) -> Iterable[LookupInReplicaResult]:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-
-        def _decode_replicas() -> Iterator[LookupInReplicaResult]:
-            while True:
-                try:
-                    res = next(ret)
-                except StopIteration:
-                    # this is a timeout from pulling a result from the queue, kill the generator
-                    raise UnAmbiguousTimeoutException('Timeout reached waiting for result in queue.') from None
-                else:
-                    if isinstance(res, PycbcCoreException):
-                        raise ErrorMapper.build_exception(res)
-                    # should only be None once all replicas have been retrieved
-                    if res is None:
-                        return
-
-                    yield LookupInReplicaResult(res, transcoder=transcoder, is_subdoc=True, key=req.key)
-        return _decode_replicas()
-
-    def lookup_in_any_replica(self,
-                              req: PycbcCoreKeyValueRequest,
-                              transcoder: Transcoder,
-                              obs_handler: ObservableRequestHandler) -> LookupInReplicaResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return LookupInReplicaResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
-
-    def mutate_in(self,
-                  req: PycbcCoreKeyValueRequest,
-                  obs_handler: ObservableRequestHandler) -> MutateInResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        transcoder = self._collection_details.default_transcoder
-        return MutateInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
-
-    def prepend(self,
-                req: PycbcCoreKeyValueRequest,
-                obs_handler: ObservableRequestHandler) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
-
-    def prepend_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+    def upsert_multi(self,
+                     req: KeyValueMultiRequest,
+                     obs_handler: ObservableRequestHandler) -> MultiMutationResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
         return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
-
-    def range_scan(self, req: RangeScanRequest) -> ScanResultIterable:
-        return ScanResultIterable(req)
-
-    def remove(self,
-               req: PycbcCoreKeyValueRequest,
-               obs_handler: ObservableRequestHandler) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
-
-    def remove_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
-        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
-
-    def replace(self,
-                req: PycbcCoreKeyValueRequest,
-                obs_handler: ObservableRequestHandler) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
 
     def replace_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
         return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
-    def touch(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
-        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
+    def remove_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
     def touch_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
         return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
-
-    def unlock(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> None:
-        self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
 
     def unlock_multi(self,
                      req: KeyValueMultiRequest,
@@ -406,20 +446,57 @@ class CollectionImpl:
 
         return output
 
-    def upsert(self,
+    def increment(self,
+                  req: PycbcCoreKeyValueRequest,
+                  obs_handler: ObservableRequestHandler) -> CounterResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return CounterResult(ret, key=req.key)
+
+    def decrement(self,
+                  req: PycbcCoreKeyValueRequest,
+                  obs_handler: ObservableRequestHandler) -> CounterResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return CounterResult(ret, key=req.key)
+
+    def append(self,
                req: PycbcCoreKeyValueRequest,
                obs_handler: ObservableRequestHandler) -> MutationResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
 
-    def upsert_multi(self,
-                     req: KeyValueMultiRequest,
-                     obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+    def prepend(self,
+                req: PycbcCoreKeyValueRequest,
+                obs_handler: ObservableRequestHandler) -> MutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    def append_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
         ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
         return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
+
+    def prepend_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiMutationResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
+        return MultiMutationResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
+
+    def increment_multi(self,
+                        req: KeyValueMultiRequest,
+                        obs_handler: ObservableRequestHandler) -> MultiCounterResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
+        return MultiCounterResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
+
+    def decrement_multi(self, req: KeyValueMultiRequest, obs_handler: ObservableRequestHandler) -> MultiCounterResult:
+        ret = self._client_adapter.execute_collection_request(req.opcode, req.request_list, obs_handler=obs_handler)
+        return MultiCounterResult(ret, return_exceptions=req.return_exceptions, obs_handler=obs_handler)
 
     def _set_default_transcoder(self, transcoder: Transcoder) -> None:
         if not issubclass(transcoder.__class__, Transcoder):
             raise InvalidArgumentException('Cannot set default transcoder to non Transcoder type.')
 
         self._collection_details.default_transcoder = transcoder
+
+    @property
+    def multi_request_builder(self) -> CollectionMultiRequestBuilder:
+        return self._multi_request_builder
+
+    def range_scan(self, req: RangeScanRequest) -> ScanResultIterable:
+        return ScanResultIterable(req)

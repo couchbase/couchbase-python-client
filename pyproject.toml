@@ -42,7 +42,21 @@ recursive = true
 [tool.mypy]
 # Kept here rather than in a separate mypy.ini so tool config stays in one file, matching
 # autopep8 / isort / pytest above.  Semantically identical to the [mypy] ini form.
-files = ["tests", "couchbase/tests", "acouchbase/tests", "txcouchbase/tests"]
+files = ["tests", "couchbase/tests", "acouchbase/tests", "txcouchbase/tests", "couchbase/common/result.py",
+         "couchbase/common/config_profiles.py", "couchbase/common/option_enums.py",
+         "couchbase/protocol/classic/_error_mapping.py", "couchbase/common/exceptions.py",
+         "couchbase/common/options.py", "couchbase/common/subdocument.py", "couchbase/common/diagnostics.py",
+         "couchbase/common/_option_spec.py", "couchbase/common/_operations.py",
+         "couchbase/protocol/classic/_bindings.py", "txcouchbase/protocol/classic/_deferred.py",
+         "couchbase/common/warnings.py", "couchbase/common/_supportability.py",
+         "couchbase/common/_option_diagnostics.py", "couchbase/common/_option_args.py",
+         "couchbase/protocol/classic/_wire.py", "couchbase/common/_transforms.py", "couchbase/common/protocol.py",
+         "couchbase/common/_observability", "couchbase/protocol/classic/_client_adapter.py",
+         "couchbase/protocol/classic/_collection_types.py", "couchbase/common/_registry.py",
+         "couchbase/protocol/classic/_registry.py", "couchbase/common/_utils.py", "couchbase/common/auth.py",
+         "couchbase/common/serializer.py", "couchbase/common/transcoder.py", "couchbase/common/_tracing.py",
+         "couchbase/common/_durability.py", "couchbase/common/durability.py",
+         "couchbase/common/mutation_state.py"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
@@ -97,6 +111,16 @@ ignore_errors = true
 # them appear in an annotation we care about checking.
 [[tool.mypy.overrides]]
 module = ["faker.*", "faker_vehicle.*", "faker_vehicle", "xdist.*"]
+ignore_missing_imports = true
+
+# BRIDGE: modules the shared code names for typing only, ahead of the change that adds them.  Each
+# change drops the names it adds.  Removed by PYCBC-2016.
+[[tool.mypy.overrides]]
+module = ["couchbase.common._interfaces.*",
+          "couchbase.common.replica_reads",
+          "couchbase.common.analytics", "couchbase.common.n1ql", "couchbase.common.views",
+          "couchbase.common.search", "couchbase.common.search_scoring", "couchbase.common.vector_search",
+          "couchbase.protocol.classic._transactions_impl", "acouchbase.protocol.classic._transactions_impl"]
 ignore_missing_imports = true
 
 [tool.isort]

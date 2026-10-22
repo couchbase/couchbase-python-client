@@ -15,6 +15,12 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'AsyncCluster',
+    'Cluster',
+    'get_event_loop',
+]
+
 from asyncio import AbstractEventLoop
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
@@ -29,11 +35,12 @@ from acouchbase.management.eventing import EventingFunctionManager
 from acouchbase.management.queries import QueryIndexManager
 from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
-from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from acouchbase.transactions import Transactions
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
+from couchbase.common._registry import ASYNC_CLUSTER, resolve
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.result import (AnalyticsResult,
@@ -44,7 +51,8 @@ from couchbase.result import (AnalyticsResult,
                               SearchResult)
 
 if TYPE_CHECKING:
-    from couchbase._utils import JSONType
+    from couchbase.common._interfaces._cluster import AsyncClusterInterface
+    from couchbase.common._utils import JSONType
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    DiagnosticsOptions,
@@ -77,7 +85,7 @@ class AsyncCluster:
         options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
             Some operations allow the global options to be overriden by passing in options to the
             operation.
-        **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+        **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
             overrride provided :class:`~couchbase.options.ClusterOptions`
 
     Raises:
@@ -88,12 +96,9 @@ class AsyncCluster:
 
     """
 
-    def __init__(self,
-                 connstr,  # type: str
-                 *options,  # type: ClusterOptions
-                 **kwargs,  # type: Any
-                 ) -> None:
-        self._impl = AsyncClusterImpl(connstr, *options, **kwargs)
+    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: Any) -> None:
+        impl = resolve(ASYNC_CLUSTER, CouchbaseProtocol.from_connstr(connstr))
+        self._impl: AsyncClusterInterface = impl(connstr, *options, **kwargs)
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -134,7 +139,7 @@ class AsyncCluster:
         await self._impl.close_connection()
 
     def set_authenticator(
-            self, authenticator: Union[CertificateAuthenticator, JwtAuthenticator, PasswordAuthenticator]
+            self, authenticator: CertificateAuthenticator | JwtAuthenticator | PasswordAuthenticator
     ) -> None:
         """Replace the authenticator used by this Cluster.
 
@@ -157,8 +162,7 @@ class AsyncCluster:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If `authenticator` is not the
                 same type as the current authenticator.
         """
-        req = self._impl.request_builder.build_update_credential_request(authenticator)
-        self._impl.update_credentials(req)
+        self._impl.update_credentials(authenticator)
 
     def bucket(self, bucket_name: str) -> AsyncBucket:
         """Creates a Bucket instance to a specific bucket.
@@ -172,9 +176,9 @@ class AsyncCluster:
         Returns:
             :class:`~acouchbase.bucket.AsyncBucket`: A bucket instance
 
-        Raises:
-            :class:`~couchbase.exceptions.BucketNotFoundException`: If provided `bucket_name` cannot
-                be found.
+        The bucket opens on the event loop once the cluster is connected, so this call does not raise.  A
+        bucket that cannot be opened, such as one that does not exist, fails the first operation awaited on
+        it, or :meth:`~acouchbase.bucket.AsyncBucket.on_connect`.
 
         """
         return AsyncBucket(self, bucket_name)
@@ -192,18 +196,13 @@ class AsyncCluster:
             Awaitable[:class:`~couchbase.result.ClusterInfoResult`]: Information about the connected cluster.
 
         Raises:
-            RuntimeError:  If called prior to the cluster being connected.
             :class:`~couchbase.exceptions.ServiceUnavailableException`: If called prior to connecting
                 to a bucket if using server version < 6.6.
 
         """
-        req = self._impl.request_builder.build_cluster_info_request()
-        return await self._impl.get_cluster_info(req)
+        return await self._impl.get_cluster_info()
 
-    async def ping(self,
-                   *opts,  # type: PingOptions
-                   **kwargs  # type: Any
-                   ) -> PingResult:
+    async def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
         """Performs a ping operation against the cluster.
 
         The ping operation pings the services which are specified
@@ -218,13 +217,9 @@ class AsyncCluster:
             ping operations which were performed.
 
         """
-        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
-        return await self._impl.ping(req)
+        return await self._impl.ping(opts, **kwargs)
 
-    async def diagnostics(self,
-                          *opts,  # type: DiagnosticsOptions
-                          **kwargs  # type: Any
-                          ) -> DiagnosticsResult:
+    async def diagnostics(self, opts: DiagnosticsOptions | None = None, **kwargs: Any) -> DiagnosticsResult:
         """Performs a diagnostic operation against the cluster.
 
         The diagnostic operations returns a report about the current active connections with the cluster.
@@ -238,14 +233,12 @@ class AsyncCluster:
             connections with the cluster.
 
         """
-        req = self._impl.request_builder.build_diagnostics_request(*opts, **kwargs)
-        return await self._impl.diagnostics(req)
+        return await self._impl.diagnostics(opts, **kwargs)
 
     async def wait_until_ready(self,
-                               timeout,  # type: timedelta
-                               *opts,  # type: WaitUntilReadyOptions
-                               **kwargs  # type: Any
-                               ) -> None:
+                               timeout: timedelta,
+                               opts: WaitUntilReadyOptions | None = None,
+                               **kwargs: Any) -> None:
         """Wait until the cluster is ready for use.
 
             Check the current connections to see if the desired state has been reached.  If not,
@@ -261,7 +254,7 @@ class AsyncCluster:
             timeout (timedelta): Amount of time to wait for cluster to be ready before a
                 :class:`~couchbase.exceptions.UnAmbiguousTimeoutException` is raised.
             opts (:class:`~couchbase.options.WaitUntilReadyOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.WaitUntilReadyOptions`
 
         Raises:
@@ -273,9 +266,9 @@ class AsyncCluster:
             Wait until the cluster is ready to use KV and query services::
 
                 from acouchbase.cluster import Cluster
-                from couchbase.auth import PasswordAuthenticator
-                from couchbase.diagnostics import ServiceType
-                from couchbase.options import WaitUntilReadyOptions
+                from acouchbase.auth import PasswordAuthenticator
+                from acouchbase.diagnostics import ServiceType
+                from acouchbase.options import WaitUntilReadyOptions
 
                 auth = PasswordAuthenticator('username', 'password')
                 cluster = Cluster.connect('couchbase://localhost', ClusterOptions(auth))
@@ -284,8 +277,7 @@ class AsyncCluster:
                          WaitUntilReadyOptions(service_types=[ServiceType.KeyValue, ServiceType.Query]))
 
         """
-        req = self._impl.request_builder.build_wait_until_ready_request(timeout, *opts, **kwargs)
-        await self._impl.wait_until_ready(req)
+        await self._impl.wait_until_ready(timeout, opts, **kwargs)
 
     def query(self,
               statement,  # type: str
@@ -705,10 +697,7 @@ class AsyncCluster:
         return EventingFunctionManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     @staticmethod
-    async def connect(connstr,  # type: str
-                      *options,  # type: ClusterOptions
-                      **kwargs,  # type: Any
-                      ) -> AsyncCluster:
+    async def connect(connstr: str, *options: ClusterOptions, **kwargs: Any) -> AsyncCluster:
         """Create a Couchbase Cluster and connect
 
         Args:
@@ -723,7 +712,7 @@ class AsyncCluster:
             options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
                 Some operations allow the global options to be overriden by passing in options to the
                 operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 overrride provided :class:`~couchbase.options.ClusterOptions`
 
         Returns:
@@ -740,8 +729,8 @@ class AsyncCluster:
             Initialize cluster using default options::
 
                 from acouchbase.cluster import Cluster
-                from couchbase.auth import PasswordAuthenticator
-                from couchbase.options import ClusterOptions
+                from acouchbase.auth import PasswordAuthenticator
+                from acouchbase.options import ClusterOptions
 
                 auth = PasswordAuthenticator('username', 'password')
                 cluster = await Cluster.connect('couchbase://localhost', ClusterOptions(auth))
@@ -749,8 +738,8 @@ class AsyncCluster:
             Connect using SSL::
 
                 from acouchbase.cluster import Cluster
-                from couchbase.auth import PasswordAuthenticator
-                from couchbase.options import ClusterOptions
+                from acouchbase.auth import PasswordAuthenticator
+                from acouchbase.options import ClusterOptions
 
                 auth = PasswordAuthenticator('username', 'password', cert_path='/path/to/cert')
                 cluster = await Cluster.connect('couchbases://localhost', ClusterOptions(auth))
@@ -760,8 +749,8 @@ class AsyncCluster:
                 from datetime import timedelta
 
                 from acouchbase.cluster import Cluster
-                from couchbase.auth import PasswordAuthenticator
-                from couchbase.options import ClusterOptions, ClusterTimeoutOptions
+                from acouchbase.auth import PasswordAuthenticator
+                from acouchbase.options import ClusterOptions, ClusterTimeoutOptions
 
                 auth = PasswordAuthenticator('username', 'password')
                 timeout_opts = ClusterTimeoutOptions(kv_timeout=timedelta(seconds=10),

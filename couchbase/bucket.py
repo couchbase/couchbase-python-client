@@ -15,20 +15,25 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'Bucket',
+]
+
 from typing import TYPE_CHECKING, Any
 
 from couchbase.collection import Collection
+from couchbase.common import options
 from couchbase.common._supportability import Supportability
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.management.collections import CollectionManager
 from couchbase.management.views import ViewIndexManager
-from couchbase.protocol.classic._bucket_impl import BucketImpl
 from couchbase.result import PingResult, ViewResult
 from couchbase.scope import Scope
 
 if TYPE_CHECKING:
     from couchbase.cluster import Cluster
+    from couchbase.common._interfaces._bucket import BucketInterface
     from couchbase.options import PingOptions, ViewOptions
 
 
@@ -48,7 +53,7 @@ class Bucket:
     """
 
     def __init__(self, cluster: Cluster, bucket_name: str) -> None:
-        self._impl = BucketImpl(bucket_name, cluster)
+        self._impl: BucketInterface = cluster._impl.bucket(bucket_name)
 
     @property
     def name(self) -> str:
@@ -93,9 +98,10 @@ class Bucket:
             collection_name (str): Name of the collection to reference.
 
         Returns:
-            :class:`~couchbase.collection.Collection`: A :class:`~couchbase.collection.Collection` instance of the specified collection.
+            :class:`~couchbase.collection.Collection`: A :class:`~couchbase.collection.Collection` instance of the
+            specified collection.
 
-        """  # noqa: E501
+        """
         scope = self.default_scope()
         return scope.collection(collection_name)
 
@@ -103,15 +109,13 @@ class Bucket:
         """Creates a :class:`~couchbase.collection.Collection` instance of the default collection.
 
         Returns:
-            :class:`~couchbase.collection.Collection`: A :class:`~couchbase.collection.Collection` instance of the default collection.
-        """  # noqa: E501
+            :class:`~couchbase.collection.Collection`: A :class:`~couchbase.collection.Collection` instance of the
+            default collection.
+        """
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    def ping(self,
-             *opts,  # type: PingOptionsBase
-             **kwargs  # type: Any
-             ) -> PingResult:
+    def ping(self, opts: options.PingOptions | None = None, **kwargs: Any) -> PingResult:
         """Performs a ping operation against the bucket.
 
         The ping operation pings the services which are specified
@@ -126,8 +130,7 @@ class Bucket:
             which were performed.
 
         """
-        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
-        return self._impl.ping(req)
+        return self._impl.ping(opts, **kwargs)
 
     def view_query(self,
                    design_doc,      # type: str
@@ -224,20 +227,19 @@ Instead use:
 
 """
 
-from couchbase.logic.options import PingOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import ViewOptionsBase  # nopep8 # isort:skip # noqa: E402
-
 
 @Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')  # noqa: F811
-class PingOptions(PingOptionsBase):  # noqa: F811
+class PingOptions(options.PingOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')  # noqa: F811
-class ViewOptions(ViewOptionsBase):  # noqa: F811
+class ViewOptions(options.ViewOptions):  # noqa: F811
     pass
 
 
 from couchbase.views import ViewScanConsistency  # nopep8 # isort:skip # noqa: E402, F401
 from couchbase.views import ViewOrdering  # nopep8 # isort:skip # noqa: E402, F401
 from couchbase.views import ViewErrorMode  # nopep8 # isort:skip # noqa: E402, F401
+
+from couchbase.logic.options import ViewOptionsBase  # nopep8 # isort:skip # noqa: E402

@@ -17,26 +17,29 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Generator
-from typing import (ClassVar,
-                    Optional,
-                    cast)
+from typing import ClassVar, cast
 
 import pytest
 
 from couchbase.common._observability.logging_meter import LoggingMeter, LoggingMeterReporter
-from couchbase.logic.observability.observability_types import (OpAttributeName,
-                                                               OpName,
-                                                               ServiceType)
+from couchbase.common._observability.observability_types import OpAttributeName
+from couchbase.common._operations import Op, ServiceType
+from couchbase.protocol.classic._pycbc_core import pycbc_hdr_histogram
 from tests.manifest import validate_test_manifest
+from tests.observability_ops import span_name
 from tests.observability_test_impls import InertReporter
+from tests.test_features import TestProtocol
+
+# The meter is shared, but the percentiles asserted here are those of the classic HDR histogram.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 
-def kv_tags(op_name: OpName, service: ServiceType = ServiceType.KeyValue) -> dict[str, str]:
+def kv_tags(op_name: Op, service: ServiceType = ServiceType.KeyValue) -> dict[str, str]:
     # `value_recorder` reads exactly these two keys and ignores the rest, so building the
     # mapping in one place keeps the tests about what they record rather than how it is spelled.
     return {
         OpAttributeName.Service.value: service.value,
-        OpAttributeName.OperationName.value: op_name.value,
+        OpAttributeName.OperationName.value: span_name(op_name),
     }
 
 
@@ -64,7 +67,7 @@ def run_concurrently(*workers: tuple[Callable[[], None], int]) -> list[Exception
 
 
 class LoggingMeterTestSuite:
-    # No cb_env: `LoggingMeter` is reached through the same `couchbase/logic/observability/`
+    # No cb_env: `LoggingMeter` is reached through the same `couchbase/common/_observability/`
     # module from all three apis and nothing here calls an operation on a collection, so a
     # generated copy would assert the same thing about the same object three times.
 
@@ -96,8 +99,8 @@ class LoggingMeterTestSuite:
         # thread behind in exactly the runs where something has already gone wrong.
         meters: list[LoggingMeter] = []
 
-        def _make(emit_interval_ms: Optional[int] = None) -> LoggingMeter:
-            meter = LoggingMeter(emit_interval_ms=emit_interval_ms)
+        def _make(emit_interval_ms: int | None = None) -> LoggingMeter:
+            meter = LoggingMeter(pycbc_hdr_histogram, emit_interval_ms=emit_interval_ms)
             meter._reporter.stop()
             # `InertReporter` stands in for the reporter thread; cast rather than suppress, so
             # any *other* error on this line stays visible.
@@ -114,7 +117,7 @@ class LoggingMeterTestSuite:
         emit_interval_ms = 1000
         meter = make_meter(emit_interval_ms=emit_interval_ms)
 
-        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
         recorder.record_value(100)
 
         report = meter.create_report()
@@ -125,9 +128,9 @@ class LoggingMeterTestSuite:
 
         assert 'operations' in report
         assert ServiceType.KeyValue.value in report['operations']
-        assert OpName.Get.value in report['operations'][ServiceType.KeyValue.value]
+        assert span_name(Op.Get) in report['operations'][ServiceType.KeyValue.value]
 
-        stats = report['operations'][ServiceType.KeyValue.value][OpName.Get.value]
+        stats = report['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]
         assert stats['total_count'] == 1
         assert isinstance(stats['percentiles_us'], dict)
         for percentile in ('50.0', '90.0', '99.0', '99.9', '100.0'):
@@ -136,12 +139,12 @@ class LoggingMeterTestSuite:
     def test_multiple_values_percentiles(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
 
-        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
         recorder.record_value(100)
         recorder.record_value(200)
         recorder.record_value(300)
 
-        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][OpName.Get.value]
+        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]
         assert stats['total_count'] == 3
         assert stats['percentiles_us']['50.0'] >= 100
         assert stats['percentiles_us']['100.0'] >= 300
@@ -149,11 +152,11 @@ class LoggingMeterTestSuite:
     def test_reset_after_report(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
 
-        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
         recorder.record_value(100)
 
         first = meter.create_report()
-        assert first['operations'][ServiceType.KeyValue.value][OpName.Get.value]['total_count'] == 1
+        assert first['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]['total_count'] == 1
 
         # Reporting resets the histogram, so the second report has nothing to carry.
         assert meter.create_report()['operations'] == {}
@@ -163,40 +166,40 @@ class LoggingMeterTestSuite:
         # the meter; the only symptom is a report that stays empty.
         recorder.record_value(200)
         after = meter.create_report()
-        assert after['operations'][ServiceType.KeyValue.value][OpName.Get.value]['total_count'] == 1
+        assert after['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]['total_count'] == 1
 
     def test_multiple_services(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
 
-        kv_recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        kv_recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
         query_recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value,
-                                              kv_tags(OpName.Query, service=ServiceType.Query))
+                                              kv_tags(Op.Query, service=ServiceType.Query))
 
         kv_recorder.record_value(100)
         query_recorder.record_value(5000)
 
         operations = meter.create_report()['operations']
-        assert operations[ServiceType.KeyValue.value][OpName.Get.value]['total_count'] == 1
-        assert operations[ServiceType.Query.value][OpName.Query.value]['total_count'] == 1
+        assert operations[ServiceType.KeyValue.value][span_name(Op.Get)]['total_count'] == 1
+        assert operations[ServiceType.Query.value][span_name(Op.Query)]['total_count'] == 1
 
     def test_multiple_operations_per_service(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
 
-        get_recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
-        upsert_recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Upsert))
+        get_recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
+        upsert_recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Upsert))
 
         get_recorder.record_value(100)
         upsert_recorder.record_value(200)
 
         kv_operations = meter.create_report()['operations'][ServiceType.KeyValue.value]
-        assert kv_operations[OpName.Get.value]['total_count'] == 1
-        assert kv_operations[OpName.Upsert.value]['total_count'] == 1
+        assert kv_operations[span_name(Op.Get)]['total_count'] == 1
+        assert kv_operations[span_name(Op.Upsert)]['total_count'] == 1
 
     def test_recorder_reuse(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
 
-        first = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
-        second = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        first = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
+        second = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
 
         # Identity is the actual contract: value_recorder caches by (service, operation), and
         # two histograms for one operation would split the percentiles rather than merge them.
@@ -206,12 +209,12 @@ class LoggingMeterTestSuite:
         first.record_value(100)
         second.record_value(200)
 
-        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][OpName.Get.value]
+        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]
         assert stats['total_count'] == 2
 
     def test_thread_safety(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
-        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
 
         def record_values() -> None:
             for i in range(100):
@@ -220,12 +223,12 @@ class LoggingMeterTestSuite:
         exceptions = run_concurrently((record_values, 10))
         assert not exceptions, f'Exceptions occurred: {exceptions}'
 
-        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][OpName.Get.value]
+        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]
         assert stats['total_count'] == 1000
 
     def test_large_value_ranges(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
-        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
 
         # 1us through 10s, all inside the histogram's 30s trackable maximum.  A value above
         # that maximum is dropped rather than clamped, so the count is what proves the whole
@@ -233,7 +236,7 @@ class LoggingMeterTestSuite:
         for value_us in (1, 1_000, 1_000_000, 5_000_000, 10_000_000):
             recorder.record_value(value_us)
 
-        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][OpName.Get.value]
+        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]
         assert stats['total_count'] == 5
         assert stats['percentiles_us']['50.0'] > 0
         assert stats['percentiles_us']['100.0'] > 0
@@ -242,7 +245,7 @@ class LoggingMeterTestSuite:
         meter = make_meter()
 
         # Created and never recorded to.
-        meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
 
         # An idle recorder is left out of the report rather than reported with a zero count:
         # get_percentiles_and_reset() hands back a populated mapping either way, so create_report
@@ -258,7 +261,7 @@ class LoggingMeterTestSuite:
 
     def test_concurrent_recording_and_reporting(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
-        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
 
         reports = []
 
@@ -277,13 +280,13 @@ class LoggingMeterTestSuite:
 
     def test_percentile_accuracy(self, make_meter: Callable[..., LoggingMeter]) -> None:
         meter = make_meter()
-        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(OpName.Get))
+        recorder = meter.value_recorder(OpAttributeName.MeterOperationDuration.value, kv_tags(Op.Get))
 
         # Uniform over 100us..100_000us, so the expected percentile is the value itself.
         for i in range(1, 1001):
             recorder.record_value(i * 100)
 
-        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][OpName.Get.value]
+        stats = meter.create_report()['operations'][ServiceType.KeyValue.value][span_name(Op.Get)]
         assert stats['total_count'] == 1000
 
         p50 = stats['percentiles_us']['50.0']

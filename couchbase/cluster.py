@@ -15,6 +15,10 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'Cluster',
+]
+
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
@@ -24,7 +28,10 @@ from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
 from couchbase.bucket import Bucket
+from couchbase.common import options
+from couchbase.common._registry import CLUSTER, resolve
 from couchbase.common._supportability import Supportability
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.management.analytics import AnalyticsIndexManager
@@ -33,7 +40,6 @@ from couchbase.management.eventing import EventingFunctionManager
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.users import UserManager
-from couchbase.protocol.classic._cluster_impl import ClusterImpl
 from couchbase.result import (AnalyticsResult,
                               ClusterInfoResult,
                               DiagnosticsResult,
@@ -43,7 +49,8 @@ from couchbase.result import (AnalyticsResult,
 from couchbase.transactions import Transactions
 
 if TYPE_CHECKING:
-    from couchbase._utils import JSONType
+    from couchbase.common._interfaces._cluster import ClusterInterface
+    from couchbase.common._utils import JSONType
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    DiagnosticsOptions,
@@ -76,7 +83,7 @@ class Cluster:
         options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
             Some operations allow the global options to be overriden by passing in options to the
             operation.
-        **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+        **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
             overrride provided :class:`~couchbase.options.ClusterOptions`
 
     Raises:
@@ -87,12 +94,9 @@ class Cluster:
 
     """
 
-    def __init__(self,
-                 connstr,  # type: str
-                 *options,  # type: ClusterOptionsBase
-                 **kwargs,  # type: Any
-                 ) -> None:
-        self._impl = ClusterImpl(connstr, *options, **kwargs)
+    def __init__(self, connstr: str, *options: options.ClusterOptions, **kwargs: Any) -> None:
+        impl = resolve(CLUSTER, CouchbaseProtocol.from_connstr(connstr))
+        self._impl: ClusterInterface = impl(connstr, *options, **kwargs)
 
     @property
     def transactions(self) -> Transactions:
@@ -151,13 +155,9 @@ class Cluster:
                 to a bucket if using server version < 6.6.
 
         """
-        req = self._impl.request_builder.build_cluster_info_request()
-        return self._impl.get_cluster_info(req)
+        return self._impl.get_cluster_info()
 
-    def ping(self,
-             *opts,  # type: PingOptions
-             **kwargs  # type: Any
-             ) -> PingResult:
+    def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
         """Performs a ping operation against the cluster.
 
         The ping operation pings the services which are specified
@@ -172,13 +172,9 @@ class Cluster:
             which were performed.
 
         """
-        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
-        return self._impl.ping(req)
+        return self._impl.ping(opts, **kwargs)
 
-    def diagnostics(self,
-                    *opts,  # type: DiagnosticsOptionsBase
-                    **kwargs  # type: Any
-                    ) -> DiagnosticsResult:
+    def diagnostics(self, opts: options.DiagnosticsOptions | None = None, **kwargs: Any) -> DiagnosticsResult:
         """Performs a diagnostic operation against the cluster.
 
         The diagnostic operations returns a report about the current active connections with the cluster.
@@ -192,11 +188,10 @@ class Cluster:
             with the cluster.
 
         """
-        req = self._impl.request_builder.build_diagnostics_request(*opts, **kwargs)
-        return self._impl.diagnostics(req)
+        return self._impl.diagnostics(opts, **kwargs)
 
     def set_authenticator(
-            self, authenticator: Union[CertificateAuthenticator, JwtAuthenticator, PasswordAuthenticator]
+            self, authenticator: CertificateAuthenticator | JwtAuthenticator | PasswordAuthenticator
     ) -> None:
         """Replace the authenticator used by this Cluster.
 
@@ -219,14 +214,9 @@ class Cluster:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If `authenticator` is not the
                 same type as the current authenticator.
         """
-        req = self._impl.request_builder.build_update_credential_request(authenticator)
-        self._impl.update_credentials(req)
+        self._impl.update_credentials(authenticator)
 
-    def wait_until_ready(self,
-                         timeout,  # type: timedelta
-                         *opts,  # type: WaitUntilReadyOptions
-                         **kwargs  # type: Any
-                         ) -> None:
+    def wait_until_ready(self, timeout: timedelta, opts: WaitUntilReadyOptions | None = None, **kwargs: Any) -> None:
         """Wait until the cluster is ready for use.
 
             Check the current connections to see if the desired state has been reached.  If not,
@@ -242,7 +232,7 @@ class Cluster:
             timeout (timedelta): Amount of time to wait for cluster to be ready before a
                 :class:`~couchbase.exceptions.UnAmbiguousTimeoutException` is raised.
             opts (:class:`~couchbase.options.WaitUntilReadyOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.WaitUntilReadyOptions`
 
         Raises:
@@ -265,8 +255,7 @@ class Cluster:
                          WaitUntilReadyOptions(service_types=[ServiceType.KeyValue, ServiceType.Query]))
 
         """
-        req = self._impl.request_builder.build_wait_until_ready_request(timeout, *opts, **kwargs)
-        self._impl.wait_until_ready(req)
+        self._impl.wait_until_ready(timeout, opts, **kwargs)
 
     def query(self,
               statement,  # type: str
@@ -686,10 +675,7 @@ class Cluster:
         return EventingFunctionManager(self._impl._client_adapter, self._impl.observability_instruments)
 
     @staticmethod
-    def connect(connstr,  # type: str
-                *options,  # type: ClusterOptionsBase
-                **kwargs,  # type: Any
-                ) -> Cluster:
+    def connect(connstr: str, *options: options.ClusterOptions, **kwargs: Any) -> Cluster:
         """Create a Couchbase Cluster and connect
 
         Args:
@@ -704,7 +690,7 @@ class Cluster:
             options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
                 Some operations allow the global options to be overriden by passing in options to the
                 operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 overrride provided :class:`~couchbase.options.ClusterOptions`
 
         Returns:
@@ -764,35 +750,29 @@ Instead use:
 
 """
 
-from couchbase.logic.options import ClusterOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import ClusterTimeoutOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import ClusterTracingOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import DiagnosticsOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import QueryOptionsBase  # nopep8 # isort:skip # noqa: E402
-
 
 @Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class ClusterOptions(ClusterOptionsBase):  # noqa: F811
+class ClusterOptions(options.ClusterOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class ClusterTimeoutOptions(ClusterTimeoutOptionsBase):
+class ClusterTimeoutOptions(options.ClusterTimeoutOptions):
     pass
 
 
 @Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class ClusterTracingOptions(ClusterTracingOptionsBase):
+class ClusterTracingOptions(options.ClusterTracingOptions):
     pass
 
 
 @Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class DiagnosticsOptions(DiagnosticsOptionsBase):  # noqa: F811
+class DiagnosticsOptions(options.DiagnosticsOptions):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class QueryOptions(QueryOptionsBase):  # noqa: F811
+class QueryOptions(options.QueryOptions):  # noqa: F811
     pass
 
 

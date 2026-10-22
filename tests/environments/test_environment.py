@@ -321,7 +321,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         self._data_provider: DataProvider = kwargs.pop('data_provider', None)
         self._default_collection: Any = kwargs.pop('default_collection', None)
         self._default_scope: Any = (
-            self._default_collection._impl._scope
+            self._bucket.default_scope()
             if self._default_collection is not None else None
         )
 

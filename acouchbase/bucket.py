@@ -15,12 +15,16 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'AsyncBucket',
+    'Bucket',
+]
+
 from typing import TYPE_CHECKING, Any
 
 from acouchbase.collection import Collection
 from acouchbase.management.collections import CollectionManager
 from acouchbase.management.views import ViewIndexManager
-from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
 from acouchbase.scope import Scope
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
@@ -28,6 +32,7 @@ from couchbase.result import PingResult, ViewResult
 
 if TYPE_CHECKING:
     from acouchbase.cluster import AsyncCluster
+    from couchbase.common._interfaces._bucket import AsyncBucketInterface
     from couchbase.options import PingOptions, ViewOptions
 
 
@@ -47,7 +52,7 @@ class AsyncBucket:
     """
 
     def __init__(self, cluster: AsyncCluster, bucket_name: str) -> None:
-        self._impl = AsyncBucketImpl(bucket_name, cluster)
+        self._impl: AsyncBucketInterface = cluster._impl.bucket(bucket_name)
 
     @property
     def name(self) -> str:
@@ -104,9 +109,10 @@ class AsyncBucket:
             collection_name (str): Name of the collection to reference.
 
         Returns:
-            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the specified collection.
+            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the
+            specified collection.
 
-        """  # noqa: E501
+        """
         scope = self.default_scope()
         return scope.collection(collection_name)
 
@@ -114,15 +120,13 @@ class AsyncBucket:
         """Creates a :class:`~acouchbase.collection.Collection` instance of the default collection.
 
         Returns:
-            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the default collection.
-        """  # noqa: E501
+            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the
+            default collection.
+        """
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    async def ping(self,
-                   *opts,  # type: PingOptions
-                   **kwargs  # type: Any
-                   ) -> PingResult:
+    async def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
         """Performs a ping operation against the bucket.
 
         The ping operation pings the services which are specified
@@ -137,8 +141,7 @@ class AsyncBucket:
             operations which were performed.
 
         """
-        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
-        return await self._impl.ping(req)
+        return await self._impl.ping(opts, **kwargs)
 
     def view_query(self,
                    design_doc,      # type: str

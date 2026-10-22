@@ -19,10 +19,12 @@
 
 from __future__ import annotations
 
-import platform
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any
+from typing import (Any,
+                    NoReturn,
+                    Protocol,
+                    runtime_checkable)
 
 import pytest
 import pytest_asyncio
@@ -32,99 +34,103 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.common._cluster_settings import ClusterSettings
 from couchbase.options import (CONFIG_PROFILES,
                                ClusterOptions,
+                               ClusterOrphanReportingOptions,
+                               ClusterTracingOptions,
                                ConfigProfile,
                                IpProtocol,
                                KnownConfigProfiles,
                                TLSVerifyMode)
-from couchbase.protocol.classic._cluster_impl import ClusterImpl
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   SuiteRequirements,
                                                   build_async_environment,
                                                   teardown_async_environment)
+from tests.environments.test_environment import TestProtocol
 from tests.manifest import validate_test_manifest
 
 CONNSTR = 'couchbase://localhost'
-USER_AGENT = f'python/{platform.python_version()}'
 
-# The timeout and tracing groups drive the same cases through two spellings, so the case
-# lists are shared: two copies can stop agreeing without anything reporting it.
-TIMEOUT_CASES: list[tuple[dict[str, Any], dict[str, Any]]] = [
-    ({'bootstrap_timeout': timedelta(seconds=30)}, {'bootstrap_timeout': 30000}),
-    ({'resolve_timeout': timedelta(seconds=30)}, {'resolve_timeout': 30000}),
-    ({'connect_timeout': timedelta(seconds=30)}, {'connect_timeout': 30000}),
-    ({'kv_timeout': timedelta(seconds=30)}, {'key_value_timeout': 30000}),
-    ({'kv_durable_timeout': timedelta(seconds=30)}, {'key_value_durable_timeout': 30000}),
-    ({'views_timeout': timedelta(seconds=30)}, {'view_timeout': 30000}),
-    ({'query_timeout': timedelta(seconds=30)}, {'query_timeout': 30000}),
-    ({'analytics_timeout': timedelta(seconds=30)}, {'analytics_timeout': 30000}),
-    ({'search_timeout': timedelta(seconds=30)}, {'search_timeout': 30000}),
-    ({'management_timeout': timedelta(seconds=30)}, {'management_timeout': 30000}),
-    ({'dns_srv_timeout': timedelta(seconds=30)}, {'dns_srv_timeout': 30000}),
-    ({'idle_http_connection_timeout': timedelta(seconds=30)}, {'idle_http_connection_timeout': 30000}),
-    ({'config_idle_redial_timeout': timedelta(seconds=30)}, {'config_idle_redial_timeout': 30000}),
-    ({'bootstrap_timeout': timedelta(seconds=60),
-      'kv_timeout': timedelta(seconds=5),
-      'query_timeout': timedelta(seconds=30),
-      'search_timeout': timedelta(seconds=120),
-      'management_timeout': timedelta(seconds=60)},
-     {'bootstrap_timeout': 60000,
-      'key_value_timeout': 5000,
-      'query_timeout': 30000,
-      'search_timeout': 120000,
-      'management_timeout': 60000}),
+# Every timeout a cluster takes, alone and then together.  The parse keeps each as it was given;
+# what each is sent as is classic_connect_options_t's.
+TIMEOUT_CASES: list[dict[str, Any]] = [{name: timedelta(seconds=30)} for name in (
+    'bootstrap_timeout', 'resolve_timeout', 'connect_timeout', 'kv_timeout', 'kv_durable_timeout', 'views_timeout',
+    'query_timeout', 'analytics_timeout', 'search_timeout', 'management_timeout', 'dns_srv_timeout',
+    'idle_http_connection_timeout', 'config_idle_redial_timeout')] + [
+    {'bootstrap_timeout': timedelta(seconds=60),
+     'kv_timeout': timedelta(seconds=5),
+     'query_timeout': timedelta(seconds=30),
+     'search_timeout': timedelta(seconds=120),
+     'management_timeout': timedelta(seconds=60)},
 ]
 
+# The tracing group drives these through two spellings, so the list is shared: two copies can
+# stop agreeing without anything reporting it.  The two orphan settings on ClusterTracingOptions
+# are rehomed to the orphan block under the keys that replaced them.
 TRACING_CASES: list[tuple[dict[str, Any], dict[str, Any]]] = [
-    ({'tracing_threshold_kv': timedelta(milliseconds=30)}, {'key_value_threshold': 30}),
-    ({'tracing_threshold_view': timedelta(milliseconds=30)}, {'view_threshold': 30}),
-    ({'tracing_threshold_query': timedelta(milliseconds=30)}, {'query_threshold': 30}),
-    ({'tracing_threshold_search': timedelta(milliseconds=30)}, {'search_threshold': 30}),
-    ({'tracing_threshold_analytics': timedelta(milliseconds=30)}, {'analytics_threshold': 30}),
-    ({'tracing_threshold_eventing': timedelta(milliseconds=30)}, {'eventing_threshold': 30}),
-    ({'tracing_threshold_management': timedelta(milliseconds=30)}, {'management_threshold': 30}),
-    ({'tracing_threshold_queue_size': 20}, {'threshold_sample_size': 20}),
-    ({'tracing_threshold_queue_flush_interval': timedelta(seconds=30)}, {'threshold_emit_interval': 30000}),
+    ({'tracing_threshold_kv': timedelta(milliseconds=30)}, {'tracing_threshold_kv': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_view': timedelta(milliseconds=30)}, {'tracing_threshold_view': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_query': timedelta(milliseconds=30)}, {'tracing_threshold_query': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_search': timedelta(milliseconds=30)},
+     {'tracing_threshold_search': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_analytics': timedelta(milliseconds=30)},
+     {'tracing_threshold_analytics': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_eventing': timedelta(milliseconds=30)},
+     {'tracing_threshold_eventing': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_management': timedelta(milliseconds=30)},
+     {'tracing_threshold_management': timedelta(milliseconds=30)}),
+    ({'tracing_threshold_queue_size': 20}, {'tracing_threshold_queue_size': 20}),
+    ({'tracing_threshold_queue_flush_interval': timedelta(seconds=30)},
+     {'tracing_threshold_queue_flush_interval': timedelta(seconds=30)}),
     ({'tracing_orphaned_queue_size': 20}, {'orphan_sample_size': 20}),
-    ({'tracing_orphaned_queue_flush_interval': timedelta(seconds=30)}, {'orphan_emit_interval': 30000}),
+    ({'tracing_orphaned_queue_flush_interval': timedelta(seconds=30)}, {'orphan_emit_interval': timedelta(seconds=30)}),
     ({'enable_tracing': True,
       'tracing_threshold_kv': timedelta(milliseconds=60),
       'tracing_threshold_query': timedelta(milliseconds=5),
       'tracing_threshold_management': timedelta(milliseconds=30),
       'tracing_threshold_queue_size': 20},
-     {'enable_tracing': True,
-      'key_value_threshold': 60,
-      'query_threshold': 5,
-      'management_threshold': 30,
-      'threshold_sample_size': 20}),
+     {'tracing_enable_tracing': True,
+      'tracing_threshold_kv': timedelta(milliseconds=60),
+      'tracing_threshold_query': timedelta(milliseconds=5),
+      'tracing_threshold_management': timedelta(milliseconds=30),
+      'tracing_threshold_queue_size': 20}),
 ]
 
 
+def _no_histogram(**kwargs: Any) -> NoReturn:
+    raise AssertionError('parsing a cluster\'s options recorded a value')
+
+
 def _settings(connstr: str, *options: ClusterOptions, **kwargs: Any) -> ClusterSettings:
-    # `skip_connect` stops the client adapter opening a connection, so everything built on
-    # this is cluster-free.  The read goes to `cluster_settings`, the INTERNAL property,
-    # rather than `ClusterImpl._get_connection_opts`, which returns a union every call site
-    # has to narrow and has no other caller in the repo.
-    return ClusterImpl(connstr, *options, skip_connect='TEST_SKIP_CONNECT', **kwargs).cluster_settings
+    # The parse every protocol's cluster runs, built without one.  It constructs the meter
+    # but records nothing, so the histogram factory a protocol supplies is never called.
+    return ClusterSettings.build_cluster_settings(connstr, *options, _histogram_factory=_no_histogram, **kwargs)
+
+
+@runtime_checkable
+class _ClassicClusterImpl(Protocol):
+    # What ConnectionTestSuite reads off classic's cluster impl, past the interface the facade holds it as.
+    def get_connection_info(self) -> dict[str, Any]: ...
 
 
 @pytest.mark.testgen_exclude('txcouchbase',
                              reason='txcouchbase.Cluster has no connect() classmethod')
 class ConnectionTestSuite(SuiteRequirements):
-    # The rest of this file asserts what the SDK hands the core.  These seven assert what
-    # comes back out of `cluster._impl.get_connection_info()`, which is the only reason any
-    # of them needs a connection; it is INTERNAL in both impls, the same deliberate reach
-    # cluster_t makes for `cluster._impl.connected`.  Not generated for txcouchbase, whose
+    # The rest of this file asserts what the SDK makes of a cluster's options.  These eight
+    # assert what comes back out of `get_connection_info()` on classic's cluster impl, which is the only
+    # reason any of them needs a connection, and which makes the suite classic-only: no
+    # protocol-neutral interface carries it.  Not generated for txcouchbase, whose
     # Cluster has no `connect` classmethod.  Every test closes in a `finally`: since
     # PYCBC-1915 a connection left open leaks observability reporter threads, and this file
-    # opens eight.  The `flaky(reruns=5)` markers mean "opens a connection", not "observed
+    # opens twelve.  The `flaky(reruns=5)` markers mean "opens a connection", not "observed
     # flaky".
 
     NUM_DOCS = 0
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
 
     TEST_MANIFEST = [
         'test_cluster_ldap_auth_real',
         'test_cluster_legacy_sasl_mech_force_real',
         'test_cluster_options_core_round_trip',
+        'test_cluster_orphan_reporting_core_round_trip',
         'test_cluster_sasl_mech_default',
         'test_custom_config_profile',
         'test_wan_config_profile',
@@ -152,6 +158,12 @@ class ConnectionTestSuite(SuiteRequirements):
         username, pw = cb_env.config.get_username_and_pw()
         return PasswordAuthenticator(username, pw, **kwargs)
 
+    @staticmethod
+    def _connection_info(cluster: Cluster) -> dict[str, Any]:
+        impl = cluster._impl
+        assert isinstance(impl, _ClassicClusterImpl)
+        return impl.get_connection_info()
+
     @pytest.mark.asyncio
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     async def test_cluster_ldap_auth_real(self, cb_env: AsyncTestEnvironment) -> None:
@@ -159,7 +171,7 @@ class ConnectionTestSuite(SuiteRequirements):
         auth = PasswordAuthenticator.ldap_compatible(username, pw)
         cluster: Cluster = await self._connect(cb_env, ClusterOptions(auth))
         try:
-            credentials = cluster._impl.get_connection_info()['credentials']
+            credentials = self._connection_info(cluster)['credentials']
             assert credentials['allowed_sasl_mechanisms'] == ['PLAIN']
         finally:
             await cluster.close()
@@ -172,7 +184,7 @@ class ConnectionTestSuite(SuiteRequirements):
                                                ClusterOptions(self._pw_auth(cb_env)),
                                                connstr=f'{conn_string}?sasl_mech_force=PLAIN')
         try:
-            credentials = cluster._impl.get_connection_info()['credentials']
+            credentials = self._connection_info(cluster)['credentials']
             assert credentials['allowed_sasl_mechanisms'] == ['PLAIN']
         finally:
             await cluster.close()
@@ -182,7 +194,7 @@ class ConnectionTestSuite(SuiteRequirements):
     async def test_cluster_sasl_mech_default(self, cb_env: AsyncTestEnvironment) -> None:
         cluster: Cluster = await self._connect(cb_env, ClusterOptions(self._pw_auth(cb_env)))
         try:
-            credentials = cluster._impl.get_connection_info()['credentials']
+            credentials = self._connection_info(cluster)['credentials']
             # The empty list is normalized in, not sent: the binding's cluster_credentials
             # to_py omits the field when the vector is empty as well as when it is unset, so
             # `[]` says the connection restricts no mechanism.  PYCBC-1925 fixed reading it
@@ -237,10 +249,42 @@ class ConnectionTestSuite(SuiteRequirements):
 
         cluster: Cluster = await self._connect(cb_env, ClusterOptions(self._pw_auth(cb_env), **opts))
         try:
-            client_opts = cluster._impl.get_connection_info()
+            client_opts = self._connection_info(cluster)
             for key, expected_value in expected.items():
                 assert client_opts.get(key) == expected_value, (
                     f'Expected {key}={expected_value!r}, got {client_opts.get(key)!r}')
+        finally:
+            await cluster.close()
+
+    @pytest.mark.asyncio
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    @pytest.mark.parametrize('opts, expected',
+                             [({}, {'enable_orphan_reporting': True,
+                                    'orphan_sample_size': 64,
+                                    'orphan_emit_interval': 10000}),
+                              ({'orphan_reporting_options': ClusterOrphanReportingOptions(
+                                  enable_orphan_reporting=False,
+                                  sample_size=5,
+                                  emit_interval=timedelta(seconds=3))},
+                               {'enable_orphan_reporting': False,
+                                'orphan_sample_size': 5,
+                                'orphan_emit_interval': 3000}),
+                              ({'enable_orphan_reporting': False,
+                                'tracing_options': ClusterTracingOptions(
+                                    tracing_orphaned_queue_size=5,
+                                    tracing_orphaned_queue_flush_interval=timedelta(seconds=3))},
+                               {'enable_orphan_reporting': False,
+                                'orphan_sample_size': 5,
+                                'orphan_emit_interval': 3000})])
+    async def test_cluster_orphan_reporting_core_round_trip(self,
+                                                            cb_env: AsyncTestEnvironment,
+                                                            opts: dict[str, Any],
+                                                            expected: dict[str, Any]) -> None:
+        # PYCBC-1960.  The first case is the core's defaults, the last the deprecated spelling on the
+        # tracing block.
+        cluster: Cluster = await self._connect(cb_env, ClusterOptions(self._pw_auth(cb_env), **opts))
+        try:
+            assert self._connection_info(cluster).get('orphan_reporting_options') == expected
         finally:
             await cluster.close()
 
@@ -273,7 +317,7 @@ class ConnectionTestSuite(SuiteRequirements):
             opts.apply_profile('test_profile')
             cluster: Cluster = await self._connect(cb_env, opts)
             try:
-                timeout_opts = cluster._impl.get_connection_info()['timeout_options']
+                timeout_opts = self._connection_info(cluster)['timeout_options']
                 for key, expected_value in expected_opts.items():
                     assert timeout_opts[key] == expected_value, key
             finally:
@@ -293,7 +337,7 @@ class ConnectionTestSuite(SuiteRequirements):
         opts.apply_profile(profile)
         cluster: Cluster = await self._connect(cb_env, opts)
         try:
-            timeout_opts = cluster._impl.get_connection_info()['timeout_options']
+            timeout_opts = self._connection_info(cluster)['timeout_options']
             for key, expected_value in self.WAN_TIMEOUTS.items():
                 assert timeout_opts[key] == expected_value, key
         finally:
@@ -309,7 +353,7 @@ class ConnectionTestSuite(SuiteRequirements):
                                                ClusterOptions.create_options_with_profile(
                                                    self._pw_auth(cb_env), profile))
         try:
-            timeout_opts = cluster._impl.get_connection_info()['timeout_options']
+            timeout_opts = self._connection_info(cluster)['timeout_options']
             for key, expected_value in self.WAN_TIMEOUTS.items():
                 assert timeout_opts[key] == expected_value, key
         finally:

@@ -13,39 +13,52 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""One parser for a cluster's connection string and `ClusterOptions`, whatever the protocol.
+
+Parsing, the authenticator, the tracer and meter and the per-concern blocks are the same work for
+every protocol, so they are done once here.  What a protocol is handed at connect is its own
+projection of `ClusterSettings`, and which keys it can act on is declared per protocol in the
+option schema and reported by `check_options`.
+"""
+
 from __future__ import annotations
 
+import re
 import warnings
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    List,
-                    Mapping,
-                    Optional,
-                    Tuple,
-                    TypedDict,
-                    Union)
+from datetime import timedelta
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from couchbase import USER_AGENT_EXTRA
-from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
+from couchbase.common._observability import (LegacyTracerProtocol,
+                                             MeterProtocol,
+                                             NoOpMeter,
+                                             NoOpTracer,
+                                             ObservabilityInstruments,
+                                             PercentileHistogramFactory,
+                                             RequestTracerProtocol,
+                                             WrappedTracer)
+from couchbase.common._option_args import accepted_args
+from couchbase.common._option_diagnostics import validated_mode
+from couchbase.common._option_spec import BLOCKS
+from couchbase.common._supportability import Supportability, _caller_stacklevel
+from couchbase.common._transforms import (csv_or_list,
+                                          timedelta_as_milliseconds,
+                                          validate_bool)
+from couchbase.common.auth import CertificateAuthenticator, PasswordAuthenticator
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.option_enums import OptionValidationMode, TLSVerifyMode
+from couchbase.common.options import (ClusterMetricsOptions,
+                                      ClusterOptions,
+                                      ClusterOrphanReportingOptions,
+                                      ClusterTimeoutOptions,
+                                      ClusterTracingOptions,
+                                      TransactionConfig)
 from couchbase.common.protocol import CouchbaseProtocol
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability import (LegacyTracerProtocol,
-                                           MeterProtocol,
-                                           NoOpMeter,
-                                           NoOpTracer,
-                                           ObservabilityInstruments,
-                                           RequestTracerProtocol,
-                                           WrappedTracer)
-from couchbase.options import (ClusterOptions,
-                               TLSVerifyMode,
-                               TransactionConfig,
-                               get_valid_args)
-from couchbase.protocol.classic._wire import wire_keys
-from couchbase.serializer import DefaultJsonSerializer, Serializer
-from couchbase.transcoder import JSONTranscoder, Transcoder
+from couchbase.common.serializer import DefaultJsonSerializer, Serializer
+from couchbase.common.transcoder import JSONTranscoder, Transcoder
+from couchbase.common.warnings import CouchbaseDeprecationWarning, CouchbaseOptionWarning
 
 LEGACY_CONNSTR_QUERY_ARGS = {
     'ssl': {'tls_verify': TLSVerifyMode.to_str},
@@ -56,8 +69,36 @@ LEGACY_CONNSTR_QUERY_ARGS = {
     'sasl_mech_force': {'sasl_mech_force': lambda x: x.split(',') if isinstance(x, str) else x}
 }
 
+# The ClusterOptions keys that take a duration, which a connection string can only spell as text.
+CONNSTR_DURATION_KEYS = frozenset(key for key, spec in BLOCKS['ClusterOptions'].keys.items() if spec.duration)
+_DURATION_PART = r'(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)'
+_DURATION_MS = {'ns': 1e-6, 'us': 1e-3, 'µs': 1e-3, 'ms': 1, 's': 1e3, 'm': 6e4, 'h': 3.6e6}
 
-def parse_connection_string(connection_str: str) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
+
+def parse_connection_string_duration(key: str, value: object) -> timedelta:
+    """A duration from the connection string: a whole number of milliseconds, or one or more
+    number-and-unit parts as in ``2500ms``, ``2.5s`` or ``1m30s``.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the value is neither, or is
+            longer than a `timedelta` can hold.
+    """
+    milliseconds: float
+    if isinstance(value, int) and not isinstance(value, bool):
+        milliseconds = value
+    elif isinstance(value, str) and re.fullmatch(f'(?:{_DURATION_PART})+', value):
+        milliseconds = sum(float(number) * _DURATION_MS[unit] for number, unit in re.findall(_DURATION_PART, value))
+    else:
+        raise InvalidArgumentException(message=(f'{key}={value} in the connection string is not a duration. '
+                                                'Expected milliseconds, or a duration such as 2500ms or 2.5s.'))
+    try:
+        return timedelta(milliseconds=milliseconds)
+    except OverflowError:
+        raise InvalidArgumentException(message=(f'{key}={value} in the connection string is longer than '
+                                                'a duration can be.')) from None
+
+
+def parse_connection_string(connection_str: str) -> tuple[str, dict[str, Any], dict[str, Any]]:
     """Parse the provided connection string
 
     The provided connection string will be parsed to split the connection string
@@ -68,13 +109,13 @@ def parse_connection_string(connection_str: str) -> Tuple[str, Dict[str, Any], D
         connection_str (str): The connection string for the cluster.
 
     Returns:
-        Tuple[str, Dict[str, Any], Dict[str, Any]]: The parsed connection string,
+        tuple[str, dict[str, Any], dict[str, Any]]: The parsed connection string,
             current options and legacy options.
     """
     # handle possible lack of URL scheme
     if '//' not in connection_str:
         warning_msg = 'Connection string has deprecated format. Start connection string with: couchbase://'
-        warnings.warn(warning_msg, DeprecationWarning, stacklevel=2)
+        warnings.warn(warning_msg, CouchbaseDeprecationWarning, stacklevel=_caller_stacklevel())
         connection_str = f'//{connection_str}'
 
     parsed_conn = urlparse(connection_str)
@@ -89,7 +130,7 @@ def parse_connection_string(connection_str: str) -> Tuple[str, Dict[str, Any], D
     return conn_str, query_str_opts, legacy_query_str_opts
 
 
-def parse_query_string_options(query_str: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def parse_query_string_options(query_str: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """Parse the query string options
 
     Query options will be split into legacy options and 'current' options. The values for the
@@ -99,7 +140,7 @@ def parse_query_string_options(query_str: str) -> Tuple[Dict[str, Any], Dict[str
         query_str (str): The query string.
 
     Returns:
-        Tuple[Dict[str, Any], Dict[str, Any]]: The parsed current options and legacy options.
+        tuple[dict[str, Any], dict[str, Any]]: The parsed current options and legacy options.
     """
     options = parse_qs(query_str)
 
@@ -122,17 +163,17 @@ def parse_query_string_options(query_str: str) -> Tuple[Dict[str, Any], Dict[str
     return query_str_opts, legacy_query_str_opts
 
 
-def parse_query_string_value(value: List[str]) -> Union[List[str], str, bool, int]:
+def parse_query_string_value(value: list[str]) -> list[str] | str | bool | int:
     """Parse a query string value
 
     The provided value is a list of at least one element. Returns either a list of strings or a single element
     which might be cast to an integer or a boolean if that's appropriate.
 
     Args:
-        value (List[str]): The query string value.
+        value (list[str]): The query string value.
 
     Returns:
-        Union[List[str], str, bool, int]: The parsed current options and legacy options.
+        list[str] | str | bool | int: The parsed current options and legacy options.
     """
 
     if len(value) > 1:
@@ -145,11 +186,11 @@ def parse_query_string_value(value: List[str]) -> Union[List[str], str, bool, in
     return v
 
 
-def parse_legacy_query_options(**query_opts: object) -> Dict[str, Any]:
+def parse_legacy_query_options(**query_opts: object) -> dict[str, Any]:
     """Parse legacy query string options
 
     Returns:
-        Dict[str, Any]: Representation of parsed query string parameters.
+        dict[str, Any]: Representation of parsed query string parameters.
     """
     final_options = {}
     for opt_key, opt_value in query_opts.items():
@@ -162,41 +203,40 @@ def parse_legacy_query_options(**query_opts: object) -> Dict[str, Any]:
     return final_options
 
 
-def build_authenticator(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:  # noqa: C901
+def build_authenticator(cluster_opts: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     authenticator = cluster_opts.pop('authenticator', None)
     if not authenticator:
         raise InvalidArgumentException(message='Authenticator is mandatory.')
 
     # the cert_path _might_ be a part of the query options
     cert_path = cluster_opts.pop('cert_path', None)
+    # Taken out whatever the authenticator, since they reach the binding only through the credentials.
+    sasl_opts = {key: cluster_opts.pop(key)
+                 for key in ('sasl_mech_force', 'allowed_sasl_mechanisms') if key in cluster_opts}
 
     # lets only pass in the authenticator, no kwargs
     auth_kwargs = {k: v for k, v in cluster_opts.items() if k in authenticator.valid_keys()}
     if isinstance(authenticator, CertificateAuthenticator) and 'trust_store_path' in auth_kwargs:
-        # the trust_store_path _should_ be in the cluster opts, however <= 3.x SDK allowed it in
-        # the CertificateAuthenticator, pop the trust_store_path from the auth_kwargs in case
-        if 'trust_store_path' not in authenticator.as_dict():
-            auth_kwargs.pop('trust_store_path')
+        # A cluster option, which a CertificateAuthenticator may also set, but not both.
+        if 'trust_store_path' in authenticator.as_dict():
+            raise InvalidArgumentException(message=('trust_store_path is set on both the CertificateAuthenticator '
+                                                    'and the cluster options. Set it in one place.'))
+        auth_kwargs.pop('trust_store_path')
     elif (
         isinstance(authenticator, PasswordAuthenticator) and
-        any(map(lambda mech: mech in auth_kwargs, ['sasl_mech_force', 'allowed_sasl_mechanisms']))
+        sasl_opts and
+        authenticator._allowed_sasl_mechanisms is None
     ):
         # 3.x SDK allowed sasl_mech_force in the query string, 4.x is going to allow allowed_sasl_mechanisms
         # in the query string, if the PasswordAuthenticator's static ldap_compatible() method has been used
         # it takes precendence.
         # Set the PasswordAuthenticator's allowed_sasl_mechanisms, if not already set, to the value(s) found in the
-        # connection string.  Note that allowed_sasl_mechanisms takes precendence over sasl_mech_force.
-        for sasl_key in ['sasl_mech_force', 'allowed_sasl_mechanisms']:
-            if sasl_key not in cluster_opts:
-                continue
-            # pop from auth_kwargs to satisfy future check
-            auth_kwargs.pop(sasl_key)
-            if authenticator._allowed_sasl_mechanisms is not None:
-                continue
-            if isinstance(cluster_opts[sasl_key], str):
-                authenticator._allowed_sasl_mechanisms = [cluster_opts[sasl_key]]
-            else:
-                authenticator._allowed_sasl_mechanisms = cluster_opts[sasl_key]
+        # connection string.  Note that sasl_mech_force takes precedence over allowed_sasl_mechanisms.
+        if len(sasl_opts) > 1:
+            warnings.warn('sasl_mech_force and allowed_sasl_mechanisms are both set; sasl_mech_force applies.',
+                          CouchbaseOptionWarning, stacklevel=_caller_stacklevel())
+        mechanisms = sasl_opts.get('sasl_mech_force', sasl_opts.get('allowed_sasl_mechanisms'))
+        authenticator._allowed_sasl_mechanisms = csv_or_list(mechanisms)
 
     if len(auth_kwargs.keys()) > 0:
         raise InvalidArgumentException(message='Authentication kwargs not allowed. Only provide the Authenticator.')
@@ -209,37 +249,38 @@ def build_authenticator(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:  # noqa
     return auth
 
 
-def build_metrics_options(cluster_opts: Dict[str, Any]) -> Tuple[Dict[str, Any], MeterProtocol]:
+def build_metrics_options(cluster_opts: dict[str, Any],
+                          histogram_factory: PercentileHistogramFactory) -> tuple[dict[str, Any], MeterProtocol]:
     metrics_opts = {}
-    for key in wire_keys('ClusterMetricsOptions'):
+    for key in ClusterMetricsOptions.get_allowed_option_keys():
         if key in cluster_opts:
             metrics_opts[key] = cluster_opts.pop(key)
 
-    cluster_metrics_emit_interval = cluster_opts.pop('cluster_metrics_emit_interval', None)
-    if cluster_metrics_emit_interval and 'metrics_emit_interval' not in metrics_opts:
-        metrics_opts['metrics_emit_interval'] = cluster_metrics_emit_interval
-    cluster_enable_metrics = cluster_opts.pop('cluster_enable_metrics', None)
+    logging_meter_emit_interval = cluster_opts.pop('logging_meter_emit_interval', None)
+    if logging_meter_emit_interval and 'metrics_emit_interval' not in metrics_opts:
+        metrics_opts['metrics_emit_interval'] = logging_meter_emit_interval
+    cluster_enable_metrics = cluster_opts.pop('enable_metrics', None)
 
     # NOTE: we disable metrics in the C++ core as metrics logic resides (for now) on the wrapper side
-    if cluster_enable_metrics is not None and 'enable_metrics' not in metrics_opts:
-        metrics_opts['enable_metrics'] = cluster_enable_metrics
-    if metrics_opts:
-        cluster_opts['metrics_options'] = metrics_opts
+    if cluster_enable_metrics is not None and 'metrics_enable_metrics' not in metrics_opts:
+        metrics_opts['metrics_enable_metrics'] = cluster_enable_metrics
 
     meter = cluster_opts.pop('meter', None)
     # We want to disble metrics if we don't have a meter AND metrics is explicitly disabled
-    if meter is None and metrics_opts.get('enable_metrics', None) is False:
+    if meter is None and validate_bool(metrics_opts.get('metrics_enable_metrics', True)) is False:
         enable_metrics = False
     else:
         enable_metrics = True
 
-    metrics_opts['enable_metrics'] = enable_metrics
+    metrics_opts['metrics_enable_metrics'] = enable_metrics
     if meter is None and enable_metrics is True:
-        from couchbase.logic.observability import LoggingMeter
-        meter = LoggingMeter(emit_interval_ms=metrics_opts.get('metrics_emit_interval', None))
+        from couchbase.common._observability import LoggingMeter
+        emit_interval = metrics_opts.get('metrics_emit_interval')
+        emit_interval_ms = None if emit_interval is None else timedelta_as_milliseconds(emit_interval)
+        meter = LoggingMeter(histogram_factory, emit_interval_ms=emit_interval_ms)
 
     if meter is None:
-        from couchbase.logic.observability import NoOpMeter
+        from couchbase.common._observability import NoOpMeter
         meter = NoOpMeter()
 
     if meter and not isinstance(meter, MeterProtocol):
@@ -248,70 +289,68 @@ def build_metrics_options(cluster_opts: Dict[str, Any]) -> Tuple[Dict[str, Any],
     return metrics_opts, meter
 
 
-def build_timeout_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
+def build_timeout_options(cluster_opts: dict[str, Any]) -> dict[str, Any]:
     timeout_opts = {}
-    for key in wire_keys('ClusterTimeoutOptions'):
+    for key in ClusterTimeoutOptions.get_allowed_option_keys():
         if key in cluster_opts:
             timeout_opts[key] = cluster_opts.pop(key)
-    if timeout_opts:
-        cluster_opts['timeout_options'] = timeout_opts
-
     return timeout_opts
 
 
-def build_tracing_and_orphan_options(cluster_opts: Dict[str, Any]  # noqa: C901
-                                     ) -> Tuple[Dict[str, Any], Dict[str, Any], WrappedTracer]:
-    tracing_opts = {}
-    for key in wire_keys('ClusterTracingOptions'):
-        if key in cluster_opts:
-            tracing_opts[key] = cluster_opts.pop(key)
+# The tracing block's deprecated keys for the orphan reporter's queue, with the orphan block's keys
+# that replaced them and win wherever both are written.
+DEPRECATED_ORPHAN_KEYS = {'tracing_orphaned_queue_size': 'orphan_sample_size',
+                          'tracing_orphaned_queue_flush_interval': 'orphan_emit_interval'}
 
+
+def build_tracing_and_orphan_options(cluster_opts: dict[str, Any]  # noqa: C901
+                                     ) -> tuple[dict[str, Any], dict[str, Any], WrappedTracer]:
     orphan_opts = {}
-    for key in wire_keys('ClusterOrphanReportingOptions'):
+    for key in ClusterOrphanReportingOptions.get_allowed_option_keys():
         if key in cluster_opts:
             orphan_opts[key] = cluster_opts.pop(key)
 
-    # PYCBC-1718: C++ core split out orphan reporting from tracing, so we have separate options blocks now.
-    #           However, we have to check for the old options in the tracing block for backwards compatibility.
-    if tracing_opts:
-        sample_size = tracing_opts.pop('orphan_sample_size', None)
-        if sample_size and 'sample_size' not in orphan_opts:
-            orphan_opts['orphan_sample_size'] = sample_size
-        emit_interval = tracing_opts.pop('orphan_emit_interval', None)
-        if emit_interval and 'emit_interval' not in orphan_opts:
-            orphan_opts['orphan_emit_interval'] = emit_interval
+    tracing_opts = {}
+    for key in ClusterTracingOptions.get_allowed_option_keys():
+        if key in cluster_opts:
+            tracing_opts[key] = cluster_opts.pop(key)
 
-    cluster_enable_tracing = cluster_opts.pop('cluster_enable_tracing', None)
-    if cluster_enable_tracing is not None and 'enable_tracing' not in tracing_opts:
-        tracing_opts['enable_tracing'] = cluster_enable_tracing
+    for old, new in DEPRECATED_ORPHAN_KEYS.items():
+        if old in tracing_opts:
+            orphan_opts.setdefault(new, tracing_opts.pop(old))
 
-    cluster_enable_orphan_reporting = cluster_opts.pop('cluster_enable_orphan_reporting', None)
-    if cluster_enable_orphan_reporting is not None and 'enable_orphan_reporting' not in orphan_opts:
-        orphan_opts['enable_orphan_reporting'] = cluster_enable_orphan_reporting
-    if orphan_opts:
-        cluster_opts['orphan_reporting_options'] = orphan_opts
+    cluster_enable_tracing = cluster_opts.pop('enable_tracing', None)
+    if cluster_enable_tracing is not None and 'tracing_enable_tracing' not in tracing_opts:
+        tracing_opts['tracing_enable_tracing'] = cluster_enable_tracing
+
+    cluster_enable_orphan_reporting = cluster_opts.pop('enable_orphan_reporting', None)
+    if cluster_enable_orphan_reporting is not None and 'orphan_enable_orphan_reporting' not in orphan_opts:
+        orphan_opts['orphan_enable_orphan_reporting'] = cluster_enable_orphan_reporting
 
     tracer = cluster_opts.pop('tracer', None)
     # We want to disble tracing if we don't have a tracer AND tracing is explicitly disabled
-    if tracer is None and tracing_opts.get('enable_tracing', None) is False:
+    if tracer is None and validate_bool(tracing_opts.get('tracing_enable_tracing', True)) is False:
         enable_tracing = False
     else:
         enable_tracing = True
 
-    tracing_opts['enable_tracing'] = enable_tracing
+    tracing_opts['tracing_enable_tracing'] = enable_tracing
     if tracer is None and enable_tracing is True:
-        from couchbase.logic.observability import ThresholdLoggingTracer
+        from couchbase.common._observability import ThresholdLoggingTracer
         tracer = ThresholdLoggingTracer(config=(tracing_opts if tracing_opts else None))
 
     is_legacy = False
     if tracer is None:
-        from couchbase.logic.observability import NoOpTracer
+        from couchbase.common._observability import NoOpTracer
         tracer = NoOpTracer()
-    else:  # if we have a tracer at this point, we need to enable tracing w/in the bindings
-        cluster_opts['setup_sdk_tracing'] = True
-        from couchbase.tracing import CouchbaseTracer
+    else:
+        from couchbase.common._tracing import CouchbaseTracer
         if isinstance(tracer, CouchbaseTracer):
-            cluster_opts['legacy_tracer'] = tracer
+            # Once per cluster rather than per span: a legacy tracer makes a span on every
+            # traced operation, and the spans it makes are the deprecated class's too.
+            Supportability.type_deprecated('CouchbaseTracer', 'couchbase.observability.tracing.RequestTracer',
+                                           'CouchbaseSpan is deprecated with it; use '
+                                           'couchbase.observability.tracing.RequestSpan instead.')
             is_legacy = True
 
     if not isinstance(tracer, (RequestTracerProtocol, LegacyTracerProtocol)):
@@ -321,26 +360,26 @@ def build_tracing_and_orphan_options(cluster_opts: Dict[str, Any]  # noqa: C901
     return tracing_opts, orphan_opts, WrappedTracer(tracer, is_legacy)
 
 
-class StreamingTimeouts(TypedDict):
-    analytics_timeout: Optional[int] = None
-    query_timeout: Optional[int] = None
-    search_timeout: Optional[int] = None
-    view_timeout: Optional[int] = None
-
-
 @dataclass
 class ClusterSettings:
+    """A cluster's parsed settings, split by concern, each key under the spelling `ClusterOptions`
+    stores it and each value as the caller gave it.
+
+    `cluster_options` is the keys no block claimed.  The timeout, tracing, orphan and metrics
+    blocks are their own fields, so a protocol decides how each reaches what it connects with,
+    and maps each to what it sends.
+    """
+
     connstr: str
-    auth: Dict[str, Any]
-    cluster_options: Dict[str, Any]
+    auth: dict[str, Any]
+    cluster_options: dict[str, Any]
     default_transcoder: Transcoder
     default_serializer: Serializer
-    default_timeouts: Dict[str, int]
-    metrics_options: Dict[str, Any]
-    orphan_options: Dict[str, Any]
-    streaming_timeouts: StreamingTimeouts
-    timeout_options: Dict[str, Any]
-    tracing_options: Dict[str, Any]
+    option_validation: OptionValidationMode | None
+    metrics_options: dict[str, Any]
+    orphan_options: dict[str, Any]
+    timeout_options: dict[str, Any]
+    tracing_options: dict[str, Any]
     transaction_config: TransactionConfig
     observability_instruments: ObservabilityInstruments
 
@@ -348,17 +387,15 @@ class ClusterSettings:
         self.observability_instruments.get_cluster_labels_fn = callable
 
     @classmethod
-    def build_cluster_settings(cls,
-                               connstr,  # type: str
-                               *options,  # type: ClusterOptions
-                               **kwargs  # type: Any
-                               ) -> ClusterSettings:
-        default_timeouts = kwargs.pop('_default_timeouts', {})
+    def build_cluster_settings(cls, connstr: str, *options: ClusterOptions, **kwargs: Any) -> ClusterSettings:
+        histogram_factory = kwargs.pop('_histogram_factory')
         # parse query string prior to parsing ClusterOptions
         connection_str, query_opts, legacy_opts = parse_connection_string(connstr)
 
-        kwargs.update(query_opts)
-        cluster_opts = get_valid_args(ClusterOptions, kwargs, *options, protocol=CouchbaseProtocol.CLASSIC)
+        kwargs.update({key: parse_connection_string_duration(key, value) if key in CONNSTR_DURATION_KEYS else value
+                       for key, value in query_opts.items()})
+        cluster_opts = accepted_args(ClusterOptions, kwargs, *options,
+                                     protocol=CouchbaseProtocol.from_connstr(connstr))
         # add legacy options after parsing ClusterOptions to keep logic separate
         cluster_opts.update(parse_legacy_query_options(**legacy_opts))
 
@@ -375,27 +412,23 @@ class ClusterSettings:
         if not default_transcoder:
             default_transcoder = JSONTranscoder()
 
+        option_validation = validated_mode(cluster_opts.pop('option_validation', None))
+
         timeout_opts = build_timeout_options(cluster_opts)
-        streaming_timeouts: StreamingTimeouts = {
-            'analytics_timeout': timeout_opts.get('analytics_timeout',
-                                                  default_timeouts.get('analytics_timeout', None)),
-            'query_timeout': timeout_opts.get('query_timeout', default_timeouts.get('query_timeout', None)),
-            'search_timeout': timeout_opts.get('search_timeout', default_timeouts.get('search_timeout', None)),
-            'view_timeout': timeout_opts.get('view_timeout', default_timeouts.get('view_timeout', None)),
-        }
         tracing_opts, orphan_opts, tracer = build_tracing_and_orphan_options(cluster_opts)
-        metrics_opts, meter = build_metrics_options(cluster_opts)
-        transaction_cfg = cluster_opts.pop('transaction_config', TransactionConfig())
-        cluster_opts['user_agent_extra'] = USER_AGENT_EXTRA
+        metrics_opts, meter = build_metrics_options(cluster_opts, histogram_factory)
+        # BRIDGE: the legacy TransactionConfig, whose core config the old transactions logic reads.
+        # Removed by PYCBC-2007.
+        from couchbase.logic._legacy_options import TransactionConfig as LegacyTransactionConfig
+        transaction_cfg = cluster_opts.pop('transaction_config', LegacyTransactionConfig())
         return cls(connection_str,
                    auth,
                    cluster_opts,
                    default_transcoder,
                    default_serializer,
-                   default_timeouts,
+                   option_validation,
                    metrics_opts,
                    orphan_opts,
-                   streaming_timeouts,
                    timeout_opts,
                    tracing_opts,
                    transaction_cfg,

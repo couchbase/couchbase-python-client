@@ -17,24 +17,19 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable, Mapping
 from threading import (Event,
                        Lock,
                        Thread)
-from typing import (Callable,
-                    Dict,
+from typing import (Any,
                     Generic,
-                    Mapping,
-                    Optional,
-                    Tuple,
+                    Protocol,
                     TypedDict,
                     TypeVar)
 
-from couchbase.logic.observability.observability_types import (_ATTR_OPERATION_NAME,
-                                                               _ATTR_SERVICE,
-                                                               OpName,
-                                                               ServiceType)
-from couchbase.observability.metrics import Meter, ValueRecorder
-from couchbase.protocol.classic._pycbc_core import pycbc_hdr_histogram
+from couchbase.common._observability.observability_types import _ATTR_OPERATION_NAME, _ATTR_SERVICE
+from couchbase.common._operations import ServiceType
+from couchbase.common.observability.metrics import Meter, ValueRecorder
 
 logger = logging.getLogger('couchbase.metrics')
 
@@ -44,18 +39,17 @@ V = TypeVar('V')
 
 class ConcurrentMap(Generic[K, V]):
     def __init__(self,
-                 initial_data: Optional[Dict[K, V]] = None,
-                 factory: Optional[Callable[[K], V]] = None):
-        self._data = {}
+                 initial_data: dict[K, V] | None = None,
+                 factory: Callable[[K], V] | None = None) -> None:
         self._lock = Lock()
-        self._data: Dict[K, V] = initial_data.copy() if initial_data else {}
+        self._data: dict[K, V] = initial_data.copy() if initial_data else {}
         self._factory = factory
 
     def set(self, key: K, value: V) -> None:
         with self._lock:
             self._data[key] = value
 
-    def get(self, key: K, default: Optional[V] = None):
+    def get(self, key: K, default: V | None = None) -> V | None:
         with self._lock:
             return self._data.get(key, default)
 
@@ -67,7 +61,7 @@ class ConcurrentMap(Generic[K, V]):
                 self._data[key] = self._factory(key)
             return self._data[key]
 
-    def items(self):
+    def items(self) -> list[tuple[K, V]]:
         with self._lock:
             # Return a static list so we don't get iteration size mutation errors
             return list(self._data.items())
@@ -98,14 +92,39 @@ class ConcurrentMap(Generic[K, V]):
             return len(self._data)
 
 
+class HistogramPercentiles(TypedDict):
+    total_count: int
+    percentiles: list[int]
+
+
+class PercentileHistogram(Protocol):
+    """**INTERNAL** A latency histogram for the logging meter.  Each protocol supplies its own, so the
+    meter itself depends on no binding."""
+
+    def record_value(self, value: int) -> None: ...
+
+    def get_percentiles_and_reset(self, percentiles: list[float]) -> HistogramPercentiles: ...
+
+    def reset(self) -> None: ...
+
+
+class PercentileHistogramFactory(Protocol):
+
+    def __call__(self,
+                 *,
+                 lowest_discernible_value: int,
+                 highest_trackable_value: int,
+                 significant_figures: int) -> PercentileHistogram: ...
+
+
 class PercentileReport(TypedDict):
     total_count: int
     percentiles_us: Mapping[str, int]
 
 
 class LoggingMeterReport(TypedDict):
-    meta: Mapping[str, int]
-    operations: Mapping[str, Mapping[str, PercentileReport]]
+    meta: Mapping[str, float]
+    operations: dict[str, Mapping[str, PercentileReport]]
 
 
 class LoggingMeterReporter(Thread):
@@ -123,7 +142,7 @@ class LoggingMeterReporter(Thread):
     def stopped(self) -> bool:
         return self._stopped
 
-    def run(self):
+    def run(self) -> None:
         while not self._finished.is_set():
             if self._finished.wait(self._interval):
                 break
@@ -156,7 +175,7 @@ class LoggingMeterReporter(Thread):
 
 class LoggingValueRecorder(ValueRecorder):
 
-    def __init__(self, op_name: OpName, service_type: ServiceType):
+    def __init__(self, op_name: str, service_type: ServiceType, histogram_factory: PercentileHistogramFactory):
         self._op_name = op_name
         self._service_type = service_type
         self._lowest_discernible_value = 1  # 1 microsecond
@@ -164,7 +183,7 @@ class LoggingValueRecorder(ValueRecorder):
         self._significant_figures = 3
         # RFC required percentiles
         self._percentiles = [50.0, 90.0, 99.0, 99.9, 100.0]
-        self._histogram = pycbc_hdr_histogram(
+        self._histogram = histogram_factory(
             lowest_discernible_value=self._lowest_discernible_value,
             highest_trackable_value=self._highest_trackable_value,
             significant_figures=self._significant_figures
@@ -174,7 +193,7 @@ class LoggingValueRecorder(ValueRecorder):
         self._histogram.record_value(value)
 
     def get_percentiles_and_reset(self) -> PercentileReport:
-        # what we get from the bindings:
+        # what we get from the histogram:
         #   {
         #       "total_count": 100,               # An integer
         #       "percentiles": [5, 45, 25, 25]    # A list of integers (latencies in microseconds)
@@ -196,38 +215,38 @@ class LoggingValueRecorder(ValueRecorder):
 
 class LoggingMeter(Meter):
 
-    def __init__(self, emit_interval_ms: Optional[int] = None) -> None:
+    def __init__(self, histogram_factory: PercentileHistogramFactory, emit_interval_ms: int | None = None) -> None:
         if emit_interval_ms is None:
             emit_interval_ms = 600000
         self._emit_interval_s = emit_interval_ms / 1000
 
-        recorded_services = {}
+        recorded_services: dict[ServiceType, ConcurrentMap[str, LoggingValueRecorder]] = {}
         for svc_type in ServiceType:
-            def factory(op_name, svc_type=svc_type): return LoggingValueRecorder(op_name=op_name,
-                                                                                 service_type=svc_type)
+            def factory(op_name: str, svc_type: ServiceType = svc_type) -> LoggingValueRecorder:
+                return LoggingValueRecorder(op_name=op_name, service_type=svc_type, histogram_factory=histogram_factory)
             recorded_services[svc_type] = ConcurrentMap(factory=factory)
 
         self._recorders: ConcurrentMap[
             ServiceType,
-            ConcurrentMap[OpName, LoggingValueRecorder]
+            ConcurrentMap[str, LoggingValueRecorder]
         ] = ConcurrentMap(recorded_services)
 
-        # (service_str, op_str) -> recorder cache. Avoids OpName() and
-        # ServiceType() enum construction on every value_recorder() call. There
+        # (service_str, op_str) -> recorder cache. Avoids ServiceType() enum
+        # construction on every value_recorder() call. There
         # are only ~8 KV op combinations so this fills up after the first ops.
         # It also pins the recorders: a cached entry outlives every lookup, so
         # self._recorders must keep the same objects for the life of the meter.
         # Replacing that map, rather than resetting the recorders in it, strands
         # each cached recorder beyond create_report's reach and it reports
         # nothing again.
-        self._recorder_cache: Dict[Tuple[str, str], LoggingValueRecorder] = {}
+        self._recorder_cache: dict[tuple[str, str], LoggingValueRecorder] = {}
         self._reporter = LoggingMeterReporter(logging_meter=self, interval=self._emit_interval_s)
         self._reporter.start()
 
-    def value_recorder(self, name: str, tags: Dict[str, str]) -> ValueRecorder:
+    def value_recorder(self, name: str, tags: Mapping[str, Any]) -> ValueRecorder:
         # Use cached string constants instead of Enum.value on every call,
-        # and cache the recorder by (service_str, op_str) to avoid OpName() and
-        # ServiceType() enum construction.
+        # and cache the recorder by (service_str, op_str) to avoid ServiceType()
+        # enum construction.
         op_str = tags.get(_ATTR_OPERATION_NAME, None)
         svc_str = tags.get(_ATTR_SERVICE, None)
         lvr = self._recorder_cache.get((svc_str, op_str))
@@ -235,9 +254,8 @@ class LoggingMeter(Meter):
             # Slow path: first encounter of this combination (~8 total for KV).
             # No lock needed — worst case two threads both miss and write the
             # same value; the result is identical and the assignment is atomic.
-            op_name = OpName(op_str)
             service_type = ServiceType(svc_str)
-            lvr = self._recorders[service_type].get_or_create(op_name)
+            lvr = self._recorders[service_type].get_or_create(op_str)
             self._recorder_cache[(svc_str, op_str)] = lvr
         return lvr
 
@@ -247,13 +265,13 @@ class LoggingMeter(Meter):
             'operations': {}
         }
         for svc_type, op_map in self._recorders.items():
-            svc_report = {}
+            svc_report: dict[str, PercentileReport] = {}
             for op_name, recorder in op_map.items():
                 percentile_report = recorder.get_percentiles_and_reset()
                 # get_percentiles_and_reset returns a populated dict either way,
                 # so an idle operation is only recognizable by its count.
                 if percentile_report['total_count']:
-                    svc_report[op_name.value] = percentile_report
+                    svc_report[op_name] = percentile_report
             if svc_report:
                 report['operations'][svc_type.value] = svc_report
         return report

@@ -17,12 +17,12 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Iterable,
-                    Iterator,
-                    Union)
+                    Iterator)
 
 from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
+from couchbase.common._observability import KeyspaceDetails, ObservabilityInstruments
 from couchbase.exceptions import ErrorMapper, UnAmbiguousTimeoutException
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
 from couchbase.protocol.classic._collection_types import CollectionDetails
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
@@ -41,22 +41,31 @@ if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
     from acouchbase.kv_range_scan import AsyncRangeScanRequest
-    from acouchbase.scope import AsyncScope
+    from acouchbase.protocol.classic._scope_impl import AsyncScopeImpl
+    from couchbase.common.protocol import CouchbaseProtocol
     from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.transcoder import Transcoder
-    from txcouchbase.scope import TxScope
 
 
 class AsyncCollectionImpl:
 
-    def __init__(self, collection_name: str, scope: Union[AsyncScope, TxScope]) -> None:
-        self._scope = scope
-        self._client_adapter = scope._impl._client_adapter
-        self._collection_details = CollectionDetails(self._scope._impl.bucket_name,
-                                                     self._scope._impl.name,
-                                                     collection_name,
-                                                     self._scope._impl.cluster_settings.default_transcoder)
-        self._request_builder = CollectionRequestBuilder(self._collection_details, self._client_adapter.loop)
+    def __init__(self, collection_name: str, scope_impl: AsyncScopeImpl) -> None:
+        self._scope_impl = scope_impl
+        self._client_adapter: AsyncClientAdapter = scope_impl._client_adapter
+        cluster_settings = scope_impl.cluster_settings
+        self._collection_details: CollectionDetails = CollectionDetails(
+            scope_impl.bucket_name,
+            scope_impl.name,
+            collection_name,
+            cluster_settings.default_transcoder,
+            default_serializer=cluster_settings.default_serializer,
+            option_validation=cluster_settings.option_validation)
+        self._request_builder = CollectionRequestBuilder(self._collection_details)
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._client_adapter.couchbase_protocol
 
     @property
     def bucket_name(self) -> str:
@@ -71,7 +80,7 @@ class AsyncCollectionImpl:
 
     @property
     def connected(self) -> bool:
-        return self._scope._impl._bucket_impl.connected
+        return self._scope_impl.connected
 
     @property
     def connection(self) -> pycbc_connection:
@@ -107,22 +116,27 @@ class AsyncCollectionImpl:
         """
         **INTERNAL**
         """
-        return self._scope._impl.cluster_settings.observability_instruments
+        return self._scope_impl.observability_instruments
 
-    async def append(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+    @property
+    def keyspace(self) -> KeyspaceDetails:
+        return self._collection_details.get_details_as_dict()
+
+    async def get(self,
+                  req: PycbcCoreKeyValueRequest,
+                  transcoder: Transcoder,
+                  obs_handler: ObservableRequestHandler) -> GetResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
+        return GetResult(ret, transcoder=transcoder, key=req.key)
 
-    async def decrement(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> CounterResult:
+    async def get_any_replica(self,
+                              req: PycbcCoreKeyValueRequest,
+                              transcoder: Transcoder,
+                              obs_handler: ObservableRequestHandler) -> GetReplicaResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return CounterResult(ret, key=req.key)
-
-    async def exists(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> ExistsResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return ExistsResult(ret, key=req.key)
+        return GetReplicaResult(ret, transcoder=transcoder, key=req.key)
 
     async def get_all_replicas(self,
                                req: PycbcCoreKeyValueRequest,
@@ -149,13 +163,35 @@ class AsyncCollectionImpl:
 
         return _decode_replicas()
 
-    async def get_and_lock(self,
-                           req: PycbcCoreKeyValueRequest,
-                           transcoder: Transcoder,
-                           obs_handler: ObservableRequestHandler) -> GetResult:
+    async def exists(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> ExistsResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return GetResult(ret, transcoder=transcoder, key=req.key)
+        return ExistsResult(ret, key=req.key)
+
+    async def insert(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    async def upsert(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    async def replace(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    async def remove(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
+    async def touch(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
 
     async def get_and_touch(self,
                             req: PycbcCoreKeyValueRequest,
@@ -165,31 +201,17 @@ class AsyncCollectionImpl:
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=transcoder, key=req.key)
 
-    async def get_any_replica(self,
-                              req: PycbcCoreKeyValueRequest,
-                              transcoder: Transcoder,
-                              obs_handler: ObservableRequestHandler) -> GetReplicaResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return GetReplicaResult(ret, transcoder=transcoder, key=req.key)
-
-    async def get(self,
-                  req: PycbcCoreKeyValueRequest,
-                  transcoder: Transcoder,
-                  obs_handler: ObservableRequestHandler) -> GetResult:
+    async def get_and_lock(self,
+                           req: PycbcCoreKeyValueRequest,
+                           transcoder: Transcoder,
+                           obs_handler: ObservableRequestHandler) -> GetResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
         return GetResult(ret, transcoder=transcoder, key=req.key)
 
-    async def increment(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> CounterResult:
+    async def unlock(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> None:
         await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return CounterResult(ret, key=req.key)
-
-    async def insert(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
+        await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
 
     async def lookup_in(self,
                         req: PycbcCoreKeyValueRequest,
@@ -198,6 +220,14 @@ class AsyncCollectionImpl:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
         return LookupInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
+
+    async def lookup_in_any_replica(self,
+                                    req: PycbcCoreKeyValueRequest,
+                                    transcoder: Transcoder,
+                                    obs_handler: ObservableRequestHandler) -> LookupInReplicaResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return LookupInReplicaResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
 
     async def lookup_in_all_replicas(self,
                                      req: PycbcCoreKeyValueRequest,
@@ -223,48 +253,28 @@ class AsyncCollectionImpl:
                     yield LookupInReplicaResult(res, transcoder=transcoder, is_subdoc=True, key=req.key)
         return _decode_replicas()
 
-    async def lookup_in_any_replica(self,
-                                    req: PycbcCoreKeyValueRequest,
-                                    transcoder: Transcoder,
-                                    obs_handler: ObservableRequestHandler) -> LookupInReplicaResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return LookupInReplicaResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
-
     async def mutate_in(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutateInResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
         transcoder = self._collection_details.default_transcoder
         return MutateInResult(ret, transcoder=transcoder, is_subdoc=True, key=req.key)
 
+    async def increment(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> CounterResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return CounterResult(ret, key=req.key)
+
+    async def decrement(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> CounterResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return CounterResult(ret, key=req.key)
+
+    async def append(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
+        await self.wait_until_bucket_connected()
+        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        return MutationResult(ret, key=req.key)
+
     async def prepend(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
-
-    def range_scan(self, req: AsyncRangeScanRequest) -> ScanResultIterable:
-        return ScanResultIterable(req)
-
-    async def remove(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
-
-    async def replace(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
-
-    async def touch(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
-        await self.wait_until_bucket_connected()
-        ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-        return MutationResult(ret, key=req.key)
-
-    async def unlock(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> None:
-        await self.wait_until_bucket_connected()
-        await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
-
-    async def upsert(self, req: PycbcCoreKeyValueRequest, obs_handler: ObservableRequestHandler) -> MutationResult:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
         return MutationResult(ret, key=req.key)
@@ -272,4 +282,7 @@ class AsyncCollectionImpl:
     async def wait_until_bucket_connected(self) -> None:
         if self.connected:
             return
-        await self._scope._impl.wait_until_bucket_connected()
+        await self._scope_impl.wait_until_bucket_connected()
+
+    def range_scan(self, req: AsyncRangeScanRequest) -> ScanResultIterable:
+        return ScanResultIterable(req)

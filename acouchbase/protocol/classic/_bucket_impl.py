@@ -16,35 +16,50 @@
 from __future__ import annotations
 
 from asyncio import AbstractEventLoop, Future
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any
 
+from acouchbase.protocol.classic._scope_impl import AsyncScopeImpl
 from acouchbase.views import AsyncViewRequest
-from couchbase.common._cluster_settings import ClusterSettings, StreamingTimeouts
-from couchbase.logic.observability import ObservabilityInstruments
+from couchbase.common._cluster_settings import ClusterSettings
+from couchbase.common._observability import ObservabilityInstruments
+from couchbase.common.result import PingResult
 from couchbase.protocol.classic._bucket_req_builder import BucketRequestBuilder
+from couchbase.protocol.classic._cluster_types import StreamingTimeouts
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
-from couchbase.result import PingResult, ViewResult
+from couchbase.protocol.classic._result import _ping_from_core
+from couchbase.result import ViewResult
 
 if TYPE_CHECKING:
-    from acouchbase.cluster import AsyncCluster
+    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
+    from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
+    from couchbase.common.options import PingOptions
+    from couchbase.common.protocol import CouchbaseProtocol
     from couchbase.protocol.classic._bucket_types import PingRequest, ViewQueryRequest
     from couchbase.serializer import Serializer
     from couchbase.transcoder import Transcoder
-    from txcouchbase.cluster import TxCluster
 
 
 class AsyncBucketImpl:
-    def __init__(self, bucket_name: str, cluster: Union[AsyncCluster, TxCluster]) -> None:
+
+    def __init__(self, bucket_name: str, cluster_impl: AsyncClusterImpl) -> None:
         self._bucket_name = bucket_name
-        self._client_adapter = cluster._impl._client_adapter
-        self._cluster_settings = cluster._impl._cluster_settings
-        self._request_builder = BucketRequestBuilder(bucket_name)
+        self._client_adapter: AsyncClientAdapter = cluster_impl._client_adapter
+        self._cluster_settings = cluster_impl._cluster_settings
+        self._streaming_timeouts = cluster_impl.streaming_timeouts
+        self._kv_durable_timeout = cluster_impl.kv_durable_timeout
+        self._request_builder = BucketRequestBuilder(bucket_name,
+                                                     self._client_adapter.option_validation)
         # Opening a bucket is an async operation that we cannot await b/c the call needs to happen when we initialize
         # a bucket. We await the bucket connection future in whichever operation comes next.
         # NOTE:  We chain the bucket connection with the client connection future if the client connection future was
         #        not previously awaited.
         self._connect_ft = self._client_adapter.execute_connect_bucket_request(bucket_name)
         self._bucket_connected = False
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._client_adapter.couchbase_protocol
 
     @property
     def bucket_connected(self) -> bool:
@@ -101,7 +116,12 @@ class AsyncBucketImpl:
     @property
     def streaming_timeouts(self) -> StreamingTimeouts:
         """**INTERNAL**"""
-        return self._cluster_settings.streaming_timeouts
+        return self._streaming_timeouts
+
+    @property
+    def kv_durable_timeout(self) -> int | None:
+        """**INTERNAL**"""
+        return self._kv_durable_timeout
 
     @property
     def observability_instruments(self) -> ObservabilityInstruments:
@@ -118,11 +138,19 @@ class AsyncBucketImpl:
             return
         await self._client_adapter.execute_close_bucket_request(self._bucket_name)
 
-    async def ping(self, req: PingRequest) -> PingResult:
+    def scope(self, name: str) -> AsyncScopeImpl:
         """**INTERNAL**"""
+        return AsyncScopeImpl(name, self)
+
+    async def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
+        return await self._ping(self._request_builder.build_ping_request(opts, **kwargs))
+
+    # Split from ping so TxBucketImpl can build the request inside defer()'s start callable, where a bad
+    # argument raises at the call rather than arriving as a failed Deferred.
+    async def _ping(self, req: PingRequest) -> PingResult:
         await self.wait_until_bucket_connected()
         res = await self._client_adapter.execute_bucket_request(req)
-        return PingResult(res)
+        return PingResult(_ping_from_core(res.raw_result))
 
     def view_query(self, req: ViewQueryRequest) -> ViewResult:
         """**INTERNAL**"""
@@ -134,7 +162,7 @@ class AsyncBucketImpl:
         # timeout, the streaming_timeout defaults to cluster's view_timeout (set here). If the cluster
         # also does not specify a view_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::view_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('view_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('view_timeout', None)
         return ViewResult(AsyncViewRequest.generate_view_request(self._client_adapter.connection,
                                                                  self.loop,
                                                                  req.view_query.as_encodable(),

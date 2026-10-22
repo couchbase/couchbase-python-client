@@ -16,39 +16,53 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Optional
+from typing import (TYPE_CHECKING,
+                    Any,
+                    cast)
 
 from twisted.internet.defer import Deferred
 
 from acouchbase import get_event_loop
 from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
+from couchbase.common.result import (ClusterInfoResult,
+                                     DiagnosticsResult,
+                                     PingResult)
 from couchbase.result import (AnalyticsResult,
-                              ClusterInfoResult,
-                              DiagnosticsResult,
-                              PingResult,
                               QueryResult,
                               SearchResult)
 from txcouchbase.analytics import AnalyticsRequest
 from txcouchbase.n1ql import N1QLRequest
+from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
+from txcouchbase.protocol.classic._deferred import defer
 from txcouchbase.search import FullTextSearchRequest
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
+    from datetime import timedelta
 
+    from twisted.internet.interfaces import IReactorCore
+
+    from couchbase.common.options import (ClusterOptions,
+                                          DiagnosticsOptions,
+                                          PingOptions,
+                                          WaitUntilReadyOptions)
     from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
-                                                           ClusterInfoRequest,
-                                                           DiagnosticsRequest,
-                                                           PingRequest,
                                                            QueryRequest,
-                                                           SearchQueryRequest,
-                                                           WaitUntilReadyRequest)
+                                                           SearchQueryRequest)
 
 
 class TxClusterImpl(AsyncClusterImpl):
 
-    def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
-        kwargs['loop_validator'] = self._validate_loop
-        super().__init__(connstr, *options, **kwargs)
+    def __init__(self,
+                 connstr: str,
+                 *options: ClusterOptions,
+                 **kwargs: object) -> None:
+        # `loop` is spelled out so a caller's is refused: the validator supplies the reactor's loop.
+        super().__init__(connstr, *options, loop=None, loop_validator=self._validate_loop, **kwargs)
+
+    def bucket(self, name: str) -> TxBucketImpl:
+        """**INTERNAL**"""
+        return TxBucketImpl(name, self)
 
     def analytics_query_deferred(self, req: AnalyticsQueryRequest) -> Deferred[AnalyticsResult]:
         """**INTERNAL**"""
@@ -59,7 +73,7 @@ class TxClusterImpl(AsyncClusterImpl):
         # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
         # also does not specify an analytics_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('analytics_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('analytics_timeout', None)
         q_req = AnalyticsRequest.generate_analytics_request(self.connection,
                                                             self.loop,
                                                             req.analytics_query.params,
@@ -86,26 +100,18 @@ class TxClusterImpl(AsyncClusterImpl):
         d = Deferred.fromFuture(future)
         return d
 
-    def diagnostics_deferred(self, req: DiagnosticsRequest) -> Deferred[DiagnosticsResult]:
-        """**INTERNAL**"""
-        coro = super().diagnostics(req)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+    def diagnostics_deferred(self,
+                             opts: DiagnosticsOptions | None = None,
+                             **kwargs: Any) -> Deferred[DiagnosticsResult]:
+        return defer(self.loop,
+                     None,
+                     lambda: self._diagnostics(self._request_builder.build_diagnostics_request(opts, **kwargs)))
 
-    def get_cluster_info_deferred(self, req: ClusterInfoRequest) -> Deferred[ClusterInfoResult]:
-        """**INTERNAL**"""
-        coro = super().get_cluster_info(req)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+    def get_cluster_info_deferred(self) -> Deferred[ClusterInfoResult]:
+        return defer(self.loop, None, self.get_cluster_info)
 
-    def ping_deferred(self, req: PingRequest) -> Deferred[PingResult]:
-        """**INTERNAL**"""
-        coro = super().ping(req)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+    def ping_deferred(self, opts: PingOptions | None = None, **kwargs: Any) -> Deferred[PingResult]:
+        return defer(self.loop, None, lambda: self._ping(self._request_builder.build_ping_request(opts, **kwargs)))
 
     def query_deferred(self, req: QueryRequest) -> Deferred[QueryResult]:
         """**INTERNAL**"""
@@ -117,7 +123,7 @@ class TxClusterImpl(AsyncClusterImpl):
         # timeout, the streaming_timeout defaults to cluster's query_timeout (set here). If the cluster
         # also does not specify a query_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::query_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('query_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('query_timeout', None)
         q_req = N1QLRequest.generate_n1ql_request(self.connection,
                                                   self.loop,
                                                   req.n1ql_query.params,
@@ -147,7 +153,7 @@ class TxClusterImpl(AsyncClusterImpl):
         # timeout, the streaming_timeout defaults to cluster's search_timeout (set here). If the cluster
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('search_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('search_timeout', None)
         q_req = FullTextSearchRequest.generate_search_request(self.connection,
                                                               self.loop,
                                                               req.query_builder.as_encodable(),
@@ -167,12 +173,14 @@ class TxClusterImpl(AsyncClusterImpl):
         query_d.addErrback(_on_err)
         return d
 
-    def wait_until_ready_deferred(self, req: WaitUntilReadyRequest) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().wait_until_ready(req)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+    def wait_until_ready_deferred(self,
+                                  timeout: timedelta,
+                                  opts: WaitUntilReadyOptions | None = None,
+                                  **kwargs: Any) -> Deferred[None]:
+        return defer(self.loop,
+                     None,
+                     lambda: self._wait_until_ready(
+                         self._request_builder.build_wait_until_ready_request(timeout, opts, **kwargs)))
 
     def wait_until_connected_deferred(self) -> Deferred[None]:
         """**INTERNAL**"""
@@ -181,7 +189,7 @@ class TxClusterImpl(AsyncClusterImpl):
         d = Deferred.fromFuture(future)
         return d
 
-    def _validate_loop(self, loop: Optional[AbstractEventLoop] = None) -> None:
+    def _validate_loop(self, loop: AbstractEventLoop | None = None) -> AbstractEventLoop:
         """**INTERNAL**"""
         if not loop:
             loop = get_event_loop()
@@ -189,7 +197,7 @@ class TxClusterImpl(AsyncClusterImpl):
         from twisted.internet import reactor
         if hasattr(reactor, '_asyncioEventloop') and reactor._asyncioEventloop is loop:
             # We're in Twisted context - check reactor.running instead
-            if not reactor.running:
+            if not cast('IReactorCore', reactor).running:
                 raise RuntimeError('Reactor is not running.')
         else:
             msg = ('The asyncio event loop has not been installed.  Be sure to import txcouchbase prior to'

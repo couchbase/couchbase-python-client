@@ -18,10 +18,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from couchbase.analytics import AnalyticsRequest
-from couchbase.common._cluster_settings import StreamingTimeouts
-from couchbase.logic.observability import ObservabilityInstruments
+from couchbase.common._cluster_settings import ClusterSettings
+from couchbase.common._observability import ObservabilityInstruments
 from couchbase.n1ql import N1QLRequest
-from couchbase.protocol.classic._cluster_impl import ClusterSettings
+from couchbase.protocol.classic._cluster_types import StreamingTimeouts
+from couchbase.protocol.classic._collection_impl import CollectionImpl
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._scope_req_builder import ScopeRequestBuilder
 from couchbase.result import (AnalyticsResult,
@@ -32,7 +33,9 @@ from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
-    from couchbase.bucket import Bucket
+    from couchbase.common.protocol import CouchbaseProtocol
+    from couchbase.protocol.classic._bucket_impl import BucketImpl
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
     from couchbase.protocol.classic._scope_types import (AnalyticsQueryRequest,
                                                          QueryRequest,
                                                          SearchQueryRequest)
@@ -40,12 +43,17 @@ if TYPE_CHECKING:
 
 class ScopeImpl:
 
-    def __init__(self, scope_name: str, bucket: Bucket) -> None:
+    def __init__(self, scope_name: str, bucket_impl: BucketImpl) -> None:
         self._scope_name = scope_name
-        self._bucket_impl = bucket._impl
+        self._bucket_impl = bucket_impl
         # needed for the CollectionImpl
-        self._client_adapter = bucket._impl._client_adapter
+        self._client_adapter: ClientAdapter = bucket_impl._client_adapter
         self._request_builder = ScopeRequestBuilder(self._bucket_impl.bucket_name, self._scope_name)
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._client_adapter.couchbase_protocol
 
     @property
     def bucket_name(self) -> str:
@@ -83,7 +91,12 @@ class ScopeImpl:
         """
         **INTERNAL**
         """
-        return self.cluster_settings.streaming_timeouts
+        return self._bucket_impl.streaming_timeouts
+
+    @property
+    def kv_durable_timeout(self) -> int | None:
+        """**INTERNAL**"""
+        return self._bucket_impl.kv_durable_timeout
 
     @property
     def observability_instruments(self) -> ObservabilityInstruments:
@@ -94,20 +107,9 @@ class ScopeImpl:
     def name(self) -> str:
         return self._scope_name
 
-    def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
-        self._client_adapter._ensure_not_closed()
-        self._client_adapter._ensure_connected()
-        # If the analytics_query was provided a timeout we will use that value for the streaming timeout
-        # when the streaming object is created in the bindings.  If the analytics_query does not specify a
-        # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
-        # also does not specify an analytics_timeout we set the streaming_timeout to
-        # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
-        return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self.connection,
-                                                                           req.analytics_query.params,
-                                                                           default_serializer=self.default_serializer,
-                                                                           streaming_timeout=streaming_timeout,
-                                                                           obs_handler=req.obs_handler))
+    def collection(self, name: str) -> CollectionImpl:
+        """**INTERNAL**"""
+        return CollectionImpl(name, self)
 
     def query(self, req: QueryRequest) -> QueryResult:
         self._client_adapter._ensure_not_closed()
@@ -123,6 +125,21 @@ class ScopeImpl:
                                                              default_serializer=self.default_serializer,
                                                              streaming_timeout=streaming_timeout,
                                                              obs_handler=req.obs_handler))
+
+    def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
+        self._client_adapter._ensure_not_closed()
+        self._client_adapter._ensure_connected()
+        # If the analytics_query was provided a timeout we will use that value for the streaming timeout
+        # when the streaming object is created in the bindings.  If the analytics_query does not specify a
+        # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
+        # also does not specify an analytics_timeout we set the streaming_timeout to
+        # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
+        streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
+        return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self.connection,
+                                                                           req.analytics_query.params,
+                                                                           default_serializer=self.default_serializer,
+                                                                           streaming_timeout=streaming_timeout,
+                                                                           obs_handler=req.obs_handler))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
         self._client_adapter._ensure_not_closed()

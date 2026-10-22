@@ -16,30 +16,28 @@
 from __future__ import annotations
 
 from asyncio import Future
+from collections.abc import Callable, Mapping
 from functools import partial
 from typing import (TYPE_CHECKING,
                     Any,
-                    Callable,
-                    Dict,
-                    Optional)
+                    cast)
 
 from acouchbase import get_event_loop
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap,
-                                  InternalSDKException)
-from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._registry import CLOSED_CLUSTER_MSG
+from couchbase.common.exceptions import CouchbaseException, InternalSDKException
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.protocol.classic._binding_map import BindingMap
 from couchbase.protocol.classic._bucket_types import CloseBucketRequest, OpenBucketRequest
 from couchbase.protocol.classic._cluster_types import CloseConnectionRequest
+from couchbase.protocol.classic._error_mapping import ErrorMapper
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
-    from couchbase.logic.operation_types import KeyValueOperationCode
+    from couchbase.common.option_enums import OptionValidationMode
     from couchbase.protocol.classic._bucket_types import BucketRequest
     from couchbase.protocol.classic._cluster_types import ClusterRequest, CreateConnectionRequest
     from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
@@ -50,29 +48,42 @@ class AsyncClientAdapter:
 
     def __init__(self,
                  connect_req: CreateConnectionRequest,
-                 loop: Optional[AbstractEventLoop] = None,
-                 loop_validator: Optional[Callable[[Optional[AbstractEventLoop]], AbstractEventLoop]] = None,
+                 loop: AbstractEventLoop | None = None,
+                 loop_validator: Callable[[AbstractEventLoop | None], AbstractEventLoop] | None = None,
                  **kwargs: Any
                  ) -> None:
         num_io_threads = connect_req.options.get('num_io_threads', None)
-        self._connection = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
+        conn = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
+        self._connection: pycbc_connection | None = conn
         # The loop will be setup prior to running the first async op.
         # This is the preferred mechanism to handling the event loop.
-        self._loop: Optional[AbstractEventLoop] = loop
+        self._loop: AbstractEventLoop | None = loop
         self._loop_validator = loop_validator
         self._connect_req = connect_req
-        self._binding_map = BindingMap(self._connection)
-        self._close_ft: Optional[Future[None]] = None
-        self._connect_ft: Optional[Future[None]] = None
+        self._binding_map = BindingMap(conn)
+        self._close_ft: Future[None] | None = None
+        self._connect_ft: Future[None] | None = None
         self._closed = False
+        self._couchbase_protocol = CouchbaseProtocol.CLASSIC
+        self._option_validation: OptionValidationMode | None = kwargs.pop('option_validation', None)
         # for testing we sometimes want to skip the actual C++ core connection
         if not (kwargs.get('skip_connect', None) == 'TEST_SKIP_CONNECT'):
             self._create_connection()
 
     @property
+    def option_validation(self) -> OptionValidationMode | None:
+        """**INTERNAL**"""
+        return self._option_validation
+
+    @property
     def binding_map(self) -> BindingMap:
         """**INTERNAL**"""
         return self._binding_map
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._couchbase_protocol
 
     @property
     def connected(self) -> bool:
@@ -82,10 +93,12 @@ class AsyncClientAdapter:
     @property
     def connection(self) -> pycbc_connection:
         """**INTERNAL**"""
+        if self._connection is None:
+            raise RuntimeError(CLOSED_CLUSTER_MSG)
         return self._connection
 
     @property
-    def connect_ft(self) -> Optional[Future[None]]:
+    def connect_ft(self) -> Future[None] | None:
         """**INTERNAL**"""
         return self._connect_ft
 
@@ -97,8 +110,7 @@ class AsyncClientAdapter:
 
     def _ensure_not_closed(self) -> None:
         if self._closed:
-            raise RuntimeError(
-                'Cannot perform operations on a closed cluster. Create a new cluster instance to reconnect.')
+            raise RuntimeError(CLOSED_CLUSTER_MSG)
 
     def _ensure_connected(self) -> None:
         if not self.connected:
@@ -118,10 +130,10 @@ class AsyncClientAdapter:
 
         ft = self.loop.create_future()
 
-        def _callback(result) -> None:
+        def _callback(result: Any) -> None:
             self.loop.call_soon_threadsafe(ft.set_result, result)
 
-        def _errback(exc) -> None:
+        def _errback(exc: Any) -> None:
             excptn = ErrorMapper.build_exception(exc)
             self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
@@ -142,10 +154,10 @@ class AsyncClientAdapter:
 
         ft = self.loop.create_future()
 
-        def _callback(result) -> None:
+        def _callback(result: Any) -> None:
             self.loop.call_soon_threadsafe(ft.set_result, result)
 
-        def _errback(exc) -> None:
+        def _errback(exc: Any) -> None:
             excptn = ErrorMapper.build_exception(exc)
             self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
@@ -166,20 +178,20 @@ class AsyncClientAdapter:
         return ret
 
     def execute_collection_request(self,
-                                   opcode: KeyValueOperationCode,
+                                   opcode: int,
                                    req: PycbcCoreKeyValueRequest,
-                                   obs_handler: Optional[ObservableRequestHandler] = None) -> Future[Any]:
+                                   obs_handler: ObservableRequestHandler | None = None) -> Future[Any]:
         self._ensure_not_closed()
         self._ensure_connected()
 
         ft = self.loop.create_future()
 
-        def _callback(result) -> None:
+        def _callback(result: Any) -> None:
             if obs_handler and hasattr(result, 'core_span'):
                 obs_handler.process_core_span(result.core_span)
             self.loop.call_soon_threadsafe(ft.set_result, result)
 
-        def _errback(exc) -> None:
+        def _errback(exc: Any) -> None:
             if obs_handler and hasattr(exc, 'core_span'):
                 obs_handler.process_core_span(exc.core_span)
             excptn = ErrorMapper.build_exception(exc)
@@ -189,15 +201,15 @@ class AsyncClientAdapter:
         req.errback = _errback
 
         try:
-            self._binding_map.kv_ops[opcode](req)
+            kv_op: Callable[[Any], Any] = self._binding_map.kv_ops[opcode]
+            kv_op(req)
         except CouchbaseException as e:
             ft.set_exception(e)
         except Exception as e:
             if isinstance(e, (TypeError, ValueError)):
                 ft.set_exception(e)
             else:
-                exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                excptn = exc_cls(str(e))
+                excptn = InternalSDKException(str(e))
                 ft.set_exception(excptn)
 
         return ft
@@ -208,7 +220,7 @@ class AsyncClientAdapter:
         req = OpenBucketRequest(bucket_name)
         ft = self.loop.create_future()
 
-        def _callback(_) -> None:
+        def _callback(_: Any) -> None:
             if not ft.done():
                 self.loop.call_soon_threadsafe(ft.set_result, None)
 
@@ -227,7 +239,7 @@ class AsyncClientAdapter:
 
     def execute_mgmt_request(self,
                              req: MgmtRequest,
-                             obs_handler: Optional[ObservableRequestHandler] = None) -> Future[Any]:
+                             obs_handler: ObservableRequestHandler | None = None) -> Future[Any]:
         self._ensure_not_closed()
 
         ft = self.loop.create_future()
@@ -257,11 +269,10 @@ class AsyncClientAdapter:
         self._ensure_not_closed()
         if self.connected:
             return
-        if self._connect_ft is None:
-            self._create_connection()
-        await self._connect_ft
+        connect_ft = self._connect_ft if self._connect_ft is not None else self._create_connection()
+        await connect_ft
 
-    def _create_connection(self) -> None:
+    def _create_connection(self) -> Future[None]:
         self._ensure_not_closed()
         if self._close_ft is not None and self._close_ft.done() is not True:
             raise RuntimeError('Cannot attempt to connect when close attempt is pending.')
@@ -270,11 +281,12 @@ class AsyncClientAdapter:
             self._close_ft = None
 
         self._connect_ft = self._execute_connect_request()
+        return self._connect_ft
 
     def _execute_chained_req(self,
                              ft: Future[Any],
                              binding_method: str,
-                             req_dict: Dict[str, Any],
+                             req_dict: dict[str, Any],
                              chained_future: Future[Any]) -> None:
         if chained_future.cancelled():
             ft.cancel()
@@ -291,7 +303,7 @@ class AsyncClientAdapter:
         req = CloseConnectionRequest()
         ft = self.loop.create_future()
 
-        def _callback(_) -> None:
+        def _callback(_: Any) -> None:
             if not ft.done():
                 self._reset_connection()
                 self.loop.call_soon_threadsafe(ft.set_result, None)
@@ -329,7 +341,7 @@ class AsyncClientAdapter:
     def _execute_connect_request(self) -> Future[None]:
         ft = self.loop.create_future()
 
-        def _callback(_) -> None:
+        def _callback(_: Any) -> None:
             if not ft.done():
                 self.loop.call_soon_threadsafe(ft.set_result, None)
 
@@ -342,9 +354,10 @@ class AsyncClientAdapter:
         self._execute_req(ft, self._connect_req.binding_method, req_dict)
         return ft
 
-    def _execute_req(self, ft: Future[Any], binding_method: str, req_dict: Dict[str, Any]) -> None:
+    def _execute_req(self, ft: Future[Any], binding_method: str, req_dict: dict[str, Any]) -> None:
         try:
-            self._binding_map.op_map[binding_method](**req_dict)
+            op_map = cast(Mapping[str, Callable[..., Any]], self._binding_map.op_map)
+            op_map[binding_method](**req_dict)
         except KeyError as e:
             msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
             ft.set_exception(InternalSDKException(message=msg))
@@ -354,24 +367,23 @@ class AsyncClientAdapter:
             if isinstance(e, (TypeError, ValueError)):
                 ft.set_exception(e)
             else:
-                exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                excptn = exc_cls(str(e))
+                excptn = InternalSDKException(str(e))
                 ft.set_exception(excptn)
 
-    def _execute_req_sync(self, binding_method: str, req_dict: Dict[str, Any]) -> Any:
+    def _execute_req_sync(self, binding_method: str, req_dict: dict[str, Any]) -> Any:
         try:
-            return self._binding_map.op_map[binding_method](**req_dict)
+            op_map = cast(Mapping[str, Callable[..., Any]], self._binding_map.op_map)
+            return op_map[binding_method](**req_dict)
         except KeyError as e:
             msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
             raise InternalSDKException(message=msg) from None
         except CouchbaseException:
             raise
         except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(message=str(ex))
+            excptn = InternalSDKException(message=str(ex))
             raise excptn from None
 
-    def _get_loop(self, loop: Optional[AbstractEventLoop] = None) -> AbstractEventLoop:
+    def _get_loop(self, loop: AbstractEventLoop | None = None) -> AbstractEventLoop:
         if not loop:
             if self._loop_validator:
                 loop = self._loop_validator(loop)
@@ -383,6 +395,6 @@ class AsyncClientAdapter:
 
         return loop
 
-    def _reset_connection(self):
+    def _reset_connection(self) -> None:
         self._connect_ft = None
         self._connection = None

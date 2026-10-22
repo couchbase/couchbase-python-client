@@ -18,47 +18,58 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict,
-                    Optional,
-                    Tuple,
-                    Union)
+from typing import TYPE_CHECKING, Any
 
 from couchbase.analytics import AnalyticsRequest
 from couchbase.common._cluster_settings import ClusterSettings
-from couchbase.exceptions import ServiceUnavailableException, UnAmbiguousTimeoutException
-from couchbase.logic.observability import ObservabilityInstruments
-from couchbase.logic.operation_types import ClusterOperationType
+from couchbase.common._observability import ObservabilityInstruments
+from couchbase.common.exceptions import ServiceUnavailableException, UnAmbiguousTimeoutException
+from couchbase.common.options import ClusterOptions
+from couchbase.common.result import (ClusterInfoResult,
+                                     DiagnosticsResult,
+                                     PingResult)
 from couchbase.n1ql import N1QLRequest
+from couchbase.protocol.classic._bindings import ConnectionBinding
+from couchbase.protocol.classic._bucket_impl import BucketImpl
 from couchbase.protocol.classic._client_adapter import ClientAdapter
 from couchbase.protocol.classic._cluster_req_builder import ClusterRequestBuilder
-from couchbase.protocol.classic._cluster_types import CreateConnectionRequest, GetConnectionInfoRequest
-from couchbase.protocol.classic._pycbc_core import pycbc_connection
+from couchbase.protocol.classic._cluster_types import (CreateConnectionRequest,
+                                                       GetConnectionInfoRequest,
+                                                       StreamingTimeouts,
+                                                       cluster_streaming_timeouts,
+                                                       connect_options,
+                                                       timeout_ms)
+from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_hdr_histogram
+from couchbase.protocol.classic._result import (_cluster_info_from_core,
+                                                _diagnostics_from_core,
+                                                _ping_from_core)
 from couchbase.result import (AnalyticsResult,
-                              ClusterInfoResult,
-                              DiagnosticsResult,
-                              PingResult,
                               QueryResult,
                               SearchResult)
 from couchbase.search import FullTextSearchRequest
 from couchbase.transactions import Transactions
 
 if TYPE_CHECKING:
+    from datetime import timedelta
+
+    from couchbase.auth import (CertificateAuthenticator,
+                                JwtAuthenticator,
+                                PasswordAuthenticator)
+    from couchbase.common.options import (DiagnosticsOptions,
+                                          PingOptions,
+                                          WaitUntilReadyOptions)
+    from couchbase.common.protocol import CouchbaseProtocol
     from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
-                                                           ClusterInfoRequest,
                                                            DiagnosticsRequest,
                                                            PingRequest,
                                                            QueryRequest,
-                                                           SearchQueryRequest,
-                                                           UpdateCredentialsRequest,
-                                                           WaitUntilReadyRequest)
+                                                           SearchQueryRequest)
     from couchbase.serializer import Serializer
 
 log = logging.getLogger(__name__)
 
 
-def normalize_connection_info(res: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_connection_info(res: dict[str, Any]) -> dict[str, Any]:
     """**INTERNAL**
 
     The binding's cluster_credentials to_py omits allowed_sasl_mechanisms when the vector is
@@ -72,21 +83,28 @@ def normalize_connection_info(res: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class ClusterImpl:
-    def __init__(self, connstr: str, *options: object, **kwargs: object) -> None:
+
+    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: object) -> None:
         skip_connect = kwargs.pop('skip_connect', None)
-        kwargs['_default_timeouts'] = pycbc_connection.pycbc_get_default_timeouts()
+        kwargs['_histogram_factory'] = pycbc_hdr_histogram
         self._cluster_settings = ClusterSettings.build_cluster_settings(connstr, *options, **kwargs)
-        connect_request = CreateConnectionRequest(self._cluster_settings.connstr,
-                                                  self._cluster_settings.auth,
-                                                  self._cluster_settings.cluster_options)
-        self._client_adapter = ClientAdapter(connect_request, skip_connect=skip_connect)
+        connect_request = CreateConnectionRequest.from_settings(self._cluster_settings)
+        self._client_adapter = ClientAdapter(connect_request, skip_connect=skip_connect,
+                                             option_validation=self._cluster_settings.option_validation)
         self._cluster_settings.set_observability_cluster_labels_callable(
-            self._client_adapter.binding_map.op_map[ClusterOperationType.GetClusterLabels.value])
-        self._request_builder = ClusterRequestBuilder()
-        self._cluster_info: Optional[ClusterInfoResult] = None
-        self._transactions: Optional[Transactions] = None
+            self._client_adapter.binding_map.op_map[ConnectionBinding.GetClusterLabels.value])
+        self._request_builder = ClusterRequestBuilder(self._cluster_settings.option_validation)
+        self._streaming_timeouts = cluster_streaming_timeouts(self._cluster_settings)
+        self._kv_durable_timeout = timeout_ms(self._cluster_settings, 'kv_durable_timeout')
+        self._cluster_info: ClusterInfoResult | None = None
+        self._transactions: Transactions | None = None
         # Guards the lazy init of self._transactions in the transactions property
         self._transactions_lock = threading.Lock()
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._client_adapter.couchbase_protocol
 
     @property
     def client_adapter(self) -> ClientAdapter:
@@ -94,7 +112,7 @@ class ClusterImpl:
         return self._client_adapter
 
     @property
-    def cluster_info(self) -> Optional[ClusterInfoResult]:
+    def cluster_info(self) -> ClusterInfoResult | None:
         """**INTERNAL**"""
         return self._cluster_info
 
@@ -102,6 +120,21 @@ class ClusterImpl:
     def cluster_settings(self) -> ClusterSettings:
         """**INTERNAL**"""
         return self._cluster_settings
+
+    @property
+    def streaming_timeouts(self) -> StreamingTimeouts:
+        """**INTERNAL**"""
+        return self._streaming_timeouts
+
+    @property
+    def kv_durable_timeout(self) -> int | None:
+        """**INTERNAL** In milliseconds, or `None` where the cluster sets none."""
+        return self._kv_durable_timeout
+
+    @property
+    def connect_options(self) -> dict[str, Any]:
+        """**INTERNAL** What the binding is handed at connect."""
+        return connect_options(self._cluster_settings)
 
     @property
     def connected(self) -> bool:
@@ -119,7 +152,7 @@ class ClusterImpl:
         return self._cluster_settings.default_serializer
 
     @property
-    def is_developer_preview(self) -> Optional[bool]:
+    def is_developer_preview(self) -> bool | None:
         """**INTERNAL**"""
         if self._cluster_info:
             return False
@@ -131,7 +164,7 @@ class ClusterImpl:
         return self._request_builder
 
     @property
-    def server_version(self) -> Optional[str]:
+    def server_version(self) -> str | None:
         """**INTERNAL**"""
         if self._cluster_info:
             return self._cluster_info.server_version
@@ -139,7 +172,7 @@ class ClusterImpl:
         return None
 
     @property
-    def server_version_short(self) -> Optional[float]:
+    def server_version_short(self) -> float | None:
         """**INTERNAL**"""
         if self._cluster_info:
             return self._cluster_info.server_version_short
@@ -147,7 +180,7 @@ class ClusterImpl:
         return None
 
     @property
-    def server_version_full(self) -> Optional[str]:
+    def server_version_full(self) -> str | None:
         """**INTERNAL**"""
         if self._cluster_info:
             return self._cluster_info.server_version_full
@@ -170,6 +203,10 @@ class ClusterImpl:
                     self._transactions = Transactions(self)
         return self._transactions
 
+    def bucket(self, name: str) -> BucketImpl:
+        """**INTERNAL**"""
+        return BucketImpl(name, self)
+
     def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
         """**INTERNAL**"""
         self._client_adapter._ensure_not_closed()
@@ -179,7 +216,7 @@ class ClusterImpl:
         # timeout, the streaming_timeout defaults to cluster's analytics_timeout (set here). If the cluster
         # also does not specify an analytics_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('analytics_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('analytics_timeout', None)
         return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self._client_adapter.connection,
                                                                            req.analytics_query.params,
                                                                            default_serializer=self.default_serializer,
@@ -207,7 +244,7 @@ class ClusterImpl:
                 log.warning('Error closing transactions while closing the cluster.', exc_info=True)
 
         try:
-            from couchbase.logic.observability import LoggingMeter, ThresholdLoggingTracer
+            from couchbase.common._observability import LoggingMeter, ThresholdLoggingTracer
             instruments = self._cluster_settings.observability_instruments
             tracer = instruments.tracer.tracer
             if isinstance(tracer, ThresholdLoggingTracer):
@@ -222,17 +259,15 @@ class ClusterImpl:
             pass
         self._client_adapter.close_connection()
 
-    def diagnostics(self, req: DiagnosticsRequest) -> DiagnosticsResult:
-        """**INTERNAL**"""
-        return DiagnosticsResult(self._client_adapter.execute_cluster_request(req))
+    def diagnostics(self, opts: DiagnosticsOptions | None = None, **kwargs: Any) -> DiagnosticsResult:
+        return self._diagnostics(self._request_builder.build_diagnostics_request(opts, **kwargs))
 
-    def get_cluster_info(self, req: ClusterInfoRequest) -> ClusterInfoResult:
-        """**INTERNAL**"""
+    def get_cluster_info(self) -> ClusterInfoResult:
         if not self.connected:
             raise RuntimeError('Cannot get cluster info until a connection is established.')
         try:
-            res = self._client_adapter.execute_cluster_request(req)
-            cluster_info = ClusterInfoResult(res)
+            res = self._client_adapter.execute_cluster_request(self._request_builder.build_cluster_info_request())
+            cluster_info = ClusterInfoResult(_cluster_info_from_core(res.raw_result))
             self._cluster_info = cluster_info
             return cluster_info
         except ServiceUnavailableException as ex:
@@ -240,14 +275,13 @@ class ClusterImpl:
                            'a bucket needs to be opened prior to cluster level operations')
             raise ex from None
 
-    def get_connection_info(self) -> Dict[str, Any]:
+    def get_connection_info(self) -> dict[str, Any]:
         """**INTERNAL**"""
         return normalize_connection_info(
             self._client_adapter.execute_cluster_request(GetConnectionInfoRequest()))
 
-    def ping(self, req: PingRequest) -> PingResult:
-        """**INTERNAL**"""
-        return PingResult(self._client_adapter.execute_cluster_request(req))
+    def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
+        return self._ping(self._request_builder.build_ping_request(opts, **kwargs))
 
     def query(self, req: QueryRequest) -> QueryResult:
         """**INTERNAL**"""
@@ -258,7 +292,7 @@ class ClusterImpl:
         # timeout, the streaming_timeout defaults to cluster's query_timeout (set here). If the cluster
         # also does not specify a query_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::query_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('query_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('query_timeout', None)
         return QueryResult(N1QLRequest.generate_n1ql_request(self._client_adapter.connection,
                                                              req.n1ql_query.params,
                                                              default_serializer=self.default_serializer,
@@ -274,20 +308,22 @@ class ClusterImpl:
         # timeout, the streaming_timeout defaults to cluster's search_timeout (set here). If the cluster
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('search_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('search_timeout', None)
         return SearchResult(FullTextSearchRequest.generate_search_request(self._client_adapter.connection,
                                                                           req.query_builder.as_encodable(),
                                                                           default_serializer=self.default_serializer,
                                                                           streaming_timeout=streaming_timeout,
                                                                           obs_handler=req.obs_handler))
 
-    def update_credentials(self, req: UpdateCredentialsRequest) -> None:
-        """**INTERNAL**"""
+    def update_credentials(self,
+                           authenticator: CertificateAuthenticator | JwtAuthenticator | PasswordAuthenticator
+                           ) -> None:
+        req = self._request_builder.build_update_credential_request(authenticator)
         self._client_adapter.execute_cluster_request(req)
         self._cluster_settings.auth = req.auth
 
-    def wait_until_ready(self, req: WaitUntilReadyRequest) -> None:
-        """**INTERNAL**"""
+    def wait_until_ready(self, timeout: timedelta, opts: WaitUntilReadyOptions | None = None, **kwargs: Any) -> None:
+        req = self._request_builder.build_wait_until_ready_request(timeout, opts, **kwargs)
         current_time = time.monotonic()
         deadline = current_time + req.timeout.total_seconds()
         delay = 0.1  # seconds
@@ -296,11 +332,11 @@ class ClusterImpl:
         ping_req = self._request_builder.build_ping_request(service_types=req.service_types)
 
         while True:
-            diag_res = self.diagnostics(diag_req)
+            diag_res = self._diagnostics(diag_req)
             endpoint_svc_types = set(map(lambda st: st.value, diag_res.endpoints.keys()))
             if not endpoint_svc_types.issuperset(req.service_types):
-                self.ping(ping_req)
-                diag_res = self.diagnostics(diag_req)
+                self._ping(ping_req)
+                diag_res = self._diagnostics(diag_req)
 
             if diag_res.state == req.desired_state:
                 break
@@ -310,10 +346,16 @@ class ClusterImpl:
                 raise UnAmbiguousTimeoutException('Desired state not found.')
             time.sleep(delay)
 
+    def _diagnostics(self, req: DiagnosticsRequest) -> DiagnosticsResult:
+        return DiagnosticsResult(_diagnostics_from_core(self._client_adapter.execute_cluster_request(req).raw_result))
+
+    def _ping(self, req: PingRequest) -> PingResult:
+        return PingResult(_ping_from_core(self._client_adapter.execute_cluster_request(req).raw_result))
+
     def _get_connection_opts(self,
-                             auth_only: Optional[bool] = None,
-                             conn_only: Optional[bool] = None
-                             ) -> Union[Dict[str, Any], Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+                             auth_only: bool | None = None,
+                             conn_only: bool | None = None
+                             ) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any]]:
         """Get connection related options
 
         **INTERNAL** not intended for use in public API.
@@ -323,11 +365,11 @@ class ClusterImpl:
             conn_only (bool, optional): Set to True to return only cluster options. Defaults to False.
 
         Returns:
-            Union[Dict[str, Any], Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]: Either the
+            dict[str, Any] | tuple[dict[str, Any], dict[str, Any]]: Either the
                 cluster auth, cluster options or a tuple of both the cluster auth and cluster options.
         """
         if auth_only is True:
             return self._cluster_settings.auth
         if conn_only is True:
-            return self._cluster_settings.cluster_options
-        return self._cluster_settings.auth, self._cluster_settings.cluster_options
+            return self.connect_options
+        return self._cluster_settings.auth, self.connect_options

@@ -16,6 +16,11 @@
 # used to allow for unquoted (i.e. forward reference, Python >= 3.7, PEP563)
 from __future__ import annotations
 
+__all__ = [
+    'Collection',
+    'TxCollection',
+]
+
 from typing import (TYPE_CHECKING,
                     Any,
                     Iterable)
@@ -32,12 +37,12 @@ from couchbase.result import (ExistsResult,
                               MutateInResult,
                               MutationResult)
 from txcouchbase.binary_collection import BinaryCollection
-from txcouchbase.protocol.classic._collection_impl import TxCollectionImpl
 
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import DocumentValue
+    from couchbase.common._interfaces._collection import TxCollectionInterface
+    from couchbase.common._utils import DocumentValue
     from couchbase.options import (ExistsOptions,
                                    GetAllReplicasOptions,
                                    GetAndLockOptions,
@@ -61,7 +66,7 @@ if TYPE_CHECKING:
 class Collection:
 
     def __init__(self, scope: TxScope, name: str) -> None:
-        self._impl = TxCollectionImpl(name, scope)
+        self._impl: TxCollectionInterface = scope._impl.collection(name)
 
     @property
     def name(self) -> str:

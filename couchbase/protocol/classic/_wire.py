@@ -17,8 +17,8 @@
 
 `couchbase/protocol/classic/_option_wire.py` holds what each key is sent to the binding as, and
 `couchbase/common/_option_spec.py` what each options class accepts.  The request builders judge
-a caller's keywords and map them here, and the cluster settings map the connection options here
-as they are built.
+a caller's keywords and map them here.  The connection options arrive judged and kept as the
+caller wrote them, and are mapped here when the binding is handed them.
 """
 
 from __future__ import annotations
@@ -88,14 +88,6 @@ def to_wire(merged: dict[str, Any], block: str, drop_none: bool = True) -> dict[
     if entry.retired:
         merged = resolve_deprecated(entry, merged)
     return mapped(merged, block, drop_none)
-
-
-def wire_keys(block: str) -> list[str]:
-    """BRIDGE: one connection block's keys as the binding reads them, for the cluster settings
-    that map the connection options as they are built.  Removed by PYCBC-1994.
-    """
-    return [name for key, spec in BLOCKS[block].keys.items()
-            if (name := wire_of(block, key).name_for(spec.stored or spec.key)) is not None]
 
 
 def get_valid_args(opt_type: type[dict[str, Any]],

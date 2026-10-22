@@ -16,23 +16,21 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Callable,
-                    Dict,
-                    Optional)
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from couchbase.logic.observability import ObservableRequestHandler
+    from couchbase.common._observability import ObservableRequestHandler
+    from couchbase.common.exceptions import CouchbaseException
 
 
 class MgmtBaseRequest(ABC):
     @abstractmethod
     def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+                    obs_handler: ObservableRequestHandler | None = None,
+                    callback: Callable[..., None] | None = None,
+                    errback: Callable[..., None] | None = None) -> dict[str, Any]:
 
         raise NotImplementedError
 
@@ -44,4 +42,4 @@ class MgmtBaseRequest(ABC):
 
 @dataclass
 class MgmtRequest(MgmtBaseRequest):
-    error_map: Dict[str, Exception]
+    error_map: dict[str, type[CouchbaseException]]

@@ -189,8 +189,7 @@ class CollectionManager:
             scope_name (str): The name of the scope the collection is in.
             collection_name (str): The name of the collection that will be updated
             settings (:class:`~.UpdateCollectionSettings`, optional): Settings to apply for the collection
-            options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this
-                operation.
+            options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
         Raises:

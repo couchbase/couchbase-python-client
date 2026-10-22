@@ -15,6 +15,11 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'Bucket',
+    'TxBucket',
+]
+
 from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
@@ -25,10 +30,10 @@ from couchbase.result import PingResult, ViewResult
 from txcouchbase.collection import Collection
 from txcouchbase.management.collections import CollectionManager
 from txcouchbase.management.views import ViewIndexManager
-from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
 from txcouchbase.scope import Scope
 
 if TYPE_CHECKING:
+    from couchbase.common._interfaces._bucket import TxBucketInterface
     from couchbase.options import PingOptions, ViewOptions
     from txcouchbase.cluster import TxCluster
 
@@ -36,7 +41,7 @@ if TYPE_CHECKING:
 class Bucket:
 
     def __init__(self, cluster: TxCluster, bucket_name: str) -> None:
-        self._impl = TxBucketImpl(bucket_name, cluster)
+        self._impl: TxBucketInterface = cluster._impl.bucket(bucket_name)
 
     @property
     def name(self) -> str:
@@ -46,28 +51,72 @@ class Bucket:
         return self._impl.wait_until_bucket_connected_deferred()
 
     def close(self) -> Deferred:
+        """Shuts down this bucket instance. Cleaning up all resources associated with it.
+
+        .. warning::
+            Use of this method is almost *always* unnecessary.  Bucket resources should be cleaned
+            up once the bucket instance falls out of scope.  However, in some applications tuning resources
+            is necessary and in those types of applications, this method might be beneficial.
+        """
         return self._impl.close_bucket_deferred()
 
     def default_scope(self) -> Scope:
+        """Creates a :class:`~.scope.Scope` instance of the default scope.
+
+        Returns:
+            :class:`~.scope.Scope`: A :class:`~.scope.Scope` instance of the default scope.
+        """
         return self.scope(Scope.default_name())
 
     def scope(self, name: str) -> Scope:
+        """Creates a :class:`~txcouchbase.scope.Scope` instance of the specified scope.
+
+        Args:
+            name (str): Name of the scope to reference.
+
+        Returns:
+            :class:`~txcouchbase.scope.Scope`: A :class:`~txcouchbase.scope.Scope` instance of the specified scope.
+        """
         return Scope(self, name)
 
     def collection(self, collection_name: str) -> Collection:
+        """Creates a :class:`~txcouchbase.collection.Collection` instance of the specified collection.
+
+        Args:
+            collection_name (str): Name of the collection to reference.
+
+        Returns:
+            :class:`~txcouchbase.collection.Collection`: A :class:`~txcouchbase.collection.Collection` instance of the
+            specified collection.
+        """
         scope = self.default_scope()
         return scope.collection(collection_name)
 
     def default_collection(self) -> Collection:
+        """Creates a :class:`~txcouchbase.collection.Collection` instance of the default collection.
+
+        Returns:
+            :class:`~txcouchbase.collection.Collection`: A :class:`~txcouchbase.collection.Collection` instance of the
+            default collection.
+        """
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    def ping(self,
-             *opts,  # type: PingOptions
-             **kwargs  # type: Any
-             ) -> Deferred[PingResult]:
-        req = self._impl.request_builder.build_ping_request(*opts, **kwargs)
-        return self._impl.ping_deferred(req)
+    def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> Deferred[PingResult]:
+        """Performs a ping operation against the bucket.
+
+        The ping operation pings the services which are specified
+        (or all services if none are specified). Returns a report which describes the outcome of
+        the ping operations which were performed.
+
+        Args:
+            opts (:class:`~couchbase.options.PingOptions`): Optional parameters for this operation.
+
+        Returns:
+            Deferred[:class:`~couchbase.result.PingResult`]: A report which describes the outcome of the ping operations
+            which were performed.
+        """
+        return self._impl.ping_deferred(opts, **kwargs)
 
     def view_query(self,
                    design_doc,      # type: str

@@ -17,18 +17,25 @@ from __future__ import annotations
 
 import json
 import warnings
+from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
 
-from couchbase.common._observability.no_op import NoOpMeter, NoOpTracer
+from couchbase.common._observability.no_op import (NoOpMeter,
+                                                   NoOpSpan,
+                                                   NoOpTracer)
 from couchbase.common._supportability import CouchbaseDeprecationWarning
+from couchbase.common.option_enums import OptionValidationMode
+from couchbase.common.warnings import CouchbaseApplicabilityWarning
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability.handler import ObservableRequestHandler
 from couchbase.logic.observability.observability_types import (ObservabilityInstruments,
                                                                TracerProtocol,
                                                                WrappedTracer)
 from couchbase.logic.operation_types import StreamingOperationType
+from couchbase.options import DiagnosticsOptions, PingOptions
+from couchbase.protocol.classic._bucket_req_builder import BucketRequestBuilder
 from couchbase.protocol.classic._cluster_req_builder import ClusterRequestBuilder
 from couchbase.search import (SearchQuery,
                               SearchRequest,
@@ -136,3 +143,21 @@ class ClusterRequestBuilderUnitTests:
 
         # Naming the entry point that does take a SearchRequest is the actionable half.
         assert 'search()' in str(exc_info.value)
+
+    # Neither operation is traced, so a parent span has nowhere to go: it is accepted, not sent,
+    # and reported as having no effect, which strict mode refuses.
+    @pytest.mark.parametrize('build', [
+        lambda mode: ClusterRequestBuilder(mode).build_ping_request(PingOptions(parent_span=NoOpSpan('p'))),
+        lambda mode: BucketRequestBuilder('default', mode).build_ping_request(PingOptions(parent_span=NoOpSpan('p'))),
+        lambda mode: ClusterRequestBuilder(mode).build_diagnostics_request(
+            DiagnosticsOptions(parent_span=NoOpSpan('p'))),
+    ], ids=['cluster ping', 'bucket ping', 'diagnostics'])
+    def test_parent_span_is_accepted_and_not_sent(self, build: Callable[[OptionValidationMode], Any]) -> None:
+        with warnings.catch_warnings(record=True) as recorded:
+            warnings.simplefilter('always')
+            req = build(OptionValidationMode.Warn)
+
+        assert 'parent_span' not in vars(req)
+        assert len([w for w in recorded if issubclass(w.category, CouchbaseApplicabilityWarning)]) == 1
+        with pytest.raises(InvalidArgumentException, match='parent_span'):
+            build(OptionValidationMode.Strict)

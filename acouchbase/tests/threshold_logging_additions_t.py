@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Generator
+from datetime import timedelta
 from time import time_ns
 from typing import (Any,
                     ClassVar,
@@ -34,7 +35,7 @@ from couchbase.logic.options import ClusterTracingOptionsBase
 from tests.manifest import validate_test_manifest
 from tests.observability_test_impls import RecordingReporter
 
-KV_THRESHOLD_MS = 0.5
+KV_THRESHOLD = timedelta(milliseconds=0.5)
 
 
 class AsyncThresholdLoggingTests:
@@ -64,7 +65,7 @@ class AsyncThresholdLoggingTests:
         tracers: list[ThresholdLoggingTracer] = []
 
         def _make(sample_size: int) -> tuple[ThresholdLoggingTracer, RecordingReporter]:
-            config = {'key_value_threshold': KV_THRESHOLD_MS, 'threshold_sample_size': sample_size}
+            config = {'tracing_threshold_kv': KV_THRESHOLD, 'tracing_threshold_queue_size': sample_size}
             tracer = ThresholdLoggingTracer(cast(ClusterTracingOptionsBase, config))
             tracer._reporter.stop()
             reporter = RecordingReporter()

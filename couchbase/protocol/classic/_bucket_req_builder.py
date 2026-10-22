@@ -15,21 +15,26 @@
 
 from __future__ import annotations
 
-from couchbase.diagnostics import ServiceType
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic._legacy_options import forward_args
+from couchbase.common.diagnostics import ServiceType
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.option_enums import OptionValidationMode
+from couchbase.common.options import PingOptions
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.protocol.classic._bucket_types import PingRequest, ViewQueryRequest
+from couchbase.protocol.classic._bucket_types import (BucketOptionsBlock,
+                                                      PingRequest,
+                                                      ViewQueryRequest)
+from couchbase.protocol.classic._wire import forward_args
 from couchbase.views import ViewQuery
 
 
 class BucketRequestBuilder:
 
-    def __init__(self, bucket_name: str) -> None:
+    def __init__(self, bucket_name: str, option_validation: OptionValidationMode | None = None) -> None:
         self._bucket_name = bucket_name
+        self._option_validation = option_validation
 
-    def build_ping_request(self, *options: object, **kwargs: object) -> PingRequest:
-        final_args = forward_args(kwargs, *options)
+    def build_ping_request(self, options: PingOptions | None = None, **kwargs: object) -> PingRequest:
+        final_args = forward_args(kwargs, options, block=BucketOptionsBlock.Ping, mode=self._option_validation)
         timeout = final_args.pop('timeout', None)
 
         service_types = final_args.pop('service_types', None)

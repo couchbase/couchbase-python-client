@@ -15,29 +15,45 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from couchbase.common._cluster_settings import ClusterSettings, StreamingTimeouts
-from couchbase.logic.observability import ObservabilityInstruments
+from couchbase.common._cluster_settings import ClusterSettings
+from couchbase.common._observability import ObservabilityInstruments
+from couchbase.common.result import PingResult
 from couchbase.protocol.classic._bucket_req_builder import BucketRequestBuilder
+from couchbase.protocol.classic._cluster_types import StreamingTimeouts
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
-from couchbase.result import PingResult, ViewResult
+from couchbase.protocol.classic._result import _ping_from_core
+from couchbase.protocol.classic._scope_impl import ScopeImpl
+from couchbase.result import ViewResult
 from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 from couchbase.views import ViewRequest
 
 if TYPE_CHECKING:
-    from couchbase.cluster import Cluster
-    from couchbase.protocol.classic._bucket_types import PingRequest, ViewQueryRequest
+    from couchbase.common.options import PingOptions
+    from couchbase.common.protocol import CouchbaseProtocol
+    from couchbase.protocol.classic._bucket_types import ViewQueryRequest
+    from couchbase.protocol.classic._client_adapter import ClientAdapter
+    from couchbase.protocol.classic._cluster_impl import ClusterImpl
 
 
 class BucketImpl:
-    def __init__(self, bucket_name: str, cluster: Cluster) -> None:
+
+    def __init__(self, bucket_name: str, cluster_impl: ClusterImpl) -> None:
         self._bucket_name = bucket_name
-        self._client_adapter = cluster._impl._client_adapter
-        self._cluster_settings = cluster._impl._cluster_settings
-        self._request_builder = BucketRequestBuilder(self._bucket_name)
+        self._client_adapter: ClientAdapter = cluster_impl._client_adapter
+        self._cluster_settings = cluster_impl._cluster_settings
+        self._streaming_timeouts = cluster_impl.streaming_timeouts
+        self._kv_durable_timeout = cluster_impl.kv_durable_timeout
+        self._request_builder = BucketRequestBuilder(self._bucket_name,
+                                                     self._client_adapter.option_validation)
         self.open_bucket()
+
+    @property
+    def couchbase_protocol(self) -> CouchbaseProtocol:
+        """**INTERNAL**"""
+        return self._client_adapter.couchbase_protocol
 
     @property
     def bucket_name(self) -> str:
@@ -77,7 +93,12 @@ class BucketImpl:
     @property
     def streaming_timeouts(self) -> StreamingTimeouts:
         """**INTERNAL**"""
-        return self._cluster_settings.streaming_timeouts
+        return self._streaming_timeouts
+
+    @property
+    def kv_durable_timeout(self) -> int | None:
+        """**INTERNAL**"""
+        return self._kv_durable_timeout
 
     @property
     def observability_instruments(self) -> ObservabilityInstruments:
@@ -92,9 +113,13 @@ class BucketImpl:
         """**INTERNAL**"""
         self._client_adapter.open_bucket(self._bucket_name)
 
-    def ping(self, req: PingRequest) -> PingResult:
+    def scope(self, name: str) -> ScopeImpl:
         """**INTERNAL**"""
-        return PingResult(self._client_adapter.execute_cluster_request(req))
+        return ScopeImpl(name, self)
+
+    def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
+        req = self._request_builder.build_ping_request(opts, **kwargs)
+        return PingResult(_ping_from_core(self._client_adapter.execute_bucket_request(req).raw_result))
 
     def view_query(self, req: ViewQueryRequest) -> ViewResult:
         """**INTERNAL**"""
@@ -105,7 +130,7 @@ class BucketImpl:
         # timeout, the streaming_timeout defaults to cluster's view_timeout (set here). If the cluster
         # also does not specify a view_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::view_timeout when the streaming object is created in the bindings.
-        streaming_timeout = self._cluster_settings.streaming_timeouts.get('view_timeout', None)
+        streaming_timeout = self._streaming_timeouts.get('view_timeout', None)
         return ViewResult(ViewRequest.generate_view_request(self._client_adapter.connection,
                                                             req.view_query.as_encodable(),
                                                             default_serializer=self.default_serializer,

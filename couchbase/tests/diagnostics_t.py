@@ -15,31 +15,36 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
-from couchbase.diagnostics import (EndpointDiagnosticsReport,
-                                   EndpointPingReport,
-                                   ServiceType)
+import pytest
+
+from couchbase.diagnostics import EndpointDiagnosticsReport, EndpointPingReport
+from couchbase.protocol.classic._pycbc_core.binding_cpp_types import CppEndpointDiagInfo, CppEndpointPingInfo
+from couchbase.protocol.classic._result import _endpoint_diagnostics_from_core, _endpoint_ping_from_core
+from tests.test_features import TestProtocol
+
+# Each record here is built by classic's adapter from what its binding returns.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 
 def _ping_report(**overrides: Any) -> EndpointPingReport:
-    # An override of None is not the same as an omission, and omission is what is under test,
-    # so the absent cases below pass a source without the key rather than a None.
-    return EndpointPingReport(ServiceType.KeyValue,
-                              {'id': 'ep', 'remote': 'r', 'local': 'l', 'state': 'ok', **overrides})
+    core = {'type': 'key_value', 'id': 'ep', 'latency': 120, 'remote': 'r', 'local': 'l', 'state': 'ok',
+            'bucket': None, 'error': None, **overrides}
+    return EndpointPingReport(_endpoint_ping_from_core(cast(CppEndpointPingInfo, core)))
 
 
 def _diagnostics_report(**overrides: Any) -> EndpointDiagnosticsReport:
-    return EndpointDiagnosticsReport(ServiceType.KeyValue,
-                                     {'id': 'ep', 'remote': 'r', 'local': 'l',
-                                      'state': 'connected', **overrides})
+    core = {'type': 'key_value', 'id': 'ep', 'last_activity': None, 'remote': 'r', 'local': 'l',
+            'state': 'connected', 'bucket': None, 'details': None, **overrides}
+    return EndpointDiagnosticsReport(_endpoint_diagnostics_from_core(cast(CppEndpointDiagInfo, core)))
 
 
 class DiagnosticsReportUnitTests:
-    # No cb_env and no TEST_MANIFEST: both classes are constructed straight from the dict the
-    # core would have handed them, and `couchbase.diagnostics` is the only definition of
-    # either.  Not generated for that reason.
+    # No cb_env and no TEST_MANIFEST: each report is built from the dict the core would have
+    # handed the classic adapter.  Not generated for that reason.
     #
     # Both classes distinguish an absent optional from a present zero, and a live ping produces
     # neither edge, so `bucket_t` and `cluster_t` cannot reach them.  The core sends a latency
@@ -55,7 +60,9 @@ class DiagnosticsReportUnitTests:
         assert report.as_dict()['latency_us'] == 0
 
     def test_ping_report_omits_an_absent_latency(self) -> None:
-        report = _ping_report()
+        # The core always sends a latency, so its absence is a record a protocol could build
+        # rather than a dict the core could send.
+        report = EndpointPingReport(replace(_ping_report()._record, latency_us=None))
 
         assert report.latency is None
         assert 'latency_us' not in report.as_dict()
@@ -79,13 +86,17 @@ class DiagnosticsReportUnitTests:
         assert report.last_activity_us == timedelta(microseconds=1500)
         assert report.as_dict()['last_activity_us'] == 1500
 
-    def test_the_two_reports_read_namespace_from_different_keys(self) -> None:
-        # One property name over three source keys, agreeing on none: a ping report reads
-        # `namespace` and falls back to the `scope` the core used to send, a diagnostics
-        # report reads `bucket` with no fallback.  The two sit three lines apart.
-        assert _ping_report(namespace='inventory').namespace == 'inventory'
-        assert _ping_report(scope='inventory').namespace == 'inventory'
-        assert _ping_report(bucket='default').namespace is None
-
+    def test_both_reports_read_namespace_from_the_bucket(self) -> None:
+        # The core names an endpoint's bucket `bucket` in both reports.
+        assert _ping_report(bucket='default').namespace == 'default'
         assert _diagnostics_report(bucket='default').namespace == 'default'
-        assert _diagnostics_report(namespace='inventory').namespace is None
+        assert _ping_report().namespace is None
+        assert _diagnostics_report().namespace is None
+
+    def test_as_dict_keeps_the_core_order_with_the_duration_last(self) -> None:
+        ping = _ping_report(bucket='default', error='refused')
+        diag = _diagnostics_report(last_activity=9, bucket='default', details='d')
+
+        assert list(ping.as_dict()) == ['type', 'id', 'remote', 'local', 'state', 'bucket', 'error', 'latency_us']
+        assert list(diag.as_dict()) == ['type', 'id', 'remote', 'local', 'state', 'bucket', 'details',
+                                        'last_activity_us']

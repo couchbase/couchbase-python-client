@@ -106,6 +106,7 @@ class TransactionTestSuite(TopologySuite):
         'test_binary',
         'test_binary_kwargs',
         'test_binary_not_supported',
+        'test_default_config',
         'test_get',
         'test_get_inner_exc_doc_not_found',
         'test_get_lambda_raises_doc_not_found',
@@ -674,6 +675,30 @@ class TransactionTestSuite(TopologySuite):
 
             with pytest.raises(BucketNotFoundException):
                 cluster.transactions.run(txn_logic)
+        finally:
+            cluster.close()
+
+    # Creates a new connection, so allow retries.
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_default_config(self, cb_env: SyncTestEnvironment) -> None:
+        # Every other test reaches transactions through a cluster built with a transaction_config,
+        # so this is the one that proves the default config can build the transactions object.
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        cluster_opts = ClusterOptions(PasswordAuthenticator(username, pw),
+                                      tracing_options=ClusterTracingOptions(enable_tracing=False))
+        cluster = Cluster.connect(conn_string, cluster_opts)
+        try:
+            bucket = cluster.bucket(cb_env.bucket.name)
+            collection = bucket.scope(cb_env.scope.name).collection(cb_env.collection.name)
+            key, value = cb_env.get_new_doc()
+
+            def txn_logic(ctx: AttemptContext) -> None:
+                ctx.insert(collection, key, value)
+
+            cluster.transactions.run(txn_logic)
+            result = collection.get(key)
+            cb_assert_eq(result.content_as[dict], value, what='doc content')
         finally:
             cluster.close()
 

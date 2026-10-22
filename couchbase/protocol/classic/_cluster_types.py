@@ -15,36 +15,47 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, fields
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
-                    Callable,
-                    Dict,
-                    List,
                     Optional,
-                    Set)
+                    TypedDict)
 
+from couchbase import USER_AGENT_EXTRA
+from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common._transforms import timedelta_as_milliseconds
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import (ClusterMgmtOperationType,
-                                             ClusterOperationType,
-                                             StreamingOperationType)
+from couchbase.logic.operation_types import StreamingOperationType
+from couchbase.protocol.classic._bindings import ClusterMgmtBinding, ConnectionBinding
+from couchbase.protocol.classic._wire import mapped
 
 if TYPE_CHECKING:
     from couchbase.analytics import AnalyticsQuery
-    from couchbase.diagnostics import ClusterState
+    from couchbase.common._cluster_settings import ClusterSettings
+    from couchbase.common.diagnostics import ClusterState
     from couchbase.n1ql import N1QLQuery
     from couchbase.search import SearchQueryBuilder
 
-_FIELDS_CACHE: Dict[type, List] = {}
+
+class ClusterOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    Diagnostics = 'DiagnosticsOptions'
+    Ping = 'PingOptions'
+    WaitUntilReady = 'WaitUntilReadyOptions'
+
+
+_FIELDS_CACHE: dict[type, list] = {}
 
 
 @dataclass
-class ClusterRequest:
+class ClusterRequest(ABC):
 
     def req_to_dict(self,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+                    callback: Callable[..., None] | None = None,
+                    errback: Callable[..., None] | None = None) -> dict[str, Any]:
         cls = type(self)
         cached_fields = _FIELDS_CACHE.get(cls)
         if cached_fields is None:
@@ -65,6 +76,11 @@ class ClusterRequest:
 
         return op_kwargs
 
+    @property
+    @abstractmethod
+    def binding_method(self) -> str:
+        raise NotImplementedError
+
 
 @dataclass
 class AnalyticsQueryRequest:
@@ -81,30 +97,79 @@ class AnalyticsQueryRequest:
 class CloseConnectionRequest(ClusterRequest):
     @property
     def binding_method(self) -> str:
-        return ClusterOperationType.Close.value
+        return ConnectionBinding.Close.value
 
 
 @dataclass
 class ClusterInfoRequest(ClusterRequest):
     @property
     def binding_method(self) -> str:
-        return ClusterMgmtOperationType.ClusterDescribe.value
+        return ClusterMgmtBinding.ClusterDescribe.value
+
+
+class StreamingTimeouts(TypedDict):
+    """The cluster's timeout for each streaming service, in the milliseconds the binding reads."""
+    analytics_timeout: int | None
+    query_timeout: int | None
+    search_timeout: int | None
+    view_timeout: int | None
+
+
+def timeout_ms(settings: ClusterSettings, key: str) -> int | None:
+    """One of the cluster's timeouts in milliseconds, or `None` where the cluster sets none, which
+    the binding answers with the core's default for the request."""
+    timeout = settings.timeout_options.get(key)
+    return None if timeout is None else timedelta_as_milliseconds(timeout)
+
+
+def cluster_streaming_timeouts(settings: ClusterSettings) -> StreamingTimeouts:
+    return {'analytics_timeout': timeout_ms(settings, 'analytics_timeout'),
+            'query_timeout': timeout_ms(settings, 'query_timeout'),
+            'search_timeout': timeout_ms(settings, 'search_timeout'),
+            'view_timeout': timeout_ms(settings, 'views_timeout')}
+
+
+def connect_options(settings: ClusterSettings) -> dict[str, Any]:
+    """The options dict the binding reads at connect, nested the way it reads them.
+
+    Every block is mapped through `ClusterOptions`' entry, since the settings hold each key under
+    the spelling `ClusterOptions` stores it.  The tracing and metrics blocks stay on the Python
+    side, which owns both: the binding is told only whether to forward spans, and to which tracer.
+    """
+    options = mapped(settings.cluster_options, 'ClusterOptions')
+    if settings.timeout_options:
+        options['timeout_options'] = mapped(settings.timeout_options, 'ClusterOptions')
+    if settings.orphan_options:
+        options['orphan_reporting_options'] = mapped(settings.orphan_options, 'ClusterOptions')
+    if settings.tracing_options.get('tracing_enable_tracing'):
+        options['setup_sdk_tracing'] = True
+    tracer = settings.observability_instruments.tracer
+    if tracer.is_legacy:
+        options['legacy_tracer'] = tracer.tracer
+    # The core appends this after its own fields, each separated by ';'.
+    options['user_agent_extra'] = ';'.join(part for part in (USER_AGENT_EXTRA, options.get('user_agent_extra'))
+                                           if part)
+    return options
 
 
 @dataclass
 class CreateConnectionRequest:
     connstr: str
-    auth: Dict[str, Any]
-    options: Dict[str, Any]
+    auth: dict[str, Any]
+    options: dict[str, Any]
+
+    @classmethod
+    def from_settings(cls, settings: ClusterSettings) -> CreateConnectionRequest:
+        return cls(settings.connstr, settings.auth, connect_options(settings))
 
     @property
     def binding_method(self) -> str:
-        return ClusterOperationType.Connect.value
+        return ConnectionBinding.Connect.value
 
     def req_to_dict(self,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        op_kwargs = {
+                    callback: Callable[..., None] | None = None,
+                    errback: Callable[..., None] | None = None) -> dict[str, Any]:
+        op_kwargs: dict[str, Any] = {
             'connstr': self.connstr,
             'auth': self.auth,
             'options': self.options
@@ -121,30 +186,30 @@ class CreateConnectionRequest:
 
 @dataclass
 class DiagnosticsRequest(ClusterRequest):
-    report_id: Optional[str] = None
-    timeout: Optional[int] = None
+    report_id: str | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return ClusterOperationType.Diagnostics.value
+        return ConnectionBinding.Diagnostics.value
 
 
 @dataclass
 class GetConnectionInfoRequest(ClusterRequest):
     @property
     def binding_method(self) -> str:
-        return ClusterOperationType.GetConnectionInfo.value
+        return ConnectionBinding.GetConnectionInfo.value
 
 
 @dataclass
 class PingRequest(ClusterRequest):
-    services: Set[str]
-    report_id: Optional[str] = None
-    timeout: Optional[int] = None
+    services: set[str]
+    report_id: str | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return ClusterOperationType.Ping.value
+        return ConnectionBinding.Ping.value
 
 
 @dataclass
@@ -171,19 +236,15 @@ class SearchQueryRequest:
 
 @dataclass
 class UpdateCredentialsRequest(ClusterRequest):
-    auth: Dict[str, Any]
+    auth: dict[str, Any]
 
     @property
     def binding_method(self) -> str:
-        return ClusterOperationType.UpdateCredentials.value
+        return ConnectionBinding.UpdateCredentials.value
 
 
 @dataclass
 class WaitUntilReadyRequest:
     timeout: timedelta
     desired_state: ClusterState
-    service_types: Set[str]
-
-    @property
-    def binding_method(self) -> str:
-        return ClusterOperationType.WaitUntilReady.value
+    service_types: set[str]

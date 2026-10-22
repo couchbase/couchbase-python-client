@@ -15,37 +15,79 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import (Any,
-                    Dict,
-                    Tuple)
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
+from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common.option_enums import OptionValidationMode
+from couchbase.common.protocol import CouchbaseProtocol
+from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.transcoder import Transcoder
+
+if TYPE_CHECKING:
+    from couchbase.common._observability.handler import KeyspaceDetails
+
+
+class CollectionOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    Append = 'AppendOptions'
+    Decrement = 'DecrementOptions'
+    Exists = 'ExistsOptions'
+    GetAllReplicas = 'GetAllReplicasOptions'
+    GetAndLock = 'GetAndLockOptions'
+    GetAndTouch = 'GetAndTouchOptions'
+    GetAnyReplica = 'GetAnyReplicaOptions'
+    Get = 'GetOptions'
+    Increment = 'IncrementOptions'
+    Insert = 'InsertOptions'
+    LookupInAllReplicas = 'LookupInAllReplicasOptions'
+    LookupInAnyReplica = 'LookupInAnyReplicaOptions'
+    LookupIn = 'LookupInOptions'
+    MutateIn = 'MutateInOptions'
+    Prepend = 'PrependOptions'
+    Remove = 'RemoveOptions'
+    Replace = 'ReplaceOptions'
+    Scan = 'ScanOptions'
+    Touch = 'TouchOptions'
+    Unlock = 'UnlockOptions'
+    Upsert = 'UpsertOptions'
 
 
 @dataclass
 class CollectionDetails:
+    """What an operation on this collection needs that the operation itself cannot say.
+
+    The cluster's option validation mode travels here for the reason the default transcoder and
+    serializer do: each is set once on `ClusterOptions` and read on every operation, and a request
+    builder holds one of these and no route back to the cluster that made it.  The transcoder
+    encodes and decodes whole documents; a subdocument value is always JSON and carries no flags,
+    so the serializer encodes and decodes those.
+    """
     bucket_name: str
     scope_name: str
     collection_name: str
     default_transcoder: Transcoder
+    default_serializer: Serializer = field(default_factory=DefaultJsonSerializer)
+    option_validation: OptionValidationMode | None = None
 
-    def get_details(self) -> Tuple[str, str, str]:
+    def get_details(self) -> tuple[str, str, str]:
         return self.bucket_name, self.scope_name, self.collection_name
 
-    def get_details_as_dict(self) -> Dict[str, str]:
+    def get_details_as_dict(self) -> KeyspaceDetails:
         return {
             'bucket_name': self.bucket_name,
             'scope_name': self.scope_name,
             'collection_name': self.collection_name
         }
 
-    def get_details_as_txn_dict(self) -> Dict[str, str]:
+    def get_details_as_txn_dict(self) -> dict[str, str]:
         return {
             'bucket': self.bucket_name,
             'scope': self.scope_name,
             'collection_name': self.collection_name
         }
 
-    def get_request_transcoder(self, op_args: Dict[str, Any]) -> Transcoder:
+    def get_request_transcoder(self, op_args: dict[str, Any]) -> Transcoder:
         return op_args.pop('transcoder', self.default_transcoder)
+
+    def get_request_serializer(self, op_args: dict[str, Any]) -> Serializer:
+        return op_args.pop('serializer', self.default_serializer)
