@@ -22,9 +22,9 @@ from couchbase.analytics import AnalyticsQuery
 from couchbase.common._supportability import Supportability
 from couchbase.diagnostics import ClusterState, ServiceType
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.n1ql import N1QLQuery
-from couchbase.options import forward_args
 from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                        ClusterInfoRequest,
                                                        DiagnosticsRequest,

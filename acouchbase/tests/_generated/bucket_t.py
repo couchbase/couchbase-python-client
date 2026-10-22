@@ -110,7 +110,7 @@ class BucketDiagnosticsTestSuite(SuiteRequirements):
         # the point of the test is that the request builder rejects it, and a cast would
         # assert the opposite.
         with pytest.raises(InvalidArgumentException):
-            await bucket.ping(PingOptions(service_types=ServiceType.KeyValue))  # type: ignore[call-overload]
+            await bucket.ping(PingOptions(service_types=ServiceType.KeyValue))  # type: ignore[arg-type]
 
     @pytest.mark.asyncio
     async def test_ping_mixed_services(self, cb_env: AsyncTestEnvironment) -> None:

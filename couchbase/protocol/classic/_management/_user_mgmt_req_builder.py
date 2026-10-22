@@ -33,8 +33,8 @@ from couchbase.common.management.users import (USER_MGMT_ERROR_MAP,
                                                UpsertGroupRequest,
                                                UpsertUserRequest)
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.options import forward_args
 
 if TYPE_CHECKING:
     from couchbase.common.management.users import Group, User

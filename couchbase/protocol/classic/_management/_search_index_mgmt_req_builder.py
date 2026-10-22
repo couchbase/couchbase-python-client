@@ -38,8 +38,8 @@ from couchbase.common.management.search import (SEARCH_INDEX_MGMT_ERROR_MAP,
                                                 UnfreezePlanRequest,
                                                 UpsertIndexRequest)
 from couchbase.exceptions import FeatureUnavailableException, InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.options import forward_args
 
 if TYPE_CHECKING:
     from couchbase.common.management.search import SearchIndex

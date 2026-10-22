@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.options import forward_args
 from couchbase.protocol.classic._bucket_types import PingRequest, ViewQueryRequest
 from couchbase.views import ViewQuery
 
@@ -29,7 +29,6 @@ class BucketRequestBuilder:
         self._bucket_name = bucket_name
 
     def build_ping_request(self, *options: object, **kwargs: object) -> PingRequest:
-        # TODO: OptionsProcessor
         final_args = forward_args(kwargs, *options)
         timeout = final_args.pop('timeout', None)
 

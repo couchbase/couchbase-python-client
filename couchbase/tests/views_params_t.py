@@ -148,14 +148,8 @@ class ViewsParamsUnitTests:
     def test_params_serializer(self) -> None:
         # The serializer rides along as the object itself: it is consumed when rows are
         # decoded, so it is never serialized into the request.
-        #
-        # @FINDING(PYCBC-1873): `ViewOptions` accepts `serializer` at runtime, as the
-        # assertion below proves, but its `__init__` overload does not declare it and the
-        # class docstring does not document it.  mypy honours the lone overload rather than
-        # the `**kwargs` implementation, so the option is also a call error.
         serializer = DefaultJsonSerializer()
-        assert _encoded(ViewOptions(serializer=serializer)) == _expected(  # type: ignore[call-overload]  # PYCBC-1873
-            serializer=serializer)
+        assert _encoded(ViewOptions(serializer=serializer)) == _expected(serializer=serializer)
 
     def test_params_skip(self) -> None:
         assert _encoded(ViewOptions(skip=10)) == _expected(skip=10)

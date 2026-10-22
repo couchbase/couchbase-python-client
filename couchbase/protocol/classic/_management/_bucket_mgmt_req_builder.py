@@ -35,9 +35,9 @@ from couchbase.common.management.buckets import (BUCKET_MGMT_ERROR_MAP,
                                                  StorageBackend,
                                                  UpdateBucketRequest)
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.validation import validate_bool, validate_int
-from couchbase.options import forward_args
 
 
 class BucketMgmtRequestBuilder:

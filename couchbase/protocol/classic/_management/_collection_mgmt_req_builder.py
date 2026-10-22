@@ -24,9 +24,9 @@ from typing import (Any,
 from couchbase._utils import is_null_or_empty
 from couchbase.common._supportability import Supportability
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.management.options import CreateCollectionOptions, DropCollectionOptions
-from couchbase.options import forward_args
 from couchbase.protocol.classic._management._collection_mgmt_types import (COLLECTION_MGMT_ERROR_MAP,
                                                                            CollectionSpec,
                                                                            CreateCollectionRequest,

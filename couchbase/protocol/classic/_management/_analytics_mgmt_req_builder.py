@@ -42,8 +42,8 @@ from couchbase.common.management.analytics import (ANALYTICS_MGMT_ERROR_MAP,
                                                    ReplaceLinkRequest,
                                                    ReplaceS3ExternalLinkRequest)
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.options import forward_args
 
 if TYPE_CHECKING:
     from couchbase.common.management.analytics import AnalyticsLink

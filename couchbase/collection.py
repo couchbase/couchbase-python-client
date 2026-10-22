@@ -85,21 +85,9 @@ if TYPE_CHECKING:
     from couchbase._utils import DocumentValue, JSONType
     from couchbase.kv_range_scan import ScanType
     from couchbase.logic.observability import WrappedSpan
-    from couchbase.options import (ExistsOptions,
-                                   GetAndLockOptions,
-                                   GetAndTouchOptions,
-                                   GetAnyReplicaOptions,
-                                   GetOptions,
-                                   InsertOptions,
-                                   LookupInAllReplicasOptions,
+    from couchbase.options import (LookupInAllReplicasOptions,
                                    LookupInAnyReplicaOptions,
-                                   LookupInOptions,
-                                   MutateInOptions,
-                                   RemoveOptions,
-                                   ReplaceOptions,
-                                   TouchOptions,
-                                   UnlockOptions,
-                                   UpsertOptions)
+                                   MutateInOptions)
     from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.result import MultiResultType
     from couchbase.scope import Scope
@@ -747,7 +735,7 @@ class Collection:
         Args:
             key (str): The key for the document to unlock.
             cas (int): The CAS of the document, used to validate lock ownership.
-            opts (:class:`couchbaseoptions.UnlockOptions`): Optional parameters for this operation.
+            opts (:class:`~couchbase.options.UnlockOptions`): Optional parameters for this operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockOptions`
 
@@ -2614,7 +2602,7 @@ Instead use:
 
 from couchbase.logic.options import AppendOptionsBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import DecrementOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import DeltaValueBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.common.options import DeltaValue as DeltaValueBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import DurabilityOptionBlockBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import ExistsOptionsBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import GetAllReplicasOptionsBase  # nopep8 # isort:skip # noqa: E402

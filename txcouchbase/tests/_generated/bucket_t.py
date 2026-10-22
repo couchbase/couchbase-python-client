@@ -108,7 +108,7 @@ class BucketDiagnosticsTestSuite(SuiteRequirements):
         # assert the opposite.
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(bucket.ping, PingOptions(
-                service_types=ServiceType.KeyValue))  # type: ignore[call-overload]
+                service_types=ServiceType.KeyValue))  # type: ignore[arg-type]
 
     def test_ping_mixed_services(self, cb_env: TwistedTestEnvironment) -> None:
         bucket = cb_env.bucket

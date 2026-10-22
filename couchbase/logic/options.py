@@ -22,10 +22,8 @@ from enum import Enum, IntEnum
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
-                    Iterable,
                     List,
                     Optional,
-                    Sequence,
                     Type,
                     Union,
                     overload)
@@ -33,35 +31,13 @@ from typing import (TYPE_CHECKING,
 from couchbase._utils import (timedelta_as_milliseconds,
                               timedelta_as_timestamp,
                               validate_bool,
-                              validate_int,
-                              validate_str)
-from couchbase.durability import DurabilityParser
+                              validate_int)
+from couchbase.common._durability import DurabilityParser
 from couchbase.exceptions import InvalidArgumentException
 
 if TYPE_CHECKING:
-    from couchbase._utils import JSONType
-    from couchbase.analytics import AnalyticsScanConsistency
-    from couchbase.auth import Authenticator
-    from couchbase.diagnostics import ClusterState, ServiceType
     from couchbase.durability import DurabilityType
-    from couchbase.logic.observability import SpanProtocol, TracerProtocol
-    from couchbase.management.views import DesignDocumentNamespace
-    from couchbase.metrics import CouchbaseMeter
-    from couchbase.mutation_state import MutationState
-    from couchbase.n1ql import QueryProfile, QueryScanConsistency
-    from couchbase.replica_reads import ReadPreference
-    from couchbase.search import (Facet,
-                                  HighlightStyle,
-                                  SearchScanConsistency,
-                                  Sort)
-    from couchbase.search_scoring import SearchScoring
-    from couchbase.serializer import Serializer
-    from couchbase.subdocument import StoreSemantics
-    from couchbase.transcoder import Transcoder
-    from couchbase.vector_search import VectorQueryCombination
-    from couchbase.views import (ViewErrorMode,
-                                 ViewOrdering,
-                                 ViewScanConsistency)
+    from couchbase.logic.observability import SpanProtocol
 
 
 OptionsBase = dict
@@ -397,424 +373,8 @@ Couchbase Python SDK Cluster related Options
 """
 
 
-class ClusterTimeoutOptionsBase(dict):
-
-    _VALID_OPTS = {
-        "bootstrap_timeout": {"bootstrap_timeout": timedelta_as_milliseconds},
-        "resolve_timeout": {"resolve_timeout": timedelta_as_milliseconds},
-        "connect_timeout": {"connect_timeout": timedelta_as_milliseconds},
-        "kv_timeout": {"key_value_timeout": timedelta_as_milliseconds},
-        "kv_durable_timeout": {"key_value_durable_timeout": timedelta_as_milliseconds},
-        "views_timeout": {"view_timeout": timedelta_as_milliseconds},
-        "query_timeout": {"query_timeout": timedelta_as_milliseconds},
-        "analytics_timeout": {"analytics_timeout": timedelta_as_milliseconds},
-        "search_timeout": {"search_timeout": timedelta_as_milliseconds},
-        "management_timeout": {"management_timeout": timedelta_as_milliseconds},
-        "dns_srv_timeout": {"dns_srv_timeout": timedelta_as_milliseconds},
-        "idle_http_connection_timeout": {"idle_http_connection_timeout": timedelta_as_milliseconds},
-        "config_idle_redial_timeout": {"config_idle_redial_timeout": timedelta_as_milliseconds}
-    }
-
-    @overload
-    def __init__(
-        self,
-        bootstrap_timeout=None,  # type: Optional[timedelta]
-        resolve_timeout=None,  # type: Optional[timedelta]
-        connect_timeout=None,  # type: Optional[timedelta]
-        kv_timeout=None,  # type: Optional[timedelta]
-        kv_durable_timeout=None,  # type: Optional[timedelta]
-        views_timeout=None,  # type: Optional[timedelta]
-        query_timeout=None,  # type: Optional[timedelta]
-        analytics_timeout=None,  # type: Optional[timedelta]
-        search_timeout=None,  # type: Optional[timedelta]
-        management_timeout=None,  # type: Optional[timedelta]
-        dns_srv_timeout=None,  # type: Optional[timedelta]
-        idle_http_connection_timeout=None,  # type: Optional[timedelta]
-        config_idle_redial_timeout=None,  # type: Optional[timedelta]
-        config_total_timeout=None  # type: Optional[timedelta]
-    ):
-        """ClusterTimeoutOptions instance."""
-
-    def __init__(self, **kwargs):
-        # kv_timeout = kwargs.pop('kv_timeout', None)
-        # if kv_timeout:
-        #     kwargs["key_value_timeout"] = kv_timeout
-        # kv_durable_timeout = kwargs.pop('kv_durable_timeout', None)
-        # if kv_durable_timeout:
-        #     kwargs["key_value_durable_timeout"] = kv_durable_timeout
-
-        # legacy...
-        kwargs.pop('config_total_timeout', None)
-
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-        super().__init__(**kwargs)
-
-    def as_dict(self):
-        opts = {}
-        allowed_opts = ClusterTimeoutOptionsBase.get_allowed_option_keys()
-        for k, v in self.items():
-            if k not in allowed_opts:
-                continue
-            if v is None:
-                continue
-            if isinstance(v, timedelta):
-                opts[k] = v.total_seconds()
-            elif isinstance(v, (int, float)):
-                opts[k] = v
-        return opts
-
-    @staticmethod
-    def get_allowed_option_keys(use_transform_keys=False  # type: Optional[bool]
-                                ) -> List[str]:
-        if use_transform_keys is True:
-            keys = []
-            for val in ClusterTimeoutOptionsBase._VALID_OPTS.values():
-                keys.append(list(val.keys())[0])
-            return keys
-
-        return list(ClusterTimeoutOptionsBase._VALID_OPTS.keys())
-
-
-class ClusterMetricsOptionsBase(dict):
-
-    _VALID_OPTS = {
-        "metrics_enable_metrics": {"enable_metrics": validate_bool},
-        "metrics_emit_interval": {"metrics_emit_interval": timedelta_as_milliseconds}
-    }
-
-    @overload
-    def __init__(
-        self,
-        enable_metrics=None,  # type: Optional[bool]
-        emit_interval=None,  # type: Optional[timedelta]
-    ):
-        """ClusterMetricsOptions instance."""
-
-    def __init__(self, **kwargs):
-        kwargs = {f'metrics_{k}': v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-    def as_dict(self):
-        opts = {}
-        allowed_opts = ClusterMetricsOptionsBase.get_allowed_option_keys()
-        for k, v in self.items():
-            if k not in allowed_opts:
-                continue
-            if v is None:
-                continue
-            if isinstance(v, timedelta):
-                opts[k] = v.total_seconds()
-            elif isinstance(v, (int, float)):
-                opts[k] = v
-        return opts
-
-    @staticmethod
-    def get_allowed_option_keys(use_transform_keys=False  # type: Optional[bool]
-                                ) -> List[str]:
-        if use_transform_keys is True:
-            keys = []
-            for val in ClusterMetricsOptionsBase._VALID_OPTS.values():
-                keys.append(list(val.keys())[0])
-            return keys
-
-        return list(ClusterMetricsOptionsBase._VALID_OPTS.keys())
-
-
-class ClusterOrphanReportingOptionsBase(dict):
-
-    _VALID_OPTS = {
-        "orphan_enable_orphan_reporting": {"enable_orphan_reporting": validate_bool},
-        "orphan_sample_size": {"orphan_sample_size": validate_int},
-        "orphan_emit_interval": {"orphan_emit_interval": timedelta_as_milliseconds}
-    }
-
-    @overload
-    def __init__(
-        self,
-        enable_orphan_reporting=None,  # type: Optional[bool]
-        sample_size=None,  # type: Optional[int]
-        emit_interval=None,  # type: Optional[timedelta]
-    ):
-        """ClusterOrphanReportingOptions instance."""
-
-    def __init__(self, **kwargs):
-        kwargs = {f'orphan_{k}': v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-    def as_dict(self):
-        opts = {}
-        allowed_opts = ClusterOrphanReportingOptionsBase.get_allowed_option_keys()
-        for k, v in self.items():
-            if k not in allowed_opts:
-                continue
-            if v is None:
-                continue
-            if isinstance(v, timedelta):
-                opts[k] = v.total_seconds()
-            elif isinstance(v, (int, float)):
-                opts[k] = v
-        return opts
-
-    @staticmethod
-    def get_allowed_option_keys(use_transform_keys=False  # type: Optional[bool]
-                                ) -> List[str]:
-        if use_transform_keys is True:
-            keys = []
-            for val in ClusterOrphanReportingOptionsBase._VALID_OPTS.values():
-                keys.append(list(val.keys())[0])
-            return keys
-
-        return list(ClusterOrphanReportingOptionsBase._VALID_OPTS.keys())
-
-
-class ClusterTracingOptionsBase(dict):
-
-    _VALID_OPTS = {
-        "tracing_enable_tracing": {"enable_tracing": validate_bool},
-        "tracing_threshold_kv": {"key_value_threshold": timedelta_as_milliseconds},
-        "tracing_threshold_view": {"view_threshold": timedelta_as_milliseconds},
-        "tracing_threshold_query": {"query_threshold": timedelta_as_milliseconds},
-        "tracing_threshold_search": {"search_threshold": timedelta_as_milliseconds},
-        "tracing_threshold_analytics": {"analytics_threshold": timedelta_as_milliseconds},
-        "tracing_threshold_eventing": {"eventing_threshold": timedelta_as_milliseconds},
-        "tracing_threshold_management": {"management_threshold": timedelta_as_milliseconds},
-        "tracing_threshold_queue_size": {"threshold_sample_size": validate_int},
-        "tracing_threshold_queue_flush_interval": {"threshold_emit_interval": timedelta_as_milliseconds},
-        "tracing_orphaned_queue_size": {"orphan_sample_size": validate_int},
-        "tracing_orphaned_queue_flush_interval": {"orphan_emit_interval": timedelta_as_milliseconds}
-    }
-
-    @overload
-    def __init__(
-        self,
-        enable_tracing=None,  # type: Optional[bool]
-        tracing_threshold_kv=None,  # type: Optional[timedelta]
-        tracing_threshold_view=None,  # type: Optional[timedelta]
-        tracing_threshold_query=None,  # type: Optional[timedelta]
-        tracing_threshold_search=None,  # type: Optional[timedelta]
-        tracing_threshold_analytics=None,  # type: Optional[timedelta]
-        tracing_threshold_eventing=None,  # type: Optional[timedelta]
-        tracing_threshold_management=None,  # type: Optional[timedelta]
-        tracing_threshold_queue_size=None,  # type: Optional[int]
-        tracing_threshold_queue_flush_interval=None,  # type: Optional[timedelta]
-        tracing_orphaned_queue_size=None,  # type: Optional[int]
-        tracing_orphaned_queue_flush_interval=None,  # type: Optional[timedelta]
-    ):
-        """ClusterTracingOptions instance."""
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        enable_tracing = kwargs.pop('enable_tracing', None)
-        if enable_tracing is not None:
-            kwargs['tracing_enable_tracing'] = enable_tracing
-        super().__init__(**kwargs)
-
-    def as_dict(self):
-        opts = {}
-        allowed_opts = ClusterTracingOptionsBase.get_allowed_option_keys()
-        for k, v in self.items():
-            if k not in allowed_opts:
-                continue
-            if v is None:
-                continue
-            if isinstance(v, timedelta):
-                opts[k] = v.total_seconds()
-            elif isinstance(v, (int, float)):
-                opts[k] = v
-        return opts
-
-    @staticmethod
-    def get_allowed_option_keys(use_transform_keys=False  # type: Optional[bool]
-                                ) -> List[str]:
-        if use_transform_keys is True:
-            keys = []
-            for val in ClusterTracingOptionsBase._VALID_OPTS.values():
-                keys.append(list(val.keys())[0])
-            return keys
-
-        return list(ClusterTracingOptionsBase._VALID_OPTS.keys())
-
-
 # @TODO: remove this when we remove all the deprecated 3.x imports
 TransactionConfig = Union[Dict[str, Any], Any]
-
-
-class ClusterOptionsBase(dict):
-
-    _VALID_OPTS = {
-        'allowed_sasl_mechanisms': {'allowed_sasl_mechanisms': lambda x: x.split(',') if isinstance(x, str) else x},
-        "authenticator": {"authenticator": lambda x: x},
-        "enable_tls": {"enable_tls": validate_bool},
-        "enable_mutation_tokens": {"enable_mutation_tokens": validate_bool},
-        "enable_tcp_keep_alive": {"enable_tcp_keep_alive": validate_bool},
-        "ip_protocol": {"use_ip_protocol": IpProtocol.to_str},
-        "enable_dns_srv": {"enable_dns_srv": validate_bool},
-        "show_queries": {"show_queries": validate_bool},
-        "enable_unordered_execution": {"enable_unordered_execution": validate_bool},
-        "enable_clustermap_notification": {"enable_clustermap_notification": validate_bool},
-        "enable_compression": {"enable_compression": validate_bool},
-        "enable_tracing": {"cluster_enable_tracing": validate_bool},
-        "enable_metrics": {"cluster_enable_metrics": validate_bool},
-        "enable_orphan_reporting": {"cluster_enable_orphan_reporting": validate_bool},
-        "network": {"network": validate_str},
-        "tls_verify": {"tls_verify": TLSVerifyMode.to_str},
-        "serializer": {"serializer": lambda x: x},
-        "transcoder": {"transcoder": lambda x: x},
-        "span": {"span": lambda x: x},
-        "tcp_keep_alive_interval": {"tcp_keep_alive_interval": timedelta_as_milliseconds},
-        "config_poll_interval": {"config_poll_interval": timedelta_as_milliseconds},
-        "config_poll_floor": {"config_poll_floor": timedelta_as_milliseconds},
-        "max_http_connections": {"max_http_connections": validate_int},
-        "user_agent_extra": {"user_agent_extra": validate_str},
-        "trust_store_path": {"trust_store_path": validate_str},
-        "cert_path": {"cert_path": validate_str},
-        "disable_mozilla_ca_certificates": {"disable_mozilla_ca_certificates": validate_bool},
-        "logging_meter_emit_interval": {"cluster_metrics_emit_interval": timedelta_as_milliseconds},
-        "num_io_threads": {"num_io_threads": validate_int},
-        "transaction_config": {"transaction_config": lambda x: x},
-        "tracer": {"tracer": lambda x: x},
-        "meter": {"meter": lambda x: x},
-        "dns_nameserver": {"dns_nameserver": validate_str},
-        "dns_port": {"dns_port": validate_int},
-        "dump_configuration": {"dump_configuration": validate_bool},
-        "preferred_server_group": {"preferred_server_group": validate_str},
-        "enable_app_telemetry": {"enable_app_telemetry": validate_bool},
-        "app_telemetry_endpoint": {"app_telemetry_endpoint": validate_str},
-        "app_telemetry_backoff": {"app_telemetry_backoff": timedelta_as_milliseconds},
-        "app_telemetry_ping_interval": {"app_telemetry_ping_interval": timedelta_as_milliseconds},
-        "app_telemetry_ping_timeout": {"app_telemetry_ping_timeout": timedelta_as_milliseconds},
-        "allow_enterprise_analytics": {"allow_enterprise_analytics": validate_bool},
-        "enable_lazy_connections": {"enable_lazy_connections": validate_bool}
-    }
-
-    @overload
-    def __init__(
-        self,
-        authenticator,  # type: Authenticator
-        timeout_options=None,  # type: Optional[ClusterTimeoutOptionsBase]
-        orphan_reporting_options=None,  # type: Optional[ClusterOrphanReportingOptionsBase]
-        metrics_options=None,  # type: Optional[ClusterMetricsOptionsBase]
-        tracing_options=None,  # type: Optional[ClusterTracingOptionsBase]
-        enable_tls=None,    # type: Optional[bool]
-        enable_mutation_tokens=None,    # type: Optional[bool]
-        enable_tcp_keep_alive=None,    # type: Optional[bool]
-        ip_protocol=None,    # type: Optional[Union[IpProtocol, str]]
-        enable_dns_srv=None,    # type: Optional[bool]
-        show_queries=None,    # type: Optional[bool]
-        enable_unordered_execution=None,    # type: Optional[bool]
-        enable_clustermap_notification=None,    # type: Optional[bool]
-        enable_compression=None,    # type: Optional[bool]
-        enable_tracing=None,    # type: Optional[bool]
-        enable_metrics=None,    # type: Optional[bool]
-        enable_orphan_reporting=None,    # type: Optional[bool]
-        network=None,    # type: Optional[str]
-        tls_verify=None,    # type: Optional[Union[TLSVerifyMode, str]]
-        serializer=None,  # type: Optional[Serializer]
-        transcoder=None,  # type: Optional[Transcoder]
-        tcp_keep_alive_interval=None,  # type: Optional[timedelta]
-        config_poll_interval=None,  # type: Optional[timedelta]
-        config_poll_floor=None,  # type: Optional[timedelta]
-        max_http_connections=None,  # type: Optional[int]
-        user_agent_extra=None,  # type: Optional[str]
-        logging_meter_emit_interval=None,  # type: Optional[timedelta]
-        transaction_config=None,  # type: Optional[TransactionConfig]
-        log_redaction=None,  # type: Optional[bool]
-        compression=None,  # type: Optional[Compression]
-        compression_min_size=None,  # type: Optional[int]
-        compression_min_ratio=None,  # type: Optional[float]
-        lockmode=None,  # type: Optional[LockMode]
-        tracer=None,  # type: Optional[TracerProtocol]
-        meter=None,  # type: Optional[CouchbaseMeter]
-        dns_nameserver=None,  # type: Optional[str]
-        dns_port=None,  # type: Optional[int]
-        disable_mozilla_ca_certificates=None,  # type: Optional[bool]
-        dump_configuration=None,  # type: Optional[bool]
-        preferred_server_group=None,  # type: Optional[str]
-        enable_app_telemetry=None,  # type: Optional[bool]
-        app_telemetry_endpoint=None,  # type: Optional[str]
-        app_telemetry_backoff=None,  # type: Optional[timedelta]
-        app_telemetry_ping_interval=None,  # type: Optional[timedelta]
-        app_telemetry_ping_timeout=None,  # type: Optional[timedelta]
-        allow_enterprise_analytics=None,  # type: Optional[bool]
-        enable_lazy_connections=None  # type: Optional[bool]
-    ):
-        """ClusterOptions instance."""
-
-    def __init__(self,  # noqa: C901
-                 authenticator,  # type: Authenticator
-                 **kwargs
-                 ):
-
-        if authenticator:
-            kwargs["authenticator"] = authenticator
-
-        # flatten tracing and timeout options
-        tracing_opts = kwargs.pop('tracing_options', {})
-        if tracing_opts:
-            for k, v in tracing_opts.items():
-                if k not in kwargs:
-                    kwargs[k] = v
-
-        orphan_opts = kwargs.pop('orphan_reporting_options', {})
-        if orphan_opts:
-            for k, v in orphan_opts.items():
-                if k not in kwargs:
-                    kwargs[k] = v
-
-        metrics_opts = kwargs.pop('metrics_options', {})
-        if metrics_opts:
-            for k, v in metrics_opts.items():
-                if k not in kwargs:
-                    kwargs[k] = v
-
-        timeout_opts = kwargs.pop('timeout_options', {})
-        if timeout_opts:
-            for k, v in timeout_opts.items():
-                if k not in kwargs:
-                    kwargs[k] = v
-
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-    @staticmethod
-    def get_allowed_option_keys(cluster_opts_only=False,  # type: Optional[bool]
-                                use_transform_keys=False  # type: Optional[bool]
-                                ) -> List[str]:
-        if use_transform_keys is True:
-            keys = []
-            for val in ClusterOptionsBase._VALID_OPTS.values():
-                keys.append(list(val.keys())[0])
-
-            if cluster_opts_only is True:
-                return keys
-
-            keys.extend(ClusterTimeoutOptionsBase.get_allowed_option_keys(use_transform_keys=True))
-            keys.extend(ClusterTracingOptionsBase.get_allowed_option_keys(use_transform_keys=True))
-            keys.extend(ClusterMetricsOptionsBase.get_allowed_option_keys(use_transform_keys=True))
-            keys.extend(ClusterOrphanReportingOptionsBase.get_allowed_option_keys(use_transform_keys=True))
-
-            return keys
-
-        if cluster_opts_only is True:
-            return list(ClusterOptionsBase._VALID_OPTS.keys())
-
-        valid_keys = ClusterTimeoutOptionsBase.get_allowed_option_keys()
-        valid_keys.extend(ClusterOrphanReportingOptionsBase.get_allowed_option_keys())
-        valid_keys.extend(ClusterMetricsOptionsBase.get_allowed_option_keys())
-        valid_keys.extend(ClusterTracingOptionsBase.get_allowed_option_keys())
-        valid_keys.extend(list(ClusterOptionsBase._VALID_OPTS.keys()))
-
-        return valid_keys
-
-    @staticmethod
-    def get_valid_options() -> Dict[str, Any]:
-        valid_opts = copy.copy(ClusterTimeoutOptionsBase._VALID_OPTS)
-        valid_opts.update(copy.copy(ClusterMetricsOptionsBase._VALID_OPTS))
-        valid_opts.update(copy.copy(ClusterOrphanReportingOptionsBase._VALID_OPTS))
-        valid_opts.update(copy.copy(ClusterTracingOptionsBase._VALID_OPTS))
-        valid_opts.update(copy.copy(ClusterOptionsBase._VALID_OPTS))
-        return valid_opts
 
 
 """
@@ -860,52 +420,6 @@ class OptionsTimeoutBase(OptionsBase):
 # Diagnostic Operations
 
 
-class PingOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,       # type: timedelta
-                 report_id=None,     # type: str
-                 service_types=None  # type: Union[Iterable[ServiceType], Iterable[str]]
-                 ):
-        pass
-
-    def __init__(self,
-                 **kwargs
-                 ):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class DiagnosticsOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 report_id=None     # type: str
-                 ):
-        pass
-
-    def __init__(self,
-                 **kwargs
-                 ):
-
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class WaitUntilReadyOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 desired_state=None,     # type: ClusterState
-                 service_types=None  # type: Union[Iterable[ServiceType], Iterable[str]]
-                 ):
-        pass
-
-    def __init__(self,
-                 **kwargs
-                 ):
-
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
 # Key-Value Operations
 
 
@@ -927,378 +441,10 @@ class DurabilityOptionBlockBase(OptionsTimeoutBase):
         return self.get("expiry", None)
 
 
-class InsertOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 expiry=None,  # type: Optional[timedelta]
-                 durability=None,  # type: Optional[DurabilityType]
-                 transcoder=None,  # type: Optional[Transcoder]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class UpsertOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 expiry=None,  # type: Optional[timedelta]
-                 preserve_expiry=False,  # type: Optional[bool]
-                 durability=None,  # type: Optional[DurabilityType]
-                 transcoder=None,  # type: Optional[Transcoder]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class ScanOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(
-            self,
-            timeout=None,  # type: Optional[timedelta]
-            ids_only=None,  # type: Optional[bool]
-            consistent_with=None,  # type: Optional[MutationState]
-            batch_byte_limit=None,  # type: Optional[int]
-            batch_item_limit=None,  # type: Optional[int]
-            batch_time_limit=None,  # type: Optional[timedelta]
-            transcoder=None,  # type: Optional[Transcoder]
-            concurrency=None,  # type: Optional[int]
-            span=None,  # type: Optional[SpanProtocol]
-            parent_span=None,  # type: Optional[SpanProtocol]
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-    @classmethod
-    def get_valid_keys(cls):
-        return ['timeout',
-                'ids_only',
-                'consistent_with',
-                'batch_byte_limit',
-                'batch_item_limit',
-                'concurrency',
-                'transcoder',
-                'span',
-                'parent_span']
-
-
-class ReplaceOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 expiry=None,  # type: Optional[timedelta]
-                 cas=None,  # type: Optional[int]
-                 preserve_expiry=False,  # type: Optional[bool]
-                 durability=None,  # type: Optional[DurabilityType]
-                 transcoder=None,  # type: Optional[Transcoder]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class RemoveOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 cas=None,  # type: Optional[int]
-                 durability=None,  # type: Optional[DurabilityType]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: Optional[timedelta]
-        with_expiry=None,  # type: Optional[bool]
-        project=None,  # type: Optional[Iterable[str]]
-        transcoder=None,  # type: Optional[Transcoder]
-        span=None,  # type: Optional[SpanProtocol]
-        parent_span=None,  # type: Optional[SpanProtocol]
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-    @property
-    def with_expiry(self) -> bool:
-        return self.get("with_expiry", False)
-
-    @property
-    def project(self) -> Iterable[str]:
-        return self.get("project", [])
-
-
-class ExistsOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class TouchOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetAllReplicasOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 transcoder=None,  # type: Optional[Transcoder]
-                 read_preference=None,  # type: Optional[ReadPreference]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetAndTouchOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 transcoder=None,  # type: Optional[Transcoder]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetAndLockOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 transcoder=None,  # type: Optional[Transcoder]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetAnyReplicaOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 transcoder=None,  # type: Optional[Transcoder]
-                 read_preference=None,  # type: Optional[ReadPreference]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class UnlockOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
 # Sub-document Operations
 
 
-class LookupInOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 access_deleted=None,  # type: Optional[bool]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class LookupInAllReplicasOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 serializer=None,  # type: Optional[Serializer]
-                 read_preference=None,  # type: Optional[ReadPreference]
-                 ) -> None:
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class LookupInAnyReplicaOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 serializer=None,  # type: Optional[Serializer]
-                 read_preference=None,  # type: Optional[ReadPreference]
-                 ) -> None:
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class MutateInOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 expiry=None,  # type: Optional[timedelta]
-                 cas=0,          # type: Optional[int]
-                 durability=None,  # type: Optional[DurabilityType]
-                 store_semantics=None,  # type: Optional[StoreSemantics]
-                 access_deleted=None,  # type: Optional[bool]
-                 preserve_expiry=None,  # type: Optional[bool]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
 # Binary Operations
-
-class IncrementOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,      # type: Optional[timedelta]
-                 expiry=None,       # type: Optional[timedelta]
-                 durability=None,   # type: Optional[DurabilityType]
-                 delta=None,         # type: Optional[DeltaValueBase]
-                 initial=None,      # type: Optional[SignedInt64Base]
-                 span=None,         # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class DecrementOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,      # type: Optional[timedelta]
-                 expiry=None,       # type: Optional[timedelta]
-                 durability=None,   # type: Optional[DurabilityType]
-                 delta=None,         # type: Optional[DeltaValueBase]
-                 initial=None,      # type: Optional[SignedInt64Base]
-                 span=None,         # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class AppendOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,      # type: Optional[timedelta]
-                 durability=None,   # type: Optional[DurabilityType]
-                 cas=None,          # type: Optional[int]
-                 span=None,         # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class PrependOptionsBase(DurabilityOptionBlockBase):
-    @overload
-    def __init__(self,
-                 timeout=None,      # type: Optional[timedelta]
-                 durability=None,   # type: Optional[DurabilityType]
-                 cas=None,          # type: Optional[int]
-                 span=None,         # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
 
 
 """
@@ -1308,73 +454,11 @@ Couchbase Python SDK N1QL related Options
 """
 
 
-class QueryOptionsBase(dict):
-
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: Optional[timedelta]
-        read_only=None,  # type: Optional[bool]
-        scan_consistency=None,  # type: Optional[QueryScanConsistency]
-        adhoc=None,  # type: Optional[bool]
-        client_context_id=None,  # type: Optional[str]
-        max_parallelism=None,  # type: Optional[int]
-        positional_parameters=None,  # type: Optional[Iterable[JSONType]]
-        named_parameters=None,  # type: Optional[Dict[str, JSONType]]
-        pipeline_batch=None,  # type: Optional[int]
-        pipeline_cap=None,  # type: Optional[int]
-        profile=None,  # type: Optional[QueryProfile]
-        query_context=None,  # type: Optional[str]
-        scan_cap=None,  # type: Optional[int]
-        scan_wait=None,  # type: Optional[timedelta]
-        metrics=None,  # type: Optional[bool]
-        flex_index=None,  # type: Optional[bool]
-        preserve_expiry=None,  # type: Optional[bool]
-        use_replica=None,  # type: Optional[bool]
-        consistent_with=None,  # type: Optional[MutationState]
-        send_to_node=None,  # type: Optional[str]
-        raw=None,  # type: Optional[Dict[str,Any]]
-        span=None,  # type: Optional[SpanProtocol]
-        parent_span=None,  # type: Optional[SpanProtocol]
-        serializer=None  # type: Optional[Serializer]
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
 """
 
 Couchbase Python SDK Analytics related Options
 
 """
-
-
-class AnalyticsOptionsBase(OptionsTimeoutBase):
-
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: Optional[timedelta]
-                 read_only=None,  # type: Optional[bool]
-                 scan_consistency=None,  # type: Optional[AnalyticsScanConsistency]
-                 positional_parameters=None,  # type: Optional[Iterable[JSONType]]
-                 named_parameters=None,  # type: Optional[Dict[str, JSONType]]
-                 client_context_id=None,  # type: Optional[str]
-                 priority=None,  # type: Optional[bool]
-                 metrics=None,  # type: Optional[bool]
-                 query_context=None,  # type: Optional[str]
-                 raw=None,              # type: Optional[Dict[str, Any]]
-                 serializer=None,  # type: Optional[Serializer]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
 
 
 """
@@ -1384,115 +468,11 @@ Couchbase Python SDK Full Text Search (FTS) related Options
 """
 
 
-class SearchOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,           # type: Optional[timedelta]
-                 limit=None,             # type: Optional[int]
-                 skip=None,              # type: Optional[int]
-                 explain=None,           # type: Optional[bool]
-                 fields=None,            # type: Optional[List[str]]
-                 highlight_style=None,   # type: Optional[HighlightStyle]
-                 highlight_fields=None,  # type: Optional[List[str]]
-                 scan_consistency=None,  # type: Optional[SearchScanConsistency]
-                 consistent_with=None,   # type: Optional[MutationState]
-                 facets=None,            # type: Optional[Dict[str, Facet]]
-                 raw=None,               # type: Optional[Dict[str, Any]]
-                 sort=None,              # type: Optional[Union[Sequence[str], Sequence[Sort]]]
-                 disable_scoring=None,   # type: Optional[bool]
-                 scoring=None,           # type: Optional[SearchScoring]
-                 scope_name=None,  # type: Optional[str]
-                 collections=None,       # type: Optional[List[str]]
-                 include_locations=None,  # type: Optional[bool]
-                 client_context_id=None,  # type: Optional[str]
-                 serializer=None,  # type: Optional[Serializer]
-                 show_request=None,      # type: Optional[bool]
-                 log_request=None,      # type: Optional[bool]
-                 log_response=None,      # type: Optional[bool]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class VectorSearchOptionsBase(dict):
-    """
-    **INTERNAL**
-    """
-    @overload
-    def __init__(self,
-                 vector_query_combination=None,           # type: Optional[VectorQueryCombination]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
 """
 
 Couchbase Python SDK View related Options
 
 """
-
-
-class ViewOptionsBase(OptionsTimeoutBase):
-    @overload
-    def __init__(self,
-                 timeout=None,               # type: Optional[timedelta]
-                 scan_consistency=None,      # type: Optional[ViewScanConsistency]
-                 skip=None,                  # type: Optional[int]
-                 limit=None,                 # type: Optional[int]
-                 startkey=None,              # type: Optional[JSONType]
-                 endkey=None,                # type: Optional[JSONType]
-                 startkey_docid=None,        # type: Optional[str]
-                 endkey_docid=None,          # type: Optional[str]
-                 inclusive_end=None,         # type: Optional[bool]
-                 group=None,                 # type: Optional[bool]
-                 group_level=None,           # type: Optional[int]
-                 key=None,                   # type: Optional[JSONType]
-                 keys=None,                  # type: Optional[Sequence[JSONType]]
-                 order=None,                 # type: Optional[ViewOrdering]
-                 reduce=None,                # type: Optional[bool]
-                 on_error=None,              # type: Optional[ViewErrorMode]
-                 debug=None,                 # type: Optional[bool]
-                 namespace=None,             # type: Optional[DesignDocumentNamespace]
-                 query_string=None,          # type: Optional[List[str]]
-                 client_context_id=None,     # type: Optional[str]
-                 raw=None,                   # type: Optional[Dict[str, str]]
-                 full_set=None,              # type: Optional[bool]
-                 span=None,  # type: Optional[SpanProtocol]
-                 parent_span=None,  # type: Optional[SpanProtocol]
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-        # @TODO:  do we need this??  Don't think so...
-        # val = kwargs.pop('scan_consistency', None)
-        # if val:
-        #     kwargs['stale'] = val.value
-        # val = kwargs.pop('order', None)
-        # if val:
-        #     kwargs['descending'] = val.value
-        # val = kwargs.pop('on_error', None)
-        # if val:
-        #     kwargs['on_error'] = val.value
-        # val = kwargs.pop('raw', None)
-        # if val:
-        #     kwargs[val[0]] = val[1]
-        # val = kwargs.pop('namespace', None)
-        # if val:
-        #     kwargs['use_devmode'] = (
-        #         val == DesignDocumentNamespace.DEVELOPMENT)
-
-        super().__init__(**kwargs)
 
 
 """
@@ -1652,3 +632,42 @@ class DeltaValueBase(ConstrainedIntBase):
     @classmethod
     def min(cls):
         return 0
+
+
+# BRIDGE: the old *Base names, bound to the final option classes for the code that still annotates
+# with them.  Removed by PYCBC-2016.
+from couchbase.common.options import AnalyticsOptions as AnalyticsOptionsBase  # noqa: F401, E402
+from couchbase.common.options import AppendOptions as AppendOptionsBase  # noqa: F401, E402
+from couchbase.common.options import ClusterMetricsOptions as ClusterMetricsOptionsBase  # noqa: F401, E402
+from couchbase.common.options import ClusterOptions as ClusterOptionsBase  # noqa: F401, E402
+from couchbase.common.options import (  # noqa: F401, E402
+    ClusterOrphanReportingOptions as ClusterOrphanReportingOptionsBase)
+from couchbase.common.options import ClusterTimeoutOptions as ClusterTimeoutOptionsBase  # noqa: F401, E402
+from couchbase.common.options import ClusterTracingOptions as ClusterTracingOptionsBase  # noqa: F401, E402
+from couchbase.common.options import DecrementOptions as DecrementOptionsBase  # noqa: F401, E402
+from couchbase.common.options import DiagnosticsOptions as DiagnosticsOptionsBase  # noqa: F401, E402
+from couchbase.common.options import ExistsOptions as ExistsOptionsBase  # noqa: F401, E402
+from couchbase.common.options import GetAllReplicasOptions as GetAllReplicasOptionsBase  # noqa: F401, E402
+from couchbase.common.options import GetAndLockOptions as GetAndLockOptionsBase  # noqa: F401, E402
+from couchbase.common.options import GetAndTouchOptions as GetAndTouchOptionsBase  # noqa: F401, E402
+from couchbase.common.options import GetAnyReplicaOptions as GetAnyReplicaOptionsBase  # noqa: F401, E402
+from couchbase.common.options import GetOptions as GetOptionsBase  # noqa: F401, E402
+from couchbase.common.options import IncrementOptions as IncrementOptionsBase  # noqa: F401, E402
+from couchbase.common.options import InsertOptions as InsertOptionsBase  # noqa: F401, E402
+from couchbase.common.options import LookupInAllReplicasOptions as LookupInAllReplicasOptionsBase  # noqa: F401, E402
+from couchbase.common.options import LookupInAnyReplicaOptions as LookupInAnyReplicaOptionsBase  # noqa: F401, E402
+from couchbase.common.options import LookupInOptions as LookupInOptionsBase  # noqa: F401, E402
+from couchbase.common.options import MutateInOptions as MutateInOptionsBase  # noqa: F401, E402
+from couchbase.common.options import PingOptions as PingOptionsBase  # noqa: F401, E402
+from couchbase.common.options import PrependOptions as PrependOptionsBase  # noqa: F401, E402
+from couchbase.common.options import QueryOptions as QueryOptionsBase  # noqa: F401, E402
+from couchbase.common.options import RemoveOptions as RemoveOptionsBase  # noqa: F401, E402
+from couchbase.common.options import ReplaceOptions as ReplaceOptionsBase  # noqa: F401, E402
+from couchbase.common.options import ScanOptions as ScanOptionsBase  # noqa: F401, E402
+from couchbase.common.options import SearchOptions as SearchOptionsBase  # noqa: F401, E402
+from couchbase.common.options import TouchOptions as TouchOptionsBase  # noqa: F401, E402
+from couchbase.common.options import UnlockOptions as UnlockOptionsBase  # noqa: F401, E402
+from couchbase.common.options import UpsertOptions as UpsertOptionsBase  # noqa: F401, E402
+from couchbase.common.options import VectorSearchOptions as VectorSearchOptionsBase  # noqa: F401, E402
+from couchbase.common.options import ViewOptions as ViewOptionsBase  # noqa: F401, E402
+from couchbase.common.options import WaitUntilReadyOptions as WaitUntilReadyOptionsBase  # noqa: F401, E402

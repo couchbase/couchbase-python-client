@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, urlparse
 
 from couchbase import USER_AGENT_EXTRA
 from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability import (LegacyTracerProtocol,
                                            MeterProtocol,
@@ -38,14 +39,11 @@ from couchbase.logic.observability import (LegacyTracerProtocol,
                                            ObservabilityInstruments,
                                            RequestTracerProtocol,
                                            WrappedTracer)
-from couchbase.options import (ClusterMetricsOptions,
-                               ClusterOptions,
-                               ClusterOrphanReportingOptions,
-                               ClusterTimeoutOptions,
-                               ClusterTracingOptions,
+from couchbase.options import (ClusterOptions,
                                TLSVerifyMode,
                                TransactionConfig,
                                get_valid_args)
+from couchbase.protocol.classic._wire import wire_keys
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.transcoder import JSONTranscoder, Transcoder
 
@@ -213,7 +211,7 @@ def build_authenticator(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:  # noqa
 
 def build_metrics_options(cluster_opts: Dict[str, Any]) -> Tuple[Dict[str, Any], MeterProtocol]:
     metrics_opts = {}
-    for key in ClusterMetricsOptions.get_allowed_option_keys(use_transform_keys=True):
+    for key in wire_keys('ClusterMetricsOptions'):
         if key in cluster_opts:
             metrics_opts[key] = cluster_opts.pop(key)
 
@@ -252,7 +250,7 @@ def build_metrics_options(cluster_opts: Dict[str, Any]) -> Tuple[Dict[str, Any],
 
 def build_timeout_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
     timeout_opts = {}
-    for key in ClusterTimeoutOptions.get_allowed_option_keys(use_transform_keys=True):
+    for key in wire_keys('ClusterTimeoutOptions'):
         if key in cluster_opts:
             timeout_opts[key] = cluster_opts.pop(key)
     if timeout_opts:
@@ -264,12 +262,12 @@ def build_timeout_options(cluster_opts: Dict[str, Any]) -> Dict[str, Any]:
 def build_tracing_and_orphan_options(cluster_opts: Dict[str, Any]  # noqa: C901
                                      ) -> Tuple[Dict[str, Any], Dict[str, Any], WrappedTracer]:
     tracing_opts = {}
-    for key in ClusterTracingOptions.get_allowed_option_keys(use_transform_keys=True):
+    for key in wire_keys('ClusterTracingOptions'):
         if key in cluster_opts:
             tracing_opts[key] = cluster_opts.pop(key)
 
     orphan_opts = {}
-    for key in ClusterOrphanReportingOptions.get_allowed_option_keys(use_transform_keys=True):
+    for key in wire_keys('ClusterOrphanReportingOptions'):
         if key in cluster_opts:
             orphan_opts[key] = cluster_opts.pop(key)
 
@@ -360,7 +358,7 @@ class ClusterSettings:
         connection_str, query_opts, legacy_opts = parse_connection_string(connstr)
 
         kwargs.update(query_opts)
-        cluster_opts = get_valid_args(ClusterOptions, kwargs, *options)
+        cluster_opts = get_valid_args(ClusterOptions, kwargs, *options, protocol=CouchbaseProtocol.CLASSIC)
         # add legacy options after parsing ClusterOptions to keep logic separate
         cluster_opts.update(parse_legacy_query_options(**legacy_opts))
 

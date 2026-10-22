@@ -29,8 +29,8 @@ from couchbase.common.management.eventing import (EVENTING_FUNCTION_MGMT_ERROR_M
                                                   ResumeFunctionRequest,
                                                   UndeployFunctionRequest,
                                                   UpsertFunctionRequest)
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.options import forward_args
 
 if TYPE_CHECKING:
     from couchbase.common.management.eventing import EventingFunction

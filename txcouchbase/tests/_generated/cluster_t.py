@@ -184,7 +184,7 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
         # a bare ServiceType, and a cast would assert the opposite.
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(cluster.ping, PingOptions(
-                service_types=ServiceType.KeyValue))  # type: ignore[call-overload]
+                service_types=ServiceType.KeyValue))  # type: ignore[arg-type]
 
     def test_ping_mixed_services(self, cb_env: TwistedTestEnvironment) -> None:
         cluster = cb_env.cluster

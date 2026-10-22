@@ -24,8 +24,8 @@ from couchbase.common.management.views import (VIEW_INDEX_MGMT_ERROR_MAP,
                                                PublishDesignDocumentRequest,
                                                UpsertDesignDocumentRequest)
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.options import forward_args
 
 if TYPE_CHECKING:
     from couchbase.common.management.views import DesignDocument, DesignDocumentNamespace

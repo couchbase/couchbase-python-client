@@ -262,12 +262,12 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
                                          kv_validator: KeyValueSpanValidator) -> None:
         keys = list(cb_env.get_docs(NUM_KEYS))
         parent = kv_validator.new_parent_span(OpName.GetAndLockMulti)
-        lock_opts = GetAndLockMultiOptions(parent_span=parent)  # type: ignore[arg-type]
+        lock_opts = GetAndLockMultiOptions(parent_span=parent)
         locked = cb_env.collection.get_and_lock_multi(keys, HALF_SECOND, lock_opts)
         kv_validator.validate_kv_op(OpName.GetAndLockMulti, parent_span=parent, multi_op_key_count=NUM_KEYS)
 
         parent = kv_validator.new_parent_span(OpName.UnlockMulti)
-        unlock_opts = UnlockMultiOptions(parent_span=parent)  # type: ignore[arg-type]
+        unlock_opts = UnlockMultiOptions(parent_span=parent)
         cb_env.collection.unlock_multi(locked, unlock_opts)
         kv_validator.validate_kv_op(OpName.UnlockMulti, parent_span=parent, multi_op_key_count=NUM_KEYS)
 

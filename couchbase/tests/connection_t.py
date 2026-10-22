@@ -386,7 +386,7 @@ class ClusterOptionsUnitTests:
             ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
         with pytest.raises(InvalidArgumentException):
             ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), metrics_options=opts))  # type: ignore[call-overload]
+                        ClusterOptions(self._auth(), metrics_options=opts))  # type: ignore[arg-type]
 
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'enable_metrics': True, 'metrics_emit_interval': timedelta(seconds=30)},
@@ -435,7 +435,7 @@ class ClusterOptionsUnitTests:
             ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
         with pytest.raises(InvalidArgumentException):
             ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), orphan_reporting_options=opts))  # type: ignore[call-overload]
+                        ClusterOptions(self._auth(), orphan_reporting_options=opts))  # type: ignore[arg-type]
 
     @pytest.mark.parametrize('opts, expected_opts',
                              [({'enable_orphan_reporting': True,
@@ -506,7 +506,7 @@ class ClusterOptionsUnitTests:
             ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
         with pytest.raises(InvalidArgumentException):
             ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), timeout_options=opts))  # type: ignore[call-overload]
+                        ClusterOptions(self._auth(), timeout_options=opts))  # type: ignore[arg-type]
 
     @pytest.mark.parametrize('opts, expected_opts', TIMEOUT_CASES)
     def test_cluster_timeout_options_kwargs(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:
@@ -553,7 +553,7 @@ class ClusterOptionsUnitTests:
             ClusterImpl(CONNSTR, ClusterOptions(self._auth()), **opts)
         with pytest.raises(InvalidArgumentException):
             ClusterImpl(CONNSTR,
-                        ClusterOptions(self._auth(), tracing_options=opts))  # type: ignore[call-overload]
+                        ClusterOptions(self._auth(), tracing_options=opts))  # type: ignore[arg-type]
 
     @pytest.mark.parametrize('opts, expected_opts', TRACING_CASES)
     def test_cluster_tracing_options_kwargs(self, opts: dict[str, Any], expected_opts: dict[str, Any]) -> None:

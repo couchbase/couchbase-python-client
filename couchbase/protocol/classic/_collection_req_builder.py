@@ -27,6 +27,8 @@ from typing import (TYPE_CHECKING,
 
 from acouchbase.kv_range_scan import AsyncRangeScanRequest
 from couchbase.common._transforms import timedelta_as_milliseconds
+from couchbase.common.options import DeltaValue as DeltaValueBase
+from couchbase.common.options import SignedInt64 as SignedInt64Base
 from couchbase.constants import FMT_BYTES
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
@@ -35,11 +37,10 @@ from couchbase.kv_range_scan import (PrefixScan,
                                      RangeScanRequest,
                                      SamplingScan,
                                      ScanType)
+from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import KeyValueOperationCode
-from couchbase.logic.options import DeltaValueBase, SignedInt64Base
 from couchbase.mutation_state import MutationState
-from couchbase.options import forward_args
 from couchbase.protocol.classic._collection_types import CollectionDetails
 from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.subdocument import (StoreSemantics,

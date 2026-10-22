@@ -195,7 +195,7 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
         # Suppressed rather than cast: what is under test is that the request builder rejects
         # a bare ServiceType, and a cast would assert the opposite.
         with pytest.raises(InvalidArgumentException):
-            await cluster.ping(PingOptions(service_types=ServiceType.KeyValue))  # type: ignore[call-overload]
+            await cluster.ping(PingOptions(service_types=ServiceType.KeyValue))  # type: ignore[arg-type]
 
     @pytest.mark.asyncio
     async def test_ping_mixed_services(self, cb_env: AsyncTestEnvironment) -> None:

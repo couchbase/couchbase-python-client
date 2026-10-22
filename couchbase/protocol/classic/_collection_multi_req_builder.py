@@ -26,12 +26,14 @@ from typing import (TYPE_CHECKING,
                     Type,
                     Union)
 
+from couchbase.common.options import DeltaValue as DeltaValueBase
+from couchbase.common.options import SignedInt64 as SignedInt64Base
+from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.constants import FMT_BYTES
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import KeyValueMultiOperationCode
-from couchbase.logic.options import DeltaValueBase, SignedInt64Base
 from couchbase.options import (AppendMultiOptions,
                                DecrementMultiOptions,
                                ExistsMultiOptions,
@@ -134,7 +136,7 @@ class CollectionMultiRequestBuilder:
                                        *opts: object,
                                        **kwargs: object) -> KeyValueMultiRequest:
 
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
             span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
@@ -197,7 +199,7 @@ class CollectionMultiRequestBuilder:
                                   obs_handler: Optional[ObservableRequestHandler],
                                   *opts: object,
                                   **kwargs: object) -> KeyValueMultiRequest:
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
             span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
@@ -258,7 +260,7 @@ class CollectionMultiRequestBuilder:
                                    **kwargs: object
                                    ) -> KeyValueMultiRequest:
 
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
             span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
@@ -331,7 +333,7 @@ class CollectionMultiRequestBuilder:
                                     **kwargs: object) -> Union[KeyValueMultiRequest,
                                                                KeyValueMultiWithTranscoderRequest]:
         op_keys_cas = kwargs.pop('op_keys_cas', None)
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
             span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
