@@ -16,13 +16,14 @@
 
 from __future__ import annotations
 
-from typing import Mapping, Optional
+from collections.abc import Mapping
 
-from couchbase.observability.metrics import Meter, ValueRecorder
-from couchbase.observability.tracing import (RequestSpan,
-                                             RequestTracer,
-                                             SpanAttributeValue,
-                                             SpanStatusCode)
+from couchbase.common.observability.metrics import Meter, ValueRecorder
+from couchbase.common.observability.tracing import (RequestSpan,
+                                                    RequestTracer,
+                                                    SpanAttributes,
+                                                    SpanAttributeValue,
+                                                    SpanStatusCode)
 
 
 class NoOpValueRecorder(ValueRecorder):
@@ -50,8 +51,8 @@ class NoOpSpan(RequestSpan):
 
     def __init__(self,
                  name: str,
-                 parent_span: Optional[RequestSpan] = None,
-                 start_time: Optional[int] = None) -> None:
+                 parent_span: RequestSpan | None = None,
+                 start_time: int | None = None) -> None:
         pass
 
     @property
@@ -63,7 +64,7 @@ class NoOpSpan(RequestSpan):
         return ''
 
     @property
-    def span_end(self) -> Optional[int]:
+    def span_end(self) -> int | None:
         return None
 
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
@@ -72,13 +73,16 @@ class NoOpSpan(RequestSpan):
     def set_attributes(self, attributes: Mapping[str, SpanAttributeValue]) -> None:
         pass
 
-    def add_event(self, name: str, value: SpanAttributeValue) -> None:
+    def add_event(self,
+                  name: str,
+                  attributes: SpanAttributes | None = None,
+                  timestamp: int | None = None) -> None:
         pass
 
     def set_status(self, status: SpanStatusCode) -> None:
         pass
 
-    def end(self, timestamp: Optional[int] = None) -> None:
+    def end(self, timestamp: int | None = None) -> None:
         pass
 
 
@@ -90,7 +94,7 @@ class NoOpTracer(RequestTracer):
     def request_span(
         self,
         name: str,
-        parent_span: Optional[RequestSpan] = None,
-        start_time: Optional[int] = None
+        parent_span: RequestSpan | None = None,
+        start_time: int | None = None
     ) -> RequestSpan:
         return NoOpSpan(name, parent_span=parent_span, start_time=start_time)

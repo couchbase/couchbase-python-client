@@ -73,21 +73,21 @@ class AnalyticsQueryRequest:
     num_workers: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return StreamingOperationType.AnalyticsQuery.value
 
 
 @dataclass
 class CloseConnectionRequest(ClusterRequest):
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterOperationType.Close.value
 
 
 @dataclass
 class ClusterInfoRequest(ClusterRequest):
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterMgmtOperationType.ClusterDescribe.value
 
 
@@ -98,7 +98,7 @@ class CreateConnectionRequest:
     options: Dict[str, Any]
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterOperationType.Connect.value
 
     def req_to_dict(self,
@@ -125,14 +125,14 @@ class DiagnosticsRequest(ClusterRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterOperationType.Diagnostics.value
 
 
 @dataclass
 class GetConnectionInfoRequest(ClusterRequest):
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterOperationType.GetConnectionInfo.value
 
 
@@ -143,7 +143,7 @@ class PingRequest(ClusterRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterOperationType.Ping.value
 
 
@@ -154,7 +154,7 @@ class QueryRequest:
     num_workers: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return StreamingOperationType.Query
 
 
@@ -165,7 +165,7 @@ class SearchQueryRequest:
     num_workers: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return StreamingOperationType.SearchQuery
 
 
@@ -174,7 +174,7 @@ class UpdateCredentialsRequest(ClusterRequest):
     auth: Dict[str, Any]
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterOperationType.UpdateCredentials.value
 
 
@@ -185,5 +185,5 @@ class WaitUntilReadyRequest:
     service_types: Set[str]
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ClusterOperationType.WaitUntilReady.value

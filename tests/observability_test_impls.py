@@ -643,4 +643,8 @@ class LegacyRecordingTracer(CouchbaseTracer):
 
 
 TestSpanType = Union[RecordingSpan, InertSpan, ThresholdRecordingSpan, LegacyRecordingSpan]
+# The three test spans that are a `RequestSpan`, which is what an SDK option takes as
+# `parent_span`.  The legacy span goes through the same option at runtime, and
+# `_SpanTreeValidator.new_parent_span` says why it is typed as if it did not.
+TestRequestSpanType = Union[RecordingSpan, InertSpan, ThresholdRecordingSpan]
 TestTracerType = Union[RecordingTracer, InertTracer, ThresholdRecordingTracer, LegacyRecordingTracer]

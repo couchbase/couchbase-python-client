@@ -100,7 +100,7 @@ class ClientAdapter:
         """**INTERNAL**"""
         self._ensure_not_closed()
         req_dict = req.req_to_dict()
-        ret = self._execute_req(req.op_name, req_dict)
+        ret = self._execute_req(req.binding_method, req_dict)
         if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
@@ -128,7 +128,7 @@ class ClientAdapter:
         """**INTERNAL**"""
         self._ensure_not_closed()
         req_dict = req.req_to_dict()
-        ret = self._execute_req(req.op_name, req_dict)
+        ret = self._execute_req(req.binding_method, req_dict)
         if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
@@ -139,7 +139,7 @@ class ClientAdapter:
         """**INTERNAL**"""
         self._ensure_not_closed()
         req_dict = req.req_to_dict(obs_handler)
-        ret = self._execute_req(req.op_name, req_dict)
+        ret = self._execute_req(req.binding_method, req_dict)
         # pycbc_result and pycbc_exception have a core_span member
         if obs_handler and hasattr(ret, 'core_span'):
             obs_handler.process_core_span(ret.core_span)
@@ -155,13 +155,13 @@ class ClientAdapter:
 
     def _execute_connect_request(self) -> None:
         req_dict = self._connect_req.req_to_dict()
-        ret = self._execute_req(self._connect_req.op_name, req_dict)
+        ret = self._execute_req(self._connect_req.binding_method, req_dict)
         if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
 
-    def _execute_req(self, op_name: str, req_dict: Dict[str, Any]) -> Any:
+    def _execute_req(self, binding_method: str, req_dict: Dict[str, Any]) -> Any:
         try:
-            return self._binding_map.op_map[op_name](**req_dict)
+            return self._binding_map.op_map[binding_method](**req_dict)
         except KeyError as e:
             msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
             raise InternalSDKException(message=msg) from None

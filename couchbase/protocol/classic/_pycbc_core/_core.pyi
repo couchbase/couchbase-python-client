@@ -32,6 +32,7 @@ else:
     from typing_extensions import Unpack
 
 import couchbase.protocol.classic._pycbc_core.binding_cpp_types as CppTypes
+from couchbase.common.exceptions import _ExceptionInfo
 from couchbase.protocol.classic._pycbc_core.pycbc_core_types import (CreateNewAttemptContextRequest,
                                                                      CreateTransactionContextRequest,
                                                                      CreateTransactionsRequest,
@@ -111,6 +112,8 @@ class pycbc_exception:
     def strerror(self) -> str: ...
 
     def error_context(self) -> Dict[str, Any]: ...
+
+    def error_info(self) -> Optional[_ExceptionInfo]: ...
 
 
 class pycbc_logger:

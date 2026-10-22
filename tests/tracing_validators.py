@@ -46,7 +46,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import (Any,
                     Optional,
-                    Union)
+                    Union,
+                    cast)
 
 from couchbase.logic.observability import (CollectionDetails,
                                            DispatchAttributeName,
@@ -63,8 +64,8 @@ from tests.observability_test_impls import (PARENT_SPAN_PREFIX,
                                             LegacyRecordingSpan,
                                             LegacyRecordingTracer,
                                             RecordingSpan,
+                                            TestRequestSpanType,
                                             TestSpanProtocol,
-                                            TestSpanType,
                                             TestTracerType,
                                             ThresholdRecordingSpan,
                                             ThresholdRecordingTracer)
@@ -240,7 +241,7 @@ class _SpanTreeValidator:
         """Drop every span the tracer holds, so the next assertion is about one operation."""
         self._tracer.clear_spans()
 
-    def new_parent_span(self, op_name: OpName) -> TestSpanType:
+    def new_parent_span(self, op_name: OpName) -> TestRequestSpanType:
         """Clear the tracer and open a parent span for the next operation to hang under.
 
         The name is not cosmetic.  A threshold-logging span asks, as it ends, whether it should
@@ -248,13 +249,15 @@ class _SpanTreeValidator:
         the test opened from an operation the SDK ran is the name, so every parent gets the
         prefix the test span looks for.
 
-        The concrete union rather than `TestSpanProtocol`, and that is the one place the distinction
-        matters.  What comes back is handed straight to an SDK option, which types the parameter
-        as the tracing protocols; the read-only surface a validator uses satisfies none of them,
-        while all four concrete spans do.
+        A concrete union rather than `TestSpanProtocol`, because what comes back is handed
+        straight to an SDK option typed `RequestSpan`, and the read-only surface a validator uses
+        is not one.  Under the legacy tracer the span is a `CouchbaseSpan`, which the option
+        rejects statically on purpose: passed at runtime it is accepted with a deprecation
+        warning, and that path is what the legacy runs exercise.  So the cast is the one place
+        the legacy span is let through, rather than one suppression at every call site.
         """
         self.reset()
-        return self._tracer.request_span(f'{PARENT_SPAN_PREFIX}{op_name.value}_span')
+        return cast(TestRequestSpanType, self._tracer.request_span(f'{PARENT_SPAN_PREFIX}{op_name.value}_span'))
 
     def _end_parent_span(self, parent_span: Optional[TestSpanProtocol]) -> None:
         if parent_span is None:

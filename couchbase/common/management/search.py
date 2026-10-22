@@ -225,7 +225,7 @@ class AllowQueryingRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexControlQuery.value
 
 
@@ -239,7 +239,7 @@ class AnalyzeDocumentRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument.value
 
 
@@ -253,7 +253,7 @@ class DisallowQueryingRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexControlQuery.value
 
 
@@ -266,7 +266,7 @@ class DropIndexRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexDrop.value
 
 
@@ -280,7 +280,7 @@ class FreezePlanRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze.value
 
 
@@ -292,7 +292,7 @@ class GetAllIndexesRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexGetAll.value
 
 
@@ -302,7 +302,7 @@ class GetAllIndexStatsRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchGetStats.value
 
 
@@ -315,7 +315,7 @@ class GetIndexedDocumentsCountRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount.value
 
 
@@ -328,7 +328,7 @@ class GetIndexRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexGet.value
 
 
@@ -341,7 +341,7 @@ class GetIndexStatsRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexGetStats.value
 
 
@@ -355,7 +355,7 @@ class PauseIngestRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexControlIngest.value
 
 
@@ -369,7 +369,7 @@ class ResumeIngestRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexControlIngest.value
 
 
@@ -383,7 +383,7 @@ class UnfreezePlanRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze.value
 
 
@@ -396,7 +396,7 @@ class UpsertIndexRequest(SearchIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return SearchIndexMgmtOperationType.SearchIndexUpsert.value
 
 

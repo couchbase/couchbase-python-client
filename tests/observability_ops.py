@@ -24,6 +24,7 @@ happen.  It sits here instead, imported by both.
 
 from __future__ import annotations
 
+from couchbase.common._operations import Op
 from couchbase.logic.observability import OpName, ServiceType
 
 # Operations that encode a value on the way out, and so produce an encoding span.
@@ -89,6 +90,14 @@ _SERVICE_BY_MANAGER_PREFIX = {
     'manager_users': ServiceType.Management,
     'manager_views': ServiceType.Views,
 }
+
+
+def span_name(op: Op | str) -> str:
+    """The name a span carries: the operation's, or as given for a span the core names itself."""
+    if isinstance(op, str):
+        return op
+    assert op.span_name is not None, f'{op} is never traced or metered'
+    return op.span_name
 
 
 def service_for(op_name: OpName) -> ServiceType:

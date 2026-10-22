@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from heapq import heappop, heappush
@@ -26,37 +27,34 @@ from threading import (Event,
                        Thread)
 from typing import (Any,
                     Generic,
-                    List,
-                    Mapping,
-                    Optional,
-                    Tuple,
                     TypedDict,
                     TypeVar,
-                    Union)
+                    cast)
 
 from couchbase.common._observability._clock import now_ns
-from couchbase.logic.observability.observability_types import (_ATTR_DISPATCH_SPAN_NAME,
-                                                               _ATTR_ENCODING_SPAN_NAME,
-                                                               _ATTR_SERVICE,
-                                                               _DISP_LOCAL_ID,
-                                                               _DISP_OPERATION_ID,
-                                                               _DISP_PEER_ADDRESS,
-                                                               _DISP_PEER_PORT,
-                                                               _DISP_SERVER_ADDRESS,
-                                                               _DISP_SERVER_DURATION,
-                                                               _DISP_SERVER_PORT,
-                                                               ServiceType)
-from couchbase.logic.options import ClusterTracingOptionsBase
-from couchbase.observability.tracing import (RequestSpan,
-                                             RequestTracer,
-                                             SpanAttributeValue,
-                                             SpanStatusCode)
+from couchbase.common._observability.observability_types import (_ATTR_DISPATCH_SPAN_NAME,
+                                                                 _ATTR_ENCODING_SPAN_NAME,
+                                                                 _ATTR_SERVICE,
+                                                                 _DISP_LOCAL_ID,
+                                                                 _DISP_OPERATION_ID,
+                                                                 _DISP_PEER_ADDRESS,
+                                                                 _DISP_PEER_PORT,
+                                                                 _DISP_SERVER_ADDRESS,
+                                                                 _DISP_SERVER_DURATION,
+                                                                 _DISP_SERVER_PORT)
+from couchbase.common._operations import ServiceType
+from couchbase.common.observability.tracing import (RequestSpan,
+                                                    RequestTracer,
+                                                    SpanAttributes,
+                                                    SpanAttributeValue,
+                                                    SpanStatusCode)
+from couchbase.common.options import ClusterTracingOptions
 
 logger = logging.getLogger('couchbase.threshold')
 
 T = TypeVar('T')
 
-ThresholdLogRecord = Mapping[str, Union[str, int, float]]
+ThresholdLogRecord = Mapping[str, str | int | float]
 
 
 class ThresholdLoggingAttributeName(Enum):
@@ -81,7 +79,6 @@ class IgnoredMultiOpSpan(Enum):
     GetMulti = 'get_multi'
     GetAllReplicasMulti = 'get_all_replicas_multi'
     GetAndLockMulti = 'get_and_lock_multi'
-    GetAndTouchMulti = 'get_and_touch_multi'
     GetAnyReplicaMulti = 'get_any_replica_multi'
     IncrementMulti = 'increment_multi'
     InsertMulti = 'insert_multi'
@@ -147,17 +144,17 @@ _PROCESSED_ATTRIBUTE_KEYS = frozenset({
 class ThresholdLoggingSpanSnapshot:
     """Immutable snapshot of span state for threshold logging."""
     name: str
-    service_type: Optional[ServiceType]
+    service_type: ServiceType | None
     total_duration_ns: int
-    encode_duration_ns: Optional[int]
-    dispatch_duration_ns: Optional[int]
+    encode_duration_ns: int | None
+    dispatch_duration_ns: int | None
     total_dispatch_duration_ns: int
-    server_duration_ns: Optional[int]
+    server_duration_ns: int | None
     total_server_duration_ns: int
-    local_id: Optional[str]
-    operation_id: Optional[str]
-    local_socket: Optional[str]
-    remote_socket: Optional[str]
+    local_id: str | None
+    operation_id: str | None
+    local_socket: str | None
+    remote_socket: str | None
 
 
 class PriorityQueue(Generic[T]):
@@ -171,8 +168,8 @@ class PriorityQueue(Generic[T]):
         which represents all items that exceeded the threshold, not just the top N.
     """
 
-    def __init__(self, max_size: Optional[int] = None) -> None:
-        self._heap: List[Tuple[int, int, T]] = []
+    def __init__(self, max_size: int | None = None) -> None:
+        self._heap: list[tuple[int, int, T]] = []
         self._max_size = max_size or 10
         self._counter = 0
         self._dropped_count = 0
@@ -191,10 +188,10 @@ class PriorityQueue(Generic[T]):
         heappush(self._heap, new_item)
         return True
 
-    def peek(self) -> Optional[T]:
+    def peek(self) -> T | None:
         return self._heap[0][2] if len(self._heap) > 0 else None
 
-    def drain(self) -> Tuple[List[T], int]:
+    def drain(self) -> tuple[list[T], int]:
         # Sort entries by descending priority, then FIFO order (counter ascending)
         # This returns top requests with highest durations first
         sorted_entries = sorted(self._heap, key=lambda e: (-e[0], e[1]))
@@ -209,13 +206,13 @@ class PriorityQueue(Generic[T]):
 
 class ThresholdLoggingServiceReport(TypedDict):
     total_count: int
-    top_requests: List[ThresholdLogRecord]
+    top_requests: list[ThresholdLogRecord]
 
 
 class ThresholdLoggingReporter(Thread):
 
     def __init__(
-            self, *, interval: float = 10, max_size: Optional[int] = 10
+            self, *, interval: float = 10, max_size: int | None = 10
     ) -> None:
         super().__init__()
         self.daemon = True
@@ -242,7 +239,7 @@ class ThresholdLoggingReporter(Thread):
             with self._lock:
                 self._queues[service_type].enqueue(record, total_duration)
 
-    def run(self):
+    def run(self) -> None:
         while not self._finished.is_set():
             if self._finished.wait(self._interval):
                 break
@@ -269,7 +266,7 @@ class ThresholdLoggingReporter(Thread):
 
     def _report(self) -> None:
         with self._lock:
-            report: Mapping[str, ThresholdLoggingServiceReport] = {}
+            report: dict[str, ThresholdLoggingServiceReport] = {}
             for service_type, queue in self._queues.items():
                 items, dropped_count = queue.drain()
                 if items:
@@ -308,39 +305,39 @@ class ThresholdLoggingSpan(RequestSpan):
     def __init__(
         self,
         name: str,
-        parent_span: Optional[ThresholdLoggingSpan] = None,
-        start_time: Optional[int] = None,
-        tracer: Optional[ThresholdLoggingTracer] = None
+        parent_span: ThresholdLoggingSpan | None = None,
+        start_time: int | None = None,
+        tracer: ThresholdLoggingTracer | None = None
     ) -> None:
         self._name = name
         self._parent_span = parent_span
         self._start_time_ns = start_time if start_time is not None else now_ns()
         self._tracer = tracer
-        self._events = {}
+        self._events: dict[str, SpanAttributes | None] = {}
         self._status = SpanStatusCode.UNSET
-        self._end_time_ns: Optional[int] = None
-        self._service_type: Optional[ServiceType] = None
-        self._local_id: Optional[str] = None
-        self._operation_id: Optional[str] = None
-        self._peer_address: Optional[str] = None
-        self._peer_port: Optional[int] = None
-        self._remote_address: Optional[str] = None
-        self._remote_port: Optional[int] = None
-        self._encode_duration_ns: Optional[int] = None
-        self._dispatch_duration_ns: Optional[int] = None
-        self._server_duration_ns: Optional[int] = None
+        self._end_time_ns: int | None = None
+        self._service_type: ServiceType | None = None
+        self._local_id: str | None = None
+        self._operation_id: str | None = None
+        self._peer_address: str | None = None
+        self._peer_port: int | None = None
+        self._remote_address: str | None = None
+        self._remote_port: int | None = None
+        self._encode_duration_ns: int | None = None
+        self._dispatch_duration_ns: int | None = None
+        self._server_duration_ns: int | None = None
         self._total_dispatch_duration_ns = 0
         self._total_encode_duration_ns = 0
         self._total_server_duration_ns = 0
         self._total_duration_ns = 0
-        self._span_snapshot: Optional[ThresholdLoggingSpanSnapshot] = None
+        self._span_snapshot: ThresholdLoggingSpanSnapshot | None = None
 
     @property
     def name(self) -> str:
         return self._name
 
     @property
-    def local_socket(self) -> Optional[str]:
+    def local_socket(self) -> str | None:
         if self._peer_address is not None or self._peer_port is not None:
             address = self._peer_address or ''
             port = self._peer_port or ''
@@ -348,7 +345,7 @@ class ThresholdLoggingSpan(RequestSpan):
         return None
 
     @property
-    def remote_socket(self) -> Optional[str]:
+    def remote_socket(self) -> str | None:
         if self._remote_address is not None or self._remote_port is not None:
             address = self._remote_address or ''
             port = self._remote_port or ''
@@ -357,7 +354,7 @@ class ThresholdLoggingSpan(RequestSpan):
 
     def _propagate_dispatch_duration(self, value: int) -> None:
         """Set dispatch duration on this span and propagate to parent (non-recursive)."""
-        span = self
+        span: ThresholdLoggingSpan | None = self
         while span is not None:
             span._dispatch_duration_ns = value
             span._total_dispatch_duration_ns += value
@@ -365,7 +362,7 @@ class ThresholdLoggingSpan(RequestSpan):
 
     def _propagate_encode_duration(self, value: int) -> None:
         """Set encode duration on this span and propagate to parent (non-recursive)."""
-        span = self
+        span: ThresholdLoggingSpan | None = self
         while span is not None:
             span._encode_duration_ns = value
             span._total_encode_duration_ns += value
@@ -375,12 +372,12 @@ class ThresholdLoggingSpan(RequestSpan):
         if key not in _PROCESSED_ATTRIBUTE_KEYS:
             return
 
-        span = self
+        span: ThresholdLoggingSpan | None = self
         while span is not None:
             if key == _ATTR_SERVICE:
-                span._service_type = ServiceType.from_str(value)
+                span._service_type = ServiceType(value)
             elif key == _DISP_SERVER_DURATION:
-                int_val = int(value)
+                int_val = int(cast(int, value))
                 span._server_duration_ns = int_val
                 span._total_server_duration_ns += int_val
             elif key == _DISP_LOCAL_ID:
@@ -390,11 +387,11 @@ class ThresholdLoggingSpan(RequestSpan):
             elif key == _DISP_PEER_ADDRESS:
                 span._peer_address = str(value)
             elif key == _DISP_PEER_PORT:
-                span._peer_port = int(value)
+                span._peer_port = int(cast(int, value))
             elif key == _DISP_SERVER_ADDRESS:
                 span._remote_address = str(value)
             elif key == _DISP_SERVER_PORT:
-                span._remote_port = int(value)
+                span._remote_port = int(cast(int, value))
             span = span._parent_span
 
     def set_attributes(self, attributes: Mapping[str, SpanAttributeValue]) -> None:
@@ -407,9 +404,9 @@ class ThresholdLoggingSpan(RequestSpan):
         Replaces N separate set_attribute() calls (each walking the parent chain)
         with one pass that processes all keys at every level in one traversal.
         """
-        span = self
+        span: ThresholdLoggingSpan | None = self
         while span is not None:
-            server_duration: Optional[int] = None
+            server_duration: int | None = None
             for key, value in attributes.items():
                 if key == _DISP_SERVER_DURATION:
                     server_duration = int(value)
@@ -427,18 +424,21 @@ class ThresholdLoggingSpan(RequestSpan):
                 elif key == _DISP_SERVER_PORT:
                     span._remote_port = int(value)
                 elif key == _ATTR_SERVICE:
-                    span._service_type = ServiceType.from_str(value)
+                    span._service_type = ServiceType(value)
             if server_duration is not None:
                 span._total_server_duration_ns += server_duration
             span = span._parent_span
 
-    def add_event(self, name: str, value: SpanAttributeValue) -> None:
-        self._events[name] = value
+    def add_event(self,
+                  name: str,
+                  attributes: SpanAttributes | None = None,
+                  timestamp: int | None = None) -> None:
+        self._events[name] = attributes
 
     def set_status(self, status: SpanStatusCode) -> None:
         self._status = status
 
-    def end(self, end_time: Optional[int] = None) -> None:
+    def end(self, end_time: int | None = None) -> None:
         if self._end_time_ns is not None:
             return
 
@@ -486,19 +486,18 @@ class ThresholdLoggingSpan(RequestSpan):
 
 class ThresholdLoggingTracer(RequestTracer):
 
-    def __init__(self, config: Optional[ClusterTracingOptionsBase] = None) -> None:
-        if config is None:
-            config = {}
-        self._emit_interval_ms: int = config.get('threshold_emit_interval', 10000)
-        self._sample_size: int = config.get('threshold_sample_size', 10)
+    def __init__(self, config: ClusterTracingOptions | None = None) -> None:
+        settings: Mapping[str, Any] = config if config is not None else {}
+        self._emit_interval_ms: int = settings.get('threshold_emit_interval', 10000)
+        self._sample_size: int = settings.get('threshold_sample_size', 10)
         self._service_thresholds = {
-            ServiceType.KeyValue: config.get('key_value_threshold', 500),
-            ServiceType.Query: config.get('query_threshold', 1000),
-            ServiceType.Search: config.get('search_threshold', 1000),
-            ServiceType.Analytics: config.get('analytics_threshold', 1000),
-            ServiceType.Management: config.get('management_threshold', 1000),
-            ServiceType.Eventing: config.get('eventing_threshold', 1000),
-            ServiceType.Views: config.get('view_threshold', 1000),
+            ServiceType.KeyValue: settings.get('key_value_threshold', 500),
+            ServiceType.Query: settings.get('query_threshold', 1000),
+            ServiceType.Search: settings.get('search_threshold', 1000),
+            ServiceType.Analytics: settings.get('analytics_threshold', 1000),
+            ServiceType.Management: settings.get('management_threshold', 1000),
+            ServiceType.Eventing: settings.get('eventing_threshold', 1000),
+            ServiceType.Views: settings.get('view_threshold', 1000),
         }
         self._reporter = ThresholdLoggingReporter(interval=self._emit_interval_ms / 1000, max_size=self._sample_size)
         self._reporter.start()
@@ -528,16 +527,20 @@ class ThresholdLoggingTracer(RequestTracer):
     def request_span(
         self,
         name: str,
-        parent_span: Optional[RequestSpan] = None,
-        start_time: Optional[int] = None
+        parent_span: RequestSpan | None = None,
+        start_time: int | None = None
     ) -> RequestSpan:
-        return ThresholdLoggingSpan(name, parent_span=parent_span, start_time=start_time, tracer=self)
+        # Every span this tracer is handed as a parent is one it made.
+        return ThresholdLoggingSpan(name,
+                                    parent_span=cast('ThresholdLoggingSpan | None', parent_span),
+                                    start_time=start_time,
+                                    tracer=self)
 
     def _build_threshold_log_record(self,
                                     snapshot: ThresholdLoggingSpanSnapshot,
-                                    span_total_duration: int,
+                                    span_total_duration: float,
                                     ) -> ThresholdLogRecord:
-        threshold_log_record: ThresholdLogRecord = {
+        threshold_log_record: dict[str, str | int | float] = {
             ThresholdLoggingAttributeName.OperationName.value: snapshot.name,
             ThresholdLoggingAttributeName.TotalDuration.value: span_total_duration
         }

@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import sys
 import time
+from collections.abc import Callable
 
 __all__ = ['now_ns']
 
 
-def _build_now_ns():
+def _build_now_ns() -> Callable[[], int]:
     """Return a callable giving the current wall-clock time in nanoseconds.
 
     Durations here are measured against the wall clock rather than a monotonic clock

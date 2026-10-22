@@ -539,7 +539,7 @@ class ChangePasswordRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.ChangePassword.value
 
     def req_to_dict(self,
@@ -558,7 +558,7 @@ class DropGroupRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.GroupDrop.value
 
 
@@ -569,7 +569,7 @@ class DropUserRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.UserDrop.value
 
 
@@ -578,7 +578,7 @@ class GetAllGroupsRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.GroupGetAll.value
 
 
@@ -588,7 +588,7 @@ class GetAllUsersRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.UserGetAll.value
 
 
@@ -598,7 +598,7 @@ class GetGroupRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.GroupGet.value
 
 
@@ -607,7 +607,7 @@ class GetRolesRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.RoleGetAll.value
 
 
@@ -618,7 +618,7 @@ class GetUserRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.UserGet.value
 
 
@@ -628,7 +628,7 @@ class UpsertGroupRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.GroupUpsert.value
 
 
@@ -639,7 +639,7 @@ class UpsertUserRequest(UserMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return UserMgmtOperationType.UserUpsert.value
 
 

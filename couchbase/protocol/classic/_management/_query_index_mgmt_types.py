@@ -128,7 +128,7 @@ class CreateIndexRequest(QueryIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return QueryIndexMgmtOperationType.QueryIndexCreate.value
 
 
@@ -143,7 +143,7 @@ class DropIndexRequest(QueryIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return QueryIndexMgmtOperationType.QueryIndexDrop.value
 
 
@@ -155,7 +155,7 @@ class GetAllIndexesRequest(QueryIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return QueryIndexMgmtOperationType.QueryIndexGetAll.value
 
 
@@ -167,7 +167,7 @@ class BuildDeferredIndexesRequest(QueryIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return QueryIndexMgmtOperationType.QueryIndexBuildDeferred.value
 
 
@@ -180,7 +180,7 @@ class WatchIndexesRequest(QueryIndexMgmtRequest):
     collection_name: Optional[str] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return 'watch_indexes'
 
 

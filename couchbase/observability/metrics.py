@@ -13,46 +13,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from abc import ABC, abstractmethod
-from typing import Any, Mapping
+"""The `couchbase.observability.metrics` import path.
 
+The declarations live in `couchbase.common.observability.metrics`, which every API shares, and are
+re-exported here.
+"""
 
-class ValueRecorder(ABC):
-    """
-    This is an abstract base class intended to wrap an external recorder implementation, to use withing the
-    python client.  You will want to create a class deriving from this, which implements the :meth:`record_value`
-    method.
-    """
+__all__ = [
+    'Meter',
+    'ValueRecorder',
+]
 
-    @abstractmethod
-    def record_value(self, value: int) -> None:
-        """
-        This method will need to be implemented in derived classes.
-
-        Args:
-            value (int): The value to record.
-
-        """
-        pass
-
-
-class Meter(ABC):
-    """
-    This is an abstract base class intended to wrap an external meter implementation, to use withing the
-    python client.  You will want to create a class deriving from this, which implements the :meth:`value_recorder`
-    method.
-    """
-
-    @abstractmethod
-    def value_recorder(self, name: str, tags: Mapping[str, Any]) -> ValueRecorder:
-        """
-        This method will need to be implemented in derived classes.
-
-        Args:
-            name (int): The name of the recorder.
-            tags (Mapping[str, str]): The tags associated with the recorder.
-
-        Returns:
-            :class:`~couchbase.observability.metrics.ValueRecorder`:
-        """
-        pass
+from couchbase.common.observability.metrics import Meter  # noqa: F401
+from couchbase.common.observability.metrics import ValueRecorder  # noqa: F401

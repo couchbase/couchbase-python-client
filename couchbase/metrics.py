@@ -13,26 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""The `couchbase.metrics` import path, which publishes nothing.
 
-from couchbase.common._supportability import Supportability
-from couchbase.observability.metrics import Meter, ValueRecorder
+The deprecated classes it binds are declared in `couchbase.common._metrics`.
+"""
 
+__all__: list[str] = []
 
-@Supportability.class_deprecated('couchbase.observability.metrics.Meter')
-class CouchbaseMeter(Meter):
-    """
-    .. deprecated:: 4.7.0
-
-        This class is deprecated and will be removed in a future release.  Use :class:`~couchbase.observability.metrics.Meter` instead.
-    """  # noqa: E501
-    pass
-
-
-@Supportability.class_deprecated('couchbase.observability.metrics.ValueRecorder')
-class CouchbaseValueRecorder(ValueRecorder):
-    """
-    .. deprecated:: 4.7.0
-
-        This class is deprecated and will be removed in a future release.  Use :class:`~couchbase.observability.metrics.ValueRecorder` instead.
-    """  # noqa: E501
-    pass
+from couchbase.common._metrics import CouchbaseMeter  # noqa: F401
+from couchbase.common._metrics import CouchbaseValueRecorder  # noqa: F401

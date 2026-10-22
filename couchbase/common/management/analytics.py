@@ -598,7 +598,7 @@ class ConnectLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkConnect.value
 
 
@@ -611,7 +611,7 @@ class CreateDatasetRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsDatasetCreate.value
 
 
@@ -622,7 +622,7 @@ class CreateDataverseRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsDataverseCreate.value
 
 
@@ -636,7 +636,7 @@ class CreateIndexRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsIndexCreate.value
 
 
@@ -646,7 +646,7 @@ class CreateAzureBlobExternalLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkCreateAzureBlobExternalLink.value
 
 
@@ -656,7 +656,7 @@ class CreateCouchbaseRemoteLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkCreateCouchbaseRemoteLink.value
 
 
@@ -666,7 +666,7 @@ class CreateS3ExternalLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkCreateS3ExternalLink.value
 
 
@@ -677,7 +677,7 @@ class DisconnectLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkDisconnect.value
 
 
@@ -689,7 +689,7 @@ class DropDatasetRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsDatasetDrop.value
 
 
@@ -700,7 +700,7 @@ class DropDataverseRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsDataverseDrop.value
 
 
@@ -713,7 +713,7 @@ class DropIndexRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsIndexDrop.value
 
 
@@ -724,7 +724,7 @@ class DropLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkDrop.value
 
 
@@ -733,7 +733,7 @@ class GetAllDatasetsRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsDatasetGetAll.value
 
 
@@ -742,7 +742,7 @@ class GetAllIndexesRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsIndexGetAll.value
 
 
@@ -754,7 +754,7 @@ class GetLinksRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkGetAll.value
 
 
@@ -763,7 +763,7 @@ class GetPendingMutationsRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsGetPendingMutations.value
 
 
@@ -773,7 +773,7 @@ class ReplaceAzureBlobExternalLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkReplaceAzureBlobExternalLink.value
 
 
@@ -783,7 +783,7 @@ class ReplaceCouchbaseRemoteLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkReplaceCouchbaseRemoteLink.value
 
 
@@ -793,7 +793,7 @@ class ReplaceS3ExternalLinkRequest(AnalyticsMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return AnalyticsMgmtOperationType.AnalyticsLinkReplaceS3ExternalLink.value
 
 

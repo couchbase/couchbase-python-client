@@ -38,7 +38,7 @@ class MgmtBaseRequest(ABC):
 
     @property
     @abstractmethod
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         raise NotImplementedError
 
 

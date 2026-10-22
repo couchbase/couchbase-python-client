@@ -1125,7 +1125,7 @@ class DeployFunctionRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingDeployFunction.value
 
 
@@ -1137,7 +1137,7 @@ class DropFunctionRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingDropFunction.value
 
 
@@ -1148,7 +1148,7 @@ class GetAllFunctionsRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingGetAllFunctions.value
 
 
@@ -1160,7 +1160,7 @@ class GetFunctionRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingGetFunction.value
 
 
@@ -1171,7 +1171,7 @@ class GetFunctionsStatusRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingGetStatus.value
 
 
@@ -1183,7 +1183,7 @@ class PauseFunctionRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingPauseFunction.value
 
 
@@ -1195,7 +1195,7 @@ class ResumeFunctionRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingResumeFunction.value
 
 
@@ -1207,7 +1207,7 @@ class UndeployFunctionRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingUndeployFunction.value
 
 
@@ -1219,7 +1219,7 @@ class UpsertFunctionRequest(EventingFunctionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return EventingFunctionMgmtOperationType.EventingUpsertFunction.value
 
 

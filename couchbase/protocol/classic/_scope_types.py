@@ -34,7 +34,7 @@ class AnalyticsQueryRequest:
     num_workers: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return StreamingOperationType.AnalyticsQuery.value
 
 
@@ -45,7 +45,7 @@ class QueryRequest:
     num_workers: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return StreamingOperationType.Query.value
 
 
@@ -58,5 +58,5 @@ class SearchQueryRequest:
     num_workers: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return StreamingOperationType.ViewQuery.value

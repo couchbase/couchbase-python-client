@@ -126,7 +126,7 @@ class AsyncClientAdapter:
             self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
-        self._execute_req(ft, req.op_name, req_dict)
+        self._execute_req(ft, req.binding_method, req_dict)
         return ft
 
     def execute_close_bucket_request(self, bucket_name: str) -> Future[None]:
@@ -152,15 +152,15 @@ class AsyncClientAdapter:
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
-            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
+            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.binding_method, req_dict))
         else:
-            self._execute_req(ft, req.op_name, req_dict)
+            self._execute_req(ft, req.binding_method, req_dict)
         return ft
 
     def execute_cluster_request_sync(self, req: ClusterRequest) -> Any:
         self._ensure_not_closed()
         req_dict = req.req_to_dict()
-        ret = self._execute_req_sync(req.op_name, req_dict)
+        ret = self._execute_req_sync(req.binding_method, req_dict)
         if isinstance(ret, PycbcCoreException):
             raise ErrorMapper.build_exception(ret)
         return ret
@@ -220,9 +220,9 @@ class AsyncClientAdapter:
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
-            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
+            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.binding_method, req_dict))
         else:
-            self._execute_req(ft, req.op_name, req_dict)
+            self._execute_req(ft, req.binding_method, req_dict)
         return ft
 
     def execute_mgmt_request(self,
@@ -248,9 +248,9 @@ class AsyncClientAdapter:
         req_dict = req.req_to_dict(obs_handler=obs_handler, callback=_callback, errback=_errback)
         if not self.connected:
             chained_ft = self._execute_connect_request() if self._connect_ft is None else self._connect_ft
-            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.op_name, req_dict))
+            chained_ft.add_done_callback(partial(self._execute_chained_req, ft, req.binding_method, req_dict))
         else:
-            self._execute_req(ft, req.op_name, req_dict)
+            self._execute_req(ft, req.binding_method, req_dict)
         return ft
 
     async def wait_until_connected(self) -> None:
@@ -273,7 +273,7 @@ class AsyncClientAdapter:
 
     def _execute_chained_req(self,
                              ft: Future[Any],
-                             op_name: str,
+                             binding_method: str,
                              req_dict: Dict[str, Any],
                              chained_future: Future[Any]) -> None:
         if chained_future.cancelled():
@@ -285,7 +285,7 @@ class AsyncClientAdapter:
             ft.set_exception(exc)
             return
 
-        self._execute_req(ft, op_name, req_dict)
+        self._execute_req(ft, binding_method, req_dict)
 
     def _execute_close_connection_request(self) -> Future[None]:
         req = CloseConnectionRequest()
@@ -318,12 +318,12 @@ class AsyncClientAdapter:
                     self._reset_connection()
                     ft.set_result(None)
                     return
-                self._execute_req(ft, req.op_name, req_dict)
+                self._execute_req(ft, req.binding_method, req_dict)
 
             self._connect_ft.add_done_callback(_close_once_connected)
             return ft
 
-        self._execute_req(ft, req.op_name, req_dict)
+        self._execute_req(ft, req.binding_method, req_dict)
         return ft
 
     def _execute_connect_request(self) -> Future[None]:
@@ -339,12 +339,12 @@ class AsyncClientAdapter:
                 self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
         req_dict = self._connect_req.req_to_dict(callback=_callback, errback=_errback)
-        self._execute_req(ft, self._connect_req.op_name, req_dict)
+        self._execute_req(ft, self._connect_req.binding_method, req_dict)
         return ft
 
-    def _execute_req(self, ft: Future[Any], op_name: str, req_dict: Dict[str, Any]) -> None:
+    def _execute_req(self, ft: Future[Any], binding_method: str, req_dict: Dict[str, Any]) -> None:
         try:
-            self._binding_map.op_map[op_name](**req_dict)
+            self._binding_map.op_map[binding_method](**req_dict)
         except KeyError as e:
             msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
             ft.set_exception(InternalSDKException(message=msg))
@@ -358,9 +358,9 @@ class AsyncClientAdapter:
                 excptn = exc_cls(str(e))
                 ft.set_exception(excptn)
 
-    def _execute_req_sync(self, op_name: str, req_dict: Dict[str, Any]) -> Any:
+    def _execute_req_sync(self, binding_method: str, req_dict: Dict[str, Any]) -> Any:
         try:
-            return self._binding_map.op_map[op_name](**req_dict)
+            return self._binding_map.op_map[binding_method](**req_dict)
         except KeyError as e:
             msg = f'KeyError, most likely from op not found in binding_map.  Details: {e}'
             raise InternalSDKException(message=msg) from None

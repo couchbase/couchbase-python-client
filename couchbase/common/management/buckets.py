@@ -465,7 +465,7 @@ class BucketDescribeRequest(BucketMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketMgmtOperationType.BucketDescribe.value
 
 
@@ -475,7 +475,7 @@ class CreateBucketRequest(BucketMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketMgmtOperationType.BucketCreate.value
 
 
@@ -485,7 +485,7 @@ class DropBucketRequest(BucketMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketMgmtOperationType.BucketDrop.value
 
 
@@ -495,7 +495,7 @@ class FlushBucketRequest(BucketMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketMgmtOperationType.BucketFlush.value
 
 
@@ -504,7 +504,7 @@ class GetAllBucketsRequest(BucketMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketMgmtOperationType.BucketGetAll.value
 
 
@@ -514,7 +514,7 @@ class GetBucketRequest(BucketMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketMgmtOperationType.BucketGet.value
 
 
@@ -524,7 +524,7 @@ class UpdateBucketRequest(BucketMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketMgmtOperationType.BucketUpdate.value
 
 

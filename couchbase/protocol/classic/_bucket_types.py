@@ -65,7 +65,7 @@ class CloseBucketRequest(BucketRequest):
     bucket_name: str
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketOperationType.CloseBucket.value
 
 
@@ -74,7 +74,7 @@ class OpenBucketRequest(BucketRequest):
     bucket_name: str
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketOperationType.OpenBucket.value
 
 
@@ -86,7 +86,7 @@ class PingRequest(BucketRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return BucketOperationType.Ping.value
 
 
@@ -97,5 +97,5 @@ class ViewQueryRequest:
     num_workers: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return StreamingOperationType.ViewQuery.value

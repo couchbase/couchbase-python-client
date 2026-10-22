@@ -218,7 +218,7 @@ class CreateCollectionRequest(CollectionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return CollectionMgmtOperationType.CollectionCreate.value
 
 
@@ -229,7 +229,7 @@ class CreateScopeRequest(CollectionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return CollectionMgmtOperationType.ScopeCreate.value
 
 
@@ -241,7 +241,7 @@ class DropCollectionRequest(CollectionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return CollectionMgmtOperationType.CollectionDrop.value
 
 
@@ -252,7 +252,7 @@ class DropScopeRequest(CollectionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return CollectionMgmtOperationType.ScopeDrop.value
 
 
@@ -262,7 +262,7 @@ class GetAllScopesRequest(CollectionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return CollectionMgmtOperationType.ScopeGetAll.value
 
 
@@ -276,7 +276,7 @@ class UpdateCollectionRequest(CollectionMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return CollectionMgmtOperationType.CollectionUpdate.value
 
 

@@ -71,7 +71,8 @@ from couchbase.logic.observability.observability_types import (_ATTR_BUCKET_NAME
                                                                RequestSpanProtocol,
                                                                ServiceType,
                                                                SpanProtocol,
-                                                               WrappedTracer)
+                                                               WrappedTracer,
+                                                               service_type_from_op_type)
 from couchbase.logic.operation_types import DatastructureOperationType, KeyValueMultiOperationType
 from couchbase.observability.tracing import SpanAttributeValue, SpanStatusCode
 
@@ -492,7 +493,7 @@ class ObservableRequestHandlerMeterImpl:
         # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
         # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
         self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type, toggle=op_type_toggle)
-        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or service_type_from_op_type(op_type)
         self._meter = observability_instruments.meter
         self._get_cluster_labels_fn = observability_instruments.get_cluster_labels_fn
         self._start_time = start_time if start_time is not None else now_ns()
@@ -546,7 +547,7 @@ class ObservableRequestHandlerMeterImpl:
         # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
         # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
         self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type)
-        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or service_type_from_op_type(op_type)
         _raw = self._op_name.value
         self._op_name_str = _raw[:-6] if _raw.endswith('_multi') else _raw
         self._start_time = now_ns()
@@ -620,7 +621,7 @@ class ObservableRequestHandlerTracerImpl:
         # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
         # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
         self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type, toggle=op_type_toggle)
-        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or service_type_from_op_type(op_type)
         self._wrapped_tracer = observability_instruments.tracer
         self._get_cluster_labels_fn = observability_instruments.get_cluster_labels_fn
         self._wrapped_span: Optional[WrappedSpan] = None
@@ -733,7 +734,7 @@ class ObservableRequestHandlerTracerImpl:
         # _OP_NAME_FROM_OP_TYPE/_SERVICE_TYPE_FROM_OP_TYPE are only populated w/ KV ops,
         # so we fall back to the from_op_type() methods for all other ops (e.g. streaming and mgmt)
         self._op_name = _OP_NAME_FROM_OP_TYPE.get(op_type) or OpName.from_op_type(op_type)
-        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or ServiceType.from_op_type(op_type)
+        self._service_type = _SERVICE_TYPE_FROM_OP_TYPE.get(op_type) or service_type_from_op_type(op_type)
         self._is_streaming_op = self._op_name.is_streaming_op()
         self._wrapped_span: Optional[WrappedSpan] = None
         self._end_time: Optional[int] = None
@@ -1081,9 +1082,10 @@ class WrappedSpan:
             self._encoding_spans.span.set_attribute(key, value)
 
     def _set_span_attrs(self, **options: Unpack[OpAttributeOptions]) -> None:
-        if self._service_type.is_key_value_service_type():
+        if self._service_type is ServiceType.KeyValue:
             attrs = get_attributes_for_kv_op(self._op_name_str, options.get('collection_details', {}))
-        elif self._service_type.is_http_service_type():
+        elif self._service_type in (ServiceType.Analytics, ServiceType.Eventing, ServiceType.Management,
+                                    ServiceType.Query, ServiceType.Search, ServiceType.Views):
             attrs = get_attributes_for_http_op(self._op_name_str, self._service_type, **options)
 
         for k, v in attrs.items():

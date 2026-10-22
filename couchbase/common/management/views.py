@@ -201,7 +201,7 @@ class DropDesignDocumentRequest(ViewIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ViewIndexMgmtOperationType.ViewIndexDrop.value
 
 
@@ -213,7 +213,7 @@ class GetAllDesignDocumentsRequest(ViewIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ViewIndexMgmtOperationType.ViewIndexGetAll.value
 
 
@@ -225,7 +225,7 @@ class GetDesignDocumentRequest(ViewIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ViewIndexMgmtOperationType.ViewIndexGet.value
 
 
@@ -237,7 +237,7 @@ class UpsertDesignDocumentRequest(ViewIndexMgmtRequest):
     timeout: Optional[int] = None
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return ViewIndexMgmtOperationType.ViewIndexUpsert.value
 
 
@@ -253,7 +253,7 @@ class PublishDesignDocumentRequest:
     design_doc_name: str
 
     @property
-    def op_name(self) -> str:
+    def binding_method(self) -> str:
         return MgmtOperationType.ViewIndexPublish.value
 
 

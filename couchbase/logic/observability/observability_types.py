@@ -15,18 +15,53 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Callable,
-                    Literal,
-                    Mapping,
-                    Optional,
-                    Protocol,
-                    Union,
-                    runtime_checkable)
+from typing import Optional, Union
 
+# BRIDGE: the shared observability names, re-exported for the old request handler.  Removed by
+# PYCBC-2016.
+from couchbase.common._observability.observability_types import _ATTR_BUCKET_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_CLUSTER_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_CLUSTER_UUID  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_COLLECTION_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_DISPATCH_SPAN_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_DURABILITY_LEVEL  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_ENCODING_SPAN_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_ERROR_TYPE  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_METER_OP_DURATION  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_OPERATION_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_QUERY_STATEMENT  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_RESERVED_UNIT  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_RESERVED_UNIT_SECONDS  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_RETRY_COUNT  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_SCOPE_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_SERVICE  # noqa: F401
+from couchbase.common._observability.observability_types import _ATTR_SYSTEM_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _CPP_ATTR_CLUSTER_NAME  # noqa: F401
+from couchbase.common._observability.observability_types import _CPP_ATTR_CLUSTER_UUID  # noqa: F401
+from couchbase.common._observability.observability_types import _CPP_ATTR_RETRY_COUNT  # noqa: F401
+from couchbase.common._observability.observability_types import _DISP_LOCAL_ID  # noqa: F401
+from couchbase.common._observability.observability_types import _DISP_OPERATION_ID  # noqa: F401
+from couchbase.common._observability.observability_types import _DISP_PEER_ADDRESS  # noqa: F401
+from couchbase.common._observability.observability_types import _DISP_PEER_PORT  # noqa: F401
+from couchbase.common._observability.observability_types import _DISP_SERVER_ADDRESS  # noqa: F401
+from couchbase.common._observability.observability_types import _DISP_SERVER_DURATION  # noqa: F401
+from couchbase.common._observability.observability_types import _DISP_SERVER_PORT  # noqa: F401
+from couchbase.common._observability.observability_types import CppOpAttributeName  # noqa: F401
+from couchbase.common._observability.observability_types import DispatchAttributeName  # noqa: F401
+from couchbase.common._observability.observability_types import ExceptionName  # noqa: F401
+from couchbase.common._observability.observability_types import LegacySpanProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import LegacyTracerProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import MeterProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import ObservabilityInstruments  # noqa: F401
+from couchbase.common._observability.observability_types import OpAttributeName  # noqa: F401
+from couchbase.common._observability.observability_types import RequestSpanProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import RequestTracerProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import SpanProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import TracerProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import ValueRecorderProtocol  # noqa: F401
+from couchbase.common._observability.observability_types import WrappedTracer  # noqa: F401
+from couchbase.common._operations import ServiceType  # noqa: F401
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.operation_types import (AnalyticsMgmtOperationType,
                                              BucketMgmtOperationType,
@@ -42,72 +77,6 @@ from couchbase.logic.operation_types import (AnalyticsMgmtOperationType,
                                              UserMgmtOperationType,
                                              ViewIndexMgmtOperationType)
 
-if TYPE_CHECKING:
-    from couchbase.logic.observability.handler import (ObservableRequestHandlerNoOpMeterImpl,
-                                                       ObservableRequestHandlerNoOpTracerImpl)
-
-
-@runtime_checkable
-class LegacySpanProtocol(Protocol):
-
-    def set_attribute(self, name, value: Any) -> None: ...
-
-    def finish(self) -> None: ...
-
-
-@runtime_checkable
-class LegacyTracerProtocol(Protocol):
-
-    def start_span(self,
-                   name: str,
-                   parent: Optional[LegacySpanProtocol] = None,
-                   start_time: Optional[int] = None) -> LegacySpanProtocol: ...
-
-
-@runtime_checkable
-class RequestSpanProtocol(Protocol):
-
-    @property
-    def name(self) -> str: ...
-
-    def set_attribute(self, key: str, value: Any) -> None: ...
-
-    def set_attributes(self, attributes: Mapping[str, Any]) -> None: ...
-
-    def add_event(self, name: str, value: Any) -> None: ...
-
-    def set_status(self, status: Any) -> None: ...
-
-    def end(self, timestamp: Optional[int]) -> None: ...
-
-
-@runtime_checkable
-class RequestTracerProtocol(Protocol):
-
-    def request_span(self,
-                     name: str,
-                     parent_span: Optional[RequestSpanProtocol] = None,
-                     start_time: Optional[int] = None
-                     ) -> RequestSpanProtocol:
-        ...
-
-
-SpanProtocol = Union[LegacySpanProtocol, RequestSpanProtocol]
-TracerProtocol = Union[LegacyTracerProtocol, RequestTracerProtocol]
-
-
-@runtime_checkable
-class ValueRecorderProtocol(Protocol):
-
-    def record_value(self, value: int) -> None: ...
-
-
-@runtime_checkable
-class MeterProtocol(Protocol):
-
-    def value_recorder(self, name: str, tags: Mapping[str, str]) -> ValueRecorderProtocol: ...
-
-
 OpType = Union[AnalyticsMgmtOperationType,
                BucketMgmtOperationType,
                CollectionMgmtOperationType,
@@ -121,167 +90,6 @@ OpType = Union[AnalyticsMgmtOperationType,
                StreamingOperationType,
                UserMgmtOperationType,
                ViewIndexMgmtOperationType]
-
-
-@dataclass
-class WrappedTracer:
-    tracer: TracerProtocol
-    is_legacy: bool
-
-
-@dataclass
-class ObservabilityInstruments:
-    tracer: WrappedTracer
-    meter: MeterProtocol
-    get_cluster_labels_fn: Optional[Callable[[], Mapping[str, str]]] = None
-    # set to True when both tracer and meter or no-op
-    is_noop: bool = False
-    # Populated on first use by ObservableRequestHandler.  Literal[False] rather than bool is what
-    # lets `is not False` narrow to the impl type, leaving no Literal[True] arm behind.
-    _cached_noop_tracer_impl: Union[ObservableRequestHandlerNoOpTracerImpl, Literal[False], None] = field(
-        default=None, repr=False, compare=False)
-    _cached_noop_meter_impl: Union[ObservableRequestHandlerNoOpMeterImpl, Literal[False], None] = field(
-        default=None, repr=False, compare=False)
-
-
-class ServiceType(Enum):
-    Analytics = 'analytics'
-    Eventing = 'eventing'
-    KeyValue = 'kv'
-    Management = 'management'
-    Query = 'query'
-    Search = 'search'
-    Transactions = 'transactions'
-    Views = 'views'
-
-    def is_http_service_type(self) -> bool:
-        return (self.is_streaming_service_type()
-                or self is ServiceType.Eventing
-                or self is ServiceType.Management)
-
-    def is_key_value_service_type(self) -> bool:
-        return self is ServiceType.KeyValue
-
-    def is_streaming_service_type(self) -> bool:
-        return (self is ServiceType.Analytics
-                or self is ServiceType.Query
-                or self is ServiceType.Search
-                or self is ServiceType.Views)
-
-    def is_txn_service_type(self) -> bool:
-        return self is ServiceType.Transactions
-
-    @classmethod
-    def from_str(cls, service_type: str) -> ServiceType:
-        return ServiceType(service_type)
-
-    @classmethod
-    def from_op_type(cls, opt_type: OpType) -> ServiceType:  # noqa: C901
-        if isinstance(opt_type, (KeyValueMultiOperationType, KeyValueOperationType, DatastructureOperationType)):
-            return ServiceType.KeyValue
-        elif isinstance(opt_type, StreamingOperationType):
-            if opt_type == StreamingOperationType.AnalyticsQuery:
-                return ServiceType.Analytics
-            elif opt_type == StreamingOperationType.Query:
-                return ServiceType.Query
-            elif opt_type == StreamingOperationType.SearchQuery:
-                return ServiceType.Search
-            elif opt_type == StreamingOperationType.ViewQuery:
-                return ServiceType.Views
-        elif isinstance(opt_type, AnalyticsMgmtOperationType):
-            return ServiceType.Analytics
-        elif isinstance(opt_type, EventingFunctionMgmtOperationType):
-            return ServiceType.Eventing
-        # MgmtOperationType is a special case for Python-only composite operations
-        elif isinstance(opt_type, MgmtOperationType):
-            if opt_type is MgmtOperationType.ViewIndexPublish:
-                return ServiceType.Views
-            return ServiceType.Query
-        elif isinstance(opt_type, QueryIndexMgmtOperationType):
-            return ServiceType.Query
-        elif isinstance(opt_type, SearchIndexMgmtOperationType):
-            return ServiceType.Search
-        elif isinstance(opt_type, ViewIndexMgmtOperationType):
-            return ServiceType.Views
-        elif isinstance(opt_type, (BucketMgmtOperationType,
-                                   CollectionMgmtOperationType,
-                                   UserMgmtOperationType)):
-            return ServiceType.Management
-
-        raise InvalidArgumentException(f'Unsupported operation type {opt_type}')
-
-
-class OpAttributeName(Enum):
-    BucketName = 'db.namespace'
-    ClusterName = 'couchbase.cluster.name'
-    ClusterUUID = 'couchbase.cluster.uuid'
-    CollectionName = 'couchbase.collection.name'
-    DispatchSpanName = 'dispatch_to_server'
-    DurabilityLevel = 'couchbase.durability'
-    EncodingSpanName = 'request_encoding'
-    ErrorType = 'error.type'
-    MeterOperationDuration = 'db.client.operation.duration'
-    OperationName = 'db.operation.name'
-    QueryStatement = 'db.query.text'
-    ReservedUnit = '__unit'
-    ReservedUnitSeconds = 's'
-    RetryCount = 'couchbase.retries'
-    ScopeName = 'couchbase.scope.name'
-    Service = 'couchbase.service'
-    SystemName = 'db.system.name'
-
-
-# OpAttributeName cached values
-_ATTR_BUCKET_NAME = OpAttributeName.BucketName.value
-_ATTR_CLUSTER_NAME = OpAttributeName.ClusterName.value
-_ATTR_CLUSTER_UUID = OpAttributeName.ClusterUUID.value
-_ATTR_COLLECTION_NAME = OpAttributeName.CollectionName.value
-_ATTR_DISPATCH_SPAN_NAME = OpAttributeName.DispatchSpanName.value
-_ATTR_DURABILITY_LEVEL = OpAttributeName.DurabilityLevel.value
-_ATTR_ENCODING_SPAN_NAME = OpAttributeName.EncodingSpanName.value
-_ATTR_ERROR_TYPE = OpAttributeName.ErrorType.value
-_ATTR_METER_OP_DURATION = OpAttributeName.MeterOperationDuration.value
-_ATTR_OPERATION_NAME = OpAttributeName.OperationName.value
-_ATTR_QUERY_STATEMENT = OpAttributeName.QueryStatement.value
-_ATTR_RESERVED_UNIT = OpAttributeName.ReservedUnit.value
-_ATTR_RESERVED_UNIT_SECONDS = OpAttributeName.ReservedUnitSeconds.value
-_ATTR_RETRY_COUNT = OpAttributeName.RetryCount.value
-_ATTR_SCOPE_NAME = OpAttributeName.ScopeName.value
-_ATTR_SERVICE = OpAttributeName.Service.value
-_ATTR_SYSTEM_NAME = OpAttributeName.SystemName.value
-
-
-class CppOpAttributeName(Enum):
-    ClusterName = 'cluster_name'
-    ClusterUUID = 'cluster_uuid'
-    RetryCount = 'retries'
-
-
-# CppOpAttributeName cached values
-_CPP_ATTR_CLUSTER_NAME = CppOpAttributeName.ClusterName.value
-_CPP_ATTR_CLUSTER_UUID = CppOpAttributeName.ClusterUUID.value
-_CPP_ATTR_RETRY_COUNT = CppOpAttributeName.RetryCount.value
-
-
-class DispatchAttributeName(Enum):
-    LocalId = 'couchbase.local_id'
-    NetworkTransport = 'network.transport'
-    OperationId = 'couchbase.operation_id'
-    PeerAddress = 'network.peer.address'
-    PeerPort = 'network.peer.port'
-    ServerAddress = 'server.address'
-    ServerDuration = 'couchbase.server_duration'
-    ServerPort = 'server.port'
-
-
-# DispatchAttributeName cached values
-_DISP_LOCAL_ID = DispatchAttributeName.LocalId.value
-_DISP_OPERATION_ID = DispatchAttributeName.OperationId.value
-_DISP_PEER_ADDRESS = DispatchAttributeName.PeerAddress.value
-_DISP_PEER_PORT = DispatchAttributeName.PeerPort.value
-_DISP_SERVER_ADDRESS = DispatchAttributeName.ServerAddress.value
-_DISP_SERVER_DURATION = DispatchAttributeName.ServerDuration.value
-_DISP_SERVER_PORT = DispatchAttributeName.ServerPort.value
 
 
 class OpName(Enum):
@@ -532,90 +340,37 @@ for _grp in (KeyValueOperationType, KeyValueMultiOperationType, DatastructureOpe
 del _grp, _op, _op_name
 
 
-class ExceptionName(Enum):
-    AmbiguousTimeoutException = 'AmbiguousTimeout'
-    AnalyticsLinkExistsException = 'LinkExists'
-    AnalyticsLinkNotFoundException = 'LinkNotFound'
-    AuthenticationException = 'AuthenticationFailure'
-    BucketAlreadyExistsException = 'BucketExists'
-    BucketDoesNotExistException = 'BucketNotFound'
-    BucketNotFlushableException = 'BucketNotFlushable'
-    BucketNotFoundException = 'BucketNotFound'
-    CASMismatchException = 'CasMismatch'
-    CasMismatchException = 'CasMismatch'
-    CollectionAlreadyExistsException = 'CollectionExists'
-    CollectionNotFoundException = 'CollectionNotFound'
-    CryptoException = 'Crypto'
-    CryptoKeyNotFoundException = 'CryptoKeyNotFound'
-    DatasetAlreadyExistsException = 'DatasetExists'
-    DatasetNotFoundException = 'DatasetNotFound'
-    DataverseAlreadyExistsException = 'DataverseExists'
-    DataverseNotFoundException = 'DataverseNotFound'
-    DecrypterAlreadyExistsException = 'DecrypterExists'
-    DecrypterNotFoundException = 'DecrypterNotFound'
-    DecryptionFailureException = 'DecryptionFailure'
-    DeltaInvalidException = 'DeltaInvalid'
-    DesignDocumentNotFoundException = 'DesignDocumentNotFound'
-    DocumentExistsException = 'DocumentExists'
-    DocumentLockedException = 'DocumentLocked'
-    DocumentNotFoundException = 'DocumentNotFound'
-    DocumentNotJsonException = 'DocumentNotJson'
-    DocumentNotLockedException = 'DocumentNotLocked'
-    DocumentUnretrievableException = 'DocumentUnretrievable'
-    DurabilityImpossibleException = 'DurabilityImpossible'
-    DurabilityInvalidLevelException = 'DurabilityLevelNotAvailable'
-    DurabilitySyncWriteAmbiguousException = 'DurabilityAmbiguous'
-    DurabilitySyncWriteInProgressException = 'DurableWriteInProgress'
-    EncrypterAlreadyExistsException = 'EncrypterExists'
-    EncrypterNotFoundException = 'EncrypterNotFound'
-    EncryptionFailureException = 'EncryptionFailure'
-    EventingFunctionAlreadyDeployedException = 'EventingFunctionDeployed'
-    EventingFunctionCollectionNotFoundException = 'CollectionNotFound'
-    EventingFunctionCompilationFailureException = 'EventingFunctionCompilationFailure'
-    EventingFunctionIdenticalKeyspaceException = 'EventingFunctionIdenticalKeyspace'
-    EventingFunctionNotBootstrappedException = 'EventingFunctionNotBootstrapped'
-    EventingFunctionNotDeployedException = 'EventingFunctionNotDeployed'
-    EventingFunctionNotFoundException = 'EventingFunctionNotFound'
-    EventingFunctionNotUnDeployedException = 'EventingFunctionDeployed'
-    FeatureNotFoundException = 'FeatureNotAvailable'
-    FeatureUnavailableException = 'FeatureNotAvailable'
-    GroupNotFoundException = 'GroupNotFound'
-    InternalServerFailureException = 'InternalServerFailure'
-    InvalidArgumentException = 'InvalidArgument'
-    InvalidCipherTextException = 'InvalidCiphertext'
-    InvalidCryptoKeyException = 'InvalidCryptoKey'
-    InvalidIndexException = 'InvalidIndex'
-    InvalidValueException = 'InvalidValue'
-    KeyspaceNotFoundException = 'KeyspaceNotFound'
-    NumberTooBigException = 'NumberTooBig'
-    ParsingFailedException = 'ParsingFailure'
-    PathExistsException = 'PathExists'
-    PathInvalidException = 'PathInvalid'
-    PathMismatchException = 'PathMismatch'
-    PathNotFoundException = 'PathNotFound'
-    PathTooBigException = 'PathTooBig'
-    PathTooDeepException = 'PathTooDeep'
-    QueryIndexAlreadyExistsException = 'IndexExists'
-    QueryIndexNotFoundException = 'IndexNotFound'
-    QuotaLimitedException = 'QuotaLimited'
-    RateLimitedException = 'RateLimited'
-    RequestCanceledException = 'RequestCanceled'
-    ScopeAlreadyExistsException = 'ScopeExists'
-    ScopeNotFoundException = 'ScopeNotFound'
-    SearchIndexNotFoundException = 'IndexNotFound'
-    ServiceUnavailableException = 'ServiceNotAvailable'
-    SubdocCantInsertValueException = 'ValueInvalid'
-    SubdocPathMismatchException = 'PathMismatch'
-    TemporaryFailException = 'TemporaryFailure'
-    TimeoutException = 'Timeout'
-    UnAmbiguousTimeoutException = 'UnambiguousTimeout'
-    UserNotFoundException = 'UserNotFound'
-    ValueFormatException = 'ValueFormat'
-    ValueTooDeepException = 'ValueTooDeep'
+# The old operation types name their service through this; the members are the shared ServiceType's.
+def service_type_from_op_type(opt_type: OpType) -> ServiceType:  # noqa: C901
+    if isinstance(opt_type, (KeyValueMultiOperationType, KeyValueOperationType, DatastructureOperationType)):
+        return ServiceType.KeyValue
+    elif isinstance(opt_type, StreamingOperationType):
+        if opt_type == StreamingOperationType.AnalyticsQuery:
+            return ServiceType.Analytics
+        elif opt_type == StreamingOperationType.Query:
+            return ServiceType.Query
+        elif opt_type == StreamingOperationType.SearchQuery:
+            return ServiceType.Search
+        elif opt_type == StreamingOperationType.ViewQuery:
+            return ServiceType.Views
+    elif isinstance(opt_type, AnalyticsMgmtOperationType):
+        return ServiceType.Analytics
+    elif isinstance(opt_type, EventingFunctionMgmtOperationType):
+        return ServiceType.Eventing
+    # MgmtOperationType is a special case for Python-only composite operations
+    elif isinstance(opt_type, MgmtOperationType):
+        if opt_type is MgmtOperationType.ViewIndexPublish:
+            return ServiceType.Views
+        return ServiceType.Query
+    elif isinstance(opt_type, QueryIndexMgmtOperationType):
+        return ServiceType.Query
+    elif isinstance(opt_type, SearchIndexMgmtOperationType):
+        return ServiceType.Search
+    elif isinstance(opt_type, ViewIndexMgmtOperationType):
+        return ServiceType.Views
+    elif isinstance(opt_type, (BucketMgmtOperationType,
+                               CollectionMgmtOperationType,
+                               UserMgmtOperationType)):
+        return ServiceType.Management
 
-    @staticmethod
-    def from_exception(exception: Exception) -> Optional[ExceptionName]:
-        try:
-            return ExceptionName[exception.__class__.__name__]
-        except KeyError:
-            return None
+    raise InvalidArgumentException(f'Unsupported operation type {opt_type}')

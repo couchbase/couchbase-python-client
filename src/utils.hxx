@@ -454,6 +454,17 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
   extract_field<std::chrono::milliseconds>(
     pyObj_options, "app_telemetry_ping_timeout", options.app_telemetry_ping_timeout);
 
+  // Orphan reporting options (nested dict, emit interval in milliseconds)
+  PyObject* pyObj_orphan_opts = PyDict_GetItemString(pyObj_options, "orphan_reporting_options");
+  if (pyObj_orphan_opts && PyDict_Check(pyObj_orphan_opts)) {
+    extract_bool_field(
+      pyObj_orphan_opts, "enable_orphan_reporting", options.enable_orphan_reporting);
+    extract_field<std::size_t>(
+      pyObj_orphan_opts, "orphan_sample_size", options.orphan_options.sample_size);
+    extract_field<std::chrono::milliseconds>(
+      pyObj_orphan_opts, "orphan_emit_interval", options.orphan_options.emit_interval);
+  }
+
   // Timeout options (nested dict with durations in microseconds)
   PyObject* pyObj_timeout_opts = PyDict_GetItemString(pyObj_options, "timeout_options");
   // we parse srv timeout later, but go ahead and pull from timeout options (if available)
@@ -541,6 +552,18 @@ cluster_options_to_py(const couchbase::core::cluster_options& opts,
     timeout_dict, "config_idle_redial_timeout", opts.config_idle_redial_timeout);
   PyDict_SetItemString(dict, "timeout_options", timeout_dict);
   Py_DECREF(timeout_dict);
+
+  PyObject* orphan_dict = PyDict_New();
+  if (orphan_dict == nullptr) {
+    Py_DECREF(dict);
+    return nullptr;
+  }
+  add_bool_field(orphan_dict, "enable_orphan_reporting", opts.enable_orphan_reporting);
+  add_field<std::size_t>(orphan_dict, "orphan_sample_size", opts.orphan_options.sample_size);
+  add_field<std::chrono::milliseconds>(
+    orphan_dict, "orphan_emit_interval", opts.orphan_options.emit_interval);
+  PyDict_SetItemString(dict, "orphan_reporting_options", orphan_dict);
+  Py_DECREF(orphan_dict);
 
   // DNS configuration
   add_bool_field(dict, "enable_dns_srv", opts.enable_dns_srv);
