@@ -118,7 +118,6 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["couchbase.common._interfaces.*",
           "couchbase.common.replica_reads",
-          "couchbase.common.analytics", "couchbase.common.n1ql", "couchbase.common.views",
           "couchbase.common.search", "couchbase.common.search_scoring", "couchbase.common.vector_search",
           "couchbase.protocol.classic._transactions_impl", "acouchbase.protocol.classic._transactions_impl"]
 ignore_missing_imports = true

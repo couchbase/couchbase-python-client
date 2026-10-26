@@ -33,6 +33,8 @@ from couchbase.common.result import (_ClusterInfoBucketRecord,
                                      _DiagnosticsRecord,
                                      _PingRecord,
                                      _ServerVersionRecord)
+from couchbase.common.views import ViewRow
+from couchbase.serializer import Serializer
 
 if TYPE_CHECKING:
     from couchbase.protocol.classic._pycbc_core.binding_cpp_types import (CppClusterDescribeResponse,
@@ -42,7 +44,8 @@ if TYPE_CHECKING:
                                                                           CppEndpointDiagInfo,
                                                                           CppEndpointPingInfo,
                                                                           CppPingResult,
-                                                                          CppRangeScanItem)
+                                                                          CppRangeScanItem,
+                                                                          CppViewRow)
 
     class _CoreScanItem(TypedDict, total=False):
         """What the binding writes for one item of a range scan (``src/result.cxx``)."""
@@ -126,3 +129,13 @@ def _cluster_info_from_core(raw: CppClusterDescribeResponse) -> _ClusterInfoReco
     return _ClusterInfoRecord(nodes=tuple(_cluster_info_node_from_core(n) for n in info.get('nodes') or ()),
                               buckets=tuple(_cluster_info_bucket_from_core(b) for b in info.get('buckets') or ()),
                               services=frozenset(info.get('services') or ()))
+
+
+def _view_row_from_core(raw: CppViewRow, serializer: Serializer) -> ViewRow:
+    """Views sends a row's key and value as JSON text, and a reduced row has no id.
+
+    Both are what the view's map function emitted, so the request's serializer reads them.
+    """
+    return ViewRow(key=serializer.deserialize(raw['key'].encode('utf-8')) if 'key' in raw else None,
+                   id=raw.get('id'),
+                   value=serializer.deserialize(raw['value'].encode('utf-8')) if 'value' in raw else None)

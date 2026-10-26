@@ -261,6 +261,7 @@ not_generated:
   cluster_free:
     - couchbase/tests/analytics_params_t.py
     - couchbase/tests/bucketmgmt_bucket_settings_t.py
+    - couchbase/tests/classic_streaming_t.py
     - couchbase/tests/classic_wire_t.py
     - couchbase/tests/cluster_req_builder_t.py
     - couchbase/tests/collection_req_builder_t.py
@@ -275,6 +276,7 @@ not_generated:
     - couchbase/tests/query_params_t.py
     - couchbase/tests/scope_req_builder_t.py
     - couchbase/tests/search_params_t.py
+    - couchbase/tests/streaming_rows_t.py
     - couchbase/tests/threshold_logging_t.py
     - couchbase/tests/view_result_types_t.py
     - couchbase/tests/viewmgmt_view_types_t.py
@@ -292,11 +294,13 @@ not_generated:
     - couchbase/tests/tracing_binary_multi_t.py
     - couchbase/tests/tracing_kv_multi_t.py
 
-  # stream_next is driven through a stand-in for the request object rather than through a
-  # server, and the stand-in is API-specific.  acouchbase carries a hand-written counterpart,
-  # not a sidecar, there being no generated file for a sidecar to merge into.
+  # Driven through a stand-in rather than through a server, and the stand-in is API-specific: the
+  # request object stream_next reads, and the row iterators' executor.  acouchbase carries a
+  # hand-written counterpart to each, not a sidecar, there being no generated file for a sidecar
+  # to merge into.
   api_specific_fake:
     - couchbase/tests/streaming_helpers_t.py
+    - couchbase/tests/streaming_iterators_t.py
 
   # Both trees have a connection lifecycle and neither can be written from the other's spelling
   # of it: close_bucket is execute_close_bucket_request under acouchbase and returns a future,
