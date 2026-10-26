@@ -72,8 +72,10 @@ class ViewTypesUnitTests:
 
         assert ddoc.name == DDOC_NAME
         assert ddoc.namespace is DesignDocumentNamespace.PRODUCTION
-        assert ddoc.get_view('by_id').map == MAP_FN
-        assert ddoc.get_view('by_id').reduce == '_count'
+        view = ddoc.get_view('by_id')
+        assert view is not None
+        assert view.map == MAP_FN
+        assert view.reduce == '_count'
 
     def test_design_document_name_is_stored_unprefixed(self) -> None:
         # The server stores the name with a `_design/` prefix and, for a development document,

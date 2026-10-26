@@ -24,8 +24,6 @@ from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.result import PingResult, ViewResult
 from txcouchbase.collection import Collection
 from txcouchbase.management.collections import CollectionManager
@@ -119,11 +117,10 @@ class Bucket:
         return self._impl.ping_deferred(opts, **kwargs)
 
     def view_query(self,
-                   design_doc,      # type: str
-                   view_name,       # type: str
-                   *view_options,   # type: ViewOptions
-                   **kwargs
-                   ) -> Deferred[ViewResult]:
+                   design_doc: str,
+                   view_name: str,
+                   view_options: ViewOptions | None = None,
+                   **kwargs: Any) -> Deferred[ViewResult]:
         """Executes a View query against the bucket.
 
         .. deprecated:: 4.6.0
@@ -132,15 +129,26 @@ class Bucket:
             Views are not compatible with the Magma storage engine. Instead of views, use indexes and queries using the
             Index Service (GSI) and the Query Service (SQL++).
 
+        .. note::
+
+            The query is sent when this is called, and the Deferred fires once the core has buffered
+            the response, so iterating the :class:`~couchbase.result.ViewResult` does not block the reactor.
+
+        .. seealso::
+            * :class:`~.management.ViewIndexManager`: for how to manage query indexes
+
+        Args:
+            design_doc (str): The name of the design document containing the view to execute.
+            view_name (str): The name of the view to execute.
+            view_options (:class:`~.options.ViewOptions`): Optional parameters for the view query operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~.options.ViewOptions`
+
+        Returns:
+            Deferred[:class:`~.result.ViewResult`]: An instance of a :class:`~.result.ViewResult` which
+            provides access to iterate over the query results and access metadata about the query.
         """
-        op_type = StreamingOperationType.ViewQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_view_query_request(design_doc,
-                                                                  view_name,
-                                                                  obs_handler,
-                                                                  *view_options,
-                                                                  **kwargs)
-        return self._impl.view_query_deferred(req)
+        return self._impl.view_query_deferred(design_doc, view_name, view_options, **kwargs)
 
     def collections(self) -> CollectionManager:
         """

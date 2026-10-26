@@ -553,7 +553,7 @@ WIRES: dict[str, WireBlock] = {
     }, by_builder=True),
     'ViewOptions': WireBlock({
         'timeout': TIMEOUT,
-        'scan_consistency': replace(SCAN_CONSISTENCY, transform=None),
+        'scan_consistency': replace(SCAN_CONSISTENCY, name='consistency', transform=None),
         'startkey': STARTKEY,
         'endkey': ENDKEY,
         'startkey_docid': STARTKEY_DOCID,

@@ -23,12 +23,12 @@ from couchbase.logic.operation_types import ViewIndexMgmtOperationType
 from couchbase.protocol.classic._management._view_index_mgmt_req_builder import ViewIndexMgmtRequestBuilder
 
 if TYPE_CHECKING:
-    from couchbase.common.management.views import (DropDesignDocumentRequest,
-                                                   GetAllDesignDocumentsRequest,
-                                                   GetDesignDocumentRequest,
-                                                   PublishDesignDocumentRequest,
-                                                   UpsertDesignDocumentRequest)
     from couchbase.protocol.classic._client_adapter import ClientAdapter
+    from couchbase.protocol.classic._management._view_index_mgmt_types import (DropDesignDocumentRequest,
+                                                                               GetAllDesignDocumentsRequest,
+                                                                               GetDesignDocumentRequest,
+                                                                               PublishDesignDocumentRequest,
+                                                                               UpsertDesignDocumentRequest)
 
 
 class ViewIndexMgmtImpl:

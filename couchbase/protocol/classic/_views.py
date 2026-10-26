@@ -124,7 +124,7 @@ class ViewQuery:
     @property
     def consistency(self) -> ViewScanConsistency:
         value = self._params.get(
-            'scan_consistency', None
+            'consistency', None
         )
         if value is None:
             return ViewScanConsistency.NOT_BOUNDED
@@ -137,9 +137,9 @@ class ViewQuery:
     @consistency.setter
     def consistency(self, value: ViewScanConsistency | str) -> None:
         if isinstance(value, ViewScanConsistency):
-            self.set_option('scan_consistency', value.to_str())
+            self.set_option('consistency', value.to_str())
         elif isinstance(value, str) and value in [sc.value for sc in ViewScanConsistency]:
-            self.set_option('scan_consistency', ViewScanConsistency(value).to_str())
+            self.set_option('consistency', ViewScanConsistency(value).to_str())
         else:
             raise InvalidArgumentException(message=("Expected consistency to be either of type "
                                                     "ViewScanConsistency or str representation "

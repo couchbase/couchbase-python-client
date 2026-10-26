@@ -111,8 +111,11 @@ class ViewOrdering(Enum):
     def from_str(cls, value: str) -> ViewOrdering:
         if value == 'descending':
             return cls.DESCENDING
-        else:
+        elif value == 'ascending':
             return cls.ASCENDING
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid ViewOrdering option. "
+                     "Expected str representation of type ViewOrdering."))
 
 
 class ViewErrorMode(Enum):
@@ -124,9 +127,10 @@ class ViewErrorMode(Enum):
 
     @classmethod
     def from_str(cls, value: str) -> ViewErrorMode:
-        if value == 'resume':
+        if value in ['resume', 'continue']:
             return cls.CONTINUE
-        elif value == 'continue':
-            return cls.CONTINUE
-        else:
+        elif value == 'stop':
             return cls.STOP
+        raise InvalidArgumentException(
+            message=(f"{value} is not a valid ViewErrorMode option. "
+                     "Expected str representation of type ViewErrorMode."))

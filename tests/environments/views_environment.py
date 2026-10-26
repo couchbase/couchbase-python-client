@@ -110,8 +110,7 @@ class ViewsEnvironment:
 
     @staticmethod
     def _validate_metadata(result: ViewResult, expected_count: int) -> None:
-        meta = result.metadata()
-        cb_assert_isinstance(meta, ViewMetaData, what='view result metadata')
+        meta = cb_assert_isinstance(result.metadata(), ViewMetaData, what='view result metadata')
         # total_rows() counts what the view holds, not what this query returned, so it stays
         # `>=` even where the row count itself is exact: most queries here carry a key filter.
         total_rows = meta.total_rows()

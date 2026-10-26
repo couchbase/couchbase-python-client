@@ -27,11 +27,11 @@ from couchbase.logic.observability import ObservabilityInstruments, ObservableRe
 
 if TYPE_CHECKING:
     from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.common.management.views import (DropDesignDocumentRequest,
-                                                   GetAllDesignDocumentsRequest,
-                                                   GetDesignDocumentRequest,
-                                                   PublishDesignDocumentRequest,
-                                                   UpsertDesignDocumentRequest)
+    from couchbase.protocol.classic._management._view_index_mgmt_types import (DropDesignDocumentRequest,
+                                                                               GetAllDesignDocumentsRequest,
+                                                                               GetDesignDocumentRequest,
+                                                                               PublishDesignDocumentRequest,
+                                                                               UpsertDesignDocumentRequest)
 
 
 class TxViewIndexMgmtImpl(AsyncViewIndexMgmtImpl):

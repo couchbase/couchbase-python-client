@@ -25,10 +25,9 @@ from typing import TYPE_CHECKING, Any
 from acouchbase.collection import Collection
 from acouchbase.management.collections import CollectionManager
 from acouchbase.management.views import ViewIndexManager
+from acouchbase.result import AsyncViewResult
 from acouchbase.scope import Scope
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.result import PingResult, ViewResult
+from couchbase.result import PingResult
 
 if TYPE_CHECKING:
     from acouchbase.cluster import AsyncCluster
@@ -144,11 +143,10 @@ class AsyncBucket:
         return await self._impl.ping(opts, **kwargs)
 
     def view_query(self,
-                   design_doc,      # type: str
-                   view_name,       # type: str
-                   *view_options,   # type: ViewOptions
-                   **kwargs         # type: Any
-                   ) -> ViewResult:
+                   design_doc: str,
+                   view_name: str,
+                   view_options: ViewOptions | None = None,
+                   **kwargs: Any) -> AsyncViewResult:
         """Executes a View query against the bucket.
 
         .. deprecated:: 4.6.0
@@ -160,7 +158,7 @@ class AsyncBucket:
         .. note::
 
             The query is executed lazily in that it is executed once iteration over the
-            :class:`~.result.ViewResult` begins.
+            :class:`~.result.AsyncViewResult` begins.
 
         .. seealso::
             * :class:`~.management.ViewIndexManager`: for how to manage query indexes
@@ -169,17 +167,17 @@ class AsyncBucket:
             design_doc (str): The name of the design document containing the view to execute.
             view_name (str): The name of the view to execute.
             view_options (:class:`~.options.ViewOptions`): Optional parameters for the view query operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~.options.ViewOptions`
 
         Returns:
-            :class:`~.result.ViewResult`: An instance of a :class:`~.result.ViewResult` which
+            :class:`~.result.AsyncViewResult`: An instance of a :class:`~.result.AsyncViewResult` which
             provides access to iterate over the query results and access metadata about the query.
 
         Examples:
             Simple view query::
 
-                from couchbase.management.views import DesignDocumentNamespace
+                from acouchbase.management.views import DesignDocumentNamespace
 
                 # ... other code ...
 
@@ -192,14 +190,7 @@ class AsyncBucket:
                     print(f'Found row: {row}')
 
         """
-        op_type = StreamingOperationType.ViewQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_view_query_request(design_doc,
-                                                                  view_name,
-                                                                  obs_handler,
-                                                                  *view_options,
-                                                                  **kwargs)
-        return self._impl.view_query(req)
+        return self._impl.view_query(design_doc, view_name, view_options, **kwargs)
 
     def collections(self) -> CollectionManager:
         """

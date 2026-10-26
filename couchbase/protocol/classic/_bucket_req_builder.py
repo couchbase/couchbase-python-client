@@ -15,16 +15,16 @@
 
 from __future__ import annotations
 
+from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common.diagnostics import ServiceType
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.option_enums import OptionValidationMode
-from couchbase.common.options import PingOptions
-from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.common.options import PingOptions, ViewOptions
 from couchbase.protocol.classic._bucket_types import (BucketOptionsBlock,
                                                       PingRequest,
                                                       ViewQueryRequest)
-from couchbase.protocol.classic._wire import forward_args
-from couchbase.views import ViewQuery
+from couchbase.protocol.classic._views import ViewQuery
+from couchbase.protocol.classic._wire import check_streaming_args, forward_args
 
 
 class BucketRequestBuilder:
@@ -57,15 +57,12 @@ class BucketRequestBuilder:
                                  design_doc: str,
                                  view_name: str,
                                  obs_handler: ObservableRequestHandler,
-                                 *options: object,
+                                 options: ViewOptions | None = None,
                                  **kwargs: object) -> ViewQueryRequest:
-        num_workers = kwargs.pop('num_workers', None)
-        req = ViewQueryRequest(ViewQuery.create_view_query_object(self._bucket_name,
-                                                                  design_doc,
-                                                                  view_name,
-                                                                  *options,
-                                                                  **kwargs), obs_handler)
-        # since query is lazy executed, we wait until we submit the query to create the span
-        if num_workers:
-            req.num_workers = num_workers
-        return req
+        check_streaming_args((options,), kwargs, block=BucketOptionsBlock.View, options_type=ViewOptions,
+                             mode=self._option_validation)
+        return ViewQueryRequest(ViewQuery.create_view_query_object(self._bucket_name,
+                                                                   design_doc,
+                                                                   view_name,
+                                                                   options,
+                                                                   **kwargs), obs_handler)

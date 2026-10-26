@@ -17,15 +17,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from couchbase.common.management.views import (VIEW_INDEX_MGMT_ERROR_MAP,
-                                               DropDesignDocumentRequest,
-                                               GetAllDesignDocumentsRequest,
-                                               GetDesignDocumentRequest,
-                                               PublishDesignDocumentRequest,
-                                               UpsertDesignDocumentRequest)
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic._legacy_options import forward_args
 from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.protocol.classic._management._view_index_mgmt_types import (VIEW_INDEX_MGMT_ERROR_MAP,
+                                                                           DropDesignDocumentRequest,
+                                                                           GetAllDesignDocumentsRequest,
+                                                                           GetDesignDocumentRequest,
+                                                                           PublishDesignDocumentRequest,
+                                                                           UpsertDesignDocumentRequest)
 
 if TYPE_CHECKING:
     from couchbase.common.management.views import DesignDocument, DesignDocumentNamespace

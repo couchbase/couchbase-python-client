@@ -123,6 +123,24 @@ def forward_args(arg_vars: dict[str, Any] | None,
     return to_wire(merged, block)
 
 
+def check_streaming_args(options: tuple[object, ...],
+                         kwargs: dict[str, object],
+                         *,
+                         block: OptionsBlock,
+                         options_type: type[dict[str, Any]],
+                         mode: OptionValidationMode | None = None) -> None:
+    """The streaming path: judge only, because each service's query builder maps the keys.
+
+    Query and analytics send every key their blocks do not declare as a named parameter, and
+    views and search drop it, so a near miss is the one thing the judgement can report and
+    this is the only place it is.  The options object's keys count as much as the keywords.
+    A query's `options` also holds its positional parameters, and only an instance of the
+    options class is read by any of the builders, which is why it is picked out by its type.
+    """
+    keys = [key for option in options if isinstance(option, options_type) for key in option]
+    check_options(block, [*keys, *kwargs], mode, protocol=block.protocol)
+
+
 def _get_per_key_opts(per_key_opts: dict[str, Any],
                       opt_type: type[dict[str, Any]],
                       durability_type: type[dict] | type[int] | None,

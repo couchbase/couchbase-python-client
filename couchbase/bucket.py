@@ -24,8 +24,6 @@ from typing import TYPE_CHECKING, Any
 from couchbase.collection import Collection
 from couchbase.common import options
 from couchbase.common._supportability import Supportability
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.management.collections import CollectionManager
 from couchbase.management.views import ViewIndexManager
 from couchbase.result import PingResult, ViewResult
@@ -133,11 +131,10 @@ class Bucket:
         return self._impl.ping(opts, **kwargs)
 
     def view_query(self,
-                   design_doc,      # type: str
-                   view_name,       # type: str
-                   *view_options,   # type: ViewOptionsBase
-                   **kwargs         # type: Any
-                   ) -> ViewResult:
+                   design_doc: str,
+                   view_name: str,
+                   view_options: options.ViewOptions | None = None,
+                   **kwargs: Any) -> ViewResult:
         """Executes a View query against the bucket.
 
         .. deprecated:: 4.6.0
@@ -158,7 +155,7 @@ class Bucket:
             design_doc (str): The name of the design document containing the view to execute.
             view_name (str): The name of the view to execute.
             view_options (:class:`~.options.ViewOptions`): Optional parameters for the view query operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~.options.ViewOptions`
 
         Returns:
@@ -181,14 +178,7 @@ class Bucket:
                     print(f'Found row: {row}')
 
         """
-        op_type = StreamingOperationType.ViewQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_view_query_request(design_doc,
-                                                                  view_name,
-                                                                  obs_handler,
-                                                                  *view_options,
-                                                                  **kwargs)
-        return self._impl.view_query(req)
+        return self._impl.view_query(design_doc, view_name, view_options, **kwargs)
 
     def collections(self) -> CollectionManager:
         """
@@ -241,5 +231,3 @@ class ViewOptions(options.ViewOptions):  # noqa: F811
 from couchbase.views import ViewScanConsistency  # nopep8 # isort:skip # noqa: E402, F401
 from couchbase.views import ViewOrdering  # nopep8 # isort:skip # noqa: E402, F401
 from couchbase.views import ViewErrorMode  # nopep8 # isort:skip # noqa: E402, F401
-
-from couchbase.logic.options import ViewOptionsBase  # nopep8 # isort:skip # noqa: E402

@@ -21,15 +21,17 @@ from typing import TYPE_CHECKING, Any
 from twisted.internet.defer import Deferred
 
 from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
 from couchbase.common.result import PingResult
+from couchbase.protocol.classic._streaming import ViewStreamSpec
 from couchbase.result import ViewResult
 from txcouchbase.protocol.classic._deferred import defer
 from txcouchbase.protocol.classic._scope_impl import TxScopeImpl
-from txcouchbase.views import ViewRequest
+from txcouchbase.protocol.classic._streaming import submit_rows
 
 if TYPE_CHECKING:
-    from couchbase.common.options import PingOptions
-    from couchbase.protocol.classic._bucket_types import ViewQueryRequest
+    from couchbase.common.options import PingOptions, ViewOptions
     from txcouchbase.protocol.classic._cluster_impl import TxClusterImpl
 
 
@@ -52,8 +54,17 @@ class TxBucketImpl(AsyncBucketImpl):
     def ping_deferred(self, opts: PingOptions | None = None, **kwargs: Any) -> Deferred[PingResult]:
         return defer(self.loop, None, lambda: self._ping(self._request_builder.build_ping_request(opts, **kwargs)))
 
-    def view_query_deferred(self, req: ViewQueryRequest) -> ViewResult:
-        """**INTERNAL**"""
+    def view_query_deferred(self,
+                            design_doc: str,
+                            view_name: str,
+                            view_options: ViewOptions | None = None,
+                            **kwargs: Any) -> Deferred[ViewResult]:
+        obs_handler = ObservableRequestHandler(Op.ViewQuery, self.observability_instruments)
+        req = self._request_builder.build_view_query_request(design_doc,
+                                                             view_name,
+                                                             obs_handler,
+                                                             view_options,
+                                                             **kwargs)
         if not self.connected or not self.bucket_connected:
             raise RuntimeError('Cannot attempt to execute a view query to establishing a connection.')
         # If the view_query was provided a timeout we will use that value for the streaming timeout
@@ -62,24 +73,12 @@ class TxBucketImpl(AsyncBucketImpl):
         # also does not specify a view_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::view_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('view_timeout', None)
-        q_req = ViewRequest.generate_view_request(self.connection,
-                                                  self.loop,
-                                                  req.view_query.as_encodable(),
-                                                  default_serializer=self.default_serializer,
-                                                  streaming_timeout=streaming_timeout,
-                                                  obs_handler=req.obs_handler)
-        d = Deferred()
-
-        def _on_ok(_):
-            d.callback(ViewResult(q_req))
-
-        def _on_err(exc):
-            d.errback(exc)
-
-        query_d = q_req.execute_view_query()
-        query_d.addCallback(_on_ok)
-        query_d.addErrback(_on_err)
-        return d
+        rows, responded = submit_rows(self.connection,
+                                      self.loop,
+                                      ViewStreamSpec(req.view_query.as_encodable(), self.default_serializer),
+                                      obs_handler=req.obs_handler,
+                                      streaming_timeout=streaming_timeout)
+        return responded.addCallback(lambda _: ViewResult(rows))
 
     def wait_until_bucket_connected_deferred(self) -> Deferred[None]:
         """**INTERNAL**"""

@@ -18,22 +18,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from couchbase.common._cluster_settings import ClusterSettings
-from couchbase.common._observability import ObservabilityInstruments
+from couchbase.common._observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._operations import Op
+from couchbase.common._streaming import RowIterator
 from couchbase.common.result import PingResult
 from couchbase.protocol.classic._bucket_req_builder import BucketRequestBuilder
 from couchbase.protocol.classic._cluster_types import StreamingTimeouts
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._result import _ping_from_core
 from couchbase.protocol.classic._scope_impl import ScopeImpl
+from couchbase.protocol.classic._streaming import ClassicStreamingExecutor, ViewStreamSpec
 from couchbase.result import ViewResult
 from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
-from couchbase.views import ViewRequest
 
 if TYPE_CHECKING:
-    from couchbase.common.options import PingOptions
+    from couchbase.common.options import PingOptions, ViewOptions
     from couchbase.common.protocol import CouchbaseProtocol
-    from couchbase.protocol.classic._bucket_types import ViewQueryRequest
     from couchbase.protocol.classic._client_adapter import ClientAdapter
     from couchbase.protocol.classic._cluster_impl import ClusterImpl
 
@@ -121,8 +122,17 @@ class BucketImpl:
         req = self._request_builder.build_ping_request(opts, **kwargs)
         return PingResult(_ping_from_core(self._client_adapter.execute_bucket_request(req).raw_result))
 
-    def view_query(self, req: ViewQueryRequest) -> ViewResult:
-        """**INTERNAL**"""
+    def view_query(self,
+                   design_doc: str,
+                   view_name: str,
+                   view_options: ViewOptions | None = None,
+                   **kwargs: Any) -> ViewResult:
+        obs_handler = ObservableRequestHandler(Op.ViewQuery, self.observability_instruments)
+        req = self._request_builder.build_view_query_request(design_doc,
+                                                             view_name,
+                                                             obs_handler,
+                                                             view_options,
+                                                             **kwargs)
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the view_query was provided a timeout we will use that value for the streaming timeout
@@ -131,8 +141,8 @@ class BucketImpl:
         # also does not specify a view_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::view_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('view_timeout', None)
-        return ViewResult(ViewRequest.generate_view_request(self._client_adapter.connection,
-                                                            req.view_query.as_encodable(),
-                                                            default_serializer=self.default_serializer,
-                                                            streaming_timeout=streaming_timeout,
-                                                            obs_handler=req.obs_handler))
+        return ViewResult(RowIterator(ClassicStreamingExecutor(self._client_adapter.connection,
+                                                               ViewStreamSpec(req.view_query.as_encodable(),
+                                                                              self.default_serializer),
+                                                               obs_handler=req.obs_handler,
+                                                               streaming_timeout=streaming_timeout)))

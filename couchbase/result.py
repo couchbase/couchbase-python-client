@@ -63,7 +63,6 @@ from typing import (TYPE_CHECKING,
 
 import couchbase.common.result as _common_result
 from acouchbase.search import AsyncFullTextSearchRequest
-from acouchbase.views import AsyncViewRequest
 from couchbase.common._supportability import Supportability
 from couchbase.common.result import ClusterInfoResult  # noqa: F401
 from couchbase.common.result import DiagnosticsResult  # noqa: F401
@@ -83,6 +82,7 @@ if TYPE_CHECKING:
     from couchbase.common._streaming import RowIterator
     from couchbase.common.analytics import AnalyticsMetaData
     from couchbase.common.n1ql import QueryMetaData
+    from couchbase.common.views import ViewMetaData, ViewRow
 
 
 _ExecuteT = TypeVar('_ExecuteT', covariant=True)
@@ -278,21 +278,28 @@ class SearchResult:
         return self._request.__aiter__()
 
 
-class ViewResult:
-    def __init__(
-        self,
-        search_request
-    ):
-        self._request = search_request
+class _ViewResult:
+    def __init__(self, view_request: _Rows[object, ViewMetaData]) -> None:
+        self._request = view_request
 
-    def __repr__(self):
-        return "ViewResult:{}".format(self._request)
+    def metadata(self) -> ViewMetaData | None:
+        """The meta-data which has been returned by the view query.
 
-    def rows(self):
+        Returns:
+            :class:`~couchbase.views.ViewMetaData`: An instance of
+            :class:`~couchbase.views.ViewMetaData`.
+        """
+        return self._request.final_metadata()
+
+    def __repr__(self) -> str:
+        return '{}:{}'.format(type(self).__name__, self._request)
+
+
+class ViewResult(_ViewResult):
+    _request: RowIterator[ViewRow, ViewMetaData]
+
+    def rows(self) -> RowIterator[ViewRow, ViewMetaData]:
         """The rows which have been returned by the view query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
 
         .. note::
             A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
@@ -300,26 +307,12 @@ class ViewResult:
             to be delivered rather than firing instantly.
 
         Returns:
-            Iterable: Either an iterable or async iterable.
+            Iterable: An iterable over the view query's rows.
         """
-        if isinstance(self._request, AsyncViewRequest):
-            return self.__aiter__()
         return self.__iter__()
 
-    def metadata(self):
-        """The meta-data which has been returned by the view query.
-
-        Returns:
-            :class:`~couchbase.views.ViewMetaData`: An instance of
-            :class:`~couchbase.views.ViewMetaData`.
-        """
-        return self._request.metadata()
-
-    def __iter__(self):
+    def __iter__(self) -> RowIterator[ViewRow, ViewMetaData]:
         return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
 
 
 class Result:

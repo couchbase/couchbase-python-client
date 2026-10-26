@@ -92,8 +92,7 @@ class TwistedViewsEnvironment:
 
     @staticmethod
     def _validate_metadata(result: ViewResult, expected_count: int) -> None:
-        meta = result.metadata()
-        cb_assert_isinstance(meta, ViewMetaData, what='view result metadata')
+        meta = cb_assert_isinstance(result.metadata(), ViewMetaData, what='view result metadata')
         total_rows = meta.total_rows()
         assert total_rows is not None, 'view result metadata carried no total_rows'
         # int() rather than comparing directly, and not for tidiness.  total_rows() is annotated

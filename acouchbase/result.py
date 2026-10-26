@@ -18,6 +18,7 @@ from __future__ import annotations
 __all__ = [
     'AsyncAnalyticsResult',
     'AsyncQueryResult',
+    'AsyncViewResult',
     'ClusterInfoResult',
     'ContentProxy',
     'ContentSubdocProxy',
@@ -76,12 +77,14 @@ from couchbase.result import (ClusterInfoResult,
                               ScanResult,
                               ValueResult,
                               _AnalyticsResult,
-                              _QueryResult)
+                              _QueryResult,
+                              _ViewResult)
 
 if TYPE_CHECKING:
     from couchbase.common._streaming import AsyncRowIterator
     from couchbase.common.analytics import AnalyticsMetaData
     from couchbase.common.n1ql import QueryMetaData
+    from couchbase.common.views import ViewMetaData, ViewRow
 
 
 class AsyncQueryResult(_QueryResult[asyncio.Task[list[Any]]]):
@@ -122,4 +125,24 @@ class AsyncAnalyticsResult(_AnalyticsResult):
         return self.__aiter__()
 
     def __aiter__(self) -> AsyncRowIterator[Any, AnalyticsMetaData]:
+        return self._request.__aiter__()
+
+
+class AsyncViewResult(_ViewResult):
+    _request: AsyncRowIterator[ViewRow, ViewMetaData]
+
+    def rows(self) -> AsyncRowIterator[ViewRow, ViewMetaData]:
+        """The rows which have been returned by the view query.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
+        Returns:
+            AsyncIterable: An async iterable over the view query's rows.  Use ``async for`` to loop over it.
+        """
+        return self.__aiter__()
+
+    def __aiter__(self) -> AsyncRowIterator[ViewRow, ViewMetaData]:
         return self._request.__aiter__()

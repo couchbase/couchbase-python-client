@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import warnings
 from collections.abc import Callable
+from datetime import timedelta
 from typing import Any, cast
 
 import pytest
@@ -27,14 +28,16 @@ from couchbase.common._observability.no_op import (NoOpMeter,
                                                    NoOpTracer)
 from couchbase.common._supportability import CouchbaseDeprecationWarning
 from couchbase.common.option_enums import OptionValidationMode
-from couchbase.common.warnings import CouchbaseApplicabilityWarning
+from couchbase.common.warnings import CouchbaseApplicabilityWarning, CouchbaseOptionWarning
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.observability.handler import ObservableRequestHandler
 from couchbase.logic.observability.observability_types import (ObservabilityInstruments,
                                                                TracerProtocol,
                                                                WrappedTracer)
 from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.options import DiagnosticsOptions, PingOptions
+from couchbase.options import (DiagnosticsOptions,
+                               PingOptions,
+                               ViewOptions)
 from couchbase.protocol.classic._bucket_req_builder import BucketRequestBuilder
 from couchbase.protocol.classic._cluster_req_builder import ClusterRequestBuilder
 from couchbase.search import (SearchQuery,
@@ -161,3 +164,33 @@ class ClusterRequestBuilderUnitTests:
         assert len([w for w in recorded if issubclass(w.category, CouchbaseApplicabilityWarning)]) == 1
         with pytest.raises(InvalidArgumentException, match='parent_span'):
             build(OptionValidationMode.Strict)
+
+    # The view builder reads the keys it knows and drops the rest, so a near miss is reported
+    # here or not at all.
+    @pytest.mark.parametrize('build, options_type', [
+        (lambda mode, options, **kwargs: BucketRequestBuilder('default', mode).build_view_query_request(
+            'ddoc', 'view', _obs_handler(), options, **kwargs).view_query.as_encodable(), ViewOptions),
+    ], ids=['view'])
+    def test_near_miss_warns_and_is_not_sent(self,
+                                             build: Callable[..., dict[str, Any]],
+                                             options_type: type[dict[str, Any]]) -> None:
+        for options, kwargs in ((None, {'limt': 5}), (options_type(limt=5), {})):
+            with warnings.catch_warnings(record=True) as recorded:
+                warnings.simplefilter('always')
+                encoded = build(None, options, **kwargs)
+
+            assert [str(w.message) for w in recorded if issubclass(w.category, CouchbaseOptionWarning)] == [
+                f'Option limt is not carried by {options_type.__name__}. Did you mean limit?']
+            assert 'limt' not in encoded and 'limit' not in encoded
+
+            with pytest.raises(InvalidArgumentException, match='Did you mean limit?'):
+                build(OptionValidationMode.Strict, options, **kwargs)
+
+    @pytest.mark.parametrize('build, options', [
+        (lambda options, **kwargs: BucketRequestBuilder('default', OptionValidationMode.Strict)
+         .build_view_query_request('ddoc', 'view', _obs_handler(), options, **kwargs),
+         ViewOptions(limit=5, skip=1)),
+    ], ids=['view'])
+    def test_declared_options_pass_strict_mode(self, build: Callable[..., Any], options: dict[str, Any]) -> None:
+        build(options)
+        build(None, limit=5, skip=1, timeout=timedelta(seconds=5))

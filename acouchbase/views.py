@@ -13,121 +13,23 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from typing import Awaitable
+"""The `acouchbase.views` import path.
 
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  AlreadyQueriedException,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap)
-from couchbase.logic.streaming import stream_anext
-from couchbase.logic.views import ViewQuery  # noqa: F401
-from couchbase.logic.views import ViewRequestLogic, ViewRow
-from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
+The same objects as `couchbase.views`, re-exported so asyncio code imports them from its own
+package.
+"""
 
+__all__ = [
+    'ViewErrorMode',
+    'ViewMetaData',
+    'ViewOrdering',
+    'ViewRow',
+    'ViewScanConsistency',
+]
 
-class AsyncViewRequest(ViewRequestLogic):
-    def __init__(self,
-                 connection,
-                 loop,
-                 encoded_query,
-                 **kwargs
-                 ):
-        num_workers = kwargs.pop('num_workers', None) or 1
-        super().__init__(connection, encoded_query, **kwargs)
-        self._loop = loop
-        self._tp_executor = ThreadPoolExecutor(num_workers)
-        self._executor_shutdown = False
-
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
-
-    @classmethod
-    def generate_view_request(cls, connection, loop, encoded_query, **kwargs):
-        return cls(connection, loop, encoded_query, **kwargs)
-
-    def _get_metadata(self):
-        try:
-            views_response = next(self._streaming_result)
-            self._set_metadata(views_response)
-        except CouchbaseException as ex:
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            raise excptn
-
-    def execute(self) -> Awaitable[None]:
-        async def _execute():
-            return [r async for r in self]
-
-        return asyncio.create_task(_execute())
-
-    def __aiter__(self):
-        if self.done_streaming:
-            raise AlreadyQueriedException()
-
-        if not self.started_streaming:
-            self._submit_query()
-
-        return self
-
-    def _get_next_row(self):
-        if self.done_streaming is True:
-            return
-
-        # this is a blocking operation
-        row = next(self._streaming_result)
-        if isinstance(row, PycbcCoreException):
-            raise ErrorMapper.build_exception(row)
-
-        # should only be None once query request is complete and _no_ errors found
-        if row is None:
-            raise StopAsyncIteration
-
-        # TODO:  until streaming, a dict is returned, no deserializing...
-        # deserialized_row = self.serializer.deserialize(row)
-        deserialized_row = row
-        if issubclass(self.row_factory, ViewRow):
-            if hasattr(self.row_factory, 'from_json'):
-                return self.row_factory.from_json(deserialized_row)
-            return self.row_factory(**deserialized_row)
-        else:
-            return deserialized_row
-
-    def _shutdown_executor(self):
-        """
-        **INTERNAL**
-
-        Release the per-request streaming executor.  Safe to call multiple times.
-        """
-        if not self._executor_shutdown:
-            self._executor_shutdown = True
-            self._tp_executor.shutdown(wait=False)
-
-    def _finalize(self, exc_val=None):
-        """
-        **INTERNAL**
-
-        Terminal cleanup for the streaming op: end the observability span/meter and release the
-        executor.  Invoked from every terminal branch of ``__anext__`` -- including cancellation --
-        so that ``asyncio.CancelledError`` (a ``BaseException``, not an ``Exception``) cannot bypass
-        teardown and leak the span/meter or orphan the streaming result and its executor thread.
-        """
-        self._process_core_span(exc_val=exc_val)
-        if exc_val is not None and self._streaming_result is not None:
-            # Cancellation/error: unblock a worker still waiting on the C++ core so its executor
-            # thread is released promptly instead of waiting for the whole server-side operation
-            # to finish.  Normal completion (exc_val is None) skips this so trailing metadata can
-            # still be read from the streaming result.
-            self._streaming_result.cancel()
-        self._shutdown_executor()
-
-    async def __anext__(self):
-        return await stream_anext(self)
+from couchbase.common.views import ViewErrorMode  # noqa: F401
+from couchbase.common.views import ViewMetaData  # noqa: F401
+from couchbase.common.views import ViewOrdering  # noqa: F401
+from couchbase.common.views import ViewRow  # noqa: F401
+from couchbase.common.views import ViewScanConsistency  # noqa: F401
+from couchbase.protocol.classic._views import ViewQuery  # noqa: F401

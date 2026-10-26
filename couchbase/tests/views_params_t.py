@@ -17,14 +17,11 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
-from typing import (Any,
-                    Dict,
-                    List,
-                    Tuple)
+from typing import Any
 
 import pytest
 
-from couchbase._utils import JSONType
+from couchbase.common._utils import JSONType
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
@@ -41,7 +38,7 @@ DDOC_NAME = 'test-ddoc'
 VIEW_NAME = 'test-view'
 
 
-def _encoded(options: ViewOptions) -> Dict[str, Any]:
+def _encoded(options: ViewOptions) -> dict[str, Any]:
     # Copied rather than returned as-is because `as_encodable()` hands back the query's own
     # params dict, and returning a live internal dict is how a test ends up asserting about
     # a value it wrote itself.
@@ -49,7 +46,7 @@ def _encoded(options: ViewOptions) -> Dict[str, Any]:
     return dict(query.as_encodable())
 
 
-def _expected(**overrides: Any) -> Dict[str, Any]:
+def _expected(**overrides: Any) -> dict[str, Any]:
     # The three names are unconditional: a view query cannot be addressed without all of
     # them, so unlike the search and query suites nothing defaults into the base.
     return {'bucket_name': BUCKET_NAME,
@@ -106,7 +103,7 @@ class ViewsParamsUnitTests:
         # full union because `ViewOptions.keys` is `Optional[List[JSONType]]` and `List` is
         # invariant, so the natural `keys=['a', 'b']` is an arg-type error; `Sequence` is the
         # fix and it belongs in the SDK.
-        keys: List[JSONType] = ['test-key1', 'test-key2']
+        keys: list[JSONType] = ['test-key1', 'test-key2']
         assert _encoded(ViewOptions(keys=keys)) == _expected(keys=[json.dumps(k) for k in keys])
 
     def test_params_limit(self) -> None:
@@ -138,11 +135,13 @@ class ViewsParamsUnitTests:
         assert _encoded(ViewOptions(reduce=True)) == _expected(reduce=True)
 
     def test_params_scan_consistency(self) -> None:
+        # The option is `scan_consistency` and the binding's field is `consistency`.  Under any
+        # other key the binding never reads it, and the view runs not bounded.
         opts = ViewOptions(scan_consistency=ViewScanConsistency.REQUEST_PLUS)
         query = ViewQuery.create_view_query_object(BUCKET_NAME, DDOC_NAME, VIEW_NAME, opts)
 
         assert dict(query.as_encodable()) == _expected(
-            scan_consistency=ViewScanConsistency.REQUEST_PLUS.to_str())
+            consistency=ViewScanConsistency.REQUEST_PLUS.to_str())
         assert query.consistency == ViewScanConsistency.REQUEST_PLUS
 
     def test_params_serializer(self) -> None:
@@ -165,7 +164,7 @@ class ViewsParamsUnitTests:
     def test_params_timeout(self) -> None:
         # A timedelta, a whole number of seconds, and a fractional one: the three input forms,
         # all converging on the same millisecond count, which is the unit the binding reads.
-        timeouts: List[Tuple[Any, int]] = [(timedelta(seconds=20), 20000),
+        timeouts: list[tuple[Any, int]] = [(timedelta(seconds=20), 20000),
                                            (20, 20000),
                                            (25.5, 25500)]
         for timeout, expected_ms in timeouts:
@@ -187,14 +186,41 @@ class ViewsParamsUnitTests:
         # getters can turn into an enum member survives until it is read back.  Each handles
         # None and a str and has nothing left for anything else, from a signature declaring a
         # non-optional enum.
-        options = (('scan_consistency', 'consistency'), ('order', 'order'), ('on_error', 'on_error'))
-        for option, prop in options:
+        for option in ('consistency', 'order', 'on_error'):
             query = ViewQuery.create_view_query_object(BUCKET_NAME, DDOC_NAME, VIEW_NAME)
             query.set_option(option, 5)
             with pytest.raises(InvalidArgumentException):
-                getattr(query, prop)
+                getattr(query, option)
 
-        # The str branch of the consistency getter delegates to from_str, so an unrecognised
-        # string raises from the enum rather than from the query.
-        with pytest.raises(InvalidArgumentException):
-            ViewScanConsistency.from_str('not_a_scan_consistency')
+    def test_params_unrecognised_enum_string(self) -> None:
+        # The str branch of each getter delegates to from_str, which raises on a spelling it
+        # cannot name rather than answering with a member the caller did not write.  `'true'` and
+        # `'false'` are ViewOrdering's member values and not spellings it reads.
+        cases = [('consistency', ViewScanConsistency, 'not_bounded!'),
+                 ('order', ViewOrdering, 'ascending!'),
+                 ('order', ViewOrdering, 'true'),
+                 ('on_error', ViewErrorMode, 'stop!')]
+        for option, enum_cls, value in cases:
+            query = ViewQuery.create_view_query_object(BUCKET_NAME, DDOC_NAME, VIEW_NAME)
+            query.set_option(option, value)
+            with pytest.raises(InvalidArgumentException) as exc_info:
+                getattr(query, option)
+            assert exc_info.value.message == (f'{value} is not a valid {enum_cls.__name__} option. '
+                                              f'Expected str representation of type {enum_cls.__name__}.')
+
+    def test_params_enum_spellings(self) -> None:
+        # Every spelling each converter reads.
+        spellings = [
+            (ViewScanConsistency.from_str, 'not_bounded', ViewScanConsistency.NOT_BOUNDED),
+            (ViewScanConsistency.from_str, 'ok', ViewScanConsistency.NOT_BOUNDED),
+            (ViewScanConsistency.from_str, 'request_plus', ViewScanConsistency.REQUEST_PLUS),
+            (ViewScanConsistency.from_str, 'false', ViewScanConsistency.REQUEST_PLUS),
+            (ViewScanConsistency.from_str, 'update_after', ViewScanConsistency.UPDATE_AFTER),
+            (ViewOrdering.from_str, 'ascending', ViewOrdering.ASCENDING),
+            (ViewOrdering.from_str, 'descending', ViewOrdering.DESCENDING),
+            (ViewErrorMode.from_str, 'resume', ViewErrorMode.CONTINUE),
+            (ViewErrorMode.from_str, 'continue', ViewErrorMode.CONTINUE),
+            (ViewErrorMode.from_str, 'stop', ViewErrorMode.STOP),
+        ]
+        for from_str, spelling, member in spellings:
+            assert from_str(spelling) is member

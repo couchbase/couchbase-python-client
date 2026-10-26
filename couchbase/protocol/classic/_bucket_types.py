@@ -18,22 +18,20 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, fields
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Optional)
+from typing import TYPE_CHECKING, Any
 
+from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._option_diagnostics import OptionsBlock
 from couchbase.common.protocol import CouchbaseProtocol
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.protocol.classic._bindings import ConnectionBinding
 
 if TYPE_CHECKING:
-    from couchbase.views import ViewQuery
+    from couchbase.protocol.classic._views import ViewQuery
 
 
 class BucketOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
     Ping = 'PingOptions'
+    View = 'ViewOptions'
 
 
 _FIELDS_CACHE: dict[type, list] = {}
@@ -105,8 +103,3 @@ class PingRequest(BucketRequest):
 class ViewQueryRequest:
     view_query: ViewQuery
     obs_handler: ObservableRequestHandler
-    num_workers: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return StreamingOperationType.ViewQuery.value

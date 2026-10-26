@@ -25,12 +25,12 @@ from couchbase.protocol.classic._management._view_index_mgmt_req_builder import 
 
 if TYPE_CHECKING:
     from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.common.management.views import (DropDesignDocumentRequest,
-                                                   GetAllDesignDocumentsRequest,
-                                                   GetDesignDocumentRequest,
-                                                   PublishDesignDocumentRequest,
-                                                   UpsertDesignDocumentRequest)
     from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.protocol.classic._management._view_index_mgmt_types import (DropDesignDocumentRequest,
+                                                                               GetAllDesignDocumentsRequest,
+                                                                               GetDesignDocumentRequest,
+                                                                               PublishDesignDocumentRequest,
+                                                                               UpsertDesignDocumentRequest)
 
 
 class AsyncViewIndexMgmtImpl:

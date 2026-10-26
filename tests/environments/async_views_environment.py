@@ -15,7 +15,7 @@
 
 """View bucket setup, teardown and row validation for the acouchbase views suites.
 
-The async counterpart of views_environment.py, and the same shape.  Four things differ from the
+The async counterpart of views_environment.py, and the same shape.  Five things differ from the
 sync module, all forced by the SDK rather than chosen:
 
   * every bucket and view-index manager call is awaited, since the async wrappers return
@@ -31,6 +31,9 @@ sync module, all forced by the SDK rather than chosen:
   * the drain cannot be `for row in result.rows()`.  That does not raise over an async iterator,
     it iterates nothing, so every count would be zero and the readiness wait in particular would
     never see a single row while reporting a clean, ordinary timeout.
+  * the result is an `AsyncViewResult`, from acouchbase.result.  It shares a private base with
+    the sync `ViewResult` and subclasses neither, so the drain's isinstance check names the
+    async class.
 
 Everything else, including why there is no loose assertion helper, is settled in the sync
 module's docstring and not restated here.
@@ -41,12 +44,12 @@ from __future__ import annotations
 import warnings
 from typing import Any
 
+from acouchbase.result import AsyncViewResult
 from couchbase.exceptions import BucketDoesNotExistException, DesignDocumentNotFoundException
 from couchbase.management.buckets import CreateBucketSettings, StorageBackend
 from couchbase.management.views import (DesignDocument,
                                         DesignDocumentNamespace,
                                         View)
-from couchbase.result import ViewResult
 from couchbase.views import (ViewMetaData,
                              ViewRow,
                              ViewScanConsistency)
@@ -91,9 +94,8 @@ class AsyncViewsEnvironment:
         cb_assert_isinstance(value['batch'], str, what='view row value batch')
 
     @staticmethod
-    def _validate_metadata(result: ViewResult, expected_count: int) -> None:
-        meta = result.metadata()
-        cb_assert_isinstance(meta, ViewMetaData, what='view result metadata')
+    def _validate_metadata(result: AsyncViewResult, expected_count: int) -> None:
+        meta = cb_assert_isinstance(result.metadata(), ViewMetaData, what='view result metadata')
         total_rows = meta.total_rows()
         assert total_rows is not None, 'view result metadata carried no total_rows'
         # int() rather than comparing directly, and not for tidiness.  total_rows() is annotated
@@ -105,9 +107,9 @@ class AsyncViewsEnvironment:
         cb_assert_gte(int(total_rows), expected_count, what='view metadata total_rows')
 
     @staticmethod
-    async def _drain(result: ViewResult, expected_count: int) -> list[ViewRow]:
+    async def _drain(result: AsyncViewResult, expected_count: int) -> list[ViewRow]:
         """Validate every row and the metadata in one pass, and return the rows."""
-        cb_assert_isinstance(result, ViewResult, what='result passed to _drain')
+        cb_assert_isinstance(result, AsyncViewResult, what='result passed to _drain')
         rows: list[ViewRow] = []
         async for row in result.rows():
             assert row is not None, f'view result yielded a None row at index {len(rows)}'
@@ -117,7 +119,7 @@ class AsyncViewsEnvironment:
         return rows
 
     @staticmethod
-    async def assert_rows_exact(result: ViewResult, expected_count: int) -> list[ViewRow]:
+    async def assert_rows_exact(result: AsyncViewResult, expected_count: int) -> list[ViewRow]:
         """Assert the result yields exactly expected_count validated rows, and return them."""
         rows = await AsyncViewsEnvironment._drain(result, expected_count)
         cb_assert_eq(len(rows), expected_count, what='view rows returned')
@@ -131,7 +133,7 @@ class AsyncViewsEnvironment:
         return value
 
     @staticmethod
-    async def drain(result: ViewResult) -> None:
+    async def drain(result: AsyncViewResult) -> None:
         """Consume the result without asserting anything about it; see the sync module."""
         async for _ in result.rows():
             pass
