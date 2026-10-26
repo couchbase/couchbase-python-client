@@ -44,10 +44,11 @@ from typing import (Any,
                     Union)
 
 from couchbase.common._observability.no_op import NoOpMeter
+from couchbase.common._operations import Op
 from couchbase.logic.observability import (CollectionDetails,
                                            OpAttributeName,
                                            OpName)
-from tests.observability_ops import service_for
+from tests.observability_ops import as_op_name, service_for
 from tests.observability_test_impls import (InertMeter,
                                             RecordingMeter,
                                             RecordingValueRecorder,
@@ -323,11 +324,12 @@ class HttpMeterValidator:
         self._meter.clear()
 
     def validate_http_op(self,
-                         op_name: OpName,
+                         op_name: OpName | Op,
                          validate_error: bool = False,
                          bucket_name: Optional[str] = None,
                          scope_name: Optional[str] = None,
                          collection_name: Optional[str] = None) -> None:
+        op_name = as_op_name(op_name)
         if isinstance(self._meter, NoOpMeter):
             assert isinstance(self._meter, InertMeter), (
                 f'no-op validation needs a meter that would record if asked, '

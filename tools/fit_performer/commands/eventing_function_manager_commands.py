@@ -7,7 +7,6 @@ from typing import (Iterable,
                     Optional,
                     Union)
 
-from couchbase.logic.n1ql import QueryScanConsistency
 from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionBucketAccess,
                                            EventingFunctionBucketBinding,
@@ -36,6 +35,7 @@ from couchbase.management.options import (DeployFunctionOptions,
                                           ResumeFunctionOptions,
                                           UndeployFunctionOptions,
                                           UpsertFunctionOptions)
+from couchbase.n1ql import QueryScanConsistency
 
 from ..generated.run import top_level_pb2 as run_pb
 from ..generated.sdk import workload_pb2 as sdk_pb

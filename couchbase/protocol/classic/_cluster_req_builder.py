@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING, Union
 
-from couchbase.analytics import AnalyticsQuery
+from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._supportability import Supportability
 from couchbase.common.diagnostics import ClusterState, ServiceType
 from couchbase.common.exceptions import InvalidArgumentException
@@ -26,8 +26,8 @@ from couchbase.common.option_enums import OptionValidationMode
 from couchbase.common.options import (DiagnosticsOptions,
                                       PingOptions,
                                       WaitUntilReadyOptions)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.n1ql import N1QLQuery
+from couchbase.logic.observability import ObservableRequestHandler as _OldObservableRequestHandler
+from couchbase.protocol.classic._analytics import AnalyticsQuery
 from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                        ClusterInfoRequest,
                                                        ClusterOptionsBlock,
@@ -38,6 +38,7 @@ from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                        SearchQueryRequest,
                                                        UpdateCredentialsRequest,
                                                        WaitUntilReadyRequest)
+from couchbase.protocol.classic._n1ql import N1QLQuery
 from couchbase.protocol.classic._wire import forward_args
 from couchbase.search import (SearchQuery,
                               SearchQueryBuilder,
@@ -59,12 +60,9 @@ class ClusterRequestBuilder:
                                       obs_handler: ObservableRequestHandler,
                                       *options: object,
                                       **kwargs: object) -> AnalyticsQueryRequest:
-        num_workers = kwargs.pop('num_workers', None)
-        req = AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs), obs_handler)
-        # since query is lazy executed, we wait until we submit the query to create the span
-        if num_workers:
-            req.num_workers = num_workers
-        return req
+        # Accepted and discarded; the statement's builder would send it as a named parameter.
+        kwargs.pop('num_workers', None)
+        return AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs), obs_handler)
 
     def build_cluster_info_request(self) -> ClusterInfoRequest:
         return ClusterInfoRequest()
@@ -107,17 +105,14 @@ class ClusterRequestBuilder:
                             obs_handler: ObservableRequestHandler,
                             *options: object,
                             **kwargs: object) -> QueryRequest:
-        num_workers = kwargs.pop('num_workers', None)
-        req = QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs), obs_handler)
-        # since query is lazy executed, we wait until we submit the query to create the span
-        if num_workers:
-            req.num_workers = num_workers
-        return req
+        # Accepted and discarded; the statement's builder would send it as a named parameter.
+        kwargs.pop('num_workers', None)
+        return QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs), obs_handler)
 
     def build_search_request(self,
                              index: str,
                              request: Union[SearchRequest, SearchQuery],
-                             obs_handler: ObservableRequestHandler,
+                             obs_handler: _OldObservableRequestHandler,
                              *options: object,
                              **kwargs: object) -> SearchQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
@@ -137,7 +132,7 @@ class ClusterRequestBuilder:
     def build_search_query_request(self,
                                    index: str,
                                    query: SearchQuery,
-                                   obs_handler: ObservableRequestHandler,
+                                   obs_handler: _OldObservableRequestHandler,
                                    *options: object,
                                    **kwargs: object) -> SearchQueryRequest:
         if isinstance(query, SearchRequest):

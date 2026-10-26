@@ -16,23 +16,25 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
 from acouchbase.protocol.classic._scope_impl import AsyncScopeImpl
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from couchbase.protocol.classic._streaming import AnalyticsStreamSpec, QueryStreamSpec
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
-from txcouchbase.analytics import AnalyticsRequest
-from txcouchbase.n1ql import N1QLRequest
 from txcouchbase.protocol.classic._collection_impl import TxCollectionImpl
+from txcouchbase.protocol.classic._streaming import submit_rows
 from txcouchbase.search import FullTextSearchRequest
 
 if TYPE_CHECKING:
-    from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
-                                                           QueryRequest,
-                                                           SearchQueryRequest)
+    from couchbase.common._utils import JSONType
+    from couchbase.common.options import AnalyticsOptions, QueryOptions
+    from couchbase.protocol.classic._cluster_types import SearchQueryRequest
     from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
 
 
@@ -45,7 +47,12 @@ class TxScopeImpl(AsyncScopeImpl):
         """**INTERNAL**"""
         return TxCollectionImpl(name, self)
 
-    def analytics_query_deferred(self, req: AnalyticsQueryRequest) -> Deferred[AnalyticsResult]:
+    def analytics_query_deferred(self,
+                                 statement: str,
+                                 *options: AnalyticsOptions | JSONType,
+                                 **kwargs: Any) -> Deferred[AnalyticsResult]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsQuery, self.observability_instruments)
+        req = self._request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         if not self.connected:
             raise RuntimeError('Cannot attempt to execute an analytics query prior to establishing a connection.')
         # If the analytics_query was provided a timeout we will use that value for the streaming timeout
@@ -54,26 +61,19 @@ class TxScopeImpl(AsyncScopeImpl):
         # also does not specify an analytics_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
         streaming_timeout = self.streaming_timeouts.get('analytics_timeout', None)
-        q_req = AnalyticsRequest.generate_analytics_request(self.connection,
-                                                            self.loop,
-                                                            req.analytics_query.params,
-                                                            default_serializer=self.default_serializer,
-                                                            streaming_timeout=streaming_timeout,
-                                                            obs_handler=req.obs_handler)
-        d = Deferred()
+        rows, responded = submit_rows(self.connection,
+                                      self.loop,
+                                      AnalyticsStreamSpec(req.analytics_query.params, self.default_serializer),
+                                      obs_handler=req.obs_handler,
+                                      streaming_timeout=streaming_timeout)
+        return responded.addCallback(lambda _: AnalyticsResult(rows))
 
-        def _on_ok(_):
-            d.callback(AnalyticsResult(q_req))
-
-        def _on_err(exc):
-            d.errback(exc)
-
-        query_d = q_req.execute_analytics_query()
-        query_d.addCallback(_on_ok)
-        query_d.addErrback(_on_err)
-        return d
-
-    def query_deferred(self, req: QueryRequest) -> Deferred[QueryResult]:
+    def query_deferred(self,
+                       statement: str,
+                       *options: QueryOptions | JSONType,
+                       **kwargs: Any) -> Deferred[QueryResult]:
+        obs_handler = ObservableRequestHandler(Op.Query, self.observability_instruments)
+        req = self._request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         if not self.connected:
             raise RuntimeError('Cannot attempt to execute a query prior to establishing a connection.')
 
@@ -83,25 +83,12 @@ class TxScopeImpl(AsyncScopeImpl):
         # also does not specify a query_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::query_timeout when the streaming object is created in the bindings.
         streaming_timeout = self.streaming_timeouts.get('query_timeout', None)
-        q_req = N1QLRequest.generate_n1ql_request(self.connection,
-                                                  self.loop,
-                                                  req.n1ql_query.params,
-                                                  default_serializer=self.default_serializer,
-                                                  streaming_timeout=streaming_timeout,
-                                                  obs_handler=req.obs_handler)
-
-        d = Deferred()
-
-        def _on_ok(_):
-            d.callback(QueryResult(q_req))
-
-        def _on_err(exc):
-            d.errback(exc)
-
-        query_d = q_req.execute_query()
-        query_d.addCallback(_on_ok)
-        query_d.addErrback(_on_err)
-        return d
+        rows, responded = submit_rows(self.connection,
+                                      self.loop,
+                                      QueryStreamSpec(req.n1ql_query.params, self.default_serializer),
+                                      obs_handler=req.obs_handler,
+                                      streaming_timeout=streaming_timeout)
+        return responded.addCallback(lambda _: QueryResult(rows))
 
     def search_deferred(self, req: SearchQueryRequest) -> Deferred[SearchResult]:
         if not self.connected:

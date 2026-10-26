@@ -27,15 +27,14 @@ from typing import (TYPE_CHECKING,
 from acouchbase.collection import Collection
 from acouchbase.management.eventing import ScopeEventingFunctionManager
 from acouchbase.management.search import ScopeSearchIndexManager
+from acouchbase.result import AsyncAnalyticsResult, AsyncQueryResult
 from couchbase.common._supportability import Supportability
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions)
-from couchbase.result import (AnalyticsResult,
-                              QueryResult,
-                              SearchResult)
+from couchbase.result import SearchResult
 
 if TYPE_CHECKING:
     from acouchbase.bucket import AsyncBucket
@@ -95,16 +94,12 @@ class AsyncScope:
         """
         return Collection(self, name)
 
-    def query(self,
-              statement,  # type: str
-              *options,  # type: Union[QueryOptions, JSONType]
-              **kwargs   # type: Any
-              ) -> QueryResult:
+    def query(self, statement: str, *options: QueryOptions | JSONType, **kwargs: Any) -> AsyncQueryResult:
         """Executes a N1QL query against the scope.
 
         .. note::
             The query is executed lazily in that it is executed once iteration over the
-            :class:`~couchbase.result.QueryResult` begins.
+            :class:`~acouchbase.result.AsyncQueryResult` begins.
 
         .. note::
             Scope-level queries are only supported on Couchbase Server versions that support scopes and collections.
@@ -116,12 +111,13 @@ class AsyncScope:
         Args:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.QueryOptions`
 
         Returns:
-            :class:`~couchbase.result.QueryResult`: An instance of a :class:`~couchbase.result.QueryResult` which
-            provides access to iterate over the query results and access metadata and metrics about the query.
+            :class:`~acouchbase.result.AsyncQueryResult`: An instance of a
+            :class:`~acouchbase.result.AsyncQueryResult` which provides access to iterate over the
+            query results and access metadata and metrics about the query.
 
         Examples:
             Simple query::
@@ -132,7 +128,7 @@ class AsyncScope:
 
             Simple query with positional parameters::
 
-                from couchbase.options import QueryOptions
+                from acouchbase.options import QueryOptions
 
                 # ... other code ...
 
@@ -143,7 +139,7 @@ class AsyncScope:
 
             Simple query with named parameters::
 
-                from couchbase.options import QueryOptions
+                from acouchbase.options import QueryOptions
 
                 # ... other code ...
 
@@ -154,7 +150,7 @@ class AsyncScope:
 
             Retrieve metadata and/or metrics from query::
 
-                from couchbase.options import QueryOptions
+                from acouchbase.options import QueryOptions
 
                 # ... other code ...
 
@@ -167,36 +163,35 @@ class AsyncScope:
                 print(f'Query metrics: {q_res.metadata().metrics()}')
 
         """
-        op_type = StreamingOperationType.Query
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
-        return self._impl.query(req)
+        return self._impl.query(statement, *options, **kwargs)
 
     def analytics_query(self,
-                        statement,  # type: str
-                        *options,  # type: Union[AnalyticsOptions, JSONType]
-                        **kwargs   # type: Any
-                        ) -> AnalyticsResult:
+                        statement: str,
+                        *options: AnalyticsOptions | JSONType,
+                        **kwargs: Any) -> AsyncAnalyticsResult:
         """Executes an analaytics query against the scope.
 
         .. note::
             The analytics query is executed lazily in that it is executed once iteration over the
-            :class:`~couchbase.result.AnalyticsResult` begins.
+            :class:`~acouchbase.result.AsyncAnalyticsResult` begins.
 
         .. seealso::
-            * :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses, datasets, indexes and links.
-            * :meth:`~acouchbase.cluster.AsyncCluster.analytics_query`: for how to execute cluster-level analytics queries
+            * :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses,
+              datasets, indexes and links.
+            * :meth:`~acouchbase.cluster.AsyncCluster.analytics_query`: for how to execute cluster-level analytics
+              queries
 
         Args:
             statement (str): The analytics SQL++ statement to execute.
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AnalyticsOptions`
 
         Returns:
-            :class:`~couchbase.result.AnalyticsResult`: An instance of a :class:`~couchbase.result.AnalyticsResult` which provides access to iterate over the analytics
-            query results and access metadata and metrics about the analytics query.
+            :class:`~acouchbase.result.AsyncAnalyticsResult`: An instance of a
+            :class:`~acouchbase.result.AsyncAnalyticsResult` which provides access to iterate over the analytics query
+            results and access metadata and metrics about the analytics query.
 
         Examples:
             .. note::
@@ -212,7 +207,7 @@ class AsyncScope:
 
             Simple analytics query with positional parameters::
 
-                from couchbase.options import AnalyticsOptions
+                from acouchbase.options import AnalyticsOptions
 
                 # ... other code ...
 
@@ -223,7 +218,7 @@ class AsyncScope:
 
             Simple analytics query with named parameters::
 
-                from couchbase.options import AnalyticsOptions
+                from acouchbase.options import AnalyticsOptions
 
                 # ... other code ...
 
@@ -243,11 +238,8 @@ class AsyncScope:
                 print(f'Analytics query metadata: {q_res.metadata()}')
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
-        """  # noqa: E501
-        op_type = StreamingOperationType.AnalyticsQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
-        return self._impl.analytics_query(req)
+        """
+        return self._impl.analytics_query(statement, *options, **kwargs)
 
     def search_query(self,
                      index,  # type: str

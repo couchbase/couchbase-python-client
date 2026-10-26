@@ -38,9 +38,29 @@ from tests.environments.async_environment import AsyncTestEnvironment
 
 class QueryTestSuite:
     TEST_MANIFEST = [
+        'test_draining_queries_take_turns_on_the_loop',
         'test_non_blocking',
         'test_query_cancellation',
     ]
+
+    @pytest.mark.asyncio
+    async def test_draining_queries_take_turns_on_the_loop(self, cb_env: AsyncTestEnvironment) -> None:
+        # Once the core has answered a query, all its rows are queued and no read waits, so only
+        # the executor's yield between rows keeps one drain from holding the loop to its last
+        # row.  Both first rows are read before either drain, so both responses are in and a slow
+        # second response cannot pass for a held loop.
+        statement = 'SELECT RAW d FROM ARRAY_RANGE(0, 1000) AS d'
+        streams = [cb_env.cluster.query(statement).__aiter__() for _ in range(2)]
+        await asyncio.gather(*(stream.__anext__() for stream in streams))
+        order: list[int] = []
+
+        async def drain(idx: int) -> None:
+            async for _ in streams[idx]:
+                order.append(idx)
+
+        await asyncio.gather(drain(0), drain(1))
+        assert len(order) == 1998
+        assert order[:4] == [0, 1, 0, 1]
 
     @pytest.mark.asyncio
     async def test_non_blocking(self, cb_env: AsyncTestEnvironment) -> None:
@@ -67,9 +87,8 @@ class QueryTestSuite:
     @pytest.mark.asyncio
     async def test_query_cancellation(self, cb_env: AsyncTestEnvironment) -> None:
         # PYCBC-1774: cancelling an in-flight streaming query must propagate CancelledError
-        # unchanged (not swallow or convert it) and cancel the underlying C++ streamed
-        # result, so the executor worker is released promptly instead of waiting for the
-        # whole server-side operation to finish.
+        # unchanged, not swallow or convert it.  That the cancel also reaches the protocol's
+        # stream is each executor's own to show; classic's is in classic_streaming_t.
         result = cb_env.cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` LIMIT 100')
 
         async def consume() -> list[Any]:
@@ -79,14 +98,9 @@ class QueryTestSuite:
             return rows
 
         task = asyncio.ensure_future(consume())
-        # Let the task start streaming (submit the query) and reach the first, blocking
-        # __anext__.
-        while result._request._streaming_result is None and not task.done():
-            await asyncio.sleep(0)
+        # One turn of the loop runs the task to its first wait, which is on the query it sent.
+        await asyncio.sleep(0)
+        assert task.done() is False
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-
-        # The cancellation must have reached through to the C++ streamed result.
-        assert result._request._streaming_result is not None
-        assert result._request._streaming_result.is_cancelled() is True

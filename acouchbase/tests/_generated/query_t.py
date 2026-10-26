@@ -56,7 +56,9 @@ from tests.manifest import validate_test_manifest
 from tests.skips import (server_label,
                          skip_feature_unsupported,
                          skip_known_issue)
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class QueryCollectionTestSuite(SuiteRequirements):
@@ -77,7 +79,10 @@ class QueryCollectionTestSuite(SuiteRequirements):
         'test_scope_query_with_positional_params_in_options',
     ]
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_bad_query_context(self, cb_env: AsyncTestEnvironment) -> None:
         q_str = f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2"
         # test w/ no context
@@ -92,6 +97,7 @@ class QueryCollectionTestSuite(SuiteRequirements):
             await cb_env.assert_rows_exact(result, 2)
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_bad_scope_query(self, cb_env: AsyncTestEnvironment) -> None:
         q_str = f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2"
         q_context = f'{cb_env.bucket.name}.`fake-scope`'
@@ -122,14 +128,13 @@ class QueryCollectionTestSuite(SuiteRequirements):
         result = cb_env.cluster.query(f"SELECT * FROM {cb_env.fqdn} LIMIT 2")
         await cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None
-        # if adhoc is not set, it should be None
-        assert result._request.params.get('adhoc', None) is None
 
     @pytest.mark.asyncio
     async def test_query_metadata(self, cb_env: AsyncTestEnvironment) -> None:
         result = cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2")
         await cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -148,7 +153,8 @@ class QueryCollectionTestSuite(SuiteRequirements):
         result = cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2",
                                     QueryOptions(metrics=False))
         await cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -188,7 +194,8 @@ class QueryCollectionTestSuite(SuiteRequirements):
             f"SELECT * FROM `{cb_env.collection.name}` LIMIT 1", QueryOptions(metrics=True))
         await cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         assert isinstance(metadata, QueryMetaData)
         metrics = metadata.metrics()
         assert isinstance(metrics, QueryMetrics)
@@ -240,6 +247,7 @@ class QueryTestSuite(SuiteRequirements):
 
     TEST_MANIFEST = [
         'test_bad_query',
+        'test_draining_queries_take_turns_on_the_loop',
         'test_mixed_named_parameters',
         'test_mixed_positional_parameters',
         'test_non_blocking',
@@ -269,6 +277,7 @@ class QueryTestSuite(SuiteRequirements):
         EnvironmentFeatures.check_if_feature_supported(ServerFeatures.PreserveExpiry, cb_env.server_context)
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_bad_query(self, cb_env: AsyncTestEnvironment) -> None:
         with pytest.raises(ParsingFailedException):
             result = cb_env.cluster.query("I'm not N1QL!")
@@ -323,25 +332,28 @@ class QueryTestSuite(SuiteRequirements):
         assert expiry2 is not None
         assert expiry1 == expiry2
 
+    # couchbase2 carries a GenericErrorContext on every exception.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_query_error_context(self, cb_env: AsyncTestEnvironment) -> None:
-        try:
+        with pytest.raises(CouchbaseException) as ex:
             result = cb_env.cluster.query("SELECT * FROM no_such_bucket")
             await cb_env.drain_rows(result)
-        except CouchbaseException as ex:
-            assert isinstance(ex.context, QueryErrorContext)
-            assert ex.context.statement is not None
-            assert ex.context.first_error_code is not None
-            assert ex.context.first_error_message is not None
-            assert ex.context.client_context_id is not None
-            assert ex.context.response_body is not None
+        context = ex.value.error_context
+        assert isinstance(context, QueryErrorContext)
+        assert context.statement is not None
+        assert context.first_error_code is not None
+        assert context.first_error_message is not None
+        assert context.client_context_id is not None
+        assert context.response_body is not None
 
     @pytest.mark.asyncio
     async def test_query_metadata(self, cb_env: AsyncTestEnvironment) -> None:
         result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` "
                                       f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2")
         await cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -361,7 +373,8 @@ class QueryTestSuite(SuiteRequirements):
                                       f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2",
                                       QueryOptions(metrics=False))
         await cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -482,7 +495,8 @@ class QueryTestSuite(SuiteRequirements):
             f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 1", QueryOptions(metrics=True))
         await cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         assert isinstance(metadata, QueryMetaData)
         metrics = metadata.metrics()
         assert isinstance(metrics, QueryMetrics)
@@ -512,7 +526,9 @@ class QueryTestSuite(SuiteRequirements):
             f"SELECT * FROM `{cb_env.bucket.name}` "
             f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 1", QueryOptions(profile=QueryProfile.TIMINGS))
         await cb_env.assert_rows_exact(result, 1)
-        assert result.metadata().profile() is not None
+        metadata = result.metadata()
+        assert metadata is not None
+        assert metadata.profile() is not None
 
     @pytest.mark.asyncio
     async def test_simple_query(self, cb_env: AsyncTestEnvironment) -> None:
@@ -520,8 +536,6 @@ class QueryTestSuite(SuiteRequirements):
                                       f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2")
         await cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None
-        # if adhoc is not set, it should be None
-        assert result._request.params.get('adhoc', None) is None
 
     @pytest.mark.asyncio
     async def test_simple_query_explain(self, cb_env: AsyncTestEnvironment) -> None:
@@ -534,7 +548,9 @@ class QueryTestSuite(SuiteRequirements):
         assert len(rows) == 1
         assert 'plan' in rows[0]
         assert result.metadata() is not None
-        assert result.metadata().metrics() is not None
+        metadata = result.metadata()
+        assert metadata is not None
+        assert metadata.metrics() is not None
 
     @pytest.mark.asyncio
     async def test_simple_query_prepared(self, cb_env: AsyncTestEnvironment) -> None:
@@ -552,8 +568,9 @@ class QueryTestSuite(SuiteRequirements):
                                       QueryOptions(adhoc=False, metrics=True))
         await cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None
-        assert result.metadata().metrics() is not None
-        assert result._request.params.get('adhoc', None) is False
+        metadata = result.metadata()
+        assert metadata is not None
+        assert metadata.metrics() is not None
 
     @pytest.mark.asyncio
     async def test_simple_query_with_named_params(self, cb_env: AsyncTestEnvironment) -> None:
@@ -596,6 +613,25 @@ class QueryTestSuite(SuiteRequirements):
         await cb_env.assert_rows_exact(result, 1)
 
     @pytest.mark.asyncio
+    async def test_draining_queries_take_turns_on_the_loop(self, cb_env: AsyncTestEnvironment) -> None:
+        # Once the core has answered a query, all its rows are queued and no read waits, so only
+        # the executor's yield between rows keeps one drain from holding the loop to its last
+        # row.  Both first rows are read before either drain, so both responses are in and a slow
+        # second response cannot pass for a held loop.
+        statement = 'SELECT RAW d FROM ARRAY_RANGE(0, 1000) AS d'
+        streams = [cb_env.cluster.query(statement).__aiter__() for _ in range(2)]
+        await asyncio.gather(*(stream.__anext__() for stream in streams))
+        order: list[int] = []
+
+        async def drain(idx: int) -> None:
+            async for _ in streams[idx]:
+                order.append(idx)
+
+        await asyncio.gather(drain(0), drain(1))
+        assert len(order) == 1998
+        assert order[:4] == [0, 1, 0, 1]
+
+    @pytest.mark.asyncio
     async def test_non_blocking(self, cb_env: AsyncTestEnvironment) -> None:
         # PYCBC-1471: rows must be pulled from the binding's streaming result without
         # blocking the event loop.  Before the fix the queries returned in submission
@@ -620,9 +656,8 @@ class QueryTestSuite(SuiteRequirements):
     @pytest.mark.asyncio
     async def test_query_cancellation(self, cb_env: AsyncTestEnvironment) -> None:
         # PYCBC-1774: cancelling an in-flight streaming query must propagate CancelledError
-        # unchanged (not swallow or convert it) and cancel the underlying C++ streamed
-        # result, so the executor worker is released promptly instead of waiting for the
-        # whole server-side operation to finish.
+        # unchanged, not swallow or convert it.  That the cancel also reaches the protocol's
+        # stream is each executor's own to show; classic's is in classic_streaming_t.
         result = cb_env.cluster.query(f'SELECT * FROM `{cb_env.bucket.name}` LIMIT 100')
 
         async def consume() -> list[Any]:
@@ -632,17 +667,12 @@ class QueryTestSuite(SuiteRequirements):
             return rows
 
         task = asyncio.ensure_future(consume())
-        # Let the task start streaming (submit the query) and reach the first, blocking
-        # __anext__.
-        while result._request._streaming_result is None and not task.done():
-            await asyncio.sleep(0)
+        # One turn of the loop runs the task to its first wait, which is on the query it sent.
+        await asyncio.sleep(0)
+        assert task.done() is False
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-
-        # The cancellation must have reached through to the C++ streamed result.
-        assert result._request._streaming_result is not None
-        assert result._request._streaming_result.is_cancelled() is True
 
 
 class QueryCollectionTests(QueryCollectionTestSuite):

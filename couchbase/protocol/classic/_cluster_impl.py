@@ -20,15 +20,15 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
-from couchbase.analytics import AnalyticsRequest
 from couchbase.common._cluster_settings import ClusterSettings
-from couchbase.common._observability import ObservabilityInstruments
+from couchbase.common._observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._operations import Op
+from couchbase.common._streaming import RowIterator
 from couchbase.common.exceptions import ServiceUnavailableException, UnAmbiguousTimeoutException
 from couchbase.common.options import ClusterOptions
 from couchbase.common.result import (ClusterInfoResult,
                                      DiagnosticsResult,
                                      PingResult)
-from couchbase.n1ql import N1QLRequest
 from couchbase.protocol.classic._bindings import ConnectionBinding
 from couchbase.protocol.classic._bucket_impl import BucketImpl
 from couchbase.protocol.classic._client_adapter import ClientAdapter
@@ -43,6 +43,9 @@ from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_hdr_h
 from couchbase.protocol.classic._result import (_cluster_info_from_core,
                                                 _diagnostics_from_core,
                                                 _ping_from_core)
+from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
+                                                   ClassicStreamingExecutor,
+                                                   QueryStreamSpec)
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
@@ -55,14 +58,15 @@ if TYPE_CHECKING:
     from couchbase.auth import (CertificateAuthenticator,
                                 JwtAuthenticator,
                                 PasswordAuthenticator)
-    from couchbase.common.options import (DiagnosticsOptions,
+    from couchbase.common._utils import JSONType
+    from couchbase.common.options import (AnalyticsOptions,
+                                          DiagnosticsOptions,
                                           PingOptions,
+                                          QueryOptions,
                                           WaitUntilReadyOptions)
     from couchbase.common.protocol import CouchbaseProtocol
-    from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
-                                                           DiagnosticsRequest,
+    from couchbase.protocol.classic._cluster_types import (DiagnosticsRequest,
                                                            PingRequest,
-                                                           QueryRequest,
                                                            SearchQueryRequest)
     from couchbase.serializer import Serializer
 
@@ -207,8 +211,12 @@ class ClusterImpl:
         """**INTERNAL**"""
         return BucketImpl(name, self)
 
-    def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
-        """**INTERNAL**"""
+    def analytics_query(self,
+                        statement: str,
+                        *options: AnalyticsOptions | JSONType,
+                        **kwargs: Any) -> AnalyticsResult:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsQuery, self.observability_instruments)
+        req = self._request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the analytics_query was provided a timeout we will use that value for the streaming timeout
@@ -217,11 +225,11 @@ class ClusterImpl:
         # also does not specify an analytics_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('analytics_timeout', None)
-        return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self._client_adapter.connection,
-                                                                           req.analytics_query.params,
-                                                                           default_serializer=self.default_serializer,
-                                                                           streaming_timeout=streaming_timeout,
-                                                                           obs_handler=req.obs_handler))
+        return AnalyticsResult(RowIterator(ClassicStreamingExecutor(self._client_adapter.connection,
+                                                                    AnalyticsStreamSpec(req.analytics_query.params,
+                                                                                        self.default_serializer),
+                                                                    obs_handler=req.obs_handler,
+                                                                    streaming_timeout=streaming_timeout)))
 
     def close_connection(self) -> None:
         """**INTERNAL**"""
@@ -283,8 +291,12 @@ class ClusterImpl:
     def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
         return self._ping(self._request_builder.build_ping_request(opts, **kwargs))
 
-    def query(self, req: QueryRequest) -> QueryResult:
-        """**INTERNAL**"""
+    def query(self,
+              statement: str,
+              *options: QueryOptions | JSONType,
+              **kwargs: Any) -> QueryResult:
+        obs_handler = ObservableRequestHandler(Op.Query, self.observability_instruments)
+        req = self._request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the n1ql_query was provided a timeout we will use that value for the streaming timeout
@@ -293,11 +305,11 @@ class ClusterImpl:
         # also does not specify a query_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::query_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('query_timeout', None)
-        return QueryResult(N1QLRequest.generate_n1ql_request(self._client_adapter.connection,
-                                                             req.n1ql_query.params,
-                                                             default_serializer=self.default_serializer,
-                                                             streaming_timeout=streaming_timeout,
-                                                             obs_handler=req.obs_handler))
+        return QueryResult(RowIterator(ClassicStreamingExecutor(self._client_adapter.connection,
+                                                                QueryStreamSpec(req.n1ql_query.params,
+                                                                                self.default_serializer),
+                                                                obs_handler=req.obs_handler,
+                                                                streaming_timeout=streaming_timeout)))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
         """**INTERNAL**"""

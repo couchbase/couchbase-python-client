@@ -25,6 +25,7 @@ from typing import (Any,
                     Optional)
 
 from couchbase._utils import is_null_or_empty, timedelta_as_milliseconds
+from couchbase.common.n1ql import QueryScanConsistency
 from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
                                   EventingFunctionCollectionNotFoundException,
                                   EventingFunctionCompilationFailureException,
@@ -34,7 +35,6 @@ from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
                                   EventingFunctionNotFoundException,
                                   EventingFunctionNotUnDeployedException,
                                   InvalidArgumentException)
-from couchbase.logic.n1ql import QueryScanConsistency
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import EventingFunctionMgmtOperationType
 from couchbase.protocol.classic._management._mgmt_req import MgmtRequest

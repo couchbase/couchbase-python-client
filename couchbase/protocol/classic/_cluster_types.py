@@ -25,19 +25,20 @@ from typing import (TYPE_CHECKING,
                     TypedDict)
 
 from couchbase import USER_AGENT_EXTRA
+from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._option_diagnostics import OptionsBlock
 from couchbase.common._transforms import timedelta_as_milliseconds
 from couchbase.common.protocol import CouchbaseProtocol
-from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.logic.observability import ObservableRequestHandler as _OldObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.protocol.classic._bindings import ClusterMgmtBinding, ConnectionBinding
 from couchbase.protocol.classic._wire import mapped
 
 if TYPE_CHECKING:
-    from couchbase.analytics import AnalyticsQuery
     from couchbase.common._cluster_settings import ClusterSettings
     from couchbase.common.diagnostics import ClusterState
-    from couchbase.n1ql import N1QLQuery
+    from couchbase.protocol.classic._analytics import AnalyticsQuery
+    from couchbase.protocol.classic._n1ql import N1QLQuery
     from couchbase.search import SearchQueryBuilder
 
 
@@ -86,11 +87,6 @@ class ClusterRequest(ABC):
 class AnalyticsQueryRequest:
     analytics_query: AnalyticsQuery
     obs_handler: ObservableRequestHandler
-    num_workers: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return StreamingOperationType.AnalyticsQuery.value
 
 
 @dataclass
@@ -216,17 +212,12 @@ class PingRequest(ClusterRequest):
 class QueryRequest:
     n1ql_query: N1QLQuery
     obs_handler: ObservableRequestHandler
-    num_workers: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return StreamingOperationType.Query
 
 
 @dataclass
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
-    obs_handler: ObservableRequestHandler
+    obs_handler: _OldObservableRequestHandler
     num_workers: Optional[int] = None
 
     @property

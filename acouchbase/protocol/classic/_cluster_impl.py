@@ -22,13 +22,15 @@ from asyncio import AbstractEventLoop, sleep
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from acouchbase.analytics import AsyncAnalyticsRequest
-from acouchbase.n1ql import AsyncN1QLRequest
 from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
 from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
+from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor
+from acouchbase.result import AsyncAnalyticsResult, AsyncQueryResult
 from acouchbase.search import AsyncFullTextSearchRequest
 from acouchbase.transactions import Transactions
-from couchbase.common._observability import ObservabilityInstruments
+from couchbase.common._observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._operations import Op
+from couchbase.common._streaming import AsyncRowIterator
 from couchbase.common.exceptions import ServiceUnavailableException, UnAmbiguousTimeoutException
 from couchbase.common.result import (ClusterInfoResult,
                                      DiagnosticsResult,
@@ -45,9 +47,8 @@ from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_hdr_h
 from couchbase.protocol.classic._result import (_cluster_info_from_core,
                                                 _diagnostics_from_core,
                                                 _ping_from_core)
-from couchbase.result import (AnalyticsResult,
-                              QueryResult,
-                              SearchResult)
+from couchbase.protocol.classic._streaming import AnalyticsStreamSpec, QueryStreamSpec
+from couchbase.result import SearchResult
 from couchbase.serializer import Serializer
 
 if TYPE_CHECKING:
@@ -56,15 +57,16 @@ if TYPE_CHECKING:
     from couchbase.auth import (CertificateAuthenticator,
                                 JwtAuthenticator,
                                 PasswordAuthenticator)
-    from couchbase.common.options import (ClusterOptions,
+    from couchbase.common._utils import JSONType
+    from couchbase.common.options import (AnalyticsOptions,
+                                          ClusterOptions,
                                           DiagnosticsOptions,
                                           PingOptions,
+                                          QueryOptions,
                                           WaitUntilReadyOptions)
     from couchbase.common.protocol import CouchbaseProtocol
-    from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
-                                                           DiagnosticsRequest,
+    from couchbase.protocol.classic._cluster_types import (DiagnosticsRequest,
                                                            PingRequest,
-                                                           QueryRequest,
                                                            SearchQueryRequest,
                                                            WaitUntilReadyRequest)
 
@@ -206,8 +208,12 @@ class AsyncClusterImpl:
         """**INTERNAL**"""
         return AsyncBucketImpl(name, self)
 
-    def analytics_query(self, req: AnalyticsQueryRequest) -> AnalyticsResult:
-        """**INTERNAL**"""
+    def analytics_query(self,
+                        statement: str,
+                        *options: AnalyticsOptions | JSONType,
+                        **kwargs: Any) -> AsyncAnalyticsResult:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsQuery, self.observability_instruments)
+        req = self._request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the analytics_query was provided a timeout we will use that value for the streaming timeout
@@ -216,13 +222,13 @@ class AsyncClusterImpl:
         # also does not specify an analytics_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::analytics_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('analytics_timeout', None)
-        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self._client_adapter.connection,
-                                                                                self.loop,
-                                                                                req.analytics_query.params,
-                                                                                default_serializer=self.default_serializer,  # noqa: E501
-                                                                                streaming_timeout=streaming_timeout,
-                                                                                obs_handler=req.obs_handler,
-                                                                                num_workers=req.num_workers))
+        executor = ClassicAsyncStreamingExecutor(self._client_adapter.connection,
+                                                 AnalyticsStreamSpec(req.analytics_query.params,
+                                                                     self.default_serializer),
+                                                 self._client_adapter.loop,
+                                                 obs_handler=req.obs_handler,
+                                                 streaming_timeout=streaming_timeout)
+        return AsyncAnalyticsResult(AsyncRowIterator(executor))
 
     async def close_connection(self) -> None:
         """**INTERNAL**"""
@@ -285,8 +291,12 @@ class AsyncClusterImpl:
     async def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
         return await self._ping(self._request_builder.build_ping_request(opts, **kwargs))
 
-    def query(self, req: QueryRequest) -> QueryResult:
-        """**INTERNAL**"""
+    def query(self,
+              statement: str,
+              *options: QueryOptions | JSONType,
+              **kwargs: Any) -> AsyncQueryResult:
+        obs_handler = ObservableRequestHandler(Op.Query, self.observability_instruments)
+        req = self._request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the n1ql_query was provided a timeout we will use that value for the streaming timeout
@@ -295,13 +305,12 @@ class AsyncClusterImpl:
         # also does not specify a query_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::query_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('query_timeout', None)
-        return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self._client_adapter.connection,
-                                                                  self._client_adapter.loop,
-                                                                  req.n1ql_query.params,
-                                                                  default_serializer=self.default_serializer,
-                                                                  streaming_timeout=streaming_timeout,
-                                                                  obs_handler=req.obs_handler,
-                                                                  num_workers=req.num_workers))
+        executor = ClassicAsyncStreamingExecutor(self._client_adapter.connection,
+                                                 QueryStreamSpec(req.n1ql_query.params, self.default_serializer),
+                                                 self._client_adapter.loop,
+                                                 obs_handler=req.obs_handler,
+                                                 streaming_timeout=streaming_timeout)
+        return AsyncQueryResult(AsyncRowIterator(executor))
 
     def search(self, req: SearchQueryRequest) -> SearchResult:
         """**INTERNAL**"""

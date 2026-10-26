@@ -25,12 +25,12 @@ import pytest
 import pytest_asyncio
 
 from acouchbase.management.views import DesignDocumentNamespace
+from couchbase.common._operations import Op
 from couchbase.exceptions import (CouchbaseException,
                                   DataverseNotFoundException,
                                   DesignDocumentNotFoundException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
-from couchbase.logic.observability import OpName
 from couchbase.search import SearchRequest, TermQuery
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   ConnectionStrategy,
@@ -146,7 +146,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     async def test_query(self, cb_env: AsyncTestEnvironment, http_validator: HttpMeterValidator) -> None:
         result = cb_env.cluster.query(TRIVIAL_STATEMENT)
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query)
+        http_validator.validate_http_op(Op.Query)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_query_supported')
@@ -155,7 +155,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                           http_validator: HttpMeterValidator) -> None:
         result = cb_env.cluster.query(NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query)
+        http_validator.validate_http_op(Op.Query)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_query_supported')
@@ -164,7 +164,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                                http_validator: HttpMeterValidator) -> None:
         result = cb_env.cluster.query(POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query)
+        http_validator.validate_http_op(Op.Query)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_query_supported')
@@ -174,7 +174,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(ParsingFailedException):
             result = cb_env.cluster.query(INVALID_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.Query, validate_error=True)
+        http_validator.validate_http_op(Op.Query, validate_error=True)
 
     # ------------------------------------------------------------------
     # Query, on a scope
@@ -186,7 +186,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     async def test_scope_query(self, cb_env: AsyncTestEnvironment, http_validator: HttpMeterValidator) -> None:
         result = cb_env.scope.query(TRIVIAL_STATEMENT)
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
 
@@ -198,7 +198,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                                 http_validator: HttpMeterValidator) -> None:
         result = cb_env.scope.query(NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
 
@@ -210,7 +210,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                                      http_validator: HttpMeterValidator) -> None:
         result = cb_env.scope.query(POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
 
@@ -223,7 +223,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(ParsingFailedException):
             result = cb_env.scope.query(INVALID_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -237,7 +237,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     async def test_analytics_query(self, cb_env: AsyncTestEnvironment, http_validator: HttpMeterValidator) -> None:
         result = cb_env.cluster.analytics_query(TRIVIAL_STATEMENT)
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery)
+        http_validator.validate_http_op(Op.AnalyticsQuery)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -246,7 +246,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                                     http_validator: HttpMeterValidator) -> None:
         result = cb_env.cluster.analytics_query(NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery)
+        http_validator.validate_http_op(Op.AnalyticsQuery)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -255,7 +255,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                                          http_validator: HttpMeterValidator) -> None:
         result = cb_env.cluster.analytics_query(POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery)
+        http_validator.validate_http_op(Op.AnalyticsQuery)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -271,7 +271,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(CouchbaseException):
             result = cb_env.cluster.analytics_query(INVALID_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.AnalyticsQuery, validate_error=True)
+        http_validator.validate_http_op(Op.AnalyticsQuery, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -285,7 +285,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(DataverseNotFoundException):
             result = cb_env.scope.analytics_query(TRIVIAL_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.AnalyticsQuery,
+        http_validator.validate_http_op(Op.AnalyticsQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -305,7 +305,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(QueryIndexNotFoundException):
             result = cb_env.cluster.search(MISSING_INDEX, MISSING_INDEX_REQUEST)
             await AsyncSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery, validate_error=True)
+        http_validator.validate_http_op(Op.SearchQuery, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_scope_search_supported')
@@ -315,7 +315,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(QueryIndexNotFoundException):
             result = cb_env.scope.search(MISSING_INDEX, MISSING_INDEX_REQUEST)
             await AsyncSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery,
+        http_validator.validate_http_op(Op.SearchQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -332,7 +332,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                               limit=10,
                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
             await AsyncViewsEnvironment.drain(result)
-        http_validator.validate_http_op(OpName.ViewQuery,
+        http_validator.validate_http_op(Op.ViewQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name)
 

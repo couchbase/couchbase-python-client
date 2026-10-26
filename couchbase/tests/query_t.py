@@ -53,7 +53,9 @@ from tests.manifest import validate_test_manifest
 from tests.skips import (server_label,
                          skip_feature_unsupported,
                          skip_known_issue)
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class QueryCollectionTestSuite(SuiteRequirements):
@@ -75,6 +77,9 @@ class QueryCollectionTestSuite(SuiteRequirements):
         'test_scope_query_with_positional_params_in_options',
     ]
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_bad_query_context(self, cb_env: SyncTestEnvironment) -> None:
         q_str = f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2"
         # test w/ no context
@@ -88,6 +93,7 @@ class QueryCollectionTestSuite(SuiteRequirements):
             result = cb_env.cluster.query(q_str, QueryOptions(query_context=q_context))
             cb_env.assert_rows_exact(result, 2)
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_bad_scope_query(self, cb_env: SyncTestEnvironment) -> None:
         q_str = f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2"
         q_context = f'{cb_env.bucket.name}.`fake-scope`'
@@ -116,8 +122,6 @@ class QueryCollectionTestSuite(SuiteRequirements):
         result = cb_env.cluster.query(f"SELECT * FROM {cb_env.fqdn} LIMIT 2")
         cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None
-        # if adhoc is not set, it should be None
-        assert result._request.params.get('adhoc', None) is None
 
     # Driven by a plain threading.Thread, so it has no async analogue: acouchbase and
     # txcouchbase objects are bound to an event loop (a reactor under Twisted), and
@@ -154,7 +158,8 @@ class QueryCollectionTestSuite(SuiteRequirements):
     def test_query_metadata(self, cb_env: SyncTestEnvironment) -> None:
         result = cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2")
         cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -172,7 +177,8 @@ class QueryCollectionTestSuite(SuiteRequirements):
         result = cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2",
                                     QueryOptions(metrics=False))
         cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -210,7 +216,8 @@ class QueryCollectionTestSuite(SuiteRequirements):
             f"SELECT * FROM `{cb_env.collection.name}` LIMIT 1", QueryOptions(metrics=True))
         cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         assert isinstance(metadata, QueryMetaData)
         metrics = metadata.metrics()
         assert isinstance(metrics, QueryMetrics)
@@ -286,6 +293,7 @@ class QueryTestSuite(SuiteRequirements):
     def check_preserve_expiry_supported(self, cb_env: SyncTestEnvironment) -> None:
         EnvironmentFeatures.check_if_feature_supported(ServerFeatures.PreserveExpiry, cb_env.server_context)
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_bad_query(self, cb_env: SyncTestEnvironment) -> None:
         with pytest.raises(ParsingFailedException):
             result = cb_env.cluster.query("I'm not N1QL!")
@@ -337,17 +345,19 @@ class QueryTestSuite(SuiteRequirements):
         assert expiry2 is not None
         assert expiry1 == expiry2
 
+    # couchbase2 carries a GenericErrorContext on every exception.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_query_error_context(self, cb_env: SyncTestEnvironment) -> None:
-        try:
+        with pytest.raises(CouchbaseException) as ex:
             result = cb_env.cluster.query("SELECT * FROM no_such_bucket")
             cb_env.drain_rows(result)
-        except CouchbaseException as ex:
-            assert isinstance(ex.context, QueryErrorContext)
-            assert ex.context.statement is not None
-            assert ex.context.first_error_code is not None
-            assert ex.context.first_error_message is not None
-            assert ex.context.client_context_id is not None
-            assert ex.context.response_body is not None
+        context = ex.value.error_context
+        assert isinstance(context, QueryErrorContext)
+        assert context.statement is not None
+        assert context.first_error_code is not None
+        assert context.first_error_message is not None
+        assert context.client_context_id is not None
+        assert context.response_body is not None
 
     # Driven by a plain threading.Thread, so it has no async analogue: acouchbase and
     # txcouchbase objects are bound to an event loop (a reactor under Twisted), and
@@ -383,7 +393,8 @@ class QueryTestSuite(SuiteRequirements):
         result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` "
                                       f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2")
         cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -402,7 +413,8 @@ class QueryTestSuite(SuiteRequirements):
                                       f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2",
                                       QueryOptions(metrics=False))
         cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
@@ -519,7 +531,8 @@ class QueryTestSuite(SuiteRequirements):
             f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 1", QueryOptions(metrics=True))
         cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
-        metadata = result.metadata()  # type: QueryMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         assert isinstance(metadata, QueryMetaData)
         metrics = metadata.metrics()
         assert isinstance(metrics, QueryMetrics)
@@ -548,15 +561,15 @@ class QueryTestSuite(SuiteRequirements):
             f"SELECT * FROM `{cb_env.bucket.name}` "
             f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 1", QueryOptions(profile=QueryProfile.TIMINGS))
         cb_env.assert_rows_exact(result, 1)
-        assert result.metadata().profile() is not None
+        metadata = result.metadata()
+        assert metadata is not None
+        assert metadata.profile() is not None
 
     def test_simple_query(self, cb_env: SyncTestEnvironment) -> None:
         result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` "
                                       f"WHERE batch LIKE '{cb_env.get_batch_id()}%' LIMIT 2")
         cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None
-        # if adhoc is not set, it should be None
-        assert result._request.params.get('adhoc', None) is None
 
     def test_simple_query_explain(self, cb_env: SyncTestEnvironment) -> None:
         result = cb_env.cluster.query(f"EXPLAIN SELECT * FROM `{cb_env.bucket.name}` LIMIT 2",
@@ -568,7 +581,9 @@ class QueryTestSuite(SuiteRequirements):
         assert len(rows) == 1
         assert 'plan' in rows[0]
         assert result.metadata() is not None
-        assert result.metadata().metrics() is not None
+        metadata = result.metadata()
+        assert metadata is not None
+        assert metadata.metrics() is not None
 
     def test_simple_query_prepared(self, cb_env: SyncTestEnvironment) -> None:
         assert cb_env.server_version_short is not None
@@ -585,8 +600,9 @@ class QueryTestSuite(SuiteRequirements):
                                       QueryOptions(adhoc=False, metrics=True))
         cb_env.assert_rows_exact(result, 2)
         assert result.metadata() is not None
-        assert result.metadata().metrics() is not None
-        assert result._request.params.get('adhoc', None) is False
+        metadata = result.metadata()
+        assert metadata is not None
+        assert metadata.metrics() is not None
 
     def test_simple_query_with_named_params(self, cb_env: SyncTestEnvironment) -> None:
         result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` WHERE batch LIKE $batch LIMIT 2",

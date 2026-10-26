@@ -56,7 +56,12 @@ files = ["tests", "couchbase/tests", "acouchbase/tests", "txcouchbase/tests", "c
          "couchbase/protocol/classic/_registry.py", "couchbase/common/_utils.py", "couchbase/common/auth.py",
          "couchbase/common/serializer.py", "couchbase/common/transcoder.py", "couchbase/common/_tracing.py",
          "couchbase/common/_durability.py", "couchbase/common/durability.py",
-         "couchbase/common/mutation_state.py"]
+         "couchbase/common/mutation_state.py", "couchbase/common/n1ql.py", "couchbase/common/analytics.py",
+         "couchbase/common/views.py", "couchbase/common/_streaming.py",
+         "acouchbase/protocol/classic/_streaming.py", "txcouchbase/protocol/classic/_streaming.py",
+         "couchbase/protocol/classic/_n1ql.py", "couchbase/protocol/classic/_analytics.py",
+         "couchbase/protocol/classic/_views.py", "couchbase/protocol/classic/_bucket_req_builder.py",
+         "couchbase/protocol/classic/_bucket_types.py"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 

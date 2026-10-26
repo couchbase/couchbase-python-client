@@ -259,6 +259,7 @@ not_generated:
   # manager exercises the constructors and the outbound `as_dict()`; nothing in it reads a
   # server payload back, and inbound and outbound are not the same shape.
   cluster_free:
+    - couchbase/tests/analytics_metadata_t.py
     - couchbase/tests/analytics_params_t.py
     - couchbase/tests/bucketmgmt_bucket_settings_t.py
     - couchbase/tests/classic_streaming_t.py
@@ -273,6 +274,7 @@ not_generated:
     - couchbase/tests/no_op_observability_t.py
     - couchbase/tests/option_diagnostics_t.py
     - couchbase/tests/pycbc_core_t.py
+    - couchbase/tests/query_metadata_t.py
     - couchbase/tests/query_params_t.py
     - couchbase/tests/scope_req_builder_t.py
     - couchbase/tests/search_params_t.py
@@ -296,8 +298,8 @@ not_generated:
 
   # Driven through a stand-in rather than through a server, and the stand-in is API-specific: the
   # request object stream_next reads, and the row iterators' executor.  acouchbase carries a
-  # hand-written counterpart to each, not a sidecar, there being no generated file for a sidecar
-  # to merge into.
+  # hand-written counterpart to the second, not a sidecar, there being no generated file for a
+  # sidecar to merge into.
   api_specific_fake:
     - couchbase/tests/streaming_helpers_t.py
     - couchbase/tests/streaming_iterators_t.py

@@ -25,12 +25,12 @@ import pytest
 import pytest_asyncio
 
 from acouchbase.management.views import DesignDocumentNamespace
+from couchbase.common._operations import Op
 from couchbase.exceptions import (CouchbaseException,
                                   DataverseNotFoundException,
                                   DesignDocumentNotFoundException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
-from couchbase.logic.observability import OpName
 from couchbase.options import (AnalyticsOptions,
                                QueryOptions,
                                SearchOptions,
@@ -161,7 +161,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
     async def test_query(self, cb_env: AsyncTestEnvironment, http_validator: HttpSpanValidator) -> None:
         result = cb_env.cluster.query(TRIVIAL_STATEMENT)
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query)
+        http_validator.validate_http_op(Op.Query)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_query_supported')
@@ -169,7 +169,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                           http_validator: HttpSpanValidator) -> None:
         result = cb_env.cluster.query(NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query, statement=NAMED_PARAM_STATEMENT)
+        http_validator.validate_http_op(Op.Query, statement=NAMED_PARAM_STATEMENT)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_query_supported')
@@ -177,7 +177,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                                http_validator: HttpSpanValidator) -> None:
         result = cb_env.cluster.query(POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query, statement=POSITIONAL_PARAM_STATEMENT)
+        http_validator.validate_http_op(Op.Query, statement=POSITIONAL_PARAM_STATEMENT)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_query_supported')
@@ -186,15 +186,15 @@ class StreamingTracingTestSuite(SuiteRequirements):
         with pytest.raises(ParsingFailedException):
             result = cb_env.cluster.query(INVALID_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.Query, validate_error=True)
+        http_validator.validate_http_op(Op.Query, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_query_supported')
     async def test_query_with_parent(self, cb_env: AsyncTestEnvironment, http_validator: HttpSpanValidator) -> None:
-        parent = http_validator.new_parent_span(OpName.Query)
+        parent = http_validator.new_parent_span(Op.Query)
         result = cb_env.cluster.query(TRIVIAL_STATEMENT, QueryOptions(parent_span=parent))
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query, parent_span=parent)
+        http_validator.validate_http_op(Op.Query, parent_span=parent)
 
     # ------------------------------------------------------------------
     # Query, on a scope
@@ -206,7 +206,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
     async def test_scope_query(self, cb_env: AsyncTestEnvironment, http_validator: HttpSpanValidator) -> None:
         result = cb_env.scope.query(TRIVIAL_STATEMENT)
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
 
@@ -217,7 +217,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                                 http_validator: HttpSpanValidator) -> None:
         result = cb_env.scope.query(NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         statement=NAMED_PARAM_STATEMENT,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -229,7 +229,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                                      http_validator: HttpSpanValidator) -> None:
         result = cb_env.scope.query(POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         statement=POSITIONAL_PARAM_STATEMENT,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -242,7 +242,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
         with pytest.raises(ParsingFailedException):
             result = cb_env.scope.query(INVALID_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -252,10 +252,10 @@ class StreamingTracingTestSuite(SuiteRequirements):
     @pytest.mark.usefixtures('check_collections_supported')
     async def test_scope_query_with_parent(self, cb_env: AsyncTestEnvironment,
                                            http_validator: HttpSpanValidator) -> None:
-        parent = http_validator.new_parent_span(OpName.Query)
+        parent = http_validator.new_parent_span(Op.Query)
         result = cb_env.scope.query(TRIVIAL_STATEMENT, QueryOptions(parent_span=parent))
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         parent_span=parent,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -269,7 +269,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
     async def test_analytics_query(self, cb_env: AsyncTestEnvironment, http_validator: HttpSpanValidator) -> None:
         result = cb_env.cluster.analytics_query(TRIVIAL_STATEMENT)
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery)
+        http_validator.validate_http_op(Op.AnalyticsQuery)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -277,7 +277,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                                     http_validator: HttpSpanValidator) -> None:
         result = cb_env.cluster.analytics_query(NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery, statement=NAMED_PARAM_STATEMENT)
+        http_validator.validate_http_op(Op.AnalyticsQuery, statement=NAMED_PARAM_STATEMENT)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -285,7 +285,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                                          http_validator: HttpSpanValidator) -> None:
         result = cb_env.cluster.analytics_query(POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery, statement=POSITIONAL_PARAM_STATEMENT)
+        http_validator.validate_http_op(Op.AnalyticsQuery, statement=POSITIONAL_PARAM_STATEMENT)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -299,16 +299,16 @@ class StreamingTracingTestSuite(SuiteRequirements):
         with pytest.raises(CouchbaseException):
             result = cb_env.cluster.analytics_query(INVALID_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.AnalyticsQuery, validate_error=True)
+        http_validator.validate_http_op(Op.AnalyticsQuery, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
     async def test_analytics_query_with_parent(self, cb_env: AsyncTestEnvironment,
                                                http_validator: HttpSpanValidator) -> None:
-        parent = http_validator.new_parent_span(OpName.AnalyticsQuery)
+        parent = http_validator.new_parent_span(Op.AnalyticsQuery)
         result = cb_env.cluster.analytics_query(TRIVIAL_STATEMENT, AnalyticsOptions(parent_span=parent))
         await cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery, parent_span=parent)
+        http_validator.validate_http_op(Op.AnalyticsQuery, parent_span=parent)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_analytics_supported')
@@ -321,7 +321,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
         with pytest.raises(DataverseNotFoundException):
             result = cb_env.scope.analytics_query(TRIVIAL_STATEMENT)
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.AnalyticsQuery,
+        http_validator.validate_http_op(Op.AnalyticsQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -331,11 +331,11 @@ class StreamingTracingTestSuite(SuiteRequirements):
     @pytest.mark.usefixtures('check_collections_supported')
     async def test_scope_analytics_query_with_parent(self, cb_env: AsyncTestEnvironment,
                                                      http_validator: HttpSpanValidator) -> None:
-        parent = http_validator.new_parent_span(OpName.AnalyticsQuery)
+        parent = http_validator.new_parent_span(Op.AnalyticsQuery)
         with pytest.raises(DataverseNotFoundException):
             result = cb_env.scope.analytics_query(TRIVIAL_STATEMENT, AnalyticsOptions(parent_span=parent))
             await cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.AnalyticsQuery,
+        http_validator.validate_http_op(Op.AnalyticsQuery,
                                         parent_span=parent,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
@@ -355,17 +355,17 @@ class StreamingTracingTestSuite(SuiteRequirements):
         with pytest.raises(QueryIndexNotFoundException):
             result = cb_env.cluster.search(MISSING_INDEX, MISSING_INDEX_REQUEST)
             await AsyncSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery, validate_error=True)
+        http_validator.validate_http_op(Op.SearchQuery, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_search_supported')
     async def test_search_query_missing_index_with_parent(self, cb_env: AsyncTestEnvironment,
                                                           http_validator: HttpSpanValidator) -> None:
-        parent = http_validator.new_parent_span(OpName.SearchQuery)
+        parent = http_validator.new_parent_span(Op.SearchQuery)
         with pytest.raises(QueryIndexNotFoundException):
             result = cb_env.cluster.search(MISSING_INDEX, MISSING_INDEX_REQUEST, SearchOptions(parent_span=parent))
             await AsyncSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery, parent_span=parent, validate_error=True)
+        http_validator.validate_http_op(Op.SearchQuery, parent_span=parent, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_scope_search_supported')
@@ -374,7 +374,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
         with pytest.raises(QueryIndexNotFoundException):
             result = cb_env.scope.search(MISSING_INDEX, MISSING_INDEX_REQUEST)
             await AsyncSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery,
+        http_validator.validate_http_op(Op.SearchQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -383,11 +383,11 @@ class StreamingTracingTestSuite(SuiteRequirements):
     @pytest.mark.usefixtures('check_scope_search_supported')
     async def test_scope_search_query_missing_index_with_parent(self, cb_env: AsyncTestEnvironment,
                                                                 http_validator: HttpSpanValidator) -> None:
-        parent = http_validator.new_parent_span(OpName.SearchQuery)
+        parent = http_validator.new_parent_span(Op.SearchQuery)
         with pytest.raises(QueryIndexNotFoundException):
             result = cb_env.scope.search(MISSING_INDEX, MISSING_INDEX_REQUEST, SearchOptions(parent_span=parent))
             await AsyncSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery,
+        http_validator.validate_http_op(Op.SearchQuery,
                                         parent_span=parent,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
@@ -404,7 +404,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                               limit=10,
                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
             await AsyncViewsEnvironment.drain(result)
-        http_validator.validate_http_op(OpName.ViewQuery,
+        http_validator.validate_http_op(Op.ViewQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name)
 
@@ -412,7 +412,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
     @pytest.mark.usefixtures('check_views_supported')
     async def test_view_query_missing_design_document_with_parent(self, cb_env: AsyncTestEnvironment,
                                                                   http_validator: HttpSpanValidator) -> None:
-        parent = http_validator.new_parent_span(OpName.ViewQuery)
+        parent = http_validator.new_parent_span(Op.ViewQuery)
         with pytest.raises(DesignDocumentNotFoundException):
             result = cb_env.bucket.view_query(MISSING_DESIGN_DOCUMENT,
                                               MISSING_VIEW,
@@ -420,7 +420,7 @@ class StreamingTracingTestSuite(SuiteRequirements):
                                               limit=10,
                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
             await AsyncViewsEnvironment.drain(result)
-        http_validator.validate_http_op(OpName.ViewQuery,
+        http_validator.validate_http_op(Op.ViewQuery,
                                         parent_span=parent,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name)

@@ -35,6 +35,7 @@ from acouchbase.management.eventing import EventingFunctionManager
 from acouchbase.management.queries import QueryIndexManager
 from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
+from acouchbase.result import AsyncAnalyticsResult, AsyncQueryResult
 from acouchbase.transactions import Transactions
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
@@ -43,11 +44,9 @@ from couchbase.common._registry import ASYNC_CLUSTER, resolve
 from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.logic.observability import ObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.result import (AnalyticsResult,
-                              ClusterInfoResult,
+from couchbase.result import (ClusterInfoResult,
                               DiagnosticsResult,
                               PingResult,
-                              QueryResult,
                               SearchResult)
 
 if TYPE_CHECKING:
@@ -279,16 +278,12 @@ class AsyncCluster:
         """
         await self._impl.wait_until_ready(timeout, opts, **kwargs)
 
-    def query(self,
-              statement,  # type: str
-              *options,  # type: Union[QueryOptions, JSONType]
-              **kwargs  # type: Any
-              ) -> QueryResult:
+    def query(self, statement: str, *options: QueryOptions | JSONType, **kwargs: Any) -> AsyncQueryResult:
         """Executes a N1QL query against the cluster.
 
         .. note::
             The query is executed lazily in that it is executed once iteration over the
-            :class:`~couchbase.result.QueryResult` begins.
+            :class:`~acouchbase.result.AsyncQueryResult` begins.
 
         .. seealso::
             * :class:`~acouchbase.management.queries.QueryIndexManager`: for how to manage query indexes
@@ -297,12 +292,13 @@ class AsyncCluster:
         Args:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.QueryOptions`
 
         Returns:
-            :class:`~couchbase.result.QueryResult`: An instance of a :class:`~couchbase.result.QueryResult` which
-            provides access to iterate over the query results and access metadata and metrics about the query.
+            :class:`~acouchbase.result.AsyncQueryResult`: An instance of a
+            :class:`~acouchbase.result.AsyncQueryResult` which provides access to iterate over the
+            query results and access metadata and metrics about the query.
 
         Examples:
             Simple query::
@@ -313,7 +309,7 @@ class AsyncCluster:
 
             Simple query with positional parameters::
 
-                from couchbase.options import QueryOptions
+                from acouchbase.options import QueryOptions
 
                 # ... other code ...
 
@@ -324,7 +320,7 @@ class AsyncCluster:
 
             Simple query with named parameters::
 
-                from couchbase.options import QueryOptions
+                from acouchbase.options import QueryOptions
 
                 # ... other code ...
 
@@ -335,7 +331,7 @@ class AsyncCluster:
 
             Retrieve metadata and/or metrics from query::
 
-                from couchbase.options import QueryOptions
+                from acouchbase.options import QueryOptions
 
                 # ... other code ...
 
@@ -348,36 +344,33 @@ class AsyncCluster:
                 print(f'Query metrics: {q_res.metadata().metrics()}')
 
         """
-        op_type = StreamingOperationType.Query
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
-        return self._impl.query(req)
+        return self._impl.query(statement, *options, **kwargs)
 
-    def analytics_query(self,  # type: Cluster
-                        statement,  # type: str
-                        *options,  # type: Union[AnalyticsOptions, JSONType]
-                        **kwargs,  # type: Any
-                        ) -> AnalyticsResult:
+    def analytics_query(self,
+                        statement: str,
+                        *options: AnalyticsOptions | JSONType,
+                        **kwargs: Any) -> AsyncAnalyticsResult:
         """Executes an analaytics query against the cluster.
 
         .. note::
             The analytics query is executed lazily in that it is executed once iteration over the
-            :class:`~couchbase.result.AnalyticsResult` begins.
+            :class:`~acouchbase.result.AsyncAnalyticsResult` begins.
 
         .. seealso::
-            * :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses, datasets, indexes and links.
+            * :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses,
+              datasets, indexes and links.
             * :meth:`~acouchbase.scope.AsyncScope.analytics_query`: for how to execute scope-level analytics queries
 
         Args:
             statement (str): The analytics SQL++ statement to execute.
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AnalyticsOptions`
 
         Returns:
-            :class:`~couchbase.result.AnalyticsResult`: An instance of a
-            :class:`~couchbase.result.AnalyticsResult` which provides access to iterate over the analytics
+            :class:`~acouchbase.result.AsyncAnalyticsResult`: An instance of a
+            :class:`~acouchbase.result.AsyncAnalyticsResult` which provides access to iterate over the analytics
             query results and access metadata and metrics about the analytics query.
 
         Examples:
@@ -394,7 +387,7 @@ class AsyncCluster:
 
             Simple analytics query with positional parameters::
 
-                from couchbase.options import AnalyticsOptions
+                from acouchbase.options import AnalyticsOptions
 
                 # ... other code ...
 
@@ -405,7 +398,7 @@ class AsyncCluster:
 
             Simple analytics query with named parameters::
 
-                from couchbase.options import AnalyticsOptions
+                from acouchbase.options import AnalyticsOptions
 
                 # ... other code ...
 
@@ -425,11 +418,8 @@ class AsyncCluster:
                 print(f'Analytics query metadata: {q_res.metadata()}')
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
-        """  # noqa: E501
-        op_type = StreamingOperationType.AnalyticsQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
-        return self._impl.analytics_query(req)
+        """
+        return self._impl.analytics_query(statement, *options, **kwargs)
 
     def search_query(self,
                      index,  # type: str

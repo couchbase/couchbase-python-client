@@ -17,12 +17,13 @@ from __future__ import annotations
 
 from typing import Union
 
-from couchbase.analytics import AnalyticsQuery
+from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._supportability import Supportability
+from couchbase.common.options import AnalyticsOptions, QueryOptions
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.n1ql import N1QLQuery
-from couchbase.options import AnalyticsOptions, QueryOptions
+from couchbase.logic.observability import ObservableRequestHandler as _OldObservableRequestHandler
+from couchbase.protocol.classic._analytics import AnalyticsQuery
+from couchbase.protocol.classic._n1ql import N1QLQuery
 from couchbase.protocol.classic._scope_types import (AnalyticsQueryRequest,
                                                      QueryRequest,
                                                      SearchQueryRequest)
@@ -53,12 +54,9 @@ class ScopeRequestBuilder:
         if not ('query_context' in opt or 'query_context' in kwargs):
             kwargs['query_context'] = 'default:`{}`.`{}`'.format(self._bucket_name, self._scope_name)
 
-        num_workers = kwargs.pop('num_workers', None)
-        req = AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs), obs_handler)
-        # since query is lazy executed, we wait until we submit the query to create the span
-        if num_workers:
-            req.num_workers = num_workers
-        return req
+        # Accepted and discarded; the statement's builder would send it as a named parameter.
+        kwargs.pop('num_workers', None)
+        return AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs), obs_handler)
 
     def build_query_request(self,
                             statement: str,
@@ -76,17 +74,14 @@ class ScopeRequestBuilder:
         if not ('query_context' in opt or 'query_context' in kwargs):
             kwargs['query_context'] = '`{}`.`{}`'.format(self._bucket_name, self._scope_name)
 
-        num_workers = kwargs.pop('num_workers', None)
-        req = QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs), obs_handler)
-        # since query is lazy executed, we wait until we submit the query to create the span
-        if num_workers:
-            req.num_workers = num_workers
-        return req
+        # Accepted and discarded; the statement's builder would send it as a named parameter.
+        kwargs.pop('num_workers', None)
+        return QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs), obs_handler)
 
     def build_search_request(self,
                              index: str,
                              request: Union[SearchRequest, SearchQuery],
-                             obs_handler: ObservableRequestHandler,
+                             obs_handler: _OldObservableRequestHandler,
                              *options: object,
                              **kwargs: object) -> SearchQueryRequest:
         num_workers = kwargs.pop('num_workers', None)
@@ -108,7 +103,7 @@ class ScopeRequestBuilder:
     def build_search_query_request(self,
                                    index: str,
                                    query: SearchQuery,
-                                   obs_handler: ObservableRequestHandler,
+                                   obs_handler: _OldObservableRequestHandler,
                                    *options: object,
                                    **kwargs: object) -> SearchQueryRequest:
         if isinstance(query, SearchRequest):

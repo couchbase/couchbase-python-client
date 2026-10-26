@@ -33,8 +33,8 @@ from couchbase.serializer import DefaultJsonSerializer
 class QueryParamsUnitTests:
     # No cb_env and no TEST_MANIFEST: every test builds an N1QLQuery and reads the dict it
     # would hand the core.  Not generated either: `acouchbase.n1ql.N1QLQuery` is
-    # `couchbase.logic.n1ql.N1QLQuery`, the same object rather than a subclass, and
-    # `txcouchbase.n1ql` does not re-export it at all.
+    # `couchbase.protocol.classic._n1ql.N1QLQuery`, the same object rather than a subclass, and
+    # `txcouchbase.n1ql` exports no `N1QLQuery`.
 
     Q_STR = 'SELECT * FROM default'
 
@@ -209,6 +209,11 @@ class QueryParamsUnitTests:
 
         assert query.params['scan_wait'] == 30000
         assert query.scan_wait == 30
+
+    def test_params_send_to_node(self) -> None:
+        # An option, so it is sent as one and never as the named parameter `$send_to_node`.
+        query = N1QLQuery.create_query_object(self.Q_STR, QueryOptions(send_to_node='10.0.0.1:8093'))
+        assert query.params == self._expected(send_to_node='10.0.0.1:8093')
 
     def test_params_serializer(self) -> None:
         serializer = DefaultJsonSerializer()

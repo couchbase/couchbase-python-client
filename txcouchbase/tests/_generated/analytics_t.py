@@ -81,7 +81,8 @@ class AnalyticsCollectionTestSuite(SuiteRequirements):
         q_str = f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2'
         result = run_in_reactor_thread(cb_env.scope.analytics_query, q_str)
         cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: AnalyticsMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         assert isinstance(metadata, AnalyticsMetaData)
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
@@ -101,7 +102,8 @@ class AnalyticsCollectionTestSuite(SuiteRequirements):
         result = run_in_reactor_thread(cb_env.scope.analytics_query, q_str)
         cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
-        metadata = result.metadata()  # type: AnalyticsMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         metrics = metadata.metrics()
         assert isinstance(metrics, AnalyticsMetrics)
         assert isinstance(metrics.elapsed_time(), timedelta)
@@ -223,7 +225,8 @@ class AnalyticsTestSuite(SuiteRequirements):
         q_str = f'SELECT * FROM `{TwistedAnalyticsEnvironment.DATASET_NAME}` LIMIT 2'
         result = run_in_reactor_thread(cb_env.cluster.analytics_query, q_str)
         cb_env.assert_rows_exact(result, 2)
-        metadata = result.metadata()  # type: AnalyticsMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         assert isinstance(metadata, AnalyticsMetaData)
         for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
@@ -243,7 +246,8 @@ class AnalyticsTestSuite(SuiteRequirements):
         result = run_in_reactor_thread(cb_env.cluster.analytics_query, q_str)
         cb_env.assert_rows_exact(result, 1)
         taken = datetime.now() - initial
-        metadata = result.metadata()  # type: AnalyticsMetaData
+        metadata = result.metadata()
+        assert metadata is not None
         metrics = metadata.metrics()
         assert isinstance(metrics, AnalyticsMetrics)
         assert isinstance(metrics.elapsed_time(), timedelta)

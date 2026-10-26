@@ -13,83 +13,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+__all__ = [
+    'AnalyticsError',
+    'AnalyticsMetaData',
+    'AnalyticsMetrics',
+    'AnalyticsScanConsistency',
+    'AnalyticsStatus',
+    'AnalyticsWarning',
+]
+
+from couchbase.common import options
 from couchbase.common._supportability import Supportability
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  AlreadyQueriedException,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap)
-from couchbase.logic.analytics import AnalyticsError  # noqa: F401
-from couchbase.logic.analytics import AnalyticsMetaData  # noqa: F401
-from couchbase.logic.analytics import AnalyticsMetrics  # noqa: F401
-from couchbase.logic.analytics import AnalyticsQuery  # noqa: F401
-from couchbase.logic.analytics import AnalyticsScanConsistency  # noqa: F401
-from couchbase.logic.analytics import AnalyticsStatus  # noqa: F401
-from couchbase.logic.analytics import AnalyticsWarning  # noqa: F401
-from couchbase.logic.analytics import AnalyticsRequestLogic
-from couchbase.logic.streaming import stream_next
-from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
-
-
-class AnalyticsRequest(AnalyticsRequestLogic):
-    def __init__(self,
-                 connection,
-                 query_params,
-                 row_factory=lambda x: x,
-                 **kwargs
-                 ):
-        super().__init__(connection, query_params, row_factory=row_factory, **kwargs)
-
-    @classmethod
-    def generate_analytics_request(cls, connection, query_params, row_factory=lambda x: x, **kwargs):
-        return cls(connection, query_params, row_factory=row_factory, **kwargs)
-
-    def execute(self):
-        return [r for r in list(self)]
-
-    def _get_metadata(self):
-        try:
-            # @TODO:  PYCBC-1524
-            analytics_response = next(self._streaming_result)
-            self._set_metadata(analytics_response)
-        except CouchbaseException as ex:
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            raise excptn
-
-    def __iter__(self):
-        if self.done_streaming:
-            raise AlreadyQueriedException()
-
-        if not self.started_streaming:
-            self._submit_query()
-
-        return self
-
-    def _get_next_row(self):
-        if self.done_streaming is True:
-            return
-
-        try:
-            row = next(self._streaming_result)
-        except StopIteration:
-            # @TODO:  PYCBC-1524
-            row = next(self._streaming_result)
-
-        if isinstance(row, PycbcCoreException):
-            raise ErrorMapper.build_exception(row)
-
-        # should only be None once query request is complete and _no_ errors found
-        if row is None:
-            raise StopIteration
-
-        return self.serializer.deserialize(row)
-
-    def __next__(self):
-        return stream_next(self)
-
+from couchbase.common.analytics import AnalyticsError  # noqa: F401
+from couchbase.common.analytics import AnalyticsMetaData  # noqa: F401
+from couchbase.common.analytics import AnalyticsMetrics  # noqa: F401
+from couchbase.common.analytics import AnalyticsScanConsistency  # noqa: F401
+from couchbase.common.analytics import AnalyticsStatus  # noqa: F401
+from couchbase.common.analytics import AnalyticsWarning  # noqa: F401
+from couchbase.protocol.classic._analytics import AnalyticsQuery  # noqa: F401
 
 """
 ** DEPRECATION NOTICE **
@@ -100,9 +41,7 @@ Instead use:
 
 """
 
-from couchbase.logic.options import AnalyticsOptionsBase  # nopep8 # isort:skip # noqa: E402
-
 
 @Supportability.import_deprecated('couchbase.analytics', 'couchbase.options')
-class AnalyticsOptions(AnalyticsOptionsBase):  # noqa: F811
+class AnalyticsOptions(options.AnalyticsOptions):  # noqa: F811
     pass

@@ -74,27 +74,60 @@ class Scope:
         """
         return Collection(self, name)
 
-    def query(
-        self,
-        statement,  # type: str
-        *options,  # type: Union[QueryOptions, JSONType]
-        **kwargs  # type: Any
-    ) -> Deferred[QueryResult]:
-        op_type = StreamingOperationType.Query
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_query_request(statement, obs_handler, *options, **kwargs)
-        return self._impl.query_deferred(req)
+    def query(self, statement: str, *options: QueryOptions | JSONType, **kwargs: Any) -> Deferred[QueryResult]:
+        """Executes a N1QL query against the scope.
 
-    def analytics_query(
-        self,
-        statement,  # type: str
-        *options,  # type: Union[AnalyticsOptions, JSONType]
-        **kwargs  # type: Any
-    ) -> Deferred[AnalyticsResult]:
-        op_type = StreamingOperationType.AnalyticsQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_analytics_query_request(statement, obs_handler, *options, **kwargs)
-        return self._impl.analytics_query_deferred(req)
+        .. note::
+            The query is sent when this is called, and the Deferred fires once the core has buffered
+            the response, so iterating the :class:`~couchbase.result.QueryResult` does not block the reactor.
+
+        .. note::
+            Scope-level queries are only supported on Couchbase Server versions that support scopes and collections.
+
+        .. seealso::
+            * :class:`~txcouchbase.management.queries.QueryIndexManager`: For how to manage query indexes.
+            * :meth:`~txcouchbase.cluster.Cluster.query`: For how to execute cluster-level queries.
+
+        Args:
+            statement (str): The N1QL statement to execute.
+            options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.QueryOptions`
+
+        Returns:
+            Deferred[:class:`~couchbase.result.QueryResult`]: An instance of a :class:`~couchbase.result.QueryResult`
+            which provides access to iterate over the query results and access metadata and metrics about the query.
+        """
+        return self._impl.query_deferred(statement, *options, **kwargs)
+
+    def analytics_query(self,
+                        statement: str,
+                        *options: AnalyticsOptions | JSONType,
+                        **kwargs: Any) -> Deferred[AnalyticsResult]:
+        """Executes an analaytics query against the scope.
+
+        .. note::
+            The analytics query is sent when this is called, and the Deferred fires once the core has buffered
+            the response, so iterating the :class:`~couchbase.result.AnalyticsResult` does not block the reactor.
+
+        .. seealso::
+            * :class:`~txcouchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses,
+              datasets, indexes and links.
+            * :meth:`~txcouchbase.cluster.Cluster.analytics_query`: for how to execute cluster-level analytics queries
+
+        Args:
+            statement (str): The analytics SQL++ statement to execute.
+            options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.AnalyticsOptions`
+
+        Returns:
+            Deferred[:class:`~couchbase.result.AnalyticsResult`]: An instance of a
+            :class:`~couchbase.result.AnalyticsResult` which provides access to iterate over the analytics query results
+            and access metadata and metrics about the analytics query.
+        """
+        return self._impl.analytics_query_deferred(statement, *options, **kwargs)
 
     def search_query(
         self,

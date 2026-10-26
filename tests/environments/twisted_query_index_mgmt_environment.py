@@ -31,10 +31,6 @@ TwistedTestEnvironmentQueryIndexManager bridges every call itself.  So the bodie
 straight-line synchronous code and are, in fact, the sync module with the manager classes
 renamed.  That is the honest description, and it is worth stating rather than dressing the
 file up as more Twisted-specific than it is.
-
-`txcouchbase.n1ql.N1QLRequest` defines no `execute()`, so a suite driving DDL through
-`.execute()` cannot run here at all.  Nothing needs to: `.execute()` only drives a statement
-to completion, and cb_env.drain_rows() does that in all three api styles.
 """
 
 from __future__ import annotations

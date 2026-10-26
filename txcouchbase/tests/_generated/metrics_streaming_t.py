@@ -23,12 +23,12 @@ from collections.abc import Generator
 
 import pytest
 
+from couchbase.common._operations import Op
 from couchbase.exceptions import (CouchbaseException,
                                   DataverseNotFoundException,
                                   DesignDocumentNotFoundException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
-from couchbase.logic.observability import OpName
 from couchbase.search import SearchRequest, TermQuery
 from tests.environments.metrics_environment import MeterType, MetricsEnvironment
 from tests.environments.test_environment import TestProtocol
@@ -145,7 +145,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     def test_query(self, cb_env: TwistedTestEnvironment, http_validator: HttpMeterValidator) -> None:
         result = run_in_reactor_thread(cb_env.cluster.query, TRIVIAL_STATEMENT)
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query)
+        http_validator.validate_http_op(Op.Query)
 
     @pytest.mark.usefixtures('check_query_supported')
     def test_query_named_parameters(self,
@@ -153,7 +153,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                     http_validator: HttpMeterValidator) -> None:
         result = run_in_reactor_thread(cb_env.cluster.query, NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query)
+        http_validator.validate_http_op(Op.Query)
 
     @pytest.mark.usefixtures('check_query_supported')
     def test_query_positional_parameters(self,
@@ -162,7 +162,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         result = run_in_reactor_thread(cb_env.cluster.query, POSITIONAL_PARAM_STATEMENT,
                                        positional_parameters=['hello'])
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query)
+        http_validator.validate_http_op(Op.Query)
 
     @pytest.mark.usefixtures('check_query_supported')
     def test_query_invalid_statement(self,
@@ -171,7 +171,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(ParsingFailedException):
             result = run_in_reactor_thread(cb_env.cluster.query, INVALID_STATEMENT)
             cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.Query, validate_error=True)
+        http_validator.validate_http_op(Op.Query, validate_error=True)
 
     # ------------------------------------------------------------------
     # Query, on a scope
@@ -182,7 +182,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     def test_scope_query(self, cb_env: TwistedTestEnvironment, http_validator: HttpMeterValidator) -> None:
         result = run_in_reactor_thread(cb_env.scope.query, TRIVIAL_STATEMENT)
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
 
@@ -193,7 +193,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                           http_validator: HttpMeterValidator) -> None:
         result = run_in_reactor_thread(cb_env.scope.query, NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
 
@@ -204,7 +204,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                                http_validator: HttpMeterValidator) -> None:
         result = run_in_reactor_thread(cb_env.scope.query, POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
 
@@ -216,7 +216,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(ParsingFailedException):
             result = run_in_reactor_thread(cb_env.scope.query, INVALID_STATEMENT)
             cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.Query,
+        http_validator.validate_http_op(Op.Query,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -229,7 +229,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     def test_analytics_query(self, cb_env: TwistedTestEnvironment, http_validator: HttpMeterValidator) -> None:
         result = run_in_reactor_thread(cb_env.cluster.analytics_query, TRIVIAL_STATEMENT)
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery)
+        http_validator.validate_http_op(Op.AnalyticsQuery)
 
     @pytest.mark.usefixtures('check_analytics_supported')
     def test_analytics_query_named_parameters(self,
@@ -238,7 +238,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         result = run_in_reactor_thread(cb_env.cluster.analytics_query,
                                        NAMED_PARAM_STATEMENT, named_parameters={'named_param': 5})
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery)
+        http_validator.validate_http_op(Op.AnalyticsQuery)
 
     @pytest.mark.usefixtures('check_analytics_supported')
     def test_analytics_query_positional_parameters(self,
@@ -247,7 +247,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         result = run_in_reactor_thread(cb_env.cluster.analytics_query,
                                        POSITIONAL_PARAM_STATEMENT, positional_parameters=['hello'])
         cb_env.assert_rows_exact(result, 1)
-        http_validator.validate_http_op(OpName.AnalyticsQuery)
+        http_validator.validate_http_op(Op.AnalyticsQuery)
 
     @pytest.mark.usefixtures('check_analytics_supported')
     def test_analytics_query_invalid_statement(self,
@@ -262,7 +262,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(CouchbaseException):
             result = run_in_reactor_thread(cb_env.cluster.analytics_query, INVALID_STATEMENT)
             cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.AnalyticsQuery, validate_error=True)
+        http_validator.validate_http_op(Op.AnalyticsQuery, validate_error=True)
 
     @pytest.mark.usefixtures('check_analytics_supported')
     @pytest.mark.usefixtures('check_collections_supported')
@@ -275,7 +275,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(DataverseNotFoundException):
             result = run_in_reactor_thread(cb_env.scope.analytics_query, TRIVIAL_STATEMENT)
             cb_env.drain_rows(result)
-        http_validator.validate_http_op(OpName.AnalyticsQuery,
+        http_validator.validate_http_op(Op.AnalyticsQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -294,7 +294,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(QueryIndexNotFoundException):
             result = run_in_reactor_thread(cb_env.cluster.search, MISSING_INDEX, MISSING_INDEX_REQUEST)
             TwistedSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery, validate_error=True)
+        http_validator.validate_http_op(Op.SearchQuery, validate_error=True)
 
     @pytest.mark.usefixtures('check_scope_search_supported')
     def test_scope_search_query_missing_index(self,
@@ -303,7 +303,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
         with pytest.raises(QueryIndexNotFoundException):
             result = run_in_reactor_thread(cb_env.scope.search, MISSING_INDEX, MISSING_INDEX_REQUEST)
             TwistedSearchEnvironment.assert_rows_exact(result, 0)
-        http_validator.validate_http_op(OpName.SearchQuery,
+        http_validator.validate_http_op(Op.SearchQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name,
                                         scope_name=cb_env.scope.name)
@@ -319,7 +319,7 @@ class StreamingMetricsTestSuite(SuiteRequirements):
                                            limit=10,
                                            namespace=DesignDocumentNamespace.DEVELOPMENT)
             TwistedViewsEnvironment.drain(result)
-        http_validator.validate_http_op(OpName.ViewQuery,
+        http_validator.validate_http_op(Op.ViewQuery,
                                         validate_error=True,
                                         bucket_name=cb_env.bucket.name)
 

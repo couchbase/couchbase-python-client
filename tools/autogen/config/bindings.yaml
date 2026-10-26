@@ -132,7 +132,7 @@ key_value:
 
 streaming:
   header_path: "core/operations"
-  ignored_cpp_request_fields: [send_to_node, ctx_, extract_encoded_plan_, body_str, row_callback]
+  ignored_cpp_request_fields: [ctx_, extract_encoded_plan_, body_str, row_callback]
   structs_prefix: "couchbase::core::operations::"
   ops_prefix: "document_"
   operation_headers:

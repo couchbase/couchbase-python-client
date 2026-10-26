@@ -18,12 +18,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.logic.observability import ObservableRequestHandler as _OldObservableRequestHandler
 from couchbase.logic.operation_types import StreamingOperationType
 
 if TYPE_CHECKING:
-    from couchbase.analytics import AnalyticsQuery
-    from couchbase.n1ql import N1QLQuery
+    from couchbase.protocol.classic._analytics import AnalyticsQuery
+    from couchbase.protocol.classic._n1ql import N1QLQuery
     from couchbase.search import SearchQueryBuilder
 
 
@@ -31,28 +32,18 @@ if TYPE_CHECKING:
 class AnalyticsQueryRequest:
     analytics_query: AnalyticsQuery
     obs_handler: ObservableRequestHandler
-    num_workers: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return StreamingOperationType.AnalyticsQuery.value
 
 
 @dataclass
 class QueryRequest:
     n1ql_query: N1QLQuery
     obs_handler: ObservableRequestHandler
-    num_workers: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return StreamingOperationType.Query.value
 
 
 @dataclass
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
-    obs_handler: ObservableRequestHandler
+    obs_handler: _OldObservableRequestHandler
     bucket_name: str
     scope_name: str
     num_workers: Optional[int] = None

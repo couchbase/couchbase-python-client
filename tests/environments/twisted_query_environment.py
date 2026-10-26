@@ -18,15 +18,12 @@
 The third of the trio, the same shape as query_environment.py and
 async_query_environment.py.
 
-Three things differ from the sync module, and each is forced by the SDK rather than
+Two things differ from the sync module, and each is forced by the SDK rather than
 chosen:
 
   * `cluster.query()` returns a Deferred, so the *call* goes through the reactor.
     `result.rows()` is then a plain iterator and the drain is an ordinary `for`.
     acouchbase is the mirror image, and neither module is a relabelling of the other.
-  * there is no `.execute()`.  `txcouchbase.n1ql.N1QLRequest` defines `execute_query()`
-    instead, so the shared `QueryResult.execute()` raises AttributeError here.  Both raw
-    statement helpers drain rows() instead, which is what `.execute()` did anyway.
   * the manager wrapper bridges its own calls, so it goes to try_n_times with
     `is_deferred=False`.  Leaving the default would have the retry helper wait on a value
     that is not a Deferred.  Same as TwistedAnalyticsEnvironment.
@@ -68,8 +65,8 @@ class TwistedQueryEnvironment:
     def _drain(cb_env: TwistedTestEnvironment, statement: str) -> None:
         """Run a statement for its effect, draining the rows.
 
-        Draining is what drives the query to completion.  It is also exactly what the sync
-        module's `.execute()` does, which returns `[r for r in list(self)]` and discards it.
+        Draining is what drives the query to completion, which is all `.execute()` would do
+        here, building a list the caller discards.
         """
         result = run_in_reactor_thread(cb_env.cluster.query, statement)
         for _ in result.rows():

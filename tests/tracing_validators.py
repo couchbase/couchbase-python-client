@@ -49,6 +49,7 @@ from typing import (Any,
                     Union,
                     cast)
 
+from couchbase.common._operations import Op
 from couchbase.logic.observability import (CollectionDetails,
                                            DispatchAttributeName,
                                            OpAttributeName,
@@ -57,6 +58,7 @@ from couchbase.observability.tracing import SpanStatusCode
 from tests.observability_ops import (DS_OPS,
                                      DS_REMOVE_OPS,
                                      ENCODING_OPS,
+                                     as_op_name,
                                      service_for)
 from tests.observability_test_impls import (PARENT_SPAN_PREFIX,
                                             InertSpan,
@@ -241,7 +243,7 @@ class _SpanTreeValidator:
         """Drop every span the tracer holds, so the next assertion is about one operation."""
         self._tracer.clear_spans()
 
-    def new_parent_span(self, op_name: OpName) -> TestRequestSpanType:
+    def new_parent_span(self, op_name: OpName | Op) -> TestRequestSpanType:
         """Clear the tracer and open a parent span for the next operation to hang under.
 
         The name is not cosmetic.  A threshold-logging span asks, as it ends, whether it should
@@ -257,6 +259,7 @@ class _SpanTreeValidator:
         the legacy span is let through, rather than one suppression at every call site.
         """
         self.reset()
+        op_name = as_op_name(op_name)
         return cast(TestRequestSpanType, self._tracer.request_span(f'{PARENT_SPAN_PREFIX}{op_name.value}_span'))
 
     def _end_parent_span(self, parent_span: Optional[TestSpanProtocol]) -> None:
@@ -760,16 +763,17 @@ class HttpSpanValidator(_SpanTreeValidator):
     """
 
     def validate_http_op(self,
-                         op_name: OpName,
+                         op_name: OpName | Op,
                          parent_span: Optional[TestSpanProtocol] = None,
                          validate_error: bool = False,
                          statement: Optional[str] = None,
-                         nested_ops: Optional[Sequence[OpName]] = None,
+                         nested_ops: Optional[Sequence[OpName | Op]] = None,
                          error_before_dispatch: bool = False,
                          expect_request_span: bool = True,
                          bucket_name: Optional[str] = None,
                          scope_name: Optional[str] = None,
                          collection_name: Optional[str] = None) -> None:
+        op_name = as_op_name(op_name)
         self._end_parent_span(parent_span)
         if self._is_inert:
             self._validate_inert(parent_span)
@@ -790,7 +794,7 @@ class HttpSpanValidator(_SpanTreeValidator):
         if self._is_threshold:
             self._validate_threshold_http_span(expectations)
         elif nested_ops:
-            self._validate_nested(expectations, nested_ops)
+            self._validate_nested(expectations, [as_op_name(o) for o in nested_ops])
         else:
             self._validate_span(expectations)
 

@@ -41,7 +41,10 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Container
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    TypeVar,
+                    overload)
 
 import pytest
 
@@ -52,16 +55,28 @@ if TYPE_CHECKING:
     # runtime import here closes the cycle.
     from tests.environments.test_environment import SyncTestEnvironment
 
+_T = TypeVar('_T')
+
 
 def cb_assert_eq(actual: Any, expected: Any, *, what: str, ctx: str = '') -> None:
     assert actual == expected, f'{what}: expected={expected!r} actual={actual!r}. {ctx}'.rstrip()
 
 
-def cb_assert_isinstance(val: Any, typ: type | tuple[type, ...], *, what: str, ctx: str = '') -> None:
+@overload
+def cb_assert_isinstance(val: Any, typ: type[_T], *, what: str, ctx: str = '') -> _T: ...
+
+
+@overload
+def cb_assert_isinstance(val: Any, typ: tuple[type, ...], *, what: str, ctx: str = '') -> Any: ...
+
+
+def cb_assert_isinstance(val: Any, typ: type | tuple[type, ...], *, what: str, ctx: str = '') -> Any:
+    """``val``, narrowed to ``typ``: an assert outside a suite module does not narrow for mypy."""
     expected = typ.__name__ if isinstance(typ, type) else ' | '.join(t.__name__ for t in typ)
     assert isinstance(val, typ), (
         f'{what}: expected type {expected!r} got {type(val).__name__!r} (value={val!r}). {ctx}'.rstrip()
     )
+    return val
 
 
 def cb_assert_gte(actual: Any, minimum: Any, *, what: str, ctx: str = '') -> None:

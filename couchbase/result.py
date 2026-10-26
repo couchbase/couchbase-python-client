@@ -51,7 +51,8 @@ __all__ = [
 import sys
 from copy import copy
 from datetime import datetime
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Generic,
                     List,
@@ -61,8 +62,6 @@ from typing import (Any,
                     Union)
 
 import couchbase.common.result as _common_result
-from acouchbase.analytics import AsyncAnalyticsRequest
-from acouchbase.n1ql import AsyncN1QLRequest
 from acouchbase.search import AsyncFullTextSearchRequest
 from acouchbase.views import AsyncViewRequest
 from couchbase.common._supportability import Supportability
@@ -79,6 +78,12 @@ from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreE
 from couchbase.protocol.classic._pycbc_core import pycbc_result
 from couchbase.subdocument import parse_subdocument_content_as, parse_subdocument_exists
 from couchbase.transcoder import Transcoder
+
+if TYPE_CHECKING:
+    from couchbase.common._streaming import RowIterator
+    from couchbase.common.analytics import AnalyticsMetaData
+    from couchbase.common.n1ql import QueryMetaData
+
 
 _ExecuteT = TypeVar('_ExecuteT', covariant=True)
 _FinalT = TypeVar('_FinalT', covariant=True)
@@ -138,36 +143,15 @@ class ScanResultIterable:
         return "ScanResultIterable:{}".format(self._request)
 
 
-class QueryResult:
-    def __init__(
-        self,
-        n1ql_request
-    ):
+class _QueryResult(Generic[_ExecuteT]):
+    def __init__(self, n1ql_request: _Rows[_ExecuteT, QueryMetaData]) -> None:
         self._request = n1ql_request
 
-    def rows(self):
-        """The rows which have been returned by the query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
-
-        Returns:
-            Iterable: Either an iterable or async iterable.
-        """
-        if isinstance(self._request, AsyncN1QLRequest):
-            return self.__aiter__()
-        return self.__iter__()
-
-    def execute(self):
+    def execute(self) -> _ExecuteT:
         """Convenience method to execute the query.
 
         Returns:
-            List[Any]:  A list of query results.
+            list[Any]:  A list of query results.
 
         Example:
             q_rows = cluster.query('SELECT * FROM `travel-sample` WHERE country LIKE 'United%' LIMIT 2;').execute()
@@ -175,39 +159,23 @@ class QueryResult:
         """
         return self._request.execute()
 
-    def metadata(self):
+    def metadata(self) -> QueryMetaData | None:
         """The meta-data which has been returned by the query.
 
         Returns:
             :class:`~couchbase.n1ql.QueryMetaData`: An instance of :class:`~couchbase.n1ql.QueryMetaData`.
         """
-        return self._request.metadata()
+        return self._request.final_metadata()
 
-    def __iter__(self):
-        return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
-
-    def __repr__(self):
-        return "QueryResult:{}".format(self._request)
+    def __repr__(self) -> str:
+        return '{}:{}'.format(type(self).__name__, self._request)
 
 
-class AnalyticsResult:
-    def __init__(
-        self,
-        analytics_request
-    ):
-        self._request = analytics_request
+class QueryResult(_QueryResult[list[Any]]):
+    _request: RowIterator[Any, QueryMetaData]
 
-    def __repr__(self):
-        return "AnalyticsResult:{}".format(self._request)
-
-    def rows(self):
-        """The rows which have been returned by the analytics query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+    def rows(self) -> RowIterator[Any, QueryMetaData]:
+        """The rows which have been returned by the query.
 
         .. note::
             A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
@@ -215,26 +183,49 @@ class AnalyticsResult:
             to be delivered rather than firing instantly.
 
         Returns:
-            Iterable: Either an iterable or async iterable.
+            Iterable: An iterable over the query's rows.
         """
-        if isinstance(self._request, AsyncAnalyticsRequest):
-            return self.__aiter__()
         return self.__iter__()
 
-    def metadata(self):
+    def __iter__(self) -> RowIterator[Any, QueryMetaData]:
+        return self._request.__iter__()
+
+
+class _AnalyticsResult:
+    def __init__(self, analytics_request: _Rows[object, AnalyticsMetaData]) -> None:
+        self._request = analytics_request
+
+    def metadata(self) -> AnalyticsMetaData | None:
         """The meta-data which has been returned by the analytics query.
 
         Returns:
             :class:`~couchbase.analytics.AnalyticsMetaData`: An instance of
             :class:`~couchbase.analytics.AnalyticsMetaData`.
         """
-        return self._request.metadata()
+        return self._request.final_metadata()
 
-    def __iter__(self):
+    def __repr__(self) -> str:
+        return '{}:{}'.format(type(self).__name__, self._request)
+
+
+class AnalyticsResult(_AnalyticsResult):
+    _request: RowIterator[Any, AnalyticsMetaData]
+
+    def rows(self) -> RowIterator[Any, AnalyticsMetaData]:
+        """The rows which have been returned by the analytics query.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
+        Returns:
+            Iterable: An iterable over the analytics query's rows.
+        """
+        return self.__iter__()
+
+    def __iter__(self) -> RowIterator[Any, AnalyticsMetaData]:
         return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
 
 
 class SearchResult:

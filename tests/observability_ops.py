@@ -100,6 +100,12 @@ def span_name(op: Op | str) -> str:
     return op.span_name
 
 
+# BRIDGE: the suites of ported areas name an operation by its Op, the rest by its OpName, so the
+# validators take either and work in OpName.  Removed by PYCBC-2013.
+def as_op_name(op: OpName | Op) -> OpName:
+    return op if isinstance(op, OpName) else OpName(span_name(op))
+
+
 def service_for(op_name: OpName) -> ServiceType:
     service = _SERVICE_BY_OP.get(op_name)
     if service is not None:
