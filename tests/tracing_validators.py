@@ -513,13 +513,17 @@ class KeyValueSpanValidator(_SpanTreeValidator):
     def validate_ds_op(self,
                        ds_op_name: OpName,
                        sub_ops: DsSubOps,
-                       parent_span: Optional[TestSpanProtocol] = None) -> None:
+                       parent_span: Optional[TestSpanProtocol] = None,
+                       absorbed: bool = False) -> None:
         """A datastructure operation's span, and the key-value sub-operations under it.
 
         `sub_ops` is the sequence of sub-operations in the order the SDK ran them, each paired
         with whether it was expected to fail.  It is asserted as a sequence: a datastructure
         operation against a document that does not exist yet fails, inserts and retries, and
         that three-step shape is the thing worth pinning.
+
+        `absorbed` says the last sub-operation failed and the datastructure operation caught it
+        and returned normally, as `CouchbaseSet.add` does for a value the set already holds.
         """
         self._end_parent_span(parent_span)
         if self._is_inert:
@@ -540,15 +544,18 @@ class KeyValueSpanValidator(_SpanTreeValidator):
             f'datastructure span parent mismatch. {ctx}'
         )
         _expect_count(span.children, len(sub_ops), 'sub-operation spans', ctx)
-        # The datastructure operation failed exactly when its last sub-operation did.  An
-        # earlier one failing is normal: the create-then-retry sequence starts with a failure
-        # and ends having succeeded.  Derived rather than declared, so a test cannot state the
-        # sequence and the outcome inconsistently.
+        # The datastructure operation failed exactly when its last sub-operation did, unless it
+        # caught that failure.  An earlier one failing is normal: the create-then-retry sequence
+        # starts with a failure and ends having succeeded.  Derived from the sequence rather than
+        # declared, so a test cannot state the sequence and the outcome inconsistently.
+        assert not absorbed or sub_ops[-1][1], (
+            f'absorbed says the last sub-operation failed, but the sequence says it succeeded. {ctx}'
+        )
         self._validate_span(_KvExpectations(span,
                                             ds_op_name,
                                             self._collection_details,
                                             parent_span=parent_span,
-                                            validate_error=sub_ops[-1][1],
+                                            validate_error=sub_ops[-1][1] and not absorbed,
                                             skip_dispatch=True))
 
         recorded = [child.name for child in span.children]
@@ -624,9 +631,8 @@ class KeyValueSpanValidator(_SpanTreeValidator):
         """How many encoding spans a mutation should have, and whether that is exact.
 
         Only `mutate_in` is ambiguous, and only because the answer depends on the specs it was
-        given: a remove spec encodes nothing, a retried subdocument operation reuses the request
-        it already encoded, and a `mutate_in` a test wrote by hand can carry any mix.  Where the
-        count cannot be derived it is a floor rather than an equality.
+        given: a remove spec encodes nothing, and a `mutate_in` a test wrote by hand can carry
+        any mix.  Where the count cannot be derived it is a floor rather than an equality.
         """
         count = expectations.multi_op_key_count or 1
         if expectations.op_name is not OpName.MutateIn:
@@ -635,13 +641,8 @@ class KeyValueSpanValidator(_SpanTreeValidator):
         if ds_op_name in DS_REMOVE_OPS:
             return 0, True
         if ds_op_name in DS_OPS:
-            subdoc_sub_ops = [op for op, _ in (expectations.ds_sub_ops or [])
-                              if op in (OpName.MutateIn, OpName.LookupIn)]
-            if expectations.validate_error:
-                return count, False
-            # More than one subdocument sub-operation means this one is the retry, which reuses
-            # the request the first attempt already encoded.
-            return (0, True) if len(subdoc_sub_ops) > 1 else (count, True)
+            # Every attempt builds its own request, so the retry after a create encodes again.
+            return count, not expectations.validate_error
         # A `mutate_in` the test wrote itself: one encoding span per spec that encodes, and the
         # test is not asked to count its own specs.
         return count, False

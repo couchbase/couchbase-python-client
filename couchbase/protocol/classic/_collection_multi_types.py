@@ -16,20 +16,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
 
-from couchbase.logic.operation_types import KeyValueMultiOperationCode
+from couchbase.protocol.classic._bindings import KeyValueMultiBinding
 from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.transcoder import Transcoder
 
 
 @dataclass
 class KeyValueMultiRequest:
-    opcode: KeyValueMultiOperationCode
-    request_list: List[PycbcCoreKeyValueRequest]
+    opcode: KeyValueMultiBinding
+    request_list: list[PycbcCoreKeyValueRequest]
     return_exceptions: bool
 
 
 @dataclass
 class KeyValueMultiWithTranscoderRequest(KeyValueMultiRequest):
-    key_transcoders: Dict[str, Transcoder]
+    key_transcoders: dict[str, Transcoder]

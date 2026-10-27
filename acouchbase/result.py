@@ -18,6 +18,7 @@ from __future__ import annotations
 __all__ = [
     'AsyncAnalyticsResult',
     'AsyncQueryResult',
+    'AsyncScanResultIterable',
     'AsyncSearchResult',
     'AsyncViewResult',
     'ClusterInfoResult',
@@ -50,35 +51,34 @@ __all__ = [
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-# BRIDGE: the async API returns couchbase.result's classes until each area's own result types land.
-# Removed by PYCBC-2001.
-from couchbase.result import (ClusterInfoResult,
-                              ContentProxy,
-                              ContentSubdocProxy,
-                              CounterResult,
-                              DiagnosticsResult,
-                              ExistsResult,
-                              GetReplicaResult,
-                              GetResult,
-                              LookupInReplicaResult,
-                              LookupInResult,
-                              MultiCounterResult,
-                              MultiExistsResult,
-                              MultiGetReplicaResult,
-                              MultiGetResult,
-                              MultiMutationResult,
-                              MultiResult,
-                              MultiResultType,
-                              MutateInResult,
-                              MutationResult,
-                              MutationToken,
-                              OperationResult,
-                              PingResult,
-                              Result,
-                              ScanResult,
-                              ValueResult,
-                              _AnalyticsResult,
+from couchbase.common.result import (ClusterInfoResult,
+                                     ContentProxy,
+                                     ContentSubdocProxy,
+                                     CounterResult,
+                                     DiagnosticsResult,
+                                     ExistsResult,
+                                     GetReplicaResult,
+                                     GetResult,
+                                     LookupInReplicaResult,
+                                     LookupInResult,
+                                     MultiCounterResult,
+                                     MultiExistsResult,
+                                     MultiGetReplicaResult,
+                                     MultiGetResult,
+                                     MultiMutationResult,
+                                     MultiResult,
+                                     MultiResultType,
+                                     MutateInResult,
+                                     MutationResult,
+                                     MutationToken,
+                                     OperationResult,
+                                     PingResult,
+                                     Result,
+                                     ScanResult,
+                                     ValueResult)
+from couchbase.result import (_AnalyticsResult,
                               _QueryResult,
+                              _ScanResultIterable,
                               _SearchResult,
                               _ViewResult)
 
@@ -88,6 +88,21 @@ if TYPE_CHECKING:
     from couchbase.common.n1ql import QueryMetaData
     from couchbase.common.search import SearchRow, _SearchFinalMetadata
     from couchbase.common.views import ViewMetaData, ViewRow
+
+
+class AsyncScanResultIterable(_ScanResultIterable):
+    _request: AsyncRowIterator[ScanResult, None]
+
+    def rows(self) -> AsyncRowIterator[ScanResult, None]:
+        """The rows which have been returned by the scan.
+
+        Returns:
+            AsyncIterable: An async iterable over the scan's rows.  Use ``async for`` to loop over it.
+        """
+        return self.__aiter__()
+
+    def __aiter__(self) -> AsyncRowIterator[ScanResult, None]:
+        return self._request.__aiter__()
 
 
 class AsyncQueryResult(_QueryResult[asyncio.Task[list[Any]]]):

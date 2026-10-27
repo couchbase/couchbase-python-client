@@ -44,6 +44,11 @@ class CppMutationToken(TypedDict, total=False):
     bucket_name: Optional[str]
 
 
+class CppErrorCode(TypedDict):
+    code: int
+    message: str
+
+
 class CppSubdocField(TypedDict, total=False):
     path: Optional[str]
     value: Optional[bytes]
@@ -538,7 +543,7 @@ class CppLookupInAnyReplicaResponseEntry(TypedDict, total=False):
     exists: bool
     opcode: int
     status: int
-    ec: int
+    ec: Optional[CppErrorCode]
 
 
 class CppLookupInEntry(TypedDict, total=False):
@@ -548,7 +553,7 @@ class CppLookupInEntry(TypedDict, total=False):
     exists: bool
     opcode: int
     status: int
-    ec: int
+    ec: Optional[CppErrorCode]
 
 
 class CppLookupInResponseEntry(TypedDict, total=False):
@@ -558,7 +563,7 @@ class CppLookupInResponseEntry(TypedDict, total=False):
     exists: bool
     opcode: int
     status: int
-    ec: int
+    ec: Optional[CppErrorCode]
 
 
 class CppMutateInResponseEntry(TypedDict, total=False):
@@ -567,7 +572,7 @@ class CppMutateInResponseEntry(TypedDict, total=False):
     original_index: int
     opcode: int
     status: int
-    ec: int
+    ec: Optional[CppErrorCode]
 
 
 class CppPingResult(TypedDict, total=False):

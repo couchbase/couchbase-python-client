@@ -203,7 +203,6 @@ class BindingMap:
             get_multi=self._conn.pycbc_get_multi,
             get_all_replicas_multi=self._conn.pycbc_get_all_replicas_multi,
             get_and_lock_multi=self._conn.pycbc_get_and_lock_multi,
-            get_and_touch_multi=self._conn.pycbc_get_and_touch_multi,
             get_any_replica_multi=self._conn.pycbc_get_any_replica_multi,
             increment_multi=self._conn.pycbc_increment_multi,
             increment_with_legacy_durability_multi=self._conn.pycbc_increment_with_legacy_durability_multi,

@@ -15,27 +15,25 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'PrefixScan',
+    'RangeScan',
+    'SamplingScan',
+    'ScanTerm',
+    'ScanType',
+]
+
 from abc import ABC
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Optional)
+from typing import Any
 
-from couchbase.exceptions import ErrorMapper, InvalidArgumentException
-from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.result import ScanResult
-
-if TYPE_CHECKING:
-    from couchbase.protocol.classic._pycbc_core import pycbc_connection
-    from couchbase.transcoder import Transcoder
+from couchbase.common.exceptions import InvalidArgumentException
 
 
 class ScanTerm:
     """Represents a search term for a RangeScan
     """
 
-    def __init__(self, term,  # type: str
-                 exclusive=None  # type: Optional[bool]
-                 ) -> None:
+    def __init__(self, term: str, exclusive: bool | None = None) -> None:
 
         self._term = None
         if isinstance(term, str):
@@ -45,7 +43,7 @@ class ScanTerm:
 
         self._exclusive = exclusive
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             'term': self._term,
             'exclusive': self._exclusive
@@ -62,19 +60,16 @@ class RangeScan(ScanType):
     """A RangeScan performs a scan on a range of keys with the range specified through a start and end ScanTerm.
     """
 
-    def __init__(self,
-                 start=None,  # type: Optional[ScanTerm]
-                 end=None,  # type: Optional[ScanTerm]
-                 ) -> None:
+    def __init__(self, start: ScanTerm | None = None, end: ScanTerm | None = None) -> None:
         self._start = start
         self._end = end
 
     @property
-    def start(self) -> ScanTerm:
+    def start(self) -> ScanTerm | None:
         return self._start
 
     @property
-    def end(self) -> ScanTerm:
+    def end(self) -> ScanTerm | None:
         return self._end
 
 
@@ -82,9 +77,7 @@ class PrefixScan(ScanType):
     """A PrefixScan performs a scan on a given prefix
     """
 
-    def __init__(self,
-                 prefix,  # type: str
-                 ) -> None:
+    def __init__(self, prefix: str) -> None:
         self._prefix = prefix
 
     @property
@@ -96,9 +89,7 @@ class SamplingScan(ScanType):
     """A SamplingScan performs a scan on a random sampling of keys with the sampling bounded by a limit.
     """
 
-    def __init__(self, limit,  # type: int
-                 seed=None,  # type: Optional[int]
-                 ) -> None:
+    def __init__(self, limit: int, seed: int | None = None) -> None:
         self._limit = limit
         self._seed = seed
 
@@ -107,56 +98,5 @@ class SamplingScan(ScanType):
         return self._limit
 
     @property
-    def seed(self) -> Optional[int]:
+    def seed(self) -> int | None:
         return self._seed
-
-
-class RangeScanRequestLogic:
-    """
-    ** INTERNAL **
-    """
-
-    def __init__(self, connection: pycbc_connection, **kwargs: Any) -> None:
-        self._connection = connection
-        self._transcoder = kwargs.pop('transcoder', None)
-
-        if not self._transcoder:
-            raise InvalidArgumentException('No transcoder provided.')
-        self._ids_only = kwargs['orchestrator_options'].get('ids_only', False)
-        self._scan_args = kwargs
-        self._scan_iterator = None
-        self._started_streaming = False
-        self._done_streaming = False
-
-    @property
-    def transcoder(self) -> Transcoder:
-        return self._transcoder
-
-    @property
-    def started_streaming(self) -> bool:
-        return self._started_streaming
-
-    @property
-    def done_streaming(self) -> bool:
-        return self._done_streaming
-
-    def cancel_scan(self) -> None:
-        if self._scan_iterator.is_cancelled() is False:
-            self._scan_iterator.cancel_scan()
-
-    def _submit_scan(self):
-        if self.done_streaming:
-            return
-
-        self._started_streaming = True
-        self._scan_iterator = self._connection.pycbc_kv_range_scan(**self._scan_args)
-
-    def _get_next_row(self):
-        if self.done_streaming is True:
-            return
-
-        resp = next(self._scan_iterator)
-        if isinstance(resp, PycbcCoreException):
-            raise ErrorMapper.build_exception(resp)
-
-        return ScanResult(resp, self._ids_only, self.transcoder)

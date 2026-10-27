@@ -63,6 +63,7 @@ ACB_NAME_MAP = {
     # annotation or an isinstance check naming the sync class is wrong under asyncio.
     # API_SPECIFIC_MODULES is what moves the import to match.  Removed by PYCBC-2013.
     'SearchResult': 'AsyncSearchResult',
+    'ScanResultIterable': 'AsyncScanResultIterable',
 }
 
 TXCB_NAME_MAP = {
@@ -103,7 +104,7 @@ TXCB_NAME_MAP = {
 API_MODULES = {
     'couchbase.cluster', 'couchbase.bucket', 'couchbase.scope', 'couchbase.collection',
     'couchbase.binary_collection', 'couchbase.datastructures', 'couchbase.transactions',
-    'couchbase.kv_range_scan', 'couchbase.management.buckets',
+    'couchbase.management.buckets',
     'couchbase.management.queries', 'couchbase.management.collections',
     'couchbase.management.users', 'couchbase.management.views',
     'couchbase.management.search',
@@ -116,6 +117,8 @@ API_MODULES = {
 # to a module holding none of them.  Nothing needs the rewrite either: the eventing suites
 # reach both managers through the framework's own manager classes, which ACB_NAME_MAP
 # rewrites, and every other name they import is api-independent.
+#
+# Nor couchbase.kv_range_scan: the scan types are api-independent and have no counterpart.
 
 # Module paths that have a counterpart under one api and not the other.  `couchbase.result`
 # is the one case: acouchbase.result holds the async streaming results, and txcouchbase
@@ -1021,7 +1024,7 @@ class SuiteTransformer:
         this.  rows() resolves to ASYNC_ITER perfectly well, but ASYNC_ITER matches neither
         the AWAIT nor the UNKNOWN branch of handle_call(), so the site was resolved,
         unrewritable, and completely unreported: the emitted loop stayed synchronous and
-        died on the real server with `'AsyncRangeScanRequest' object is not iterable`.
+        died on the real server, an async iterator not being iterable.
 
         There is deliberately no attempt to rewrite it.  `enumerate`, `zip`, `list` and
         `sorted` all consume an iterator eagerly and none of them accept an async one, so

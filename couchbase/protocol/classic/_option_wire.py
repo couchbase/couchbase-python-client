@@ -402,7 +402,7 @@ WIRES: dict[str, WireBlock] = {
         'read_preference': READ_PREFERENCE,
     }),
     'GetMultiOptions': WireBlock({
-        'with_expiry': Wire(transform=validate_bool),
+        'with_expiry': Wire(name=DROP),
         'return_exceptions': RETURN_EXCEPTIONS,
         'timeout': TIMEOUT,
     }),
@@ -463,6 +463,7 @@ WIRES: dict[str, WireBlock] = {
         'timeout': TIMEOUT,
         'cas': CAS,
         'durability': DURABILITY,
+        'transcoder': Wire(name=DROP),
     }),
     'RemoveOptions': WireBlock({
         'timeout': TIMEOUT,
@@ -488,7 +489,9 @@ WIRES: dict[str, WireBlock] = {
         'consistent_with': CONSISTENT_WITH,
         'batch_byte_limit': BATCH_BYTE_LIMIT,
         'batch_item_limit': BATCH_ITEM_LIMIT,
+        'batch_time_limit': Wire(name=DROP),
         'concurrency': CONCURRENCY,
+        'parent_span': Wire(name=DROP),
     }),
     'TouchMultiOptions': WireBlock({
         'return_exceptions': RETURN_EXCEPTIONS,

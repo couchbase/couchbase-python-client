@@ -128,7 +128,6 @@ ignore_missing_imports = true
 # change drops the names it adds.  Removed by PYCBC-2016.
 [[tool.mypy.overrides]]
 module = ["couchbase.common._interfaces.*",
-          "couchbase.common.replica_reads",
           "couchbase.protocol.classic._transactions_impl", "acouchbase.protocol.classic._transactions_impl"]
 ignore_missing_imports = true
 

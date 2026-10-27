@@ -1447,13 +1447,13 @@ class ScanOptions(dict):
             partition batch. Defaults to 15000.
         batch_item_limit (int, optional): The limit applied to the number of items returned from the server for each
             partition batch. Defaults to 50.
-        batch_time_limit (timedelta, optional):
+        batch_time_limit (timedelta, optional): Not applied: the server takes no time limit for a scan batch.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
         concurrency (int, optional): The upper bound on the number of vbuckets that should be scanned in parallel.
             Defaults to 1.
-        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
-            operation.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): Not applied: a scan is not
+            traced.
     """
 
     def __init__(self, **kwargs: Unpack[ScanOptionsKwargs]) -> None:
@@ -1760,10 +1760,12 @@ class GetMultiOptions(dict):
     *per_key_options* to set specific :class:`~couchbase.options.GetOptions` for specific keys.
 
     Args:
-        project (Iterable[str], optional): Specifies a list of fields within the document which should be fetched. This
-            allows for easy retrieval of select fields without incurring the overhead of fetching the whole document.
-        with_expiry (bool, optional): Indicates that the expiry of the document should be fetched alongside the data
-            itself. Defaults to False.
+        project (Iterable[str], optional): Not supported by a multi get, here or in *per_key_options*. Setting it raises
+            :class:`~couchbase.exceptions.InvalidArgumentException`.
+        with_expiry (bool, optional): Not supported by a multi get, here or in *per_key_options*.
+
+            .. deprecated:: 4.7.0
+                A multi get does not fetch the expiry, so it has no effect.
         per_key_options (dict[str, :class:`~couchbase.options.GetOptions`], optional): Specify
             :class:`~couchbase.options.GetOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
@@ -1889,8 +1891,10 @@ class RemoveMultiOptions(dict):
             value, indicating that the document has changed.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
-        transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
-            this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
+        transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): A remove carries no value to transcode.
+
+            .. deprecated:: 4.7.0
+                It has no effect.
     """
 
     def __init__(self, **kwargs: Unpack[RemoveMultiOptionsKwargs]) -> None:

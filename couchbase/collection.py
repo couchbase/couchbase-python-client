@@ -19,33 +19,18 @@ __all__ = [
     'Collection',
 ]
 
-from collections.abc import Mapping
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict,
-                    Iterable,
-                    List,
-                    Optional,
-                    Type,
-                    Union)
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, Any
 
 from couchbase.binary_collection import BinaryCollection
 from couchbase.common import options
+from couchbase.common._capabilities import Capability, require
 from couchbase.common._supportability import Supportability
 from couchbase.datastructures import (CouchbaseList,
                                       CouchbaseMap,
                                       CouchbaseQueue,
-                                      CouchbaseSet,
-                                      DatastructureCallable)
-from couchbase.exceptions import (DocumentExistsException,
-                                  DocumentNotFoundException,
-                                  PathExistsException,
-                                  PathNotFoundException,
-                                  QueueEmpty)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import (DatastructureOperationType,
-                                             KeyValueMultiOperationType,
-                                             KeyValueOperationType)
+                                      CouchbaseSet)
+from couchbase.exceptions import CouchbaseException
 from couchbase.management.queries import CollectionQueryIndexManager
 from couchbase.options import (ExistsMultiOptions,
                                GetAllReplicasMultiOptions,
@@ -60,7 +45,6 @@ from couchbase.options import (ExistsMultiOptions,
                                TouchMultiOptions,
                                UnlockMultiOptions,
                                UpsertMultiOptions)
-from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
@@ -74,31 +58,19 @@ from couchbase.result import (ExistsResult,
                               MutationResult,
                               OperationResult,
                               ScanResultIterable)
-from couchbase.subdocument import (array_addunique,
-                                   array_append,
-                                   array_prepend,
-                                   count)
-from couchbase.subdocument import get as subdoc_get
-from couchbase.subdocument import remove as subdoc_remove
-from couchbase.subdocument import replace
-from couchbase.subdocument import upsert as subdoc_upsert
 
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import JSONType
     from couchbase.common._interfaces._collection import CollectionInterface
-    from couchbase.common._utils import DocumentValue
+    from couchbase.common._utils import DocumentValue, JSONType
     from couchbase.kv_range_scan import ScanType
-    from couchbase.logic.observability import WrappedSpan
     from couchbase.options import (LookupInAllReplicasOptions,
                                    LookupInAnyReplicaOptions,
                                    MutateInOptions)
-    from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.result import MultiResultType
     from couchbase.scope import Scope
     from couchbase.subdocument import Spec
-    from couchbase.transcoder import Transcoder
 
 
 class Collection:
@@ -114,16 +86,15 @@ class Collection:
         return self._impl.name
 
     def get(self,
-            key,  # type: str
-            *opts,  # type: GetOptionsBase
-            **kwargs,  # type: Any
-            ) -> GetResult:
+            key: str,
+            opts: options.GetOptions | None = None,
+            **kwargs: Any) -> GetResult:
         """Retrieves the value of a document from the collection.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetOptions`
 
         Returns:
@@ -155,23 +126,19 @@ class Collection:
                 print(f'Document value: {res.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Get, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.get(req, transcoder, obs_handler)
+        return self._impl.get(key, opts, **kwargs)
 
     def get_any_replica(self,
-                        key,  # type: str
-                        *opts,  # type: GetAnyReplicaOptionsBase
-                        **kwargs,  # type: Any
-                        ) -> GetReplicaResult:
-        """Retrieves the value of a document from the collection leveraging both active and all available replicas returning
-        the first available.
+                        key: str,
+                        opts: options.GetAnyReplicaOptions | None = None,
+                        **kwargs: Any) -> GetReplicaResult:
+        """Retrieves the value of a document from the collection leveraging both active and all available replicas
+        returning the first available.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAnyReplicaOptions`
 
         Returns:
@@ -204,24 +171,19 @@ class Collection:
                 print(f'Document is replica: {res.is_replica}')
                 print(f'Document value: {res.content_as[dict]}')
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.GetAnyReplica, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_any_replica_request(
-                key, obs_handler, *opts, **kwargs)
-            return self._impl.get_any_replica(req, transcoder, obs_handler)
+        """
+        return self._impl.get_any_replica(key, opts, **kwargs)
 
     def get_all_replicas(self,
-                         key,  # type: str
-                         *opts,  # type: GetAllReplicasOptionsBase
-                         **kwargs,  # type: Any
-                         ) -> Iterable[GetReplicaResult]:
+                         key: str,
+                         opts: options.GetAllReplicasOptions | None = None,
+                         **kwargs: Any) -> Iterable[GetReplicaResult]:
         """Retrieves the value of a document from the collection returning both active and all available replicas.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAllReplicasOptions`
 
         Returns:
@@ -230,7 +192,7 @@ class Collection:
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
-            on the server.
+                on the server.
 
         Examples:
 
@@ -275,24 +237,18 @@ class Collection:
                         break
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.GetAllReplicas, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(
-                key, obs_handler, *opts, **kwargs)
-            return self._impl.get_all_replicas(req, transcoder, obs_handler)
+        return self._impl.get_all_replicas(key, opts, **kwargs)
 
-    def exists(
-        self,
-        key,  # type: str
-        *opts,  # type: ExistsOptionsBase
-        **kwargs,  # type: Any
-    ) -> ExistsResult:
+    def exists(self,
+               key: str,
+               opts: options.ExistsOptions | None = None,
+               **kwargs: Any) -> ExistsResult:
         """Checks whether a specific document exists or not.
 
         Args:
             key (str): The key for the document to check existence.
             opts (:class:`~couchbase.options.ExistsOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsOptions`
 
         Returns:
@@ -322,25 +278,20 @@ class Collection:
                 print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Exists, instruments) as obs_handler:
-            req = self._impl.request_builder.build_exists_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.exists(req, obs_handler)
+        return self._impl.exists(key, opts, **kwargs)
 
-    def insert(
-        self,  # type: "Collection"
-        key,  # type: str
-        value,  # type: DocumentValue
-        *opts,  # type: InsertOptionsBase
-        **kwargs,  # type: Any
-    ) -> MutationResult:
+    def insert(self,
+               key: str,
+               value: DocumentValue,
+               opts: options.InsertOptions | None = None,
+               **kwargs: Any) -> MutationResult:
         """Inserts a new document to the collection, failing if the document already exists.
 
         Args:
             key (str): Document key to insert.
             value (DocumentValue): The value of the document to insert.
             opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertOptions`
 
         Returns:
@@ -389,25 +340,20 @@ class Collection:
                 res = collection.insert(key, doc, InsertOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Insert, instruments) as obs_handler:
-            req = self._impl.request_builder.build_insert_request(key, value, obs_handler, *opts, **kwargs)
-            return self._impl.insert(req, obs_handler)
+        return self._impl.insert(key, value, opts, **kwargs)
 
-    def upsert(
-        self,
-        key,  # type: str
-        value,  # type: DocumentValue
-        *opts,  # type: UpsertOptionsBase
-        **kwargs,  # type: Any
-    ) -> MutationResult:
+    def upsert(self,
+               key: str,
+               value: DocumentValue,
+               opts: options.UpsertOptions | None = None,
+               **kwargs: Any) -> MutationResult:
         """Upserts a document to the collection. This operation succeeds whether or not the document already exists.
 
         Args:
             key (str): Document key to upsert.
             value (DocumentValue): The value of the document to upsert.
             opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertOptions`
 
         Returns:
@@ -452,24 +398,20 @@ class Collection:
                 res = collection.upsert(key, doc, InsertOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Upsert, instruments) as obs_handler:
-            req = self._impl.request_builder.build_upsert_request(key, value, obs_handler, *opts, **kwargs)
-            return self._impl.upsert(req, obs_handler)
+        return self._impl.upsert(key, value, opts, **kwargs)
 
     def replace(self,
-                key,  # type: str
-                value,  # type: DocumentValue
-                *opts,  # type: ReplaceOptionsBase
-                **kwargs,  # type: Any
-                ) -> MutationResult:
+                key: str,
+                value: DocumentValue,
+                opts: options.ReplaceOptions | None = None,
+                **kwargs: Any) -> MutationResult:
         """Replaces the value of an existing document. Failing if the document does not exist.
 
         Args:
             key (str): Document key to replace.
             value (DocumentValue): The value of the document to replace.
             opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceOptions`
 
         Returns:
@@ -508,22 +450,18 @@ class Collection:
                 res = collection.replace(key, doc, InsertOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Replace, instruments) as obs_handler:
-            req = self._impl.request_builder.build_replace_request(key, value, obs_handler, *opts, **kwargs)
-            return self._impl.replace(req, obs_handler)
+        return self._impl.replace(key, value, opts, **kwargs)
 
     def remove(self,
-               key,  # type: str
-               *opts,  # type: RemoveOptionsBase
-               **kwargs,  # type: Any
-               ) -> MutationResult:
+               key: str,
+               opts: options.RemoveOptions | None = None,
+               **kwargs: Any) -> MutationResult:
         """Removes an existing document. Failing if the document does not exist.
 
         Args:
             key (str): Key for the document to remove.
             opts (:class:`~couchbase.options.RemoveOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.RemoveOptions`
 
         Returns:
@@ -554,24 +492,20 @@ class Collection:
                 res = collection.remove('airline_10', RemoveOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Remove, instruments) as obs_handler:
-            req = self._impl.request_builder.build_remove_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.remove(req, obs_handler)
+        return self._impl.remove(key, opts, **kwargs)
 
     def touch(self,
-              key,  # type: str
-              expiry,  # type: timedelta
-              *opts,  # type: TouchOptionsBase
-              **kwargs,  # type: Any
-              ) -> MutationResult:
+              key: str,
+              expiry: timedelta,
+              opts: options.TouchOptions | None = None,
+              **kwargs: Any) -> MutationResult:
         """Updates the expiry on an existing document.
 
         Args:
             key (str): Key for the document to touch.
             expiry (timedelta): The new expiry for the document.
             opts (:class:`~couchbase.options.TouchOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TouchOptions`
 
         Returns:
@@ -608,24 +542,20 @@ class Collection:
                                         TouchOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Touch, instruments) as obs_handler:
-            req = self._impl.request_builder.build_touch_request(key, expiry, obs_handler, *opts, **kwargs)
-            return self._impl.touch(req, obs_handler)
+        return self._impl.touch(key, expiry, opts, **kwargs)
 
     def get_and_touch(self,
-                      key,  # type: str
-                      expiry,  # type: timedelta
-                      *opts,  # type: GetAndTouchOptionsBase
-                      **kwargs,  # type: Any
-                      ) -> GetResult:
+                      key: str,
+                      expiry: timedelta,
+                      opts: options.GetAndTouchOptions | None = None,
+                      **kwargs: Any) -> GetResult:
         """Retrieves the value of the document and simultanously updates the expiry time for the same document.
 
         Args:
             key (str): The key for the document retrieve and set expiry time.
             expiry (timedelta):  The new expiry to apply to the document.
             opts (:class:`~couchbase.options.GetAndTouchOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndTouchOptions`
 
         Returns:
@@ -665,26 +595,20 @@ class Collection:
                 print(f'Document w/ updated expiry: {res.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.GetAndTouch, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_and_touch_request(
-                key, expiry, obs_handler, *opts, **kwargs)
-            return self._impl.get_and_touch(req, transcoder, obs_handler)
+        return self._impl.get_and_touch(key, expiry, opts, **kwargs)
 
-    def get_and_lock(
-        self,
-        key,  # type: str
-        lock_time,  # type: timedelta
-        *opts,  # type: GetAndLockOptionsBase
-        **kwargs,  # type: Any
-    ) -> GetResult:
+    def get_and_lock(self,
+                     key: str,
+                     lock_time: timedelta,
+                     opts: options.GetAndLockOptions | None = None,
+                     **kwargs: Any) -> GetResult:
         """Locks a document and retrieves the value of that document at the time it is locked.
 
         Args:
             key (str): The key for the document to lock and retrieve.
             lock_time (timedelta):  The amount of time to lock the document.
             opts (:class:`~couchbase.options.GetAndLockOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndLockOptions`
 
         Returns:
@@ -724,25 +648,20 @@ class Collection:
                 print(f'Locked document: {res.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.GetAndLock, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
-                key, lock_time, obs_handler, *opts, **kwargs)
-            return self._impl.get_and_lock(req, transcoder, obs_handler)
+        return self._impl.get_and_lock(key, lock_time, opts, **kwargs)
 
     def unlock(self,
-               key,  # type: str
-               cas,  # type: int
-               *opts,  # type: UnlockOptionsBase
-               **kwargs,  # type: Any
-               ) -> None:
+               key: str,
+               cas: int,
+               opts: options.UnlockOptions | None = None,
+               **kwargs: Any) -> None:
         """Unlocks a previously locked document.
 
         Args:
             key (str): The key for the document to unlock.
             cas (int): The CAS of the document, used to validate lock ownership.
             opts (:class:`~couchbase.options.UnlockOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockOptions`
 
         Raises:
@@ -769,18 +688,13 @@ class Collection:
                 collection.upsert(key, res.content_as[dict])
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Unlock, instruments) as obs_handler:
-            req = self._impl.request_builder.build_unlock_request(key, cas, obs_handler, *opts, **kwargs)
-            return self._impl.unlock(req, obs_handler)
+        self._impl.unlock(key, cas, opts, **kwargs)
 
-    def lookup_in(
-        self,
-        key,  # type: str
-        spec,  # type: Iterable[Spec]
-        *opts,  # type: LookupInOptionsBase
-        **kwargs,  # type: Any
-    ) -> LookupInResult:
+    def lookup_in(self,
+                  key: str,
+                  spec: Iterable[Spec],
+                  opts: options.LookupInOptions | None = None,
+                  **kwargs: Any) -> LookupInResult:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value.
 
@@ -789,7 +703,7 @@ class Collection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInOptions`
 
         Returns:
@@ -831,19 +745,13 @@ class Collection:
                 print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.LookupIn, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_lookup_in_request(
-                key, spec, obs_handler, *opts, **kwargs)
-            return self._impl.lookup_in(req, transcoder, obs_handler)
+        return self._impl.lookup_in(key, spec, opts, **kwargs)
 
-    def lookup_in_any_replica(
-        self,
-        key,  # type: str
-        spec,  # type: Iterable[Spec]
-        *opts,  # type: LookupInAnyReplicaOptions
-        **kwargs,  # type: Any
-    ) -> LookupInReplicaResult:
+    def lookup_in_any_replica(self,
+                              key: str,
+                              spec: Iterable[Spec],
+                              opts: LookupInAnyReplicaOptions | None = None,
+                              **kwargs: Any) -> LookupInReplicaResult:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value. It leverages both active and all available replicas
         returning the first available
@@ -853,11 +761,12 @@ class Collection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAnyReplicaOptions`
 
-       Returns:
-            :class:`~couchbase.result.LookupInReplicaResult`: An instance of :class:`~couchbase.result.LookupInReplicaResult`.
+        Returns:
+            :class:`~couchbase.result.LookupInReplicaResult`: An instance of
+            :class:`~couchbase.result.LookupInReplicaResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentUnretrievableException`: If the key provided does not exist
@@ -895,23 +804,14 @@ class Collection:
                 print(f'Document is replica: {res.is_replica}')
                 print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.LookupInAnyReplica, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(key,
-                                                                                             spec,
-                                                                                             obs_handler,
-                                                                                             *opts,
-                                                                                             **kwargs)
-            return self._impl.lookup_in_any_replica(req, transcoder, obs_handler)
+        """
+        return self._impl.lookup_in_any_replica(key, spec, opts, **kwargs)
 
-    def lookup_in_all_replicas(
-        self,
-        key,  # type: str
-        spec,  # type: Iterable[Spec]
-        *opts,  # type: LookupInAllReplicasOptions
-        **kwargs,  # type: Any
-    ) -> Iterable[LookupInReplicaResult]:
+    def lookup_in_all_replicas(self,
+                               key: str,
+                               spec: Iterable[Spec],
+                               opts: LookupInAllReplicasOptions | None = None,
+                               **kwargs: Any) -> Iterable[LookupInReplicaResult]:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value, returning results from both active and all available replicas
 
@@ -920,7 +820,7 @@ class Collection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAllReplicasOptions`
 
         Returns:
@@ -959,9 +859,8 @@ class Collection:
                 # ... other code ...
 
                 key = 'hotel_10025'
-                results = collection.lookup_in_all_replicas(key,
-                                                            (SD.get("geo"),),
-                                                            LookupInAllReplicasOptions(timeout=timedelta(seconds=2)))
+                opts = LookupInAllReplicasOptions(timeout=timedelta(seconds=2))
+                results = collection.lookup_in_all_replicas(key, (SD.get("geo"),), opts)
 
                 for res in results:
                     print(f'Document is replica: {res.is_replica}')
@@ -975,9 +874,8 @@ class Collection:
                 # ... other code ...
 
                 key = 'hotel_10025'
-                results = collection.lookup_in_all_replicas(key,
-                                                            (SD.get("geo"),),
-                                                            LookupInAllReplicasOptions(timeout=timedelta(seconds=2)))
+                opts = LookupInAllReplicasOptions(timeout=timedelta(seconds=2))
+                results = collection.lookup_in_all_replicas(key, (SD.get("geo"),), opts)
                 while True:
                     try:
                         res = next(results)
@@ -988,22 +886,13 @@ class Collection:
                         break
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.LookupInAllReplicas, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(key,
-                                                                                              spec,
-                                                                                              obs_handler,
-                                                                                              *opts,
-                                                                                              **kwargs)
-            return self._impl.lookup_in_all_replicas(req, transcoder, obs_handler)
+        return self._impl.lookup_in_all_replicas(key, spec, opts, **kwargs)
 
-    def mutate_in(
-        self,
-        key,  # type: str
-        spec,  # type: Iterable[Spec]
-        *opts,  # type: MutateInOptions
-        **kwargs,  # type: Any
-    ) -> MutateInResult:
+    def mutate_in(self,
+                  key: str,
+                  spec: Iterable[Spec],
+                  opts: MutateInOptions | None = None,
+                  **kwargs: Any) -> MutateInResult:
         """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
         within a document. Also enables access to document extended-attributes (i.e. xattrs).
 
@@ -1012,7 +901,7 @@ class Collection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the operations to
                 perform on the document.
             opts (:class:`~couchbase.options.MutateInOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.MutateInOptions`
 
         Returns:
@@ -1052,32 +941,28 @@ class Collection:
                                             MutateInOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.MutateIn, instruments) as obs_handler:
-            req = self._impl.request_builder.build_mutate_in_request(key, spec, obs_handler, *opts, **kwargs)
-            return self._impl.mutate_in(req, obs_handler)
+        return self._impl.mutate_in(key, spec, opts, **kwargs)
 
-    def scan(self,
-             scan_type,  # type: ScanType
-             *opts,  # type: ScanOptions
-             **kwargs,  # type: Any
-             ) -> ScanResultIterable:
+    def scan(self, scan_type: ScanType, opts: ScanOptions | None = None, **kwargs: Any) -> ScanResultIterable:
         """Execute a key-value range scan operation from the collection.
 
         .. note::
-            Use this API for low concurrency batch queries where latency is not a critical as the system may have to scan a lot of documents to find the matching documents.
-            For low latency range queries, it is recommended that you use SQL++ with the necessary indexes.
+            Use this API for low concurrency batch queries where latency is not a critical as the system may have to
+            scan a lot of documents to find the matching documents. For low latency range queries, it is recommended
+            that you use SQL++ with the necessary indexes.
 
         Args:
-            scan_type (:class:`~couchbase.kv_range_scan.ScanType`): Either a :class:`~couchbase.kv_range_scan.RangeScan`,
+            scan_type (:class:`~couchbase.kv_range_scan.ScanType`): Either a
+                :class:`~couchbase.kv_range_scan.RangeScan`,
                 :class:`~couchbase.kv_range_scan.PrefixScan` or
                 :class:`~couchbase.kv_range_scan.SamplingScan` instance.
             opts (:class:`~couchbase.options.ScanOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ScanOptions`
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If scan_type is not either a RangeScan or SamplingScan instance.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If scan_type is not either a RangeScan or
+                SamplingScan instance.
             :class:`~couchbase.exceptions.InvalidArgumentException`: If sort option is provided and is incorrect type.
             :class:`~couchbase.exceptions.InvalidArgumentException`: If consistent_with option is provided and is not a
 
@@ -1103,9 +988,8 @@ class Collection:
                     print(res)
 
 
-        """  # noqa: E501
-        req = self._impl.request_builder.build_range_scan_request(self._impl.connection, scan_type, *opts, **kwargs)
-        return self._impl.range_scan(req)
+        """
+        return self._impl.scan(scan_type, opts, **kwargs)
 
     def binary(self) -> BinaryCollection:
         """Creates a BinaryCollection instance, allowing access to various binary operations
@@ -1118,7 +1002,7 @@ class Collection:
             :class:`~couchbase.binary_collection.BinaryCollection`: A BinaryCollection instance.
 
         """
-        return BinaryCollection(self._impl)
+        return BinaryCollection(self._impl.binary())
 
     def couchbase_list(self, key: str) -> CouchbaseList:
         """Returns a CouchbaseList permitting simple list storage in a document.
@@ -1130,70 +1014,23 @@ class Collection:
             :class:`~couchbase.datastructures.CouchbaseList`: A CouchbaseList instance.
 
         """
-        return CouchbaseList(key, self._impl)
+        return CouchbaseList(key, self)
 
     def list_append(self,
                     key: str,
                     value: JSONType,
-                    create: Optional[bool] = False,
+                    create: bool | None = False,
                     **kwargs: object) -> OperationResult:
         """Add an item to the end of a list.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseList.append`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseList.append` instead.
 
         Args:
             key (str): The key for the list document.
             value (JSONType): The value to append to the list.
             create (bool, optional): Whether the list should be created if it does not exist.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
-                for this operation.
-
-        Returns:
-            :class:`couchbase~.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
-
-        Raises:
-            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
-                on the server.
-
-        """
-        op_type = DatastructureOperationType.ListAppend
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.MutateIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = array_append('', value)
-                req = self._impl.request_builder.build_mutate_in_request(key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          create=create,
-                                                          create_type=list,
-                                                          path_value=value)
-                return OperationResult(sd_res.cas, sd_res.mutation_token())
-
-    def list_prepend(self,
-                     key: str,
-                     value: JSONType,
-                     create: Optional[bool] = False,
-                     **kwargs: object
-                     ) -> OperationResult:
-        """ Add an item to the beginning of a list.
-
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseList.prepend`
-            instead.
-
-        Args:
-            key (str): The key for the list document.
-            value (JSONType): The value to prepend to the list.
-            create (bool, optional): Whether the list should be created if it does not exist.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1204,24 +1041,39 @@ class Collection:
                 on the server.
 
         """
-        op_type = DatastructureOperationType.ListPrepend
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.MutateIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = array_prepend('', value)
-                req = self._impl.request_builder.build_mutate_in_request(key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          create=create,
-                                                          create_type=list,
-                                                          path_value=value)
-                return OperationResult(sd_res.cas, sd_res.mutation_token())
+        Supportability.method_deprecated('list_append', 'CouchbaseList.append')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.list_append(key, value, create, **kwargs)
+
+    def list_prepend(self,
+                     key: str,
+                     value: JSONType,
+                     create: bool | None = False,
+                     **kwargs: object
+                     ) -> OperationResult:
+        """ Add an item to the beginning of a list.
+
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseList.prepend` instead.
+
+        Args:
+            key (str): The key for the list document.
+            value (JSONType): The value to prepend to the list.
+            create (bool, optional): Whether the list should be created if it does not exist.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        """
+        Supportability.method_deprecated('list_prepend', 'CouchbaseList.prepend')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.list_prepend(key, value, create, **kwargs)
 
     def list_set(self,
                  key: str,
@@ -1231,15 +1083,14 @@ class Collection:
                  ) -> OperationResult:
         """Sets an item within a list at a given position.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseList.set_at`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseList.set_at` instead.
 
         Args:
             key (str): The key for the list document.
             index (int): The position to replace.
             value (JSONType): The value to prepend to the list.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1251,34 +1102,20 @@ class Collection:
             IndexError: If the index is out of bounds.
 
         """
-        op_type = DatastructureOperationType.ListSetAt
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.MutateIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = replace(f'[{index}]', value)
-                req = self._impl.request_builder.build_mutate_in_request(key,
-                                                                         (op,),
-                                                                         obs_handler,
-                                                                         **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          path_value=index)
-                return OperationResult(sd_res.cas, sd_res.mutation_token())
+        Supportability.method_deprecated('list_set', 'CouchbaseList.set_at')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.list_set(key, index, value, **kwargs)
 
     def list_get(self, key: str, index: int, **kwargs: object) -> Any:
         """Get a specific element within a list.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseList.get_at`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseList.get_at` instead.
 
         Args:
             key (str): The key for the list document.
             index (int): The position to retrieve.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1290,32 +1127,20 @@ class Collection:
             IndexError: If the index is out of bounds.
 
         """
-        op_type = DatastructureOperationType.ListGetAt
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.LookupIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_get(f'[{index}]')
-                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          path_value=index,
-                                                          transcoder=transcoder)
-                return sd_res.value[0].get('value', None)
+        Supportability.method_deprecated('list_get', 'CouchbaseList.get_at')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.list_get(key, index, **kwargs)
 
     def list_remove(self, key: str, index: int, **kwargs: object) -> OperationResult:
         """Remove the element at a specific index from a list.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseList.remove_at`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseList.remove_at` instead.
 
         Args:
             key (str): The key for the list document.
             index (int): The position to remove.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1327,30 +1152,19 @@ class Collection:
             IndexError: If the index is out of bounds.
 
         """
-        op_type = DatastructureOperationType.ListRemoveAt
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.MutateIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_remove(f'[{index}]')
-                req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          path_value=index)
-                return OperationResult(sd_res.cas, sd_res.mutation_token())
+        Supportability.method_deprecated('list_remove', 'CouchbaseList.remove_at')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.list_remove(key, index, **kwargs)
 
     def list_size(self, key: str, **kwargs: object) -> int:
         """Returns the number of items in the list.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseList.size`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseList.size` instead.
 
         Args:
             key (str): The key for the list document.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1361,19 +1175,9 @@ class Collection:
                 on the server.
 
         """
-        op_type = DatastructureOperationType.ListRemoveAt
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.LookupIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = count('')
-                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          transcoder=transcoder)
-                return sd_res.value[0].get('value', None)
+        Supportability.method_deprecated('list_size', 'CouchbaseList.size')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.list_size(key, **kwargs)
 
     def couchbase_map(self, key: str) -> CouchbaseMap:
         """Returns a CouchbaseMap permitting simple map storage in a document.
@@ -1385,27 +1189,26 @@ class Collection:
             :class:`~couchbase.datastructures.CouchbaseMap`: A CouchbaseMap instance.
 
         """
-        return CouchbaseMap(key, self._impl)
+        return CouchbaseMap(key, self)
 
     def map_add(self,
                 key: str,
                 mapkey: str,
                 value: Any,
-                create: Optional[bool] = False,
+                create: bool | None = False,
                 **kwargs: object
                 ) -> OperationResult:
         """Set a value for a key in a map.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseMap.add`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseMap.add` instead.
 
         Args:
             key (str): The key for the map document.
             mapkey (str): The key in the map to set.
             value (Any): The value to use.
             create (bool, optional): Whether the map should be created if it does not exist.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1416,33 +1219,20 @@ class Collection:
                 on the server.
 
         """
-        op_type = DatastructureOperationType.MapAdd
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.MutateIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_upsert(mapkey, value)
-                req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          create=create,
-                                                          create_type=dict,
-                                                          path_value=mapkey)
-                return OperationResult(sd_res.cas, sd_res.mutation_token())
+        Supportability.method_deprecated('map_add', 'CouchbaseMap.add')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.map_add(key, mapkey, value, create, **kwargs)
 
     def map_get(self, key: str, mapkey: str, **kwargs: object) -> Any:
         """Retrieve a value from a map.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseMap.get`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseMap.get` instead.
 
         Args:
             key (str): The key for the map document.
             mapkey (str): The key in the map to set.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1453,32 +1243,20 @@ class Collection:
                 on the server.
 
         """
-        op_type = DatastructureOperationType.MapGet
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.LookupIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_get(mapkey)
-                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          path_value=mapkey,
-                                                          transcoder=transcoder)
-                return sd_res.value[0].get('value', None)
+        Supportability.method_deprecated('map_get', 'CouchbaseMap.get')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.map_get(key, mapkey, **kwargs)
 
     def map_remove(self, key: str, mapkey: str, **kwargs: object) -> OperationResult:
         """Remove an item from a map.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseMap.remove`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseMap.remove` instead.
 
         Args:
             key (str): The key for the map document.
             mapkey (str): The key in the map to set.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1489,30 +1267,19 @@ class Collection:
                 on the server.
 
         """
-        op_type = DatastructureOperationType.MapRemove
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.MutateIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_remove(mapkey)
-                req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          path_value=mapkey)
-                return OperationResult(sd_res.cas, sd_res.mutation_token())
+        Supportability.method_deprecated('map_remove', 'CouchbaseMap.remove')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.map_remove(key, mapkey, **kwargs)
 
     def map_size(self, key: str, **kwargs: object) -> int:
         """Get the number of items in the map.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseMap.remove`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseMap.size` instead.
 
         Args:
             key (str): The key for the map document.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1523,19 +1290,9 @@ class Collection:
                 on the server.
 
         """
-        op_type = DatastructureOperationType.MapSize
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.LookupIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = count('')
-                req, transcoder = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, **kwargs)
-                sd_res = self._execute_deprecated_ds_func(self._impl.lookup_in,
-                                                          req,
-                                                          obs_handler,
-                                                          ds_obs_handler.wrapped_span,
-                                                          transcoder=transcoder)
-                return sd_res.value[0].get('value', None)
+        Supportability.method_deprecated('map_size', 'CouchbaseMap.size')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.map_size(key, **kwargs)
 
     def couchbase_set(self, key: str) -> CouchbaseSet:
         """Returns a CouchbaseSet permitting simple map storage in a document.
@@ -1547,25 +1304,24 @@ class Collection:
             :class:`~couchbase.datastructures.CouchbaseSet`: A CouchbaseSet instance.
 
         """
-        return CouchbaseSet(key, self._impl)
+        return CouchbaseSet(key, self)
 
     def set_add(self,
                 key: str,
                 value: Any,
-                create: Optional[bool] = False,
+                create: bool | None = False,
                 **kwargs: object
-                ) -> Optional[OperationResult]:
+                ) -> OperationResult | None:
         """Add an item to a set if the item does not yet exist.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseSet.add`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseSet.add` instead.
 
         Args:
             key (str): The key for the set document.
             value (Any): The value to add to the set.
             create (bool, optional): Whether the set should be created if it does not exist.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1575,66 +1331,45 @@ class Collection:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
         """
-        op_type = DatastructureOperationType.SetAdd
-        with ObservableRequestHandler(op_type, self._impl.observability_instruments) as ds_obs_handler:
-            ds_obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict())
-            kv_op_type = KeyValueOperationType.MutateIn
-            with ObservableRequestHandler(kv_op_type, self._impl.observability_instruments) as obs_handler:
-                op = array_addunique('', value)
-                try:
-                    req = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, **kwargs)
-                    sd_res = self._execute_deprecated_ds_func(self._impl.mutate_in,
-                                                              req,
-                                                              obs_handler,
-                                                              ds_obs_handler.wrapped_span,
-                                                              create=create,
-                                                              create_type=list,
-                                                              path_value=value)
-                    return OperationResult(sd_res.cas, sd_res.mutation_token())
-                except PathExistsException:
-                    pass
+        Supportability.method_deprecated('set_add', 'CouchbaseSet.add')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.set_add(key, value, create, **kwargs)
 
-    def set_remove(self, key: str, value: Any, **kwargs: object) -> Optional[OperationResult]:
+    def set_remove(self, key: str, value: Any, **kwargs: object) -> OperationResult | None:
         """Remove an item from a set.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseSet.remove`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseSet.remove` instead.
 
         Args:
             key (str): The key for the set document.
             value (Any): The value to remove from the set.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
-            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+            :class:`~couchbase.result.OperationResult` | None: An instance of
+            :class:`~couchbase.result.OperationResult`, or ``None`` if the set does not hold the value.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
+            :class:`~couchbase.exceptions.CasMismatchException`: If the set changed between reading it and
+                removing the value.  :meth:`.CouchbaseSet.remove` retries instead.
         """
-        while True:
-            rv = self.get(key, **kwargs)
-            try:
-                ix = rv.value.index(value)
-                kwargs['cas'] = rv.cas
-                return self.list_remove(key, ix, **kwargs)
-            except DocumentExistsException:
-                pass
-            except ValueError:
-                return
+        Supportability.method_deprecated('set_remove', 'CouchbaseSet.remove')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.set_remove(key, value, **kwargs)
 
     def set_size(self, key: str, **kwargs: object) -> int:
         """Get the length of a set.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseSet.size`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseSet.size` instead.
 
         Args:
             key (str): The key for the set document.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1644,30 +1379,32 @@ class Collection:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
         """
-        return self.list_size(key, **kwargs)
+        Supportability.method_deprecated('set_size', 'CouchbaseSet.size')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.set_size(key, **kwargs)
 
     def set_contains(self, key: str, value: Any, **kwargs: object) -> bool:
         """Determine if an item exists in a set
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseSet.contains`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseSet.contains` instead.
 
         Args:
             key (str): The key for the set document.
             value (Any):  The value to check for.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
-            bool: True if the set contains the specified value.  False othwerwise.
+            bool: True if the set contains the specified value.  False otherwise.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
         """
-        rv = self.get(key, **kwargs)
-        return value in rv.value
+        Supportability.method_deprecated('set_contains', 'CouchbaseSet.contains')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.set_contains(key, value, **kwargs)
 
     def couchbase_queue(self, key: str) -> CouchbaseQueue:
         """Returns a CouchbaseQueue permitting simple map storage in a document.
@@ -1679,25 +1416,24 @@ class Collection:
             :class:`~couchbase.datastructures.CouchbaseQueue`: A CouchbaseQueue instance.
 
         """
-        return CouchbaseQueue(key, self._impl)
+        return CouchbaseQueue(key, self)
 
     def queue_push(self,
                    key: str,
                    value: Any,
-                   create: Optional[bool] = False,
+                   create: bool | None = False,
                    **kwargs: object
                    ) -> OperationResult:
         """Add an item to the end of a queue.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseQueue.push`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseQueue.push` instead.
 
         Args:
             key (str): The key for the queue document.
             value (Any):  The value to add.
             create (bool, optional): Whether the queue should be created if it does not exist.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1707,49 +1443,43 @@ class Collection:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
         """
-        return self.list_prepend(key, value, create=create, **kwargs)
+        Supportability.method_deprecated('queue_push', 'CouchbaseQueue.push')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.queue_push(key, value, create, **kwargs)
 
-    def queue_pop(self, key: str, **kwargs: object) -> OperationResult:
-        """Remove and return the first item queue.
+    def queue_pop(self, key: str, **kwargs: object) -> Any:
+        """Remove and return the oldest item in a queue.
+
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseQueue.pop` instead.
 
         .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseQueue.pop`
-            instead.
+            This method is not safe with more than one consumer.  Two concurrent calls can return the same
+            item, and the queue then loses a different one.  :meth:`.CouchbaseQueue.pop` does not have this
+            problem.
 
         Args:
             key (str): The key for the queue document.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
-            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+            Any: The item removed from the queue.
 
         Raises:
+            :class:`~couchbase.exceptions.QueueEmpty`: If the queue is empty.
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
         """
-        while True:
-            try:
-                itm = self.list_get(key, -1, **kwargs)
-            except IndexError:
-                raise QueueEmpty
-
-            kwargs.update({k: v for k, v in getattr(
-                itm, '__dict__', {}).items() if k in {'cas'}})
-            try:
-                self.list_remove(key, -1, **kwargs)
-                return itm
-            except DocumentExistsException:
-                pass
-            except IndexError:
-                raise QueueEmpty
+        Supportability.method_deprecated('queue_pop', 'CouchbaseQueue.pop')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.queue_pop(key, **kwargs)
 
     def queue_size(self, key: str) -> int:
         """Get the length of a queue.
 
-        .. warning::
-            This method is deprecated and will be removed in the 4.7.0 version.  Use :meth:`.CouchbaseQueue.size`
-            instead.
+        .. deprecated:: 4.0.0
+            Use :meth:`.CouchbaseQueue.size` instead.
 
         Args:
             key (str): The key for the queue document.
@@ -1761,19 +1491,20 @@ class Collection:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
                 on the server.
         """
-        return self.list_size(key)
+        Supportability.method_deprecated('queue_size', 'CouchbaseQueue.size')
+        legacy = require(self._impl, Capability.LEGACY_DATASTRUCTURES).legacy_datastructures
+        return legacy.queue_size(key)
 
     def get_multi(self,
-                  keys,  # type: List[str]
-                  *opts,  # type: GetMultiOptions
-                  **kwargs,  # type: Any
-                  ) -> MultiGetResult:
+                  keys: list[str],
+                  opts: GetMultiOptions | None = None,
+                  **kwargs: Any) -> MultiGetResult:
         """For each key in the provided list, retrieve the document associated with the key.
 
         Args:
-            keys (List[str]): The keys to use for the multiple get operations.
+            keys (list[str]): The keys to use for the multiple get operations.
             opts (:class:`~couchbase.options.GetMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetMultiOptions`
 
         Returns:
@@ -1826,23 +1557,19 @@ class Collection:
 
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.GetMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_get_multi_request(keys, obs_handler, *opts, **kwargs)
-            return self._impl.get_multi(req, obs_handler)
+        return self._impl.get_multi(keys, opts, **kwargs)
 
     def get_any_replica_multi(self,
-                              keys,  # type: List[str]
-                              *opts,  # type: GetAnyReplicaMultiOptions
-                              **kwargs,  # type: Any
-                              ) -> MultiGetReplicaResult[GetReplicaResult]:
+                              keys: list[str],
+                              opts: GetAnyReplicaMultiOptions | None = None,
+                              **kwargs: Any) -> MultiGetReplicaResult[GetReplicaResult]:
         """For each key in the provided list, retrieve the document associated with the key from the collection
         leveraging both active and all available replicas returning the first available.
 
         Args:
-            keys (List[str]): The keys to use for the multiple get operations.
+            keys (list[str]): The keys to use for the multiple get operations.
             opts (:class:`~couchbase.options.GetAnyReplicaMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAnyReplicaMultiOptions`
 
         Returns:
@@ -1904,26 +1631,19 @@ class Collection:
                         print(f'Active doc {k} has value: {v.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.GetAnyReplicaMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_get_any_replica_multi_request(keys,
-                                                                                       obs_handler,
-                                                                                       *opts,
-                                                                                       **kwargs)
-            return self._impl.get_any_replica_multi(req, obs_handler)
+        return self._impl.get_any_replica_multi(keys, opts, **kwargs)
 
     def get_all_replicas_multi(self,
-                               keys,  # type: List[str]
-                               *opts,  # type: GetAllReplicasMultiOptions
-                               **kwargs,  # type: Any
-                               ) -> MultiGetReplicaResult[List[GetReplicaResult]]:
+                               keys: list[str],
+                               opts: GetAllReplicasMultiOptions | None = None,
+                               **kwargs: Any) -> MultiGetReplicaResult[list[GetReplicaResult]]:
         """For each key in the provided list, retrieve the document from the collection returning both
         active and all available replicas.
 
         Args:
-            keys (List[str]): The keys to use for the multiple get operations.
+            keys (list[str]): The keys to use for the multiple get operations.
             opts (:class:`~couchbase.options.GetAllReplicasMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAllReplicasMultiOptions`
 
         Returns:
@@ -1988,43 +1708,33 @@ class Collection:
                             print(f'Active doc {k} has value: {doc.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(
-            KeyValueMultiOperationType.GetAllReplicasMulti, instruments
-        ) as obs_handler:
-            req = self._impl.multi_request_builder.build_get_all_replicas_multi_request(keys,
-                                                                                        obs_handler,
-                                                                                        *opts,
-                                                                                        **kwargs)
-            return self._impl.get_all_replicas_multi(req, obs_handler)
+        return self._impl.get_all_replicas_multi(keys, opts, **kwargs)
 
     def lock_multi(self,
-                   keys,  # type: List[str]
-                   lock_time,  # type: timedelta
-                   *opts,  # type: LockMultiOptions
-                   **kwargs,  # type: Any
-                   ) -> MultiGetResult:
-        """
-        .. warning::
-            This method is deprecated and will be deprecated in a future release.
+                   keys: list[str],
+                   lock_time: timedelta,
+                   opts: LockMultiOptions | None = None,
+                   **kwargs: Any) -> MultiGetResult:
+        """For each key in the provided list, lock the document associated with the key.
+
+        .. deprecated:: 4.2.0
             Use :meth:`~couchbase.collection.Collection.get_and_lock_multi` instead.
         """
         Supportability.method_deprecated('lock_multi', 'get_and_lock_multi')
-        return self.get_and_lock_multi(keys, lock_time, *opts, **kwargs)
+        return self.get_and_lock_multi(keys, lock_time, opts, **kwargs)
 
     def get_and_lock_multi(self,
-                           keys,  # type; List[str]
-                           lock_time,  # type: timedelta
-                           *opts,  # type: GetAndLockMultiOptions
-                           **kwargs,  # type: Any
-                           ) -> MultiGetResult:
+                           keys: list[str],
+                           lock_time: timedelta,
+                           opts: GetAndLockMultiOptions | None = None,
+                           **kwargs: Any) -> MultiGetResult:
         """For each key in the provided list, lock the document associated with the key.
 
         Args:
-            keys (List[str]): The keys to use for the multiple lock operations.
+            keys (list[str]): The keys to use for the multiple lock operations.
             lock_time (timedelta):  The amount of time to lock the documents.
             opts (:class:`~couchbase.options.GetAndLockMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndLockMultiOptions`
 
         Returns:
@@ -2078,26 +1788,18 @@ class Collection:
                     print(f'Locked document: key={k}, content={v.content_as[str]}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.GetAndLockMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_get_and_lock_multi_request(keys,
-                                                                                    lock_time,
-                                                                                    obs_handler,
-                                                                                    *opts,
-                                                                                    **kwargs)
-            return self._impl.get_and_lock_multi(req, obs_handler)
+        return self._impl.get_and_lock_multi(keys, lock_time, opts, **kwargs)
 
     def exists_multi(self,
-                     keys,  # type: List[str]
-                     *opts,  # type: ExistsMultiOptions
-                     **kwargs,  # type: Any
-                     ) -> MultiExistsResult:
+                     keys: list[str],
+                     opts: ExistsMultiOptions | None = None,
+                     **kwargs: Any) -> MultiExistsResult:
         """For each key in the provided list, check if the document associated with the key exists.
 
         Args:
-            keys (List[str]): The keys to use for the multiple exists operations.
+            keys (list[str]): The keys to use for the multiple exists operations.
             opts (:class:`~couchbase.options.ExistsMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsMultiOptions`
 
         Returns:
@@ -2141,28 +1843,26 @@ class Collection:
                                               ExistsMultiOptions(per_key_options=per_key_opts))
                 for k, v in res.results.items():
                     print(f'Doc with key={k} {"exists" if v.exists else "does not exist"}')
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.ExistsMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_exists_multi_request(keys, obs_handler, *opts, **kwargs)
-            return self._impl.exists_multi(req, obs_handler)
+        """
+        return self._impl.exists_multi(keys, opts, **kwargs)
 
     def insert_multi(self,
-                     keys_and_docs,  # type: Mapping[str, DocumentValue]
-                     *opts,  # type: InsertMultiOptions
-                     **kwargs,  # type: Any
-                     ) -> MultiMutationResult:
+                     keys_and_docs: Mapping[str, DocumentValue],
+                     opts: InsertMultiOptions | None = None,
+                     **kwargs: Any) -> MultiMutationResult:
         """For each key, value pair in the provided dict, inserts a new document to the collection,
         failing if the document already exists.
 
         Args:
-            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple insert operations.
+            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple insert
+                operations.
             opts (:class:`~couchbase.options.InsertMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentExistsException`: If the key provided already exists on the
@@ -2223,31 +1923,26 @@ class Collection:
                 for k, v in res.results.items():
                     print(f'Doc inserted: key={k}, cas={v.cas}')
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.InsertMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_insert_multi_request(keys_and_docs,
-                                                                              obs_handler,
-                                                                              *opts,
-                                                                              **kwargs)
-            return self._impl.insert_multi(req, obs_handler)
+        """
+        return self._impl.insert_multi(keys_and_docs, opts, **kwargs)
 
     def upsert_multi(self,
-                     keys_and_docs,  # type: Mapping[str, DocumentValue]
-                     *opts,  # type: UpsertMultiOptions
-                     **kwargs,  # type: Any
-                     ) -> MultiMutationResult:
+                     keys_and_docs: Mapping[str, DocumentValue],
+                     opts: UpsertMultiOptions | None = None,
+                     **kwargs: Any) -> MultiMutationResult:
         """For each key, value pair in the provided dict, upserts a document to the collection. This operation
         succeeds whether or not the document already exists.
 
         Args:
-            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple upsert operations.
+            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple upsert
+                operations.
             opts (:class:`~couchbase.options.UpsertMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
 
         Examples:
 
@@ -2303,31 +1998,26 @@ class Collection:
                 for k, v in res.results.items():
                     print(f'Doc upserted: key={k}, cas={v.cas}')
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.UpsertMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_upsert_multi_request(keys_and_docs,
-                                                                              obs_handler,
-                                                                              *opts,
-                                                                              **kwargs)
-            return self._impl.upsert_multi(req, obs_handler)
+        """
+        return self._impl.upsert_multi(keys_and_docs, opts, **kwargs)
 
     def replace_multi(self,
-                      keys_and_docs,  # type: Mapping[str, DocumentValue]
-                      *opts,  # type: ReplaceMultiOptions
-                      **kwargs,  # type: Any
-                      ) -> MultiMutationResult:
+                      keys_and_docs: Mapping[str, DocumentValue],
+                      opts: ReplaceMultiOptions | None = None,
+                      **kwargs: Any) -> MultiMutationResult:
         """For each key, value pair in the provided dict, replaces the value of a document in the collection.
         This operation fails if the document does not exist.
 
         Args:
-            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple replace operations.
+            keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple replace
+                operations.
             opts (:class:`~couchbase.options.ReplaceMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
@@ -2394,31 +2084,25 @@ class Collection:
                 for k, v in res.results.items():
                     print(f'Doc replaced: key={k}, cas={v.cas}')
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.ReplaceMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_replace_multi_request(keys_and_docs,
-                                                                               obs_handler,
-                                                                               *opts,
-                                                                               **kwargs)
-            return self._impl.replace_multi(req, obs_handler)
+        """
+        return self._impl.replace_multi(keys_and_docs, opts, **kwargs)
 
     def remove_multi(self,
-                     keys,  # type: List[str]
-                     *opts,  # type: RemoveMultiOptions
-                     **kwargs,  # type: Any
-                     ) -> MultiMutationResult:
+                     keys: list[str],
+                     opts: RemoveMultiOptions | None = None,
+                     **kwargs: Any) -> MultiMutationResult:
         """For each key in the provided list, remove the existing document.  This operation fails
         if the document does not exist.
 
         Args:
-            keys (List[str]): The keys to use for the multiple remove operations.
+            keys (list[str]): The keys to use for the multiple remove operations.
             opts (:class:`~couchbase.options.RemoveMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.RemoveMultiOptions`
 
         Returns:
-            :class:`~couchbase.result.MultiMutationResult`: An instance of :class:`~couchbase.result.MultiMutationResult`.
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
@@ -2458,26 +2142,22 @@ class Collection:
                 res = collection.remove_multi(keys,
                                               RemoveMultiOptions(per_key_options=per_key_opts))
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.RemoveMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_remove_multi_request(keys, obs_handler, *opts, **kwargs)
-            return self._impl.remove_multi(req, obs_handler)
+        """
+        return self._impl.remove_multi(keys, opts, **kwargs)
 
     def touch_multi(self,
-                    keys,  # type: List[str]
-                    expiry,  # type: timedelta
-                    *opts,  # type: TouchMultiOptions
-                    **kwargs,  # type: Any
-                    ) -> MultiMutationResult:
+                    keys: list[str],
+                    expiry: timedelta,
+                    opts: TouchMultiOptions | None = None,
+                    **kwargs: Any) -> MultiMutationResult:
         """For each key in the provided list, update the expiry on an existing document. This operation fails
         if the document does not exist.
 
         Args:
-            keys (List[str]): The keys to use for the multiple touch operations.
+            keys (list[str]): The keys to use for the multiple touch operations.
             expiry (timedelta): The new expiry for the document.
             opts (:class:`~couchbase.options.TouchMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TouchMultiOptions`
 
         Returns:
@@ -2490,31 +2170,23 @@ class Collection:
                 match to the key, but is not raised.
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.TouchMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_touch_multi_request(keys,
-                                                                             expiry,
-                                                                             obs_handler,
-                                                                             *opts,
-                                                                             **kwargs)
-            return self._impl.touch_multi(req, obs_handler)
+        return self._impl.touch_multi(keys, expiry, opts, **kwargs)
 
-    def unlock_multi(self,  # noqa: C901
-                     keys,  # type: Union[MultiResultType, Dict[str, int]]
-                     *opts,  # type: UnlockMultiOptions
-                     **kwargs,  # type: Any
-                     ) -> Dict[str, Union[None, PycbcCoreException]]:
+    def unlock_multi(self,
+                     keys: MultiResultType | dict[str, int],
+                     opts: UnlockMultiOptions | None = None,
+                     **kwargs: Any) -> dict[str, CouchbaseException | None]:
         """For each result in the provided :class:`~couchbase.result.MultiResultType` in the provided list,
         unlocks a previously locked document. This operation fails if the document does not exist.
 
         Args:
-            keys (Union[MultiResultType, Dict[str, int]]): The result from a previous multi operation.
+            keys (MultiResultType | dict[str, int]): The result from a previous multi operation.
             opts (:class:`~couchbase.options.UnlockMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockMultiOptions`
 
         Returns:
-            Dict[str, Union[None, CouchbaseBaseException]]: Either None if operation successful or an Exception
+            dict[str, CouchbaseException | None]: Either None if operation successful or an Exception
             if the operation was unsuccessful
 
         Raises:
@@ -2527,10 +2199,7 @@ class Collection:
                 but is not raised.
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.UnlockMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_unlock_multi_request(keys, obs_handler, *opts, **kwargs)
-            return self._impl.unlock_multi(req, obs_handler)
+        return self._impl.unlock_multi(keys, opts, **kwargs)
 
     def query_indexes(self) -> CollectionQueryIndexManager:
         """
@@ -2538,8 +2207,10 @@ class Collection:
         indexes of this cluster.
 
         Returns:
-            :class:`~couchbase.management.queries.CollectionQueryIndexManager`: A :class:`~couchbase.management.queries.CollectionQueryIndexManager` instance.
-        """  # noqa: E501
+            :class:`~couchbase.management.queries.CollectionQueryIndexManager`: A
+            :class:`~couchbase.management.queries.CollectionQueryIndexManager` instance.
+        """
+        # BRIDGE: the manager builds its own impl until it is ported.  Removed by PYCBC-2005.
         return CollectionQueryIndexManager(self._impl._client_adapter,
                                            self._impl.bucket_name,
                                            self._impl.scope_name,
@@ -2549,49 +2220,6 @@ class Collection:
     @staticmethod
     def default_name():
         return "_default"
-
-    # @TODO(PYCBC-1732) - remove in 4.7 dot-minor
-    def _execute_deprecated_ds_func(self,
-                                    fn: DatastructureCallable,
-                                    req: PycbcCoreKeyValueRequest,
-                                    obs_handler: ObservableRequestHandler,
-                                    parent_span: WrappedSpan,
-                                    create: Optional[bool] = False,
-                                    create_type: Optional[Union[Type[dict], Type[list]]] = None,
-                                    wrap_missing_path: Optional[bool] = True,
-                                    path_value: Optional[Any] = None,
-                                    transcoder: Optional[Transcoder] = None) -> Any:
-        try:
-            fn_args = [req]
-            if transcoder:
-                fn_args.append(transcoder)
-            fn_args.append(obs_handler)
-            return fn(*fn_args)
-        except DocumentNotFoundException as ex:
-            if create:
-                orig_opt_type = obs_handler.op_type
-                obs_handler.reset(KeyValueOperationType.Insert, exc_val=ex)
-                try:
-                    ins_req = self._impl.request_builder.build_insert_request(req.key,
-                                                                              create_type(),
-                                                                              obs_handler,
-                                                                              span=parent_span)
-                    self._impl.insert(ins_req, obs_handler)
-                except DocumentExistsException:
-                    pass
-                obs_handler.reset(orig_opt_type)
-                obs_handler.create_kv_span(self._impl._request_builder._collection_dtls.get_details_as_dict(),
-                                           parent_span=parent_span)
-                fn_args = [req]
-                if transcoder:
-                    fn_args.append(transcoder)
-                fn_args.append(obs_handler)
-                return fn(*fn_args)
-            else:
-                raise
-        except PathNotFoundException:
-            if wrap_missing_path and path_value:
-                raise IndexError(path_value)
 
 
 """
@@ -2731,18 +2359,3 @@ class CBCollection(Collection):
     .. deprecated:: 4.0.0
         Use :class:`~couchbase.collection.Collection` instead.
     """
-
-
-from couchbase.logic.options import ExistsOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAllReplicasOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAndLockOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAndTouchOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetAnyReplicaOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import GetOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import InsertOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import LookupInOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import RemoveOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import ReplaceOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import TouchOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import UnlockOptionsBase  # nopep8 # isort:skip # noqa: E402
-from couchbase.logic.options import UpsertOptionsBase  # nopep8 # isort:skip # noqa: E402

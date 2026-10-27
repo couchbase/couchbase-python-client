@@ -69,6 +69,7 @@ class pycbc_result(Generic[T]):
     core_span: Optional[Any]
     start_time: Optional[int]
     end_time: Optional[int]
+    multi_resp_all_okay: Optional[bool]
 
     def __init__(self) -> None: ...
 
@@ -513,11 +514,6 @@ class pycbc_connection:
     def pycbc_get_and_lock_multi(
         self, request_list: List[pycbc_kv_request]
     ) -> pycbc_result[Dict[str, CppTypes.CppGetAndLockResponse]]:
-        ...
-
-    def pycbc_get_and_touch_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppGetAndTouchResponse]]:
         ...
 
     def pycbc_get_any_replica_multi(

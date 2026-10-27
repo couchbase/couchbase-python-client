@@ -585,11 +585,9 @@ Connection::execute_multi_op(PyObject* arg)
         return nullptr;
       }
     }
-    if (PyDict_SetItem(
-          multi_result->raw_result, pycbc::keys::all_okay, all_okay ? Py_True : Py_False) < 0) {
-      Py_DECREF(pyObj_multi_result);
-      return nullptr;
-    }
+    PyObject* pyObj_old_all_okay = multi_result->multi_resp_all_okay;
+    multi_result->multi_resp_all_okay = Py_NewRef(all_okay ? Py_True : Py_False);
+    Py_XDECREF(pyObj_old_all_okay);
   } catch (const std::exception& e) {
     Py_DECREF(pyObj_multi_result);
     return raise_invalid_argument(e.what());

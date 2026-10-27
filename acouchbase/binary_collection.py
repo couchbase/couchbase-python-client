@@ -16,16 +16,16 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Union)
+__all__ = [
+    'BinaryCollection',
+]
 
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import KeyValueOperationType
+from typing import TYPE_CHECKING, Any
+
 from couchbase.result import CounterResult, MutationResult
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._collection_impl import AsyncCollectionImpl
+    from couchbase.common._interfaces._binary_collection import AsyncBinaryCollectionInterface
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    IncrementOptions,
@@ -34,21 +34,20 @@ if TYPE_CHECKING:
 
 class BinaryCollection:
 
-    def __init__(self, collection_impl: AsyncCollectionImpl):
-        self._impl = collection_impl
+    def __init__(self, impl: AsyncBinaryCollectionInterface) -> None:
+        self._impl = impl
 
     async def increment(self,
-                        key,  # type: str
-                        *opts,  # type: IncrementOptions
-                        **kwargs,  # type: Any
-                        ) -> CounterResult:
+                        key: str,
+                        opts: IncrementOptions | None = None,
+                        **kwargs: Any) -> CounterResult:
         """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
         Args:
             key (str): The key of the document to increment.
             opts (:class:`~couchbase.options.IncrementOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.IncrementOptions`
 
         Returns:
@@ -63,7 +62,7 @@ class BinaryCollection:
 
             Simple increment operation::
 
-                from couchbase.options import IncrementOptions, SignedInt64
+                from acouchbase.options import IncrementOptions, SignedInt64
 
                 # ... other code ...
 
@@ -73,7 +72,7 @@ class BinaryCollection:
 
             Simple increment operation, change default delta::
 
-                from couchbase.options import IncrementOptions, DeltaValue
+                from acouchbase.options import IncrementOptions, DeltaValue
 
                 # ... other code ...
 
@@ -82,23 +81,19 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Increment, instruments) as obs_handler:
-            req = self._impl.request_builder.build_increment_request(key, obs_handler, *opts, **kwargs)
-            return await self._impl.increment(req, obs_handler)
+        return await self._impl.increment(key, opts, **kwargs)
 
     async def decrement(self,
-                        key,  # type: str
-                        *opts,  # type: DecrementOptions
-                        **kwargs,  # type: Any
-                        ) -> CounterResult:
+                        key: str,
+                        opts: DecrementOptions | None = None,
+                        **kwargs: Any) -> CounterResult:
         """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
         Args:
             key (str): The key of the document to decrement.
             opts (:class:`~couchbase.options.DecrementOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.DecrementOptions`
 
         Returns:
@@ -113,7 +108,7 @@ class BinaryCollection:
 
             Simple decrement operation::
 
-                from couchbase.options import DecrementOptions, SignedInt64
+                from acouchbase.options import DecrementOptions, SignedInt64
 
                 # ... other code ...
 
@@ -123,7 +118,7 @@ class BinaryCollection:
 
             Simple decrement operation, change default delta::
 
-                from couchbase.options import DecrementOptions, DeltaValue
+                from acouchbase.options import DecrementOptions, DeltaValue
 
                 # ... other code ...
 
@@ -132,24 +127,20 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Decrement, instruments) as obs_handler:
-            req = self._impl.request_builder.build_decrement_request(key, obs_handler, *opts, **kwargs)
-            return await self._impl.decrement(req, obs_handler)
+        return await self._impl.decrement(key, opts, **kwargs)
 
     async def append(self,
-                     key,  # type: str
-                     value,  # type: Union[str,bytes,bytearray]
-                     *opts,  # type: AppendOptions
-                     **kwargs,  # type: Any
-                     ) -> MutationResult:
+                     key: str,
+                     value: str | bytes | bytearray,
+                     opts: AppendOptions | None = None,
+                     **kwargs: Any) -> MutationResult:
         """Appends the specified value to the beginning of document of the specified key.
 
         Args:
             key (str): The key of the document to append to.
-            value (Union[str, bytes, bytearray]): The value to append to the document.
+            value (str | bytes | bytearray): The value to append to the document.
             opts (:class:`~couchbase.options.AppendOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AppendOptions`
 
         Returns:
@@ -180,7 +171,7 @@ class BinaryCollection:
 
                 from datetime import timedelta
 
-                from couchbase.options import AppendOptions
+                from acouchbase.options import AppendOptions
 
                 # ... other code ...
 
@@ -190,24 +181,20 @@ class BinaryCollection:
                                                         AppendOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Append, instruments) as obs_handler:
-            req = self._impl.request_builder.build_append_request(key, value, obs_handler, *opts, **kwargs)
-            return await self._impl.append(req, obs_handler)
+        return await self._impl.append(key, value, opts, **kwargs)
 
     async def prepend(self,
-                      key,  # type: str
-                      value,  # type: Union[str,bytes,bytearray]
-                      *opts,  # type: PrependOptions
-                      **kwargs,  # type: Any
-                      ) -> MutationResult:
+                      key: str,
+                      value: str | bytes | bytearray,
+                      opts: PrependOptions | None = None,
+                      **kwargs: Any) -> MutationResult:
         """Prepends the specified value to the beginning of document of the specified key.
 
         Args:
             key (str): The key of the document to prepend to.
-            value (Union[str, bytes, bytearray]): The value to prepend to the document.
+            value (str | bytes | bytearray): The value to prepend to the document.
             opts (:class:`~couchbase.options.PrependOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.PrependOptions`
 
         Returns:
@@ -238,7 +225,7 @@ class BinaryCollection:
 
                 from datetime import timedelta
 
-                from couchbase.options import PrependOptions
+                from acouchbase.options import PrependOptions
 
                 # ... other code ...
 
@@ -248,7 +235,4 @@ class BinaryCollection:
                                                         PrependOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Prepend, instruments) as obs_handler:
-            req = self._impl.request_builder.build_prepend_request(key, value, obs_handler, *opts, **kwargs)
-            return await self._impl.prepend(req, obs_handler)
+        return await self._impl.prepend(key, value, opts, **kwargs)

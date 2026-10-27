@@ -13,52 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
+__all__ = [
+    'PrefixScan',
+    'RangeScan',
+    'SamplingScan',
+    'ScanTerm',
+    'ScanType',
+]
 
 from couchbase.common.kv_range_scan import PrefixScan  # noqa: F401
 from couchbase.common.kv_range_scan import RangeScan  # noqa: F401
 from couchbase.common.kv_range_scan import SamplingScan  # noqa: F401
 from couchbase.common.kv_range_scan import ScanTerm  # noqa: F401
 from couchbase.common.kv_range_scan import ScanType  # noqa: F401
-from couchbase.common.kv_range_scan import RangeScanRequestLogic
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  AlreadyQueriedException,
-                                  CouchbaseException,
-                                  ExceptionMap,
-                                  RangeScanCompletedException)
-
-if TYPE_CHECKING:
-    from couchbase.protocol.classic._pycbc_core import pycbc_connection
-
-
-class RangeScanRequest(RangeScanRequestLogic):
-    def __init__(self, connection: pycbc_connection, **kwargs: Any) -> None:
-        super().__init__(connection, **kwargs)
-
-    def __iter__(self):
-        if self.done_streaming:
-            raise AlreadyQueriedException()
-
-        if not self.started_streaming:
-            self._submit_scan()
-
-        return self
-
-    def __next__(self):
-        try:
-            return self._get_next_row()
-        # We can stop iterator when we receive RangeScanCompletedException
-        except RangeScanCompletedException:
-            self._done_streaming = True
-            raise StopIteration
-        except StopIteration:
-            self._done_streaming = True
-            raise
-        except CouchbaseException as ex:
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            raise excptn

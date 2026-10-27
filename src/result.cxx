@@ -45,6 +45,7 @@ pycbc_result__init__(pycbc_result* self, PyObject* args, PyObject* kwargs)
   self->core_span = Py_NewRef(Py_None);
   self->start_time = Py_NewRef(Py_None);
   self->end_time = Py_NewRef(Py_None);
+  self->multi_resp_all_okay = Py_NewRef(Py_None);
   return 0;
 }
 
@@ -62,6 +63,7 @@ pycbc_result__dealloc__(pycbc_result* self)
   Py_XDECREF(self->core_span);
   Py_XDECREF(self->start_time);
   Py_XDECREF(self->end_time);
+  Py_XDECREF(self->multi_resp_all_okay);
   free_heap_type_instance(reinterpret_cast<PyObject*>(self));
 }
 
@@ -86,6 +88,12 @@ static PyMemberDef pycbc_result_members[] = {
     offsetof(pycbc_result, end_time),
     Py_READONLY,
     PyDoc_STR("Internal dictionary op end time") },
+  { "multi_resp_all_okay",
+    Py_T_OBJECT_EX,
+    offsetof(pycbc_result, multi_resp_all_okay),
+    Py_READONLY,
+    PyDoc_STR(
+      "Internal multi operation flag, True if every key succeeded; None on a single operation") },
   { nullptr }
 };
 

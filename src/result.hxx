@@ -160,6 +160,8 @@ struct pycbc_result {
   PyObject* core_span;  // For tracing support
   PyObject* start_time; // For metrics support
   PyObject* end_time;   // For metrics support
+  // Kept off raw_result, whose keys are document keys and so can be any string.
+  PyObject* multi_resp_all_okay;
 };
 
 PyObject*

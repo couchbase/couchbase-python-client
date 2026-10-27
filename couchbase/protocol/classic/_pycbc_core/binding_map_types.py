@@ -255,7 +255,6 @@ class PycbcConnectionKVOps(NamedTuple):
     get_multi: Callable[[List[pycbc_kv_request]], pycbc_result[Dict[str, CppTypes.CppGetResponse]]]
     get_all_replicas_multi: Callable[[List[pycbc_kv_request]], pycbc_result[Dict[str, pycbc_streamed_result[Any]]]]
     get_and_lock_multi: Callable[[List[pycbc_kv_request]], pycbc_result[Dict[str, CppTypes.CppGetAndLockResponse]]]
-    get_and_touch_multi: Callable[[List[pycbc_kv_request]], pycbc_result[Dict[str, CppTypes.CppGetAndTouchResponse]]]
     get_any_replica_multi: Callable[[List[pycbc_kv_request]],
                                     pycbc_result[Dict[str, CppTypes.CppGetAnyReplicaResponse]]]
     increment_multi: Callable[[List[pycbc_kv_request]], pycbc_result[Dict[str, CppTypes.CppIncrementResponse]]]

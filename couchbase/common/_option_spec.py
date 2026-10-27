@@ -418,7 +418,10 @@ BLOCKS: dict[str, BlockSpec] = {
         TIMEOUT, TRANSCODER, READ_PREFERENCE, PARENT_SPAN, SPAN,
     ),
     'GetMultiOptions': block(
-        PROJECT, WITH_EXPIRY, PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, PARENT_SPAN, TRANSCODER,
+        PROJECT,
+        replace(WITH_EXPIRY, inert=frozenset({'classic'}),
+                deprecated='A multi get does not fetch the expiry, so it has no effect.'),
+        PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, PARENT_SPAN, TRANSCODER,
         refuses_unknown=True,
     ),
     'GetOptions': block(
@@ -459,7 +462,8 @@ BLOCKS: dict[str, BlockSpec] = {
         TIMEOUT, DURABILITY, CAS, PARENT_SPAN, SPAN,
     ),
     'RemoveMultiOptions': block(
-        PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, PARENT_SPAN, CAS, DURABILITY, TRANSCODER,
+        PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, PARENT_SPAN, CAS, DURABILITY,
+        replace(TRANSCODER, inert=frozenset({'classic'}), deprecated='It has no effect.'),
         refuses_unknown=True,
     ),
     'RemoveOptions': block(
@@ -474,8 +478,9 @@ BLOCKS: dict[str, BlockSpec] = {
         TIMEOUT, EXPIRY, CAS, PRESERVE_EXPIRY, DURABILITY, TRANSCODER, PARENT_SPAN, SPAN,
     ),
     'ScanOptions': block(
-        TIMEOUT, IDS_ONLY, CONSISTENT_WITH, BATCH_BYTE_LIMIT, BATCH_ITEM_LIMIT, BATCH_TIME_LIMIT, TRANSCODER,
-        CONCURRENCY, PARENT_SPAN,
+        TIMEOUT, IDS_ONLY, CONSISTENT_WITH, BATCH_BYTE_LIMIT, BATCH_ITEM_LIMIT,
+        replace(BATCH_TIME_LIMIT, inert=frozenset({'classic'})), TRANSCODER, CONCURRENCY,
+        replace(PARENT_SPAN, inert=frozenset({'classic'})),
     ),
     'TouchMultiOptions': block(
         PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, PARENT_SPAN, replace(EXPIRY, suggest=False),

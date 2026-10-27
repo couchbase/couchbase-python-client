@@ -15,72 +15,70 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import copy
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict,
-                    List,
-                    Mapping,
-                    Optional,
-                    Tuple,
-                    Type,
-                    Union)
+from typing import TYPE_CHECKING, Any
 
-from couchbase.common.options import DeltaValue as DeltaValueBase
-from couchbase.common.options import SignedInt64 as SignedInt64Base
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from couchbase.common.exceptions import InternalSDKException, InvalidArgumentException
+from couchbase.common.options import (AppendMultiOptions,
+                                      DecrementMultiOptions,
+                                      DeltaValue,
+                                      ExistsMultiOptions,
+                                      GetAllReplicasMultiOptions,
+                                      GetAndLockMultiOptions,
+                                      GetAnyReplicaMultiOptions,
+                                      GetMultiOptions,
+                                      IncrementMultiOptions,
+                                      InsertMultiOptions,
+                                      MutationMultiOptions,
+                                      NoValueMultiOptions,
+                                      PrependMultiOptions,
+                                      RemoveMultiOptions,
+                                      ReplaceMultiOptions,
+                                      SignedInt64,
+                                      TouchMultiOptions,
+                                      UnlockMultiOptions,
+                                      UpsertMultiOptions)
 from couchbase.common.protocol import CouchbaseProtocol
+from couchbase.common.result import MultiGetResult, MultiMutationResult
 from couchbase.constants import FMT_BYTES
 from couchbase.durability import DurabilityLevel
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import KeyValueMultiOperationCode
-from couchbase.options import (AppendMultiOptions,
-                               DecrementMultiOptions,
-                               ExistsMultiOptions,
-                               GetAllReplicasMultiOptions,
-                               GetAndLockMultiOptions,
-                               GetAnyReplicaMultiOptions,
-                               GetMultiOptions,
-                               IncrementMultiOptions,
-                               InsertMultiOptions,
-                               MutationMultiOptions,
-                               NoValueMultiOptions,
-                               PrependMultiOptions,
-                               RemoveMultiOptions,
-                               ReplaceMultiOptions,
-                               TouchMultiOptions,
-                               UnlockMultiOptions,
-                               UpsertMultiOptions,
-                               get_valid_multi_args)
+from couchbase.protocol.classic._bindings import (KV_OPCODE,
+                                                  KeyValueBinding,
+                                                  KeyValueMultiBinding)
 from couchbase.protocol.classic._collection_multi_types import KeyValueMultiRequest, KeyValueMultiWithTranscoderRequest
+from couchbase.protocol.classic._collection_req_builder import DEFAULT_KV_DURABLE_TIMEOUT
 from couchbase.protocol.classic._collection_types import CollectionDetails
 from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
-from couchbase.result import MultiGetResult, MultiMutationResult
+from couchbase.protocol.classic._wire import get_valid_multi_args
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase._utils import DocumentValue
+    from couchbase.common._utils import DocumentValue
 
 
-_LEGACY_DURABILITY_LOOKUP = {
-    KeyValueMultiOperationCode.AppendMulti: KeyValueMultiOperationCode.AppendWithLegacyDurabilityMulti,
-    KeyValueMultiOperationCode.DecrementMulti: KeyValueMultiOperationCode.DecrementWithLegacyDurabilityMulti,
-    KeyValueMultiOperationCode.IncrementMulti: KeyValueMultiOperationCode.IncrementWithLegacyDurabilityMulti,
-    KeyValueMultiOperationCode.InsertMulti: KeyValueMultiOperationCode.InsertWithLegacyDurabilityMulti,
-    KeyValueMultiOperationCode.PrependMulti: KeyValueMultiOperationCode.PrependWithLegacyDurabilityMulti,
-    KeyValueMultiOperationCode.RemoveMulti: KeyValueMultiOperationCode.RemoveWithLegacyDurabilityMulti,
-    KeyValueMultiOperationCode.ReplaceMulti: KeyValueMultiOperationCode.ReplaceWithLegacyDurabilityMulti,
-    KeyValueMultiOperationCode.UpsertMulti: KeyValueMultiOperationCode.UpsertWithLegacyDurabilityMulti,
-}
+def _without_transcoders(req: KeyValueMultiWithTranscoderRequest) -> KeyValueMultiRequest:
+    """For an operation whose response has no document to decode."""
+    return KeyValueMultiRequest(req.opcode, req.request_list, req.return_exceptions)
 
-_NON_TRANSCODER_OP_LOOKUP = {
-    KeyValueMultiOperationCode.RemoveMulti: True,
-    KeyValueMultiOperationCode.RemoveWithLegacyDurabilityMulti: True,
-    KeyValueMultiOperationCode.TouchMulti: True,
-    KeyValueMultiOperationCode.UnlockMulti: True,
-}
+
+def _refuse_projection(final_args: dict[str, Any], per_key_args: dict[str, dict[str, Any]] | None) -> None:
+    """Each key of a multi get goes out as a plain get, which carries no projection."""
+    if any(args.get('project') is not None for args in (final_args, *(per_key_args or {}).values())):
+        raise InvalidArgumentException('A multi get cannot project fields; use get for each key instead.')
+
+
+def _multi_opcodes(op: Op, legacy: bool) -> tuple[KeyValueMultiBinding, KeyValueBinding]:
+    """The binding for the whole batch, and the one each key's own request carries."""
+    multi = KV_OPCODE[(op, legacy)]
+    single = KV_OPCODE[(op.single, legacy)] if op.single is not None else None
+    if not isinstance(multi, KeyValueMultiBinding) or not isinstance(single, KeyValueBinding):
+        raise InternalSDKException(message=f'{op} has no multi and single binding pair.')
+    return multi, single
 
 
 class CollectionMultiRequestBuilder:
@@ -91,7 +89,7 @@ class CollectionMultiRequestBuilder:
     def _create_kv_request(self,
                            opcode: int,
                            key: str,
-                           obs_handler: Optional[ObservableRequestHandler]) -> PycbcCoreKeyValueRequest:
+                           obs_handler: ObservableRequestHandler | None) -> PycbcCoreKeyValueRequest:
         req = PycbcCoreKeyValueRequest()
         req.opcode = opcode
         req.bucket = self._collection_dtls.bucket_name
@@ -110,14 +108,19 @@ class CollectionMultiRequestBuilder:
             req.with_metrics = obs_handler.with_metrics
         return req
 
-    def _get_delta_and_initial(self, args: Dict[str, Any]) -> Tuple[int, Optional[int]]:
+    def _maybe_update_durable_timeout(self, op_args: dict[str, Any], durability: Any) -> None:
+        if isinstance(durability, int) and op_args.get('timeout') is None:
+            durable_timeout = self._collection_dtls.kv_durable_timeout
+            op_args['timeout'] = DEFAULT_KV_DURABLE_TIMEOUT if durable_timeout is None else durable_timeout
+
+    def _get_delta_and_initial(self, args: dict[str, Any]) -> tuple[int, int | None]:
         """**INTERNAL**"""
         initial = args.pop('initial', None)
         delta = args.pop('delta', None)
         if not initial:
-            initial = SignedInt64Base(0)
+            initial = SignedInt64(0)
         if not delta:
-            delta = DeltaValueBase(1)
+            delta = DeltaValue(1)
 
         self._validate_delta_initial(delta=delta, initial=initial)
 
@@ -129,18 +132,19 @@ class CollectionMultiRequestBuilder:
             return delta, None
 
     def _get_multi_binary_mutation_req(self,  # noqa: C901
-                                       keys_and_docs: Mapping[str, Union[str, bytes, bytearray]],
-                                       opts_type: Type[Union[AppendMultiOptions, PrependMultiOptions]],
-                                       opcode: KeyValueMultiOperationCode,
-                                       obs_handler: Optional[ObservableRequestHandler],
-                                       *opts: object,
+                                       keys_and_docs: Mapping[str, str | bytes | bytearray],
+                                       opts_type: type[AppendMultiOptions | PrependMultiOptions],
+                                       op: Op,
+                                       obs_handler: ObservableRequestHandler | None,
+                                       opts: dict[str, Any] | None,
                                        **kwargs: object) -> KeyValueMultiRequest:
 
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
+        final_args = get_valid_multi_args(opts_type, kwargs, opts,
+                                          protocol=CouchbaseProtocol.CLASSIC,
+                                          mode=self._collection_dtls.option_validation)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
-            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
-        )
+            parent_span=final_args.pop('parent_span', None))
         if obs_handler:
             obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
@@ -150,12 +154,11 @@ class CollectionMultiRequestBuilder:
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        if isinstance(durability, dict):
-            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
-
         per_key_args = final_args.pop('per_key_options', None)
         return_exceptions = final_args.pop('return_exceptions', True)
-        req_opcode = opcode.get_single_op_code()
+        legacy = isinstance(durability, dict)
+        self._maybe_update_durable_timeout(final_args, durability)
+        opcode, req_opcode = _multi_opcodes(op, legacy)
 
         requests = []
         for k, v in keys_and_docs.items():
@@ -193,17 +196,18 @@ class CollectionMultiRequestBuilder:
         return KeyValueMultiRequest(opcode, requests, return_exceptions)
 
     def _get_multi_counter_op_req(self,  # noqa: C901
-                                  keys: List[str],
-                                  opts_type: Type[Union[DecrementMultiOptions, IncrementMultiOptions]],
-                                  opcode: KeyValueMultiOperationCode,
-                                  obs_handler: Optional[ObservableRequestHandler],
-                                  *opts: object,
+                                  keys: list[str],
+                                  opts_type: type[DecrementMultiOptions | IncrementMultiOptions],
+                                  op: Op,
+                                  obs_handler: ObservableRequestHandler | None,
+                                  opts: dict[str, Any] | None,
                                   **kwargs: object) -> KeyValueMultiRequest:
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
+        final_args = get_valid_multi_args(opts_type, kwargs, opts,
+                                          protocol=CouchbaseProtocol.CLASSIC,
+                                          mode=self._collection_dtls.option_validation)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
-            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
-        )
+            parent_span=final_args.pop('parent_span', None))
         if obs_handler:
             obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
@@ -213,12 +217,11 @@ class CollectionMultiRequestBuilder:
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        if isinstance(durability, dict):
-            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
-
         per_key_args = final_args.pop('per_key_options', None)
         return_exceptions = final_args.pop('return_exceptions', True)
-        req_opcode = opcode.get_single_op_code()
+        legacy = isinstance(durability, dict)
+        self._maybe_update_durable_timeout(final_args, durability)
+        opcode, req_opcode = _multi_opcodes(op, legacy)
 
         global_delta, global_initial = self._get_delta_and_initial(final_args)
         final_args['delta'] = int(global_delta)
@@ -253,18 +256,19 @@ class CollectionMultiRequestBuilder:
 
     def _get_multi_op_mutation_req(self,  # noqa: C901
                                    keys_and_docs: Mapping[str, DocumentValue],
-                                   opts_type: Type[MutationMultiOptions],
-                                   opcode: KeyValueMultiOperationCode,
-                                   obs_handler: Optional[ObservableRequestHandler],
-                                   *opts: object,
+                                   opts_type: type[MutationMultiOptions],
+                                   op: Op,
+                                   obs_handler: ObservableRequestHandler | None,
+                                   opts: dict[str, Any] | None,
                                    **kwargs: object
                                    ) -> KeyValueMultiRequest:
 
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
+        final_args = get_valid_multi_args(opts_type, kwargs, opts,
+                                          protocol=CouchbaseProtocol.CLASSIC,
+                                          mode=self._collection_dtls.option_validation)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
-            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
-        )
+            parent_span=final_args.pop('parent_span', None))
         if obs_handler:
             obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
@@ -274,12 +278,11 @@ class CollectionMultiRequestBuilder:
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        if isinstance(durability, dict):
-            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
-
         per_key_args = final_args.pop('per_key_options', None)
         return_exceptions = final_args.pop('return_exceptions', True)
-        req_opcode = opcode.get_single_op_code()
+        legacy = isinstance(durability, dict)
+        self._maybe_update_durable_timeout(final_args, durability)
+        opcode, req_opcode = _multi_opcodes(op, legacy)
 
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
 
@@ -325,19 +328,21 @@ class CollectionMultiRequestBuilder:
         return KeyValueMultiRequest(opcode, requests, return_exceptions)
 
     def _get_multi_op_non_value_req(self,  # noqa: C901
-                                    keys: List[str],
-                                    opts_type: Type[NoValueMultiOptions],
-                                    opcode: KeyValueMultiOperationCode,
-                                    obs_handler: Optional[ObservableRequestHandler],
-                                    *opts: object,
-                                    **kwargs: object) -> Union[KeyValueMultiRequest,
-                                                               KeyValueMultiWithTranscoderRequest]:
-        op_keys_cas = kwargs.pop('op_keys_cas', None)
-        final_args = get_valid_multi_args(opts_type, kwargs, *opts, protocol=CouchbaseProtocol.CLASSIC)
+                                    keys: list[str],
+                                    opts_type: type[NoValueMultiOptions
+                                                    | GetAllReplicasMultiOptions
+                                                    | GetAnyReplicaMultiOptions],
+                                    op: Op,
+                                    obs_handler: ObservableRequestHandler | None,
+                                    op_keys_cas: dict[str, int] | None,
+                                    opts: dict[str, Any] | None,
+                                    **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
+        final_args = get_valid_multi_args(opts_type, kwargs, opts,
+                                          protocol=CouchbaseProtocol.CLASSIC,
+                                          mode=self._collection_dtls.option_validation)
         durability = final_args.pop('durability', None)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(
-            span=final_args.pop('span', None), parent_span=final_args.pop('parent_span', None)
-        )
+            parent_span=final_args.pop('parent_span', None))
         if obs_handler:
             obs_handler.create_kv_multi_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
 
@@ -347,15 +352,16 @@ class CollectionMultiRequestBuilder:
         if not opts_type:
             raise InvalidArgumentException(message='Expected options type is missing.')
 
-        if isinstance(durability, dict):
-            opcode = _LEGACY_DURABILITY_LOOKUP[opcode]
-
         transcoder = self._collection_dtls.get_request_transcoder(final_args)
         per_key_args = final_args.pop('per_key_options', None if op_keys_cas is None else {})
         if op_keys_cas:
-            per_key_args.update({k: {'cas': v} for k, v in op_keys_cas.items()})
+            per_key_args = {k: {**per_key_args.get(k, {}), 'cas': v} for k, v in op_keys_cas.items()}
+        if op is Op.GetMulti:
+            _refuse_projection(final_args, per_key_args)
         return_exceptions = final_args.pop('return_exceptions', True)
-        req_opcode = opcode.get_single_op_code()
+        legacy = isinstance(durability, dict)
+        self._maybe_update_durable_timeout(final_args, durability)
+        opcode, req_opcode = _multi_opcodes(op, legacy)
 
         requests = []
         key_transcoders = {}
@@ -383,191 +389,197 @@ class CollectionMultiRequestBuilder:
 
             requests.append(req)
 
-        if _NON_TRANSCODER_OP_LOOKUP.get(opcode, False) is True:
-            return KeyValueMultiRequest(opcode, requests, return_exceptions)
-
         return KeyValueMultiWithTranscoderRequest(opcode, requests, return_exceptions, key_transcoders)
 
     def _validate_delta_initial(self,
-                                delta: Optional[DeltaValueBase] = None,
-                                initial: Optional[SignedInt64Base] = None) -> None:
+                                delta: DeltaValue | None = None,
+                                initial: SignedInt64 | None = None) -> None:
         # @TODO: remove deprecation next .minor
         # from couchbase.collection import DeltaValueDeprecated, SignedInt64Deprecated
         if delta is not None:
-            if not DeltaValueBase.is_valid(delta):
+            if not isinstance(delta, DeltaValue):
                 raise InvalidArgumentException("Argument is not valid DeltaValue")
         if initial is not None:
-            if not SignedInt64Base.is_valid(initial):
+            if not isinstance(initial, SignedInt64):
                 raise InvalidArgumentException("Argument is not valid SignedInt64")
 
     def build_append_multi_request(self,
-                                   keys_and_docs: Mapping[str, Union[str, bytes, bytearray]],
-                                   obs_handler: ObservableRequestHandler,
-                                   *opts: object,
+                                   keys_and_docs: Mapping[str, str | bytes | bytearray],
+                                   obs_handler: ObservableRequestHandler | None,
+                                   opts: AppendMultiOptions | None = None,
                                    **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_binary_mutation_req(keys_and_docs,
                                                    AppendMultiOptions,
-                                                   KeyValueMultiOperationCode.AppendMulti,
+                                                   Op.AppendMulti,
                                                    obs_handler,
-                                                   *opts,
+                                                   opts,
                                                    **kwargs)
 
     def build_decrement_multi_request(self,
-                                      keys: List[str],
-                                      obs_handler: ObservableRequestHandler,
-                                      *opts: object,
+                                      keys: list[str],
+                                      obs_handler: ObservableRequestHandler | None,
+                                      opts: DecrementMultiOptions | None = None,
                                       **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_counter_op_req(keys,
                                               DecrementMultiOptions,
-                                              KeyValueMultiOperationCode.DecrementMulti,
+                                              Op.DecrementMulti,
                                               obs_handler,
-                                              *opts,
+                                              opts,
                                               **kwargs)
 
     def build_exists_multi_request(self,
-                                   keys: List[str],
-                                   obs_handler: ObservableRequestHandler,
-                                   *opts: object,
+                                   keys: list[str],
+                                   obs_handler: ObservableRequestHandler | None,
+                                   opts: ExistsMultiOptions | None = None,
                                    **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 ExistsMultiOptions,
-                                                KeyValueMultiOperationCode.ExistsMulti,
+                                                Op.ExistsMulti,
                                                 obs_handler,
-                                                *opts,
+                                                None,
+                                                opts,
                                                 **kwargs)
 
     def build_get_all_replicas_multi_request(self,
-                                             keys: List[str],
-                                             obs_handler: ObservableRequestHandler,
-                                             *opts: object,
+                                             keys: list[str],
+                                             obs_handler: ObservableRequestHandler | None,
+                                             opts: GetAllReplicasMultiOptions | None = None,
                                              **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 GetAllReplicasMultiOptions,
-                                                KeyValueMultiOperationCode.GetAllReplicasMulti,
+                                                Op.GetAllReplicasMulti,
                                                 obs_handler,
-                                                *opts,
+                                                None,
+                                                opts,
                                                 **kwargs)
 
     def build_get_and_lock_multi_request(self,
-                                         keys: List[str],
+                                         keys: list[str],
                                          lock_time: timedelta,
-                                         obs_handler: ObservableRequestHandler,
-                                         *opts: object,
+                                         obs_handler: ObservableRequestHandler | None,
+                                         opts: GetAndLockMultiOptions | None = None,
                                          **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
         kwargs['lock_time'] = lock_time
         return self._get_multi_op_non_value_req(keys,
                                                 GetAndLockMultiOptions,
-                                                KeyValueMultiOperationCode.GetAndLockMulti,
+                                                Op.GetAndLockMulti,
                                                 obs_handler,
-                                                *opts,
+                                                None,
+                                                opts,
                                                 **kwargs)
 
     def build_get_any_replica_multi_request(self,
-                                            keys: List[str],
-                                            obs_handler: ObservableRequestHandler,
-                                            *opts: object,
+                                            keys: list[str],
+                                            obs_handler: ObservableRequestHandler | None,
+                                            opts: GetAnyReplicaMultiOptions | None = None,
                                             **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 GetAnyReplicaMultiOptions,
-                                                KeyValueMultiOperationCode.GetAnyReplicaMulti,
+                                                Op.GetAnyReplicaMulti,
                                                 obs_handler,
-                                                *opts,
+                                                None,
+                                                opts,
                                                 **kwargs)
 
     def build_get_multi_request(self,
-                                keys: List[str],
-                                obs_handler: ObservableRequestHandler,
-                                *opts: object,
+                                keys: list[str],
+                                obs_handler: ObservableRequestHandler | None,
+                                opts: GetMultiOptions | None = None,
                                 **kwargs: object) -> KeyValueMultiWithTranscoderRequest:
         return self._get_multi_op_non_value_req(keys,
                                                 GetMultiOptions,
-                                                KeyValueMultiOperationCode.GetMulti,
+                                                Op.GetMulti,
                                                 obs_handler,
-                                                *opts,
+                                                None,
+                                                opts,
                                                 **kwargs)
 
     def build_increment_multi_request(self,
-                                      keys: List[str],
-                                      obs_handler: ObservableRequestHandler,
-                                      *opts: object,
+                                      keys: list[str],
+                                      obs_handler: ObservableRequestHandler | None,
+                                      opts: IncrementMultiOptions | None = None,
                                       **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_counter_op_req(keys,
                                               IncrementMultiOptions,
-                                              KeyValueMultiOperationCode.IncrementMulti,
+                                              Op.IncrementMulti,
                                               obs_handler,
-                                              *opts,
+                                              opts,
                                               **kwargs)
 
     def build_insert_multi_request(self,
                                    keys_and_docs: Mapping[str, DocumentValue],
-                                   obs_handler: ObservableRequestHandler,
-                                   *opts: object,
+                                   obs_handler: ObservableRequestHandler | None,
+                                   opts: InsertMultiOptions | None = None,
                                    **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                InsertMultiOptions,
-                                               KeyValueMultiOperationCode.InsertMulti,
+                                               Op.InsertMulti,
                                                obs_handler,
-                                               *opts,
+                                               opts,
                                                **kwargs)
 
     def build_prepend_multi_request(self,
-                                    keys_and_docs: Mapping[str, Union[str, bytes, bytearray]],
-                                    obs_handler: ObservableRequestHandler,
-                                    *opts: object,
+                                    keys_and_docs: Mapping[str, str | bytes | bytearray],
+                                    obs_handler: ObservableRequestHandler | None,
+                                    opts: PrependMultiOptions | None = None,
                                     **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_binary_mutation_req(keys_and_docs,
                                                    PrependMultiOptions,
-                                                   KeyValueMultiOperationCode.PrependMulti,
+                                                   Op.PrependMulti,
                                                    obs_handler,
-                                                   *opts,
+                                                   opts,
                                                    **kwargs)
 
     def build_remove_multi_request(self,
-                                   keys: List[str],
-                                   obs_handler: ObservableRequestHandler,
-                                   *opts: object,
+                                   keys: list[str],
+                                   obs_handler: ObservableRequestHandler | None,
+                                   opts: RemoveMultiOptions | None = None,
                                    **kwargs: object) -> KeyValueMultiRequest:
         # use the non-mutation logic even though remove is a mutation
-        return self._get_multi_op_non_value_req(keys,
-                                                RemoveMultiOptions,
-                                                KeyValueMultiOperationCode.RemoveMulti,
-                                                obs_handler,
-                                                *opts,
-                                                **kwargs)
+        req = self._get_multi_op_non_value_req(keys,
+                                               RemoveMultiOptions,
+                                               Op.RemoveMulti,
+                                               obs_handler,
+                                               None,
+                                               opts,
+                                               **kwargs)
+        return _without_transcoders(req)
 
     def build_replace_multi_request(self,
                                     keys_and_docs: Mapping[str, DocumentValue],
-                                    obs_handler: ObservableRequestHandler,
-                                    *opts: object,
+                                    obs_handler: ObservableRequestHandler | None,
+                                    opts: ReplaceMultiOptions | None = None,
                                     **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                ReplaceMultiOptions,
-                                               KeyValueMultiOperationCode.ReplaceMulti,
+                                               Op.ReplaceMulti,
                                                obs_handler,
-                                               *opts,
+                                               opts,
                                                **kwargs)
 
     def build_touch_multi_request(self,
-                                  keys: List[str],
+                                  keys: list[str],
                                   expiry: timedelta,
-                                  obs_handler: ObservableRequestHandler,
-                                  *opts: object,
+                                  obs_handler: ObservableRequestHandler | None,
+                                  opts: TouchMultiOptions | None = None,
                                   **kwargs: object) -> KeyValueMultiRequest:
         kwargs['expiry'] = expiry
         # use the non-mutation logic even though touch is a mutation
-        return self._get_multi_op_non_value_req(keys,
-                                                TouchMultiOptions,
-                                                KeyValueMultiOperationCode.TouchMulti,
-                                                obs_handler,
-                                                *opts,
-                                                **kwargs)
+        req = self._get_multi_op_non_value_req(keys,
+                                               TouchMultiOptions,
+                                               Op.TouchMulti,
+                                               obs_handler,
+                                               None,
+                                               opts,
+                                               **kwargs)
+        return _without_transcoders(req)
 
     def build_unlock_multi_request(self,
-                                   keys: List[str],
-                                   obs_handler: ObservableRequestHandler,
-                                   *opts: object,
+                                   keys: dict[str, int] | MultiGetResult | MultiMutationResult,
+                                   obs_handler: ObservableRequestHandler | None,
+                                   opts: UnlockMultiOptions | None = None,
                                    **kwargs: object) -> KeyValueMultiRequest:
-        op_keys_cas = {}
+        op_keys_cas: dict[str, int] = {}
         if isinstance(keys, dict):
             if not all(map(lambda k: isinstance(k, str), keys.keys())):
                 raise InvalidArgumentException('If providing keys of type dict, all values must be type int.')
@@ -580,23 +592,24 @@ class CollectionMultiRequestBuilder:
         else:
             raise InvalidArgumentException(
                 'keys type must be Union[MultiGetResult, MultiMutationResult, Dict[str, int].')
-        kwargs['op_keys_cas'] = op_keys_cas
         # use the non-mutation logic even though unlock is a mutation
-        return self._get_multi_op_non_value_req(list(op_keys_cas.keys()),
-                                                UnlockMultiOptions,
-                                                KeyValueMultiOperationCode.UnlockMulti,
-                                                obs_handler,
-                                                *opts,
-                                                **kwargs)
+        req = self._get_multi_op_non_value_req(list(op_keys_cas.keys()),
+                                               UnlockMultiOptions,
+                                               Op.UnlockMulti,
+                                               obs_handler,
+                                               op_keys_cas,
+                                               opts,
+                                               **kwargs)
+        return _without_transcoders(req)
 
     def build_upsert_multi_request(self,
                                    keys_and_docs: Mapping[str, DocumentValue],
-                                   obs_handler: ObservableRequestHandler,
-                                   *opts: object,
+                                   obs_handler: ObservableRequestHandler | None,
+                                   opts: UpsertMultiOptions | None = None,
                                    **kwargs: object) -> KeyValueMultiRequest:
         return self._get_multi_op_mutation_req(keys_and_docs,
                                                UpsertMultiOptions,
-                                               KeyValueMultiOperationCode.UpsertMulti,
+                                               Op.UpsertMulti,
                                                obs_handler,
-                                               *opts,
+                                               opts,
                                                **kwargs)

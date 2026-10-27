@@ -144,6 +144,11 @@ class DatastructuresTracingTestSuite(SuiteRequirements):
         await cb_list.clear()
         kv_validator.validate_ds_op(OpName.ListClear, REMOVE)
 
+        # The document is gone, so a second clear's remove fails, and the list catches it.
+        kv_validator.reset()
+        await cb_list.clear()
+        kv_validator.validate_ds_op(OpName.ListClear, [(OpName.Remove, True)], absorbed=True)
+
         # Clearing removes the document, so the next read is a first read again.
         kv_validator.reset()
         assert 0 == await cb_list.size()
@@ -286,10 +291,11 @@ class DatastructuresTracingTestSuite(SuiteRequirements):
         await cb_set.add(123)
         kv_validator.validate_ds_op(OpName.SetAdd, CREATE_THEN_MUTATE)
 
-        # Adding a value the set already holds still costs the mutation that finds out.
+        # Adding a value the set already holds still costs the mutation that finds out, and that
+        # mutation fails.  The set catches the failure and returns False.
         kv_validator.reset()
-        await cb_set.add(123)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        assert await cb_set.add(123) is False
+        kv_validator.validate_ds_op(OpName.SetAdd, FAILED_MUTATE, absorbed=True)
 
         kv_validator.reset()
         assert 1 == await cb_set.size()

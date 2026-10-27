@@ -16,9 +16,8 @@
 # Two suites, because the file covers two APIs.  `DatastructuresTestSuite` exercises the
 # objects reached through `collection.couchbase_list(key)` and friends;
 # `LegacyDatastructuresTestSuite` exercises `collection.list_append(...)` and its three
-# siblings, which exist only on the sync Collection and are deprecated for removal in 4.7.0
-# under PYCBC-1732.  Generated for acouchbase only: txcouchbase has no datastructure
-# support at all.
+# siblings, which exist only on the sync Collection and are deprecated under PYCBC-1732.
+# Generated for acouchbase only: txcouchbase has no datastructure support at all.
 #
 # Every test starts from a key that must not exist, because the datastructure operations
 # create the document on first write.  A fixed key would be a literal in the shared

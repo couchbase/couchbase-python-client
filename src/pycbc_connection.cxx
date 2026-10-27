@@ -548,15 +548,6 @@ pycbc_connection__get_and_lock_multi__(pycbc_connection* self, PyObject* arg)
 }
 
 static PyObject*
-pycbc_connection__get_and_touch_multi__(pycbc_connection* self, PyObject* arg)
-{
-  if (!validate_connection_and_multi_request(self, arg, "get_and_touch_multi")) {
-    return nullptr;
-  }
-  return self->conn->execute_multi_op<couchbase::core::operations::get_and_touch_request>(arg);
-}
-
-static PyObject*
 pycbc_connection__get_any_replica_multi__(pycbc_connection* self, PyObject* arg)
 {
   if (!validate_connection_and_multi_request(self, arg, "get_any_replica_multi")) {
@@ -1821,10 +1812,6 @@ static PyMethodDef pycbc_connection_methods[] = {
     (PyCFunction)pycbc_connection__get_and_lock_multi__,
     METH_O,
     PyDoc_STR("KV get_and_lock-multi operation") },
-  { "pycbc_get_and_touch_multi",
-    (PyCFunction)pycbc_connection__get_and_touch_multi__,
-    METH_O,
-    PyDoc_STR("KV get_and_touch-multi operation") },
   { "pycbc_get_any_replica_multi",
     (PyCFunction)pycbc_connection__get_any_replica_multi__,
     METH_O,

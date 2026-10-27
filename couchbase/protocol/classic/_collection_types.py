@@ -61,6 +61,10 @@ class CollectionDetails:
     builder holds one of these and no route back to the cluster that made it.  The transcoder
     encodes and decodes whole documents; a subdocument value is always JSON and carries no flags,
     so the serializer encodes and decodes those.
+
+    `kv_durable_timeout` is the cluster's, in milliseconds, for the same reason.  The binding
+    builds each request itself, so the core's own durable default never reaches it and a durable
+    request would otherwise go out under the plain key-value timeout.
     """
     bucket_name: str
     scope_name: str
@@ -68,6 +72,7 @@ class CollectionDetails:
     default_transcoder: Transcoder
     default_serializer: Serializer = field(default_factory=DefaultJsonSerializer)
     option_validation: OptionValidationMode | None = None
+    kv_durable_timeout: int | None = None
 
     def get_details(self) -> tuple[str, str, str]:
         return self.bucket_name, self.scope_name, self.collection_name

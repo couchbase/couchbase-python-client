@@ -91,6 +91,7 @@ class CollectionMultiTestSuite(TopologySuite):
     }
 
     TEST_MANIFEST = [
+        'test_multi_document_keyed_all_okay',
         'test_multi_exists_invalid_input',
         'test_multi_exists_not_exist',
         'test_multi_exists_simple',
@@ -131,6 +132,22 @@ class CollectionMultiTestSuite(TopologySuite):
         'test_multi_upsert_mapping',
         'test_multi_upsert_simple',
     ]
+
+    def test_multi_document_keyed_all_okay(self, cb_env: SyncTestEnvironment) -> None:
+        # The binding reports a multi operation's overall outcome beside its per-key results, so
+        # the name of that flag is a document key like any other.
+        key = 'all_okay'
+        missing = next(iter(self.FAKE_DOCS))
+        try:
+            res = cb_env.collection.upsert_multi({key: {'id': key}})
+            assert list(res.results) == [key]
+            got = cb_env.collection.get_multi([key, missing])
+            assert got.all_ok is False
+            assert list(got.results) == [key]
+            assert got.results[key].content_as[dict] == {'id': key}
+            assert list(got.exceptions) == [missing]
+        finally:
+            cb_env.collection.remove_multi([key])
 
     def test_multi_exists_simple(self, cb_env: SyncTestEnvironment) -> None:
         keys_and_docs = cb_env.get_docs(4)

@@ -13,92 +13,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
+"""The `acouchbase.kv_range_scan` import path.
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any
+The same objects as `couchbase.kv_range_scan`, re-exported so asyncio code imports them from its own
+package.
+"""
 
-from couchbase.common.kv_range_scan import RangeScanRequestLogic
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  AlreadyQueriedException,
-                                  CouchbaseException,
-                                  ExceptionMap,
-                                  RangeScanCompletedException)
+__all__ = [
+    'PrefixScan',
+    'RangeScan',
+    'SamplingScan',
+    'ScanTerm',
+    'ScanType',
+]
 
-if TYPE_CHECKING:
-    from couchbase.protocol.classic._pycbc_core import pycbc_connection
-
-
-class AsyncRangeScanRequest(RangeScanRequestLogic):
-    def __init__(self, connection: pycbc_connection, loop: asyncio.AbstractEventLoop, **kwargs: Any) -> None:
-        num_workers = kwargs.pop('num_workers', None) or 1
-        super().__init__(connection, **kwargs)
-        self._loop = loop
-        self._result_ftr = None
-        self._tp_executor = ThreadPoolExecutor(num_workers)
-        self._executor_shutdown = False
-
-    @property
-    def loop(self) -> asyncio.AbstractEventLoop:
-        """
-        **INTERNAL**
-        """
-        return self._loop
-
-    def __aiter__(self):
-        if self.done_streaming:
-            raise AlreadyQueriedException()
-
-        if not self.started_streaming:
-            self._submit_scan()
-
-        return self
-
-    def _shutdown_executor(self):
-        """
-        **INTERNAL**
-
-        Release the per-request streaming executor.  Safe to call multiple times.
-        """
-        if not self._executor_shutdown:
-            self._executor_shutdown = True
-            self._tp_executor.shutdown(wait=False)
-
-    def _abort(self):
-        """
-        **INTERNAL**
-
-        Cancel the in-flight core scan so a worker still waiting on the C++ core unwinds promptly,
-        then release the executor.  Used on the error/cancellation paths only.
-        """
-        if self._scan_iterator is not None and self._scan_iterator.is_cancelled() is False:
-            self._scan_iterator.cancel_scan()
-        self._shutdown_executor()
-
-    async def __anext__(self):
-        try:
-            return await self._loop.run_in_executor(self._tp_executor, self._get_next_row)
-        # We can stop iterator when we receive RangeScanCompletedException
-        except RangeScanCompletedException:
-            self._done_streaming = True
-            self._shutdown_executor()
-            raise StopAsyncIteration
-        except StopAsyncIteration:
-            self._done_streaming = True
-            self._shutdown_executor()
-            raise
-        except CouchbaseException as ex:
-            self._abort()
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            self._abort()
-            raise excptn
-        except BaseException:
-            # asyncio.CancelledError (and KeyboardInterrupt/SystemExit) derive from BaseException,
-            # not Exception, so they fall through every handler above.  Cancel the in-flight scan
-            # and release the executor so the worker thread is not orphaned, then re-raise unchanged.
-            self._abort()
-            raise
+from couchbase.common.kv_range_scan import PrefixScan  # noqa: F401
+from couchbase.common.kv_range_scan import RangeScan  # noqa: F401
+from couchbase.common.kv_range_scan import SamplingScan  # noqa: F401
+from couchbase.common.kv_range_scan import ScanTerm  # noqa: F401
+from couchbase.common.kv_range_scan import ScanType  # noqa: F401

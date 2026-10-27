@@ -20,9 +20,8 @@ __all__ = [
     'Collection',
 ]
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Iterable)
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.binary_collection import BinaryCollection
 from acouchbase.datastructures import (CouchbaseList,
@@ -30,16 +29,14 @@ from acouchbase.datastructures import (CouchbaseList,
                                        CouchbaseQueue,
                                        CouchbaseSet)
 from acouchbase.management.queries import CollectionQueryIndexManager
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import KeyValueOperationType
+from acouchbase.result import AsyncScanResultIterable
 from couchbase.result import (ExistsResult,
                               GetReplicaResult,
                               GetResult,
                               LookupInReplicaResult,
                               LookupInResult,
                               MutateInResult,
-                              MutationResult,
-                              ScanResultIterable)
+                              MutationResult)
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -81,16 +78,15 @@ class AsyncCollection:
         return self._impl.name
 
     async def get(self,
-                  key,  # type: str
-                  *opts,  # type: GetOptions
-                  **kwargs,  # type: Any
-                  ) -> GetResult:
+                  key: str,
+                  opts: GetOptions | None = None,
+                  **kwargs: Any) -> GetResult:
         """Retrieves the value of a document from the collection.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetOptions`
 
         Returns:
@@ -115,7 +111,7 @@ class AsyncCollection:
             Simple get operation with options::
 
                 from datetime import timedelta
-                from couchbase.options import GetOptions
+                from acouchbase.options import GetOptions
 
                 # ... other code ...
 
@@ -123,23 +119,19 @@ class AsyncCollection:
                 print(f'Document value: {res.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Get, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_request(key, obs_handler, *opts, **kwargs)
-            return await self._impl.get(req, transcoder, obs_handler)
+        return await self._impl.get(key, opts, **kwargs)
 
     async def get_any_replica(self,
-                              key,  # type: str
-                              *opts,  # type: GetAnyReplicaOptions
-                              **kwargs,  # type: Any
-                              ) -> GetReplicaResult:
-        """Retrieves the value of a document from the collection leveraging both active and all available replicas returning
-        the first available.
+                              key: str,
+                              opts: GetAnyReplicaOptions | None = None,
+                              **kwargs: Any) -> GetReplicaResult:
+        """Retrieves the value of a document from the collection leveraging both active and all available replicas
+        returning the first available.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAnyReplicaOptions`
 
         Returns:
@@ -164,7 +156,7 @@ class AsyncCollection:
             Simple get_any_replica operation with options::
 
                 from datetime import timedelta
-                from couchbase.options import GetAnyReplicaOptions
+                from acouchbase.options import GetAnyReplicaOptions
 
                 # ... other code ...
 
@@ -173,24 +165,19 @@ class AsyncCollection:
                 print(f'Document is replica: {res.is_replica}')
                 print(f'Document value: {res.content_as[dict]}')
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.GetAnyReplica, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_any_replica_request(
-                key, obs_handler, *opts, **kwargs)
-            return await self._impl.get_any_replica(req, transcoder, obs_handler)
+        """
+        return await self._impl.get_any_replica(key, opts, **kwargs)
 
     async def get_all_replicas(self,
-                               key,  # type: str
-                               *opts,  # type: GetAllReplicasOptions
-                               **kwargs,  # type: Any
-                               ) -> Iterable[GetReplicaResult]:
+                               key: str,
+                               opts: GetAllReplicasOptions | None = None,
+                               **kwargs: Any) -> Iterable[GetReplicaResult]:
         """Retrieves the value of a document from the collection returning both active and all available replicas.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAllReplicasOptions`
 
         Returns:
@@ -217,7 +204,7 @@ class AsyncCollection:
             Simple get_all_replicas operation with options::
 
                 from datetime import timedelta
-                from couchbase.options import GetAllReplicasOptions
+                from acouchbase.options import GetAllReplicasOptions
 
                 # ... other code ...
 
@@ -230,7 +217,7 @@ class AsyncCollection:
             Stream get_all_replicas results::
 
                 from datetime import timedelta
-                from couchbase.options import GetAllReplicasOptions
+                from acouchbase.options import GetAllReplicasOptions
 
                 # ... other code ...
 
@@ -246,23 +233,18 @@ class AsyncCollection:
                         break
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.GetAllReplicas, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_all_replicas_request(
-                key, obs_handler, *opts, **kwargs)
-            return await self._impl.get_all_replicas(req, transcoder, obs_handler)
+        return await self._impl.get_all_replicas(key, opts, **kwargs)
 
     async def exists(self,
-                     key,  # type: str
-                     *opts,  # type: ExistsOptions
-                     **kwargs,  # type: Any
-                     ) -> ExistsResult:
+                     key: str,
+                     opts: ExistsOptions | None = None,
+                     **kwargs: Any) -> ExistsResult:
         """Checks whether a specific document exists or not.
 
         Args:
             key (str): The key for the document to check existence.
             opts (:class:`~couchbase.options.ExistsOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsOptions`
 
         Returns:
@@ -284,7 +266,7 @@ class AsyncCollection:
             Simple exists operation with options::
 
                 from datetime import timedelta
-                from couchbase.options import ExistsOptions
+                from acouchbase.options import ExistsOptions
 
                 # ... other code ...
 
@@ -293,24 +275,20 @@ class AsyncCollection:
                 print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Exists, instruments) as obs_handler:
-            req = self._impl.request_builder.build_exists_request(key, obs_handler, *opts, **kwargs)
-            return await self._impl.exists(req, obs_handler)
+        return await self._impl.exists(key, opts, **kwargs)
 
     async def insert(self,
-                     key,  # type: str
-                     value,  # type: DocumentValue
-                     *opts,  # type: InsertOptions
-                     **kwargs,  # type: Any
-                     ) -> MutationResult:
+                     key: str,
+                     value: DocumentValue,
+                     opts: InsertOptions | None = None,
+                     **kwargs: Any) -> MutationResult:
         """Inserts a new document to the collection, failing if the document already exists.
 
         Args:
             key (str): Document key to insert.
             value (DocumentValue): The value of the document to insert.
             opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertOptions`
 
         Returns:
@@ -342,8 +320,8 @@ class AsyncCollection:
 
             Simple insert operation with options::
 
-                from couchbase.durability import DurabilityLevel, ServerDurability
-                from couchbase.options import InsertOptions
+                from acouchbase.durability import DurabilityLevel, ServerDurability
+                from acouchbase.options import InsertOptions
 
                 # ... other code ...
 
@@ -360,24 +338,20 @@ class AsyncCollection:
                 res = await collection.insert(key, doc, InsertOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Insert, instruments) as obs_handler:
-            req = self._impl.request_builder.build_insert_request(key, value, obs_handler, *opts, **kwargs)
-            return await self._impl.insert(req, obs_handler)
+        return await self._impl.insert(key, value, opts, **kwargs)
 
     async def upsert(self,
-                     key,  # type: str
-                     value,  # type: DocumentValue
-                     *opts,  # type: UpsertOptions
-                     **kwargs,  # type: Any
-                     ) -> MutationResult:
+                     key: str,
+                     value: DocumentValue,
+                     opts: UpsertOptions | None = None,
+                     **kwargs: Any) -> MutationResult:
         """Upserts a document to the collection. This operation succeeds whether or not the document already exists.
 
         Args:
             key (str): Document key to upsert.
             value (DocumentValue): The value of the document to upsert.
             opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertOptions`
 
         Returns:
@@ -405,8 +379,8 @@ class AsyncCollection:
 
             Simple upsert operation with options::
 
-                from couchbase.durability import DurabilityLevel, ServerDurability
-                from couchbase.options import UpsertOptions
+                from acouchbase.durability import DurabilityLevel, ServerDurability
+                from acouchbase.options import UpsertOptions
 
                 # ... other code ...
 
@@ -423,24 +397,20 @@ class AsyncCollection:
                 res = await collection.upsert(key, doc, InsertOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Upsert, instruments) as obs_handler:
-            req = self._impl.request_builder.build_upsert_request(key, value, obs_handler, *opts, **kwargs)
-            return await self._impl.upsert(req, obs_handler)
+        return await self._impl.upsert(key, value, opts, **kwargs)
 
     async def replace(self,
-                      key,  # type: str
-                      value,  # type: DocumentValue
-                      *opts,  # type: ReplaceOptions
-                      **kwargs,  # type: Any
-                      ) -> MutationResult:
+                      key: str,
+                      value: DocumentValue,
+                      opts: ReplaceOptions | None = None,
+                      **kwargs: Any) -> MutationResult:
         """Replaces the value of an existing document. Failing if the document does not exist.
 
         Args:
             key (str): Document key to replace.
             value (DocumentValue): The value of the document to replace.
             opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceOptions`
 
         Returns:
@@ -467,8 +437,8 @@ class AsyncCollection:
 
             Simple replace operation with options::
 
-                from couchbase.durability import DurabilityLevel, ServerDurability
-                from couchbase.options import ReplaceOptions
+                from acouchbase.durability import DurabilityLevel, ServerDurability
+                from acouchbase.options import ReplaceOptions
 
                 # ... other code ...
 
@@ -480,22 +450,18 @@ class AsyncCollection:
                 res = await collection.replace(key, doc, InsertOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Replace, instruments) as obs_handler:
-            req = self._impl.request_builder.build_replace_request(key, value, obs_handler, *opts, **kwargs)
-            return await self._impl.replace(req, obs_handler)
+        return await self._impl.replace(key, value, opts, **kwargs)
 
     async def remove(self,
-                     key,  # type: str
-                     *opts,  # type: RemoveOptions
-                     **kwargs,  # type: Any
-                     ) -> MutationResult:
+                     key: str,
+                     opts: RemoveOptions | None = None,
+                     **kwargs: Any) -> MutationResult:
         """Removes an existing document. Failing if the document does not exist.
 
         Args:
             key (str): Key for the document to remove.
             opts (:class:`~couchbase.options.RemoveOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.RemoveOptions`
 
         Returns:
@@ -518,8 +484,8 @@ class AsyncCollection:
 
             Simple remove operation with options::
 
-                from couchbase.durability import DurabilityLevel, ServerDurability
-                from couchbase.options import RemoveOptions
+                from acouchbase.durability import DurabilityLevel, ServerDurability
+                from acouchbase.options import RemoveOptions
 
                 # ... other code ...
 
@@ -527,24 +493,20 @@ class AsyncCollection:
                 res = collection.remove('airline_10', RemoveOptions(durability=durability))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Remove, instruments) as obs_handler:
-            req = self._impl.request_builder.build_remove_request(key, obs_handler, *opts, **kwargs)
-            return await self._impl.remove(req, obs_handler)
+        return await self._impl.remove(key, opts, **kwargs)
 
     async def touch(self,
-                    key,  # type: str
-                    expiry,  # type: timedelta
-                    *opts,  # type: TouchOptions
-                    **kwargs,  # type: Any
-                    ) -> MutationResult:
+                    key: str,
+                    expiry: timedelta,
+                    opts: TouchOptions | None = None,
+                    **kwargs: Any) -> MutationResult:
         """Updates the expiry on an existing document.
 
         Args:
             key (str): Key for the document to touch.
             expiry (timedelta): The new expiry for the document.
             opts (:class:`~couchbase.options.TouchOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TouchOptions`
 
         Returns:
@@ -573,7 +535,7 @@ class AsyncCollection:
 
                 from datetime import timedelta
 
-                from couchbase.options import TouchOptions
+                from acouchbase.options import TouchOptions
 
                 # ... other code ...
 
@@ -582,24 +544,20 @@ class AsyncCollection:
                                         TouchOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Touch, instruments) as obs_handler:
-            req = self._impl.request_builder.build_touch_request(key, expiry, obs_handler, *opts, **kwargs)
-            return await self._impl.touch(req, obs_handler)
+        return await self._impl.touch(key, expiry, opts, **kwargs)
 
     async def get_and_touch(self,
-                            key,  # type: str
-                            expiry,  # type: timedelta
-                            *opts,  # type: GetAndTouchOptions
-                            **kwargs,  # type: Any
-                            ) -> GetResult:
+                            key: str,
+                            expiry: timedelta,
+                            opts: GetAndTouchOptions | None = None,
+                            **kwargs: Any) -> GetResult:
         """Retrieves the value of the document and simultanously updates the expiry time for the same document.
 
         Args:
             key (str): The key for the document retrieve and set expiry time.
             expiry (timedelta):  The new expiry to apply to the document.
             opts (:class:`~couchbase.options.GetAndTouchOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndTouchOptions`
 
         Returns:
@@ -629,7 +587,7 @@ class AsyncCollection:
             Simple get and touch operation with options::
 
                 from datetime import timedelta
-                from couchbase.options import GetAndTouchOptions
+                from acouchbase.options import GetAndTouchOptions
 
                 # ... other code ...
 
@@ -640,25 +598,20 @@ class AsyncCollection:
                 print(f'Document w/ updated expiry: {res.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.GetAndTouch, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_and_touch_request(
-                key, expiry, obs_handler, *opts, **kwargs)
-            return await self._impl.get_and_touch(req, transcoder, obs_handler)
+        return await self._impl.get_and_touch(key, expiry, opts, **kwargs)
 
     async def get_and_lock(self,
-                           key,  # type: str
-                           lock_time,  # type: timedelta
-                           *opts,  # type: GetAndLockOptions
-                           **kwargs,  # type: Any
-                           ) -> GetResult:
+                           key: str,
+                           lock_time: timedelta,
+                           opts: GetAndLockOptions | None = None,
+                           **kwargs: Any) -> GetResult:
         """Locks a document and retrieves the value of that document at the time it is locked.
 
         Args:
             key (str): The key for the document to lock and retrieve.
             lock_time (timedelta):  The amount of time to lock the document.
             opts (:class:`~couchbase.options.GetAndLockOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndLockOptions`
 
         Returns:
@@ -688,7 +641,7 @@ class AsyncCollection:
             Simple get and lock operation with options::
 
                 from datetime import timedelta
-                from couchbase.options import GetAndLockOptions
+                from acouchbase.options import GetAndLockOptions
 
                 # ... other code ...
 
@@ -699,25 +652,20 @@ class AsyncCollection:
                 print(f'Locked document: {res.content_as[dict]}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.GetAndLock, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_get_and_lock_request(
-                key, lock_time, obs_handler, *opts, **kwargs)
-            return await self._impl.get_and_lock(req, transcoder, obs_handler)
+        return await self._impl.get_and_lock(key, lock_time, opts, **kwargs)
 
     async def unlock(self,
-                     key,  # type: str
-                     cas,  # type: int
-                     *opts,  # type: UnlockOptions
-                     **kwargs,  # type: Any
-                     ) -> None:
+                     key: str,
+                     cas: int,
+                     opts: UnlockOptions | None = None,
+                     **kwargs: Any) -> None:
         """Unlocks a previously locked document.
 
         Args:
             key (str): The key for the document to unlock.
             cas (int): The CAS of the document, used to validate lock ownership.
             opts (:class:`~couchbase.options.UnlockOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockOptions`
 
         Returns:
@@ -747,17 +695,13 @@ class AsyncCollection:
                 await collection.upsert(key, res.content_as[dict])
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.Unlock, instruments) as obs_handler:
-            req = self._impl.request_builder.build_unlock_request(key, cas, obs_handler, *opts, **kwargs)
-            await self._impl.unlock(req, obs_handler)
+        await self._impl.unlock(key, cas, opts, **kwargs)
 
     async def lookup_in(self,
-                        key,  # type: str
-                        spec,  # type: Iterable[Spec]
-                        *opts,  # type: LookupInOptions
-                        **kwargs,  # type: Any
-                        ) -> LookupInResult:
+                        key: str,
+                        spec: Iterable[Spec],
+                        opts: LookupInOptions | None = None,
+                        **kwargs: Any) -> LookupInResult:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value.
 
@@ -766,7 +710,7 @@ class AsyncCollection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInOptions`
 
         Returns:
@@ -798,7 +742,7 @@ class AsyncCollection:
                 from datetime import timedelta
 
                 import couchbase.subdocument as SD
-                from couchbase.options import LookupInOptions
+                from acouchbase.options import LookupInOptions
 
                 # ... other code ...
 
@@ -809,18 +753,13 @@ class AsyncCollection:
                 print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.LookupIn, instruments) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_lookup_in_request(
-                key, spec, obs_handler, *opts, **kwargs)
-            return await self._impl.lookup_in(req, transcoder, obs_handler)
+        return await self._impl.lookup_in(key, spec, opts, **kwargs)
 
     async def lookup_in_any_replica(self,
-                                    key,  # type: str
-                                    spec,  # type: Iterable[Spec]
-                                    *opts,  # type: LookupInAnyReplicaOptions
-                                    **kwargs,  # type: Any
-                                    ) -> LookupInReplicaResult:
+                                    key: str,
+                                    spec: Iterable[Spec],
+                                    opts: LookupInAnyReplicaOptions | None = None,
+                                    **kwargs: Any) -> LookupInReplicaResult:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value. It leverages both active and all available replicas
         returning the first available
@@ -830,7 +769,7 @@ class AsyncCollection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAnyReplicaOptions`
 
         Returns:
@@ -862,7 +801,7 @@ class AsyncCollection:
                 from datetime import timedelta
 
                 import couchbase.subdocument as SD
-                from couchbase.options import LookupInAnyReplicaOptions
+                from acouchbase.options import LookupInAnyReplicaOptions
 
                 # ... other code ...
 
@@ -874,20 +813,13 @@ class AsyncCollection:
                 print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(
-            KeyValueOperationType.LookupInAnyReplica, instruments
-        ) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_lookup_in_any_replica_request(
-                key, spec, obs_handler, *opts, **kwargs)
-            return await self._impl.lookup_in_any_replica(req, transcoder, obs_handler)
+        return await self._impl.lookup_in_any_replica(key, spec, opts, **kwargs)
 
     async def lookup_in_all_replicas(self,
-                                     key,  # type: str
-                                     spec,  # type: Iterable[Spec]
-                                     *opts,  # type: LookupInAllReplicasOptions
-                                     **kwargs,  # type: Any
-                                     ) -> Iterable[LookupInReplicaResult]:
+                                     key: str,
+                                     spec: Iterable[Spec],
+                                     opts: LookupInAllReplicasOptions | None = None,
+                                     **kwargs: Any) -> Iterable[LookupInReplicaResult]:
         """Performs a lookup-in operation against a document, fetching individual fields or information
         about specific fields inside the document value, returning results from both active and all available replicas
 
@@ -896,7 +828,7 @@ class AsyncCollection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAllReplicasOptions`
 
         Returns:
@@ -930,14 +862,13 @@ class AsyncCollection:
 
                 import couchbase.subdocument as SD
                 from datetime import timedelta
-                from couchbase.options import LookupInAllReplicasOptions
+                from acouchbase.options import LookupInAllReplicasOptions
 
                 # ... other code ...
 
                 key = 'hotel_10025'
-                results = await collection.lookup_in_all_replicas(key,
-                                                                  (SD.get("geo"),),
-                                                                  LookupInAllReplicasOptions(timeout=timedelta(seconds=2)))
+                opts = LookupInAllReplicasOptions(timeout=timedelta(seconds=2))
+                results = await collection.lookup_in_all_replicas(key, (SD.get("geo"),), opts)
 
                 for res in results:
                     print(f'Document is replica: {res.is_replica}')
@@ -946,14 +877,13 @@ class AsyncCollection:
             Stream lookup_in_all_replicas results::
 
                 from datetime import timedelta
-                from couchbase.options import GetAllReplicasOptions
+                from acouchbase.options import GetAllReplicasOptions
 
                 # ... other code ...
 
                 key = 'hotel_10025'
-                results = await collection.lookup_in_all_replicas(key,
-                                                                  (SD.get("geo"),),
-                                                                  LookupInAllReplicasOptions(timeout=timedelta(seconds=2)))
+                opts = LookupInAllReplicasOptions(timeout=timedelta(seconds=2))
+                results = await collection.lookup_in_all_replicas(key, (SD.get("geo"),), opts)
                 while True:
                     try:
                         res = next(results)
@@ -963,21 +893,14 @@ class AsyncCollection:
                         print('Done streaming replicas.')
                         break
 
-        """  # noqa: E501
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(
-            KeyValueOperationType.LookupInAllReplicas, instruments
-        ) as obs_handler:
-            req, transcoder = self._impl.request_builder.build_lookup_in_all_replicas_request(
-                key, spec, obs_handler, *opts, **kwargs)
-            return await self._impl.lookup_in_all_replicas(req, transcoder, obs_handler)
+        """
+        return await self._impl.lookup_in_all_replicas(key, spec, opts, **kwargs)
 
     async def mutate_in(self,
-                        key,  # type: str
-                        spec,  # type: Iterable[Spec]
-                        *opts,  # type: MutateInOptions
-                        **kwargs,  # type: Any
-                        ) -> MutateInResult:
+                        key: str,
+                        spec: Iterable[Spec],
+                        opts: MutateInOptions | None = None,
+                        **kwargs: Any) -> MutateInResult:
         """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
         within a document. Also enables access to document extended-attributes (i.e. xattrs).
 
@@ -986,7 +909,7 @@ class AsyncCollection:
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the operations to
                 perform on the document.
             opts (:class:`~couchbase.options.MutateInOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.MutateInOptions`
 
         Returns:
@@ -1017,7 +940,7 @@ class AsyncCollection:
                 from datetime import timedelta
 
                 import couchbase.subdocument as SD
-                from couchbase.options import MutateInOptions
+                from acouchbase.options import MutateInOptions
 
                 # ... other code ...
 
@@ -1027,44 +950,44 @@ class AsyncCollection:
                                             MutateInOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        async with ObservableRequestHandler.create(KeyValueOperationType.MutateIn, instruments) as obs_handler:
-            req = self._impl.request_builder.build_mutate_in_request(key, spec, obs_handler, *opts, **kwargs)
-            return await self._impl.mutate_in(req, obs_handler)
+        return await self._impl.mutate_in(key, spec, opts, **kwargs)
 
     def scan(self,
-             scan_type,  # type: ScanType
-             *opts,  # type: ScanOptions
-             **kwargs,  # type: Any
-             ) -> ScanResultIterable:
+             scan_type: ScanType,
+             opts: ScanOptions | None = None,
+             **kwargs: Any) -> AsyncScanResultIterable:
         """Execute a key-value range scan operation from the collection.
 
         .. note::
-            Use this API for low concurrency batch queries where latency is not a critical as the system may have to scan a lot of documents to find the matching documents.
-            For low latency range queries, it is recommended that you use SQL++ with the necessary indexes.
+            Use this API for low concurrency batch queries where latency is not a critical as the system may have to
+            scan a lot of documents to find the matching documents. For low latency range queries, it is recommended
+            that you use SQL++ with the necessary indexes.
 
         Args:
-            scan_type (:class:`~couchbase.kv_range_scan.ScanType`): Either a :class:`~couchbase.kv_range_scan.RangeScan`,
+            scan_type (:class:`~couchbase.kv_range_scan.ScanType`): Either a
+                :class:`~couchbase.kv_range_scan.RangeScan`,
                 :class:`~couchbase.kv_range_scan.PrefixScan` or
                 :class:`~couchbase.kv_range_scan.SamplingScan` instance.
             opts (:class:`~couchbase.options.ScanOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ScanOptions`
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If scan_type is not either a RangeScan or SamplingScan instance.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If scan_type is not either a RangeScan or
+                SamplingScan instance.
             :class:`~couchbase.exceptions.InvalidArgumentException`: If sort option is provided and is incorrect type.
             :class:`~couchbase.exceptions.InvalidArgumentException`: If consistent_with option is provided and is not a
 
         Returns:
-            :class:`~couchbase.result.ScanResultIterable`: An instance of :class:`~couchbase.result.ScanResultIterable`.
+            :class:`~acouchbase.result.AsyncScanResultIterable`: An instance of
+            :class:`~acouchbase.result.AsyncScanResultIterable`.
 
         Examples:
 
             Simple range scan operation::
 
-                from couchbase.kv_range_scan import RangeScan
-                from couchbase.options import ScanOptions
+                from acouchbase.kv_range_scan import RangeScan
+                from acouchbase.options import ScanOptions
 
                 # ... other code ...
 
@@ -1078,10 +1001,8 @@ class AsyncCollection:
                     print(res)
 
 
-        """  # noqa: E501
-        req = self._impl.request_builder.build_range_scan_async_request(
-            self._impl.connection, scan_type, *opts, **kwargs)
-        return self._impl.range_scan(req)
+        """
+        return self._impl.scan(scan_type, opts, **kwargs)
 
     def binary(self) -> BinaryCollection:
         """Creates a BinaryCollection instance, allowing access to various binary operations
@@ -1094,7 +1015,7 @@ class AsyncCollection:
             :class:`~acouchbase.binary_collection.BinaryCollection`: A BinaryCollection instance.
 
         """
-        return BinaryCollection(self._impl)
+        return BinaryCollection(self._impl.binary())
 
     def couchbase_list(self, key: str) -> CouchbaseList:
         """Returns a CouchbaseList permitting simple list storage in a document.
@@ -1106,7 +1027,7 @@ class AsyncCollection:
             :class:`~acouchbase.datastructures.CouchbaseList`: A CouchbaseList instance.
 
         """
-        return CouchbaseList(key, self._impl)
+        return CouchbaseList(key, self)
 
     def couchbase_map(self, key: str) -> CouchbaseMap:
         """Returns a CouchbaseMap permitting simple map storage in a document.
@@ -1118,7 +1039,7 @@ class AsyncCollection:
             :class:`~acouchbase.datastructures.CouchbaseMap`: A CouchbaseMap instance.
 
         """
-        return CouchbaseMap(key, self._impl)
+        return CouchbaseMap(key, self)
 
     def couchbase_set(self, key: str) -> CouchbaseSet:
         """Returns a CouchbaseSet permitting simple map storage in a document.
@@ -1130,7 +1051,7 @@ class AsyncCollection:
             :class:`~acouchbase.datastructures.CouchbaseSet`: A CouchbaseSet instance.
 
         """
-        return CouchbaseSet(key, self._impl)
+        return CouchbaseSet(key, self)
 
     def couchbase_queue(self, key: str) -> CouchbaseQueue:
         """Returns a CouchbaseQueue permitting simple map storage in a document.
@@ -1142,7 +1063,7 @@ class AsyncCollection:
             :class:`~acouchbase.datastructures.CouchbaseQueue`: A CouchbaseQueue instance.
 
         """
-        return CouchbaseQueue(key, self._impl)
+        return CouchbaseQueue(key, self)
 
     def query_indexes(self) -> CollectionQueryIndexManager:
         """
@@ -1150,8 +1071,10 @@ class AsyncCollection:
         indexes of this cluster.
 
         Returns:
-            :class:`~acouchbase.management.queries.CollectionQueryIndexManager`: A :class:`~acouchbase.management.queries.CollectionQueryIndexManager` instance.
-        """  # noqa: E501
+            :class:`~acouchbase.management.queries.CollectionQueryIndexManager`: A
+            :class:`~acouchbase.management.queries.CollectionQueryIndexManager` instance.
+        """
+        # BRIDGE: the manager builds its own impl until it is ported.  Removed by PYCBC-2005.
         return CollectionQueryIndexManager(self._impl._client_adapter,
                                            self._impl.bucket_name,
                                            self._impl.scope_name,

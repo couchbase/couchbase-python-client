@@ -28,10 +28,14 @@ from couchbase.common._streaming import RowIterator
 from couchbase.common.analytics import AnalyticsMetaData
 from couchbase.common.exceptions import _ExceptionInfo
 from couchbase.common.n1ql import QueryMetaData
+from couchbase.common.result import ScanResult
 from couchbase.common.search import SearchMetaData, SearchRow
 from couchbase.common.views import ViewMetaData, ViewRow
-from couchbase.exceptions import InternalSDKException, RequestCanceledException
+from couchbase.exceptions import (AlreadyQueriedException,
+                                  InternalSDKException,
+                                  RequestCanceledException)
 from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_exception
+from couchbase.protocol.classic._range_scan import ClassicRangeScanExecutor
 from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
                                                    ClassicStream,
                                                    ClassicStreamingExecutor,
@@ -39,7 +43,9 @@ from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
                                                    QueryStreamSpec,
                                                    SearchStreamSpec,
                                                    ViewStreamSpec)
+from couchbase.result import ScanResultIterable
 from couchbase.serializer import DefaultJsonSerializer, Serializer
+from couchbase.transcoder import JSONTranscoder
 from tests.test_features import TestProtocol
 
 # What is checked here is classic's streaming executors and stream specs.
@@ -563,3 +569,150 @@ class ViewStreamSpecUnitTests:
 
     def test_no_metadata_is_none(self) -> None:
         assert ViewStreamSpec({}, DefaultJsonSerializer()).decode_final_metadata({}) is None
+
+
+class _ScanCompleted(_CoreError):
+    # The value the core ends every scan with, a cancelled one included.
+
+    def err(self) -> int:
+        return 134
+
+    def strerror(self) -> str:
+        return 'range_scan_completed'
+
+
+class _ScanIterator:
+    # The core's scan iterator: an item per read, an error value at the end, and no end marker.
+
+    def __init__(self, items: list[Any]) -> None:
+        self._items = list(items)
+        self.cancel_calls = 0
+
+    def __iter__(self) -> _ScanIterator:
+        return self
+
+    def __next__(self) -> Any:
+        if self.cancel_calls or not self._items:
+            return _ScanCompleted()
+        return self._items.pop(0)
+
+    def cancel_scan(self) -> None:
+        self.cancel_calls += 1
+
+    def is_cancelled(self) -> bool:
+        return self.cancel_calls > 0
+
+
+class _ScanConnection:
+
+    def __init__(self, scan: _ScanIterator) -> None:
+        self._scan = scan
+        self.calls: list[dict[str, Any]] = []
+
+    def pycbc_kv_range_scan(self, **kwargs: Any) -> _ScanIterator:
+        self.calls.append(kwargs)
+        return self._scan
+
+
+def _scan_item(key: str) -> SimpleNamespace:
+    return SimpleNamespace(raw_result={'scan_item': {'key': key}})
+
+
+def _scan_args(**orchestrator_options: Any) -> dict[str, Any]:
+    return {'bucket': 'b', 'scope': 's', 'collection_name': 'c', 'transcoder': JSONTranscoder(),
+            'scan_type': {'scan_type': 'prefix_scan', 'prefix': 'p'}, 'orchestrator_options': orchestrator_options}
+
+
+def _scan_executor(items: list[Any],
+                   scan_args: dict[str, Any] | None = None
+                   ) -> tuple[ClassicRangeScanExecutor, _ScanIterator, _ScanConnection]:
+    scan = _ScanIterator(items)
+    connection = _ScanConnection(scan)
+    executor = ClassicRangeScanExecutor(cast(pycbc_connection, connection), scan_args or _scan_args())
+    return executor, scan, connection
+
+
+class ClassicRangeScanExecutorUnitTests:
+    # The blocking range scan executor, over a stand-in for the core's scan iterator.  The asyncio
+    # executor reads through the same stream, and its own suite is under acouchbase/tests.
+
+    def test_submit_sends_the_arguments_without_the_transcoder(self) -> None:
+        scan_args = _scan_args(ids_only=True)
+        executor, _, connection = _scan_executor([], scan_args)
+        executor.submit()
+        expected = dict(scan_args)
+        del expected['transcoder']
+        assert connection.calls == [expected]
+        assert 'transcoder' in scan_args
+
+    def test_items_are_scan_results(self) -> None:
+        executor, _, _ = _scan_executor([_scan_item('k1')], _scan_args(ids_only=True))
+        executor.submit()
+        row = executor.next_row()
+        assert isinstance(row, ScanResult)
+        assert row.id == 'k1'
+        assert row.ids_only is True
+
+    def test_ids_only_defaults_to_false(self) -> None:
+        executor, _, _ = _scan_executor([_scan_item('k1')])
+        executor.submit()
+        assert executor.next_row().ids_only is False
+
+    def test_the_completed_scan_ends_the_rows(self) -> None:
+        executor, scan, _ = _scan_executor([_scan_item('k1')])
+        executor.submit()
+        executor.next_row()
+        with pytest.raises(StopIteration):
+            executor.next_row()
+        assert scan.cancel_calls == 0
+
+    def test_any_other_core_error_is_raised_mapped(self) -> None:
+        executor, _, _ = _scan_executor([_CoreError()])
+        executor.submit()
+        with pytest.raises(RequestCanceledException):
+            executor.next_row()
+
+    def test_fetching_before_submitting_is_internal(self) -> None:
+        executor, _, _ = _scan_executor([_scan_item('k1')])
+        with pytest.raises(InternalSDKException):
+            executor.next_row()
+
+    def test_cancel_scan_ends_the_scan_at_the_next_read(self) -> None:
+        executor, scan, _ = _scan_executor([_scan_item('k1'), _scan_item('k2')])
+        executor.submit()
+        executor.next_row()
+        executor.cancel_scan()
+        executor.cancel_scan()
+        with pytest.raises(StopIteration):
+            executor.next_row()
+        assert scan.cancel_calls == 1
+
+    def test_cancel_scan_before_submitting_does_nothing(self) -> None:
+        executor, scan, connection = _scan_executor([])
+        executor.cancel_scan()
+        assert connection.calls == []
+        assert scan.cancel_calls == 0
+
+    def test_finalize_on_an_error_cancels_the_scan(self) -> None:
+        executor, scan, _ = _scan_executor([_scan_item('k1')])
+        executor.submit()
+        executor.finalize(RequestCanceledException())
+        assert scan.cancel_calls == 1
+
+    def test_finalize_on_the_end_leaves_the_scan(self) -> None:
+        executor, scan, _ = _scan_executor([])
+        executor.submit()
+        executor.finalize(None)
+        assert scan.cancel_calls == 0
+
+    def test_cancel_scan_ends_the_iteration_at_the_next_read(self) -> None:
+        executor, _, _ = _scan_executor([_scan_item('k1'), _scan_item('k2'), _scan_item('k3')])
+        result = ScanResultIterable(RowIterator(executor), executor)
+        seen: list[str | None] = []
+        for row in result.rows():
+            if not seen:
+                result.cancel_scan()
+            seen.append(row.id)
+        assert seen == ['k1']
+        with pytest.raises(AlreadyQueriedException):
+            result.rows()

@@ -29,7 +29,7 @@ from couchbase.common._option_args import merge, resolve_deprecated
 from couchbase.common._option_diagnostics import (OptionsBlock,
                                                   check_options,
                                                   mode_of)
-from couchbase.common._option_spec import BLOCKS
+from couchbase.common._option_spec import BLOCKS, BlockSpec
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.option_enums import OptionValidationMode
 from couchbase.common.protocol import CouchbaseProtocol
@@ -141,6 +141,16 @@ def check_streaming_args(options: tuple[object, ...],
     check_options(block, [*keys, *kwargs], mode, protocol=block.protocol)
 
 
+def _judged(block: str,
+            entry: BlockSpec,
+            opts: dict[str, Any],
+            mode: OptionValidationMode | None,
+            protocol: CouchbaseProtocol) -> dict[str, Any]:
+    """One document's options, checked against the block, with each deprecated key reported."""
+    check_options(block, opts, mode, protocol=protocol)
+    return resolve_deprecated(entry, opts) if entry.retired else opts
+
+
 def _get_per_key_opts(per_key_opts: dict[str, Any],
                       opt_type: type[dict[str, Any]],
                       durability_type: type[dict] | type[int] | None,
@@ -161,7 +171,7 @@ def _get_per_key_opts(per_key_opts: dict[str, Any],
         if not isinstance(opts, (opt_type, dict)):
             raise InvalidArgumentException(message=f'Expected options to be of type Union[{opt_type.__name__}, dict]')
         key_opts = {}
-        check_options(per_key_block, opts, mode, protocol=protocol)
+        opts = _judged(per_key_block, entry, opts, mode, protocol)
         for opt_key, opt_value in opts.items():
             spec = entry.keys.get(opt_key)
             if spec is None:

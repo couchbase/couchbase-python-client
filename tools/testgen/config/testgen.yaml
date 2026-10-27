@@ -269,6 +269,8 @@ not_generated:
     - couchbase/tests/diagnostics_t.py
     - couchbase/tests/eventingmgmt_function_types_t.py
     - couchbase/tests/exceptions_t.py
+    - couchbase/tests/kv_options_completeness_t.py
+    - couchbase/tests/kv_result_types_t.py
     - couchbase/tests/logging_meter_t.py
     - couchbase/tests/logging_smoke_t.py
     - couchbase/tests/no_op_observability_t.py

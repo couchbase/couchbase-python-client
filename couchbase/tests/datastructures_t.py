@@ -16,9 +16,8 @@
 # Two suites, because the file covers two APIs.  `DatastructuresTestSuite` exercises the
 # objects reached through `collection.couchbase_list(key)` and friends;
 # `LegacyDatastructuresTestSuite` exercises `collection.list_append(...)` and its three
-# siblings, which exist only on the sync Collection and are deprecated for removal in 4.7.0
-# under PYCBC-1732.  Generated for acouchbase only: txcouchbase has no datastructure
-# support at all.
+# siblings, which exist only on the sync Collection and are deprecated under PYCBC-1732.
+# Generated for acouchbase only: txcouchbase has no datastructure support at all.
 #
 # Every test starts from a key that must not exist, because the datastructure operations
 # create the document on first write.  A fixed key would be a literal in the shared
@@ -55,6 +54,7 @@ class DatastructuresTestSuite(SuiteRequirements):
     TEST_MANIFEST = [
         'test_list',
         'test_map',
+        'test_next_before_iterating_ends_at_once',
         'test_queue',
         'test_sets',
     ]
@@ -157,6 +157,23 @@ class DatastructuresTestSuite(SuiteRequirements):
         cb_map.clear()
         assert 0 == cb_map.size()
 
+    @pytest.mark.testgen_exclude('acouchbase',
+                                 reason='the async list and queue fetch the document on the first __anext__')
+    def test_next_before_iterating_ends_at_once(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        cb_list = cb_env.collection.couchbase_list(key)
+        cb_list.append('a')
+        cb_queue = cb_env.collection.couchbase_queue(cb_env.get_new_doc(key_only=True))
+        cb_queue.push(1)
+
+        # Only iter() fetches the document, so next() before it has nothing to read.
+        with pytest.raises(StopIteration):
+            next(cb_list)
+        with pytest.raises(StopIteration):
+            next(cb_queue)
+        assert ['a'] == list(cb_list)
+        assert [1] == list(cb_queue)
+
     def test_queue(self, cb_env: SyncTestEnvironment) -> None:
         key = cb_env.get_new_doc(key_only=True)
         cb_queue = cb_env.collection.couchbase_queue(key)
@@ -234,6 +251,7 @@ class LegacyDatastructuresTestSuite(SuiteRequirements):
 
     TEST_MANIFEST = [
         'test_list',
+        'test_list_index_zero_of_an_empty_list',
         'test_map',
         'test_queue',
         'test_sets',
@@ -270,6 +288,16 @@ class LegacyDatastructuresTestSuite(SuiteRequirements):
         cb_env.collection.list_set(key, 1, 'after')
         res = cb_env.collection.get(key)
         assert ['hello', 'after'] == res.content_as[list]
+
+    def test_list_index_zero_of_an_empty_list(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        cb_env.collection.upsert(key, [])
+
+        # 0 is falsy, so the missing-path check has to test the index against None.
+        with pytest.raises(IndexError):
+            cb_env.collection.list_set(key, 0, 'a')
+        with pytest.raises(IndexError):
+            cb_env.collection.list_remove(key, 0)
 
     def test_map(self, cb_env: SyncTestEnvironment) -> None:
         key = cb_env.get_new_doc(key_only=True)

@@ -88,12 +88,3 @@ Instead use:
 @Supportability.import_deprecated('couchbase.subdocument', 'couchbase.options')
 class MutateInOptions(options.MutateInOptions):
     pass
-
-
-# BRIDGE: the subdocument helpers the logic package and couchbase.result import from here.  Removed by
-# PYCBC-2001.
-from couchbase.logic._legacy_subdocument import build_lookup_in_path_flags  # noqa: F401, E402
-from couchbase.logic._legacy_subdocument import build_mutate_in_path_flags  # noqa: F401, E402
-from couchbase.logic._legacy_subdocument import parse_subdocument_content_as  # noqa: F401, E402
-from couchbase.logic._legacy_subdocument import parse_subdocument_exists  # noqa: F401, E402
-from couchbase.logic._legacy_subdocument import parse_subdocument_status  # noqa: F401, E402

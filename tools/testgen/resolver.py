@@ -275,7 +275,7 @@ OVERRIDES: dict[tuple[str, str], Resolution] = {
     # ScanResults is the fourth streaming result type.  RESULT_TYPES below is a catch-all
     # returning SYNC for "any accessor not listed above", so an omission here surfaces as a
     # confident wrong answer rather than as a resolver miss: kv_range_scan_t's generated
-    # test_range_scan_cancel iterates an AsyncRangeScanRequest with a plain `for`, and only
+    # test_range_scan_cancel iterates an async iterator with a plain `for`, and only
     # a real server catches it.  See the assertion under RESULT_TYPES.
     ('ScanResults', 'rows'): Resolution(Kind.ASYNC_ITER, 'runtime-dispatching result type'),
     # The fifth streaming result type, added with the views suites.  Same runtime dispatch as

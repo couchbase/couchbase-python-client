@@ -31,12 +31,7 @@ from couchbase.kv_range_scan import (PrefixScan,
                                      ScanTerm)
 from couchbase.mutation_state import MutationState
 from couchbase.options import ScanOptions
-from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
-from couchbase.protocol.classic._collection_types import CollectionDetails
-from couchbase.result import (MutationToken,
-                              ScanResult,
-                              ScanResultIterable)
-from couchbase.transcoder import JSONTranscoder
+from couchbase.result import ScanResult, ScanResultIterable
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.test_environment import (CollectionStrategy,
                                                  SuiteRequirements,
@@ -493,52 +488,3 @@ class RangeScanTests(RangeScanTestSuite):
             # included.
             self._purge_temp_docs(env, test_ids)
         teardown_environment(env, RangeScanTestSuite, request.param)
-
-
-class RangeScanRequestBuilderUnitTests:
-    # Regression coverage for the consistent_with serialization bug (PYCBC-1778).  No cb_env:
-    # nothing here talks to a cluster.
-
-    @staticmethod
-    def _builder() -> CollectionRequestBuilder:
-        # A real transcoder rather than None: the field is declared non-optional and the SDK
-        # always populates it.  Nothing under test reads it, so it only has to be well-typed.
-        details = CollectionDetails('default', '_default', '_default', JSONTranscoder())
-        return CollectionRequestBuilder(details)
-
-    @staticmethod
-    def _mutation_state(count: int) -> MutationState:
-        state = MutationState()
-        for i in range(count):
-            state.add_mutation_token(MutationToken({'partition_id': i,
-                                                    'partition_uuid': 1000 + i,
-                                                    'sequence_number': 1,
-                                                    'bucket_name': 'default'}))
-        return state
-
-    def test_consistent_with_serialized_as_mutation_state(self) -> None:
-        opts = {'consistent_with': self._mutation_state(3), 'concurrency': 1}
-        self._builder()._process_scan_orchestrator_ops(opts)
-
-        # Must be a mutation_state dict ({'tokens': [...]}), not a bare list, or the C++
-        # binding drops every token.
-        consistent_with = opts['consistent_with']
-        assert isinstance(consistent_with, dict)
-        assert list(consistent_with.keys()) == ['tokens']
-
-        tokens = consistent_with['tokens']
-        assert isinstance(tokens, list)
-        assert len(tokens) == 3
-        for token in tokens:
-            assert set(token.keys()) == {'partition_id', 'partition_uuid',
-                                         'sequence_number', 'bucket_name'}
-
-    def test_empty_consistent_with_raises(self) -> None:
-        opts = {'consistent_with': MutationState()}
-        with pytest.raises(InvalidArgumentException):
-            self._builder()._process_scan_orchestrator_ops(opts)
-
-    def test_zero_concurrency_raises(self) -> None:
-        opts = {'concurrency': 0}
-        with pytest.raises(InvalidArgumentException):
-            self._builder()._process_scan_orchestrator_ops(opts)

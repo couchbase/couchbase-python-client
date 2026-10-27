@@ -19,7 +19,7 @@ import pytest
 
 import couchbase.exceptions as E
 from couchbase.exceptions import CouchbaseException
-from couchbase.subdocument import parse_subdocument_status
+from couchbase.protocol.classic._subdocument import _subdoc_error
 
 
 def _exception_classes() -> list[type[CouchbaseException]]:
@@ -82,13 +82,13 @@ class CouchbaseExceptionUnitTests:
         assert CouchbaseException(message=self.MESSAGE).message == self.MESSAGE
 
     def test_unknown_subdocument_status_reports_the_status(self) -> None:
-        # Regression guard (PYCBC-1926): every other branch of parse_subdocument_status raises a
-        # subclass and read correctly; the fallback, whose whole job is to describe a status
+        # Regression guard (PYCBC-1926): every other branch of _subdoc_error builds a subclass
+        # that reads correctly; the fallback, whose whole job is to describe a status
         # nothing else recognised, was the one that constructed the base positionally and so
         # described nothing.  A caller saw `CouchbaseException: <exception str() failed>`.
-        with pytest.raises(CouchbaseException) as exc_info:
-            parse_subdocument_status(0xFFFF, 'some.path', 'some-key')
-        message = str(exc_info.value)
+        error = _subdoc_error(0xFFFF, 'some.path', 'some-key')
+        assert type(error) is CouchbaseException
+        message = str(error)
         assert 'Status=65535' in message
         assert 'path=some.path' in message
         assert 'key=some-key' in message

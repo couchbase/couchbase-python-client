@@ -13,9 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# Hand-written and neither generated nor merged.  Classic's asyncio executor for the streams, which
-# awaits the core's callback and then reads on the loop, yielding it between rows.  It is driven
-# through `AsyncRowIterator`, over a stand-in for the binding's connection.
+# Hand-written and neither generated nor merged.  Classic's two asyncio executors: the streams',
+# which awaits the core's callback and then reads on the loop, yielding it between rows, and range
+# scan's, which reads each item in a worker thread.  Each is driven through `AsyncRowIterator`, over
+# a stand-in for the binding's connection.
 from __future__ import annotations
 
 import asyncio
@@ -25,13 +26,18 @@ from typing import Any, cast
 
 import pytest
 
+from acouchbase.protocol.classic._range_scan import ClassicAsyncRangeScanExecutor
 from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor, response_signal
+from acouchbase.result import AsyncScanResultIterable
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._streaming import AsyncRowIterator
-from couchbase.exceptions import InternalSDKException
+from couchbase.exceptions import (AlreadyQueriedException,
+                                  InternalSDKException,
+                                  RequestCanceledException)
 from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_exception
 from couchbase.protocol.classic._streaming import QueryStreamSpec
 from couchbase.serializer import DefaultJsonSerializer
+from couchbase.transcoder import JSONTranscoder
 from tests.test_features import TestProtocol
 
 # What is checked here is classic's streaming executors.
@@ -241,3 +247,130 @@ class _CoreError(pycbc_exception):
 
     def error_info(self) -> Any:
         return None
+
+
+def _scan_completed() -> _CoreError:
+    return _CoreError(134, 'range_scan_completed')
+
+
+class _ScanIterator:
+    # The core's scan iterator.  An item given as `_WAIT` blocks the read until the scan is
+    # cancelled, as a read waiting on the server does.
+
+    _WAIT = object()
+
+    def __init__(self, items: list[Any]) -> None:
+        self._items = list(items)
+        self._cancelled = threading.Event()
+        self.waiting = threading.Event()
+        self.read_threads: list[int] = []
+
+    def __iter__(self) -> _ScanIterator:
+        return self
+
+    def __next__(self) -> Any:
+        self.read_threads.append(threading.get_ident())
+        if self._items and self._items[0] is self._WAIT:
+            self._items.pop(0)
+            self.waiting.set()
+            self._cancelled.wait(5)
+        if self._cancelled.is_set() or not self._items:
+            return _scan_completed()
+        return self._items.pop(0)
+
+    def cancel_scan(self) -> None:
+        self._cancelled.set()
+
+    def is_cancelled(self) -> bool:
+        return self._cancelled.is_set()
+
+
+class _ScanConnection:
+
+    def __init__(self, scan: _ScanIterator) -> None:
+        self._scan = scan
+        self.submit_threads: list[int] = []
+
+    def pycbc_kv_range_scan(self, **kwargs: Any) -> _ScanIterator:
+        self.submit_threads.append(threading.get_ident())
+        return self._scan
+
+
+def _scan_item(key: str) -> SimpleNamespace:
+    return SimpleNamespace(raw_result={'scan_item': {'key': key}})
+
+
+def _scan_executor(scan: _ScanIterator) -> tuple[ClassicAsyncRangeScanExecutor, _ScanConnection]:
+    connection = _ScanConnection(scan)
+    scan_args = {'bucket': 'b', 'scope': 's', 'collection_name': 'c', 'transcoder': JSONTranscoder(),
+                 'scan_type': {'scan_type': 'prefix_scan', 'prefix': 'p'}, 'orchestrator_options': {'ids_only': True}}
+    executor = ClassicAsyncRangeScanExecutor(cast(pycbc_connection, connection), scan_args, asyncio.get_running_loop())
+    return executor, connection
+
+
+class ClassicAsyncRangeScanExecutorUnitTests:
+
+    @pytest.mark.asyncio
+    async def test_the_scan_is_read_in_one_worker(self) -> None:
+        scan = _ScanIterator([_scan_item('k1'), _scan_item('k2')])
+        executor, _ = _scan_executor(scan)
+        rows = await AsyncRowIterator(executor).execute()
+        assert [r.id for r in rows] == ['k1', 'k2']
+        assert threading.get_ident() not in scan.read_threads
+        assert len(set(scan.read_threads)) == 1
+
+    @pytest.mark.asyncio
+    async def test_the_end_of_the_scan_releases_the_worker(self) -> None:
+        executor, _ = _scan_executor(_ScanIterator([_scan_item('k1')]))
+        await AsyncRowIterator(executor).execute()
+        assert executor._worker._shutdown is True
+
+    @pytest.mark.asyncio
+    async def test_an_error_cancels_the_scan_and_releases_the_worker(self) -> None:
+        scan = _ScanIterator([_CoreError(2, 'request_canceled')])
+        executor, _ = _scan_executor(scan)
+        with pytest.raises(RequestCanceledException):
+            await AsyncRowIterator(executor).execute()
+        assert scan.is_cancelled() is True
+        assert executor._worker._shutdown is True
+
+    @pytest.mark.asyncio
+    async def test_cancelling_a_waiting_read_cancels_the_scan(self) -> None:
+        scan = _ScanIterator([_scan_item('k1'), _ScanIterator._WAIT, _scan_item('k2')])
+        executor, _ = _scan_executor(scan)
+        rows = AsyncRowIterator(executor)
+        assert (await rows.__anext__()).id == 'k1'
+        task = asyncio.ensure_future(rows.__anext__())
+        while not scan.waiting.is_set():
+            await asyncio.sleep(0.001)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        # The cancel is what releases the worker still waiting on the core.
+        assert scan.is_cancelled() is True
+        assert executor._worker._shutdown is True
+        with pytest.raises(StopAsyncIteration):
+            await rows.__anext__()
+
+    @pytest.mark.asyncio
+    async def test_cancel_scan_ends_the_iteration_at_the_next_read(self) -> None:
+        scan = _ScanIterator([_scan_item('k1'), _scan_item('k2'), _scan_item('k3')])
+        executor, _ = _scan_executor(scan)
+        result = AsyncScanResultIterable(AsyncRowIterator(executor), executor)
+        seen: list[str | None] = []
+        async for row in result.rows():
+            if not seen:
+                result.cancel_scan()
+            seen.append(row.id)
+        assert seen == ['k1']
+        with pytest.raises(AlreadyQueriedException):
+            result.rows()
+
+    @pytest.mark.asyncio
+    async def test_cancel_scan_before_iterating_does_nothing(self) -> None:
+        scan = _ScanIterator([_scan_item('k1')])
+        executor, connection = _scan_executor(scan)
+        result = AsyncScanResultIterable(AsyncRowIterator(executor), executor)
+        result.cancel_scan()
+        assert connection.submit_threads == []
+        assert [r.id async for r in result.rows()] == ['k1']

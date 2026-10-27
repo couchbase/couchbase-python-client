@@ -16,20 +16,20 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    List,
-                    Mapping,
-                    Union)
+__all__ = [
+    'BinaryCollection',
+]
 
-from couchbase.logic.observability.handler import ObservableRequestHandler
-from couchbase.logic.operation_types import KeyValueMultiOperationType, KeyValueOperationType
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
+
 from couchbase.result import (CounterResult,
                               MultiCounterResult,
                               MultiMutationResult,
                               MutationResult)
 
 if TYPE_CHECKING:
+    from couchbase.common._interfaces._binary_collection import BinaryCollectionInterface
     from couchbase.options import (AppendMultiOptions,
                                    AppendOptions,
                                    DecrementMultiOptions,
@@ -38,27 +38,24 @@ if TYPE_CHECKING:
                                    IncrementOptions,
                                    PrependMultiOptions,
                                    PrependOptions)
-    from couchbase.protocol.classic._collection_impl import CollectionImpl
 
 
 class BinaryCollection:
 
-    def __init__(self, collection_impl: CollectionImpl) -> None:
-        self._impl = collection_impl
+    def __init__(self, impl: BinaryCollectionInterface) -> None:
+        self._impl = impl
 
-    def increment(
-        self,
-        key,  # type: str
-        *opts,  # type: IncrementOptions
-        **kwargs,  # type: Any
-    ) -> CounterResult:
+    def increment(self,
+                  key: str,
+                  opts: IncrementOptions | None = None,
+                  **kwargs: Any) -> CounterResult:
         """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
         Args:
             key (str): The key of the document to increment.
             opts (:class:`~couchbase.options.IncrementOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.IncrementOptions`
 
         Returns:
@@ -91,24 +88,19 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Increment, instruments) as obs_handler:
-            req = self._impl.request_builder.build_increment_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.increment(req, obs_handler)
+        return self._impl.increment(key, opts, **kwargs)
 
-    def decrement(
-        self,
-        key,  # type: str
-        *opts,  # type: DecrementOptions
-        **kwargs,  # type: Any
-    ) -> CounterResult:
+    def decrement(self,
+                  key: str,
+                  opts: DecrementOptions | None = None,
+                  **kwargs: Any) -> CounterResult:
         """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
         Args:
             key (str): The key of the document to decrement.
             opts (:class:`~couchbase.options.DecrementOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.DecrementOptions`
 
         Returns:
@@ -141,25 +133,20 @@ class BinaryCollection:
                 print(f'Counter value: {res.content}')
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Decrement, instruments) as obs_handler:
-            req = self._impl.request_builder.build_decrement_request(key, obs_handler, *opts, **kwargs)
-            return self._impl.decrement(req, obs_handler)
+        return self._impl.decrement(key, opts, **kwargs)
 
-    def append(
-        self,
-        key,  # type: str
-        value,  # type: Union[str,bytes,bytearray]
-        *opts,  # type: AppendOptions
-        **kwargs,  # type: Any
-    ) -> MutationResult:
+    def append(self,
+               key: str,
+               value: str | bytes | bytearray,
+               opts: AppendOptions | None = None,
+               **kwargs: Any) -> MutationResult:
         """Appends the specified value to the beginning of document of the specified key.
 
         Args:
             key (str): The key of the document to append to.
-            value (Union[str, bytes, bytearray]): The value to append to the document.
+            value (str | bytes | bytearray): The value to append to the document.
             opts (:class:`~couchbase.options.AppendOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AppendOptions`
 
         Returns:
@@ -199,25 +186,20 @@ class BinaryCollection:
                                                 AppendOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Append, instruments) as obs_handler:
-            req = self._impl.request_builder.build_append_request(key, value, obs_handler, *opts, **kwargs)
-            return self._impl.append(req, obs_handler)
+        return self._impl.append(key, value, opts, **kwargs)
 
-    def prepend(
-        self,
-        key,  # type: str
-        value,  # type: Union[str,bytes,bytearray]
-        *opts,  # type: PrependOptions
-        **kwargs,  # type: Any
-    ) -> MutationResult:
+    def prepend(self,
+                key: str,
+                value: str | bytes | bytearray,
+                opts: PrependOptions | None = None,
+                **kwargs: Any) -> MutationResult:
         """Prepends the specified value to the beginning of document of the specified key.
 
         Args:
             key (str): The key of the document to prepend to.
-            value (Union[str, bytes, bytearray]): The value to prepend to the document.
+            value (str | bytes | bytearray): The value to prepend to the document.
             opts (:class:`~couchbase.options.PrependOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.PrependOptions`
 
         Returns:
@@ -257,25 +239,20 @@ class BinaryCollection:
                                                 PrependOptions(timeout=timedelta(seconds=2)))
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueOperationType.Prepend, instruments) as obs_handler:
-            req = self._impl.request_builder.build_prepend_request(key, value, obs_handler, *opts, **kwargs)
-            return self._impl.prepend(req, obs_handler)
+        return self._impl.prepend(key, value, opts, **kwargs)
 
-    def append_multi(
-        self,
-        keys_and_values,  # type: Mapping[str, Union[str,bytes,bytearray]]
-        *opts,  # type: AppendMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiMutationResult:
+    def append_multi(self,
+                     keys_and_values: Mapping[str, str | bytes | bytearray],
+                     opts: AppendMultiOptions | None = None,
+                     **kwargs: Any) -> MultiMutationResult:
         """For each key-value pair, appends the specified value to the end of the document specified by the key.
 
         Args:
-            keys_and_values (Mapping[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
+            keys_and_values (Mapping[str, str | bytes | bytearray]): The key-value pairs to use for the multiple
                 append operations.  Each key should correspond to the document to append to and each value should
                 correspond to the value to append to the document.
             opts (:class:`~couchbase.options.AppendMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AppendMultiOptions`
 
         Returns:
@@ -356,27 +333,21 @@ class BinaryCollection:
 
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.AppendMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_append_multi_request(
-                keys_and_values, obs_handler, *opts, **kwargs)
-            return self._impl.append_multi(req, obs_handler)
+        return self._impl.append_multi(keys_and_values, opts, **kwargs)
 
-    def prepend_multi(
-        self,
-        keys_and_values,  # type: Mapping[str, Union[str,bytes,bytearray]]
-        *opts,  # type: PrependMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiMutationResult:
+    def prepend_multi(self,
+                      keys_and_values: Mapping[str, str | bytes | bytearray],
+                      opts: PrependMultiOptions | None = None,
+                      **kwargs: Any) -> MultiMutationResult:
         """For each key-value pair, prepends the specified value to the beginning of the document specified
         by the key.
 
         Args:
-            keys_and_values (Mapping[str, Union[str,bytes,bytearray]]): The key-value pairs to use for the multiple
+            keys_and_values (Mapping[str, str | bytes | bytearray]): The key-value pairs to use for the multiple
                 prepend operations.  Each key should correspond to the document to prepend to and each value should
                 correspond to the value to prepend to the document.
             opts (:class:`~couchbase.options.PrependMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.PrependMultiOptions`
 
         Returns:
@@ -457,26 +428,20 @@ class BinaryCollection:
 
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.PrependMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_prepend_multi_request(
-                keys_and_values, obs_handler, *opts, **kwargs)
-            return self._impl.prepend_multi(req, obs_handler)
+        return self._impl.prepend_multi(keys_and_values, opts, **kwargs)
 
-    def increment_multi(
-        self,
-        keys,  # type: List[str]
-        *opts,  # type: IncrementMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiCounterResult:
+    def increment_multi(self,
+                        keys: list[str],
+                        opts: IncrementMultiOptions | None = None,
+                        **kwargs: Any) -> MultiCounterResult:
         """For each key in the provided list, increments the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
 
         Args:
-            keys (List[str]): The keys to use for the multiple increment operations.  Each key should correspond
+            keys (list[str]): The keys to use for the multiple increment operations.  Each key should correspond
                 to the document to increment.
             opts (:class:`~couchbase.options.IncrementMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.IncrementMultiOptions`
 
         Returns:
@@ -546,25 +511,20 @@ class BinaryCollection:
 
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.IncrementMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_increment_multi_request(keys, obs_handler, *opts, **kwargs)
-            return self._impl.increment_multi(req, obs_handler)
+        return self._impl.increment_multi(keys, opts, **kwargs)
 
-    def decrement_multi(
-        self,
-        keys,  # type: List[str]
-        *opts,  # type: DecrementMultiOptions
-        **kwargs,  # type: Any
-    ) -> MultiCounterResult:
+    def decrement_multi(self,
+                        keys: list[str],
+                        opts: DecrementMultiOptions | None = None,
+                        **kwargs: Any) -> MultiCounterResult:
         """For each key in the provided list, decrements the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
 
         Args:
-            keys (List[str]): The keys to use for the multiple decrement operations.  Each key should correspond
+            keys (list[str]): The keys to use for the multiple decrement operations.  Each key should correspond
                 to the document to decrement.
             opts (:class:`~couchbase.options.DecrementMultiOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.DecrementMultiOptions`
 
         Returns:
@@ -634,7 +594,4 @@ class BinaryCollection:
 
 
         """
-        instruments = self._impl.observability_instruments
-        with ObservableRequestHandler.create(KeyValueMultiOperationType.DecrementMulti, instruments) as obs_handler:
-            req = self._impl.multi_request_builder.build_decrement_multi_request(keys, obs_handler, *opts, **kwargs)
-            return self._impl.decrement_multi(req, obs_handler)
+        return self._impl.decrement_multi(keys, opts, **kwargs)
