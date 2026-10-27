@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,16 +13,96 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import (Any,
-                    Dict,
-                    List,
-                    Optional,
-                    Tuple,
-                    Union)
+"""The search query classes, and their encoding as the Search service's JSON query language.
+
+Each class holds its fields and validates them; none of them knows how a protocol sends it. The
+JSON encoding is at the bottom of the module, one function per class, and `SearchQuery.encodable`
+is its public face. A protocol that sends queries some other way reads the same fields.
+"""
+
+from __future__ import annotations
+
+__all__ = [
+    'BooleanFieldQuery',
+    'BooleanQuery',
+    'CompoundQueryType',
+    'ConjunctionQuery',
+    'DateRangeQuery',
+    'DisjunctionQuery',
+    'DocIdQuery',
+    'GeoBoundingBoxQuery',
+    'GeoDistanceQuery',
+    'GeoPolygonQuery',
+    'MatchAllQuery',
+    'MatchNoneQuery',
+    'MatchPhraseQuery',
+    'MatchQuery',
+    'NumericRangeQuery',
+    'PhraseQuery',
+    'PrefixQuery',
+    'QueryStringQuery',
+    'RawQuery',
+    'RegexQuery',
+    'RegexpQuery',
+    'SearchQuery',
+    'TermQuery',
+    'TermRangeQuery',
+    'WildcardQuery',
+]
+
+import builtins
+from collections.abc import Callable, Sequence
+from typing import Any, TypeVar
 
 from couchbase.common._supportability import Supportability
-from couchbase.exceptions import InvalidArgumentException, NoChildrenException
-from couchbase.logic.search import MatchOperator, _QueryBuilder
+from couchbase.common._utils import JSONType
+from couchbase.common.exceptions import InvalidArgumentException, NoChildrenException
+from couchbase.common.search import (MatchOperator,
+                                     _Body,
+                                     _OptionalField,
+                                     _Point,
+                                     _point,
+                                     _put)
+
+
+def _missing(query: SearchQuery, prop: str) -> ValueError:
+    return ValueError(f'{type(query).__name__} missing required property: {prop}')
+
+
+def _field() -> _OptionalField[str]:
+    return _OptionalField(str, """
+        Restrict searching to a given document field
+        """)
+
+
+def _analyzer() -> _OptionalField[str]:
+    return _OptionalField(str, """
+        Use a defined server-side analyzer to process the input term prior to
+        executing the search
+        """)
+
+
+def _fuzziness() -> _OptionalField[int]:
+    return _OptionalField(int, """
+        Allow a given degree of fuzz in the match. Matches which are closer to
+        the original term will be scored higher.
+
+        You can apply the fuzziness to only a portion of the string by
+        specifying :attr:`prefix_length` - indicating that only the part
+        of the field after the prefix length should be checked with fuzziness.
+
+        This value is specified as an int
+        """)
+
+
+def _prefix_length() -> _OptionalField[int]:
+    return _OptionalField(int, """
+        When using :attr:`fuzziness`, this controls how much of the term
+        or phrase is *excluded* from fuzziness. This may help improve
+        performance at the expense of omitting potential fuzzy matches
+        at the beginning of the string.
+        """)
+
 
 # Query Types
 
@@ -37,46 +117,50 @@ class SearchQuery:
         :class:`DisjunctionQuery`, and others in this module.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # Permissive because `_QueryBuilder._single_term_query` reassigns `__init__` on ten of
-        # this module's query classes; a checker cannot follow that, so it resolves their
-        # constructions against this signature.  Narrowing means giving each subclass its own.
-        self._json_: Dict[str, Any] = {}
+    _boost: float | None = None
 
-    def set_prop(self, key,  # type: str
-                 value  # type: Any
-                 ) -> None:
-        self._json_[key] = value
+    def __init__(self, *, boost: float | None = None) -> None:
+        self._props: _Body = {}
+        self.boost = boost
+
+    def set_prop(self, key: str, value: JSONType) -> None:
+        """
+        Sets ``key`` in the query's JSON to ``value``, sent as given and without validation.
+
+        The key is written over whatever the query's own fields encode under it, and is not read
+        back by any of the query's properties. Use this for a query parameter the class does not
+        expose.
+        """
+        self._props[key] = value
 
     @property
-    def boost(self) -> Optional[float]:
-        return self._json_.get('boost', None)
+    def boost(self) -> float | None:
+        return self._boost
 
     @boost.setter
-    def boost(self, value  # type: float
-              ) -> None:
-        self.set_prop('boost', value)
+    def boost(self, value: float | None) -> None:
+        self._boost = value
 
     @property
-    def encodable(self):
+    def encodable(self) -> JSONType:
         """
-        Returns an object suitable for serializing to JSON
+        Returns the query as the Search service's JSON query language, validated first, in a form
+        suitable for serializing to JSON. Each read builds a new object.
 
         .. code-block:: python
 
             json.dumps(query.encodable)
         """
-        self.validate()
-        return self._json_
+        return _encode(self)
 
-    def validate(self):
+    def validate(self) -> None:
         """
         Optional validation function. Invoked before encoding
         """
         pass
 
     def __repr__(self) -> str:
-        return f'query={str(self._json_)}'
+        return f'{type(self).__name__}(query={_encode(self, validate=False)})'
 
     def __str__(self) -> str:
         return self.__repr__()
@@ -85,7 +169,6 @@ class SearchQuery:
 # Single Term Queries
 
 
-@_QueryBuilder._single_term_query(fields=['fuzziness', 'prefix_length', 'field'])
 class TermQuery(SearchQuery):
 
     """
@@ -99,7 +182,8 @@ class TermQuery(SearchQuery):
             # ... other code ...
 
             query = TermQuery('park', field='description')
-            search_res = scope.search(scope_index_name)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -111,6 +195,7 @@ class TermQuery(SearchQuery):
             # ... other code ...
 
             query = TermQuery(term='park', field='description')
+            req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
@@ -124,28 +209,43 @@ class TermQuery(SearchQuery):
             # ... other code ...
 
             query = TermQuery('park', field='description')
+            req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'term'
+    fuzziness = _fuzziness()
+    prefix_length = _prefix_length()
+    field = _field()
+
+    _term: str | None = None
+
+    def __init__(self,
+                 term: str | None = None,
+                 *,
+                 field: str | None = None,
+                 fuzziness: int | None = None,
+                 prefix_length: int | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if term is None:
+            raise _missing(self, 'term')
+        self.term = term
+        self.field = field
+        self.fuzziness = fuzziness
+        self.prefix_length = prefix_length
 
     @property
-    def term(self) -> str:
-        return self._json_.get('term', None)
+    def term(self) -> str | None:
+        return self._term
 
     @term.setter
-    def term(self, value  # type: str
-             ) -> None:
-        self.set_prop('term', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def term(self, value: str | None) -> None:
+        self._term = value
 
 
-@_QueryBuilder._single_term_query()
 class QueryStringQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for a match to the specified query string.
@@ -162,7 +262,8 @@ class QueryStringQuery(SearchQuery):
             # ... other code ...
 
             query = QueryStringQuery('+description:sea -color_hex:fff5ee')
-            search_res = scope.search(scope_index_name)
+            req = SearchRequest.create(query)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -174,6 +275,7 @@ class QueryStringQuery(SearchQuery):
             # ... other code ...
 
             query = QueryStringQuery(query='+description:sea -color_hex:fff5ee')
+            req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
@@ -187,28 +289,30 @@ class QueryStringQuery(SearchQuery):
             # ... other code ...
 
             query = QueryStringQuery('+description:sea -color_hex:fff5ee')
+            req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'query'
+    _query: str | None = None
+
+    def __init__(self, query: str | None = None, *, boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if query is None:
+            raise _missing(self, 'query')
+        self.query = query
 
     @property
-    def query(self) -> str:
-        return self._json_.get('query', None)
+    def query(self) -> str | None:
+        return self._query
 
     @query.setter
-    def query(self, value  # type: str
-              ) -> None:
-        self.set_prop('query', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def query(self, value: str | None) -> None:
+        self._query = value
 
 
-@_QueryBuilder._single_term_query(fields=['field'])
 class WildcardQuery(SearchQuery):
 
     """
@@ -227,7 +331,7 @@ class WildcardQuery(SearchQuery):
 
             query = WildcardQuery('f0f???', field='color_hex')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -260,22 +364,30 @@ class WildcardQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'wildcard'
+    field = _field()
+
+    _wildcard: str | None = None
+
+    def __init__(self,
+                 wildcard: str | None = None,
+                 *,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if wildcard is None:
+            raise _missing(self, 'wildcard')
+        self.wildcard = wildcard
+        self.field = field
 
     @property
-    def wildcard(self) -> str:
-        return self._json_.get('wildcard', None)
+    def wildcard(self) -> str | None:
+        return self._wildcard
 
     @wildcard.setter
-    def wildcard(self, value  # type: str
-                 ) -> None:
-        self.set_prop('wildcard', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def wildcard(self, value: str | None) -> None:
+        self._wildcard = value
 
 
-@_QueryBuilder._single_term_query()
 class DocIdQuery(SearchQuery):
 
     """
@@ -291,7 +403,7 @@ class DocIdQuery(SearchQuery):
 
             query = DocIdQuery(['34','43','61'])
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -316,7 +428,7 @@ class DocIdQuery(SearchQuery):
 
             # ... other code ...
 
-            query = DocIdQuery(['34','43','61','72])
+            query = DocIdQuery(['34','43','61','72'])
             req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
             for r in search_res.rows():
@@ -324,27 +436,28 @@ class DocIdQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'ids'
+    _ids: Sequence[str] | None = None
+
+    def __init__(self, ids: Sequence[str] | None = None, *, boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if ids is None:
+            raise _missing(self, 'ids')
+        self.ids = ids
 
     @property
-    def ids(self) -> str:
-        return self._json_.get('ids', None)
+    def ids(self) -> Sequence[str] | None:
+        return self._ids
 
     @ids.setter
-    def ids(self, value  # type: str
-            ) -> None:
-        self.set_prop('ids', value)
+    def ids(self, value: Sequence[str] | None) -> None:
+        self._ids = value
 
-    def validate(self):
-        super(DocIdQuery, self).validate()
+    def validate(self) -> None:
+        super().validate()
         if not self.ids:
             raise NoChildrenException('`ids` must contain at least one ID')
 
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
 
-
-@_QueryBuilder._single_term_query(fields=['prefix_length', 'fuzziness', 'field', 'analyzer'])
 class MatchQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for an exact match to the specified
@@ -359,7 +472,7 @@ class MatchQuery(SearchQuery):
 
             query = MatchQuery('secondary', field='color_wheel_pos')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -392,42 +505,57 @@ class MatchQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'match'
+    fuzziness = _fuzziness()
+    prefix_length = _prefix_length()
+    field = _field()
+    analyzer = _analyzer()
+
+    _match: str | None = None
+    _match_operator: MatchOperator | None = None
+
+    def __init__(self,
+                 match: str | None = None,
+                 *,
+                 match_operator: MatchOperator | str | None = None,
+                 field: str | None = None,
+                 analyzer: str | None = None,
+                 fuzziness: int | None = None,
+                 prefix_length: int | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if match is None:
+            raise _missing(self, 'match')
+        self.match = match
+        self.match_operator = match_operator
+        self.field = field
+        self.analyzer = analyzer
+        self.fuzziness = fuzziness
+        self.prefix_length = prefix_length
 
     @property
-    def match(self) -> str:
-        return self._json_.get('match', None)
+    def match(self) -> str | None:
+        return self._match
 
     @match.setter
-    def match(self, value  # type: str
-              ) -> None:
-        self.set_prop('match', value)
+    def match(self, value: str | None) -> None:
+        self._match = value
 
     @property
-    def match_operator(self) -> Optional[MatchOperator]:
-        value = self._json_.get('operator', None)
-        if not value:
-            return value
-
-        return MatchOperator.OR if value == 'or' else MatchOperator.AND
+    def match_operator(self) -> MatchOperator | None:
+        return self._match_operator
 
     @match_operator.setter
-    def match_operator(self, value  # type: Union[MatchOperator, str]
-                       ) -> None:
-        match_op = value
-        if isinstance(value, MatchOperator):
-            match_op = value.value
-        if match_op and match_op.lower() not in ('or', 'and'):
+    def match_operator(self, value: MatchOperator | str | None) -> None:
+        if value is None or isinstance(value, MatchOperator):
+            self._match_operator = value
+        elif isinstance(value, str) and value.lower() in ('or', 'and'):
+            self._match_operator = MatchOperator(value.lower())
+        else:
             raise ValueError(("Expected match_operator to be either of type "
                               "MatchOperator or str representation "
                               "of MatchOperator"))
-        self.set_prop('operator', match_op)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
 
 
-@_QueryBuilder._single_term_query(fields=['field', 'analyzer'])
 class MatchPhraseQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for exact matches to the specified
@@ -442,7 +570,7 @@ class MatchPhraseQuery(SearchQuery):
 
             query = MatchPhraseQuery('white sands', field='description')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -475,26 +603,41 @@ class MatchPhraseQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'match_phrase'
+    field = _field()
+    analyzer = _analyzer()
+
+    _match_phrase: str | None = None
+
+    def __init__(self,
+                 match_phrase: str | None = None,
+                 *,
+                 field: str | None = None,
+                 analyzer: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if match_phrase is None:
+            raise _missing(self, 'match_phrase')
+        self.match_phrase = match_phrase
+        self.field = field
+        self.analyzer = analyzer
 
     @property
-    def match_phrase(self) -> str:
-        return self._json_.get('match_phrase', None)
+    def match_phrase(self) -> str | None:
+        return self._match_phrase
 
     @match_phrase.setter
-    def match_phrase(self, value  # type: str
-                     ) -> None:
-        self.set_prop('match_phrase', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def match_phrase(self, value: str | None) -> None:
+        self._match_phrase = value
 
 
-@_QueryBuilder._with_fields(fields=['field'])
 class PhraseQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for terms provided in the specified
     order. The `field` property must be provided.
+
+    The terms are matched as given, without analysis, so each must be a term as the index holds
+    it. Pass each term as its own argument, or as a list with ``terms=``; a single string is split
+    on whitespace. For a phrase the server should analyze first, use :class:`MatchPhraseQuery`.
 
     Examples:
         Basic search using PhraseQuery::
@@ -503,9 +646,9 @@ class PhraseQuery(SearchQuery):
 
             # ... other code ...
 
-            query = PhraseQuery('white sand', field='description')
+            query = PhraseQuery('white', 'sand', field='description')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -516,7 +659,7 @@ class PhraseQuery(SearchQuery):
 
             # ... other code ...
 
-            query = PhraseQuery(terms='white sand', field='description')
+            query = PhraseQuery(terms=['white', 'sand'], field='description')
             req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
@@ -530,7 +673,7 @@ class PhraseQuery(SearchQuery):
 
             # ... other code ...
 
-            query = PhraseQuery('white sand', field='description')
+            query = PhraseQuery('white', 'sand', field='description')
             req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
             for r in search_res.rows():
@@ -538,50 +681,46 @@ class PhraseQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'terms'
+    field = _field()
+
+    _terms: list[str] | None = None
 
     def __init__(self,
-                 *phrases,  # type: str
-                 **kwargs  # type: Any
-                 ) -> None:
-        super().__init__()
-        if self._TERMPROP in kwargs:
-            if isinstance(kwargs[self._TERMPROP], str):
-                kwargs[self._TERMPROP] = kwargs[self._TERMPROP].split()
+                 *phrases: str,
+                 terms: str | list[str] | tuple[str, ...] | None = None,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        given: str | list[str] | tuple[str, ...]
+        if terms is not None:
+            given = terms
+        elif len(phrases) == 1 and isinstance(phrases[0], str):
+            given = phrases[0]
         else:
-            if isinstance(phrases, str):
-                kwargs[self._TERMPROP] = phrases.split()
-            else:
-                kwargs[self._TERMPROP] = phrases
-        if self._TERMPROP not in kwargs or len(kwargs[self._TERMPROP]) == 0:
-            raise ValueError(f'{self.__class__.__name__} missing required property: {self._TERMPROP}')
-        _QueryBuilder._assign_kwargs(self, kwargs)
+            given = phrases
+        if isinstance(given, str):
+            given = given.split()
+        if len(given) == 0:
+            raise _missing(self, 'terms')
+        self.terms = given
+        self.field = field
 
     @property
-    def terms(self) -> List[str]:
-        return self._json_.get('terms', None)
+    def terms(self) -> list[str] | None:
+        return self._terms
 
     @terms.setter
-    def terms(self,
-              value  # type: Union[List[str], Tuple[str, ...]]
-              ) -> None:
+    def terms(self, value: list[str] | tuple[str, ...]) -> None:
         if not (isinstance(value, (list, tuple)) and all(map(lambda f: isinstance(f, str), value))):
             raise InvalidArgumentException(message='Expected a list of strings')
-        if isinstance(value, tuple):
-            self.set_prop('terms', list(value))
-        else:
-            self.set_prop('terms', value)
+        self._terms = list(value) if isinstance(value, tuple) else value
 
-    def validate(self):
-        super(PhraseQuery, self).validate()
+    def validate(self) -> None:
+        super().validate()
         if not self.terms:
             raise NoChildrenException('Missing terms')
 
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
 
-
-@_QueryBuilder._single_term_query(fields=['field'])
 class PrefixQuery(SearchQuery):
 
     """
@@ -597,7 +736,7 @@ class PrefixQuery(SearchQuery):
 
             query = PrefixQuery('yellow', field='description')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -630,22 +769,30 @@ class PrefixQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'prefix'
+    field = _field()
+
+    _prefix: str | None = None
+
+    def __init__(self,
+                 prefix: str | None = None,
+                 *,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if prefix is None:
+            raise _missing(self, 'prefix')
+        self.prefix = prefix
+        self.field = field
 
     @property
-    def prefix(self) -> str:
-        return self._json_.get('prefix', None)
+    def prefix(self) -> str | None:
+        return self._prefix
 
     @prefix.setter
-    def prefix(self, value  # type: str
-               ) -> None:
-        self.set_prop('prefix', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def prefix(self, value: str | None) -> None:
+        self._prefix = value
 
 
-@_QueryBuilder._single_term_query(fields=['field'])
 class RegexQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for matches to the specified
@@ -660,7 +807,7 @@ class RegexQuery(SearchQuery):
 
             query = RegexQuery('f[58]f.*', field='color_hex')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -693,34 +840,44 @@ class RegexQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'regexp'
+    field = _field()
+
+    _regexp: str | None = None
+
+    def __init__(self,
+                 regexp: str | None = None,
+                 *,
+                 regex: str | None = None,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if regexp is None:
+            regexp = regex
+        if regexp is None:
+            raise _missing(self, 'regexp')
+        self.regexp = regexp
+        self.field = field
 
     @property
-    def regex(self) -> str:
-        return self._json_.get('regexp', None)
+    def regex(self) -> str | None:
+        return self._regexp
 
     @regex.setter
-    def regex(self, value  # type: str
-              ) -> None:
-        self.set_prop('regexp', value)
+    def regex(self, value: str | None) -> None:
+        self._regexp = value
 
     @property
-    def regexp(self) -> str:
-        return self._json_.get('regexp', None)
+    def regexp(self) -> str | None:
+        return self._regexp
 
     @regexp.setter
-    def regexp(self, value  # type: str
-               ) -> None:
-        self.set_prop('regexp', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def regexp(self, value: str | None) -> None:
+        self._regexp = value
 
 
 RegexpQuery = RegexQuery
 
 
-@_QueryBuilder._single_term_query(fields=['field'])
 class BooleanFieldQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for to the specified
@@ -735,7 +892,7 @@ class BooleanFieldQuery(SearchQuery):
 
             query = BooleanFieldQuery(True, field='perfect_rating')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -768,25 +925,33 @@ class BooleanFieldQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _TERMPROP = 'bool'
+    field = _field()
+
+    _bool: builtins.bool | None = None
+
+    def __init__(self,
+                 bool: builtins.bool | None = None,
+                 *,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if bool is None:
+            raise _missing(self, 'bool')
+        self.bool = bool
+        self.field = field
 
     @property
-    def bool(self) -> bool:
-        return self._json_.get('bool', None)
+    def bool(self) -> builtins.bool | None:
+        return self._bool
 
     @bool.setter
-    def bool(self, value  # type: bool
-             ) -> None:
-        self.set_prop('bool', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def bool(self, value: builtins.bool | None) -> None:
+        self._bool = value
 
 
 # Geo Queries
 
 
-@_QueryBuilder._with_fields(fields=['field'])
 class GeoDistanceQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for geo location values
@@ -815,7 +980,7 @@ class GeoDistanceQuery(SearchQuery):
 
             query = GeoDistanceQuery('130mi', (-115.1391, 36.1716), field='geo_location')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -828,7 +993,7 @@ class GeoDistanceQuery(SearchQuery):
 
             query = GeoDistanceQuery('130mi', {'lon': -115.1391, 'lat': 36.1716}, field='geo_location')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -861,44 +1026,41 @@ class GeoDistanceQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
+    field = _field()
+
+    _distance: str | None = None
+    _location: list[float] | None = None
+
     def __init__(self,
-                 distance=None,  # type: str
-                 location=None,  # type: Union[List[float, float], Tuple[float, float], Dict[str, float]]
-                 **kwargs  # type: Any
-                 ) -> None:
-        super(GeoDistanceQuery, self).__init__()
-        kwargs['distance'] = distance
-        kwargs['location'] = location
-        if kwargs['distance'] is None or kwargs['location'] is None:
-            raise ValueError(f'{self.__class__.__name__} requires both a distance and location to be specified.')
-        _QueryBuilder._assign_kwargs(self, kwargs)
+                 distance: str | None = None,
+                 location: _Point | None = None,
+                 *,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if distance is None or location is None:
+            raise ValueError(f'{type(self).__name__} requires both a distance and location to be specified.')
+        self.distance = distance
+        self.location = location
+        self.field = field
 
     @property
-    def location(self) -> Tuple[float, float]:
-        return self._json_.get('location')
+    def location(self) -> list[float] | None:
+        return self._location
 
     @location.setter
-    def location(self,
-                 value  # type: Union[List[float, float], Tuple[float, float], Dict[str, float]]
-                 ) -> None:
-        location = _QueryBuilder._gen_location(value)
-        self.set_prop('location', location)
+    def location(self, value: _Point | None) -> None:
+        self._location = None if value is None else _point(value)
 
     @property
-    def distance(self) -> str:
-        return self._json_.get('distance', None)
+    def distance(self) -> str | None:
+        return self._distance
 
     @distance.setter
-    def distance(self,
-                 value  # type: str
-                 ) -> None:
-        self.set_prop('distance', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def distance(self, value: str | None) -> None:
+        self._distance = value
 
 
-@_QueryBuilder._with_fields(fields=['field'])
 class GeoBoundingBoxQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for geo location values
@@ -915,7 +1077,7 @@ class GeoBoundingBoxQuery(SearchQuery):
 
             query = GeoBoundingBoxQuery((-0.489, 51.686), (0.236, 51.28), field='geo_location')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -928,7 +1090,7 @@ class GeoBoundingBoxQuery(SearchQuery):
 
             query = GeoBoundingBoxQuery([-0.489, 51.686], [0.236, 51.28], field='geo_location')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -943,7 +1105,7 @@ class GeoBoundingBoxQuery(SearchQuery):
                                         {'lon': 0.236, 'lat': 51.28},
                                         field='geo_location')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -961,7 +1123,7 @@ class GeoBoundingBoxQuery(SearchQuery):
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
 
-        Basic search using GeoDistanceQuery with SearchOptions::
+        Basic search using GeoBoundingBoxQuery with SearchOptions::
 
             from couchbase.options import SearchOptions
             from couchbase.search import GeoBoundingBoxQuery, SearchRequest
@@ -976,43 +1138,41 @@ class GeoBoundingBoxQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
+    field = _field()
+
+    _top_left: list[float] | None = None
+    _bottom_right: list[float] | None = None
+
     def __init__(self,
-                 top_left=None,  # type: Tuple[float, float]
-                 bottom_right=None,  # type: Tuple[float, float]
-                 **kwargs  # type: Any
-                 ) -> None:
-        super(GeoBoundingBoxQuery, self).__init__()
-        kwargs['top_left'] = top_left
-        kwargs['bottom_right'] = bottom_right
-        if kwargs['top_left'] is None or kwargs['bottom_right'] is None:
-            raise ValueError(f'{self.__class__.__name__} requires both a top_left and bottom_right to be specified.')
-        _QueryBuilder._assign_kwargs(self, kwargs)
+                 top_left: _Point | None = None,
+                 bottom_right: _Point | None = None,
+                 *,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if top_left is None or bottom_right is None:
+            raise ValueError(f'{type(self).__name__} requires both a top_left and bottom_right to be specified.')
+        self.top_left = top_left
+        self.bottom_right = bottom_right
+        self.field = field
 
     @property
-    def top_left(self) -> Tuple[float, float]:
-        return self._json_.get('top_left')
+    def top_left(self) -> list[float] | None:
+        return self._top_left
 
     @top_left.setter
-    def top_left(self, value  # type: Tuple[float, float]
-                 ) -> None:
-        top_left = _QueryBuilder._gen_location(value)
-        self.set_prop('top_left', top_left)
+    def top_left(self, value: _Point | None) -> None:
+        self._top_left = None if value is None else _point(value)
 
     @property
-    def bottom_right(self) -> Tuple[float, float]:
-        return self._json_.get('bottom_right')
+    def bottom_right(self) -> list[float] | None:
+        return self._bottom_right
 
     @bottom_right.setter
-    def bottom_right(self, value  # type: Tuple[float, float]
-                     ) -> None:
-        bottom_right = _QueryBuilder._gen_location(value)
-        self.set_prop('bottom_right', bottom_right)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def bottom_right(self, value: _Point | None) -> None:
+        self._bottom_right = None if value is None else _point(value)
 
 
-@_QueryBuilder._with_fields(fields=['field'])
 class GeoPolygonQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for geo location values
@@ -1027,15 +1187,15 @@ class GeoPolygonQuery(SearchQuery):
 
             # ... other code ...
 
-            query = GeoPolygonQuery([(37.79393211306212, -122.44234633404847),
-                                     (37.77995881733997, -122.43977141339417),
-                                     (37.788031092020155, -122.42925715405579),
-                                     (37.79026946582319, -122.41149020154114),
-                                     (37.79571192027403, -122.40735054016113),
-                                     (37.79393211306212, -122.44234633404847)],
+            query = GeoPolygonQuery([(-122.44234633404847, 37.79393211306212),
+                                     (-122.43977141339417, 37.77995881733997),
+                                     (-122.42925715405579, 37.788031092020155),
+                                     (-122.41149020154114, 37.79026946582319),
+                                     (-122.40735054016113, 37.79571192027403),
+                                     (-122.44234633404847, 37.79393211306212)],
                                      field='geo_location')
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
@@ -1047,12 +1207,12 @@ class GeoPolygonQuery(SearchQuery):
 
             # ... other code ...
 
-            pts = [(37.79393211306212, -122.44234633404847),
-                   (37.77995881733997, -122.43977141339417),
-                   (37.788031092020155, -122.42925715405579),
-                   (37.79026946582319, -122.41149020154114),
-                   (37.79571192027403, -122.40735054016113),
-                   (37.79393211306212, -122.44234633404847)]
+            pts = [(-122.44234633404847, 37.79393211306212),
+                   (-122.43977141339417, 37.77995881733997),
+                   (-122.42925715405579, 37.788031092020155),
+                   (-122.41149020154114, 37.79026946582319),
+                   (-122.40735054016113, 37.79571192027403),
+                   (-122.44234633404847, 37.79393211306212)]
             query = GeoPolygonQuery(polygon_points=pts, field='geo_location')
             req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req)
@@ -1067,12 +1227,12 @@ class GeoPolygonQuery(SearchQuery):
 
             # ... other code ...
 
-            query = GeoPolygonQuery([(37.79393211306212, -122.44234633404847),
-                                     (37.77995881733997, -122.43977141339417),
-                                     (37.788031092020155, -122.42925715405579),
-                                     (37.79026946582319, -122.41149020154114),
-                                     (37.79571192027403, -122.40735054016113),
-                                     (37.79393211306212, -122.44234633404847)],
+            query = GeoPolygonQuery([(-122.44234633404847, 37.79393211306212),
+                                     (-122.43977141339417, 37.77995881733997),
+                                     (-122.42925715405579, 37.788031092020155),
+                                     (-122.41149020154114, 37.79026946582319),
+                                     (-122.40735054016113, 37.79571192027403),
+                                     (-122.44234633404847, 37.79393211306212)],
                                      field='geo_location')
             req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
@@ -1081,35 +1241,37 @@ class GeoPolygonQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
+    field = _field()
+
+    _polygon_points: list[list[float]] | None = None
+
     def __init__(self,
-                 polygon_points=None,  # type: List[Tuple[float, float]]
-                 **kwargs  # type: Any
-                 ) -> None:
-        super(GeoPolygonQuery, self).__init__()
-        pts = polygon_points or kwargs.pop('polygon_points', None)
-        if pts is None:
-            raise ValueError(f'{self.__class__.__name__} requires a list of tuples for polygon points.')
-        kwargs['polygon_points'] = pts
-        _QueryBuilder._assign_kwargs(self, kwargs)
+                 polygon_points: Sequence[_Point] | None = None,
+                 *,
+                 field: str | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        if not polygon_points:
+            raise ValueError(f'{type(self).__name__} requires a list of tuples for polygon points.')
+        self.polygon_points = polygon_points
+        self.field = field
 
     @property
-    def polygon_points(self) -> Tuple[float, float]:
-        return self._json_.get('polygon_points')
+    def polygon_points(self) -> list[list[float]] | None:
+        return self._polygon_points
 
     @polygon_points.setter
-    def polygon_points(self, value  # type: Tuple[float, float]
-                       ) -> None:
-        polygon_points = _QueryBuilder._gen_locations(value)
-        self.set_prop('polygon_points', polygon_points)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def polygon_points(self, value: Sequence[_Point] | None) -> None:
+        self._polygon_points = None if value is None else [_point(p) for p in value]
 
 
 # Range Queries
 
 
-@_QueryBuilder._with_fields(fields=['field'])
+def _no_bounds(names: tuple[str, str]) -> ValueError:
+    return ValueError(f'At least one of the following params should be specified: {", ".join(names)}')
+
+
 class NumericRangeQuery(SearchQuery):
     """
     Query that specifies the Search Service should search for matches to the specified
@@ -1172,83 +1334,99 @@ class NumericRangeQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    def __init__(self,
-                 min=None,  # type: Optional[float]
-                 max=None,  # type: Optional[float]
-                 **kwargs  # type: Any
-                 ) -> None:
-        super().__init__()
-        _QueryBuilder._validate_range_query(self, min, max, **kwargs)
+    field = _field()
 
-    _MINMAX = 'min', 'max'
+    _min: float | None = None
+    _max: float | None = None
+    _inclusive_min: bool | None = None
+    _inclusive_max: bool | None = None
+
+    def __init__(self,
+                 min: float | None = None,
+                 max: float | None = None,
+                 *,
+                 inclusive_min: bool | None = None,
+                 inclusive_max: bool | None = None,
+                 field: str | None = None,
+                 boost: float | None = None,
+                 min_inclusive: bool | None = None,
+                 max_inclusive: bool | None = None) -> None:
+        super().__init__(boost=boost)
+        if min_inclusive is not None:
+            self.min_inclusive = min_inclusive
+        if max_inclusive is not None:
+            self.max_inclusive = max_inclusive
+        if inclusive_min is not None:
+            self.inclusive_min = inclusive_min
+        if inclusive_max is not None:
+            self.inclusive_max = inclusive_max
+        self.field = field
+        if min is None and max is None:
+            raise _no_bounds(('min', 'max'))
+        self.min = min
+        self.max = max
 
     @property
-    def min(self) -> Optional[float]:
-        return self._json_.get('min', None)
+    def min(self) -> float | None:
+        return self._min
 
     @min.setter
-    def min(self,
-            value  # type: float
-            ) -> None:
-        self.set_prop('min', value)
+    def min(self, value: float | None) -> None:
+        self._min = value
 
     @property
-    def min_inclusive(self) -> Optional[bool]:
-        return self._json_.get('min_inclusive', None)
+    def min_inclusive(self) -> bool | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`inclusive_min` instead.
+        """
+        Supportability.class_property_deprecated('min_inclusive', 'inclusive_min')
+        return self._inclusive_min
 
     @min_inclusive.setter
-    def min_inclusive(self,
-                      value  # type: bool
-                      ) -> None:
+    def min_inclusive(self, value: bool | None) -> None:
         Supportability.class_property_deprecated('min_inclusive', 'inclusive_min')
-        self.set_prop('inclusive_min', value)
+        self._inclusive_min = value
 
     @property
-    def inclusive_min(self) -> Optional[bool]:
-        return self._json_.get('inclusive_min', None)
+    def inclusive_min(self) -> bool | None:
+        return self._inclusive_min
 
     @inclusive_min.setter
-    def inclusive_min(self,
-                      value  # type: bool
-                      ) -> None:
-        self.set_prop('inclusive_min', value)
+    def inclusive_min(self, value: bool | None) -> None:
+        self._inclusive_min = value
 
     @property
-    def max(self) -> Optional[float]:
-        return self._json_.get('max', None)
+    def max(self) -> float | None:
+        return self._max
 
     @max.setter
-    def max(self,
-            value  # type: float
-            ) -> None:
-        self.set_prop('max', value)
+    def max(self, value: float | None) -> None:
+        self._max = value
 
     @property
-    def max_inclusive(self) -> Optional[bool]:
-        return self._json_.get('max_inclusive', None)
+    def max_inclusive(self) -> bool | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`inclusive_max` instead.
+        """
+        Supportability.class_property_deprecated('max_inclusive', 'inclusive_max')
+        return self._inclusive_max
 
     @max_inclusive.setter
-    def max_inclusive(self,
-                      value  # type: bool
-                      ) -> None:
+    def max_inclusive(self, value: bool | None) -> None:
         Supportability.class_property_deprecated('max_inclusive', 'inclusive_max')
-        self.set_prop('inclusive_max', value)
+        self._inclusive_max = value
 
     @property
-    def inclusive_max(self) -> Optional[bool]:
-        return self._json_.get('inclusive_max', None)
+    def inclusive_max(self) -> bool | None:
+        return self._inclusive_max
 
     @inclusive_max.setter
-    def inclusive_max(self,
-                      value  # type: bool
-                      ) -> None:
-        self.set_prop('inclusive_max', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def inclusive_max(self, value: bool | None) -> None:
+        self._inclusive_max = value
 
 
-@_QueryBuilder._with_fields(fields=['field'])
 class DateRangeQuery(SearchQuery):
 
     """
@@ -1304,11 +1482,11 @@ class DateRangeQuery(SearchQuery):
 
             # ... other code ...
 
-            query = NumericRangeQuery(3.0,
-                                      3.2,
-                                      inclusive_min=True,
-                                      inclusive_max=False,
-                                      field='rating')
+            query = DateRangeQuery('2024-01-01',
+                                   '2024-01-05',
+                                   inclusive_start=True,
+                                   inclusive_end=True,
+                                   field='last_rated')
             req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req, SearchOptions(limit=3, fields=['*']))
             for r in search_res.rows():
@@ -1316,89 +1494,110 @@ class DateRangeQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    def __init__(self, start=None, end=None, **kwargs):
-        super().__init__()
-        _QueryBuilder._validate_range_query(self, start, end, **kwargs)
+    field = _field()
 
-    _MINMAX = 'start', 'end'
+    _start: str | None = None
+    _end: str | None = None
+    _inclusive_start: bool | None = None
+    _inclusive_end: bool | None = None
+    _datetime_parser: str | None = None
+
+    def __init__(self,
+                 start: str | None = None,
+                 end: str | None = None,
+                 *,
+                 inclusive_start: bool | None = None,
+                 inclusive_end: bool | None = None,
+                 datetime_parser: str | None = None,
+                 field: str | None = None,
+                 boost: float | None = None,
+                 start_inclusive: bool | None = None,
+                 end_inclusive: bool | None = None) -> None:
+        super().__init__(boost=boost)
+        if start_inclusive is not None:
+            self.start_inclusive = start_inclusive
+        if end_inclusive is not None:
+            self.end_inclusive = end_inclusive
+        if inclusive_start is not None:
+            self.inclusive_start = inclusive_start
+        if inclusive_end is not None:
+            self.inclusive_end = inclusive_end
+        self.datetime_parser = datetime_parser
+        self.field = field
+        if start is None and end is None:
+            raise _no_bounds(('start', 'end'))
+        self.start = start
+        self.end = end
 
     @property
-    def start(self) -> Optional[str]:
-        return self._json_.get('start', None)
+    def start(self) -> str | None:
+        return self._start
 
     @start.setter
-    def start(self,
-              value  # type: str
-              ) -> None:
-        self.set_prop('start', value)
+    def start(self, value: str | None) -> None:
+        self._start = value
 
     @property
-    def start_inclusive(self) -> Optional[bool]:
-        return self._json_.get('start_inclusive', None)
+    def start_inclusive(self) -> bool | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`inclusive_start` instead.
+        """
+        Supportability.class_property_deprecated('start_inclusive', 'inclusive_start')
+        return self._inclusive_start
 
     @start_inclusive.setter
-    def start_inclusive(self,
-                        value  # type: bool
-                        ) -> None:
+    def start_inclusive(self, value: bool | None) -> None:
         Supportability.class_property_deprecated('start_inclusive', 'inclusive_start')
-        self.set_prop('inclusive_start', value)
+        self._inclusive_start = value
 
     @property
-    def inclusive_start(self) -> Optional[bool]:
-        return self._json_.get('inclusive_start', None)
+    def inclusive_start(self) -> bool | None:
+        return self._inclusive_start
 
     @inclusive_start.setter
-    def inclusive_start(self,
-                        value  # type: bool
-                        ) -> None:
-        self.set_prop('inclusive_start', value)
+    def inclusive_start(self, value: bool | None) -> None:
+        self._inclusive_start = value
 
     @property
-    def end(self) -> Optional[str]:
-        return self._json_.get('end', None)
+    def end(self) -> str | None:
+        return self._end
 
     @end.setter
-    def end(self,
-            value  # type: str
-            ) -> None:
-        self.set_prop('end', value)
+    def end(self, value: str | None) -> None:
+        self._end = value
 
     @property
-    def end_inclusive(self) -> Optional[bool]:
-        return self._json_.get('end_inclusive', None)
+    def end_inclusive(self) -> bool | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`inclusive_end` instead.
+        """
+        Supportability.class_property_deprecated('end_inclusive', 'inclusive_end')
+        return self._inclusive_end
 
     @end_inclusive.setter
-    def end_inclusive(self,
-                      value  # type: bool
-                      ) -> None:
+    def end_inclusive(self, value: bool | None) -> None:
         Supportability.class_property_deprecated('end_inclusive', 'inclusive_end')
-        self.set_prop('inclusive_end', value)
+        self._inclusive_end = value
 
     @property
-    def inclusive_end(self) -> Optional[bool]:
-        return self._json_.get('inclusive_end', None)
+    def inclusive_end(self) -> bool | None:
+        return self._inclusive_end
 
     @inclusive_end.setter
-    def inclusive_end(self,
-                      value  # type: bool
-                      ) -> None:
-        self.set_prop('inclusive_end', value)
+    def inclusive_end(self, value: bool | None) -> None:
+        self._inclusive_end = value
 
     @property
-    def datetime_parser(self) -> Optional[str]:
-        return self._json_.get('datetime_parser', None)
+    def datetime_parser(self) -> str | None:
+        return self._datetime_parser
 
     @datetime_parser.setter
-    def datetime_parser(self,
-                        value  # type: str
-                        ) -> None:
-        self.set_prop('datetime_parser', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def datetime_parser(self, value: str | None) -> None:
+        self._datetime_parser = value
 
 
-@_QueryBuilder._with_fields(fields=['field'])
 class TermRangeQuery(SearchQuery):
 
     """
@@ -1408,25 +1607,11 @@ class TermRangeQuery(SearchQuery):
     .. note::
         At least one of `min` or `max` must be specified.
 
+    The first two positional arguments are the deprecated `start` and `end`, so pass the bounds
+    by keyword.
+
     Examples:
         Basic search using TermRangeQuery::
-
-            from couchbase.search import TermRangeQuery, SearchRequest
-
-            # ... other code ...
-
-            query = TermRangeQuery('mist',
-                                   'misty',
-                                   inclusive_min=True,
-                                   inclusive_max=True,
-                                   field='description')
-            req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name, req)
-            for r in search_res.rows():
-                print(f'Found search result: {r}')
-            print(f'metadata={search_res.metadata()}')
-
-        Basic search using TermRangeQuery with kwargs::
 
             from couchbase.search import TermRangeQuery, SearchRequest
 
@@ -1462,106 +1647,145 @@ class TermRangeQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _MINMAX = 'min', 'max'
+    field = _field()
+
+    _min: str | None = None
+    _max: str | None = None
+    _inclusive_min: bool | None = None
+    _inclusive_max: bool | None = None
 
     def __init__(self,
-                 start=None,  # type: Optional[str]
-                 end=None,  # type: Optional[str]
-                 min=None,  # type: Optional[str]
-                 max=None,  # type: Optional[str]
-                 **kwargs  # type: Any
-                 ) -> None:
-        super().__init__()
+                 start: str | None = None,
+                 end: str | None = None,
+                 min: str | None = None,
+                 max: str | None = None,
+                 *,
+                 inclusive_min: bool | None = None,
+                 inclusive_max: bool | None = None,
+                 field: str | None = None,
+                 boost: float | None = None,
+                 start_inclusive: bool | None = None,
+                 end_inclusive: bool | None = None) -> None:
+        super().__init__(boost=boost)
         if start is not None and min is None:
             Supportability.class_property_deprecated('start', 'min')
             min = start
         if end is not None and max is None:
             Supportability.class_property_deprecated('end', 'max')
             max = end
-
-        _QueryBuilder._validate_range_query(self, min, max, **kwargs)
+        if start_inclusive is not None:
+            self.start_inclusive = start_inclusive
+        if end_inclusive is not None:
+            self.end_inclusive = end_inclusive
+        if inclusive_min is not None:
+            self.inclusive_min = inclusive_min
+        if inclusive_max is not None:
+            self.inclusive_max = inclusive_max
+        self.field = field
+        if min is None and max is None:
+            raise _no_bounds(('min', 'max'))
+        self.min = min
+        self.max = max
 
     @property
-    def start(self) -> Optional[str]:
-        return self._json_.get('start', None)
+    def start(self) -> str | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`min` instead.
+        """
+        Supportability.class_property_deprecated('start', 'min')
+        return self._min
 
     @start.setter
-    def start(self, value  # type: str
-              ) -> None:
+    def start(self, value: str | None) -> None:
         Supportability.class_property_deprecated('start', 'min')
-        self.set_prop('min', value)
+        self._min = value
 
     @property
-    def min(self) -> Optional[str]:
-        return self._json_.get('min', None)
+    def min(self) -> str | None:
+        return self._min
 
     @min.setter
-    def min(self, value  # type: str
-            ) -> None:
-        self.set_prop('min', value)
+    def min(self, value: str | None) -> None:
+        self._min = value
 
     @property
-    def start_inclusive(self) -> Optional[bool]:
-        return self._json_.get('start_inclusive', None)
+    def start_inclusive(self) -> bool | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`inclusive_min` instead.
+        """
+        Supportability.class_property_deprecated('start_inclusive', 'inclusive_min')
+        return self._inclusive_min
 
     @start_inclusive.setter
-    def start_inclusive(self, value  # type: bool
-                        ) -> None:
+    def start_inclusive(self, value: bool | None) -> None:
         Supportability.class_property_deprecated('start_inclusive', 'inclusive_min')
-        self.set_prop('inclusive_min', value)
+        self._inclusive_min = value
 
     @property
-    def inclusive_min(self) -> Optional[bool]:
-        return self._json_.get('start_inclusive', None)
+    def inclusive_min(self) -> bool | None:
+        return self._inclusive_min
 
     @inclusive_min.setter
-    def inclusive_min(self, value  # type: bool
-                      ) -> None:
-        self.set_prop('inclusive_min', value)
+    def inclusive_min(self, value: bool | None) -> None:
+        self._inclusive_min = value
 
     @property
-    def end(self) -> Optional[str]:
-        return self._json_.get('end', None)
+    def end(self) -> str | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`max` instead.
+        """
+        Supportability.class_property_deprecated('end', 'max')
+        return self._max
 
     @end.setter
-    def end(self, value  # type: str
-            ) -> None:
+    def end(self, value: str | None) -> None:
         Supportability.class_property_deprecated('end', 'max')
-        self.set_prop('max', value)
+        self._max = value
 
     @property
-    def max(self) -> Optional[str]:
-        return self._json_.get('max', None)
+    def max(self) -> str | None:
+        return self._max
 
     @max.setter
-    def max(self, value  # type: str
-            ) -> None:
-        self.set_prop('max', value)
+    def max(self, value: str | None) -> None:
+        self._max = value
 
     @property
-    def end_inclusive(self) -> Optional[bool]:
-        return self._json_.get('end_inclusive', None)
+    def end_inclusive(self) -> bool | None:
+        """
+        .. deprecated:: 4.4.0
+            Use :attr:`inclusive_max` instead.
+        """
+        Supportability.class_property_deprecated('end_inclusive', 'inclusive_max')
+        return self._inclusive_max
 
     @end_inclusive.setter
-    def end_inclusive(self, value  # type: bool
-                      ) -> None:
+    def end_inclusive(self, value: bool | None) -> None:
         Supportability.class_property_deprecated('end_inclusive', 'inclusive_max')
-        self.set_prop('inclusive_max', value)
+        self._inclusive_max = value
 
     @property
-    def inclusive_max(self) -> Optional[bool]:
-        return self._json_.get('inclusive_max', None)
+    def inclusive_max(self) -> bool | None:
+        return self._inclusive_max
 
     @inclusive_max.setter
-    def inclusive_max(self, value  # type: bool
-                      ) -> None:
-        self.set_prop('inclusive_max', value)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+    def inclusive_max(self, value: bool | None) -> None:
+        self._inclusive_max = value
 
 
 # Compound Queries
+
+def _children(queries: tuple[SearchQuery | list[SearchQuery], ...]) -> list[SearchQuery]:
+    if len(queries) == 1 and isinstance(queries[0], list):
+        return queries[0]
+    children: list[SearchQuery] = []
+    for item in queries:
+        children.extend(item if isinstance(item, list) else (item,))
+    return children
+
 
 class ConjunctionQuery(SearchQuery):
 
@@ -1580,8 +1804,8 @@ class ConjunctionQuery(SearchQuery):
 
             queries = [DateRangeQuery('2024-01-01',
                                       '2024-02-15',
-                                      start_inclusive=False,
-                                      end_inclusive=False,
+                                      inclusive_start=False,
+                                      inclusive_end=False,
                                       field='last_rated'),
                         TermQuery('sand', field='description')]
             query = ConjunctionQuery(*queries)
@@ -1600,8 +1824,8 @@ class ConjunctionQuery(SearchQuery):
 
             queries = [DateRangeQuery('2024-01-01',
                                       '2024-02-15',
-                                      start_inclusive=False,
-                                      end_inclusive=False,
+                                      inclusive_start=False,
+                                      inclusive_end=False,
                                       field='last_rated'),
                         TermQuery('sand', field='description')]
             query = ConjunctionQuery(*queries)
@@ -1612,42 +1836,24 @@ class ConjunctionQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _COMPOUND_FIELDS = ('conjuncts', 'conjuncts'),
-
-    def __init__(self, *queries, **kwargs):
-        super().__init__()
-        _QueryBuilder._assign_kwargs(self, kwargs)
-        if len(queries) == 1 and isinstance(queries[0], list):
-            self.conjuncts = queries[0]
-        else:
-            self.conjuncts = list(queries)
+    def __init__(self,
+                 *queries: SearchQuery | list[SearchQuery],
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        self.conjuncts = _children(queries)
 
     @property
-    def encodable(self):
-        self.validate()
+    def conjuncts(self) -> list[SearchQuery]:
+        return self._conjuncts
 
-        # Requires special handling since the compound queries in themselves
-        # cannot be JSON unless they are properly encoded.
-        # Note that the 'encodable' property also triggers validation
-        js = self._json_.copy()
-        for src, tgt in self._COMPOUND_FIELDS:
-            objs = getattr(self, src)
-            if not objs:
-                continue
-            js[tgt] = [q.encodable for q in objs]
-        return js
+    @conjuncts.setter
+    def conjuncts(self, value: list[SearchQuery]) -> None:
+        self._conjuncts = value
 
-    def validate(self):
-        super(ConjunctionQuery, self).validate()
+    def validate(self) -> None:
+        super().validate()
         if not self.conjuncts:
             raise NoChildrenException('No sub-queries')
-
-    def __repr__(self) -> str:
-        query = self.encodable
-        return f'{type(self).__name__}(query={query})'
-
-    def __str__(self) -> str:
-        return self.__repr__()
 
 
 class DisjunctionQuery(SearchQuery):
@@ -1701,61 +1907,43 @@ class DisjunctionQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    _COMPOUND_FIELDS = ('disjuncts', 'disjuncts'),
+    def __init__(self,
+                 *queries: SearchQuery | list[SearchQuery],
+                 min: int | None = None,
+                 boost: float | None = None) -> None:
+        super().__init__(boost=boost)
+        self.min = 1 if min is None else min
+        self.disjuncts = _children(queries)
 
-    def __init__(self, *queries, **kwargs):
-        super().__init__()
-        _QueryBuilder._assign_kwargs(self, kwargs)
-        if len(queries) == 1 and isinstance(queries[0], list):
-            self.disjuncts = queries[0]
-        else:
-            self.disjuncts = list(queries)
-        if 'min' not in self._json_:
-            self.min = 1
+    @property
+    def disjuncts(self) -> list[SearchQuery]:
+        return self._disjuncts
+
+    @disjuncts.setter
+    def disjuncts(self, value: list[SearchQuery]) -> None:
+        self._disjuncts = value
 
     @property
     def min(self) -> int:
-        return self._json_.get('min', None)
+        return self._min
 
     @min.setter
-    def min(self, value  # type: int
-            ) -> None:
+    def min(self, value: int) -> None:
         value = int(value)
         if value < 0:
             raise InvalidArgumentException(message='Must be >= 0')
-        self.set_prop('min', value)
+        self._min = value
 
-    @property
-    def encodable(self):
-        self.validate()
-
-        # Requires special handling since the compound queries in themselves
-        # cannot be JSON unless they are properly encoded.
-        # Note that the 'encodable' property also triggers validation
-        js = self._json_.copy()
-        for src, tgt in self._COMPOUND_FIELDS:
-            objs = getattr(self, src)
-            if not objs:
-                continue
-            js[tgt] = [q.encodable for q in objs]
-        return js
-
-    def validate(self):
-        super(DisjunctionQuery, self).validate()
+    def validate(self) -> None:
+        super().validate()
         if not self.disjuncts:
             raise NoChildrenException('No queries specified')
         if len(self.disjuncts) < self.min:
             raise InvalidArgumentException(message='Specified min is larger than number of queries.')
 
-    def __repr__(self) -> str:
-        query = self.encodable
-        return f'{type(self).__name__}(query={query})'
 
-    def __str__(self) -> str:
-        return self.__repr__()
-
-
-CompoundQueryType = Union[SearchQuery, ConjunctionQuery, DisjunctionQuery, List[SearchQuery]]
+CompoundQueryType = SearchQuery | ConjunctionQuery | DisjunctionQuery | list[SearchQuery]
+_Compound = TypeVar('_Compound', ConjunctionQuery, DisjunctionQuery)
 
 
 class BooleanQuery(SearchQuery):
@@ -1811,6 +1999,7 @@ class BooleanQuery(SearchQuery):
             must_not = [TermQuery('smoke', field='description'),
                         PrefixQuery('rain', field='description')]
             query = BooleanQuery(must=must, must_not=must_not)
+            req = SearchRequest.create(query)
             search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
@@ -1844,87 +2033,61 @@ class BooleanQuery(SearchQuery):
             print(f'metadata={search_res.metadata()}')
     """
 
-    def __init__(self, must=None, should=None, must_not=None):
+    _must: ConjunctionQuery | None = None
+    _should: DisjunctionQuery | None = None
+    _must_not: DisjunctionQuery | None = None
+
+    def __init__(self,
+                 must: CompoundQueryType | None = None,
+                 should: CompoundQueryType | None = None,
+                 must_not: CompoundQueryType | None = None) -> None:
         super().__init__()
-        self._subqueries = {}
         self.must = must
         self.should = should
         self.must_not = must_not
         self.validate()
 
     @property
-    def must(self) -> ConjunctionQuery:
-        return self._subqueries.get('must')
+    def must(self) -> ConjunctionQuery | None:
+        return self._must
 
     @must.setter
-    def must(self, value  # type: CompoundQueryType
-             ) -> None:
-        self._set_query('must', value, ConjunctionQuery)
+    def must(self, value: CompoundQueryType | None) -> None:
+        self._must = _clause(value, ConjunctionQuery)
 
     @property
-    def must_not(self) -> DisjunctionQuery:
-        return self._subqueries.get('must_not')
+    def must_not(self) -> DisjunctionQuery | None:
+        return self._must_not
 
     @must_not.setter
-    def must_not(self, value  # type: CompoundQueryType
-                 ) -> None:
-        self._set_query('must_not', value, DisjunctionQuery)
+    def must_not(self, value: CompoundQueryType | None) -> None:
+        self._must_not = _clause(value, DisjunctionQuery)
 
     @property
-    def should(self) -> DisjunctionQuery:
-        return self._subqueries.get('should')
+    def should(self) -> DisjunctionQuery | None:
+        return self._should
 
     @should.setter
-    def should(self, value  # type: CompoundQueryType
-               ) -> None:
-        self._set_query('should', value, DisjunctionQuery)
-
-    @property
-    def encodable(self) -> Dict[str, Any]:
-        # Overrides the default `encodable` implementation in order to
-        # serialize any sub-queries
-        for src, tgt in ((self.must, 'must'),
-                         (self.must_not, 'must_not'),
-                         (self.should, 'should')):
-            if src:
-                self._json_[tgt] = src.encodable
-        return super(BooleanQuery, self).encodable
+    def should(self, value: CompoundQueryType | None) -> None:
+        self._should = _clause(value, DisjunctionQuery)
 
     def validate(self) -> None:
-        super(BooleanQuery, self).validate()
+        super().validate()
         if not self.must and not self.must_not and not self.should:
             raise ValueError('At least one of the following queries should be specified: must, should, must_not.')
 
-    def _set_query(self, name,  # type: str
-                   value,  # type: Optional[CompoundQueryType]
-                   reqtype  # type: Union[ConjunctionQuery, DisjunctionQuery]
-                   ) -> None:
-        if value is None:
-            if name in self._subqueries:
-                del self._subqueries[name]
-        elif isinstance(value, reqtype):
-            self._subqueries[name] = value
-        elif isinstance(value, SearchQuery):
-            self._subqueries[name] = reqtype(value)
-        else:
-            try:
-                it = iter(value)
-            except ValueError:
-                raise TypeError('Value must be iterable')
 
-            sub_query = []
-            for query in it:
-                if not isinstance(query, SearchQuery):
-                    raise TypeError('Item is not a query!', query)
-                sub_query.append(query)
-            self._subqueries[name] = reqtype(*sub_query)
-
-    def __repr__(self) -> str:
-        query = self.encodable
-        return f'{type(self).__name__}(query={query})'
-
-    def __str__(self) -> str:
-        return self.__repr__()
+def _clause(value: CompoundQueryType | None, reqtype: type[_Compound]) -> _Compound | None:
+    if value is None or isinstance(value, reqtype):
+        return value
+    if isinstance(value, SearchQuery):
+        return reqtype(value)
+    sub_query = []
+    for query in iter(value):
+        if not isinstance(query, SearchQuery):
+            raise TypeError('Item is not a query!', query)
+        sub_query.append(query)
+    return reqtype(*sub_query)
 
 
 # Special Queries
@@ -1934,11 +2097,14 @@ class RawQuery(SearchQuery):
     This class is used to wrap a raw query payload. It should be used
     for custom query parameters, or in cases where any of the other
     query classes are insufficient.
+
+    The payload is read when the query is encoded, and never written: :attr:`boost` and
+    :meth:`set_prop` are added to a copy.
     """
 
-    def __init__(self, obj):
-        super(RawQuery, self).__init__()
-        self._json_ = obj
+    def __init__(self, obj: JSONType) -> None:
+        super().__init__()
+        self._raw = obj
 
 
 class MatchAllQuery(SearchQuery):
@@ -1955,20 +2121,12 @@ class MatchAllQuery(SearchQuery):
 
             query = MatchAllQuery()
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
 
     """
-
-    def __init__(self, **kwargs):
-        super(MatchAllQuery, self).__init__()
-        self._json_['match_all'] = None
-        _QueryBuilder._assign_kwargs(self, kwargs)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
 
 
 class MatchNoneQuery(SearchQuery):
@@ -1985,17 +2143,82 @@ class MatchNoneQuery(SearchQuery):
 
             query = MatchNoneQuery()
             req = SearchRequest.create(query)
-            search_res = scope.search(scope_index_name)
+            search_res = scope.search(scope_index_name, req)
             for r in search_res.rows():
                 print(f'Found search result: {r}')
             print(f'metadata={search_res.metadata()}')
 
     """
 
-    def __init__(self, **kwargs):
-        super(MatchNoneQuery, self).__init__()
-        self._json_['match_none'] = None
-        _QueryBuilder._assign_kwargs(self, kwargs)
 
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({super().__repr__()})'
+# The JSON encoding. Each function returns the query's own fields under the Search service's names,
+# leaving out a field that is not set; `_encode` adds `boost` and the `set_prop` keys to every one.
+
+
+def _fuzzy(q: TermQuery | MatchQuery) -> _Body:
+    return _put({}, fuzziness=q.fuzziness, prefix_length=q.prefix_length)
+
+
+def _encode_match(q: MatchQuery, validate: bool) -> _Body:
+    operator = None if q.match_operator is None else q.match_operator.value
+    return _put(_fuzzy(q), match=q.match, operator=operator, field=q.field, analyzer=q.analyzer)
+
+
+def _encode_range(q: NumericRangeQuery | TermRangeQuery, validate: bool) -> _Body:
+    return _put({}, min=q.min, max=q.max, inclusive_min=q.inclusive_min, inclusive_max=q.inclusive_max,
+                field=q.field)
+
+
+def _encode_date_range(q: DateRangeQuery, validate: bool) -> _Body:
+    return _put({}, start=q.start, end=q.end, inclusive_start=q.inclusive_start, inclusive_end=q.inclusive_end,
+                datetime_parser=q.datetime_parser, field=q.field)
+
+
+def _encode_boolean(q: BooleanQuery, validate: bool) -> _Body:
+    return _put({},
+                must=None if q.must is None else _encode(q.must, validate),
+                must_not=None if q.must_not is None else _encode(q.must_not, validate),
+                should=None if q.should is None else _encode(q.should, validate))
+
+
+_JSON: dict[type, Callable[[Any, bool], _Body]] = {
+    SearchQuery: lambda q, v: {},
+    TermQuery: lambda q, v: _put(_fuzzy(q), term=q.term, field=q.field),
+    QueryStringQuery: lambda q, v: _put({}, query=q.query),
+    WildcardQuery: lambda q, v: _put({}, wildcard=q.wildcard, field=q.field),
+    DocIdQuery: lambda q, v: _put({}, ids=q.ids),
+    MatchQuery: _encode_match,
+    MatchPhraseQuery: lambda q, v: _put({}, match_phrase=q.match_phrase, field=q.field, analyzer=q.analyzer),
+    PhraseQuery: lambda q, v: _put({}, terms=q.terms, field=q.field),
+    PrefixQuery: lambda q, v: _put({}, prefix=q.prefix, field=q.field),
+    RegexQuery: lambda q, v: _put({}, regexp=q.regexp, field=q.field),
+    BooleanFieldQuery: lambda q, v: _put({}, bool=q.bool, field=q.field),
+    GeoDistanceQuery: lambda q, v: _put({}, distance=q.distance, location=q.location, field=q.field),
+    GeoBoundingBoxQuery: lambda q, v: _put({}, top_left=q.top_left, bottom_right=q.bottom_right, field=q.field),
+    GeoPolygonQuery: lambda q, v: _put({}, polygon_points=q.polygon_points, field=q.field),
+    NumericRangeQuery: _encode_range,
+    DateRangeQuery: _encode_date_range,
+    TermRangeQuery: _encode_range,
+    ConjunctionQuery: lambda q, v: {'conjuncts': [_encode(c, v) for c in q.conjuncts]},
+    DisjunctionQuery: lambda q, v: {'disjuncts': [_encode(c, v) for c in q.disjuncts], 'min': q.min},
+    BooleanQuery: _encode_boolean,
+    MatchAllQuery: lambda q, v: {'match_all': None},
+    MatchNoneQuery: lambda q, v: {'match_none': None},
+}
+
+
+def _encode(query: SearchQuery, validate: bool = True) -> JSONType:
+    if validate:
+        query.validate()
+    if isinstance(query, RawQuery):
+        if not isinstance(query._raw, dict):
+            if query.boost is not None or query._props:
+                raise TypeError(f'RawQuery holds a {type(query._raw).__name__}, which cannot carry boost or set_prop')
+            return query._raw
+        body = dict(query._raw)
+    else:
+        encoder = next(_JSON[k] for k in type(query).__mro__ if k in _JSON)
+        body = encoder(query, validate)
+    _put(body, boost=query.boost)
+    body.update(query._props)
+    return body

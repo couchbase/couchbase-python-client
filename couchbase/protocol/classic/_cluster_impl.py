@@ -45,11 +45,11 @@ from couchbase.protocol.classic._result import (_cluster_info_from_core,
                                                 _ping_from_core)
 from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
                                                    ClassicStreamingExecutor,
-                                                   QueryStreamSpec)
+                                                   QueryStreamSpec,
+                                                   SearchStreamSpec)
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
-from couchbase.search import FullTextSearchRequest
 from couchbase.transactions import Transactions
 
 if TYPE_CHECKING:
@@ -63,8 +63,11 @@ if TYPE_CHECKING:
                                           DiagnosticsOptions,
                                           PingOptions,
                                           QueryOptions,
+                                          SearchOptions,
                                           WaitUntilReadyOptions)
     from couchbase.common.protocol import CouchbaseProtocol
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
     from couchbase.protocol.classic._cluster_types import (DiagnosticsRequest,
                                                            PingRequest,
                                                            SearchQueryRequest)
@@ -311,8 +314,25 @@ class ClusterImpl:
                                                                 obs_handler=req.obs_handler,
                                                                 streaming_timeout=streaming_timeout)))
 
-    def search(self, req: SearchQueryRequest) -> SearchResult:
-        """**INTERNAL**"""
+    def search_query(self,
+                     index: str,
+                     query: SearchQuery,
+                     options: SearchOptions | None = None,
+                     **kwargs: Any) -> SearchResult:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_query_request(index, query, obs_handler, options, **kwargs)
+        return self._search(req)
+
+    def search(self,
+               index: str,
+               request: SearchRequest | SearchQuery,
+               options: SearchOptions | None = None,
+               **kwargs: Any) -> SearchResult:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_request(index, request, obs_handler, options, **kwargs)
+        return self._search(req)
+
+    def _search(self, req: SearchQueryRequest) -> SearchResult:
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the search_query was provided a timeout we will use that value for the streaming timeout
@@ -321,11 +341,11 @@ class ClusterImpl:
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('search_timeout', None)
-        return SearchResult(FullTextSearchRequest.generate_search_request(self._client_adapter.connection,
-                                                                          req.query_builder.as_encodable(),
-                                                                          default_serializer=self.default_serializer,
-                                                                          streaming_timeout=streaming_timeout,
-                                                                          obs_handler=req.obs_handler))
+        return SearchResult(RowIterator(ClassicStreamingExecutor(self._client_adapter.connection,
+                                                                 SearchStreamSpec(req.query_builder.as_encodable(),
+                                                                                  self.default_serializer),
+                                                                 obs_handler=req.obs_handler,
+                                                                 streaming_timeout=streaming_timeout)))
 
     def update_credentials(self,
                            authenticator: CertificateAuthenticator | JwtAuthenticator | PasswordAuthenticator

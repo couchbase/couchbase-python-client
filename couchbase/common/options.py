@@ -2276,7 +2276,7 @@ class SearchOptions(dict):
         scope_name (str, optional): Specifies the scope which should be searched as part of the search query.
 
             .. deprecated:: 4.7.0
-                The search API does not use this option.
+                Use ``Scope.search()`` instead.
         collections (list[str], optional): Specifies the collections which should be searched as part of the search
             query.
         include_locations (bool, optional): If set to True, will include the locations in the search result. Defaults to

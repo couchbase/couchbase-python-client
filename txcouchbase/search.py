@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,82 +13,104 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from twisted.internet.defer import Deferred
+"""The `txcouchbase.search` import path.
 
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  AlreadyQueriedException,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap)
-from couchbase.logic.search import FullTextSearchRequestLogic
-from couchbase.logic.streaming import stream_next
-from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
+The same objects as `couchbase.search`, re-exported so Twisted code imports them from its own
+package.
+"""
 
+__all__ = [
+    'BooleanFieldQuery',
+    'BooleanQuery',
+    'ConjunctionQuery',
+    'DateFacet',
+    'DateRangeQuery',
+    'DisjunctionQuery',
+    'DocIdQuery',
+    'Facet',
+    'GeoBoundingBoxQuery',
+    'GeoDistanceQuery',
+    'GeoPolygonQuery',
+    'HighlightStyle',
+    'MatchAllQuery',
+    'MatchNoneQuery',
+    'MatchOperator',
+    'MatchPhraseQuery',
+    'MatchQuery',
+    'NumericFacet',
+    'NumericRangeQuery',
+    'PhraseQuery',
+    'PrefixQuery',
+    'QueryStringQuery',
+    'RawQuery',
+    'RegexQuery',
+    'SearchDateRangeFacet',
+    'SearchFacetResult',
+    'SearchMetaData',
+    'SearchMetrics',
+    'SearchNumericRangeFacet',
+    'SearchQuery',
+    'SearchRequest',
+    'SearchRow',
+    'SearchRowFields',
+    'SearchRowLocation',
+    'SearchRowLocations',
+    'SearchScanConsistency',
+    'SearchTermFacet',
+    'Sort',
+    'SortField',
+    'SortGeoDistance',
+    'SortID',
+    'SortScore',
+    'TermFacet',
+    'TermQuery',
+    'TermRangeQuery',
+    'WildcardQuery',
+]
 
-class FullTextSearchRequest(FullTextSearchRequestLogic):
-    def __init__(self,
-                 connection,
-                 loop,
-                 encoded_query,
-                 **kwargs
-                 ):
-        super().__init__(connection, encoded_query, **kwargs)
-        self._query_request_ftr = None
-        self._query_d = None
-        self._loop = loop
-
-    @property
-    def loop(self):
-        """
-        **INTERNAL**
-        """
-        return self._loop
-
-    @classmethod
-    def generate_search_request(cls, connection, loop, encoded_query, **kwargs):
-        return cls(connection, loop, encoded_query, **kwargs)
-
-    def execute_search_query(self) -> Deferred:
-        if self.done_streaming:
-            raise AlreadyQueriedException()
-
-        if self._query_request_ftr is None:
-            self._query_request_ftr = self.loop.create_future()
-            self._submit_query(callback=self._on_query_complete)
-            self._query_d = Deferred.fromFuture(self._query_request_ftr)
-
-        return self._query_d
-
-    def _on_query_complete(self, result):
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
-
-    def _get_metadata(self):
-        try:
-            search_response = next(self._streaming_result)
-            self._set_metadata(search_response)
-        except CouchbaseException as ex:
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            raise excptn
-
-    def __iter__(self):
-        return self
-
-    def _get_next_row(self):
-        if self.done_streaming is True:
-            return
-
-        row = next(self._streaming_result)
-        if isinstance(row, PycbcCoreException):
-            raise ErrorMapper.build_exception(row)
-
-        # should only be None once query request is complete and _no_ errors found
-        if row is None:
-            raise StopIteration
-
-        return self._deserialize_row(row)
-
-    def __next__(self):
-        return stream_next(self)
+from couchbase.common.search import DateFacet  # noqa: F401
+from couchbase.common.search import Facet  # noqa: F401
+from couchbase.common.search import HighlightStyle  # noqa: F401
+from couchbase.common.search import MatchOperator  # noqa: F401
+from couchbase.common.search import NumericFacet  # noqa: F401
+from couchbase.common.search import SearchDateRangeFacet  # noqa: F401
+from couchbase.common.search import SearchFacetResult  # noqa: F401
+from couchbase.common.search import SearchMetaData  # noqa: F401
+from couchbase.common.search import SearchMetrics  # noqa: F401
+from couchbase.common.search import SearchNumericRangeFacet  # noqa: F401
+from couchbase.common.search import SearchRow  # noqa: F401
+from couchbase.common.search import SearchRowFields  # noqa: F401
+from couchbase.common.search import SearchRowLocation  # noqa: F401
+from couchbase.common.search import SearchRowLocations  # noqa: F401
+from couchbase.common.search import SearchScanConsistency  # noqa: F401
+from couchbase.common.search import SearchTermFacet  # noqa: F401
+from couchbase.common.search import Sort  # noqa: F401
+from couchbase.common.search import SortField  # noqa: F401
+from couchbase.common.search import SortGeoDistance  # noqa: F401
+from couchbase.common.search import SortID  # noqa: F401
+from couchbase.common.search import SortScore  # noqa: F401
+from couchbase.common.search import TermFacet  # noqa: F401
+from couchbase.common.search_queries import BooleanFieldQuery  # noqa: F401
+from couchbase.common.search_queries import BooleanQuery  # noqa: F401
+from couchbase.common.search_queries import ConjunctionQuery  # noqa: F401
+from couchbase.common.search_queries import DateRangeQuery  # noqa: F401
+from couchbase.common.search_queries import DisjunctionQuery  # noqa: F401
+from couchbase.common.search_queries import DocIdQuery  # noqa: F401
+from couchbase.common.search_queries import GeoBoundingBoxQuery  # noqa: F401
+from couchbase.common.search_queries import GeoDistanceQuery  # noqa: F401
+from couchbase.common.search_queries import GeoPolygonQuery  # noqa: F401
+from couchbase.common.search_queries import MatchAllQuery  # noqa: F401
+from couchbase.common.search_queries import MatchNoneQuery  # noqa: F401
+from couchbase.common.search_queries import MatchPhraseQuery  # noqa: F401
+from couchbase.common.search_queries import MatchQuery  # noqa: F401
+from couchbase.common.search_queries import NumericRangeQuery  # noqa: F401
+from couchbase.common.search_queries import PhraseQuery  # noqa: F401
+from couchbase.common.search_queries import PrefixQuery  # noqa: F401
+from couchbase.common.search_queries import QueryStringQuery  # noqa: F401
+from couchbase.common.search_queries import RawQuery  # noqa: F401
+from couchbase.common.search_queries import RegexQuery  # noqa: F401
+from couchbase.common.search_queries import SearchQuery  # noqa: F401
+from couchbase.common.search_queries import TermQuery  # noqa: F401
+from couchbase.common.search_queries import TermRangeQuery  # noqa: F401
+from couchbase.common.search_queries import WildcardQuery  # noqa: F401
+from couchbase.common.search_request import SearchRequest  # noqa: F401

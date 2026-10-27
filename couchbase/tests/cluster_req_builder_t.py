@@ -23,20 +23,24 @@ from typing import Any, cast
 
 import pytest
 
+from couchbase.common._observability.handler import ObservableRequestHandler
 from couchbase.common._observability.no_op import (NoOpMeter,
                                                    NoOpSpan,
                                                    NoOpTracer)
-from couchbase.common._supportability import CouchbaseDeprecationWarning
+from couchbase.common._observability.observability_types import (ObservabilityInstruments,
+                                                                 TracerProtocol,
+                                                                 WrappedTracer)
+from couchbase.common._operations import Op
 from couchbase.common.option_enums import OptionValidationMode
-from couchbase.common.warnings import CouchbaseApplicabilityWarning, CouchbaseOptionWarning
+from couchbase.common.warnings import (CouchbaseApplicabilityWarning,
+                                       CouchbaseDeprecationWarning,
+                                       CouchbaseOptionWarning)
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability.handler import ObservableRequestHandler
-from couchbase.logic.observability.observability_types import (ObservabilityInstruments,
-                                                               TracerProtocol,
-                                                               WrappedTracer)
-from couchbase.logic.operation_types import StreamingOperationType
-from couchbase.options import (DiagnosticsOptions,
+from couchbase.options import (AnalyticsOptions,
+                               DiagnosticsOptions,
                                PingOptions,
+                               QueryOptions,
+                               SearchOptions,
                                ViewOptions)
 from couchbase.protocol.classic._bucket_req_builder import BucketRequestBuilder
 from couchbase.protocol.classic._cluster_req_builder import ClusterRequestBuilder
@@ -44,6 +48,10 @@ from couchbase.search import (SearchQuery,
                               SearchRequest,
                               TermQuery)
 from couchbase.vector_search import VectorQuery, VectorSearch
+from tests.test_features import TestProtocol
+
+# What is checked here is classic's request builder, which writes what its binding reads.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 INDEX_NAME = 'test-index'
 
@@ -56,7 +64,7 @@ def _obs_handler() -> ObservableRequestHandler:
     # documented base satisfies the protocol structurally.
     tracer = WrappedTracer(cast(TracerProtocol, NoOpTracer()), False)
     instruments = ObservabilityInstruments(tracer, NoOpMeter(), is_noop=True)
-    return ObservableRequestHandler(StreamingOperationType.SearchQuery, instruments)
+    return ObservableRequestHandler(Op.SearchQuery, instruments)
 
 
 def _search_request(request: SearchRequest | SearchQuery, *options: Any) -> dict[str, Any]:
@@ -165,12 +173,89 @@ class ClusterRequestBuilderUnitTests:
         with pytest.raises(InvalidArgumentException, match='parent_span'):
             build(OptionValidationMode.Strict)
 
-    # The view builder reads the keys it knows and drops the rest, so a near miss is reported
-    # here or not at all.
+    @pytest.mark.parametrize('build, statement', [('build_query_request', 'n1ql_query'),
+                                                  ('build_analytics_query_request', 'analytics_query')])
+    def test_num_workers_is_accepted_and_not_sent(self, build: str, statement: str) -> None:
+        # Any other keyword is a named parameter of the statement.
+        req = getattr(ClusterRequestBuilder(), build)('SELECT $a', _obs_handler(), num_workers=2, a=1)
+
+        assert getattr(req, statement).params['named_parameters'] == {'$a': b'1'}
+
+    @pytest.mark.parametrize('options, kwargs, expected', [((), {}, None),
+                                                           ((QueryOptions(adhoc=False),), {}, False),
+                                                           ((), {'adhoc': False}, False)])
+    def test_query_request_carries_adhoc_only_when_set(self,
+                                                       options: tuple[QueryOptions, ...],
+                                                       kwargs: dict[str, Any],
+                                                       expected: bool | None) -> None:
+        req = ClusterRequestBuilder().build_query_request('SELECT 1', _obs_handler(), *options, **kwargs)
+
+        assert req.n1ql_query.params.get('adhoc', None) is expected
+
+    @pytest.mark.parametrize('build, statement, options_type, written, meant',
+                             [('build_query_request', 'n1ql_query', QueryOptions, 'readonly', 'read_only'),
+                              ('build_analytics_query_request', 'analytics_query', AnalyticsOptions,
+                               'priorty', 'priority')])
+    def test_near_miss_warns_and_is_still_sent(self,
+                                               build: str,
+                                               statement: str,
+                                               options_type: type[dict[str, Any]],
+                                               written: str,
+                                               meant: str) -> None:
+        # Any keyword these blocks do not declare is a named parameter, so only one close to a
+        # declared option is reported, and it is sent all the same.  The options object's keys
+        # are judged with the keywords, since an undeclared one is sent the same way.
+        for options, kwargs in (((), {written: True}), ((options_type(**{written: True}),), {})):
+            with warnings.catch_warnings(record=True) as recorded:
+                warnings.simplefilter('always')
+                req = getattr(ClusterRequestBuilder(), build)('SELECT 1', _obs_handler(), *options, **kwargs)
+
+            assert [str(w.message) for w in recorded if issubclass(w.category, CouchbaseOptionWarning)] == [
+                f'Option {written} is not carried by {options_type.__name__}, so it is treated as a named '
+                f'query parameter. Did you mean {meant}? To send it as a parameter, pass it in '
+                'named_parameters.']
+            assert f'${written}' in getattr(req, statement).params['named_parameters']
+
+    def test_named_parameters_far_from_an_option_do_not_warn(self) -> None:
+        # `type` is documented usage, and a dict is a positional parameter rather than options.
+        with warnings.catch_warnings(record=True) as recorded:
+            warnings.simplefilter('always')
+            ClusterRequestBuilder().build_query_request('SELECT 1', _obs_handler(), {'readonly': True}, type='hotel')
+
+        assert [w for w in recorded if issubclass(w.category, CouchbaseOptionWarning)] == []
+
+    def test_near_miss_raises_in_strict_mode(self) -> None:
+        with pytest.raises(InvalidArgumentException) as exc_info:
+            ClusterRequestBuilder(OptionValidationMode.Strict).build_query_request(
+                'SELECT 1', _obs_handler(), readonly=True)
+
+        assert 'Did you mean read_only? To send it as a parameter, pass it in named_parameters.' in str(
+            exc_info.value)
+
+    @pytest.mark.parametrize('build, statement, options_type',
+                             [('build_query_request', 'n1ql_query', QueryOptions),
+                              ('build_analytics_query_request', 'analytics_query', AnalyticsOptions)])
+    def test_near_miss_in_named_parameters_is_sent_in_strict_mode(self,
+                                                                  build: str,
+                                                                  statement: str,
+                                                                  options_type: type[dict[str, Any]]) -> None:
+        req = getattr(ClusterRequestBuilder(OptionValidationMode.Strict), build)(
+            'SELECT 1', _obs_handler(), options_type(named_parameters={'time': 1}))
+
+        assert getattr(req, statement).params['named_parameters'] == {'$time': b'1'}
+
+    # View and search builders read the keys they know and drop the rest, so a near miss is
+    # reported here or not at all.
     @pytest.mark.parametrize('build, options_type', [
         (lambda mode, options, **kwargs: BucketRequestBuilder('default', mode).build_view_query_request(
             'ddoc', 'view', _obs_handler(), options, **kwargs).view_query.as_encodable(), ViewOptions),
-    ], ids=['view'])
+        (lambda mode, options, **kwargs: ClusterRequestBuilder(mode).build_search_request(
+            INDEX_NAME, SearchRequest.create(TermQuery('term')), _obs_handler(), options,
+            **kwargs).query_builder.as_encodable(), SearchOptions),
+        (lambda mode, options, **kwargs: ClusterRequestBuilder(mode).build_search_query_request(
+            INDEX_NAME, TermQuery('term'), _obs_handler(), options, **kwargs).query_builder.as_encodable(),
+         SearchOptions),
+    ], ids=['view', 'search', 'search_query'])
     def test_near_miss_warns_and_is_not_sent(self,
                                              build: Callable[..., dict[str, Any]],
                                              options_type: type[dict[str, Any]]) -> None:
@@ -190,7 +275,10 @@ class ClusterRequestBuilderUnitTests:
         (lambda options, **kwargs: BucketRequestBuilder('default', OptionValidationMode.Strict)
          .build_view_query_request('ddoc', 'view', _obs_handler(), options, **kwargs),
          ViewOptions(limit=5, skip=1)),
-    ], ids=['view'])
+        (lambda options, **kwargs: ClusterRequestBuilder(OptionValidationMode.Strict).build_search_request(
+            INDEX_NAME, SearchRequest.create(TermQuery('term')), _obs_handler(), options, **kwargs),
+         SearchOptions(limit=5, skip=1)),
+    ], ids=['view', 'search'])
     def test_declared_options_pass_strict_mode(self, build: Callable[..., Any], options: dict[str, Any]) -> None:
         build(options)
         build(None, limit=5, skip=1, timeout=timedelta(seconds=5))

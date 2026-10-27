@@ -58,6 +58,11 @@ ACB_NAME_MAP = {
     'EventingEnvironment': 'AsyncEventingEnvironment',
     'QueryIndexManagementEnvironment': 'AsyncQueryIndexManagementEnvironment',
     'CollectionQueryIndexManagementEnvironment': 'AsyncCollectionQueryIndexManagementEnvironment',
+    # BRIDGE: the streaming result types each area's async class replaces as it arrives.  Each
+    # has its own class in acouchbase.result, and the sync class is not its base, so an
+    # annotation or an isinstance check naming the sync class is wrong under asyncio.
+    # API_SPECIFIC_MODULES is what moves the import to match.  Removed by PYCBC-2013.
+    'SearchResult': 'AsyncSearchResult',
 }
 
 TXCB_NAME_MAP = {

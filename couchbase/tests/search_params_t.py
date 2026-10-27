@@ -17,26 +17,22 @@ from __future__ import annotations
 
 import json
 import warnings
+from collections.abc import Callable
 from datetime import timedelta
 from typing import (Any,
-                    Callable,
-                    Dict,
-                    List,
                     Literal,
-                    Optional,
-                    Set,
-                    Tuple,
                     get_args,
                     get_origin,
                     get_type_hints)
 
 import pytest
 
+import couchbase.common.search as common_search
+import couchbase.common.search_queries as common_queries
 import couchbase.search as search
-from couchbase.exceptions import InvalidArgumentException
+from couchbase.exceptions import FeatureUnavailableException, InvalidArgumentException
 from couchbase.mutation_state import MutationState
 from couchbase.options import SearchOptions, VectorSearchOptions
-from couchbase.protocol.classic._pycbc_core.binding_cpp_types import CppSearchRequest
 from couchbase.result import MutationToken
 from couchbase.search import (HighlightStyle,
                               MatchOperator,
@@ -49,12 +45,13 @@ from couchbase.serializer import DefaultJsonSerializer
 from couchbase.vector_search import (VectorQuery,
                                      VectorQueryCombination,
                                      VectorSearch)
+from tests.test_features import TestProtocol
 
 # A label rather than a claim about a cluster: nothing here connects.
 INDEX_NAME = 'test-search-index'
 
 
-def _encode(builder: search.SearchQueryBuilder) -> Dict[str, Any]:
+def _encode(builder: search.SearchQueryBuilder) -> dict[str, Any]:
     # `as_encodable()` serializes the query, the facets and the sort specs to JSON text, so
     # comparing the raw result would depend on key order and float formatting.  `facets` is
     # a dict of name to JSON string and `sort_specs` a list of them, so neither is the
@@ -71,7 +68,7 @@ def _encode(builder: search.SearchQueryBuilder) -> Dict[str, Any]:
 
 
 def _encoded(query: search.SearchQuery,
-             options: Optional[SearchOptions] = None) -> Dict[str, Any]:
+             options: SearchOptions | None = None) -> dict[str, Any]:
     if options is None:
         builder = search.SearchQueryBuilder.create_search_query_object(INDEX_NAME, query)
     else:
@@ -84,13 +81,13 @@ def _params(query: search.SearchQuery,
     return search.SearchQueryBuilder.create_search_query_object(INDEX_NAME, query, options)
 
 
-def _expected_request(query_body: Any, **overrides: Any) -> Dict[str, Any]:
+def _expected_request(query_body: Any, **overrides: Any) -> dict[str, Any]:
     # `metrics` is in the base because create_search_query_object writes it unconditionally,
     # defaulting to True.  Query and analytics both default the same field the other way.
     return {'query': query_body, 'index_name': INDEX_NAME, 'metrics': True, **overrides}
 
 
-def _expected_params(**overrides: Any) -> Dict[str, Any]:
+def _expected_params(**overrides: Any) -> dict[str, Any]:
     # Deliberately not the shape of _expected_request(): `params` is the options half only.
     # It never carries `index_name` or `query`, and never `facets` or `sort` either, which
     # is the easy mistake, since both are set through SearchOptions like everything else.
@@ -107,7 +104,7 @@ def _rejects(build: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         build(*args, **kwargs)
 
 
-def _assert_query_repr(query: search.SearchQuery, encoded: Dict[str, Any]) -> None:
+def _assert_query_repr(query: search.SearchQuery, encoded: dict[str, Any]) -> None:
     # Reads the body back off the encoded request on purpose: that holds `__repr__` to the
     # encoding rather than to a hand-copied literal.
     assert str(query) == f'{type(query).__name__}(query={encoded["query"]})'
@@ -168,6 +165,13 @@ class SearchParamsUnitTests:
         assert encoded['query'] == conjuncts
         _assert_query_repr(q, encoded)
 
+    @pytest.mark.parametrize('cls, key', [(search.ConjunctionQuery, 'conjuncts'),
+                                          (search.DisjunctionQuery, 'disjuncts')])
+    def test_compound_query_takes_queries_and_lists_together(self, cls: Any, key: str) -> None:
+        q = cls(search.PrefixQuery('p'), [search.TermQuery('a'), search.TermQuery('b')], [search.TermQuery('c')])
+
+        assert _object(q.encodable)[key] == [{'prefix': 'p'}, {'term': 'a'}, {'term': 'b'}, {'term': 'c'}]
+
     def test_consistent_with(self) -> None:
         mt = MutationToken(token={'partition_id': 42,
                                   'partition_uuid': 3004,
@@ -192,7 +196,7 @@ class SearchParamsUnitTests:
         with pytest.raises(ValueError):
             search.DateRangeQuery()
 
-        cases: List[Tuple[Dict[str, Any], Dict[str, Any]]]
+        cases: list[tuple[dict[str, Any], dict[str, Any]]]
         cases = [({'end': '2024-12-01'}, {'end': '2024-12-01'}),
                  ({'start': '2024-01-01'}, {'start': '2024-01-01'}),
                  ({'start': '2024-01-01', 'end': '2024-12-01'},
@@ -215,7 +219,7 @@ class SearchParamsUnitTests:
                      'end': '2024-12-01',
                      'inclusive_start': True,
                      'inclusive_end': True}
-        spellings: List[Dict[str, Any]] = [{'start_inclusive': True, 'end_inclusive': True},
+        spellings: list[dict[str, Any]] = [{'start_inclusive': True, 'end_inclusive': True},
                                            {'inclusive_start': True, 'inclusive_end': True}]
         for kwargs in spellings:
             q = search.DateRangeQuery('2024-01-01', '2024-12-01', **kwargs)
@@ -327,7 +331,7 @@ class SearchParamsUnitTests:
                                       'location': [-115.1391, 36.1716],
                                       'field': 'geo_location'})
 
-        locations: List[Any] = [(-115.1391, 36.1716),
+        locations: list[Any] = [(-115.1391, 36.1716),
                                 [-115.1391, 36.1716],
                                 {'lon': -115.1391, 'lat': 36.1716}]
         for location in locations:
@@ -397,7 +401,7 @@ class SearchParamsUnitTests:
     def test_match_query(self) -> None:
         opts = SearchOptions(limit=10)
 
-        def expected(operator: str) -> Dict[str, Any]:
+        def expected(operator: str) -> dict[str, Any]:
             return _expected_request({'match': 'salty beers',
                                       'analyzer': 'analyzer',
                                       'boost': 1.5,
@@ -431,7 +435,7 @@ class SearchParamsUnitTests:
             search.NumericRangeQuery()
 
         # Zero is a bound, not an absent bound.
-        bounds: List[Tuple[Dict[str, Any], Dict[str, Any]]]
+        bounds: list[tuple[dict[str, Any], dict[str, Any]]]
         bounds = [({'min': 0, 'max': 0}, {'min': 0, 'max': 0}),
                   ({'min': 0.1, 'max': 0.9}, {'min': 0.1, 'max': 0.9}),
                   ({'max': 0.9}, {'max': 0.9}),
@@ -444,7 +448,7 @@ class SearchParamsUnitTests:
 
         # min_inclusive/max_inclusive are the deprecated spelling of inclusive_min/inclusive_max.
         inclusive = {'min': 0.1, 'max': 0.9, 'inclusive_min': True, 'inclusive_max': True}
-        spellings: List[Dict[str, Any]] = [{'min_inclusive': True, 'max_inclusive': True},
+        spellings: list[dict[str, Any]] = [{'min_inclusive': True, 'max_inclusive': True},
                                            {'inclusive_min': True, 'inclusive_max': True}]
         for kwargs in spellings:
             q = search.NumericRangeQuery(0.1, 0.9, **kwargs)
@@ -551,7 +555,7 @@ class SearchParamsUnitTests:
             scope_name='test-scope',
             collections=['test-collection-1', 'test-collection-2'])
         assert len(caught) == 1
-        assert 'The scope_name option is not used by the search API.' in str(caught[0].message)
+        assert 'Use Scope.search() instead.' in str(caught[0].message)
 
     def test_params_scoring_disable_scoring_conflict(self) -> None:
         # Both options write the same request field, so only disable_scoring=True conflicts.
@@ -579,35 +583,6 @@ class SearchParamsUnitTests:
             _rejects(RelativeScoreFusion, window_size=out_of_range)
         assert ReciprocalRankFusion(rank_constant=0, window_size=0xFFFFFFFF).as_encodable() == {
             'scoring_type': 'reciprocal_rank_fusion', 'rank_constant': 0, 'window_size': 0xFFFFFFFF}
-
-    def test_params_scoring_matches_generated_bindings(self) -> None:
-        # Holds the public scoring types to the generated core binding: each must encode as
-        # exactly one alternative of the request's scoring union, using only keys it declares,
-        # and every alternative must have a public type.
-        alternatives: Dict[Any, Tuple[str, Set[str]]] = {}
-        for alt in get_args(get_type_hints(CppSearchRequest)['scoring']):
-            # NoneType has no hints, so it contributes nothing here.
-            fields = get_type_hints(alt)
-            for name, annotation in fields.items():
-                if get_origin(annotation) is Literal:
-                    for tag in get_args(annotation):
-                        alternatives[tag] = (name, set(fields))
-
-        scorings: List[SearchScoring] = [ReciprocalRankFusion(rank_constant=60, window_size=200),
-                                         RelativeScoreFusion(window_size=200),
-                                         ScoringNone()]
-        for scoring in scorings:
-            encoded = _params(search.TermQuery('someterm'),
-                              SearchOptions(scoring=scoring)).as_encodable()['scoring']
-            claimed = [fields for tag, (key, fields) in alternatives.items()
-                       if encoded.get(key) == tag]
-            assert len(claimed) == 1, (f'{type(scoring).__name__} encodes as {encoded}, which no '
-                                       f'generated scoring alternative claims: {alternatives}')
-            assert set(encoded) <= claimed[0], (f'{type(scoring).__name__} encodes keys the '
-                                                f'generated alternative does not declare: '
-                                                f'{set(encoded) - claimed[0]}')
-
-        assert len(alternatives) == len(scorings)
 
     def test_params_scoring_none(self) -> None:
         builder = _params(search.TermQuery('someterm'), SearchOptions(scoring=ScoringNone()))
@@ -684,7 +659,7 @@ class SearchParamsUnitTests:
     def test_params_timeout(self) -> None:
         # A timedelta, a whole number of seconds, and a fractional one: the three input forms,
         # all converging on the same millisecond count, which is the unit the binding reads.
-        timeouts: List[Tuple[Any, int]] = [(timedelta(seconds=20), 20000),
+        timeouts: list[tuple[Any, int]] = [(timedelta(seconds=20), 20000),
                                            (20, 20000),
                                            (25.5, 25500)]
         for timeout, expected_ms in timeouts:
@@ -759,10 +734,10 @@ class SearchParamsUnitTests:
         _assert_query_repr(q, encoded)
 
     def test_raw_query(self) -> None:
-        # No repr assertion: RawQuery passes the body through untouched and does not define
-        # __repr__, so str() reports the default object repr rather than the query it carries.
         q = search.RawQuery({'foo': 'bar'})
-        assert _encoded(q) == _expected_request({'foo': 'bar'})
+        encoded = _encoded(q)
+        assert encoded == _expected_request({'foo': 'bar'})
+        _assert_query_repr(q, encoded)
 
     def test_regexp_query(self) -> None:
         expected = _expected_request({'regexp': 'some?regex'})
@@ -804,7 +779,7 @@ class SearchParamsUnitTests:
 
         # `start`/`end` are the deprecated spelling of `min`/`max`, and both reach the request
         # under the current names.  Empty strings are bounds, not absent bounds.
-        bounds: List[Tuple[Dict[str, Any], Dict[str, Any]]]
+        bounds: list[tuple[dict[str, Any], dict[str, Any]]]
         bounds = [({'start': '', 'end': ''}, {'min': '', 'max': ''}),
                   ({'start': 'startTerm', 'end': 'endTerm'},
                    {'min': 'startTerm', 'max': 'endTerm'}),
@@ -822,7 +797,7 @@ class SearchParamsUnitTests:
                      'max': 'endTerm',
                      'inclusive_min': True,
                      'inclusive_max': True}
-        spellings: List[Dict[str, Any]] = [{'start_inclusive': True, 'end_inclusive': True},
+        spellings: list[dict[str, Any]] = [{'start_inclusive': True, 'end_inclusive': True},
                                            {'inclusive_min': True, 'inclusive_max': True}]
         for kwargs in spellings:
             q = search.TermRangeQuery('startTerm', 'endTerm', **kwargs)
@@ -844,6 +819,243 @@ class SearchParamsUnitTests:
         _assert_query_repr(q, encoded)
 
 
+def _boosted(query: search.SearchQuery) -> search.SearchQuery:
+    query.boost = 2.0
+    return query
+
+
+# One query, sort and facet of every class a request can carry, with every field it declares set.
+# The walk below requires that of this list, so a class or a field added without a shape here fails
+# the walk.
+_SHAPES: list[Any] = [
+    _boosted(search.TermQuery('park', field='f', fuzziness=2, prefix_length=1)),
+    _boosted(search.QueryStringQuery('+description:sea -color_hex:fff5ee')),
+    _boosted(search.WildcardQuery('f0f???', field='f')),
+    _boosted(search.DocIdQuery(['a', 'b'])),
+    _boosted(search.MatchQuery('m', match_operator=MatchOperator.AND, field='f', analyzer='standard',
+                               fuzziness=1, prefix_length=2)),
+    _boosted(search.MatchPhraseQuery('white sands', field='f', analyzer='en')),
+    _boosted(search.PhraseQuery('white', 'sand', field='f')),
+    _boosted(search.PrefixQuery('yel', field='f')),
+    _boosted(search.RegexQuery('f[58]f.*', field='f')),
+    _boosted(search.BooleanFieldQuery(True, field='f')),
+    _boosted(search.GeoDistanceQuery('10mi', (1.0, 2.0), field='g')),
+    _boosted(search.GeoBoundingBoxQuery((0.0, 1.0), (2.0, 3.0), field='g')),
+    _boosted(search.GeoPolygonQuery([(0.0, 0.0), (1.0, 1.0), (1.0, 0.0)], field='g')),
+    _boosted(search.NumericRangeQuery(1, 2, inclusive_min=True, inclusive_max=False, field='f')),
+    _boosted(search.DateRangeQuery('2024-01-01', '2024-02-01', inclusive_start=True, inclusive_end=False,
+                                   datetime_parser='dateTimeOptional', field='f')),
+    _boosted(search.TermRangeQuery(min='a', max='b', inclusive_min=True, inclusive_max=False, field='f')),
+    _boosted(search.ConjunctionQuery(search.TermQuery('a'))),
+    _boosted(search.DisjunctionQuery(search.TermQuery('a'), search.TermQuery('b'), min=2)),
+    _boosted(search.BooleanQuery(must=search.TermQuery('a'), should=search.TermQuery('b'),
+                                 must_not=search.TermQuery('c'))),
+    _boosted(search.MatchAllQuery()),
+    _boosted(search.MatchNoneQuery()),
+    _boosted(search.RawQuery({'term': 'x'})),
+    search.SortScore(desc=True),
+    search.SortID(desc=True),
+    search.SortField('f', type='number', mode='min', missing='last', desc=True),
+    search.SortGeoDistance((1.0, 2.0), 'g', unit='km', desc=True),
+    search.TermFacet('f', 5),
+    search.DateFacet('f', 5).add_range('r', '2024-01-01', '2024-02-01'),
+    search.NumericFacet('f', 5).add_range('r', 1, 2),
+]
+
+
+def _object(encoded: object) -> dict[str, Any]:
+    assert isinstance(encoded, dict)
+    return encoded
+
+
+def _json(obj: Any) -> Any:
+    return obj.as_encodable() if isinstance(obj, search.Sort) else obj.encodable
+
+
+# Each encoder the SDK has, with the shapes it cannot send: a class, or a class and one of its
+# fields, mapped to the reason.  The JSON encoding sends everything.  A protocol that encodes some
+# other way adds its row, and its encoder raises FeatureUnavailableException for exactly what it
+# lists.
+_ENCODERS: list[tuple[str, Callable[[Any], Any], dict[tuple[type, str | None], str]]] = [
+    ('json', _json, {}),
+]
+
+
+def _dsl_classes() -> set[type]:
+    bases = (search.SearchQuery, search.Sort, search.Facet)
+    return {v for v in vars(search).values()
+            if isinstance(v, type) and issubclass(v, bases) and v not in bases}
+
+
+def _declared_fields(cls: type) -> set[str]:
+    return {name for klass in cls.__mro__ for name, attr in vars(klass).items()
+            if name != 'encodable' and hasattr(attr, '__set__') and not name.startswith('_')}
+
+
+class SearchQueryShapeUnitTests:
+    # The query, sort and facet classes read as fields and encoded by each encoder, and the
+    # defects the classes held while they stored the JSON itself.
+
+    def test_every_class_has_a_shape(self) -> None:
+        assert {type(q) for q in _SHAPES} == _dsl_classes()
+
+    def test_every_field_is_set_in_a_shape(self) -> None:
+        unset = {(type(q).__name__, name) for q in _SHAPES for name in _declared_fields(type(q))
+                 if getattr(q, name) is None}
+        assert unset == set()
+
+    @pytest.mark.parametrize('name, encode, unsupported', _ENCODERS, ids=[e[0] for e in _ENCODERS])
+    def test_every_shape_encodes_or_is_listed(self,
+                                              name: str,
+                                              encode: Callable[[Any], Any],
+                                              unsupported: dict[tuple[type, str | None], str]) -> None:
+        for q in _SHAPES:
+            listed = [key for key in unsupported
+                      if key[0] is type(q) and (key[1] is None or getattr(q, key[1]) is not None)]
+            if listed:
+                with pytest.raises(FeatureUnavailableException):
+                    encode(q)
+            else:
+                encode(q)
+
+    def test_json_encoding_is_json(self) -> None:
+        for q in _SHAPES:
+            assert json.loads(json.dumps(_json(q))) == _json(q)
+
+    def test_set_prop_is_sent_over_the_fields(self) -> None:
+        q = search.TermQuery('a', field='f')
+        q.set_prop('field', 'g')
+        q.set_prop('custom', [1])
+        assert q.encodable == {'term': 'a', 'field': 'g', 'custom': [1]}
+        assert q.field == 'f'
+
+    def test_none_leaves_an_optional_field_unset(self) -> None:
+        q = search.MatchQuery('m', field=None, prefix_length=None, match_operator=None)
+        assert q.encodable == {'match': 'm'}
+        q.field = 'f'
+        q.field = None
+        assert q.field is None
+        assert q.encodable == {'match': 'm'}
+
+    def test_required_value_is_required(self) -> None:
+        with pytest.raises(ValueError):
+            search.DocIdQuery(None)
+        with pytest.raises(ValueError):
+            search.TermQuery(term=None)
+
+    def test_unknown_keyword_is_a_type_error(self) -> None:
+        build: Callable[..., Any] = search.TermQuery
+        with pytest.raises(TypeError):
+            build('a', nope=1)
+
+    @pytest.mark.parametrize('value, expected', [(MatchOperator.OR, MatchOperator.OR), ('or', MatchOperator.OR),
+                                                 ('OR', MatchOperator.OR), ('And', MatchOperator.AND)])
+    def test_match_operator_reads_back_and_is_sent_lower_case(self, value: Any, expected: MatchOperator) -> None:
+        q = search.MatchQuery('m', match_operator=value)
+        assert q.match_operator is expected
+        assert _object(q.encodable)['operator'] == expected.value
+
+    @pytest.mark.parametrize('value', [3, '', 'xor'])
+    def test_match_operator_rejects_what_it_cannot_name(self, value: Any) -> None:
+        with pytest.raises(ValueError):
+            search.MatchQuery('m', match_operator=value)
+
+    def test_phrase_query_splits_a_single_string(self) -> None:
+        assert search.PhraseQuery('white sand').terms == ['white', 'sand']
+        assert search.PhraseQuery(terms='white sand').terms == ['white', 'sand']
+        # A list is taken as given, so a term with a space in it stays one term.
+        assert search.PhraseQuery(terms=['white sand']).terms == ['white sand']
+        assert search.PhraseQuery('white sand', 'x').terms == ['white sand', 'x']
+
+    def test_termrange_inclusive_reads_back(self) -> None:
+        q = search.TermRangeQuery(min='a', max='b', inclusive_min=True, inclusive_max=False)
+        assert q.inclusive_min is True
+        assert q.inclusive_max is False
+
+    def test_deprecated_getters_read_the_current_field_and_warn(self) -> None:
+        numeric = search.NumericRangeQuery(1, 2, inclusive_min=True, inclusive_max=False)
+        date = search.DateRangeQuery('a', 'b', inclusive_start=True, inclusive_end=False)
+        term = search.TermRangeQuery(min='a', max='b', inclusive_min=True, inclusive_max=False)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            assert (numeric.min_inclusive, numeric.max_inclusive) == (True, False)
+            assert (date.start_inclusive, date.end_inclusive) == (True, False)
+            assert (term.start, term.end, term.start_inclusive, term.end_inclusive) == ('a', 'b', True, False)
+        read = [str(w.message).split()[2] for w in caught]
+        assert read == ['min_inclusive', 'max_inclusive', 'start_inclusive', 'end_inclusive',
+                        'start', 'end', 'start_inclusive', 'end_inclusive']
+
+    def test_boolean_query_clause_cleared_after_encode(self) -> None:
+        q = search.BooleanQuery(must=search.TermQuery('a'), should=search.TermQuery('b'))
+        assert 'must' in _object(q.encodable)
+        q.must = None
+        assert 'must' not in _object(q.encodable)
+
+    def test_raw_query_leaves_the_caller_dict_alone(self) -> None:
+        body = {'term': 'x'}
+        q = search.RawQuery(body)
+        q.boost = 2.0
+        q.set_prop('field', 'f')
+        assert q.encodable == {'term': 'x', 'boost': 2.0, 'field': 'f'}
+        assert body == {'term': 'x'}
+
+    def test_repr_of_an_invalid_compound_does_not_raise(self) -> None:
+        q = search.ConjunctionQuery()
+        assert repr(q) == 'ConjunctionQuery(query={\'conjuncts\': []})'
+        with pytest.raises(search.NoChildrenException):
+            q.encodable
+
+    def test_sort_and_facet_set_prop_is_sent_over_the_fields(self) -> None:
+        sort = search.SortField('f')
+        sort.set_prop('field', 'g')
+        assert sort.as_encodable() == {'by': 'field', 'field': 'g'}
+        assert sort.field == 'f'
+        facet = search.TermFacet('f')
+        facet.set_prop('size', 3)
+        assert facet.encodable == {'field': 'f', 'size': 3}
+        assert facet.limit is None
+
+    def test_sort_and_facet_none_leaves_an_optional_field_unset(self) -> None:
+        sort = search.SortGeoDistance((1.0, 2.0), 'g', unit=None, desc=None)
+        assert sort.as_encodable() == {'by': 'geo_distance', 'location': [1.0, 2.0], 'field': 'g'}
+        facet = search.TermFacet('f', 3)
+        facet.limit = None
+        assert facet.encodable == {'field': 'f'}
+
+    def test_sort_and_facet_required_value_is_required(self) -> None:
+        build: Callable[..., Any]
+        for build, args in ((search.SortField, (None,)), (search.SortGeoDistance, (None, 'g')),
+                            (search.SortGeoDistance, ((1.0, 2.0), None)), (search.TermFacet, (None,))):
+            with pytest.raises(ValueError):
+                build(*args)
+        sort = search.SortField('f')
+        missing: Any = None
+        with pytest.raises(ValueError):
+            sort.field = missing
+
+    def test_sort_unknown_keyword_is_a_type_error(self) -> None:
+        build: Callable[..., Any] = search.SortField
+        with pytest.raises(TypeError):
+            build('f', nope=1)
+
+    def test_facet_limit_zero_is_sent(self) -> None:
+        assert search.TermFacet('f', 0).encodable == {'field': 'f', 'size': 0}
+
+    def test_sort_encodes_a_new_object_each_time(self) -> None:
+        sort = search.SortID()
+        _object(sort.as_encodable())['by'] = 'score'
+        assert sort.as_encodable() == {'by': 'id'}
+
+    def test_sort_option_takes_a_single_field_name(self) -> None:
+        builder = _params(search.TermQuery('a'), SearchOptions(sort='ab'))
+        assert _encode(builder)['sort_specs'] == ['ab']
+
+    def test_the_classes_are_defined_in_common(self) -> None:
+        for cls in _dsl_classes() | {MatchOperator, HighlightStyle, search.SearchScanConsistency}:
+            is_query = issubclass(cls, search.SearchQuery)
+            assert cls.__module__ == (common_queries if is_query else common_search).__name__
+
+
 class VectorSearchParamsUnitTests:
     # Separate from SearchParamsUnitTests because a vector search is built through
     # SearchRequest rather than by handing a query to the builder.
@@ -857,11 +1069,11 @@ class VectorSearchParamsUnitTests:
 
     TEST_VECTOR_BASE64 = 'SSdtIGp1c3QgYSB0ZXN0IHN0cmluZw=='
 
-    def _encoded_request(self, request: SearchRequest) -> Dict[str, Any]:
+    def _encoded_request(self, request: SearchRequest) -> dict[str, Any]:
         builder = search.SearchQueryBuilder.create_search_query_from_request(INDEX_NAME, request)
         return _encode(builder)
 
-    def _expected(self, *vector_queries: Dict[str, Any], **overrides: Any) -> Dict[str, Any]:
+    def _expected(self, *vector_queries: dict[str, Any], **overrides: Any) -> dict[str, Any]:
         # match_none rather than no query at all: a search request always carries one, so a
         # vector-only search gets one matching nothing and the vector half decides the result.
         return {'query': {'match_none': None},
@@ -1002,10 +1214,49 @@ class VectorSearchParamsUnitTests:
 
         # The combination is only written once there is more than one query to combine, and it
         # is the one place a vector search carries a top-level key beyond the query list.
-        for combination, expected in [(VectorQueryCombination.AND, 'and'),
-                                      (VectorQueryCombination.OR, 'or')]:
+        # Regression guard (PYCBC-1985): it is sent by the core's enumerator name, which is the
+        # only spelling the binding reads; `or` alone was read as `combination_and`.
+        for combination, expected in [(VectorQueryCombination.AND, 'combination_and'),
+                                      (VectorQueryCombination.OR, 'combination_or')]:
             request = SearchRequest.create(
                 VectorSearch(vector_queries,
                              VectorSearchOptions(vector_query_combination=combination)))
             assert self._encoded_request(request) == self._expected(
                 encoded_query, encoded_query, vector_query_combination=expected)
+
+
+@pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+class ClassicSearchParamsUnitTests:
+    # Its classic imports are inside the tests: at module level they would tie the shared tests above
+    # to classic too.
+
+    def test_params_scoring_matches_generated_bindings(self) -> None:
+        # Holds the public scoring types to the generated core binding: each must encode as
+        # exactly one alternative of the request's scoring union, using only keys it declares,
+        # and every alternative must have a public type.
+        from couchbase.protocol.classic._pycbc_core.binding_cpp_types import CppSearchRequest
+
+        alternatives: dict[Any, tuple[str, set[str]]] = {}
+        for alt in get_args(get_type_hints(CppSearchRequest)['scoring']):
+            # NoneType has no hints, so it contributes nothing here.
+            fields = get_type_hints(alt)
+            for name, annotation in fields.items():
+                if get_origin(annotation) is Literal:
+                    for tag in get_args(annotation):
+                        alternatives[tag] = (name, set(fields))
+
+        scorings: list[SearchScoring] = [ReciprocalRankFusion(rank_constant=60, window_size=200),
+                                         RelativeScoreFusion(window_size=200),
+                                         ScoringNone()]
+        for scoring in scorings:
+            encoded = _params(search.TermQuery('someterm'),
+                              SearchOptions(scoring=scoring)).as_encodable()['scoring']
+            claimed = [fields for tag, (key, fields) in alternatives.items()
+                       if encoded.get(key) == tag]
+            assert len(claimed) == 1, (f'{type(scoring).__name__} encodes as {encoded}, which no '
+                                       f'generated scoring alternative claims: {alternatives}')
+            assert set(encoded) <= claimed[0], (f'{type(scoring).__name__} encodes keys the '
+                                                f'generated alternative does not declare: '
+                                                f'{set(encoded) - claimed[0]}')
+
+        assert len(alternatives) == len(scorings)

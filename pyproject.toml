@@ -61,7 +61,13 @@ files = ["tests", "couchbase/tests", "acouchbase/tests", "txcouchbase/tests", "c
          "acouchbase/protocol/classic/_streaming.py", "txcouchbase/protocol/classic/_streaming.py",
          "couchbase/protocol/classic/_n1ql.py", "couchbase/protocol/classic/_analytics.py",
          "couchbase/protocol/classic/_views.py", "couchbase/protocol/classic/_bucket_req_builder.py",
-         "couchbase/protocol/classic/_bucket_types.py"]
+         "couchbase/protocol/classic/_bucket_types.py", "couchbase/common/search.py",
+         "couchbase/common/search_queries.py", "couchbase/common/search_scoring.py",
+         "couchbase/common/vector_search.py", "couchbase/common/search_request.py",
+         "couchbase/protocol/classic/_search.py", "couchbase/protocol/classic/_metadata.py",
+         "couchbase/protocol/classic/_streaming.py", "couchbase/protocol/classic/_cluster_req_builder.py",
+         "couchbase/protocol/classic/_cluster_types.py", "couchbase/protocol/classic/_scope_req_builder.py",
+         "couchbase/protocol/classic/_scope_types.py"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
@@ -123,7 +129,6 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["couchbase.common._interfaces.*",
           "couchbase.common.replica_reads",
-          "couchbase.common.search", "couchbase.common.search_scoring", "couchbase.common.vector_search",
           "couchbase.protocol.classic._transactions_impl", "acouchbase.protocol.classic._transactions_impl"]
 ignore_missing_imports = true
 

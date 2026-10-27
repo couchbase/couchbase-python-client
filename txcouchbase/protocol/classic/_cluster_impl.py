@@ -29,14 +29,15 @@ from couchbase.common._operations import Op
 from couchbase.common.result import (ClusterInfoResult,
                                      DiagnosticsResult,
                                      PingResult)
-from couchbase.protocol.classic._streaming import AnalyticsStreamSpec, QueryStreamSpec
+from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
+                                                   QueryStreamSpec,
+                                                   SearchStreamSpec)
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
 from txcouchbase.protocol.classic._deferred import defer
 from txcouchbase.protocol.classic._streaming import submit_rows
-from txcouchbase.search import FullTextSearchRequest
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -50,7 +51,10 @@ if TYPE_CHECKING:
                                           DiagnosticsOptions,
                                           PingOptions,
                                           QueryOptions,
+                                          SearchOptions,
                                           WaitUntilReadyOptions)
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
     from couchbase.protocol.classic._cluster_types import SearchQueryRequest
 
 
@@ -130,8 +134,25 @@ class TxClusterImpl(AsyncClusterImpl):
                                       streaming_timeout=streaming_timeout)
         return responded.addCallback(lambda _: QueryResult(rows))
 
-    def search_deferred(self, req: SearchQueryRequest) -> Deferred[SearchResult]:
-        """**INTERNAL**"""
+    def search_query_deferred(self,
+                              index: str,
+                              query: SearchQuery,
+                              options: SearchOptions | None = None,
+                              **kwargs: Any) -> Deferred[SearchResult]:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_query_request(index, query, obs_handler, options, **kwargs)
+        return self._search_deferred(req)
+
+    def search_deferred(self,
+                        index: str,
+                        request: SearchRequest | SearchQuery,
+                        options: SearchOptions | None = None,
+                        **kwargs: Any) -> Deferred[SearchResult]:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_request(index, request, obs_handler, options, **kwargs)
+        return self._search_deferred(req)
+
+    def _search_deferred(self, req: SearchQueryRequest) -> Deferred[SearchResult]:
         if not self.connected:
             raise RuntimeError('Cannot attempt to execute a search prior to establishing a connection.')
         # If the search_query was provided a timeout we will use that value for the streaming timeout
@@ -140,24 +161,12 @@ class TxClusterImpl(AsyncClusterImpl):
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
         streaming_timeout = self._streaming_timeouts.get('search_timeout', None)
-        q_req = FullTextSearchRequest.generate_search_request(self.connection,
-                                                              self.loop,
-                                                              req.query_builder.as_encodable(),
-                                                              default_serializer=self.default_serializer,
-                                                              streaming_timeout=streaming_timeout,
-                                                              obs_handler=req.obs_handler)
-        d = Deferred()
-
-        def _on_ok(_):
-            d.callback(SearchResult(q_req))
-
-        def _on_err(exc):
-            d.errback(exc)
-
-        query_d = q_req.execute_search_query()
-        query_d.addCallback(_on_ok)
-        query_d.addErrback(_on_err)
-        return d
+        rows, responded = submit_rows(self.connection,
+                                      self.loop,
+                                      SearchStreamSpec(req.query_builder.as_encodable(), self.default_serializer),
+                                      obs_handler=req.obs_handler,
+                                      streaming_timeout=streaming_timeout)
+        return responded.addCallback(lambda _: SearchResult(rows))
 
     def wait_until_ready_deferred(self,
                                   timeout: timedelta,

@@ -16,17 +16,21 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._supportability import Supportability
 from couchbase.common.diagnostics import ClusterState, ServiceType
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.option_enums import OptionValidationMode
-from couchbase.common.options import (DiagnosticsOptions,
+from couchbase.common.options import (AnalyticsOptions,
+                                      DiagnosticsOptions,
                                       PingOptions,
+                                      QueryOptions,
+                                      SearchOptions,
                                       WaitUntilReadyOptions)
-from couchbase.logic.observability import ObservableRequestHandler as _OldObservableRequestHandler
+from couchbase.common.search_queries import SearchQuery
+from couchbase.common.search_request import SearchRequest
 from couchbase.protocol.classic._analytics import AnalyticsQuery
 from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                        ClusterInfoRequest,
@@ -39,10 +43,8 @@ from couchbase.protocol.classic._cluster_types import (AnalyticsQueryRequest,
                                                        UpdateCredentialsRequest,
                                                        WaitUntilReadyRequest)
 from couchbase.protocol.classic._n1ql import N1QLQuery
-from couchbase.protocol.classic._wire import forward_args
-from couchbase.search import (SearchQuery,
-                              SearchQueryBuilder,
-                              SearchRequest)
+from couchbase.protocol.classic._search import SearchQueryBuilder
+from couchbase.protocol.classic._wire import check_streaming_args, forward_args
 
 if TYPE_CHECKING:
     from couchbase.auth import (CertificateAuthenticator,
@@ -62,6 +64,8 @@ class ClusterRequestBuilder:
                                       **kwargs: object) -> AnalyticsQueryRequest:
         # Accepted and discarded; the statement's builder would send it as a named parameter.
         kwargs.pop('num_workers', None)
+        check_streaming_args(options, kwargs, block=ClusterOptionsBlock.Analytics, options_type=AnalyticsOptions,
+                             mode=self._option_validation)
         return AnalyticsQueryRequest(AnalyticsQuery.create_query_object(statement, *options, **kwargs), obs_handler)
 
     def build_cluster_info_request(self) -> ClusterInfoRequest:
@@ -107,47 +111,42 @@ class ClusterRequestBuilder:
                             **kwargs: object) -> QueryRequest:
         # Accepted and discarded; the statement's builder would send it as a named parameter.
         kwargs.pop('num_workers', None)
+        check_streaming_args(options, kwargs, block=ClusterOptionsBlock.Query, options_type=QueryOptions,
+                             mode=self._option_validation)
         return QueryRequest(N1QLQuery.create_query_object(statement, *options, **kwargs), obs_handler)
 
     def build_search_request(self,
                              index: str,
-                             request: Union[SearchRequest, SearchQuery],
-                             obs_handler: _OldObservableRequestHandler,
-                             *options: object,
+                             request: SearchRequest | SearchQuery,
+                             obs_handler: ObservableRequestHandler,
+                             options: SearchOptions | None = None,
                              **kwargs: object) -> SearchQueryRequest:
-        num_workers = kwargs.pop('num_workers', None)
-
+        check_streaming_args((options,), kwargs, block=ClusterOptionsBlock.Search, options_type=SearchOptions,
+                             mode=self._option_validation)
         if isinstance(request, SearchQuery):
             Supportability.method_param_type_deprecated('search', 'request', 'SearchQuery', 'SearchRequest')
-            query_builder = SearchQueryBuilder.create_search_query_object(index, request, *options, **kwargs)
+            query_builder = SearchQueryBuilder.create_search_query_object(index, request, options, **kwargs)
         else:
-            query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, *options, **kwargs)
+            query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, options, **kwargs)
 
-        req = SearchQueryRequest(query_builder, obs_handler)
-        # since query is lazy executed, we wait until we submit the query to create the span
-        if num_workers:
-            req.num_workers = num_workers
-        return req
+        return SearchQueryRequest(query_builder, obs_handler)
 
     def build_search_query_request(self,
                                    index: str,
                                    query: SearchQuery,
-                                   obs_handler: _OldObservableRequestHandler,
-                                   *options: object,
+                                   obs_handler: ObservableRequestHandler,
+                                   options: SearchOptions | None = None,
                                    **kwargs: object) -> SearchQueryRequest:
+        check_streaming_args((options,), kwargs, block=ClusterOptionsBlock.Search, options_type=SearchOptions,
+                             mode=self._option_validation)
         if isinstance(query, SearchRequest):
             raise InvalidArgumentException(
                 message=('A SearchRequest is not a valid search_query() query. '
                          'Pass it to search() instead.'))
 
-        num_workers = kwargs.pop('num_workers', None)
-        query_builder = SearchQueryBuilder.create_search_query_object(index, query, *options, **kwargs)
+        query_builder = SearchQueryBuilder.create_search_query_object(index, query, options, **kwargs)
 
-        req = SearchQueryRequest(query_builder, obs_handler)
-        # since query is lazy executed, we wait until we submit the query to create the span
-        if num_workers:
-            req.num_workers = num_workers
-        return req
+        return SearchQueryRequest(query_builder, obs_handler)
 
     def build_update_credential_request(
             self, authenticator: CertificateAuthenticator | JwtAuthenticator | PasswordAuthenticator

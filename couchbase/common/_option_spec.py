@@ -249,8 +249,7 @@ SKIP = OptionSpec('skip')
 SORT = OptionSpec('sort')
 STARTKEY = OptionSpec('startkey')
 STARTKEY_DOCID = OptionSpec('startkey_docid')
-STREAMING_SCOPE_NAME = OptionSpec('scope_name', inert=frozenset({'classic'}),
-                                  deprecated='The search API does not use this option.')
+STREAMING_SCOPE_NAME = OptionSpec('scope_name', deprecated='Use Scope.search() instead.')
 USE_REPLICA = OptionSpec('use_replica')
 VECTOR_QUERY_COMBINATION = OptionSpec('vector_query_combination')
 

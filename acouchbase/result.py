@@ -18,6 +18,7 @@ from __future__ import annotations
 __all__ = [
     'AsyncAnalyticsResult',
     'AsyncQueryResult',
+    'AsyncSearchResult',
     'AsyncViewResult',
     'ClusterInfoResult',
     'ContentProxy',
@@ -78,12 +79,14 @@ from couchbase.result import (ClusterInfoResult,
                               ValueResult,
                               _AnalyticsResult,
                               _QueryResult,
+                              _SearchResult,
                               _ViewResult)
 
 if TYPE_CHECKING:
     from couchbase.common._streaming import AsyncRowIterator
     from couchbase.common.analytics import AnalyticsMetaData
     from couchbase.common.n1ql import QueryMetaData
+    from couchbase.common.search import SearchRow, _SearchFinalMetadata
     from couchbase.common.views import ViewMetaData, ViewRow
 
 
@@ -125,6 +128,26 @@ class AsyncAnalyticsResult(_AnalyticsResult):
         return self.__aiter__()
 
     def __aiter__(self) -> AsyncRowIterator[Any, AnalyticsMetaData]:
+        return self._request.__aiter__()
+
+
+class AsyncSearchResult(_SearchResult):
+    _request: AsyncRowIterator[SearchRow, _SearchFinalMetadata]
+
+    def rows(self) -> AsyncRowIterator[SearchRow, _SearchFinalMetadata]:
+        """The rows which have been returned by the search query.
+
+        .. note::
+            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
+            internal timeout boundaries while waiting on the server, so it may take a moment
+            to be delivered rather than firing instantly.
+
+        Returns:
+            AsyncIterable: An async iterable over the search query's rows.  Use ``async for`` to loop over it.
+        """
+        return self.__aiter__()
+
+    def __aiter__(self) -> AsyncRowIterator[SearchRow, _SearchFinalMetadata]:
         return self._request.__aiter__()
 
 

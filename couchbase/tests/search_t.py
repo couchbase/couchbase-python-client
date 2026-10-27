@@ -319,6 +319,7 @@ class SearchTestSuite(SuiteRequirements):
         assert isinstance(result_facet, SearchFacetResult)
         assert result_facet.name == facet_name
         assert result_facet.field == facet_name
+        assert result_facet.date_ranges is not None
         assert all(isinstance(ft, SearchDateRangeFacet) for ft in result_facet.date_ranges)
         assert len(result_facet.date_ranges) <= facet_limit
 
@@ -416,6 +417,7 @@ class SearchTestSuite(SuiteRequirements):
         assert isinstance(result_facet, SearchFacetResult)
         assert result_facet.name == facet_name
         assert result_facet.field == facet_name
+        assert result_facet.numeric_ranges is not None
         assert all(isinstance(ft, SearchNumericRangeFacet) for ft in result_facet.numeric_ranges)
         assert len(result_facet.numeric_ranges) <= facet_limit
 
@@ -470,6 +472,7 @@ class SearchTestSuite(SuiteRequirements):
         assert isinstance(result_facet, SearchFacetResult)
         assert result_facet.name == facet_name
         assert result_facet.field == facet_name
+        assert result_facet.terms is not None
         assert all(isinstance(ft, SearchTermFacet) for ft in result_facet.terms)
         assert len(result_facet.terms) <= facet_limit
 

@@ -15,12 +15,17 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import (Any,
-                    Dict,
-                    Optional)
+__all__ = [
+    'ReciprocalRankFusion',
+    'RelativeScoreFusion',
+    'ScoringNone',
+    'SearchScoring',
+]
 
-from couchbase.exceptions import InvalidArgumentException
+from abc import ABC, abstractmethod
+from typing import Any
+
+from couchbase.common.exceptions import InvalidArgumentException
 
 
 class SearchScoring(ABC):
@@ -39,9 +44,9 @@ class SearchScoring(ABC):
     """
 
     @abstractmethod
-    def __init__(self, strategy: str, **params: Optional[int]) -> None:
+    def __init__(self, strategy: str, **params: int | None) -> None:
         # Keep these values in sync with search_scoring_mode in bindings.yaml.
-        self._params: Dict[str, Any] = {'scoring_type': strategy}
+        self._params: dict[str, Any] = {'scoring_type': strategy}
         for name, value in params.items():
             if value is None:
                 continue
@@ -53,7 +58,7 @@ class SearchScoring(ABC):
                 raise InvalidArgumentException(message=f'Expected {name} to be in the range 0 to 4294967295.')
             self._params[name] = value
 
-    def as_encodable(self) -> Dict[str, Any]:
+    def as_encodable(self) -> dict[str, Any]:
         """
             **INTERNAL**
         """
@@ -75,10 +80,7 @@ class ReciprocalRankFusion(SearchScoring):
 
     """
 
-    def __init__(self,
-                 rank_constant=None,  # type: Optional[int]
-                 window_size=None,  # type: Optional[int]
-                 ) -> None:
+    def __init__(self, rank_constant: int | None = None, window_size: int | None = None) -> None:
         super().__init__('reciprocal_rank_fusion', rank_constant=rank_constant, window_size=window_size)
 
 
@@ -96,9 +98,7 @@ class RelativeScoreFusion(SearchScoring):
 
     """
 
-    def __init__(self,
-                 window_size=None,  # type: Optional[int]
-                 ) -> None:
+    def __init__(self, window_size: int | None = None) -> None:
         super().__init__('relative_score_fusion', window_size=window_size)
 
 

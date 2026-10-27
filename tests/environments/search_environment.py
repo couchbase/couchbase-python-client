@@ -56,7 +56,7 @@ from __future__ import annotations
 
 import time
 from datetime import timedelta
-from typing import Any, Union
+from typing import Any
 
 from couchbase.exceptions import SearchIndexNotFoundException
 from couchbase.management.search import SearchIndex
@@ -84,7 +84,7 @@ from tests.test_features import EnvironmentFeatures, ServerFeatures
 
 # Both classes wrap the same five methods the index lifecycle here calls, but they are
 # siblings rather than one subclassing the other, so the union is what names them.
-_SearchIndexManager = Union[TestEnvironmentSearchIndexManager, TestEnvironmentScopeSearchIndexManager]
+_SearchIndexManager = TestEnvironmentSearchIndexManager | TestEnvironmentScopeSearchIndexManager
 
 
 class SearchEnvironment:
@@ -131,10 +131,8 @@ class SearchEnvironment:
 
     @staticmethod
     def _validate_metadata(result: SearchResult, expected_count: int) -> None:
-        meta = result.metadata()
-        cb_assert_isinstance(meta, SearchMetaData, what='search result metadata')
-        metrics = meta.metrics()
-        cb_assert_isinstance(metrics, SearchMetrics, what='search result metrics')
+        meta = cb_assert_isinstance(result.metadata(), SearchMetaData, what='search result metadata')
+        metrics = cb_assert_isinstance(meta.metrics(), SearchMetrics, what='search result metrics')
         errored = metrics.error_partition_count()
         succeeded = metrics.success_partition_count()
         cb_assert_isinstance(errored, int, what='search metrics error_partition_count')

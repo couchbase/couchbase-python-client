@@ -13,7 +13,79 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+__all__ = [
+    'BooleanFieldQuery',
+    'BooleanQuery',
+    'ConjunctionQuery',
+    'DateFacet',
+    'DateRangeQuery',
+    'DisjunctionQuery',
+    'DocIdQuery',
+    'Facet',
+    'GeoBoundingBoxQuery',
+    'GeoDistanceQuery',
+    'GeoPolygonQuery',
+    'HighlightStyle',
+    'MatchAllQuery',
+    'MatchNoneQuery',
+    'MatchOperator',
+    'MatchPhraseQuery',
+    'MatchQuery',
+    'NumericFacet',
+    'NumericRangeQuery',
+    'PhraseQuery',
+    'PrefixQuery',
+    'QueryStringQuery',
+    'RawQuery',
+    'RegexQuery',
+    'SearchDateRangeFacet',
+    'SearchFacetResult',
+    'SearchMetaData',
+    'SearchMetrics',
+    'SearchNumericRangeFacet',
+    'SearchQuery',
+    'SearchRequest',
+    'SearchRow',
+    'SearchRowFields',
+    'SearchRowLocation',
+    'SearchRowLocations',
+    'SearchScanConsistency',
+    'SearchTermFacet',
+    'Sort',
+    'SortField',
+    'SortGeoDistance',
+    'SortID',
+    'SortScore',
+    'TermFacet',
+    'TermQuery',
+    'TermRangeQuery',
+    'WildcardQuery',
+]
+
+from couchbase.common import options
 from couchbase.common._supportability import Supportability
+from couchbase.common.search import DateFacet  # noqa: F401
+from couchbase.common.search import Facet  # noqa: F401
+from couchbase.common.search import HighlightStyle  # noqa: F401
+from couchbase.common.search import MatchOperator  # noqa: F401
+from couchbase.common.search import NumericFacet  # noqa: F401
+from couchbase.common.search import SearchDateRangeFacet  # noqa: F401
+from couchbase.common.search import SearchFacetResult  # noqa: F401
+from couchbase.common.search import SearchMetaData  # noqa: F401
+from couchbase.common.search import SearchMetrics  # noqa: F401
+from couchbase.common.search import SearchNumericRangeFacet  # noqa: F401
+from couchbase.common.search import SearchRow  # noqa: F401
+from couchbase.common.search import SearchRowFields  # noqa: F401
+from couchbase.common.search import SearchRowLocation  # noqa: F401
+from couchbase.common.search import SearchRowLocations  # noqa: F401
+from couchbase.common.search import SearchScanConsistency  # noqa: F401
+from couchbase.common.search import SearchTermFacet  # noqa: F401
+from couchbase.common.search import Sort  # noqa: F401
+from couchbase.common.search import SortField  # noqa: F401
+from couchbase.common.search import SortGeoDistance  # noqa: F401
+from couchbase.common.search import SortID  # noqa: F401
+from couchbase.common.search import SortScore  # noqa: F401
+from couchbase.common.search import TermFacet  # noqa: F401
 from couchbase.common.search_queries import BooleanFieldQuery  # noqa: F401
 from couchbase.common.search_queries import BooleanQuery  # noqa: F401
 from couchbase.common.search_queries import ConjunctionQuery  # noqa: F401
@@ -25,7 +97,6 @@ from couchbase.common.search_queries import GeoDistanceQuery  # noqa: F401
 from couchbase.common.search_queries import GeoPolygonQuery  # noqa: F401
 from couchbase.common.search_queries import MatchAllQuery  # noqa: F401
 from couchbase.common.search_queries import MatchNoneQuery  # noqa: F401
-from couchbase.common.search_queries import MatchOperator  # noqa: F401
 from couchbase.common.search_queries import MatchPhraseQuery  # noqa: F401
 from couchbase.common.search_queries import MatchQuery  # noqa: F401
 from couchbase.common.search_queries import NumericRangeQuery  # noqa: F401
@@ -40,96 +111,7 @@ from couchbase.common.search_queries import TermRangeQuery  # noqa: F401
 from couchbase.common.search_queries import WildcardQuery  # noqa: F401
 from couchbase.common.search_request import SearchRequest  # noqa: F401
 from couchbase.exceptions import NoChildrenException  # noqa: F401
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  AlreadyQueriedException,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap)
-from couchbase.logic.search import DateFacet  # noqa: F401
-from couchbase.logic.search import Facet  # noqa: F401
-from couchbase.logic.search import HighlightStyle  # noqa: F401
-from couchbase.logic.search import NumericFacet  # noqa: F401
-from couchbase.logic.search import SearchDateRangeFacet  # noqa: F401
-from couchbase.logic.search import SearchFacetResult  # noqa: F401
-from couchbase.logic.search import SearchMetaData  # noqa: F401
-from couchbase.logic.search import SearchMetrics  # noqa: F401
-from couchbase.logic.search import SearchNumericRangeFacet  # noqa: F401
-from couchbase.logic.search import SearchQueryBuilder  # noqa: F401
-from couchbase.logic.search import SearchRow  # noqa: F401
-from couchbase.logic.search import SearchRowFields  # noqa: F401
-from couchbase.logic.search import SearchRowLocation  # noqa: F401
-from couchbase.logic.search import SearchRowLocations  # noqa: F401
-from couchbase.logic.search import SearchScanConsistency  # noqa: F401
-from couchbase.logic.search import SearchTermFacet  # noqa: F401
-from couchbase.logic.search import Sort  # noqa: F401
-from couchbase.logic.search import SortField  # noqa: F401
-from couchbase.logic.search import SortGeoDistance  # noqa: F401
-from couchbase.logic.search import SortID  # noqa: F401
-from couchbase.logic.search import SortScore  # noqa: F401
-from couchbase.logic.search import TermFacet  # noqa: F401
-from couchbase.logic.search import FullTextSearchRequestLogic
-from couchbase.logic.streaming import stream_next
-from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
-
-
-class FullTextSearchRequest(FullTextSearchRequestLogic):
-    def __init__(self,
-                 connection,
-                 encoded_query,
-                 **kwargs
-                 ):
-        super().__init__(connection, encoded_query, **kwargs)
-
-    @classmethod
-    def generate_search_request(cls, connection, encoded_query, **kwargs):
-        return cls(connection, encoded_query, **kwargs)
-
-    def execute(self):
-        return [r for r in list(self)]
-
-    def _get_metadata(self):
-        try:
-            # @TODO:  PYCBC-1524
-            search_response = next(self._streaming_result)
-            self._set_metadata(search_response)
-        except CouchbaseException as ex:
-            raise ex
-        except Exception as ex:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(str(ex))
-            raise excptn
-
-    def __iter__(self):
-        if self.done_streaming:
-            raise AlreadyQueriedException()
-
-        if not self.started_streaming:
-            self._submit_query()
-
-        return self
-
-    def _get_next_row(self):
-        if self.done_streaming is True:
-            return
-
-        try:
-            row = next(self._streaming_result)
-        except StopIteration:
-            # @TODO:  PYCBC-1524
-            row = next(self._streaming_result)
-
-        if isinstance(row, PycbcCoreException):
-            raise ErrorMapper.build_exception(row)
-
-        # should only be None once query request is complete and _no_ errors found
-        if row is None:
-            raise StopIteration
-
-        return self._deserialize_row(row)
-
-    def __next__(self):
-        return stream_next(self)
-
+from couchbase.protocol.classic._search import SearchQueryBuilder  # noqa: F401
 
 """
 ** DEPRECATION NOTICE **
@@ -140,9 +122,7 @@ Instead use:
 
 """
 
-from couchbase.logic.options import SearchOptionsBase  # nopep8 # isort:skip # noqa: E402
-
 
 @Supportability.import_deprecated('couchbase.search', 'couchbase.options')
-class SearchOptions(SearchOptionsBase):  # noqa: F811
+class SearchOptions(options.SearchOptions):  # noqa: F811
     pass

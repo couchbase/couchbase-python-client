@@ -15,7 +15,7 @@
 
 """FTS index setup, teardown and row validation for the acouchbase search suites.
 
-The async counterpart of search_environment.py, and the same shape.  Three things differ
+The async counterpart of search_environment.py, and the same shape.  Four things differ
 from the sync module, all forced by the SDK rather than chosen:
 
   * every manager call is awaited, since AsyncTestEnvironmentSearchIndexManager returns
@@ -30,6 +30,9 @@ from the sync module, all forced by the SDK rather than chosen:
     iterator, it iterates nothing, so every assertion would compare against an empty list
     and `assert_rows_exact(result, 0)` in particular would pass on any result at all.
     Same trap as async_query_environment._wait_for_query_index; see its docstring.
+  * the result is an `AsyncSearchResult`, from acouchbase.result.  It shares a private base
+    with the sync `SearchResult` and subclasses neither, so the drain's isinstance check
+    names the async class.
 
 Everything else, including which of the two assertions a given call site wants, is settled
 in the sync module's docstring and not restated here.
@@ -39,11 +42,11 @@ from __future__ import annotations
 
 import time
 from datetime import timedelta
-from typing import Any, Union
+from typing import Any
 
+from acouchbase.result import AsyncSearchResult
 from couchbase.exceptions import SearchIndexNotFoundException
 from couchbase.management.search import SearchIndex
-from couchbase.result import SearchResult
 from couchbase.search import (SearchMetaData,
                               SearchMetrics,
                               SearchRow,
@@ -64,8 +67,7 @@ from tests.search_index_defs import (collection_index_name,
 from tests.skips import CouchbaseTestEnvironmentException
 from tests.test_features import EnvironmentFeatures, ServerFeatures
 
-_SearchIndexManager = Union[AsyncTestEnvironmentSearchIndexManager,
-                            AsyncTestEnvironmentScopeSearchIndexManager]
+_SearchIndexManager = AsyncTestEnvironmentSearchIndexManager | AsyncTestEnvironmentScopeSearchIndexManager
 
 
 class AsyncSearchEnvironment:
@@ -96,11 +98,9 @@ class AsyncSearchEnvironment:
             cb_assert_isinstance(row.fields, SearchRowFields, what='search row fields')
 
     @staticmethod
-    def _validate_metadata(result: SearchResult, expected_count: int) -> None:
-        meta = result.metadata()
-        cb_assert_isinstance(meta, SearchMetaData, what='search result metadata')
-        metrics = meta.metrics()
-        cb_assert_isinstance(metrics, SearchMetrics, what='search result metrics')
+    def _validate_metadata(result: AsyncSearchResult, expected_count: int) -> None:
+        meta = cb_assert_isinstance(result.metadata(), SearchMetaData, what='search result metadata')
+        metrics = cb_assert_isinstance(meta.metrics(), SearchMetrics, what='search result metrics')
         errored = metrics.error_partition_count()
         succeeded = metrics.success_partition_count()
         cb_assert_isinstance(errored, int, what='search metrics error_partition_count')
@@ -115,9 +115,9 @@ class AsyncSearchEnvironment:
         cb_assert_gte(metrics.total_rows(), expected_count, what='search metrics total_rows')
 
     @staticmethod
-    async def _drain(result: SearchResult, expected_count: int) -> list[SearchRow]:
+    async def _drain(result: AsyncSearchResult, expected_count: int) -> list[SearchRow]:
         """Validate every row and the metadata in one pass, and return the rows."""
-        cb_assert_isinstance(result, SearchResult, what='result passed to _drain')
+        cb_assert_isinstance(result, AsyncSearchResult, what='result passed to _drain')
         rows: list[SearchRow] = []
         async for row in result.rows():
             assert row is not None, f'search result yielded a None row at index {len(rows)}'
@@ -127,14 +127,14 @@ class AsyncSearchEnvironment:
         return rows
 
     @staticmethod
-    async def assert_rows_exact(result: SearchResult, expected_count: int) -> list[SearchRow]:
+    async def assert_rows_exact(result: AsyncSearchResult, expected_count: int) -> list[SearchRow]:
         """Assert the result yields exactly expected_count validated rows, and return them."""
         rows = await AsyncSearchEnvironment._drain(result, expected_count)
         cb_assert_eq(len(rows), expected_count, what='search rows returned')
         return rows
 
     @staticmethod
-    async def assert_rows_at_least(result: SearchResult, expected_count: int) -> list[SearchRow]:
+    async def assert_rows_at_least(result: AsyncSearchResult, expected_count: int) -> list[SearchRow]:
         """Assert the result yields at least expected_count validated rows, and return them."""
         rows = await AsyncSearchEnvironment._drain(result, expected_count)
         cb_assert_gte(len(rows), expected_count, what='search rows returned')

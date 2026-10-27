@@ -21,7 +21,6 @@ from dataclasses import dataclass, fields
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
-                    Optional,
                     TypedDict)
 
 from couchbase import USER_AGENT_EXTRA
@@ -29,8 +28,6 @@ from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._option_diagnostics import OptionsBlock
 from couchbase.common._transforms import timedelta_as_milliseconds
 from couchbase.common.protocol import CouchbaseProtocol
-from couchbase.logic.observability import ObservableRequestHandler as _OldObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.protocol.classic._bindings import ClusterMgmtBinding, ConnectionBinding
 from couchbase.protocol.classic._wire import mapped
 
@@ -39,12 +36,15 @@ if TYPE_CHECKING:
     from couchbase.common.diagnostics import ClusterState
     from couchbase.protocol.classic._analytics import AnalyticsQuery
     from couchbase.protocol.classic._n1ql import N1QLQuery
-    from couchbase.search import SearchQueryBuilder
+    from couchbase.protocol.classic._search import SearchQueryBuilder
 
 
 class ClusterOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    Analytics = 'AnalyticsOptions'
     Diagnostics = 'DiagnosticsOptions'
     Ping = 'PingOptions'
+    Query = 'QueryOptions'
+    Search = 'SearchOptions'
     WaitUntilReady = 'WaitUntilReadyOptions'
 
 
@@ -217,12 +217,7 @@ class QueryRequest:
 @dataclass
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
-    obs_handler: _OldObservableRequestHandler
-    num_workers: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return StreamingOperationType.SearchQuery
+    obs_handler: ObservableRequestHandler
 
 
 @dataclass

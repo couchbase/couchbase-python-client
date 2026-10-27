@@ -20,9 +20,7 @@ __all__ = [
 ]
 
 from datetime import timedelta
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Union)
+from typing import TYPE_CHECKING, Any
 
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
@@ -32,8 +30,6 @@ from couchbase.common import options
 from couchbase.common._registry import CLUSTER, resolve
 from couchbase.common._supportability import Supportability
 from couchbase.common.protocol import CouchbaseProtocol
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.management.analytics import AnalyticsIndexManager
 from couchbase.management.buckets import BucketManager
 from couchbase.management.eventing import EventingFunctionManager
@@ -398,12 +394,14 @@ class Cluster:
         return self._impl.analytics_query(statement, *options, **kwargs)
 
     def search_query(self,
-                     index,  # type: str
-                     query,  # type: SearchQuery
-                     *options,  # type: SearchOptions
-                     **kwargs   # type: Any
-                     ) -> SearchResult:
+                     index: str,
+                     query: SearchQuery,
+                     options: SearchOptions | None = None,
+                     **kwargs: Any) -> SearchResult:
         """Executes an search query against the cluster.
+
+        .. deprecated:: 4.1.11
+            Use :meth:`~couchbase.cluster.Cluster.search` instead.
 
         .. note::
             The search query is executed lazily in that it is executed once iteration over the
@@ -417,7 +415,7 @@ class Cluster:
             query (:class:`~couchbase.search.SearchQuery`): Type of search query to perform.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query
                 operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -494,17 +492,13 @@ class Cluster:
                     print(f'Locations: {row.locations}')
 
         """
-        op_type = StreamingOperationType.SearchQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_search_query_request(index, query, obs_handler, *options, **kwargs)
-        return self._impl.search(req)
+        return self._impl.search_query(index, query, options, **kwargs)
 
     def search(self,
-               index,  # type: str
-               request,  # type: Union[SearchRequest, SearchQuery]
-               *options,  # type: SearchOptions
-               **kwargs,  # type: Any
-               ) -> SearchResult:
+               index: str,
+               request: SearchRequest | SearchQuery,
+               options: SearchOptions | None = None,
+               **kwargs: Any) -> SearchResult:
         """Executes an search against the cluster.
 
         .. note::
@@ -517,11 +511,14 @@ class Cluster:
 
         Args:
             index (str): Name of the search index to use.
-            request (Union[:class:`~couchbase.search.SearchRequest`, :class:`~couchbase.search.SearchQuery`]): Type of
-                search request to perform.  Passing a :class:`~couchbase.search.SearchQuery` is deprecated and will be
-                removed in a future release; wrap it with :meth:`~couchbase.search.SearchRequest.create` instead.
+            request (:class:`~couchbase.search.SearchRequest` | :class:`~couchbase.search.SearchQuery`): Type of
+                search request to perform.
+
+                .. deprecated:: 4.7.0
+                    Passing a :class:`~couchbase.search.SearchQuery` is deprecated; wrap it with
+                    :meth:`~couchbase.search.SearchRequest.create` instead.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -559,9 +556,11 @@ class Cluster:
 
                 # ... other code ...
 
-                # NOTE:  the vector is expected to be type List[float], set the vector to the appropriate value, this is an example.
+                # NOTE:  the vector is expected to be type list[float], set the vector to the appropriate value,
+                # this is an example.
                 vector = [-0.014653487130999565, -0.008658270351588726, 0.017129190266132355, -0.015563474968075752]
-                request = search.SearchRequest.create(VectorSearch.from_vector_query(VectorQuery('vector_field', vector)))
+                vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', vector))
+                request = search.SearchRequest.create(vector_search)
                 q_res = cluster.search('travel-sample-vector-index',
                                        request,
                                        SearchOptions(limit=10))
@@ -577,7 +576,8 @@ class Cluster:
 
                 # ... other code ...
 
-                # NOTE:  the vector is expected to be type List[float], set the vector to the appropriate value, this is an example.
+                # NOTE:  the vector is expected to be type list[float], set the vector to the appropriate value,
+                # this is an example.
                 vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', [-0.014653487130999565,
                                                                                             -0.008658270351588726,
                                                                                             0.017129190266132355,
@@ -589,11 +589,8 @@ class Cluster:
 
                 for row in q_res.rows():
                     print(f'Found row: {row}')
-        """  # noqa: E501
-        op_type = StreamingOperationType.SearchQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_search_request(index, request, obs_handler, *options, **kwargs)
-        return self._impl.search(req)
+        """
+        return self._impl.search(index, request, options, **kwargs)
 
     def buckets(self) -> BucketManager:
         """

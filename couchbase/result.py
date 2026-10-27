@@ -62,7 +62,6 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 import couchbase.common.result as _common_result
-from acouchbase.search import AsyncFullTextSearchRequest
 from couchbase.common._supportability import Supportability
 from couchbase.common.result import ClusterInfoResult  # noqa: F401
 from couchbase.common.result import DiagnosticsResult  # noqa: F401
@@ -82,6 +81,10 @@ if TYPE_CHECKING:
     from couchbase.common._streaming import RowIterator
     from couchbase.common.analytics import AnalyticsMetaData
     from couchbase.common.n1ql import QueryMetaData
+    from couchbase.common.search import (SearchFacetResult,
+                                         SearchMetaData,
+                                         SearchRow,
+                                         _SearchFinalMetadata)
     from couchbase.common.views import ViewMetaData, ViewRow
 
 
@@ -228,21 +231,36 @@ class AnalyticsResult(_AnalyticsResult):
         return self._request.__iter__()
 
 
-class SearchResult:
-    def __init__(
-        self,
-        search_request
-    ):
+class _SearchResult:
+    def __init__(self, search_request: _Rows[object, _SearchFinalMetadata]) -> None:
         self._request = search_request
 
-    def __repr__(self):
-        return "SearchResult:{}".format(self._request)
+    def metadata(self) -> SearchMetaData | None:
+        """The meta-data which has been returned by the search query.
 
-    def rows(self):
+        Returns:
+            :class:`~couchbase.search.SearchMetaData`: An instance of
+            :class:`~couchbase.search.SearchMetaData`.
+        """
+        final_metadata = self._request.final_metadata()
+        return None if final_metadata is None else final_metadata.metadata
+
+    def result_rows(self) -> None:
+        return None
+
+    def facets(self) -> dict[str, SearchFacetResult] | None:
+        final_metadata = self._request.final_metadata()
+        return None if final_metadata is None else final_metadata.facets
+
+    def __repr__(self) -> str:
+        return '{}:{}'.format(type(self).__name__, self._request)
+
+
+class SearchResult(_SearchResult):
+    _request: RowIterator[SearchRow, _SearchFinalMetadata]
+
+    def rows(self) -> RowIterator[SearchRow, _SearchFinalMetadata]:
         """The rows which have been returned by the search query.
-
-        .. note::
-            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
 
         .. note::
             A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
@@ -250,32 +268,12 @@ class SearchResult:
             to be delivered rather than firing instantly.
 
         Returns:
-            Iterable: Either an iterable or async iterable.
+            Iterable: An iterable over the search query's rows.
         """
-        if isinstance(self._request, AsyncFullTextSearchRequest):
-            return self.__aiter__()
         return self.__iter__()
 
-    def metadata(self):
-        """The meta-data which has been returned by the search query.
-
-        Returns:
-            :class:`~couchbase.search.SearchMetaData`: An instance of
-            :class:`~couchbase.search.SearchMetaData`.
-        """
-        return self._request.metadata()
-
-    def result_rows(self):
-        return self._request.result_rows()
-
-    def facets(self):
-        return self._request.result_facets()
-
-    def __iter__(self):
+    def __iter__(self) -> RowIterator[SearchRow, _SearchFinalMetadata]:
         return self._request.__iter__()
-
-    def __aiter__(self):
-        return self._request.__aiter__()
 
 
 class _ViewResult:

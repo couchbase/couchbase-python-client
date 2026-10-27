@@ -27,18 +27,22 @@ from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._scope_req_builder import ScopeRequestBuilder
 from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
                                                    ClassicStreamingExecutor,
-                                                   QueryStreamSpec)
+                                                   QueryStreamSpec,
+                                                   SearchStreamSpec)
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
-from couchbase.search import FullTextSearchRequest
 from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from couchbase.common._utils import JSONType
-    from couchbase.common.options import AnalyticsOptions, QueryOptions
+    from couchbase.common.options import (AnalyticsOptions,
+                                          QueryOptions,
+                                          SearchOptions)
     from couchbase.common.protocol import CouchbaseProtocol
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
     from couchbase.protocol.classic._bucket_impl import BucketImpl
     from couchbase.protocol.classic._client_adapter import ClientAdapter
     from couchbase.protocol.classic._scope_types import SearchQueryRequest
@@ -51,7 +55,8 @@ class ScopeImpl:
         self._bucket_impl = bucket_impl
         # needed for the CollectionImpl
         self._client_adapter: ClientAdapter = bucket_impl._client_adapter
-        self._request_builder = ScopeRequestBuilder(self._bucket_impl.bucket_name, self._scope_name)
+        self._request_builder = ScopeRequestBuilder(self._bucket_impl.bucket_name, self._scope_name,
+                                                    self._client_adapter.option_validation)
 
     @property
     def couchbase_protocol(self) -> CouchbaseProtocol:
@@ -154,7 +159,25 @@ class ScopeImpl:
                                                                     obs_handler=req.obs_handler,
                                                                     streaming_timeout=streaming_timeout)))
 
-    def search(self, req: SearchQueryRequest) -> SearchResult:
+    def search_query(self,
+                     index: str,
+                     query: SearchQuery,
+                     options: SearchOptions | None = None,
+                     **kwargs: Any) -> SearchResult:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_query_request(index, query, obs_handler, options, **kwargs)
+        return self._search(req)
+
+    def search(self,
+               index: str,
+               request: SearchRequest | SearchQuery,
+               options: SearchOptions | None = None,
+               **kwargs: Any) -> SearchResult:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_request(index, request, obs_handler, options, **kwargs)
+        return self._search(req)
+
+    def _search(self, req: SearchQueryRequest) -> SearchResult:
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the search_query was provided a timeout we will use that value for the streaming timeout
@@ -163,10 +186,10 @@ class ScopeImpl:
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
         streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
-        return SearchResult(FullTextSearchRequest.generate_search_request(self.connection,
-                                                                          req.query_builder.as_encodable(),
-                                                                          default_serializer=self.default_serializer,
-                                                                          streaming_timeout=streaming_timeout,
-                                                                          obs_handler=req.obs_handler,
-                                                                          bucket_name=req.bucket_name,
-                                                                          scope_name=req.scope_name))
+        return SearchResult(RowIterator(ClassicStreamingExecutor(self.connection,
+                                                                 SearchStreamSpec(req.query_builder.as_encodable(),
+                                                                                  self.default_serializer,
+                                                                                  bucket_name=req.bucket_name,
+                                                                                  scope_name=req.scope_name),
+                                                                 obs_handler=req.obs_handler,
+                                                                 streaming_timeout=streaming_timeout)))

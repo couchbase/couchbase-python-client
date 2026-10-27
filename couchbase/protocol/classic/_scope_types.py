@@ -16,16 +16,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from couchbase.common._observability import ObservableRequestHandler
-from couchbase.logic.observability import ObservableRequestHandler as _OldObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
+from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common.protocol import CouchbaseProtocol
 
 if TYPE_CHECKING:
     from couchbase.protocol.classic._analytics import AnalyticsQuery
     from couchbase.protocol.classic._n1ql import N1QLQuery
-    from couchbase.search import SearchQueryBuilder
+    from couchbase.protocol.classic._search import SearchQueryBuilder
+
+
+class ScopeOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    Analytics = 'AnalyticsOptions'
+    Query = 'QueryOptions'
+    Search = 'SearchOptions'
 
 
 @dataclass
@@ -43,11 +49,6 @@ class QueryRequest:
 @dataclass
 class SearchQueryRequest:
     query_builder: SearchQueryBuilder
-    obs_handler: _OldObservableRequestHandler
+    obs_handler: ObservableRequestHandler
     bucket_name: str
     scope_name: str
-    num_workers: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return StreamingOperationType.ViewQuery.value

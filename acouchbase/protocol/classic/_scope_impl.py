@@ -19,8 +19,9 @@ from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._collection_impl import AsyncCollectionImpl
 from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor
-from acouchbase.result import AsyncAnalyticsResult, AsyncQueryResult
-from acouchbase.search import AsyncFullTextSearchRequest
+from acouchbase.result import (AsyncAnalyticsResult,
+                               AsyncQueryResult,
+                               AsyncSearchResult)
 from couchbase.common._cluster_settings import ClusterSettings
 from couchbase.common._observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.common._operations import Op
@@ -28,8 +29,9 @@ from couchbase.common._streaming import AsyncRowIterator
 from couchbase.protocol.classic._cluster_types import StreamingTimeouts
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._scope_req_builder import ScopeRequestBuilder
-from couchbase.protocol.classic._streaming import AnalyticsStreamSpec, QueryStreamSpec
-from couchbase.result import SearchResult
+from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
+                                                   QueryStreamSpec,
+                                                   SearchStreamSpec)
 from couchbase.serializer import Serializer
 from couchbase.transcoder import Transcoder
 
@@ -39,8 +41,12 @@ if TYPE_CHECKING:
     from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
     from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
     from couchbase.common._utils import JSONType
-    from couchbase.common.options import AnalyticsOptions, QueryOptions
+    from couchbase.common.options import (AnalyticsOptions,
+                                          QueryOptions,
+                                          SearchOptions)
     from couchbase.common.protocol import CouchbaseProtocol
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
     from couchbase.protocol.classic._scope_types import SearchQueryRequest
 
 
@@ -51,7 +57,8 @@ class AsyncScopeImpl:
         self._bucket_impl = bucket_impl
         # needed for the CollectionImpl
         self._client_adapter: AsyncClientAdapter = bucket_impl._client_adapter
-        self._request_builder = ScopeRequestBuilder(self._bucket_impl.bucket_name, self._scope_name)
+        self._request_builder = ScopeRequestBuilder(self._bucket_impl.bucket_name, self._scope_name,
+                                                    self._client_adapter.option_validation)
 
     @property
     def couchbase_protocol(self) -> CouchbaseProtocol:
@@ -166,7 +173,25 @@ class AsyncScopeImpl:
                                                  streaming_timeout=streaming_timeout)
         return AsyncAnalyticsResult(AsyncRowIterator(executor))
 
-    def search(self, req: SearchQueryRequest) -> SearchResult:
+    def search_query(self,
+                     index: str,
+                     query: SearchQuery,
+                     options: SearchOptions | None = None,
+                     **kwargs: Any) -> AsyncSearchResult:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_query_request(index, query, obs_handler, options, **kwargs)
+        return self._search(req)
+
+    def search(self,
+               index: str,
+               request: SearchRequest | SearchQuery,
+               options: SearchOptions | None = None,
+               **kwargs: Any) -> AsyncSearchResult:
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+        req = self._request_builder.build_search_request(index, request, obs_handler, options, **kwargs)
+        return self._search(req)
+
+    def _search(self, req: SearchQueryRequest) -> AsyncSearchResult:
         self._client_adapter._ensure_not_closed()
         self._client_adapter._ensure_connected()
         # If the search_query was provided a timeout we will use that value for the streaming timeout
@@ -175,15 +200,15 @@ class AsyncScopeImpl:
         # also does not specify a search_timeout we set the streaming_timeout to
         # couchbase::core::timeout_defaults::search_timeout when the streaming object is created in the bindings.
         streaming_timeout = self.streaming_timeouts.get('search_timeout', None)
-        return SearchResult(AsyncFullTextSearchRequest.generate_search_request(self.connection,
-                                                                               self.loop,
-                                                                               req.query_builder.as_encodable(),
-                                                                               default_serializer=self.default_serializer,  # noqa: E501
-                                                                               streaming_timeout=streaming_timeout,
-                                                                               obs_handler=req.obs_handler,
-                                                                               bucket_name=req.bucket_name,
-                                                                               scope_name=req.scope_name,
-                                                                               num_workers=req.num_workers))
+        executor = ClassicAsyncStreamingExecutor(self.connection,
+                                                 SearchStreamSpec(req.query_builder.as_encodable(),
+                                                                  self.default_serializer,
+                                                                  bucket_name=req.bucket_name,
+                                                                  scope_name=req.scope_name),
+                                                 self.loop,
+                                                 obs_handler=req.obs_handler,
+                                                 streaming_timeout=streaming_timeout)
+        return AsyncSearchResult(AsyncRowIterator(executor))
 
     async def wait_until_bucket_connected(self) -> None:
         await self._bucket_impl.wait_until_bucket_connected()

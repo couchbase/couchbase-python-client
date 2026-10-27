@@ -49,10 +49,10 @@ import pytest
 import pytest_asyncio
 
 import couchbase.search as search
+from acouchbase.result import AsyncSearchResult
 from couchbase.exceptions import InvalidArgumentException, QueryIndexNotFoundException
 from couchbase.mutation_state import MutationState
 from couchbase.options import SearchOptions
-from couchbase.result import SearchResult
 from couchbase.search import (HighlightStyle,
                               SearchDateRangeFacet,
                               SearchFacetResult,
@@ -289,6 +289,7 @@ class SearchTestSuite(SuiteRequirements):
         assert isinstance(result_facet, SearchFacetResult)
         assert result_facet.name == facet_name
         assert result_facet.field == facet_name
+        assert result_facet.date_ranges is not None
         assert all(isinstance(ft, SearchDateRangeFacet) for ft in result_facet.date_ranges)
         assert len(result_facet.date_ranges) <= facet_limit
 
@@ -391,6 +392,7 @@ class SearchTestSuite(SuiteRequirements):
         assert isinstance(result_facet, SearchFacetResult)
         assert result_facet.name == facet_name
         assert result_facet.field == facet_name
+        assert result_facet.numeric_ranges is not None
         assert all(isinstance(ft, SearchNumericRangeFacet) for ft in result_facet.numeric_ranges)
         assert len(result_facet.numeric_ranges) <= facet_limit
 
@@ -447,6 +449,7 @@ class SearchTestSuite(SuiteRequirements):
         assert isinstance(result_facet, SearchFacetResult)
         assert result_facet.name == facet_name
         assert result_facet.field == facet_name
+        assert result_facet.terms is not None
         assert all(isinstance(ft, SearchTermFacet) for ft in result_facet.terms)
         assert len(result_facet.terms) <= facet_limit
 
@@ -736,7 +739,7 @@ class SearchTestSuite(SuiteRequirements):
         await AsyncSearchEnvironment.assert_rows_at_least(res, 1)
 
     @staticmethod
-    def _assert_facet_without_details(res: SearchResult, facet_name: str) -> None:
+    def _assert_facet_without_details(res: AsyncSearchResult, facet_name: str) -> None:
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]

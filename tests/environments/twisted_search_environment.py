@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import time
 from datetime import timedelta
-from typing import Any, Union
+from typing import Any
 
 from couchbase.exceptions import SearchIndexNotFoundException
 from couchbase.management.search import SearchIndex
@@ -64,8 +64,7 @@ from tests.search_index_defs import (collection_index_name,
 from tests.skips import CouchbaseTestEnvironmentException
 from tests.test_features import EnvironmentFeatures, ServerFeatures
 
-_SearchIndexManager = Union[TwistedTestEnvironmentSearchIndexManager,
-                            TwistedTestEnvironmentScopeSearchIndexManager]
+_SearchIndexManager = TwistedTestEnvironmentSearchIndexManager | TwistedTestEnvironmentScopeSearchIndexManager
 
 
 class TwistedSearchEnvironment:
@@ -97,10 +96,8 @@ class TwistedSearchEnvironment:
 
     @staticmethod
     def _validate_metadata(result: SearchResult, expected_count: int) -> None:
-        meta = result.metadata()
-        cb_assert_isinstance(meta, SearchMetaData, what='search result metadata')
-        metrics = meta.metrics()
-        cb_assert_isinstance(metrics, SearchMetrics, what='search result metrics')
+        meta = cb_assert_isinstance(result.metadata(), SearchMetaData, what='search result metadata')
+        metrics = cb_assert_isinstance(meta.metrics(), SearchMetrics, what='search result metrics')
         errored = metrics.error_partition_count()
         succeeded = metrics.success_partition_count()
         cb_assert_isinstance(errored, int, what='search metrics error_partition_count')

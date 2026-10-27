@@ -221,8 +221,9 @@ def check_options(block: str | OptionsBlock,
             near = _closest(key, entry, NEAR_MISS_CUTOFF)
             if near is None:
                 continue
-            _report('Option {} is not carried by {} and will be sent as a named query '
-                    'parameter. Did you mean {}?'.format(key, block, near),
+            _report('Option {} is not carried by {}, so it is treated as a named query '
+                    'parameter. Did you mean {}? To send it as a parameter, pass it in '
+                    'named_parameters.'.format(key, block, near),
                     CouchbaseOptionWarning, mode)
             continue
         near = _closest(key, entry, NEAR_MISS_CUTOFF)

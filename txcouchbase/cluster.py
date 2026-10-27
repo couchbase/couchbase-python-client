@@ -22,16 +22,12 @@ __all__ = [
 ]
 
 from asyncio import AbstractEventLoop
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Union)
+from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
 from couchbase.common._registry import TX_CLUSTER, resolve
 from couchbase.common.protocol import CouchbaseProtocol
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import StreamingOperationType
 from couchbase.options import (DiagnosticsOptions,
                                PingOptions,
                                WaitUntilReadyOptions)
@@ -235,26 +231,75 @@ class Cluster:
         return self._impl.analytics_query_deferred(statement, *options, **kwargs)
 
     def search_query(self,
-                     index,  # type: str
-                     query,  # type: SearchQuery
-                     *options,  # type: SearchOptions
-                     **kwargs  # type: Any
-                     ) -> Deferred[SearchResult]:
-        op_type = StreamingOperationType.SearchQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_search_query_request(index, query, obs_handler, *options, **kwargs)
-        return self._impl.search_deferred(req)
+                     index: str,
+                     query: SearchQuery,
+                     options: SearchOptions | None = None,
+                     **kwargs: Any) -> Deferred[SearchResult]:
+        """Executes an search query against the cluster.
+
+        .. deprecated:: 4.1.11
+            Use :meth:`~txcouchbase.cluster.Cluster.search` instead.
+
+        .. note::
+            The search query is sent when this is called, and the Deferred fires once the core has buffered
+            the response, so iterating the :class:`~couchbase.result.SearchResult` does not block the reactor.
+
+        .. seealso::
+            * :class:`~txcouchbase.management.search.SearchIndexManager`: for how to manage search indexes.
+
+        Args:
+            index (str): Name of the search query to use.
+            query (:class:`~couchbase.search.SearchQuery`): Type of search query to perform.
+            options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.SearchOptions`
+
+        Returns:
+            Deferred[:class:`~couchbase.result.SearchResult`]: An instance of a
+            :class:`~couchbase.result.SearchResult` which provides access to iterate over the search
+            query results and access metadata and metrics about the search query.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If a
+                :class:`~couchbase.search.SearchRequest` is provided.  Use
+                :meth:`~txcouchbase.cluster.Cluster.search` for a search request.
+        """
+        return self._impl.search_query_deferred(index, query, options, **kwargs)
 
     def search(self,
-               index,  # type: str
-               request,  # type: Union[SearchRequest, SearchQuery]
-               *options,  # type: SearchOptions
-               **kwargs,  # type: Any
-               ) -> Deferred[SearchResult]:
-        op_type = StreamingOperationType.SearchQuery
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        req = self._impl.request_builder.build_search_request(index, request, obs_handler, *options, **kwargs)
-        return self._impl.search_deferred(req)
+               index: str,
+               request: SearchRequest | SearchQuery,
+               options: SearchOptions | None = None,
+               **kwargs: Any) -> Deferred[SearchResult]:
+        """Executes an search against the cluster.
+
+        .. note::
+            The search is sent when this is called, and the Deferred fires once the core has buffered
+            the response, so iterating the :class:`~couchbase.result.SearchResult` does not block the reactor.
+
+        .. seealso::
+            * :class:`~txcouchbase.management.search.SearchIndexManager`: for how to manage search indexes.
+            * :meth:`~txcouchbase.scope.Scope.search`: for how to execute scope-level search
+
+        Args:
+            index (str): Name of the search index to use.
+            request (:class:`~couchbase.search.SearchRequest` | :class:`~couchbase.search.SearchQuery`): Type of
+                search request to perform.
+
+                .. deprecated:: 4.7.0
+                    Passing a :class:`~couchbase.search.SearchQuery` is deprecated; wrap it with
+                    :meth:`~couchbase.search.SearchRequest.create` instead.
+            options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.SearchOptions`
+
+        Returns:
+            Deferred[:class:`~couchbase.result.SearchResult`]: An instance of a
+            :class:`~couchbase.result.SearchResult` which provides access to iterate over the search
+            query results and access metadata and metrics about the search query.
+        """
+        return self._impl.search_deferred(index, request, options, **kwargs)
 
     def buckets(self) -> BucketManager:
         """
