@@ -1,4 +1,4 @@
-#  Copyright 2016-2025. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,47 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from abc import ABC, abstractmethod
-from typing import Optional
+"""The `couchbase.encryption.decrypter` import path.
 
-from couchbase.encryption import EncryptionResult, Keyring
+The declarations live in `couchbase.common.encryption.decrypter`, which every API shares, and are
+re-exported here.
+"""
 
+__all__ = [
+    'Decrypter',
+]
 
-class Decrypter(ABC):
-    """Interface a Decrypter must implement
-
-    """
-
-    def __init__(self, keyring: Keyring, alg: Optional[str] = None) -> None:
-        self._keyring = keyring
-        self._alg = alg
-
-    @property
-    def keyring(self) -> Keyring:
-        return self._keyring
-
-    def algorithm(self) -> str:
-        """Provides name of algorithm associated with Decrypter
-
-        Returns:
-            str: The name of the description algorithm
-        """
-        return self._alg
-
-    @abstractmethod
-    def decrypt(self, encrypted: EncryptionResult) -> bytes:
-        """Decrypts the given :class:`~couchbase.encryption.EncryptionResult` ciphertext.
-
-        The Decrypter's algorithm should match the `alg` property of the given
-        :class:`~couchbase.encryption.EncryptionResult`
-
-        Args:
-            encrypted (:class:`~couchbase.encryption.EncryptionResult`): The encrypted value to decrypt.
-
-        Returns:
-            bytes: The decrypted ciphertext.
-
-        Raises:
-            :class:`~couchbase.exceptions.InvalidCryptoKeyException`
-            :class:`~couchbase.exceptions.InvalidCipherTextException`
-        """
+from couchbase.common.encryption.decrypter import Decrypter  # noqa: F401

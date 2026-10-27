@@ -1,4 +1,4 @@
-#  Copyright 2016-2025. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,38 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from abc import ABC, abstractmethod
-from typing import Union
+"""The `couchbase.encryption.encrypter` import path.
 
-from couchbase.encryption import EncryptionResult, Keyring
+The declarations live in `couchbase.common.encryption.encrypter`, which every API shares, and are
+re-exported here.
+"""
 
+__all__ = [
+    'Encrypter',
+]
 
-class Encrypter(ABC):
-
-    def __init__(self, keyring: Keyring, key: str) -> None:
-        self._keyring = keyring
-        self._key = key
-
-    @property
-    def keyring(self) -> Keyring:
-        return self._keyring
-
-    @property
-    def key(self) -> str:
-        return self._key
-
-    @abstractmethod
-    def encrypt(self, plaintext: Union[str, bytes, bytearray]) -> EncryptionResult:
-        """Encrypts the given plaintext
-
-        Args:
-            plaintext (Union[str, bytes, bytearray]): The plaintext to be encrypted
-
-        Returns:
-            :class:``~couchbase.encryption.EncryptionResult`: a :class:`~couchbase.encryption.EncryptionResult`
-            containing all the necessary information required for decryption.
-
-        Raises:
-            :class:`~couchbase.exceptions.InvalidCryptoKeyException`: If the :class:`.Encrypter` has an invalid
-            key for encryption.
-        """
+from couchbase.common.encryption.encrypter import Encrypter  # noqa: F401

@@ -1,4 +1,4 @@
-#  Copyright 2016-2025. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,24 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from abc import ABC, abstractmethod
+"""The `couchbase.encryption.keyring` import path.
 
-from couchbase.encryption import Key
+The declarations live in `couchbase.common.encryption.keyring`, which every API shares, and are
+re-exported here.
+"""
 
+__all__ = [
+    'Keyring',
+]
 
-class Keyring(ABC):
-
-    @abstractmethod
-    def get_key(self, key_id: str) -> Key:
-        """Returns requested key
-
-        Args:
-            key_id (str): Key ID to retrieve
-
-        Returns:
-            :class:`~couchbase.encryption.Key`: The corresponding :class:`~couchbase.encryption.Key`
-            of the provided key_id.
-
-        Raises:
-            :raises :class:`~couchbase.exceptions.CryptoKeyNotFoundException`
-        """
+from couchbase.common.encryption.keyring import Keyring  # noqa: F401

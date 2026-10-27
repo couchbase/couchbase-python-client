@@ -1,4 +1,4 @@
-#  Copyright 2016-2025. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,18 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Union
+"""The `couchbase.encryption.key` import path.
 
+The declarations live in `couchbase.common.encryption.key`, which every API shares, and are
+re-exported here.
+"""
 
-class Key:
-    def __init__(self, id: str, bytes_: Union[bytes, bytearray]) -> None:
-        self._id = id
-        self._bytes = bytes_ if isinstance(bytes_, bytes) else bytes(bytes_)
+__all__ = [
+    'Key',
+]
 
-    @property
-    def id(self) -> str:
-        return self._id
-
-    @property
-    def bytes(self) -> bytes:
-        return self._bytes
+from couchbase.common.encryption.key import Key  # noqa: F401

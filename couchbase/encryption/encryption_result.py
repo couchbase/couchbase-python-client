@@ -1,4 +1,4 @@
-#  Copyright 2016-2025. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,81 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
+"""The `couchbase.encryption.encryption_result` import path.
 
-import base64
-from typing import (Any,
-                    Optional,
-                    Union)
+The declarations live in `couchbase.common.encryption.encryption_result`, which every API shares,
+and are re-exported here.
+"""
 
-from couchbase.exceptions import CryptoKeyNotFoundException, InvalidArgumentException
+__all__ = [
+    'EncryptionResult',
+]
 
-
-class EncryptionResult:
-    def __init__(self,
-                 alg: str = '',
-                 kid: Optional[str] = None,
-                 ciphertext: Optional[str] = None,
-                 **kwargs: Any
-                 ):
-        if not alg:
-            raise InvalidArgumentException('EncryptionResult must include alg property.')
-
-        self._map: dict[str, Any] = {'alg': alg}
-
-        if kid:
-            self._map['kid'] = kid
-
-        if ciphertext and self._valid_base64(ciphertext):
-            self._map['ciphertext'] = ciphertext
-
-        if kwargs:
-            self._map.update(**kwargs)
-
-    @classmethod
-    def new_encryption_result_from_dict(cls, values: dict[str, Any]) -> EncryptionResult:
-        return EncryptionResult(**values)
-
-    def put(self, key: str, val: Any) -> None:
-        self._map[key] = val
-
-    def put_and_base64_encode(self, key: str, val: bytes) -> None:
-        if not isinstance(val, bytes):
-            raise ValueError('Provided value must be of type bytes.')
-        self._map[key] = base64.b64encode(val)
-
-    def get(self, key: str) -> Any:
-        val = self._map.get(key, None)
-        if not val:
-            raise CryptoKeyNotFoundException(message=f"No mapping to EncryptionResult value found for key: '{key}'.")
-
-        return val
-
-    def algorithm(self) -> str:
-        return self._map['alg']
-
-    def get_with_base64_decode(self, key: str) -> bytes:
-        val = self._map.get(key, None)
-        if not val:
-            raise CryptoKeyNotFoundException(message=f"No mapping to EncryptionResult value found for key: '{key}'.")
-
-        return base64.b64decode(val)
-
-    def asdict(self) -> dict:
-        return self._map
-
-    def _valid_base64(self, val: Union[str, bytes, bytearray]) -> bool:
-        try:
-            if isinstance(val, str):
-                bytes_val = bytes(val, 'ascii')
-            elif isinstance(val, bytes):
-                bytes_val = val
-            elif isinstance(val, bytearray):
-                bytes_val = val
-            else:
-                raise ValueError('Provided value must be of type str, bytes or bytearray')
-
-            return base64.b64encode(base64.b64decode(bytes_val)) == bytes_val
-
-        except Exception as ex:  # noqa: F841
-            return False
+from couchbase.common.encryption.encryption_result import EncryptionResult  # noqa: F401

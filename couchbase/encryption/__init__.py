@@ -1,4 +1,4 @@
-#  Copyright 2016-2025. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,11 +13,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .crypto_manager import CryptoManager  # noqa: F401
-from .encryption_result import EncryptionResult  # noqa: F401
-from .key import Key  # noqa: F401
-from .keyring import Keyring  # noqa: F401
+"""The `couchbase.encryption` import path.
 
-# import Encrypter/Decrypter last to avoid circular import
-from .decrypter import Decrypter  # nopep8 # isort:skip # noqa: F401
-from .encrypter import Encrypter  # nopep8 # isort:skip # noqa: F401
+The declarations live in `couchbase.common.encryption`, which every API shares, and are re-exported
+here.
+"""
+
+__all__ = [
+    'CryptoManager',
+    'Decrypter',
+    'Encrypter',
+    'EncryptionResult',
+    'Key',
+    'Keyring',
+]
+
+from couchbase.encryption.crypto_manager import CryptoManager  # noqa: F401
+from couchbase.encryption.decrypter import Decrypter  # noqa: F401
+from couchbase.encryption.encrypter import Encrypter  # noqa: F401
+from couchbase.encryption.encryption_result import EncryptionResult  # noqa: F401
+from couchbase.encryption.key import Key  # noqa: F401
+from couchbase.encryption.keyring import Keyring  # noqa: F401
