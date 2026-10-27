@@ -24,8 +24,12 @@ built by hand.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+import json
+from typing import (TYPE_CHECKING,
+                    Any,
+                    TypedDict)
 
+from couchbase.common._utils import is_null_or_empty
 from couchbase.common.diagnostics import _EndpointDiagnosticsRecord, _EndpointPingRecord
 from couchbase.common.result import (_ClusterInfoBucketRecord,
                                      _ClusterInfoNodeRecord,
@@ -33,6 +37,10 @@ from couchbase.common.result import (_ClusterInfoBucketRecord,
                                      _DiagnosticsRecord,
                                      _PingRecord,
                                      _ServerVersionRecord)
+from couchbase.common.search import (SearchRow,
+                                     SearchRowFields,
+                                     SearchRowLocation,
+                                     SearchRowLocations)
 from couchbase.common.views import ViewRow
 from couchbase.serializer import Serializer
 
@@ -45,6 +53,8 @@ if TYPE_CHECKING:
                                                                           CppEndpointPingInfo,
                                                                           CppPingResult,
                                                                           CppRangeScanItem,
+                                                                          CppSearchLocation,
+                                                                          CppSearchRow,
                                                                           CppViewRow)
 
     class _CoreScanItem(TypedDict, total=False):
@@ -129,6 +139,41 @@ def _cluster_info_from_core(raw: CppClusterDescribeResponse) -> _ClusterInfoReco
     return _ClusterInfoRecord(nodes=tuple(_cluster_info_node_from_core(n) for n in info.get('nodes') or ()),
                               buckets=tuple(_cluster_info_bucket_from_core(b) for b in info.get('buckets') or ()),
                               services=frozenset(info.get('services') or ()))
+
+
+def _search_location_from_core(raw: CppSearchLocation) -> SearchRowLocation:
+    array_positions = raw.get('array_positions')
+    return SearchRowLocation(field=raw['field'],
+                             term=raw['term'],
+                             position=raw['position'],
+                             start=raw['start_offset'],
+                             end=raw['end_offset'],
+                             array_positions=None if array_positions is None else list(array_positions))
+
+
+def _search_fields_from_core(text: str, serializer: Serializer) -> Any:
+    if is_null_or_empty(text):
+        return None
+    value = serializer.deserialize(text.encode('utf-8'))
+    return SearchRowFields(**value) if isinstance(value, dict) else value
+
+
+def _search_row_from_core(raw: CppSearchRow, serializer: Serializer) -> SearchRow:
+    """The core sends ``fields`` and ``explanation`` as JSON text, empty when the query did not ask.
+
+    ``fields`` is the documents' own content, so the request's serializer reads it; a mapping comes
+    back as :class:`SearchRowFields` and anything else as the serializer returned it. ``explanation``
+    is the server's account of the score and is read as JSON.
+    """
+    explanation = raw['explanation']
+    locations = raw['locations']
+    return SearchRow(index=raw['index'],
+                     id=raw['id'],
+                     score=raw['score'],
+                     fields=_search_fields_from_core(raw['fields'], serializer),
+                     locations=SearchRowLocations(map(_search_location_from_core, locations)) if locations else None,
+                     fragments={name: list(texts) for name, texts in raw['fragments'].items()},
+                     explanation={} if is_null_or_empty(explanation) else json.loads(explanation))
 
 
 def _view_row_from_core(raw: CppViewRow, serializer: Serializer) -> ViewRow:

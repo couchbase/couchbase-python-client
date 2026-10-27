@@ -26,6 +26,12 @@ from couchbase.common.n1ql import (QueryStatus,
                                    _QueryMetaDataRecord,
                                    _QueryMetricsRecord,
                                    _QueryProblemRecord)
+from couchbase.common.search import (SearchDateRangeFacet,
+                                     SearchFacetResult,
+                                     SearchNumericRangeFacet,
+                                     SearchTermFacet,
+                                     _SearchMetaDataRecord,
+                                     _SearchMetricsRecord)
 from couchbase.common.views import _ViewMetaDataRecord
 
 if TYPE_CHECKING:
@@ -33,6 +39,8 @@ if TYPE_CHECKING:
                                                                           CppAnalyticsProblem,
                                                                           CppQueryMetaData,
                                                                           CppQueryProblem,
+                                                                          CppSearchFacet,
+                                                                          CppSearchMetaData,
                                                                           CppViewMetadata)
 
 
@@ -105,6 +113,61 @@ def _analytics_metadata_from_core(raw: CppAnalyticsMetaData | None) -> _Analytic
             warning_count=metrics.get('warning_count', 0),
             mutation_count=None,
             sort_count=None))
+
+
+def _search_metadata_from_core(raw: CppSearchMetaData | None) -> _SearchMetaDataRecord | None:
+    """The classic adapter: the core's metadata dict into a record, or None when there is none.
+
+    The dict is read and never written, so the core's response is left as the core produced it.
+    The core sends no ``total_partition_count``, so it is the sum of the two counts it does send.
+    """
+    if not raw:
+        return None
+
+    metrics = raw.get('metrics')
+    return _SearchMetaDataRecord(
+        client_context_id=raw.get('client_context_id'),
+        errors=dict(raw.get('errors') or {}),
+        metrics=None if not metrics else _SearchMetricsRecord(
+            took_ns=metrics.get('took', 0),
+            total_rows=metrics.get('total_rows', 0),
+            max_score=metrics.get('max_score', 0.0),
+            total_partition_count=(metrics.get('success_partition_count', 0)
+                                   + metrics.get('error_partition_count', 0)),
+            success_partition_count=metrics.get('success_partition_count', 0),
+            error_partition_count=metrics.get('error_partition_count', 0)))
+
+
+def _search_facets_from_core(raw: list[CppSearchFacet] | None) -> dict[str, SearchFacetResult] | None:
+    """The classic adapter: the core's facet list into results keyed by name, or None when empty.
+
+    The list is read and never written. A facet the server returns without its details, which it
+    does when the request set no limit, has None for each list rather than an empty one.
+    """
+    if not raw:
+        return None
+
+    facets = {}
+    for facet in raw:
+        terms = facet['terms']
+        numeric_ranges = facet['numeric_ranges']
+        date_ranges = facet['date_ranges']
+        result = SearchFacetResult(
+            name=facet['name'],
+            field=facet['field'],
+            total=facet['total'],
+            missing=facet['missing'],
+            other=facet['other'],
+            terms=[SearchTermFacet(term=t['term'], count=t['count'])
+                   for t in terms] if terms else None,
+            numeric_ranges=[SearchNumericRangeFacet(name=nr['name'], count=nr['count'],
+                                                    min=nr['min'], max=nr['max'])
+                            for nr in numeric_ranges] if numeric_ranges else None,
+            date_ranges=[SearchDateRangeFacet(name=dr['name'], count=dr['count'],
+                                              start=dr['start'], end=dr['end'])
+                         for dr in date_ranges] if date_ranges else None)
+        facets[facet['name']] = result
+    return facets
 
 
 def _view_metadata_from_core(raw: CppViewMetadata | None) -> _ViewMetaDataRecord | None:

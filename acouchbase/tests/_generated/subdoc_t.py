@@ -34,6 +34,10 @@ import pytest_asyncio
 
 import couchbase.subdocument as SD
 from acouchbase.collection import Collection
+from acouchbase.result import (GetResult,
+                               LookupInReplicaResult,
+                               LookupInResult,
+                               MutateInResult)
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
@@ -48,10 +52,6 @@ from couchbase.options import (GetOptions,
                                LookupInOptions,
                                MutateInOptions)
 from couchbase.replica_reads import ReadPreference
-from couchbase.result import (GetResult,
-                              LookupInReplicaResult,
-                              LookupInResult,
-                              MutateInResult)
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
                                                   DocType,

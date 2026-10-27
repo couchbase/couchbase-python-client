@@ -28,6 +28,10 @@ import pytest_asyncio
 
 import couchbase.subdocument as SD
 from acouchbase.collection import Collection
+from acouchbase.result import (ExistsResult,
+                               GetReplicaResult,
+                               GetResult,
+                               MutationResult)
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CasMismatchException,
                                   DocumentExistsException,
@@ -44,10 +48,6 @@ from couchbase.options import (GetAllReplicasOptions,
                                ReplaceOptions,
                                UpsertOptions)
 from couchbase.replica_reads import ReadPreference
-from couchbase.result import (ExistsResult,
-                              GetReplicaResult,
-                              GetResult,
-                              MutationResult)
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
                                                   build_async_environment,

@@ -29,6 +29,7 @@ import pytest_asyncio
 
 from acouchbase.cluster import Cluster
 from acouchbase.management.views import DesignDocumentNamespace
+from acouchbase.result import DiagnosticsResult, PingResult
 from couchbase.auth import PasswordAuthenticator
 from couchbase.diagnostics import (ClusterState,
                                    EndpointPingReport,
@@ -39,7 +40,6 @@ from couchbase.exceptions import CouchbaseException, InvalidArgumentException
 from couchbase.options import (ClusterOptions,
                                DiagnosticsOptions,
                                PingOptions)
-from couchbase.result import DiagnosticsResult, PingResult
 from couchbase.search import MatchQuery
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.async_environment import (AsyncTestEnvironment,

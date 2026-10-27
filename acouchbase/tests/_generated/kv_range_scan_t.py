@@ -26,6 +26,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 
+from acouchbase.result import MutationToken, ScanResult
 from couchbase.exceptions import (AlreadyQueriedException,
                                   DocumentNotFoundException,
                                   FeatureUnavailableException,
@@ -38,9 +39,7 @@ from couchbase.mutation_state import MutationState
 from couchbase.options import ScanOptions
 from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
 from couchbase.protocol.classic._collection_types import CollectionDetails
-from couchbase.result import (MutationToken,
-                              ScanResult,
-                              ScanResultIterable)
+from couchbase.result import ScanResultIterable
 from couchbase.transcoder import JSONTranscoder
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.async_environment import (AsyncTestEnvironment,

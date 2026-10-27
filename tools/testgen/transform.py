@@ -112,6 +112,16 @@ API_MODULES = {
 # reach both managers through the framework's own manager classes, which ACB_NAME_MAP
 # rewrites, and every other name they import is api-independent.
 
+# Module paths that have a counterpart under one api and not the other.  `couchbase.result`
+# is the one case: acouchbase.result holds the async streaming results, and txcouchbase
+# returns the sync ones, so it has no result module to name.  A name moves when
+# acouchbase.result has it and stays in `couchbase.result` when it does not, which is the
+# split split_names() makes.
+API_SPECIFIC_MODULES = {
+    'acouchbase': {'couchbase.result': 'acouchbase.result'},
+    'txcouchbase': {},
+}
+
 # Root of the shared test-framework package.  Every module under it must be declared in
 # ENV_MODULE_MAP for every api, identity included; see the blocker in rewrite_imports().
 ENV_PACKAGE = 'tests.environments'
@@ -1191,7 +1201,7 @@ class SuiteTransformer:
 
     def import_target(self, mod: str) -> str | None:
         """The api-specific module this import's names should be looked for in."""
-        target = ENV_MODULE_MAP[self.api].get(mod)
+        target = ENV_MODULE_MAP[self.api].get(mod) or API_SPECIFIC_MODULES[self.api].get(mod)
         if target is not None:
             return target
         if mod in API_MODULES:

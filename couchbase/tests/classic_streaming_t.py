@@ -28,6 +28,7 @@ from couchbase.common._streaming import RowIterator
 from couchbase.common.analytics import AnalyticsMetaData
 from couchbase.common.exceptions import _ExceptionInfo
 from couchbase.common.n1ql import QueryMetaData
+from couchbase.common.search import SearchMetaData, SearchRow
 from couchbase.common.views import ViewMetaData, ViewRow
 from couchbase.exceptions import InternalSDKException, RequestCanceledException
 from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_exception
@@ -36,6 +37,7 @@ from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
                                                    ClassicStreamingExecutor,
                                                    ClassicStreamSpec,
                                                    QueryStreamSpec,
+                                                   SearchStreamSpec,
                                                    ViewStreamSpec)
 from couchbase.serializer import DefaultJsonSerializer, Serializer
 from tests.test_features import TestProtocol
@@ -462,6 +464,69 @@ class AnalyticsStreamSpecUnitTests:
 
     def test_no_metadata_is_none(self) -> None:
         assert AnalyticsStreamSpec({}, DefaultJsonSerializer()).decode_final_metadata({}) is None
+
+
+_SEARCH_ROW = {'index': 'ix', 'id': 'd', 'score': 1.0, 'locations': [], 'fragments': {}, 'fields': '{"a": 1}',
+               'explanation': ''}
+
+
+class SearchStreamSpecUnitTests:
+
+    def test_calls_the_search_binding(self) -> None:
+        connection = _Connection(_Stream([]))
+        spec = SearchStreamSpec({}, DefaultJsonSerializer())
+        assert spec.binding_call(cast(pycbc_connection, connection)) == connection.pycbc_search_query
+
+    def test_kwargs_are_a_copy(self) -> None:
+        encoded = {'index_name': 'ix'}
+        kwargs = SearchStreamSpec(encoded, DefaultJsonSerializer(), bucket_name='b', scope_name='s').binding_kwargs()
+        kwargs['added'] = True
+        assert encoded == {'index_name': 'ix'}
+
+    def test_a_scope_search_sends_its_bucket_and_scope(self) -> None:
+        kwargs = SearchStreamSpec({'index_name': 'ix'}, DefaultJsonSerializer(),
+                                  bucket_name='b', scope_name='s').binding_kwargs()
+        assert kwargs == {'index_name': 'ix', 'bucket_name': 'b', 'scope_name': 's'}
+
+    @pytest.mark.parametrize('names', [{}, {'bucket_name': 'b'}, {'scope_name': 's'}])
+    def test_a_bucket_or_scope_alone_is_not_sent(self, names: dict[str, str]) -> None:
+        kwargs = SearchStreamSpec({'index_name': 'ix'}, DefaultJsonSerializer(), **names).binding_kwargs()
+        assert kwargs == {'index_name': 'ix'}
+
+    def test_span_attributes_carry_the_bucket_and_scope(self) -> None:
+        spec = SearchStreamSpec({'index_name': 'ix'}, DefaultJsonSerializer(), bucket_name='b', scope_name='s')
+        assert spec.span_attributes(spec.binding_kwargs()) == {'bucket_name': 'b', 'scope_name': 's'}
+
+    def test_a_cluster_search_has_no_span_attributes(self) -> None:
+        spec = SearchStreamSpec({'index_name': 'ix'}, DefaultJsonSerializer())
+        assert spec.span_attributes(spec.binding_kwargs()) == {}
+
+    def test_rows_decode_with_the_serializer_the_query_set(self) -> None:
+        spec = SearchStreamSpec({'serializer': _TaggingSerializer()}, DefaultJsonSerializer())
+        row = spec.decode_row(dict(_SEARCH_ROW))
+        assert isinstance(row, SearchRow)
+        assert row.id == 'd'
+        assert row.fields == ('tagged', b'{"a": 1}')
+
+    def test_rows_fall_back_to_the_cluster_serializer(self) -> None:
+        spec = SearchStreamSpec({}, _TaggingSerializer())
+        assert spec.decode_row(dict(_SEARCH_ROW)).fields == ('tagged', b'{"a": 1}')
+
+    def test_final_metadata_carries_the_metadata_and_the_facets(self) -> None:
+        facet = {'name': 'f', 'field': 'type', 'total': 3, 'missing': 0, 'other': 0,
+                 'terms': [{'term': 't', 'count': 3}], 'numeric_ranges': [], 'date_ranges': []}
+        final = SearchStreamSpec({}, DefaultJsonSerializer()).decode_final_metadata(
+            {'metadata': {'client_context_id': 'c', 'errors': {}}, 'facets': [facet]})
+        assert isinstance(final.metadata, SearchMetaData)
+        assert final.metadata.client_context_id() == 'c'
+        assert final.facets is not None
+        assert list(final.facets) == ['f']
+        assert final.facets['f'].total == 3
+
+    def test_no_metadata_and_no_facets_are_none(self) -> None:
+        final = SearchStreamSpec({}, DefaultJsonSerializer()).decode_final_metadata({})
+        assert final.metadata is None
+        assert final.facets is None
 
 
 class ViewStreamSpecUnitTests:

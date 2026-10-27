@@ -37,13 +37,18 @@ from couchbase.common._streaming import (FinalMetadataT,
 from couchbase.common.analytics import AnalyticsMetaData
 from couchbase.common.exceptions import CouchbaseException, InternalSDKException
 from couchbase.common.n1ql import QueryMetaData
+from couchbase.common.search import (SearchMetaData,
+                                     SearchRow,
+                                     _SearchFinalMetadata)
 from couchbase.common.views import ViewMetaData, ViewRow
 from couchbase.protocol.classic._error_mapping import ErrorMapper
 from couchbase.protocol.classic._metadata import (_analytics_metadata_from_core,
                                                   _query_metadata_from_core,
+                                                  _search_facets_from_core,
+                                                  _search_metadata_from_core,
                                                   _view_metadata_from_core)
 from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.protocol.classic._result import _view_row_from_core
+from couchbase.protocol.classic._result import _search_row_from_core, _view_row_from_core
 from couchbase.serializer import Serializer
 
 if TYPE_CHECKING:
@@ -300,6 +305,45 @@ class AnalyticsStreamSpec(ClassicStreamSpec[Any, AnalyticsMetaData]):
     def decode_final_metadata(self, raw_result: dict[str, Any]) -> AnalyticsMetaData | None:
         record = _analytics_metadata_from_core(raw_result.get('metadata', None))
         return None if record is None else AnalyticsMetaData(record)
+
+
+class SearchStreamSpec(ClassicStreamSpec[SearchRow, _SearchFinalMetadata]):
+
+    def __init__(self,
+                 encoded_query: dict[str, Any],
+                 default_serializer: Serializer,
+                 *,
+                 bucket_name: str | None = None,
+                 scope_name: str | None = None) -> None:
+        self._encoded_query = encoded_query
+        self._serializer: Serializer = encoded_query.get('serializer', None) or default_serializer
+        self._bucket_name = bucket_name
+        self._scope_name = scope_name
+
+    def binding_call(self, connection: pycbc_connection) -> Callable[..., pycbc_streamed_result[Any]]:
+        return connection.pycbc_search_query
+
+    def binding_kwargs(self) -> dict[str, Any]:
+        kwargs = dict(self._encoded_query)
+        if self._bucket_name is not None and self._scope_name is not None:
+            kwargs['bucket_name'] = self._bucket_name
+            kwargs['scope_name'] = self._scope_name
+        return kwargs
+
+    def span_attributes(self, kwargs: dict[str, Any]) -> OpAttributeOptions:
+        attrs: OpAttributeOptions = {}
+        if 'bucket_name' in kwargs and 'scope_name' in kwargs:
+            attrs['bucket_name'] = kwargs['bucket_name']
+            attrs['scope_name'] = kwargs['scope_name']
+        return attrs
+
+    def decode_row(self, row: Any) -> SearchRow:
+        return _search_row_from_core(row, self._serializer)
+
+    def decode_final_metadata(self, raw_result: dict[str, Any]) -> _SearchFinalMetadata:
+        record = _search_metadata_from_core(raw_result.get('metadata', None))
+        return _SearchFinalMetadata(metadata=None if record is None else SearchMetaData(record),
+                                    facets=_search_facets_from_core(raw_result.get('facets', None)))
 
 
 class ViewStreamSpec(ClassicStreamSpec[ViewRow, ViewMetaData]):

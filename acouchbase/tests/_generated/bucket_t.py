@@ -26,12 +26,12 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 
+from acouchbase.result import PingResult
 from couchbase.diagnostics import (EndpointPingReport,
                                    PingState,
                                    ServiceType)
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import PingOptions
-from couchbase.result import PingResult
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   SuiteRequirements,

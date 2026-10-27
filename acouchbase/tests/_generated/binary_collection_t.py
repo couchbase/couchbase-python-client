@@ -28,12 +28,12 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 
+from acouchbase.result import CounterResult, MutationResult
 from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException
 from couchbase.options import (DecrementOptions,
                                DeltaValue,
                                IncrementOptions,
                                SignedInt64)
-from couchbase.result import CounterResult, MutationResult
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
