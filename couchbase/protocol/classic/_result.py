@@ -34,32 +34,171 @@ from couchbase.common.diagnostics import _EndpointDiagnosticsRecord, _EndpointPi
 from couchbase.common.result import (_ClusterInfoBucketRecord,
                                      _ClusterInfoNodeRecord,
                                      _ClusterInfoRecord,
+                                     _CounterRecord,
                                      _DiagnosticsRecord,
+                                     _ExistsRecord,
+                                     _GetRecord,
+                                     _GetReplicaRecord,
+                                     _LookupInFieldRecord,
+                                     _LookupInRecord,
+                                     _LookupInReplicaRecord,
+                                     _MutateInFieldRecord,
+                                     _MutateInRecord,
+                                     _MutationRecord,
+                                     _MutationTokenRecord,
                                      _PingRecord,
+                                     _ScanItemBodyRecord,
+                                     _ScanItemRecord,
                                      _ServerVersionRecord)
 from couchbase.common.search import (SearchRow,
                                      SearchRowFields,
                                      SearchRowLocation,
                                      SearchRowLocations)
 from couchbase.common.views import ViewRow
+from couchbase.protocol.classic._subdocument import _subdoc_error
 from couchbase.serializer import Serializer
 
 if TYPE_CHECKING:
     from couchbase.protocol.classic._pycbc_core.binding_cpp_types import (CppClusterDescribeResponse,
                                                                           CppClusterInfoBucket,
                                                                           CppClusterInfoNode,
+                                                                          CppDecrementResponse,
                                                                           CppDiagnosticsResult,
                                                                           CppEndpointDiagInfo,
                                                                           CppEndpointPingInfo,
+                                                                          CppExistsResponse,
+                                                                          CppGetAllReplicasResponseEntry,
+                                                                          CppGetAnyReplicaResponse,
+                                                                          CppGetProjectedResponse,
+                                                                          CppIncrementResponse,
+                                                                          CppLookupInAllReplicasResponseEntry,
+                                                                          CppLookupInAnyReplicaResponse,
+                                                                          CppLookupInResponse,
+                                                                          CppLookupInResponseEntry,
+                                                                          CppMutateInResponse,
+                                                                          CppMutateInResponseEntry,
+                                                                          CppMutationToken,
                                                                           CppPingResult,
                                                                           CppRangeScanItem,
                                                                           CppSearchLocation,
                                                                           CppSearchRow,
+                                                                          CppUpsertResponse,
                                                                           CppViewRow)
 
     class _CoreScanItem(TypedDict, total=False):
         """What the binding writes for one item of a range scan (``src/result.cxx``)."""
         scan_item: CppRangeScanItem
+
+
+def _mutation_token_from_core(raw: CppMutationToken | None) -> _MutationTokenRecord | None:
+    if raw is None:
+        return None
+    return _MutationTokenRecord(partition_id=raw['partition_id'],
+                                partition_uuid=raw['partition_uuid'],
+                                sequence_number=raw['sequence_number'],
+                                bucket_name=raw['bucket_name'])
+
+
+def _lookup_in_field_from_core(raw: CppLookupInResponseEntry, key: str | None) -> _LookupInFieldRecord:
+    return _LookupInFieldRecord(path=raw['path'],
+                                value=raw['value'],
+                                original_index=raw['original_index'],
+                                exists=raw['exists'],
+                                opcode=raw['opcode'],
+                                status=raw['status'],
+                                ec=raw['ec'],
+                                error=_subdoc_error(raw['status'], raw['path'], key))
+
+
+def _mutate_in_field_from_core(raw: CppMutateInResponseEntry, key: str | None) -> _MutateInFieldRecord:
+    return _MutateInFieldRecord(path=raw['path'],
+                                value=raw['value'],
+                                original_index=raw['original_index'],
+                                opcode=raw['opcode'],
+                                status=raw['status'],
+                                ec=raw['ec'],
+                                error=_subdoc_error(raw['status'], raw['path'], key))
+
+
+def _get_from_core(raw: CppGetProjectedResponse) -> _GetRecord:
+    """``get``, ``get_and_lock``, ``get_and_touch`` and a projected ``get``.
+
+    Only a projected ``get`` sends ``expiry``, and only when the caller asked for it, so its response
+    holds every key the other three do.
+    """
+    return _GetRecord(cas=raw.get('cas', 0),
+                      value=raw['value'],
+                      flags=raw.get('flags', 0),
+                      expiry=raw.get('expiry'))
+
+
+def _get_replica_from_core(raw: CppGetAnyReplicaResponse | CppGetAllReplicasResponseEntry) -> _GetReplicaRecord:
+    """``get_any_replica`` and each entry of ``get_all_replicas``."""
+    return _GetReplicaRecord(cas=raw.get('cas', 0),
+                             value=raw['value'],
+                             flags=raw.get('flags', 0),
+                             is_replica=raw.get('replica', False))
+
+
+def _exists_from_core(raw: CppExistsResponse) -> _ExistsRecord:
+    return _ExistsRecord(cas=raw.get('cas', 0),
+                         exists=raw.get('document_exists', False),
+                         deleted=raw.get('deleted'),
+                         flags=raw.get('flags'),
+                         expiry=raw.get('expiry'),
+                         sequence_number=raw.get('sequence_number'),
+                         datatype=raw.get('datatype'))
+
+
+def _mutation_from_core(raw: CppUpsertResponse) -> _MutationRecord:
+    """Every mutation but the counters and ``mutate_in``, and ``touch``, which sends no token.
+
+    Each of them sends the keys an ``upsert`` does, or a subset of them.
+    """
+    return _MutationRecord(cas=raw.get('cas', 0),
+                           mutation_token=_mutation_token_from_core(raw.get('token')))
+
+
+def _counter_from_core(raw: CppIncrementResponse | CppDecrementResponse) -> _CounterRecord:
+    return _CounterRecord(cas=raw.get('cas', 0),
+                          content=raw.get('content'),
+                          mutation_token=_mutation_token_from_core(raw.get('token')))
+
+
+def _lookup_in_from_core(raw: CppLookupInResponse, key: str | None) -> _LookupInRecord:
+    return _LookupInRecord(cas=raw.get('cas', 0),
+                           fields=tuple(_lookup_in_field_from_core(f, key) for f in raw.get('fields') or ()),
+                           deleted=raw.get('deleted', False))
+
+
+def _lookup_in_replica_from_core(raw: CppLookupInAnyReplicaResponse | CppLookupInAllReplicasResponseEntry,
+                                 key: str | None) -> _LookupInReplicaRecord:
+    """``lookup_in_any_replica`` and each entry of ``lookup_in_all_replicas``."""
+    return _LookupInReplicaRecord(cas=raw.get('cas', 0),
+                                  fields=tuple(_lookup_in_field_from_core(f, key) for f in raw.get('fields') or ()),
+                                  deleted=raw.get('deleted', False),
+                                  is_replica=raw.get('is_replica', False))
+
+
+def _mutate_in_from_core(raw: CppMutateInResponse, key: str | None) -> _MutateInRecord:
+    return _MutateInRecord(cas=raw.get('cas', 0),
+                           mutation_token=_mutation_token_from_core(raw.get('token')),
+                           fields=tuple(_mutate_in_field_from_core(f, key) for f in raw.get('fields') or ()),
+                           deleted=raw.get('deleted', False))
+
+
+def _scan_item_from_core(raw: _CoreScanItem) -> _ScanItemRecord:
+    """One item of a range scan. The core sends no ``body`` for a scan that asked for ids only."""
+    item = raw.get('scan_item') or {}
+    body = item.get('body')
+    return _ScanItemRecord(id=item.get('key'),
+                           body=None if body is None else _ScanItemBodyRecord(
+                               cas=body['cas'],
+                               value=body['value'],
+                               flags=body['flags'],
+                               expiry=body['expiry'],
+                               sequence_number=body['sequence_number'],
+                               datatype=body['datatype']))
 
 
 def _endpoint_diagnostics_from_core(raw: CppEndpointDiagInfo) -> _EndpointDiagnosticsRecord:
