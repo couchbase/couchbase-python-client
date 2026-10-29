@@ -27,31 +27,25 @@ from couchbase.common.management.buckets import (BucketSettings,
                                                  CreateBucketSettings,
                                                  EvictionPolicyType,
                                                  StorageBackend)
+from couchbase.common.warnings import CouchbaseDeprecationWarning
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.protocol.classic._management._bucket_mgmt_req_builder import BucketMgmtRequestBuilder
 
 
 def _optional_property_names() -> list[str]:
     # Read off the class rather than enumerated, so a property added later is asserted
     # without anyone remembering to extend a list.  `CreateBucketSettings` adds no property
-    # of its own, so one list serves both.  PYCBC-1908 will make `max_ttl` warn on read, at
-    # which point exclude it here rather than moving these tests.
+    # of its own, so one list serves both.  `max_ttl` is left out because it warns on read; it
+    # is covered by LegacyBucketSettingsUnitTests.
     return sorted(name for name in dir(BucketSettings)
-                  if name != 'name' and isinstance(getattr(BucketSettings, name, None), property))
+                  if name not in ('name', 'max_ttl') and isinstance(getattr(BucketSettings, name, None), property))
 
 
 class BucketSettingsUnitTests:
-    # No cb_env and no TEST_MANIFEST: every test either builds a `BucketSettings` and reads
-    # the dict it would hand the core, or feeds a server-shaped dict to
-    # `BucketSettings.bucket_settings_from_server`.  Not generated either: this file never
-    # gets as far as an api, since it imports the request builder and instantiates it
-    # directly, so a generated copy would be the same file with nothing to await.  The
+    # No cb_env and no TEST_MANIFEST: every test either builds a `BucketSettings` and reads it
+    # back, or feeds a server-shaped dict to `BucketSettings.bucket_settings_from_server`.  What
+    # classic's request builder makes of one is in bucket_settings_req_builder_t.  The
     # deprecated `max_ttl` alias is covered by LegacyBucketSettingsUnitTests below.
-
-    @pytest.fixture(scope='class', name='request_builder')
-    def bucket_mgmt_request_builder(self) -> BucketMgmtRequestBuilder:
-        return BucketMgmtRequestBuilder()
 
     @staticmethod
     def _assert_optional_fields_none(settings: BucketSettings, exclude: list[str] | None = None) -> None:
@@ -119,109 +113,6 @@ class BucketSettingsUnitTests:
         assert settings.history_retention_bytes == 0
         assert settings.history_retention_duration == timedelta(0)
         assert len(settings) == 4
-
-    # --- Translation to the server payload ---
-
-    def test_minimal_settings_to_server(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test-bucket')
-        result = request_builder._bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test-bucket'}
-        assert len(result) == 1
-
-    def test_zero_replicas_to_server(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test', num_replicas=0)
-        result = request_builder._bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test', 'num_replicas': 0}
-
-    def test_false_flush_enabled_to_server(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test', flush_enabled=False)
-        result = request_builder._bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test', 'flush_enabled': False}
-
-    def test_false_replica_index_to_server(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test', replica_index=False)
-        result = request_builder._bucket_settings_to_server(settings)
-
-        # The wire name is plural and differs from the attribute name, which is why this is a
-        # test of its own rather than a line in the exhaustive one below.
-        assert result == {'name': 'test', 'replica_indexes': False}
-
-    def test_zero_and_false_history_retention_to_server(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test',
-                                        history_retention_collection_default=False,
-                                        history_retention_bytes=0,
-                                        history_retention_duration=timedelta(0))
-        result = request_builder._bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test',
-                          'history_retention_collection_default': False,
-                          'history_retention_bytes': 0,
-                          'history_retention_duration': 0}
-
-    def test_durability_level_none_to_server(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test', minimum_durability_level=DurabilityLevel.NONE)
-        result = request_builder._bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test', 'minimum_durability_level': 0}
-
-    def test_max_expiry_zero_to_server(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test', max_expiry=timedelta(0))
-        result = request_builder._bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test', 'max_expiry': 0}
-
-    def test_all_fields_to_server_translation(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test',
-                                        bucket_type=BucketType.COUCHBASE,
-                                        compression_mode=CompressionMode.ACTIVE,
-                                        conflict_resolution_type=ConflictResolutionType.SEQUENCE_NUMBER,
-                                        eviction_policy=EvictionPolicyType.FULL,
-                                        flush_enabled=True,
-                                        history_retention_collection_default=True,
-                                        history_retention_bytes=2048,
-                                        history_retention_duration=timedelta(days=1),
-                                        max_expiry=timedelta(hours=12),
-                                        minimum_durability_level=DurabilityLevel.MAJORITY,
-                                        num_replicas=2,
-                                        ram_quota_mb=256,
-                                        replica_index=True,
-                                        storage_backend=StorageBackend.MAGMA,
-                                        num_vbuckets=128)
-
-        result = request_builder._create_bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test',
-                          'bucket_type': 'couchbase',
-                          'compression_mode': 'active',
-                          'conflict_resolution_type': 'sequence_number',
-                          'eviction_policy': 'full',
-                          'flush_enabled': True,
-                          'history_retention_collection_default': True,
-                          'history_retention_bytes': 2048,
-                          'history_retention_duration': 86400,
-                          'max_expiry': 43200,
-                          'minimum_durability_level': 1,
-                          'num_replicas': 2,
-                          'ram_quota_mb': 256,
-                          'replica_indexes': True,
-                          'storage_backend': 'magma',
-                          'num_vbuckets': 128}
-
-    def test_conflict_resolution_type_not_sent_on_update(self,
-                                                         request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test',
-                                        conflict_resolution_type=ConflictResolutionType.CUSTOM)
-
-        create_result = request_builder._create_bucket_settings_to_server(settings)
-        update_result = request_builder._bucket_settings_to_server(settings)
-
-        # A bucket's conflict resolution type is fixed at creation, so the update payload has
-        # to drop it rather than resend it unchanged.
-        assert create_result['conflict_resolution_type'] == 'custom'
-        assert 'conflict_resolution_type' not in update_result
 
     # --- Translation from the server payload ---
 
@@ -297,93 +188,22 @@ class BucketSettingsUnitTests:
         assert settings.bucket_type == BucketType.COUCHBASE
 
     def test_unknown_storage_backend_from_server(self) -> None:
-        # `StorageBackend` has no `unknown` member, so without the rewrite this raises rather
-        # than reporting a backend the SDK does not recognise.
+        # The core reports a bucket with no backend set as `unknown`, which `StorageBackend` has no
+        # member for.
         settings = BucketSettings.bucket_settings_from_server({'name': 'test', 'storage_backend': 'unknown'})
 
         assert settings.storage_backend == StorageBackend.UNDEFINED
 
-    # --- Round trips ---
+    @pytest.mark.parametrize('field, unknown', [('bucket_type', BucketType.UNKNOWN),
+                                                ('compression_mode', CompressionMode.UNKNOWN),
+                                                ('conflict_resolution_type', ConflictResolutionType.UNKNOWN),
+                                                ('eviction_policy', EvictionPolicyType.UNKNOWN),
+                                                ('storage_backend', StorageBackend.UNDEFINED)])
+    def test_a_value_the_sdk_cannot_name_reads_as_unknown(self, field: str, unknown: object) -> None:
+        # A server release can add a value, and reading the bucket must not fail on it.
+        settings = BucketSettings.bucket_settings_from_server({'name': 'test', field: 'not-a-real-value'})
 
-    def test_round_trip_minimal(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        original_server_dict = {'name': 'test'}
-
-        settings = BucketSettings.bucket_settings_from_server(original_server_dict)
-        result_server_dict = request_builder._bucket_settings_to_server(settings)
-
-        assert result_server_dict == original_server_dict
-
-    def test_round_trip_full(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        original_server_dict = {'name': 'test',
-                                'bucket_type': 'couchbase',
-                                'compression_mode': 'active',
-                                'eviction_policy': 'full',
-                                'flush_enabled': True,
-                                'num_replicas': 2,
-                                'ram_quota_mb': 256,
-                                'replica_indexes': True,
-                                'storage_backend': 'magma',
-                                'minimum_durability_level': 1,
-                                'max_expiry': 3600}
-
-        settings = BucketSettings.bucket_settings_from_server(original_server_dict)
-        result_server_dict = request_builder._bucket_settings_to_server(settings)
-
-        assert result_server_dict == original_server_dict
-
-    def test_round_trip_edge_cases(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        original_server_dict = {'name': 'test',
-                                'num_replicas': 0,
-                                'flush_enabled': False,
-                                'replica_indexes': False,
-                                'history_retention_bytes': 0,
-                                'history_retention_duration': 0,
-                                'max_expiry': 0,
-                                'minimum_durability_level': 0}
-
-        settings = BucketSettings.bucket_settings_from_server(original_server_dict)
-        result_server_dict = request_builder._bucket_settings_to_server(settings)
-
-        assert result_server_dict == original_server_dict
-
-    # --- Enum conversions ---
-
-    @pytest.mark.parametrize('enum_field,enum_value,server_key,expected_value', [
-        ('bucket_type', BucketType.COUCHBASE, 'bucket_type', 'couchbase'),
-        ('bucket_type', BucketType.MEMCACHED, 'bucket_type', 'memcached'),
-        ('bucket_type', BucketType.EPHEMERAL, 'bucket_type', 'ephemeral'),
-        ('compression_mode', CompressionMode.OFF, 'compression_mode', 'off'),
-        ('compression_mode', CompressionMode.PASSIVE, 'compression_mode', 'passive'),
-        ('compression_mode', CompressionMode.ACTIVE, 'compression_mode', 'active'),
-        ('conflict_resolution_type', ConflictResolutionType.TIMESTAMP, 'conflict_resolution_type', 'timestamp'),
-        ('conflict_resolution_type', ConflictResolutionType.SEQUENCE_NUMBER,
-         'conflict_resolution_type', 'sequence_number'),
-        ('conflict_resolution_type', ConflictResolutionType.CUSTOM, 'conflict_resolution_type', 'custom'),
-        ('eviction_policy', EvictionPolicyType.FULL, 'eviction_policy', 'full'),
-        ('eviction_policy', EvictionPolicyType.VALUE_ONLY, 'eviction_policy', 'value_only'),
-        ('eviction_policy', EvictionPolicyType.NOT_RECENTLY_USED, 'eviction_policy', 'not_recently_used'),
-        ('eviction_policy', EvictionPolicyType.NO_EVICTION, 'eviction_policy', 'no_eviction'),
-        ('storage_backend', StorageBackend.COUCHSTORE, 'storage_backend', 'couchstore'),
-        ('storage_backend', StorageBackend.MAGMA, 'storage_backend', 'magma'),
-        ('storage_backend', StorageBackend.UNDEFINED, 'storage_backend', 'undefined'),
-        ('minimum_durability_level', DurabilityLevel.NONE, 'minimum_durability_level', 0),
-        ('minimum_durability_level', DurabilityLevel.MAJORITY, 'minimum_durability_level', 1),
-        ('minimum_durability_level', DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE,
-         'minimum_durability_level', 2),
-        ('minimum_durability_level', DurabilityLevel.PERSIST_TO_MAJORITY,
-         'minimum_durability_level', 3),
-    ])
-    def test_enum_conversions_to_server(self,
-                                        request_builder: BucketMgmtRequestBuilder,
-                                        enum_field: str,
-                                        enum_value: Any,
-                                        server_key: str,
-                                        expected_value: Any) -> None:
-        settings = CreateBucketSettings(name='test', **{enum_field: enum_value})
-        result = request_builder._create_bucket_settings_to_server(settings)
-
-        assert server_key in result
-        assert result[server_key] == expected_value
+        assert getattr(settings, field) is unknown
 
     # --- Error cases ---
 
@@ -397,71 +217,28 @@ class BucketSettingsUnitTests:
         # None is not a name and the checker is right to say so; what is under test is that
         # the constructor rejects it at runtime.  A cast would assert the opposite.
         with pytest.raises(InvalidArgumentException) as exc_info:
-            BucketSettings(name=None)  # type: ignore[call-overload]
+            BucketSettings(name=None)  # type: ignore[arg-type]
 
         assert 'non-empty bucket name' in str(exc_info.value)
 
-    def test_invalid_enum_type_error(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test')
-        settings['bucket_type'] = 'invalid_string'
-
+    @pytest.mark.parametrize('settings_type', [BucketSettings, CreateBucketSettings])
+    @pytest.mark.parametrize('name', [7, b'test', ['test']])
+    def test_bucket_settings_non_str_name_error(self, settings_type: type[BucketSettings], name: Any) -> None:
         with pytest.raises(InvalidArgumentException) as exc_info:
-            request_builder._bucket_settings_to_server(settings)
+            settings_type(name=name)
 
-        assert 'BucketType' in str(exc_info.value)
-        assert 'invalid_string' in str(exc_info.value)
-
-    def test_invalid_int_type_error(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test')
-        settings['ram_quota_mb'] = 'not_an_int'
-
-        with pytest.raises(InvalidArgumentException) as exc_info:
-            request_builder._bucket_settings_to_server(settings)
-
-        assert 'type int' in str(exc_info.value)
-
-    def test_invalid_timedelta_type_error(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test')
-        settings['max_expiry'] = 'not_a_timedelta'
-
-        with pytest.raises(InvalidArgumentException) as exc_info:
-            request_builder._bucket_settings_to_server(settings)
-
-        # The accepted-types clause, not the verb: the message opens with `Excepted`, and
-        # asserting around that typo takes an `or` over two substrings.
-        assert 'Union[timedelta, float, int]' in str(exc_info.value)
-        assert 'not_a_timedelta' in str(exc_info.value)
+        assert exc_info.value.message == 'The bucket name must be str.'
 
 
 class LegacyBucketSettingsUnitTests:
     # Kept apart from BucketSettingsUnitTests so that what the alias does is legible on its
-    # own and leaves with it.  Passing `max_ttl` alongside `max_expiry` in an exhaustive
-    # to-server test reads as though the field were dropped; it is overwritten, not dropped.
-
-    @pytest.fixture(scope='class', name='request_builder')
-    def bucket_mgmt_request_builder(self) -> BucketMgmtRequestBuilder:
-        return BucketMgmtRequestBuilder()
-
-    def test_max_ttl_alone_is_sent_as_max_expiry(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test', max_ttl=3600)
-        result = request_builder._bucket_settings_to_server(settings)
-
-        # There is no maxTTL in the core, so the alias reaches the wire under the current name.
-        assert result == {'name': 'test', 'max_expiry': 3600}
-
-    def test_max_expiry_takes_precedence_over_max_ttl(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        settings = CreateBucketSettings(name='test', max_ttl=3600, max_expiry=timedelta(hours=12))
-        result = request_builder._bucket_settings_to_server(settings)
-
-        assert result == {'name': 'test', 'max_expiry': 43200}
+    # own and leaves with it.
 
     def test_max_ttl_property_reports_max_expiry_and_not_max_ttl(self) -> None:
-        # @FINDING(PYCBC-1908): BucketSettings.max_ttl reads the 'max_expiry' key, so a settings
-        # object built with max_ttl reports None from both accessors while still sending the
-        # value to the server.  Reading back what was just written is the obvious way to
-        # confirm a deprecated field was accepted, and it says the field was ignored.  Pinned
-        # rather than fixed: the property is public, and correcting it changes what an
-        # existing caller sees.
+        # BucketSettings.max_ttl reads the 'max_expiry' key, so a settings object built with
+        # max_ttl reports None from both accessors while still sending the value to the server.
+        # Pinned: the property is public, correcting it changes what an existing caller sees,
+        # and folding max_ttl into max_expiry was declined in PYCBC-1908.
         by_alias = BucketSettings(name='test', max_ttl=3600)
         assert by_alias['max_ttl'] == 3600
         assert by_alias.max_ttl is None
@@ -470,14 +247,7 @@ class LegacyBucketSettingsUnitTests:
         by_current_name = BucketSettings(name='test', max_expiry=timedelta(hours=1))
         assert by_current_name.max_ttl == timedelta(hours=1)
 
-    def test_max_ttl_rejects_timedelta(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        # @FINDING(PYCBC-1908): max_ttl is annotated Optional[Union[timedelta, float, int]] on both
-        # settings classes, matching max_expiry, but the builder sends it through an int
-        # validator rather than the seconds conversion max_expiry gets.  A timedelta is what
-        # the signature invites and it raises.
-        settings = CreateBucketSettings(name='test', max_ttl=timedelta(hours=1))
-
-        with pytest.raises(InvalidArgumentException) as exc_info:
-            request_builder._bucket_settings_to_server(settings)
-
-        assert 'type int' in str(exc_info.value)
+    def test_max_ttl_property_warns(self) -> None:
+        settings = BucketSettings(name='test', max_expiry=timedelta(hours=1))
+        with pytest.warns(CouchbaseDeprecationWarning, match=r'BucketSettings\.max_ttl is deprecated'):
+            _ = settings.max_ttl

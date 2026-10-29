@@ -39,7 +39,6 @@ from couchbase.exceptions import (BucketAlreadyExistsException,
                                   SearchIndexNotFoundException)
 from couchbase.logic.observability import OpName
 from couchbase.management.options import CreateQueryIndexOptions, WatchQueryIndexOptions
-from couchbase.management.users import Role
 from tests.environments.managers import (TwistedTestEnvironmentAnalyticsIndexManager,
                                          TwistedTestEnvironmentBucketManager,
                                          TwistedTestEnvironmentCollectionMgmtManager,
@@ -63,7 +62,7 @@ from tests.tracing_validators import HttpSpanValidator
 from txcouchbase.management.buckets import CreateBucketSettings
 from txcouchbase.management.collections import UpdateCollectionSettings
 from txcouchbase.management.search import SearchIndex
-from txcouchbase.management.users import User
+from txcouchbase.management.users import Role, User
 from txcouchbase.management.views import DesignDocumentNamespace
 
 # The empty name every client-side-refusal test hands its manager.  A manager rejects it before

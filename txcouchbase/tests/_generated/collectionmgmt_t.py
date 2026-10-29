@@ -44,7 +44,6 @@ from couchbase.exceptions import (CollectionAlreadyExistsException,
                                   InvalidArgumentException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException)
-from couchbase.management.buckets import StorageBackend
 from couchbase.management.options import CreateCollectionOptions, DropCollectionOptions
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.managers import TwistedTestEnvironmentBucketManager, TwistedTestEnvironmentCollectionMgmtManager
@@ -56,6 +55,7 @@ from tests.environments.twisted_environment import (CollectionStrategy,
 from tests.manifest import validate_test_manifest
 from tests.skips import CouchbaseTestEnvironmentException
 from tests.test_features import EnvironmentFeatures, ServerFeatures
+from txcouchbase.management.buckets import StorageBackend
 from txcouchbase.management.collections import (CollectionSpec,
                                                 CreateCollectionSettings,
                                                 UpdateCollectionSettings)

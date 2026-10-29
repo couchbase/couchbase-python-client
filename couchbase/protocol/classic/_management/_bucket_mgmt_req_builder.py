@@ -15,38 +15,50 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
-from couchbase._utils import is_null_or_empty
-from couchbase.common._transforms import enum_to_str, to_seconds
-from couchbase.common.management.buckets import (BUCKET_MGMT_ERROR_MAP,
-                                                 BucketDescribeRequest,
-                                                 BucketSettings,
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._transforms import (enum_to_str,
+                                          to_seconds,
+                                          validate_bool,
+                                          validate_int)
+from couchbase.common._utils import is_null_or_empty
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.management.buckets import (BucketSettings,
                                                  BucketType,
                                                  CompressionMode,
                                                  ConflictResolutionType,
-                                                 CreateBucketRequest,
                                                  CreateBucketSettings,
-                                                 DropBucketRequest,
                                                  EvictionPolicyType,
-                                                 FlushBucketRequest,
-                                                 GetAllBucketsRequest,
-                                                 GetBucketRequest,
-                                                 StorageBackend,
-                                                 UpdateBucketRequest)
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic._legacy_options import forward_args
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.validation import validate_bool, validate_int
+                                                 StorageBackend)
+from couchbase.common.management.options import (BucketDescribeOptions,
+                                                 CreateBucketOptions,
+                                                 DropBucketOptions,
+                                                 FlushBucketOptions,
+                                                 GetAllBucketOptions,
+                                                 GetBucketOptions,
+                                                 UpdateBucketOptions)
+from couchbase.common.option_enums import OptionValidationMode
+from couchbase.protocol.classic._management._bucket_mgmt_types import (BUCKET_MGMT_ERROR_MAP,
+                                                                       BucketDescribeRequest,
+                                                                       BucketMgmtOptionsBlock,
+                                                                       CreateBucketRequest,
+                                                                       DropBucketRequest,
+                                                                       FlushBucketRequest,
+                                                                       GetAllBucketsRequest,
+                                                                       GetBucketRequest,
+                                                                       UpdateBucketRequest)
+from couchbase.protocol.classic._wire import forward_args
 
 
 class BucketMgmtRequestBuilder:
 
-    def __init__(self) -> None:
+    def __init__(self, option_validation: OptionValidationMode | None = None) -> None:
         self._error_map = BUCKET_MGMT_ERROR_MAP
+        self._option_validation = option_validation
 
     def _bucket_settings_to_server(self,  # noqa: C901
-                                   settings: BucketSettings) -> Dict[str, Any]:
+                                   settings: BucketSettings) -> dict[str, Any]:
         """**INTERNAL**"""
         output = {'name': settings['name']}
         bucket_type = settings.get('bucket_type', None)
@@ -105,7 +117,7 @@ class BucketMgmtRequestBuilder:
 
         return output
 
-    def _create_bucket_settings_to_server(self, settings: CreateBucketSettings) -> Dict[str, Any]:
+    def _create_bucket_settings_to_server(self, settings: CreateBucketSettings) -> dict[str, Any]:
         """**INTERNAL**"""
         output = self._bucket_settings_to_server(settings)
         # conflict resolution type is fixed at creation, so only this path sends it
@@ -117,120 +129,100 @@ class BucketMgmtRequestBuilder:
 
         return output
 
-    def _validate_bucket_name(self, bucket_name: str) -> None:
-        if is_null_or_empty(bucket_name):
+    def _validate_bucket_name(self, bucket_name: object) -> str:
+        if bucket_name is None:
             raise InvalidArgumentException('The bucket_name cannot be empty.')
 
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException('The bucket_name must be str.')
 
+        if is_null_or_empty(bucket_name):
+            raise InvalidArgumentException('The bucket_name cannot be empty.')
+
+        return bucket_name
+
     def build_bucket_describe_request(self,
                                       bucket_name: str,
                                       obs_handler: ObservableRequestHandler,
-                                      *options: object,
+                                      options: BucketDescribeOptions | None = None,
                                       **kwargs: object) -> BucketDescribeRequest:
-        final_args = forward_args(kwargs, *options)
-        timeout = final_args.pop('timeout', None)
+        final_args = forward_args(kwargs, options, block=BucketMgmtOptionsBlock.BucketDescribe,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
-        req = BucketDescribeRequest(self._error_map, bucket_name)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return BucketDescribeRequest(self._error_map, name=bucket_name, timeout=final_args.pop('timeout', None))
 
     def build_create_bucket_request(self,
                                     settings: CreateBucketSettings,
                                     obs_handler: ObservableRequestHandler,
-                                    *options: object,
+                                    options: CreateBucketOptions | None = None,
                                     **kwargs: object) -> CreateBucketRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=BucketMgmtOptionsBlock.CreateBucket,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span, bucket_name=settings.get('name', None))
-        bucket_settings = self._create_bucket_settings_to_server(settings)
-        timeout = final_args.pop('timeout', None)
-        req = CreateBucketRequest(self._error_map, bucket_settings)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        self._validate_bucket_name(settings.get('name', None))
+        return CreateBucketRequest(self._error_map,
+                                   bucket=self._create_bucket_settings_to_server(settings),
+                                   timeout=final_args.pop('timeout', None))
 
     def build_drop_bucket_request(self,
                                   bucket_name: str,
                                   obs_handler: ObservableRequestHandler,
-                                  *options: object,
+                                  options: DropBucketOptions | None = None,
                                   **kwargs: object) -> DropBucketRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=BucketMgmtOptionsBlock.DropBucket,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name)
         self._validate_bucket_name(bucket_name)
-        timeout = final_args.pop('timeout', None)
-        req = DropBucketRequest(self._error_map, bucket_name)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return DropBucketRequest(self._error_map, name=bucket_name, timeout=final_args.pop('timeout', None))
 
     def build_flush_bucket_request(self,
                                    bucket_name: str,
                                    obs_handler: ObservableRequestHandler,
-                                   *options: object,
+                                   options: FlushBucketOptions | None = None,
                                    **kwargs: object) -> FlushBucketRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=BucketMgmtOptionsBlock.FlushBucket,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name)
         self._validate_bucket_name(bucket_name)
-        timeout = final_args.pop('timeout', None)
-        req = FlushBucketRequest(self._error_map, bucket_name)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return FlushBucketRequest(self._error_map, name=bucket_name, timeout=final_args.pop('timeout', None))
 
     def build_get_all_buckets_request(self,
                                       obs_handler: ObservableRequestHandler,
-                                      *options: object,
+                                      options: GetAllBucketOptions | None = None,
                                       **kwargs: object) -> GetAllBucketsRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=BucketMgmtOptionsBlock.GetAllBucket,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        req = GetAllBucketsRequest(self._error_map)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetAllBucketsRequest(self._error_map, timeout=final_args.pop('timeout', None))
 
     def build_get_bucket_request(self,
                                  bucket_name: str,
                                  obs_handler: ObservableRequestHandler,
-                                 *options: object,
+                                 options: GetBucketOptions | None = None,
                                  **kwargs: object) -> GetBucketRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=BucketMgmtOptionsBlock.GetBucket,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name)
         self._validate_bucket_name(bucket_name)
-        timeout = final_args.pop('timeout', None)
-        req = GetBucketRequest(self._error_map, bucket_name)
-
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetBucketRequest(self._error_map, name=bucket_name, timeout=final_args.pop('timeout', None))
 
     def build_update_bucket_request(self,
                                     settings: BucketSettings,
                                     obs_handler: ObservableRequestHandler,
-                                    *options: object,
+                                    options: UpdateBucketOptions | None = None,
                                     **kwargs: object) -> UpdateBucketRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=BucketMgmtOptionsBlock.UpdateBucket,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span, bucket_name=settings.get('name', None))
-        timeout = final_args.pop('timeout', None)
-        bucket_settings = self._bucket_settings_to_server(settings)
-        req = UpdateBucketRequest(self._error_map, bucket_settings)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        self._validate_bucket_name(settings.get('name', None))
+        return UpdateBucketRequest(self._error_map,
+                                   bucket=self._bucket_settings_to_server(settings),
+                                   timeout=final_args.pop('timeout', None))

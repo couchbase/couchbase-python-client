@@ -27,6 +27,8 @@ import pytest
 import pytest_asyncio
 
 from acouchbase.management.users import (Group,
+                                         Role,
+                                         RoleAndOrigins,
                                          User,
                                          UserAndMetadata)
 from couchbase.auth import AuthDomain
@@ -39,7 +41,6 @@ from couchbase.exceptions import (AuthenticationException,
 from couchbase.management.options import (DropUserOptions,
                                           GetUserOptions,
                                           UpsertUserOptions)
-from couchbase.management.users import Role, RoleAndOrigins
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,

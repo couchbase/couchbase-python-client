@@ -30,9 +30,6 @@ from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketNotFlushableException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException)
-from couchbase.management.buckets import (BucketType,
-                                          ConflictResolutionType,
-                                          StorageBackend)
 from tests.assert_helpers import cb_assert_eq
 from tests.environments.managers import TwistedTestEnvironmentBucketManager
 from tests.environments.twisted_environment import (CollectionStrategy,
@@ -41,9 +38,15 @@ from tests.environments.twisted_environment import (CollectionStrategy,
                                                     teardown_twisted_environment)
 from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 from txcouchbase.bucket import Bucket
-from txcouchbase.management.buckets import BucketSettings, CreateBucketSettings
+from txcouchbase.management.buckets import (BucketSettings,
+                                            BucketType,
+                                            ConflictResolutionType,
+                                            CreateBucketSettings,
+                                            StorageBackend)
 
 
 class BucketManagementTestSuite(TopologySuite):
@@ -406,6 +409,9 @@ class BucketManagementTestSuite(TopologySuite):
                 )
             )
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     def test_bucket_drop_fail(self, cb_env: TwistedTestEnvironment) -> None:
@@ -438,6 +444,7 @@ class BucketManagementTestSuite(TopologySuite):
         assert bucket.flush_enabled is True
         TwistedTestEnvironment.try_n_times(10, 3, bm.flush_bucket, bucket.name, is_deferred=False)
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')

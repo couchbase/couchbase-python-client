@@ -15,134 +15,148 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING, Iterable
-
-from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
+from collections.abc import Coroutine, Iterable
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._management._user_mgmt_impl import AsyncUserMgmtImpl
-from couchbase.common.management.users import (Group,
-                                               RoleAndDescription,
-                                               UserAndMetadata)
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from txcouchbase.protocol.classic._deferred import defer
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.common.management.users import (ChangePasswordRequest,
-                                                   DropGroupRequest,
-                                                   DropUserRequest,
-                                                   GetAllGroupsRequest,
-                                                   GetAllUsersRequest,
-                                                   GetGroupRequest,
-                                                   GetRolesRequest,
-                                                   GetUserRequest,
-                                                   UpsertGroupRequest,
-                                                   UpsertUserRequest)
+    from twisted.internet.defer import Deferred
+
+    from couchbase.common.management.options import (ChangePasswordOptions,
+                                                     DropGroupOptions,
+                                                     DropUserOptions,
+                                                     GetAllGroupsOptions,
+                                                     GetAllUsersOptions,
+                                                     GetGroupOptions,
+                                                     GetRolesOptions,
+                                                     GetUserOptions,
+                                                     UpsertGroupOptions,
+                                                     UpsertUserOptions)
+    from couchbase.common.management.users import (Group,
+                                                   RoleAndDescription,
+                                                   User,
+                                                   UserAndMetadata)
 
 
 class TxUserMgmtImpl(AsyncUserMgmtImpl):
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        super().__init__(client_adapter, observability_instruments)
-
-    def _finish_span(self, result, obs_handler: ObservableRequestHandler):
-        """Callback to properly end the span on success or failure."""
-        if isinstance(result, Failure):
-            exc = result.value
-            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
-            return result
-        else:
-            obs_handler.__exit__(None, None, None)
-            return result
-
-    def change_password_deferred(self,
-                                 req: ChangePasswordRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().change_password(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def drop_group_deferred(self,
-                            req: DropGroupRequest,
-                            obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_group(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def drop_user_deferred(self,
-                           req: DropUserRequest,
-                           obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_user(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_all_groups_deferred(self,
-                                req: GetAllGroupsRequest,
-                                obs_handler: ObservableRequestHandler) -> Deferred[Iterable[Group]]:
-        """**INTERNAL**"""
-        coro = super().get_all_groups(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_all_users_deferred(self,
-                               req: GetAllUsersRequest,
-                               obs_handler: ObservableRequestHandler) -> Deferred[Iterable[UserAndMetadata]]:
-        """**INTERNAL**"""
-        coro = super().get_all_users(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_group_deferred(self,
-                           req: GetGroupRequest,
-                           obs_handler: ObservableRequestHandler) -> Deferred[Group]:
-        """**INTERNAL**"""
-        coro = super().get_group(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_roles_deferred(self,
-                           req: GetRolesRequest,
-                           obs_handler: ObservableRequestHandler) -> Deferred[Iterable[RoleAndDescription]]:
-        """**INTERNAL**"""
-        coro = super().get_roles(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
 
     def get_user_deferred(self,
-                          req: GetUserRequest,
-                          obs_handler: ObservableRequestHandler) -> Deferred[UserAndMetadata]:
-        """**INTERNAL**"""
-        coro = super().get_user(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                          username: str,
+                          options: GetUserOptions | None = None,
+                          **kwargs: Any) -> Deferred[UserAndMetadata]:
+        obs_handler = ObservableRequestHandler(Op.UserGet, self._observability_instruments)
 
-    def upsert_group_deferred(self,
-                              req: UpsertGroupRequest,
-                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().upsert_group(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, UserAndMetadata]:
+            req = self._request_builder.build_get_user_request(username, obs_handler, options, **kwargs)
+            return self._get_user(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_all_users_deferred(self,
+                               options: GetAllUsersOptions | None = None,
+                               **kwargs: Any) -> Deferred[Iterable[UserAndMetadata]]:
+        obs_handler = ObservableRequestHandler(Op.UserGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[UserAndMetadata]]:
+            req = self._request_builder.build_get_all_users_request(obs_handler, options, **kwargs)
+            return self._get_all_users(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def upsert_user_deferred(self,
-                             req: UpsertUserRequest,
-                             obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().upsert_user(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                             user: User,
+                             options: UpsertUserOptions | None = None,
+                             **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.UserUpsert, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_upsert_user_request(user, obs_handler, options, **kwargs)
+            return self._upsert_user(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_user_deferred(self,
+                           username: str,
+                           options: DropUserOptions | None = None,
+                           **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.UserDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_user_request(username, obs_handler, options, **kwargs)
+            return self._drop_user(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def change_password_deferred(self,
+                                 new_password: str,
+                                 options: ChangePasswordOptions | None = None,
+                                 **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.ChangePassword, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_change_password_request(new_password, obs_handler, options, **kwargs)
+            return self._change_password(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_roles_deferred(self,
+                           options: GetRolesOptions | None = None,
+                           **kwargs: Any) -> Deferred[Iterable[RoleAndDescription]]:
+        obs_handler = ObservableRequestHandler(Op.RoleGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[RoleAndDescription]]:
+            req = self._request_builder.build_get_roles_request(obs_handler, options, **kwargs)
+            return self._get_roles(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_group_deferred(self,
+                           group_name: str,
+                           options: GetGroupOptions | None = None,
+                           **kwargs: Any) -> Deferred[Group]:
+        obs_handler = ObservableRequestHandler(Op.GroupGet, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Group]:
+            req = self._request_builder.build_get_group_request(group_name, obs_handler, options, **kwargs)
+            return self._get_group(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_all_groups_deferred(self,
+                                options: GetAllGroupsOptions | None = None,
+                                **kwargs: Any) -> Deferred[Iterable[Group]]:
+        obs_handler = ObservableRequestHandler(Op.GroupGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[Group]]:
+            req = self._request_builder.build_get_all_groups_request(obs_handler, options, **kwargs)
+            return self._get_all_groups(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def upsert_group_deferred(self,
+                              group: Group,
+                              options: UpsertGroupOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.GroupUpsert, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_upsert_group_request(group, obs_handler, options, **kwargs)
+            return self._upsert_group(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_group_deferred(self,
+                            group_name: str,
+                            options: DropGroupOptions | None = None,
+                            **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.GroupDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_group_request(group_name, obs_handler, options, **kwargs)
+            return self._drop_group(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)

@@ -39,6 +39,8 @@ from couchbase.protocol.classic._cluster_types import (CreateConnectionRequest,
                                                        cluster_streaming_timeouts,
                                                        connect_options,
                                                        timeout_ms)
+from couchbase.protocol.classic._management._bucket_mgmt_impl import BucketMgmtImpl
+from couchbase.protocol.classic._management._user_mgmt_impl import UserMgmtImpl
 from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_hdr_histogram
 from couchbase.protocol.classic._result import (_cluster_info_from_core,
                                                 _diagnostics_from_core,
@@ -233,6 +235,14 @@ class ClusterImpl:
                                                                                         self.default_serializer),
                                                                     obs_handler=req.obs_handler,
                                                                     streaming_timeout=streaming_timeout)))
+
+    def bucket_mgmt(self) -> BucketMgmtImpl:
+        """**INTERNAL**"""
+        return BucketMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def user_mgmt(self) -> UserMgmtImpl:
+        """**INTERNAL**"""
+        return UserMgmtImpl(self._client_adapter, self.observability_instruments)
 
     def close_connection(self) -> None:
         """**INTERNAL**"""

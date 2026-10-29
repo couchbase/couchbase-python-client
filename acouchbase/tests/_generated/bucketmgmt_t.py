@@ -26,16 +26,17 @@ import pytest
 import pytest_asyncio
 
 from acouchbase.bucket import Bucket
-from acouchbase.management.buckets import BucketSettings, CreateBucketSettings
+from acouchbase.management.buckets import (BucketSettings,
+                                           BucketType,
+                                           ConflictResolutionType,
+                                           CreateBucketSettings,
+                                           StorageBackend)
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   BucketNotFlushableException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException)
-from couchbase.management.buckets import (BucketType,
-                                          ConflictResolutionType,
-                                          StorageBackend)
 from tests.assert_helpers import cb_assert_eq
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
@@ -44,7 +45,9 @@ from tests.environments.async_environment import (AsyncTestEnvironment,
 from tests.environments.managers import AsyncTestEnvironmentBucketManager
 from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class BucketManagementTestSuite(TopologySuite):
@@ -422,7 +425,10 @@ class BucketManagementTestSuite(TopologySuite):
                 )
             )
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     async def test_bucket_drop_fail(self, cb_env: AsyncTestEnvironment) -> None:
@@ -457,6 +463,7 @@ class BucketManagementTestSuite(TopologySuite):
         await AsyncTestEnvironment.try_n_times(10, 3, bm.flush_bucket, bucket.name)
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')

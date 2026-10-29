@@ -261,6 +261,7 @@ not_generated:
   cluster_free:
     - couchbase/tests/analytics_metadata_t.py
     - couchbase/tests/analytics_params_t.py
+    - couchbase/tests/bucket_settings_req_builder_t.py
     - couchbase/tests/bucketmgmt_bucket_settings_t.py
     - couchbase/tests/classic_streaming_t.py
     - couchbase/tests/classic_wire_t.py
@@ -273,6 +274,7 @@ not_generated:
     - couchbase/tests/kv_result_types_t.py
     - couchbase/tests/logging_meter_t.py
     - couchbase/tests/logging_smoke_t.py
+    - couchbase/tests/mgmt_req_builder_t.py
     - couchbase/tests/no_op_observability_t.py
     - couchbase/tests/option_diagnostics_t.py
     - couchbase/tests/pycbc_core_t.py

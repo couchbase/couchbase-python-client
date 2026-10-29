@@ -303,20 +303,25 @@ class Cluster:
 
     def buckets(self) -> BucketManager:
         """
-        Get the BucketManager.
+        Get a :class:`~txcouchbase.management.buckets.BucketManager` which can be used to manage the buckets
+        of this cluster.
 
-        :return: A :class:`~.management.BucketManager` with which you can create or
-              modify buckets on the cluster.
+        Returns:
+            :class:`~txcouchbase.management.buckets.BucketManager`: A
+            :class:`~txcouchbase.management.buckets.BucketManager` instance.
         """
-        return BucketManager(self._impl._client_adapter, self._impl.observability_instruments)
+        return BucketManager(self._impl.bucket_mgmt())
 
     def users(self) -> UserManager:
         """
-        Get the UserManager.
+        Get a :class:`~txcouchbase.management.users.UserManager` which can be used to manage the users
+        of this cluster.
 
-        :return: A :class:`~.management.UserManager` with which you can create or update cluster users and roles.
+        Returns:
+            :class:`~txcouchbase.management.users.UserManager`: A :class:`~txcouchbase.management.users.UserManager`
+            instance.
         """
-        return UserManager(self._impl._client_adapter, self._impl.observability_instruments)
+        return UserManager(self._impl.user_mgmt())
 
     def query_indexes(self) -> QueryIndexManager:
         """

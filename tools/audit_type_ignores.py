@@ -76,7 +76,7 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # test.  mypy is right about the line and no ticket will ever make it wrong; a widened
     # annotation here would be the defect.  A cast is not the alternative it usually is,
     # since cast(str, None) asserts exactly what the test exists to disprove.
-    ('couchbase/tests/bucketmgmt_bucket_settings_t.py', 'call-overload'),
+    ('couchbase/tests/bucketmgmt_bucket_settings_t.py', 'arg-type'),
     # bucket_t and cluster_t pass a bare ServiceType where PingOptions wants an iterable of
     # them, inside pytest.raises(InvalidArgumentException), because rejecting the scalar is
     # the behaviour under test.  Same shape as the BucketSettings(name=None) entry above:
@@ -126,6 +126,13 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # near miss is the point: a caller who read the wire format rather than the api reaches
     # the else branch, and widening the annotation to accept a str would remove it.
     ('couchbase/tests/collection_req_builder_t.py', 'arg-type'),
+    # usermgmt_t hands User and Group roles that are not Role and groups that are not str,
+    # inside pytest.raises(InvalidArgumentException), because rejecting them at construction is
+    # the behaviour under test.  Same shape as the BucketSettings(name=None) entry above:
+    # widening SetInputType to accept them would be the defect, and a cast would assert the
+    # very thing the test disproves.
+    ('couchbase/tests/usermgmt_t.py', 'list-item'),
+    ('couchbase/tests/usermgmt_t.py', 'arg-type'),
 }
 
 # Directory names skipped anywhere under ROOTS.

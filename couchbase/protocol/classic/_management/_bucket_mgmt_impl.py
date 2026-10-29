@@ -15,76 +15,94 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any
 
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
 from couchbase.common.management.buckets import BucketDescribeResult, BucketSettings
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.protocol.classic._management._bucket_mgmt_req_builder import BucketMgmtRequestBuilder
 
 if TYPE_CHECKING:
-    from couchbase.common.management.buckets import (BucketDescribeRequest,
-                                                     CreateBucketRequest,
-                                                     DropBucketRequest,
-                                                     FlushBucketRequest,
-                                                     GetAllBucketsRequest,
-                                                     GetBucketRequest,
-                                                     UpdateBucketRequest)
+    from couchbase.common._observability import ObservabilityInstruments
+    from couchbase.common.management.buckets import CreateBucketSettings
+    from couchbase.common.management.options import (BucketDescribeOptions,
+                                                     CreateBucketOptions,
+                                                     DropBucketOptions,
+                                                     FlushBucketOptions,
+                                                     GetAllBucketOptions,
+                                                     GetBucketOptions,
+                                                     UpdateBucketOptions)
     from couchbase.protocol.classic._client_adapter import ClientAdapter
 
 
 class BucketMgmtImpl:
     def __init__(self, client_adapter: ClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
-        self._request_builder = BucketMgmtRequestBuilder()
+        self._request_builder = BucketMgmtRequestBuilder(client_adapter.option_validation)
         self._observability_instruments = observability_instruments
 
-    @property
-    def request_builder(self) -> BucketMgmtRequestBuilder:
-        """**INTERNAL**"""
-        return self._request_builder
+    def create_bucket(self,
+                      settings: CreateBucketSettings,
+                      options: CreateBucketOptions | None = None,
+                      **kwargs: Any) -> None:
+        with ObservableRequestHandler(Op.BucketCreate, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_create_bucket_request(settings, obs_handler, options, **kwargs)
+            self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    @property
-    def observability_instruments(self) -> ObservabilityInstruments:
-        """**INTERNAL**"""
-        return self._observability_instruments
+    def update_bucket(self,
+                      settings: BucketSettings,
+                      options: UpdateBucketOptions | None = None,
+                      **kwargs: Any) -> None:
+        with ObservableRequestHandler(Op.BucketUpdate, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_update_bucket_request(settings, obs_handler, options, **kwargs)
+            self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+
+    def drop_bucket(self,
+                    bucket_name: str,
+                    options: DropBucketOptions | None = None,
+                    **kwargs: Any) -> None:
+        with ObservableRequestHandler(Op.BucketDrop, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_drop_bucket_request(bucket_name, obs_handler, options, **kwargs)
+            self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+
+    def get_bucket(self,
+                   bucket_name: str,
+                   options: GetBucketOptions | None = None,
+                   **kwargs: Any) -> BucketSettings:
+        with ObservableRequestHandler(Op.BucketGet, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_get_bucket_request(bucket_name, obs_handler, options, **kwargs)
+            res = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+            raw_settings = res.raw_result['bucket']
+            return BucketSettings.bucket_settings_from_server(raw_settings)
+
+    def get_all_buckets(self,
+                        options: GetAllBucketOptions | None = None,
+                        **kwargs: Any) -> list[BucketSettings]:
+        with ObservableRequestHandler(Op.BucketGetAll, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_get_all_buckets_request(obs_handler, options, **kwargs)
+            res = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+            raw_buckets = res.raw_result['buckets']
+            buckets = []
+            for b in raw_buckets:
+                bucket_settings = BucketSettings.bucket_settings_from_server(b)
+                buckets.append(bucket_settings)
+
+            return buckets
+
+    def flush_bucket(self,
+                     bucket_name: str,
+                     options: FlushBucketOptions | None = None,
+                     **kwargs: Any) -> None:
+        with ObservableRequestHandler(Op.BucketFlush, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_flush_bucket_request(bucket_name, obs_handler, options, **kwargs)
+            self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
     def bucket_describe(self,
-                        req: BucketDescribeRequest,
-                        obs_handler: ObservableRequestHandler) -> BucketDescribeResult:
-        """**INTERNAL**"""
-        res = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-        bucket_info = res.raw_result['info']
-        return BucketDescribeResult(**bucket_info)
-
-    def create_bucket(self, req: CreateBucketRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-
-    def drop_bucket(self, req: DropBucketRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-
-    def flush_bucket(self, req: FlushBucketRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-
-    def get_all_buckets(self, req: GetAllBucketsRequest, obs_handler: ObservableRequestHandler) -> List[BucketSettings]:
-        """**INTERNAL**"""
-        res = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-        raw_buckets = res.raw_result['buckets']
-        buckets = []
-        for b in raw_buckets:
-            bucket_settings = BucketSettings.bucket_settings_from_server(b)
-            buckets.append(bucket_settings)
-
-        return buckets
-
-    def get_bucket(self, req: GetBucketRequest, obs_handler: ObservableRequestHandler) -> BucketSettings:
-        """**INTERNAL**"""
-        res = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-        raw_settings = res.raw_result['bucket']
-        return BucketSettings.bucket_settings_from_server(raw_settings)
-
-    def update_bucket(self, req: UpdateBucketRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+                        bucket_name: str,
+                        options: BucketDescribeOptions | None = None,
+                        **kwargs: Any) -> BucketDescribeResult:
+        with ObservableRequestHandler(Op.BucketDescribe, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_bucket_describe_request(bucket_name, obs_handler, options, **kwargs)
+            res = self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+            bucket_info = res.raw_result['info']
+            return BucketDescribeResult(**bucket_info)

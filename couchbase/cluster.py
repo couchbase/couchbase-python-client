@@ -598,9 +598,10 @@ class Cluster:
         of this cluster.
 
         Returns:
-            :class:`~couchbase.management.buckets.BucketManager`: A :class:`~couchbase.management.buckets.BucketManager` instance.
-        """  # noqa: E501
-        return BucketManager(self._impl._client_adapter, self._impl.observability_instruments)
+            :class:`~couchbase.management.buckets.BucketManager`: A :class:`~couchbase.management.buckets.BucketManager`
+            instance.
+        """
+        return BucketManager(self._impl.bucket_mgmt())
 
     def users(self) -> UserManager:
         """
@@ -608,9 +609,10 @@ class Cluster:
         of this cluster.
 
         Returns:
-            :class:`~couchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager` instance.
-        """  # noqa: E501
-        return UserManager(self._impl._client_adapter, self._impl.observability_instruments)
+            :class:`~couchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager`
+            instance.
+        """
+        return UserManager(self._impl.user_mgmt())
 
     def query_indexes(self) -> QueryIndexManager:
         """

@@ -15,98 +15,110 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import (TYPE_CHECKING,
-                    List,
-                    Optional)
-
-from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
+from collections.abc import Coroutine
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._management._bucket_mgmt_impl import AsyncBucketMgmtImpl
-from couchbase.common.management.buckets import BucketDescribeResult, BucketSettings
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from txcouchbase.protocol.classic._deferred import defer
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.common.management.buckets import (BucketDescribeRequest,
-                                                     CreateBucketRequest,
-                                                     DropBucketRequest,
-                                                     FlushBucketRequest,
-                                                     GetAllBucketsRequest,
-                                                     GetBucketRequest,
-                                                     UpdateBucketRequest)
+    from twisted.internet.defer import Deferred
+
+    from couchbase.common.management.buckets import (BucketDescribeResult,
+                                                     BucketSettings,
+                                                     CreateBucketSettings)
+    from couchbase.common.management.options import (BucketDescribeOptions,
+                                                     CreateBucketOptions,
+                                                     DropBucketOptions,
+                                                     FlushBucketOptions,
+                                                     GetAllBucketOptions,
+                                                     GetBucketOptions,
+                                                     UpdateBucketOptions)
 
 
 class TxBucketMgmtImpl(AsyncBucketMgmtImpl):
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        super().__init__(client_adapter, observability_instruments)
-
-    def _finish_span(self, result, obs_handler):
-        """Callback to properly end the span on success or failure."""
-        if isinstance(result, Failure):
-            exc = result.value
-            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
-            return result
-        else:
-            obs_handler.__exit__(None, None, None)
-            return result
-
-    def bucket_describe_deferred(self,
-                                 req: BucketDescribeRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[Optional[BucketDescribeResult]]:
-        """**INTERNAL**"""
-        coro = super().bucket_describe(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
 
     def create_bucket_deferred(self,
-                               req: CreateBucketRequest,
-                               obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().create_bucket(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                               settings: CreateBucketSettings,
+                               options: CreateBucketOptions | None = None,
+                               **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.BucketCreate, self._observability_instruments)
 
-    def drop_bucket_deferred(self, req: DropBucketRequest, obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_bucket(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_create_bucket_request(settings, obs_handler, options, **kwargs)
+            return self._create_bucket(req, obs_handler)
 
-    def flush_bucket_deferred(self, req: FlushBucketRequest, obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().flush_bucket(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        return defer(self.loop, obs_handler, start)
 
-    def get_all_buckets_deferred(self,
-                                 req: GetAllBucketsRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[List[BucketSettings]]:
-        """**INTERNAL**"""
-        coro = super().get_all_buckets(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+    def update_bucket_deferred(self,
+                               settings: BucketSettings,
+                               options: UpdateBucketOptions | None = None,
+                               **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.BucketUpdate, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_update_bucket_request(settings, obs_handler, options, **kwargs)
+            return self._update_bucket(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_bucket_deferred(self,
+                             bucket_name: str,
+                             options: DropBucketOptions | None = None,
+                             **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.BucketDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_bucket_request(bucket_name, obs_handler, options, **kwargs)
+            return self._drop_bucket(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_bucket_deferred(self,
-                            req: GetBucketRequest,
-                            obs_handler: ObservableRequestHandler) -> Deferred[BucketSettings]:
-        """**INTERNAL**"""
-        coro = super().get_bucket(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                            bucket_name: str,
+                            options: GetBucketOptions | None = None,
+                            **kwargs: Any) -> Deferred[BucketSettings]:
+        obs_handler = ObservableRequestHandler(Op.BucketGet, self._observability_instruments)
 
-    def update_bucket_deferred(self, req: UpdateBucketRequest, obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().update_bucket(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, BucketSettings]:
+            req = self._request_builder.build_get_bucket_request(bucket_name, obs_handler, options, **kwargs)
+            return self._get_bucket(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_all_buckets_deferred(self,
+                                 options: GetAllBucketOptions | None = None,
+                                 **kwargs: Any) -> Deferred[list[BucketSettings]]:
+        obs_handler = ObservableRequestHandler(Op.BucketGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, list[BucketSettings]]:
+            req = self._request_builder.build_get_all_buckets_request(obs_handler, options, **kwargs)
+            return self._get_all_buckets(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def flush_bucket_deferred(self,
+                              bucket_name: str,
+                              options: FlushBucketOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.BucketFlush, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_flush_bucket_request(bucket_name, obs_handler, options, **kwargs)
+            return self._flush_bucket(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def bucket_describe_deferred(self,
+                                 bucket_name: str,
+                                 options: BucketDescribeOptions | None = None,
+                                 **kwargs: Any) -> Deferred[BucketDescribeResult]:
+        obs_handler = ObservableRequestHandler(Op.BucketDescribe, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, BucketDescribeResult]:
+            req = self._request_builder.build_bucket_describe_request(bucket_name, obs_handler, options, **kwargs)
+            return self._bucket_describe(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)

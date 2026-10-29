@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import datetime
 
 import pytest
@@ -76,6 +76,28 @@ class UserManagementUnitTests:
         # Outbound rather than inbound: a group with no roles still sends the key, because the
         # server reads an absent `roles` as "leave them alone" rather than as "remove them".
         assert Group(name='test-group').as_dict()['roles'] == []
+
+    @pytest.mark.parametrize('build, message', [
+        pytest.param(lambda: User('test-user', roles=['data_reader']),  # type: ignore[list-item]
+                     'Roles must contain only objects of type Role.', id='user-roles-str'),
+        pytest.param(lambda: User('test-user', roles=[Role('admin'), 'data_reader']),  # type: ignore[list-item]
+                     'Roles must contain only objects of type Role.', id='user-roles-mixed'),
+        pytest.param(lambda: User('test-user', groups=[1]),  # type: ignore[list-item]
+                     'Groups must contain only objects of type str.', id='user-groups-int'),
+        pytest.param(lambda: Group('test-group', roles=('data_reader',)),  # type: ignore[arg-type]
+                     'Roles must contain only objects of type Role.', id='group-roles-str'),
+    ])
+    def test_rejects_elements_of_the_wrong_type(self, build: Callable[[], object], message: str) -> None:
+        # Rejected at construction, before an upsert reaches for Role.as_dict on each element.
+        with pytest.raises(InvalidArgumentException) as exc_info:
+            build()
+        assert exc_info.value.message == message
+
+    def test_roles_setter_rejects_elements_of_the_wrong_type(self) -> None:
+        user = User('test-user', roles=Role('admin'))
+        with pytest.raises(InvalidArgumentException):
+            user.roles = {'data_reader'}  # type: ignore[arg-type]
+        assert user.roles == {Role('admin')}
 
 
 class UserManagementTestSuite(SuiteRequirements):

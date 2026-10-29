@@ -37,6 +37,8 @@ from couchbase.result import (AnalyticsResult,
                               SearchResult)
 from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
 from txcouchbase.protocol.classic._deferred import defer
+from txcouchbase.protocol.classic._management._bucket_mgmt_impl import TxBucketMgmtImpl
+from txcouchbase.protocol.classic._management._user_mgmt_impl import TxUserMgmtImpl
 from txcouchbase.protocol.classic._streaming import submit_rows
 
 if TYPE_CHECKING:
@@ -91,6 +93,14 @@ class TxClusterImpl(AsyncClusterImpl):
                                       obs_handler=req.obs_handler,
                                       streaming_timeout=streaming_timeout)
         return responded.addCallback(lambda _: AnalyticsResult(rows))
+
+    def bucket_mgmt(self) -> TxBucketMgmtImpl:
+        """**INTERNAL**"""
+        return TxBucketMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def user_mgmt(self) -> TxUserMgmtImpl:
+        """**INTERNAL**"""
+        return TxUserMgmtImpl(self._client_adapter, self.observability_instruments)
 
     def close_connection_deferred(self) -> Deferred[None]:
         """**INTERNAL**"""

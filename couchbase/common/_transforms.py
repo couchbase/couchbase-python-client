@@ -63,33 +63,11 @@ def enum_to_str(value: Enum | str, enum: type[Enum], conversion_fn: Callable[...
     return value.value
 
 
-def int_to_enum(value: int, enum: type[Enum], conversion_fn: Callable[..., Any] | None = None) -> Enum:
-    if not isinstance(value, int):
-        raise InvalidArgumentException(f"Argument must be of type int but got {type(value)}.")
-    try:
-        if conversion_fn:
-            return conversion_fn(value)
-        return enum(value)
-    except Exception:
-        raise InvalidArgumentException(f"Unable to convert {value} to enum of type {enum}.")
-
-
 def seconds_to_timedelta(value: float | int) -> timedelta:
     if value and not isinstance(value, (float, int)):
         raise InvalidArgumentException(message=("Expected value to be of type "
                                                 f"Union[float, int] instead of {type(value)}"))
     return timedelta(seconds=value)
-
-
-def str_to_enum(value: str, enum: type[Enum], conversion_fn: Callable[..., Any] | None = None) -> Enum:
-    if not isinstance(value, str):
-        raise InvalidArgumentException(f"Argument must be of type str but got {type(value)}.")
-    try:
-        if conversion_fn:
-            return conversion_fn(value)
-        return enum(value)
-    except Exception:
-        raise InvalidArgumentException(f"Unable to convert {value} to enum of type {enum}.")
 
 
 def timedelta_as_milliseconds(duration: timedelta) -> int:

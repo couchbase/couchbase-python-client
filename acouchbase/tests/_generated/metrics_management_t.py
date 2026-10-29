@@ -30,7 +30,7 @@ import pytest_asyncio
 from acouchbase.management.buckets import CreateBucketSettings
 from acouchbase.management.collections import UpdateCollectionSettings
 from acouchbase.management.search import SearchIndex
-from acouchbase.management.users import User
+from acouchbase.management.users import Role, User
 from acouchbase.management.views import DesignDocumentNamespace
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
@@ -45,7 +45,6 @@ from couchbase.exceptions import (BucketAlreadyExistsException,
                                   SearchIndexNotFoundException)
 from couchbase.logic.observability import OpName
 from couchbase.management.options import CreateQueryIndexOptions, WatchQueryIndexOptions
-from couchbase.management.users import Role
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
                                                   ConnectionStrategy,

@@ -15,21 +15,30 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Iterable)
+__all__ = [
+    'Group',
+    'Origin',
+    'Role',
+    'RoleAndDescription',
+    'RoleAndOrigins',
+    'User',
+    'UserAndMetadata',
+    'UserManager',
+]
 
-from acouchbase.protocol.classic._management._user_mgmt_impl import AsyncUserMgmtImpl
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
+
 from couchbase.common.management.users import (Group,
+                                               Origin,
+                                               Role,
                                                RoleAndDescription,
+                                               RoleAndOrigins,
                                                User,
                                                UserAndMetadata)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import UserMgmtOperationType
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.common._interfaces._user_mgmt import AsyncUserMgmtInterface
     from couchbase.management.options import (ChangePasswordOptions,
                                               DropGroupOptions,
                                               DropUserOptions,
@@ -44,103 +53,185 @@ if TYPE_CHECKING:
 
 class UserManager:
 
-    def __init__(self, client_adapter: AsyncClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
-        self._impl = AsyncUserMgmtImpl(client_adapter, observability_instruments)
+    def __init__(self, impl: AsyncUserMgmtInterface) -> None:
+        self._impl = impl
 
     async def get_user(self,
-                       username,  # type: str
-                       *options,  # type: GetUserOptions
-                       **kwargs   # type: Any
-                       ) -> UserAndMetadata:
-        op_type = UserMgmtOperationType.UserGet
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_user_request(username, obs_handler, *options, **kwargs)
-            return await self._impl.get_user(req, obs_handler)
+                       username: str,
+                       options: GetUserOptions | None = None,
+                       **kwargs: Any) -> UserAndMetadata:
+        """Returns a user by its username.
+
+        Args:
+            username (str): The name of the user to retrieve.
+            options (:class:`~couchbase.management.options.GetUserOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`UserAndMetadata`: A :class:`UserAndMetadata` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
+        """
+        return await self._impl.get_user(username, options, **kwargs)
 
     async def get_all_users(self,
-                            *options,  # type: GetAllUsersOptions
-                            **kwargs  # type: Any
-                            ) -> Iterable[UserAndMetadata]:
-        op_type = UserMgmtOperationType.UserGetAll
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_all_users_request(obs_handler, *options, **kwargs)
-            return await self._impl.get_all_users(req, obs_handler)
+                            options: GetAllUsersOptions | None = None,
+                            **kwargs: Any) -> Iterable[UserAndMetadata]:
+        """Returns a list of all existing users.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllUsersOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`UserAndMetadata`]: A list of existing users.
+        """
+        return await self._impl.get_all_users(options, **kwargs)
 
     async def upsert_user(self,
-                          user,     # type: User
-                          *options,  # type: UpsertUserOptions
-                          **kwargs  # type: Any
-                          ) -> None:
-        op_type = UserMgmtOperationType.UserUpsert
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_upsert_user_request(user, obs_handler, *options, **kwargs)
-            await self._impl.upsert_user(req, obs_handler)
+                          user: User,
+                          options: UpsertUserOptions | None = None,
+                          **kwargs: Any) -> None:
+        """Creates a new user or updates an existing user.
+
+        Args:
+            user (:class:`.User`): The user to create or update.
+            options (:class:`~couchbase.management.options.UpsertUserOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided user argument contains an
+                invalid value or type.
+        """
+        await self._impl.upsert_user(user, options, **kwargs)
 
     async def drop_user(self,
-                        username,  # type: str
-                        *options,  # type: DropUserOptions
-                        **kwargs   # type: Any
-                        ) -> None:
-        op_type = UserMgmtOperationType.UserDrop
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_drop_user_request(username, obs_handler, *options, **kwargs)
-            await self._impl.drop_user(req, obs_handler)
+                        username: str,
+                        options: DropUserOptions | None = None,
+                        **kwargs: Any) -> None:
+        """Drops an existing user.
+
+        Args:
+            username (str): The name of the user to drop.
+            options (:class:`~couchbase.management.options.DropUserOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
+        """
+        await self._impl.drop_user(username, options, **kwargs)
 
     async def change_password(self,
-                              new_password,  # type: str
-                              *options,     # type: ChangePasswordOptions
-                              **kwargs      # type: Any
-                              ) -> None:
-        op_type = UserMgmtOperationType.ChangePassword
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_change_password_request(
-                new_password, obs_handler, *options, **kwargs)
-            await self._impl.change_password(req, obs_handler)
+                              new_password: str,
+                              options: ChangePasswordOptions | None = None,
+                              **kwargs: Any) -> None:
+        """Changes the password of the currently authenticated user. SDK must be re-started and a new connection
+         established after running, as the previous credentials will no longer be valid.
 
-    async def get_roles(self,
-                        *options,  # type: GetRolesOptions
-                        **kwargs   # type: Any
-                        ) -> Iterable[RoleAndDescription]:
-        op_type = UserMgmtOperationType.RoleGetAll
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_roles_request(obs_handler, *options, **kwargs)
-            return await self._impl.get_roles(req, obs_handler)
+         Args:
+             new_password (str): The new password for the user
+             options (:class:`~couchbase.management.options.ChangePasswordOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided group argument contains an
+                invalid value or type.
+        """
+        await self._impl.change_password(new_password, options, **kwargs)
+
+    async def get_roles(self, options: GetRolesOptions | None = None, **kwargs: Any) -> Iterable[RoleAndDescription]:
+        """Returns a list of roles available on the server.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetRolesOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`RoleAndDescription`]: A list of roles available on the server.
+        """
+        return await self._impl.get_roles(options, **kwargs)
 
     async def get_group(self,
-                        group_name,   # type: str
-                        *options,     # type: GetGroupOptions
-                        **kwargs      # type: Any
-                        ) -> Group:
-        op_type = UserMgmtOperationType.GroupGet
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_group_request(group_name, obs_handler, *options, **kwargs)
-            return await self._impl.get_group(req, obs_handler)
+                        group_name: str,
+                        options: GetGroupOptions | None = None,
+                        **kwargs: Any) -> Group:
+        """Returns a group by it's name.
 
-    async def get_all_groups(self,
-                             *options,    # type: GetAllGroupsOptions
-                             **kwargs     # type: Any
-                             ) -> Iterable[Group]:
-        op_type = UserMgmtOperationType.GroupGetAll
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_all_groups_request(obs_handler, *options, **kwargs)
-            return await self._impl.get_all_groups(req, obs_handler)
+        Args:
+            group_name (str): The name of the group to retrieve.
+            options (:class:`~couchbase.management.options.GetGroupOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`Group`: A :class:`Group` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
+        """
+        return await self._impl.get_group(group_name, options, **kwargs)
+
+    async def get_all_groups(self, options: GetAllGroupsOptions | None = None, **kwargs: Any) -> Iterable[Group]:
+        """Returns a list of all existing groups.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllGroupsOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`Group`]: A list of existing groups.
+        """
+        return await self._impl.get_all_groups(options, **kwargs)
 
     async def upsert_group(self,
-                           group,     # type: Group
-                           *options,  # type: UpsertGroupOptions
-                           **kwargs   # type: Any
-                           ) -> None:
-        op_type = UserMgmtOperationType.GroupUpsert
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_upsert_group_request(group, obs_handler, *options, **kwargs)
-            await self._impl.upsert_group(req, obs_handler)
+                           group: Group,
+                           options: UpsertGroupOptions | None = None,
+                           **kwargs: Any) -> None:
+        """Creates a new group or updates an existing group.
+
+        Args:
+            group (:class:`.Group`): The group to create or update.
+            options (:class:`~couchbase.management.options.UpsertGroupOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided group argument contains an
+                invalid value or type.
+        """
+        await self._impl.upsert_group(group, options, **kwargs)
 
     async def drop_group(self,
-                         group_name,  # type: str
-                         *options,    # type: DropGroupOptions
-                         **kwargs     # type: Any
-                         ) -> None:
-        op_type = UserMgmtOperationType.GroupDrop
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_drop_group_request(group_name, obs_handler, *options, **kwargs)
-            await self._impl.drop_group(req, obs_handler)
+                         group_name: str,
+                         options: DropGroupOptions | None = None,
+                         **kwargs: Any) -> None:
+        """Drops an existing group.
+
+        Args:
+            group_name (str): The name of the group to drop.
+            options (:class:`~couchbase.management.options.DropGroupOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
+        """
+        await self._impl.drop_group(group_name, options, **kwargs)

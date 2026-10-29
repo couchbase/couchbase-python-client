@@ -15,31 +15,35 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+__all__ = [
+    'BucketDescribeResult',
+    'BucketSettings',
+    'BucketSettingsKwargs',
+    'BucketType',
+    'CompressionMode',
+    'ConflictResolutionType',
+    'CreateBucketSettings',
+    'CreateBucketSettingsKwargs',
+    'EjectionMethod',
+    'EvictionPolicyType',
+    'StorageBackend',
+]
+
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    List,
-                    Optional,
-                    Union,
-                    overload)
+from typing import (TYPE_CHECKING,
+                    Any,
+                    TypedDict)
 
-from couchbase._utils import is_null_or_empty
-from couchbase.common._transforms import (int_to_enum,
-                                          seconds_to_timedelta,
-                                          str_to_enum)
-from couchbase.durability import DurabilityLevel
-from couchbase.exceptions import (BucketAlreadyExistsException,
-                                  BucketDoesNotExistException,
-                                  BucketNotFlushableException,
-                                  FeatureUnavailableException,
-                                  InvalidArgumentException,
-                                  RateLimitedException)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import BucketMgmtOperationType
-from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
+from couchbase.common._supportability import Supportability
+from couchbase.common._transforms import seconds_to_timedelta
+from couchbase.common._utils import is_null_or_empty
+from couchbase.common.durability import DurabilityLevel
+from couchbase.common.exceptions import InvalidArgumentException
+
+if TYPE_CHECKING:
+    from typing_extensions import Required, Unpack
 
 
 class EvictionPolicyType(Enum):
@@ -47,9 +51,10 @@ class EvictionPolicyType(Enum):
     NO_EVICTION = "noEviction"
     FULL = "fullEviction"
     VALUE_ONLY = "valueOnly"
+    UNKNOWN = "unknown"
 
     @classmethod
-    def from_server_str(cls, value):
+    def from_server_str(cls, value: object) -> EvictionPolicyType:
         if value == 'not_recently_used':
             return cls.NOT_RECENTLY_USED
         elif value == 'no_eviction':
@@ -62,7 +67,7 @@ class EvictionPolicyType(Enum):
             return cls.UNKNOWN
 
     @classmethod
-    def to_server_str(cls, value):
+    def to_server_str(cls, value: EvictionPolicyType) -> str:
         if value == cls.NOT_RECENTLY_USED:
             return 'not_recently_used'
         elif value == cls.NO_EVICTION:
@@ -87,7 +92,7 @@ class BucketType(Enum):
     UNKNOWN = "unknown"
 
     @classmethod
-    def from_server_str(cls, value):
+    def from_server_str(cls, value: object) -> BucketType:
         if value == 'couchbase':
             return cls.COUCHBASE
         elif value == 'membase':
@@ -100,7 +105,7 @@ class BucketType(Enum):
             return cls.UNKNOWN
 
     @classmethod
-    def to_server_str(cls, value):
+    def to_server_str(cls, value: BucketType) -> str:
         if value == cls.COUCHBASE:
             return 'couchbase'
         elif value == cls.MEMCACHED:
@@ -116,6 +121,13 @@ class CompressionMode(Enum):
     PASSIVE = "passive"
     ACTIVE = "active"
     UNKNOWN = "unknown"
+
+    @classmethod
+    def from_server_str(cls, value: object) -> CompressionMode:
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.UNKNOWN
 
 
 class ConflictResolutionType(Enum):
@@ -134,7 +146,7 @@ class ConflictResolutionType(Enum):
     UNKNOWN = "unknown"
 
     @classmethod
-    def from_server_str(cls, value):
+    def from_server_str(cls, value: object) -> ConflictResolutionType:
         if value == 'timestamp':
             return cls.TIMESTAMP
         elif value == 'sequence_number':
@@ -145,7 +157,7 @@ class ConflictResolutionType(Enum):
             return cls.UNKNOWN
 
     @classmethod
-    def to_server_str(cls, value):
+    def to_server_str(cls, value: ConflictResolutionType) -> str:
         if value == cls.TIMESTAMP:
             return 'timestamp'
         elif value == cls.SEQUENCE_NUMBER:
@@ -164,53 +176,64 @@ class StorageBackend(Enum):
     COUCHSTORE = "couchstore"
     MAGMA = "magma"
 
+    @classmethod
+    def from_server_str(cls, value: object) -> StorageBackend:
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.UNDEFINED
+
+
+class BucketSettingsKwargs(TypedDict, total=False):
+    name: Required[str]
+    bucket_type: BucketType | None
+    compression_mode: CompressionMode | None
+    eviction_policy: EvictionPolicyType | None
+    flush_enabled: bool | None
+    history_retention_collection_default: bool | None
+    history_retention_bytes: int | None
+    history_retention_duration: timedelta | None
+    max_expiry: timedelta | float | int | None
+    max_ttl: timedelta | float | int | None
+    minimum_durability_level: DurabilityLevel | None
+    num_replicas: int | None
+    ram_quota_mb: int | None
+    replica_index: bool | None
+    storage_backend: StorageBackend | None
+    num_vbuckets: int | None
+
 
 class BucketSettings(dict):
-    @overload
-    def __init__(self,
-                 name: str,
-                 bucket_type: Optional[BucketType] = None,
-                 compression_mode: Optional[CompressionMode] = None,
-                 eviction_policy: Optional[EvictionPolicyType] = None,
-                 flush_enabled: Optional[bool] = None,
-                 history_retention_collection_default: Optional[bool] = None,
-                 history_retention_bytes: Optional[int] = None,
-                 history_retention_duration: Optional[timedelta] = None,
-                 max_expiry: Optional[Union[timedelta, float, int]] = None,
-                 max_ttl: Optional[Union[timedelta, float, int]] = None,
-                 minimum_durability_level: Optional[DurabilityLevel] = None,
-                 num_replicas: Optional[int] = None,
-                 ram_quota_mb: Optional[int] = None,
-                 replica_index: Optional[bool] = None,
-                 storage_backend: Optional[StorageBackend] = None,
-                 num_vbuckets: Optional[int] = None,
-                 ) -> None:
-        pass
-
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Unpack[BucketSettingsKwargs]) -> None:
         """BucketSettings provides a means of mapping bucket settings into an object.
         """
-        bucket_name = kwargs.get('name', None)
-        if is_null_or_empty(bucket_name):
+        super().__init__()
+        self._fill(dict(kwargs))
+
+    def _fill(self, settings: dict[str, Any]) -> None:
+        # Shared with CreateBucketSettings, whose conflict_resolution_type this constructor does not take.
+        name = settings.get('name', None)
+        if name is not None and not isinstance(name, str):
+            raise InvalidArgumentException('The bucket name must be str.')
+        if is_null_or_empty(name):
             raise InvalidArgumentException('Must provide a non-empty bucket name.')
-        if kwargs.get('bucket_type', None) == 'couchbase':
-            kwargs['bucket_type'] = BucketType.COUCHBASE
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
+        if settings.get('bucket_type', None) == 'couchbase':
+            settings['bucket_type'] = BucketType.COUCHBASE
+        self.update((k, v) for k, v in settings.items() if v is not None)
 
     @property
-    def bucket_type(self) -> Optional[BucketType]:
+    def bucket_type(self) -> BucketType | None:
         """BucketType {couchbase (sent on wire as membase), memcached, ephemeral}
         The type of the bucket. Default to couchbase."""
         return self.get('bucket_type', None)
 
     @property
-    def compression_mode(self) -> Optional[CompressionMode]:
+    def compression_mode(self) -> CompressionMode | None:
         """{off | passive | active} - The compression mode to use."""
         return self.get('compression_mode', None)
 
     @property
-    def conflict_resolution_type(self) -> Optional[ConflictResolutionType]:
+    def conflict_resolution_type(self) -> ConflictResolutionType | None:
         """{timestamp | sequence_number | custom} - The bucket's conflict resolution type.
 
         Read-only. A bucket's conflict resolution type is fixed when it is created, so it is
@@ -220,31 +243,31 @@ class BucketSettings(dict):
         return self.get('conflict_resolution_type', None)
 
     @property
-    def eviction_policy(self) -> Optional[EvictionPolicyType]:
+    def eviction_policy(self) -> EvictionPolicyType | None:
         """{fullEviction | valueOnly}. The eviction policy to use."""
         return self.get('eviction_policy', None)
 
     @property
-    def flush_enabled(self) -> Optional[bool]:
+    def flush_enabled(self) -> bool | None:
         """True if flush enabled on bucket, False otherwise"""
         return self.get('flush_enabled', None)
 
     @property
-    def history_retention_collection_default(self) -> Optional[bool]:
+    def history_retention_collection_default(self) -> bool | None:
         """
         Whether history retention on collections is enabled by default
         """
         return self.get('history_retention_collection_default', None)
 
     @property
-    def history_retention_bytes(self) -> Optional[int]:
+    def history_retention_bytes(self) -> int | None:
         """
         The maximum size, in bytes, of the change history that is written to disk for all collections in this bucket
         """
         return self.get('history_retention_bytes', None)
 
     @property
-    def history_retention_duration(self) -> Optional[timedelta]:
+    def history_retention_duration(self) -> timedelta | None:
         """
         The maximum duration to be covered by the change history that is written to disk for all collections in this
         bucket
@@ -252,80 +275,76 @@ class BucketSettings(dict):
         return self.get('history_retention_duration', None)
 
     @property
-    def max_expiry(self) -> Optional[Union[timedelta, float, int]]:
+    def max_expiry(self) -> timedelta | float | int | None:
         """
            Value for the max expiry of new documents created without an expiry.
         """
         return self.get('max_expiry', None)
 
     @property
-    def max_ttl(self) -> Optional[Union[timedelta, float, int]]:
+    def max_ttl(self) -> timedelta | float | int | None:
+        """Value for the maxTTL of new documents created without a ttl.
+
+        .. deprecated:: 4.0.0
+            Use :attr:`max_expiry` instead.
         """
-         **DEPRECATED** use max_expiry
-            Value for the maxTTL of new documents created without a ttl.
-        """
+        Supportability.class_property_deprecated('BucketSettings.max_ttl', 'BucketSettings.max_expiry')
         return self.get('max_expiry', None)
 
     @property
-    def minimum_durability_level(self) -> Optional[DurabilityLevel]:
+    def minimum_durability_level(self) -> DurabilityLevel | None:
         """The durability level to use for the bucket."""
         return self.get('minimum_durability_level', None)
 
     @property
     def name(self) -> str:
         """ Bucket name"""
-        return self.get('name')
+        name: str = self['name']
+        return name
 
     @property
-    def num_replicas(self) -> Optional[int]:
+    def num_replicas(self) -> int | None:
         """NumReplicas (int) - The number of replicas for documents."""
         return self.get('num_replicas', None)
 
     @property
-    def num_vbuckets(self) -> Optional[int]:
+    def num_vbuckets(self) -> int | None:
         """num_vbuckets (int) - The number of vbuckets for the bucket."""
         return self.get('num_vbuckets', None)
 
     @property
-    def ram_quota_mb(self) -> Optional[int]:
+    def ram_quota_mb(self) -> int | None:
         """ram_quota_mb (int) - The RAM quota for the bucket."""
         return self.get('ram_quota_mb', None)
 
     @property
-    def replica_index(self) -> Optional[bool]:
+    def replica_index(self) -> bool | None:
         """ Whether replica indexes should be enabled for the bucket."""
         return self.get('replica_index', None)
 
     @property
-    def storage_backend(self) -> Optional[StorageBackend]:
+    def storage_backend(self) -> StorageBackend | None:
         """
         {couchstore | magma | undefined} - The storage backend to use.
         """
         return self.get('storage_backend', None)
 
     @classmethod
-    def bucket_settings_from_server(cls, settings: Dict[str, Any]) -> BucketSettings:  # noqa: C901
+    def bucket_settings_from_server(cls, settings: dict[str, Any]) -> BucketSettings:  # noqa: C901
         """**INTERNAL**"""
-        output = dict()
+        output: dict[str, Any] = {}
         bucket_type = settings.get('bucket_type', None)
         if bucket_type:
-            output['bucket_type'] = str_to_enum(bucket_type,
-                                                BucketType,
-                                                BucketType.from_server_str)
+            output['bucket_type'] = BucketType.from_server_str(bucket_type)
         compression_mode = settings.get('compression_mode', None)
         if compression_mode:
-            output['compression_mode'] = str_to_enum(compression_mode,
-                                                     CompressionMode)
+            output['compression_mode'] = CompressionMode.from_server_str(compression_mode)
         conflict_resolution_type = settings.get('conflict_resolution_type', None)
         if conflict_resolution_type:
-            output['conflict_resolution_type'] = str_to_enum(conflict_resolution_type,
-                                                             ConflictResolutionType,
-                                                             ConflictResolutionType.from_server_str)
+            output['conflict_resolution_type'] = ConflictResolutionType.from_server_str(conflict_resolution_type)
         eviction_policy = settings.get('eviction_policy', None)
         if eviction_policy:
-            output['eviction_policy'] = str_to_enum(eviction_policy,
-                                                    EvictionPolicyType,
-                                                    EvictionPolicyType.from_server_str)
+            output['eviction_policy'] = EvictionPolicyType.from_server_str(eviction_policy)
         output['flush_enabled'] = settings.get('flush_enabled', None)
         history_retention_collection_default = settings.get('history_retention_collection_default', None)
         if history_retention_collection_default is not None:
@@ -342,7 +361,7 @@ class BucketSettings(dict):
             output['max_expiry'] = seconds_to_timedelta(max_expiry)
         minimum_durability_level = settings.get('minimum_durability_level', None)
         if minimum_durability_level is not None:
-            output['minimum_durability_level'] = int_to_enum(minimum_durability_level, DurabilityLevel)
+            output['minimum_durability_level'] = DurabilityLevel(minimum_durability_level)
         output['name'] = settings.get('name', None)
         num_replicas = settings.get('num_replicas', None)
         if num_replicas is not None:
@@ -359,44 +378,40 @@ class BucketSettings(dict):
             output['replica_index'] = replica_index
         storage_backend = settings.get('storage_backend', None)
         if storage_backend:
-            if storage_backend == 'unknown':
-                storage_backend = 'undefined'
-            output['storage_backend'] = str_to_enum(storage_backend, StorageBackend)
+            output['storage_backend'] = StorageBackend.from_server_str(storage_backend)
 
         return cls(**output)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{type(self).__name__}({super().__repr__()})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
 
-class CreateBucketSettings(BucketSettings):
-    @overload
-    def __init__(self,
-                 name: str,
-                 bucket_type: Optional[BucketType] = None,
-                 compression_mode: Optional[CompressionMode] = None,
-                 conflict_resolution_type: Optional[ConflictResolutionType] = None,
-                 eviction_policy: Optional[EvictionPolicyType] = None,
-                 flush_enabled: Optional[bool] = None,
-                 history_retention_collection_default: Optional[bool] = None,
-                 history_retention_bytes: Optional[int] = None,
-                 history_retention_duration: Optional[timedelta] = None,
-                 max_expiry: Optional[Union[timedelta, float, int]] = None,
-                 max_ttl: Optional[Union[timedelta, float, int]] = None,
-                 minimum_durability_level: Optional[DurabilityLevel] = None,
-                 num_replicas: Optional[int] = None,
-                 ram_quota_mb: Optional[int] = None,
-                 replica_index: Optional[bool] = None,
-                 storage_backend: Optional[StorageBackend] = None,
-                 num_vbuckets: Optional[int] = None,
-                 ) -> None:
-        pass
+class CreateBucketSettingsKwargs(TypedDict, total=False):
+    name: Required[str]
+    bucket_type: BucketType | None
+    compression_mode: CompressionMode | None
+    conflict_resolution_type: ConflictResolutionType | None
+    eviction_policy: EvictionPolicyType | None
+    flush_enabled: bool | None
+    history_retention_collection_default: bool | None
+    history_retention_bytes: int | None
+    history_retention_duration: timedelta | None
+    max_expiry: timedelta | float | int | None
+    max_ttl: timedelta | float | int | None
+    minimum_durability_level: DurabilityLevel | None
+    num_replicas: int | None
+    ram_quota_mb: int | None
+    replica_index: bool | None
+    storage_backend: StorageBackend | None
+    num_vbuckets: int | None
 
-    def __init__(self, **kwargs: object) -> None:
-        super().__init__(**kwargs)
+
+class CreateBucketSettings(BucketSettings):
+    def __init__(self, **kwargs: Unpack[CreateBucketSettingsKwargs]) -> None:
+        self._fill(dict(kwargs))
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({super().__repr__()})"
@@ -407,131 +422,10 @@ class CreateBucketSettings(BucketSettings):
 
 @dataclass
 class BucketDescribeResult:
-    name: str = None
-    uuid: str = None
-    number_of_nodes: int = None
-    number_of_replicas: int = None
-    bucket_capabilities: List[str] = None
-    storage_backend: str = None
-    server_groups: Dict[str, Any] = None
-
-
-# we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['error_map']
-_OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
-
-
-@dataclass
-class BucketMgmtRequest(MgmtRequest):
-
-    def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        cls = type(self)
-        cached_fields = _FIELDS_CACHE.get(cls)
-        if cached_fields is None:
-            cached_fields = [f for f in fields(cls) if f.name not in _OPARG_SKIP_SET]
-            _FIELDS_CACHE[cls] = cached_fields
-
-        mgmt_kwargs = {
-            f.name: getattr(self, f.name)
-            for f in cached_fields
-            if getattr(self, f.name) is not None
-        }
-
-        if callback is not None:
-            mgmt_kwargs['callback'] = callback
-
-        if errback is not None:
-            mgmt_kwargs['errback'] = errback
-
-        if obs_handler:
-            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
-            if obs_handler.is_legacy_tracer:
-                legacy_request_span = obs_handler.legacy_request_span
-                if legacy_request_span:
-                    mgmt_kwargs['parent_span'] = legacy_request_span
-            else:
-                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
-
-        return mgmt_kwargs
-
-
-@dataclass
-class BucketDescribeRequest(BucketMgmtRequest):
-    name: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return BucketMgmtOperationType.BucketDescribe.value
-
-
-@dataclass
-class CreateBucketRequest(BucketMgmtRequest):
-    bucket: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return BucketMgmtOperationType.BucketCreate.value
-
-
-@dataclass
-class DropBucketRequest(BucketMgmtRequest):
-    name: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return BucketMgmtOperationType.BucketDrop.value
-
-
-@dataclass
-class FlushBucketRequest(BucketMgmtRequest):
-    name: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return BucketMgmtOperationType.BucketFlush.value
-
-
-@dataclass
-class GetAllBucketsRequest(BucketMgmtRequest):
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return BucketMgmtOperationType.BucketGetAll.value
-
-
-@dataclass
-class GetBucketRequest(BucketMgmtRequest):
-    name: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return BucketMgmtOperationType.BucketGet.value
-
-
-@dataclass
-class UpdateBucketRequest(BucketMgmtRequest):
-    bucket: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return BucketMgmtOperationType.BucketUpdate.value
-
-
-BUCKET_MGMT_ERROR_MAP: Dict[str, Exception] = {
-    'Bucket with given name (already|still) exists': BucketAlreadyExistsException,
-    'Requested resource not found': BucketDoesNotExistException,
-    r'.*non existent bucket.*': BucketDoesNotExistException,
-    r'.*Flush is disabled for the bucket.*': BucketNotFlushableException,
-    r'.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException,
-    r'.*is supported only with developer preview enabled.*': FeatureUnavailableException}
+    name: str | None = None
+    uuid: str | None = None
+    number_of_nodes: int | None = None
+    number_of_replicas: int | None = None
+    bucket_capabilities: list[str] | None = None
+    storage_backend: str | None = None
+    server_groups: dict[str, Any] | None = None

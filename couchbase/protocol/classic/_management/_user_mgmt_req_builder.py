@@ -15,29 +15,36 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict,
-                    Union)
+from typing import Any
 
-from couchbase.common.management.users import (USER_MGMT_ERROR_MAP,
-                                               AuthDomain,
-                                               ChangePasswordRequest,
-                                               DropGroupRequest,
-                                               DropUserRequest,
-                                               GetAllGroupsRequest,
-                                               GetAllUsersRequest,
-                                               GetGroupRequest,
-                                               GetRolesRequest,
-                                               GetUserRequest,
-                                               UpsertGroupRequest,
-                                               UpsertUserRequest)
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic._legacy_options import forward_args
-from couchbase.logic.observability import ObservableRequestHandler
-
-if TYPE_CHECKING:
-    from couchbase.common.management.users import Group, User
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common.auth import AuthDomain
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.management.options import (ChangePasswordOptions,
+                                                 DropGroupOptions,
+                                                 DropUserOptions,
+                                                 GetAllGroupsOptions,
+                                                 GetAllUsersOptions,
+                                                 GetGroupOptions,
+                                                 GetRolesOptions,
+                                                 GetUserOptions,
+                                                 UpsertGroupOptions,
+                                                 UpsertUserOptions)
+from couchbase.common.management.users import Group, User
+from couchbase.common.option_enums import OptionValidationMode
+from couchbase.protocol.classic._management._user_mgmt_types import (USER_MGMT_ERROR_MAP,
+                                                                     ChangePasswordRequest,
+                                                                     DropGroupRequest,
+                                                                     DropUserRequest,
+                                                                     GetAllGroupsRequest,
+                                                                     GetAllUsersRequest,
+                                                                     GetGroupRequest,
+                                                                     GetRolesRequest,
+                                                                     GetUserRequest,
+                                                                     UpsertGroupRequest,
+                                                                     UpsertUserRequest,
+                                                                     UserMgmtOptionsBlock)
+from couchbase.protocol.classic._wire import forward_args
 
 
 class UserMgmtRequestBuilder:
@@ -45,10 +52,11 @@ class UserMgmtRequestBuilder:
     VALID_GROUP_KEYS = ['name', 'description', 'ldap_group_reference']
     VALID_USER_KEYS = ['password', 'display_name', 'username', 'groups']
 
-    def __init__(self) -> None:
+    def __init__(self, option_validation: OptionValidationMode | None = None) -> None:
         self._error_map = USER_MGMT_ERROR_MAP
+        self._option_validation = option_validation
 
-    def _get_valid_domain(self, auth_domain: Union[AuthDomain, str]) -> str:
+    def _get_valid_domain(self, auth_domain: AuthDomain | str) -> str:
         if isinstance(auth_domain, str) and auth_domain in UserMgmtRequestBuilder.VALID_AUTH_DOMAINS:
             return auth_domain
         elif isinstance(auth_domain, AuthDomain):
@@ -56,7 +64,7 @@ class UserMgmtRequestBuilder:
         else:
             raise InvalidArgumentException(message='Unknown Authentication Domain')
 
-    def _get_valid_user(self, user: User, domain: str) -> Dict[str, Any]:
+    def _get_valid_user(self, user: User, domain: str) -> dict[str, Any]:
         if not user.groups and (not user.roles or not isinstance(user.roles, set)):
             raise InvalidArgumentException('Roles must be a non-empty list')
 
@@ -72,156 +80,116 @@ class UserMgmtRequestBuilder:
 
     def build_change_password_request(self,
                                       password: str,
-                                      obs_handler: ObservableRequestHandler = None,
-                                      *options: object,
+                                      obs_handler: ObservableRequestHandler,
+                                      options: ChangePasswordOptions | None = None,
                                       **kwargs: object) -> ChangePasswordRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.ChangePassword,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        req = ChangePasswordRequest(self._error_map, password=password, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return ChangePasswordRequest(self._error_map, password=password, timeout=final_args.pop('timeout', None))
 
     def build_drop_group_request(self,
                                  group_name: str,
-                                 obs_handler: ObservableRequestHandler = None,
-                                 *options: object,
+                                 obs_handler: ObservableRequestHandler,
+                                 options: DropGroupOptions | None = None,
                                  **kwargs: object) -> DropGroupRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.DropGroup, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        req = DropGroupRequest(self._error_map, name=group_name, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return DropGroupRequest(self._error_map, name=group_name, timeout=final_args.pop('timeout', None))
 
     def build_drop_user_request(self,
                                 username: str,
-                                obs_handler: ObservableRequestHandler = None,
-                                *options: object,
+                                obs_handler: ObservableRequestHandler,
+                                options: DropUserOptions | None = None,
                                 **kwargs: object) -> DropUserRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.DropUser, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
-        req = DropUserRequest(self._error_map, username=username, domain=domain, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return DropUserRequest(self._error_map,
+                               username=username,
+                               domain=self._get_valid_domain(final_args.pop('domain_name', 'local')),
+                               timeout=final_args.pop('timeout', None))
 
     def build_get_all_groups_request(self,
-                                     obs_handler: ObservableRequestHandler = None,
-                                     *options: object,
+                                     obs_handler: ObservableRequestHandler,
+                                     options: GetAllGroupsOptions | None = None,
                                      **kwargs: object) -> GetAllGroupsRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.GetAllGroups,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        req = GetAllGroupsRequest(self._error_map, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetAllGroupsRequest(self._error_map, timeout=final_args.pop('timeout', None))
 
     def build_get_all_users_request(self,
-                                    obs_handler: ObservableRequestHandler = None,
-                                    *options: object,
+                                    obs_handler: ObservableRequestHandler,
+                                    options: GetAllUsersOptions | None = None,
                                     **kwargs: object) -> GetAllUsersRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.GetAllUsers,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
-        req = GetAllUsersRequest(self._error_map, domain=domain, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetAllUsersRequest(self._error_map,
+                                  domain=self._get_valid_domain(final_args.pop('domain_name', 'local')),
+                                  timeout=final_args.pop('timeout', None))
 
     def build_get_group_request(self,
                                 group_name: str,
-                                obs_handler: ObservableRequestHandler = None,
-                                *options: object,
+                                obs_handler: ObservableRequestHandler,
+                                options: GetGroupOptions | None = None,
                                 **kwargs: object) -> GetGroupRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.GetGroup, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        req = GetGroupRequest(self._error_map, name=group_name, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetGroupRequest(self._error_map, name=group_name, timeout=final_args.pop('timeout', None))
 
     def build_get_roles_request(self,
-                                obs_handler: ObservableRequestHandler = None,
-                                *options: object,
+                                obs_handler: ObservableRequestHandler,
+                                options: GetRolesOptions | None = None,
                                 **kwargs: object) -> GetRolesRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.GetRoles, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        req = GetRolesRequest(self._error_map, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetRolesRequest(self._error_map, timeout=final_args.pop('timeout', None))
 
     def build_get_user_request(self,
                                username: str,
-                               obs_handler: ObservableRequestHandler = None,
-                               *options: object,
+                               obs_handler: ObservableRequestHandler,
+                               options: GetUserOptions | None = None,
                                **kwargs: object) -> GetUserRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.GetUser, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
-        domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
-        req = GetUserRequest(self._error_map, username=username, domain=domain, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetUserRequest(self._error_map,
+                              username=username,
+                              domain=self._get_valid_domain(final_args.pop('domain_name', 'local')),
+                              timeout=final_args.pop('timeout', None))
 
     def build_upsert_group_request(self,
                                    group: Group,
-                                   obs_handler: ObservableRequestHandler = None,
-                                   *options: object,
+                                   obs_handler: ObservableRequestHandler,
+                                   options: UpsertGroupOptions | None = None,
                                    **kwargs: object) -> UpsertGroupRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.UpsertGroup,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
         group_dict = {k: v for k, v in group.as_dict().items() if k in UserMgmtRequestBuilder.VALID_GROUP_KEYS}
-
         if group.roles:
-            group_dict["roles"] = list(map(lambda r: r.as_dict(), group.roles))
-        req = UpsertGroupRequest(self._error_map, group=group_dict, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+            group_dict['roles'] = [r.as_dict() for r in group.roles]
+        return UpsertGroupRequest(self._error_map, group=group_dict, timeout=final_args.pop('timeout', None))
 
     def build_upsert_user_request(self,
                                   user: User,
-                                  obs_handler: ObservableRequestHandler = None,
-                                  *options: object,
+                                  obs_handler: ObservableRequestHandler,
+                                  options: UpsertUserOptions | None = None,
                                   **kwargs: object) -> UpsertUserRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=UserMgmtOptionsBlock.UpsertUser, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        timeout = final_args.pop('timeout', None)
         domain = self._get_valid_domain(final_args.pop('domain_name', 'local'))
-        user = self._get_valid_user(user, domain)
-        req = UpsertUserRequest(self._error_map, user=user, domain=domain, **final_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return UpsertUserRequest(self._error_map,
+                                 user=self._get_valid_user(user, domain),
+                                 domain=domain,
+                                 timeout=final_args.pop('timeout', None))

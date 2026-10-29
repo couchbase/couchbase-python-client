@@ -34,7 +34,6 @@ from couchbase.exceptions import (CouchbaseException,
 from couchbase.management.options import (DropUserOptions,
                                           GetUserOptions,
                                           UpsertUserOptions)
-from couchbase.management.users import Role, RoleAndOrigins
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.managers import TwistedTestEnvironmentCollectionMgmtManager, TwistedTestEnvironmentUserManager
 from tests.environments.twisted_environment import (CollectionStrategy,
@@ -45,6 +44,8 @@ from tests.environments.twisted_environment import (CollectionStrategy,
 from tests.manifest import validate_test_manifest
 from tests.test_features import EnvironmentFeatures, ServerFeatures
 from txcouchbase.management.users import (Group,
+                                          Role,
+                                          RoleAndOrigins,
                                           User,
                                           UserAndMetadata)
 

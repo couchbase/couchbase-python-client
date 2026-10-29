@@ -15,45 +15,43 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'Group',
+    'Origin',
+    'Role',
+    'RoleAndDescription',
+    'RoleAndOrigins',
+    'SetInputType',
+    'User',
+    'UserAndMetadata',
+]
+
 from copy import deepcopy
-from dataclasses import dataclass, fields
 from datetime import datetime
 from typing import (Any,
-                    Callable,
-                    Dict,
-                    List,
-                    Optional,
-                    Set,
-                    Tuple,
-                    TypeVar,
-                    Union)
+                    TypeAlias,
+                    TypeVar)
 
-from couchbase.auth import AuthDomain
-from couchbase.exceptions import (FeatureUnavailableException,
-                                  GroupNotFoundException,
-                                  InvalidArgumentException,
-                                  RateLimitedException,
-                                  UserNotFoundException)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import UserMgmtOperationType
-from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
+from couchbase.common.auth import AuthDomain
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.management._users import UserManagementUtils
 
-T = TypeVar('T')
+_T = TypeVar('_T')
 
 # What UserManagementUtils.to_set accepts, which is wider than the set it returns: it
 # normalises a set, a list, a tuple, or a single bare element of the valid type.  Every
 # parameter feeding to_set is annotated with this, so the signature states what the helper
 # takes rather than only the one shape of the four it passes through unchanged.
-SetInputType = Union[Set[T], List[T], Tuple[T, ...], T]
+SetInputType: TypeAlias = set[_T] | list[_T] | tuple[_T, ...] | _T
 
 
 class Role:
 
     def __init__(self,
-                 name: Optional[str] = None,
-                 bucket: Optional[str] = None,
-                 scope: Optional[str] = None,
-                 collection: Optional[str] = None
+                 name: str | None = None,
+                 bucket: str | None = None,
+                 scope: str | None = None,
+                 collection: str | None = None
                  ) -> None:
 
         if not name:
@@ -69,18 +67,18 @@ class Role:
         return self._name
 
     @property
-    def bucket(self) -> Optional[str]:
+    def bucket(self) -> str | None:
         return self._bucket
 
     @property
-    def scope(self) -> Optional[str]:
+    def scope(self) -> str | None:
         return self._scope
 
     @property
-    def collection(self) -> Optional[str]:
+    def collection(self) -> str | None:
         return self._collection
 
-    def as_dict(self) -> Dict[str, Optional[str]]:
+    def as_dict(self) -> dict[str, str | None]:
         return {
             'name': self._name,
             'bucket': self._bucket,
@@ -100,7 +98,7 @@ class Role:
         return hash((self.name, self.bucket, self.scope, self.collection))
 
     @classmethod
-    def create_role(cls, raw_data: Dict[str, str]) -> Role:
+    def create_role(cls, raw_data: dict[str, str]) -> Role:
         return cls(
             name=raw_data.get("name", None),
             bucket=raw_data.get("bucket", None),
@@ -112,10 +110,10 @@ class Role:
 class RoleAndDescription:
 
     def __init__(self,
-                 role: Optional[Role] = None,
-                 display_name: Optional[str] = None,
-                 description: Optional[str] = None,
-                 ce: Optional[bool] = None,
+                 role: Role | None = None,
+                 display_name: str | None = None,
+                 description: str | None = None,
+                 ce: bool | None = None,
                  ) -> None:
 
         self._role = role
@@ -124,23 +122,23 @@ class RoleAndDescription:
         self._ce = ce
 
     @property
-    def role(self) -> Optional[Role]:
+    def role(self) -> Role | None:
         return self._role
 
     @property
-    def display_name(self) -> Optional[str]:
+    def display_name(self) -> str | None:
         return self._display_name
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self._description
 
     @property
-    def ce(self) -> Optional[bool]:
+    def ce(self) -> bool | None:
         return self._ce
 
     @classmethod
-    def create_role_and_description(cls, raw_data: Dict[str, Any]) -> RoleAndDescription:
+    def create_role_and_description(cls, raw_data: dict[str, Any]) -> RoleAndDescription:
         return cls(
             role=Role.create_role(raw_data),
             display_name=raw_data.get('display_name', None),
@@ -158,35 +156,35 @@ class Origin:
         the "name" field.
     """
 
-    def __init__(self, type: Optional[str] = None, name: Optional[str] = None) -> None:
+    def __init__(self, type: str | None = None, name: str | None = None) -> None:
         self._type = type
         self._name = name
 
     @property
-    def type(self) -> Optional[str]:
+    def type(self) -> str | None:
         return self._type
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> str | None:
         return self._name
 
 
 class RoleAndOrigins:
 
-    def __init__(self, role: Optional[Role] = None, origins: Optional[List[Origin]] = None) -> None:
+    def __init__(self, role: Role | None = None, origins: list[Origin] | None = None) -> None:
         self._role = role
         self._origins = origins
 
     @property
-    def role(self) -> Optional[Role]:
+    def role(self) -> Role | None:
         return self._role
 
     @property
-    def origins(self) -> Optional[List[Origin]]:
+    def origins(self) -> list[Origin] | None:
         return self._origins
 
     @classmethod
-    def create_role_and_origins(cls, raw_data: Dict[str, Any]) -> RoleAndOrigins:
+    def create_role_and_origins(cls, raw_data: dict[str, Any]) -> RoleAndOrigins:
 
         # RBAC prior to v6.5 does not have origins
         origin_data = raw_data.get("origins", None)
@@ -198,46 +196,14 @@ class RoleAndOrigins:
         )
 
 
-class UserManagementUtils:
-    """
-    ** INTERNAL **
-    """
-
-    @staticmethod
-    def to_set(value: Any, valid_type: Any, display_name: str) -> Set[Any]:
-
-        if not value:
-            # Returning the argument handed back None to every caller below, and Group.as_dict
-            # iterates self.roles unguarded.
-            return set()
-        elif isinstance(value, set):
-            UserManagementUtils.validate_all_set_types(value, valid_type, display_name)
-            return value
-        elif isinstance(value, list):
-            UserManagementUtils.validate_all_set_types(value, valid_type, display_name)
-            return set(value)
-        elif isinstance(value, tuple):
-            UserManagementUtils.validate_all_set_types(value, valid_type, display_name)
-            return set(value)
-        elif isinstance(value, valid_type):
-            return set([value])
-        else:
-            raise InvalidArgumentException(f'{display_name} must be of type {valid_type.__name__}.')
-
-    @staticmethod
-    def validate_all_set_types(value: Any, valid_type: Any, display_name: str) -> None:
-        if all(map(lambda r: isinstance(r, type), value)):
-            raise InvalidArgumentException(f'{display_name} must contain only objects of type {valid_type.__name__}.')
-
-
 class User:
 
     def __init__(self,
-                 username: Optional[str] = None,
-                 display_name: Optional[str] = None,
-                 groups: Optional[SetInputType[str]] = None,
-                 roles: Optional[SetInputType[Role]] = None,
-                 password: Optional[str] = None,
+                 username: str | None = None,
+                 display_name: str | None = None,
+                 groups: SetInputType[str] | None = None,
+                 roles: SetInputType[Role] | None = None,
+                 password: str | None = None,
                  ) -> None:
 
         if not username:
@@ -254,7 +220,7 @@ class User:
         return self._username
 
     @property
-    def display_name(self) -> Optional[str]:
+    def display_name(self) -> str | None:
         return self._display_name
 
     @display_name.setter
@@ -262,7 +228,7 @@ class User:
         self._display_name = value
 
     @property
-    def groups(self) -> Set[str]:
+    def groups(self) -> set[str]:
         """names of the groups"""
         return self._groups
 
@@ -271,7 +237,7 @@ class User:
         self._groups = UserManagementUtils.to_set(value, str, 'Groups')
 
     @property
-    def roles(self) -> Set[Role]:
+    def roles(self) -> set[Role]:
         """only roles assigned directly to the user (not inherited from groups)"""
         return self._roles
 
@@ -290,10 +256,10 @@ class User:
     def password(self, value: str) -> None:
         self._password = value
 
-    def as_dict(self) -> Dict[str, Any]:
-        # Annotated because the literal below infers Dict[str, Optional[str]], which the roles
+    def as_dict(self) -> dict[str, Any]:
+        # Annotated because the literal below infers dict[str, str | None], which the roles
         # list and the groups set that follow do not fit.
-        output: Dict[str, Any] = {
+        output: dict[str, Any] = {
             "username": self.username,
             "display_name": self.display_name,
             "password": self._password
@@ -308,7 +274,7 @@ class User:
         return output
 
     @classmethod
-    def create_user(cls, raw_data: Dict[str, Any], roles: Optional[SetInputType[Role]] = None) -> User:
+    def create_user(cls, raw_data: dict[str, Any], roles: SetInputType[Role] | None = None) -> User:
 
         user_roles = roles
         if not user_roles:
@@ -336,11 +302,11 @@ class UserAndMetadata:
     """
 
     def __init__(self,
-                 domain: Optional[AuthDomain] = None,
-                 user: Optional[User] = None,
-                 effective_roles: Optional[List[RoleAndOrigins]] = None,
-                 password_changed: Optional[datetime] = None,
-                 external_groups: Optional[Set[str]] = None,
+                 domain: AuthDomain | None = None,
+                 user: User | None = None,
+                 effective_roles: list[RoleAndOrigins] | None = None,
+                 password_changed: datetime | None = None,
+                 external_groups: set[str] | None = None,
                  **kwargs: Any
                  ) -> None:
 
@@ -352,47 +318,47 @@ class UserAndMetadata:
         self._raw_data = kwargs.get("raw_data", None)
 
     @property
-    def domain(self) -> Optional[AuthDomain]:
+    def domain(self) -> AuthDomain | None:
         """ AuthDomain is an enumeration with values "local" and "external".
         It MAY alternatively be represented as String."""
         return self._domain
 
     @property
-    def user(self) -> Optional[User]:
+    def user(self) -> User | None:
         """returns a new mutable User object each time this method is called.
             Modifying the fields of the returned User MUST have no effect on the
             UserAndMetadata object it came from."""
         return deepcopy(self._user)
 
     @property
-    def effective_roles(self) -> Optional[List[RoleAndOrigins]]:
+    def effective_roles(self) -> list[RoleAndOrigins] | None:
         """all roles, regardless of origin."""
         return self._effective_roles
 
     @property
-    def password_changed(self) -> Optional[datetime]:
+    def password_changed(self) -> datetime | None:
         return self._password_changed
 
     @property
-    def external_groups(self) -> Optional[Set[str]]:
+    def external_groups(self) -> set[str] | None:
         return self._external_groups
 
     @property
-    def raw_data(self) -> Optional[Dict[str, Any]]:
+    def raw_data(self) -> dict[str, Any] | None:
         return self._raw_data
 
     @classmethod
-    def create_user_and_metadata(cls, raw_data: Dict[str, Any]) -> UserAndMetadata:
+    def create_user_and_metadata(cls, raw_data: dict[str, Any]) -> UserAndMetadata:
 
         effective_roles = list(map(lambda r: RoleAndOrigins.create_role_and_origins(r),
-                                   raw_data.get("effective_roles")))
+                                   raw_data["effective_roles"]))
 
         # RoleAndOrigins.role is Optional, so without the first clause this could admit a None
         # into the user's roles.  create_role_and_origins always supplies one, so the guard never
         # drops anything; it is here so the code holds to what the annotation says.
         user_roles = set(r.role for r in effective_roles
                          if r.role is not None
-                         and (any(map(lambda o: o.type == "user", r.origins)) or len(r.origins) == 0))
+                         and (not r.origins or any(o.type == "user" for o in r.origins)))
 
         # RBAC prior to v6.5 does not have groups
         ext_group_data = raw_data.get("external_groups", None)
@@ -402,7 +368,7 @@ class UserAndMetadata:
         pw_changed = None
         formats = ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ']
         for f in formats:
-            if pw_changed:
+            if pw_changed or not isinstance(pw_data, str):
                 break
 
             try:
@@ -422,10 +388,10 @@ class UserAndMetadata:
 
 class Group:
     def __init__(self,
-                 name: Optional[str] = None,
-                 description: Optional[str] = None,
-                 roles: Optional[SetInputType[Role]] = None,
-                 ldap_group_reference: Optional[str] = None,
+                 name: str | None = None,
+                 description: str | None = None,
+                 roles: SetInputType[Role] | None = None,
+                 ldap_group_reference: str | None = None,
                  **kwargs: Any
                  ) -> None:
 
@@ -443,7 +409,7 @@ class Group:
         return self._name
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self._description
 
     @description.setter
@@ -451,7 +417,7 @@ class Group:
         self._description = value
 
     @property
-    def roles(self) -> Set[Role]:
+    def roles(self) -> set[Role]:
         return self._roles
 
     @roles.setter
@@ -459,7 +425,7 @@ class Group:
         self._roles = UserManagementUtils.to_set(value, Role, 'Roles')
 
     @property
-    def ldap_group_reference(self) -> Optional[str]:
+    def ldap_group_reference(self) -> str | None:
         return self._ldap_group_reference
 
     @ldap_group_reference.setter
@@ -467,10 +433,10 @@ class Group:
         self._ldap_group_reference = value
 
     @property
-    def raw_data(self) -> Optional[Dict[str, Any]]:
+    def raw_data(self) -> dict[str, Any] | None:
         return self._raw_data
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         rs = list(map(lambda r: r.as_dict(), self.roles))
         return {
             'name': self.name,
@@ -480,7 +446,7 @@ class Group:
         }
 
     @classmethod
-    def create_group(cls, raw_data: Dict[str, Any]) -> Group:
+    def create_group(cls, raw_data: dict[str, Any]) -> Group:
         return cls(
             raw_data.get('name'),
             description=raw_data.get('description', None),
@@ -488,169 +454,3 @@ class Group:
                 r), raw_data.get('roles', []))),
             ldap_group_reference=raw_data.get('ldap_group_ref', None)
         )
-
-
-# we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['error_map']
-_OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
-
-
-@dataclass
-class UserMgmtRequest(MgmtRequest):
-
-    def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        cls = type(self)
-        cached_fields = _FIELDS_CACHE.get(cls)
-        if cached_fields is None:
-            cached_fields = [f for f in fields(cls) if f.name not in _OPARG_SKIP_SET]
-            _FIELDS_CACHE[cls] = cached_fields
-
-        mgmt_kwargs = {
-            f.name: getattr(self, f.name)
-            for f in cached_fields
-            if getattr(self, f.name) is not None
-        }
-
-        if callback is not None:
-            mgmt_kwargs['callback'] = callback
-
-        if errback is not None:
-            mgmt_kwargs['errback'] = errback
-
-        if obs_handler:
-            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
-            if obs_handler.is_legacy_tracer:
-                legacy_request_span = obs_handler.legacy_request_span
-                if legacy_request_span:
-                    mgmt_kwargs['parent_span'] = legacy_request_span
-            else:
-                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
-
-        return mgmt_kwargs
-
-
-@dataclass
-class ChangePasswordRequest(UserMgmtRequest):
-    password: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.ChangePassword.value
-
-    def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        op_kwargs = super().req_to_dict(obs_handler=obs_handler, callback=callback, errback=errback)
-        pw = op_kwargs.pop('password')
-        op_kwargs['newPassword'] = pw
-        return op_kwargs
-
-
-@dataclass
-class DropGroupRequest(UserMgmtRequest):
-    name: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.GroupDrop.value
-
-
-@dataclass
-class DropUserRequest(UserMgmtRequest):
-    username: str
-    domain: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.UserDrop.value
-
-
-@dataclass
-class GetAllGroupsRequest(UserMgmtRequest):
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.GroupGetAll.value
-
-
-@dataclass
-class GetAllUsersRequest(UserMgmtRequest):
-    domain: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.UserGetAll.value
-
-
-@dataclass
-class GetGroupRequest(UserMgmtRequest):
-    name: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.GroupGet.value
-
-
-@dataclass
-class GetRolesRequest(UserMgmtRequest):
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.RoleGetAll.value
-
-
-@dataclass
-class GetUserRequest(UserMgmtRequest):
-    username: str
-    domain: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.UserGet.value
-
-
-@dataclass
-class UpsertGroupRequest(UserMgmtRequest):
-    group: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.GroupUpsert.value
-
-
-@dataclass
-class UpsertUserRequest(UserMgmtRequest):
-    user: Dict[str, Any]
-    domain: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return UserMgmtOperationType.UserUpsert.value
-
-
-USER_MGMT_ERROR_MAP: Dict[str, Exception] = {
-    r'Unknown group.*': GroupNotFoundException,
-    r'Unknown user.*': UserNotFoundException,
-    # The drop endpoints word it differently from the get endpoints, and the patterns are
-    # applied with re.match, so the get wording above cannot reach them.
-    r'Group was not found.*': GroupNotFoundException,
-    r'User was not found.*': UserNotFoundException,
-    r'Not found.*': FeatureUnavailableException,
-    r'Method Not Allowed.*': FeatureUnavailableException,
-    r'.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException
-}

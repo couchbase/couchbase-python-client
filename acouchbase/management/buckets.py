@@ -15,21 +15,33 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Awaitable,
-                    List)
+__all__ = [
+    'BucketDescribeResult',
+    'BucketManager',
+    'BucketSettings',
+    'BucketType',
+    'CompressionMode',
+    'ConflictResolutionType',
+    'CreateBucketSettings',
+    'EjectionMethod',
+    'EvictionPolicyType',
+    'StorageBackend',
+]
 
-from acouchbase.protocol.classic._management._bucket_mgmt_impl import AsyncBucketMgmtImpl
+from typing import TYPE_CHECKING, Any
+
 from couchbase.common.management.buckets import (BucketDescribeResult,
                                                  BucketSettings,
-                                                 CreateBucketSettings)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import BucketMgmtOperationType
+                                                 BucketType,
+                                                 CompressionMode,
+                                                 ConflictResolutionType,
+                                                 CreateBucketSettings,
+                                                 EjectionMethod,
+                                                 EvictionPolicyType,
+                                                 StorageBackend)
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.common._interfaces._bucket_mgmt import AsyncBucketMgmtInterface
     from couchbase.management.options import (BucketDescribeOptions,
                                               CreateBucketOptions,
                                               DropBucketOptions,
@@ -40,92 +52,134 @@ if TYPE_CHECKING:
 
 
 class BucketManager:
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        self._impl = AsyncBucketMgmtImpl(client_adapter, observability_instruments)
+    def __init__(self, impl: AsyncBucketMgmtInterface) -> None:
+        self._impl = impl
 
     async def create_bucket(self,
-                            settings,  # type: CreateBucketSettings
-                            *options,  # type: CreateBucketOptions
-                            **kwargs   # type: Any
-                            ) -> None:
-        """
-        Creates a new bucket.
+                            settings: CreateBucketSettings,
+                            options: CreateBucketOptions | None = None,
+                            **kwargs: Any) -> None:
+        """Creates a new bucket.
 
-        :param: CreateBucketSettings settings: settings for the bucket.
-        :param: CreateBucketOptions options: options for setting the bucket.
-        :param: Any kwargs: override corresponding values in the options.
+        Args:
+            settings (:class:`.CreateBucketSettings`): The settings to use for the new bucket.
+            options (:class:`~couchbase.management.options.CreateBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-        :raises: BucketAlreadyExistsException
-        :raises: InvalidArgumentsException
+        Raises:
+            :class:`~couchbase.exceptions.BucketAlreadyExistsException`: If the bucket already exists.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If an invalid type or value is provided for the
+                settings argument.
         """
-        op_type = BucketMgmtOperationType.BucketCreate
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_create_bucket_request(settings, obs_handler, *options, **kwargs)
-            await self._impl.create_bucket(req, obs_handler)
+        await self._impl.create_bucket(settings, options, **kwargs)
 
     async def update_bucket(self,
-                            settings,  # type: BucketSettings
-                            *options,  # type: UpdateBucketOptions
-                            **kwargs  # type: Any
-                            ) -> None:
-        op_type = BucketMgmtOperationType.BucketUpdate
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_update_bucket_request(settings, obs_handler, *options, **kwargs)
-            await self._impl.update_bucket(req, obs_handler)
+                            settings: BucketSettings,
+                            options: UpdateBucketOptions | None = None,
+                            **kwargs: Any) -> None:
+        """Update the settings for an existing bucket.
+
+        Args:
+            settings (:class:`.BucketSettings`): The settings to use for the new bucket.
+            options (:class:`~couchbase.management.options.UpdateBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If an invalid type or value is provided for the
+                settings argument.
+        """
+        await self._impl.update_bucket(settings, options, **kwargs)
 
     async def drop_bucket(self,
-                          bucket_name,  # type: str
-                          *options,     # type: DropBucketOptions
-                          **kwargs      # type: Any
-                          ) -> None:
-        op_type = BucketMgmtOperationType.BucketDrop
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_drop_bucket_request(bucket_name, obs_handler, *options, **kwargs)
-            await self._impl.drop_bucket(req, obs_handler)
+                          bucket_name: str,
+                          options: DropBucketOptions | None = None,
+                          **kwargs: Any) -> None:
+        """Drops an existing bucket.
+
+        Args:
+            bucket_name (str): The name of the bucket to drop.
+            options (:class:`~couchbase.management.options.DropBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+        """
+        await self._impl.drop_bucket(bucket_name, options, **kwargs)
 
     async def get_bucket(self,
-                         bucket_name,   # type: str
-                         *options,      # type: GetBucketOptions
-                         **kwargs       # type: Any
-                         ) -> Awaitable[BucketSettings]:
-        op_type = BucketMgmtOperationType.BucketGet
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_bucket_request(bucket_name, obs_handler, *options, **kwargs)
-            return await self._impl.get_bucket(req, obs_handler)
+                         bucket_name: str,
+                         options: GetBucketOptions | None = None,
+                         **kwargs: Any) -> BucketSettings:
+        """Fetches the settings in use for a specified bucket.
+
+        Args:
+            bucket_name (str): The name of the bucket to fetch.
+            options (:class:`~couchbase.management.options.GetBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`.BucketSettings`: The settings of the specified bucket.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+        """
+        return await self._impl.get_bucket(bucket_name, options, **kwargs)
 
     async def get_all_buckets(self,
-                              *options,  # type: GetAllBucketOptions
-                              **kwargs  # type: Any
-                              ) -> Awaitable[List[BucketSettings]]:
-        op_type = BucketMgmtOperationType.BucketGetAll
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_all_buckets_request(obs_handler, *options, **kwargs)
-            return await self._impl.get_all_buckets(req, obs_handler)
+                              options: GetAllBucketOptions | None = None,
+                              **kwargs: Any) -> list[BucketSettings]:
+        """Returns a list of existing buckets in the cluster.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            list[:class:`.BucketSettings`]: A list of existing buckets in the cluster.
+        """
+        return await self._impl.get_all_buckets(options, **kwargs)
 
     async def flush_bucket(self,
-                           bucket_name,   # type: str
-                           *options,      # type: FlushBucketOptions
-                           **kwargs       # type: Any
-                           ) -> Awaitable[None]:
-        op_type = BucketMgmtOperationType.BucketFlush
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_flush_bucket_request(bucket_name, obs_handler, *options, **kwargs)
-            await self._impl.flush_bucket(req, obs_handler)
-
-    async def bucket_describe(self,
-                              bucket_name,   # type: str
-                              *options,      # type: BucketDescribeOptions
-                              **kwargs       # type: Any
-                              ) -> BucketDescribeResult:
-        """Provides details on provided the bucket.
+                           bucket_name: str,
+                           options: FlushBucketOptions | None = None,
+                           **kwargs: Any) -> None:
+        """Flushes the bucket, deleting all the existing data that is stored in it.
 
         Args:
             bucket_name (str): The name of the bucket to flush.
+            options (:class:`~couchbase.management.options.FlushBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+            :class:`~couchbase.exceptions.BucketNotFlushableException`: If the bucket's settings have
+                flushing disabled.
+        """
+        await self._impl.flush_bucket(bucket_name, options, **kwargs)
+
+    async def bucket_describe(self,
+                              bucket_name: str,
+                              options: BucketDescribeOptions | None = None,
+                              **kwargs: Any) -> BucketDescribeResult:
+        """Provides details on provided the bucket.
+
+        Args:
+            bucket_name (str): The name of the bucket to describe.
             options (:class:`~couchbase.management.options.BucketDescribeOptions`): Optional parameters for this
                 operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -134,7 +188,4 @@ class BucketManager:
         Raises:
             :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
         """
-        op_type = BucketMgmtOperationType.BucketDescribe
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_bucket_describe_request(bucket_name, obs_handler, *options, **kwargs)
-            return await self._impl.bucket_describe(req, obs_handler)
+        return await self._impl.bucket_describe(bucket_name, options, **kwargs)
