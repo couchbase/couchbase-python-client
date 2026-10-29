@@ -27,6 +27,8 @@ from couchbase.common.result import PingResult
 from couchbase.protocol.classic._streaming import ViewStreamSpec
 from couchbase.result import ViewResult
 from txcouchbase.protocol.classic._deferred import defer
+from txcouchbase.protocol.classic._management._collection_mgmt_impl import TxCollectionMgmtImpl
+from txcouchbase.protocol.classic._management._view_index_mgmt_impl import TxViewIndexMgmtImpl
 from txcouchbase.protocol.classic._scope_impl import TxScopeImpl
 from txcouchbase.protocol.classic._streaming import submit_rows
 
@@ -53,6 +55,14 @@ class TxBucketImpl(AsyncBucketImpl):
 
     def ping_deferred(self, opts: PingOptions | None = None, **kwargs: Any) -> Deferred[PingResult]:
         return defer(self.loop, None, lambda: self._ping(self._request_builder.build_ping_request(opts, **kwargs)))
+
+    def collection_mgmt(self) -> TxCollectionMgmtImpl:
+        """**INTERNAL**"""
+        return TxCollectionMgmtImpl(self._client_adapter, self._bucket_name, self.observability_instruments)
+
+    def view_index_mgmt(self) -> TxViewIndexMgmtImpl:
+        """**INTERNAL**"""
+        return TxViewIndexMgmtImpl(self._client_adapter, self._bucket_name, self.observability_instruments)
 
     def view_query_deferred(self,
                             design_doc: str,

@@ -15,82 +15,109 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING, Iterable
-
-from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
+from collections.abc import Coroutine, Iterable
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._management._view_index_mgmt_impl import AsyncViewIndexMgmtImpl
-from couchbase.common.management.views import DesignDocument
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from txcouchbase.protocol.classic._deferred import defer
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.protocol.classic._management._view_index_mgmt_types import (DropDesignDocumentRequest,
-                                                                               GetAllDesignDocumentsRequest,
-                                                                               GetDesignDocumentRequest,
-                                                                               PublishDesignDocumentRequest,
-                                                                               UpsertDesignDocumentRequest)
+    from twisted.internet.defer import Deferred
+
+    from couchbase.common.management.options import (DropDesignDocumentOptions,
+                                                     GetAllDesignDocumentsOptions,
+                                                     GetDesignDocumentOptions,
+                                                     PublishDesignDocumentOptions,
+                                                     UpsertDesignDocumentOptions)
+    from couchbase.common.management.views import DesignDocument, DesignDocumentNamespace
 
 
 class TxViewIndexMgmtImpl(AsyncViewIndexMgmtImpl):
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        super().__init__(client_adapter, observability_instruments)
-
-    def _finish_span(self, result, obs_handler: ObservableRequestHandler):
-        """Callback to properly end the span on success or failure."""
-        if isinstance(result, Failure):
-            exc = result.value
-            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
-            return result
-        else:
-            obs_handler.__exit__(None, None, None)
-            return result
 
     def drop_design_document_deferred(self,
-                                      req: DropDesignDocumentRequest,
-                                      obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_design_document(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                      design_doc_name: str,
+                                      namespace: DesignDocumentNamespace,
+                                      options: DropDesignDocumentOptions | None = None,
+                                      **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.ViewIndexDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_design_document_request(self._bucket_name,
+                                                                           design_doc_name,
+                                                                           namespace,
+                                                                           obs_handler,
+                                                                           options,
+                                                                           **kwargs)
+            return self._drop_design_document(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_all_design_documents_deferred(self,
-                                          req: GetAllDesignDocumentsRequest,
-                                          obs_handler: ObservableRequestHandler) -> Deferred[Iterable[DesignDocument]]:
-        """**INTERNAL**"""
-        coro = super().get_all_design_documents(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                          namespace: DesignDocumentNamespace,
+                                          options: GetAllDesignDocumentsOptions | None = None,
+                                          **kwargs: Any) -> Deferred[Iterable[DesignDocument]]:
+        obs_handler = ObservableRequestHandler(Op.ViewIndexGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[DesignDocument]]:
+            req = self._request_builder.build_get_all_design_documents_request(self._bucket_name,
+                                                                               namespace,
+                                                                               obs_handler,
+                                                                               options,
+                                                                               **kwargs)
+            return self._get_all_design_documents(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_design_document_deferred(self,
-                                     req: GetDesignDocumentRequest,
-                                     obs_handler: ObservableRequestHandler) -> Deferred[DesignDocument]:
-        """**INTERNAL**"""
-        coro = super().get_design_document(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                     design_doc_name: str,
+                                     namespace: DesignDocumentNamespace,
+                                     options: GetDesignDocumentOptions | None = None,
+                                     **kwargs: Any) -> Deferred[DesignDocument]:
+        obs_handler = ObservableRequestHandler(Op.ViewIndexGet, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, DesignDocument]:
+            req = self._request_builder.build_get_design_document_request(self._bucket_name,
+                                                                          design_doc_name,
+                                                                          namespace,
+                                                                          obs_handler,
+                                                                          options,
+                                                                          **kwargs)
+            return self._get_design_document(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def publish_design_document_deferred(self,
-                                         req: PublishDesignDocumentRequest,
-                                         obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().publish_design_document(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                         design_doc_name: str,
+                                         options: PublishDesignDocumentOptions | None = None,
+                                         **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.ViewIndexPublish, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_publish_design_document_request(self._bucket_name,
+                                                                              design_doc_name,
+                                                                              obs_handler,
+                                                                              options,
+                                                                              **kwargs)
+            return self._publish_design_document(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def upsert_design_document_deferred(self,
-                                        req: UpsertDesignDocumentRequest,
-                                        obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().upsert_design_document(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                        design_doc_data: DesignDocument,
+                                        namespace: DesignDocumentNamespace,
+                                        options: UpsertDesignDocumentOptions | None = None,
+                                        **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.ViewIndexUpsert, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_upsert_design_document_request(self._bucket_name,
+                                                                             design_doc_data,
+                                                                             namespace,
+                                                                             obs_handler,
+                                                                             options,
+                                                                             **kwargs)
+            return self._upsert_design_document(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)

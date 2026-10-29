@@ -17,24 +17,32 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic._legacy_options import forward_args
-from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.option_enums import OptionValidationMode
 from couchbase.protocol.classic._management._view_index_mgmt_types import (VIEW_INDEX_MGMT_ERROR_MAP,
                                                                            DropDesignDocumentRequest,
                                                                            GetAllDesignDocumentsRequest,
                                                                            GetDesignDocumentRequest,
                                                                            PublishDesignDocumentRequest,
-                                                                           UpsertDesignDocumentRequest)
+                                                                           UpsertDesignDocumentRequest,
+                                                                           ViewIndexMgmtOptionsBlock)
+from couchbase.protocol.classic._wire import forward_args
 
 if TYPE_CHECKING:
+    from couchbase.common.management.options import (DropDesignDocumentOptions,
+                                                     GetAllDesignDocumentsOptions,
+                                                     GetDesignDocumentOptions,
+                                                     PublishDesignDocumentOptions,
+                                                     UpsertDesignDocumentOptions)
     from couchbase.common.management.views import DesignDocument, DesignDocumentNamespace
 
 
 class ViewIndexMgmtRequestBuilder:
 
-    def __init__(self) -> None:
+    def __init__(self, option_validation: OptionValidationMode | None = None) -> None:
         self._error_map = VIEW_INDEX_MGMT_ERROR_MAP
+        self._option_validation = option_validation
 
     def _get_valid_namespace(self, namespace: DesignDocumentNamespace) -> str:
         if not namespace:
@@ -55,11 +63,12 @@ class ViewIndexMgmtRequestBuilder:
         bucket_name: str,
         design_doc_name: str,
         namespace: DesignDocumentNamespace,
-        obs_handler: ObservableRequestHandler = None,
-        *options: object,
+        obs_handler: ObservableRequestHandler,
+        options: DropDesignDocumentOptions | None = None,
         **kwargs: object,
     ) -> DropDesignDocumentRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=ViewIndexMgmtOptionsBlock.DropDesignDocument, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(bucket_name=bucket_name, parent_span=parent_span)
         timeout = final_args.pop('timeout', None)
@@ -68,8 +77,7 @@ class ViewIndexMgmtRequestBuilder:
         req = DropDesignDocumentRequest(self._error_map,
                                         bucket_name=bucket_name,
                                         document_name=design_doc_name,
-                                        ns=namespace_str,
-                                        **final_args)
+                                        ns=namespace_str)
         if timeout is not None:
             req.timeout = timeout
 
@@ -79,19 +87,19 @@ class ViewIndexMgmtRequestBuilder:
         self,
         bucket_name: str,
         namespace: DesignDocumentNamespace,
-        obs_handler: ObservableRequestHandler = None,
-        *options: object,
+        obs_handler: ObservableRequestHandler,
+        options: GetAllDesignDocumentsOptions | None = None,
         **kwargs: object,
     ) -> GetAllDesignDocumentsRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=ViewIndexMgmtOptionsBlock.GetAllDesignDocuments, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(bucket_name=bucket_name, parent_span=parent_span)
         timeout = final_args.pop('timeout', None)
         namespace_str = self._get_valid_namespace(namespace)
         req = GetAllDesignDocumentsRequest(self._error_map,
                                            bucket_name=bucket_name,
-                                           ns=namespace_str,
-                                           **final_args)
+                                           ns=namespace_str)
         if timeout is not None:
             req.timeout = timeout
 
@@ -102,11 +110,12 @@ class ViewIndexMgmtRequestBuilder:
         bucket_name: str,
         design_doc_name: str,
         namespace: DesignDocumentNamespace,
-        obs_handler: ObservableRequestHandler = None,
-        *options: object,
+        obs_handler: ObservableRequestHandler,
+        options: GetDesignDocumentOptions | None = None,
         **kwargs: object,
     ) -> GetDesignDocumentRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=ViewIndexMgmtOptionsBlock.GetDesignDocument, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(bucket_name=bucket_name, parent_span=parent_span)
         timeout = final_args.pop('timeout', None)
@@ -115,8 +124,7 @@ class ViewIndexMgmtRequestBuilder:
         req = GetDesignDocumentRequest(self._error_map,
                                        bucket_name=bucket_name,
                                        document_name=design_doc_name,
-                                       ns=namespace_str,
-                                       **final_args)
+                                       ns=namespace_str)
         if timeout is not None:
             req.timeout = timeout
 
@@ -127,11 +135,12 @@ class ViewIndexMgmtRequestBuilder:
         bucket_name: str,
         design_doc: DesignDocument,
         namespace: DesignDocumentNamespace,
-        obs_handler: ObservableRequestHandler = None,
-        *options: object,
+        obs_handler: ObservableRequestHandler,
+        options: UpsertDesignDocumentOptions | None = None,
         **kwargs: object,
     ) -> UpsertDesignDocumentRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=ViewIndexMgmtOptionsBlock.UpsertDesignDocument, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(bucket_name=bucket_name, parent_span=parent_span)
         timeout = final_args.pop('timeout', None)
@@ -139,8 +148,7 @@ class ViewIndexMgmtRequestBuilder:
         design_doc_dict = design_doc.as_dict(namespace)
         req = UpsertDesignDocumentRequest(self._error_map,
                                           bucket_name=bucket_name,
-                                          document=design_doc_dict,
-                                          **final_args)
+                                          document=design_doc_dict)
         if timeout is not None:
             req.timeout = timeout
 
@@ -150,8 +158,8 @@ class ViewIndexMgmtRequestBuilder:
         self,
         bucket_name: str,
         design_doc_name: str,
-        obs_handler: ObservableRequestHandler = None,
-        *options: object,
+        obs_handler: ObservableRequestHandler,
+        options: PublishDesignDocumentOptions | None = None,
         **kwargs: object,
     ) -> PublishDesignDocumentRequest:
         """Build the request for publish_design_document.
@@ -160,8 +168,10 @@ class ViewIndexMgmtRequestBuilder:
         HTTP request to the server, but this method creates the parent span and
         returns a request object to keep the API consistent with other operations.
         """
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=ViewIndexMgmtOptionsBlock.PublishDesignDocument, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(bucket_name=bucket_name, parent_span=parent_span)
+        timeout = final_args.pop('timeout', None)
         self._validate_design_document_name(design_doc_name)
-        return PublishDesignDocumentRequest(bucket_name=bucket_name, design_doc_name=design_doc_name)
+        return PublishDesignDocumentRequest(bucket_name=bucket_name, design_doc_name=design_doc_name, timeout=timeout)

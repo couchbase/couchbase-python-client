@@ -152,15 +152,19 @@ class Bucket:
 
     def collections(self) -> CollectionManager:
         """
-        Get the CollectionManager.
+        Get a :class:`~txcouchbase.management.collections.CollectionManager` which can be used to manage the scopes and
+        collections of this bucket.
 
-        :return: the :class:`.management.collections.CollectionManager` for this bucket.
+        Returns:
+            :class:`~txcouchbase.management.collections.CollectionManager`: A
+            :class:`~txcouchbase.management.collections.CollectionManager` instance.
         """
-        return CollectionManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
+        return CollectionManager(self._impl.collection_mgmt())
 
     def view_indexes(self) -> ViewIndexManager:
         """
-        Get the ViewIndexManager.
+        Get a :class:`~txcouchbase.management.views.ViewIndexManager` which can be used to manage the view design
+        documents and views of this bucket.
 
         .. deprecated:: 4.6.0
 
@@ -168,9 +172,11 @@ class Bucket:
             Views are not compatible with the Magma storage engine. Instead of views, use indexes and queries using the
             Index Service (GSI) and the Query Service (SQL++).
 
-        :return: the :class:`.management.views.ViewIndexManager` for this bucket.
+        Returns:
+            :class:`~txcouchbase.management.views.ViewIndexManager`: A
+            :class:`~txcouchbase.management.views.ViewIndexManager` instance.
         """
-        return ViewIndexManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
+        return ViewIndexManager(self._impl.view_index_mgmt())
 
 
 TxBucket = Bucket

@@ -24,6 +24,8 @@ from couchbase.common._streaming import RowIterator
 from couchbase.common.result import PingResult
 from couchbase.protocol.classic._bucket_req_builder import BucketRequestBuilder
 from couchbase.protocol.classic._cluster_types import StreamingTimeouts
+from couchbase.protocol.classic._management._collection_mgmt_impl import CollectionMgmtImpl
+from couchbase.protocol.classic._management._view_index_mgmt_impl import ViewIndexMgmtImpl
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._result import _ping_from_core
 from couchbase.protocol.classic._scope_impl import ScopeImpl
@@ -121,6 +123,14 @@ class BucketImpl:
     def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
         req = self._request_builder.build_ping_request(opts, **kwargs)
         return PingResult(_ping_from_core(self._client_adapter.execute_bucket_request(req).raw_result))
+
+    def collection_mgmt(self) -> CollectionMgmtImpl:
+        """**INTERNAL**"""
+        return CollectionMgmtImpl(self._client_adapter, self._bucket_name, self.observability_instruments)
+
+    def view_index_mgmt(self) -> ViewIndexMgmtImpl:
+        """**INTERNAL**"""
+        return ViewIndexMgmtImpl(self._client_adapter, self._bucket_name, self.observability_instruments)
 
     def view_query(self,
                    design_doc: str,

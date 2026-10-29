@@ -16,37 +16,42 @@
 from __future__ import annotations
 
 from inspect import Parameter, Signature
-from typing import (Any,
-                    Dict,
-                    Optional,
-                    Tuple)
+from typing import Any
 
-from couchbase._utils import is_null_or_empty
+from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._supportability import Supportability
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic._legacy_options import forward_args
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.management.options import CreateCollectionOptions, DropCollectionOptions
+from couchbase.common._utils import is_null_or_empty
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.management.collections import (CollectionSpec,
+                                                     CreateCollectionSettings,
+                                                     UpdateCollectionSettings)
+from couchbase.common.management.options import (CreateCollectionOptions,
+                                                 CreateScopeOptions,
+                                                 DropCollectionOptions,
+                                                 DropScopeOptions,
+                                                 GetAllScopesOptions,
+                                                 UpdateCollectionOptions)
+from couchbase.common.option_enums import OptionValidationMode
 from couchbase.protocol.classic._management._collection_mgmt_types import (COLLECTION_MGMT_ERROR_MAP,
-                                                                           CollectionSpec,
+                                                                           CollectionMgmtOptionsBlock,
                                                                            CreateCollectionRequest,
-                                                                           CreateCollectionSettings,
                                                                            CreateScopeRequest,
                                                                            DropCollectionRequest,
                                                                            DropScopeRequest,
                                                                            GetAllScopesRequest,
-                                                                           UpdateCollectionRequest,
-                                                                           UpdateCollectionSettings)
+                                                                           UpdateCollectionRequest)
+from couchbase.protocol.classic._wire import forward_args
 
 
 class CollectionMgmtRequestBuilder:
 
-    def __init__(self) -> None:
+    def __init__(self, option_validation: OptionValidationMode | None = None) -> None:
         self._error_map = COLLECTION_MGMT_ERROR_MAP
+        self._option_validation = option_validation
 
     def _get_collection_spec_details(self,
                                      collection_spec: CollectionSpec,
-                                     method_name: str) -> Tuple[str, str, Optional[CreateCollectionSettings]]:
+                                     method_name: str) -> tuple[str, str, CreateCollectionSettings | None]:
         settings = None
         if method_name == 'create_collection':
             Supportability.method_signature_deprecated(
@@ -54,8 +59,11 @@ class CollectionMgmtRequestBuilder:
                 Signature(
                     parameters=[
                         Parameter('collection', Parameter.POSITIONAL_OR_KEYWORD, annotation=CollectionSpec),
-                        Parameter('options', Parameter.VAR_POSITIONAL, annotation=CreateCollectionOptions),
-                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
+                        Parameter('options',
+                                  Parameter.POSITIONAL_OR_KEYWORD,
+                                  annotation=CreateCollectionOptions | None,
+                                  default=None),
+                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=dict[str, Any]),
                     ],
                     return_annotation=None
                 ),
@@ -65,9 +73,13 @@ class CollectionMgmtRequestBuilder:
                         Parameter('collection_name', Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
                         Parameter('settings',
                                   Parameter.POSITIONAL_OR_KEYWORD,
-                                  annotation=Optional[CreateCollectionSettings]),
-                        Parameter('options', Parameter.VAR_POSITIONAL, annotation=CreateCollectionOptions),
-                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
+                                  annotation=CreateCollectionSettings | None,
+                                  default=None),
+                        Parameter('options',
+                                  Parameter.POSITIONAL_OR_KEYWORD,
+                                  annotation=CreateCollectionOptions | None,
+                                  default=None),
+                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=dict[str, Any]),
                     ],
                     return_annotation=None
                 )
@@ -78,8 +90,11 @@ class CollectionMgmtRequestBuilder:
                 Signature(
                     parameters=[
                         Parameter('collection', Parameter.POSITIONAL_OR_KEYWORD, annotation=CollectionSpec),
-                        Parameter('options', Parameter.VAR_POSITIONAL, annotation=DropCollectionOptions),
-                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
+                        Parameter('options',
+                                  Parameter.POSITIONAL_OR_KEYWORD,
+                                  annotation=DropCollectionOptions | None,
+                                  default=None),
+                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=dict[str, Any]),
                     ],
                     return_annotation=None,
                 ),
@@ -87,26 +102,26 @@ class CollectionMgmtRequestBuilder:
                     parameters=[
                         Parameter('scope_name', Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
                         Parameter('collection_name', Parameter.POSITIONAL_OR_KEYWORD, annotation=str),
-                        Parameter('options', Parameter.VAR_POSITIONAL, annotation=DropCollectionOptions),
-                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=Dict[str, Any]),
+                        Parameter('options',
+                                  Parameter.POSITIONAL_OR_KEYWORD,
+                                  annotation=DropCollectionOptions | None,
+                                  default=None),
+                        Parameter('kwargs', Parameter.VAR_KEYWORD, annotation=dict[str, Any]),
                     ],
                     return_annotation=None
                 )
             )
-        if collection_spec.max_expiry is not None:
-            settings = CreateCollectionSettings(max_expiry=collection_spec.max_expiry)
+        if collection_spec.max_expiry is not None or collection_spec.history is not None:
+            settings = CreateCollectionSettings(max_expiry=collection_spec.max_expiry, history=collection_spec.history)
         scope_name = collection_spec.scope_name
         collection_name = collection_spec.name
         return scope_name, collection_name, settings
 
     def _extract_collection_overload_args(self,  # noqa: C901
                                           method_name: str,
-                                          args: Tuple[object, ...],
-                                          kwargs: Dict[str, Any]
-                                          ) -> Tuple[Optional[str],
-                                                     Optional[str],
-                                                     Optional[CreateCollectionSettings],
-                                                     Tuple[object, ...]]:
+                                          args: tuple[Any, ...],
+                                          kwargs: dict[str, Any]
+                                          ) -> tuple[Any, Any, CreateCollectionSettings | None, Any]:
         supports_settings = method_name == 'create_collection'
 
         spec_positional = bool(args) and isinstance(args[0], CollectionSpec)
@@ -124,13 +139,13 @@ class CollectionMgmtRequestBuilder:
                     f"{', '.join(repr(c) for c in conflicting)}.")
             if spec_positional:
                 collection_spec = args[0]
-                options = args[1:]
+                options = self._single_options(method_name, args[1:], kwargs)
             elif args:
                 raise InvalidArgumentException(
                     f"{method_name}: cannot mix 'collection' keyword (CollectionSpec) with positional arguments.")
             else:
                 collection_spec = kwargs.pop('collection')
-                options = ()
+                options = self._single_options(method_name, (), kwargs)
             scope_name, collection_name, settings = self._get_collection_spec_details(collection_spec, method_name)
             if not supports_settings:
                 settings = None
@@ -167,39 +182,71 @@ class CollectionMgmtRequestBuilder:
                     raise InvalidArgumentException(
                         f"{method_name}: 'settings' must be a CreateCollectionSettings instance.")
 
-        return scope_name, collection_name, settings, tuple(pos)
+        return scope_name, collection_name, settings, self._single_options(method_name, tuple(pos), kwargs)
 
-    def _validate_bucket_name(self, bucket_name: str) -> None:
-        if is_null_or_empty(bucket_name):
+    def _single_options(self, method_name: str, rest: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+        if len(rest) > 1:
+            raise TypeError(f'{method_name}() takes one options object, {len(rest)} given')
+        if 'options' in kwargs:
+            if rest:
+                raise TypeError(f"{method_name}() got multiple values for argument 'options'")
+            return kwargs.pop('options')
+        return rest[0] if rest else None
+
+    def _settings_fields(self,
+                         settings: CreateCollectionSettings | UpdateCollectionSettings | None
+                         ) -> tuple[int | None, bool | None]:
+        if settings is None:
+            return None, None
+        max_expiry = int(settings.max_expiry.total_seconds()) if settings.max_expiry is not None else None
+        return max_expiry, settings.history
+
+    def _validate_bucket_name(self, bucket_name: object) -> str:
+        if bucket_name is None:
             raise InvalidArgumentException('The bucket_name cannot be empty.')
 
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException('The bucket_name must be str.')
 
-    def _validate_collection_name(self, collection_name: str) -> None:
-        if is_null_or_empty(collection_name):
+        if is_null_or_empty(bucket_name):
+            raise InvalidArgumentException('The bucket_name cannot be empty.')
+
+        return bucket_name
+
+    def _validate_collection_name(self, collection_name: object) -> str:
+        if collection_name is None:
             raise InvalidArgumentException('The collection_name cannot be empty.')
 
         if not isinstance(collection_name, str):
             raise InvalidArgumentException('The collection_name must be str.')
 
-    def _validate_scope_name(self, scope_name: str) -> None:
-        if is_null_or_empty(scope_name):
+        if is_null_or_empty(collection_name):
+            raise InvalidArgumentException('The collection_name cannot be empty.')
+
+        return collection_name
+
+    def _validate_scope_name(self, scope_name: object) -> str:
+        if scope_name is None:
             raise InvalidArgumentException('The scope_name cannot be empty.')
 
         if not isinstance(scope_name, str):
             raise InvalidArgumentException('The scope_name must be str.')
 
+        if is_null_or_empty(scope_name):
+            raise InvalidArgumentException('The scope_name cannot be empty.')
+
+        return scope_name
+
     def build_create_collection_request(self,
                                         bucket_name: str,
-                                        *args: object,
+                                        *args: Any,
+                                        obs_handler: ObservableRequestHandler,
                                         **kwargs: object) -> CreateCollectionRequest:
-        # the obs_handler is required, let pop fail if not provided
-        obs_handler: ObservableRequestHandler = kwargs.pop('obs_handler')
         scope_name, collection_name, settings, options = self._extract_collection_overload_args(
             'create_collection', args, kwargs)
 
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=CollectionMgmtOptionsBlock.CreateCollection, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span,
                                      bucket_name=bucket_name,
@@ -207,36 +254,28 @@ class CollectionMgmtRequestBuilder:
                                      collection_name=collection_name)
 
         self._validate_bucket_name(bucket_name)
-        self._validate_scope_name(scope_name)
-        self._validate_collection_name(collection_name)
+        scope_name = self._validate_scope_name(scope_name)
+        collection_name = self._validate_collection_name(collection_name)
 
         timeout = final_args.pop('timeout', None)
 
-        op_args = {
-            "bucket_name": bucket_name,
-            "scope_name": scope_name,
-            "collection_name": collection_name,
-        }
-
-        if settings is not None:
-            if settings.max_expiry is not None:
-                op_args["max_expiry"] = int(settings.max_expiry.total_seconds())
-            if settings.history is not None:
-                op_args["history"] = settings.history
-
-        req = CreateCollectionRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        max_expiry, history = self._settings_fields(settings)
+        return CreateCollectionRequest(self._error_map,
+                                       bucket_name=bucket_name,
+                                       scope_name=scope_name,
+                                       collection_name=collection_name,
+                                       max_expiry=max_expiry,
+                                       history=history,
+                                       timeout=timeout)
 
     def build_create_scope_request(self,
                                    bucket_name: str,
                                    scope_name: str,
                                    obs_handler: ObservableRequestHandler,
-                                   *options: object,
+                                   options: CreateScopeOptions | None = None,
                                    **kwargs: object) -> CreateScopeRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=CollectionMgmtOptionsBlock.CreateScope,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span,
                                      bucket_name=bucket_name,
@@ -246,27 +285,21 @@ class CollectionMgmtRequestBuilder:
 
         timeout = final_args.pop('timeout', None)
 
-        op_args = {
-            "bucket_name": bucket_name,
-            "scope_name": scope_name,
-        }
-
-        req = CreateScopeRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return CreateScopeRequest(self._error_map,
+                                  bucket_name=bucket_name,
+                                  scope_name=scope_name,
+                                  timeout=timeout)
 
     def build_drop_collection_request(self,
                                       bucket_name: str,
-                                      *args: object,
-                                      **kwargs: object) -> CreateCollectionRequest:
-        # the obs_handler is required, let pop fail if not provided
-        obs_handler: ObservableRequestHandler = kwargs.pop('obs_handler')
+                                      *args: Any,
+                                      obs_handler: ObservableRequestHandler,
+                                      **kwargs: object) -> DropCollectionRequest:
         scope_name, collection_name, _, options = self._extract_collection_overload_args(
             'drop_collection', args, kwargs)
 
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=CollectionMgmtOptionsBlock.DropCollection, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span,
                                      bucket_name=bucket_name,
@@ -274,30 +307,25 @@ class CollectionMgmtRequestBuilder:
                                      collection_name=collection_name)
 
         self._validate_bucket_name(bucket_name)
-        self._validate_scope_name(scope_name)
-        self._validate_collection_name(collection_name)
+        scope_name = self._validate_scope_name(scope_name)
+        collection_name = self._validate_collection_name(collection_name)
 
         timeout = final_args.pop('timeout', None)
 
-        op_args = {
-            "bucket_name": bucket_name,
-            "scope_name": scope_name,
-            "collection_name": collection_name,
-        }
-
-        req = DropCollectionRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return DropCollectionRequest(self._error_map,
+                                     bucket_name=bucket_name,
+                                     scope_name=scope_name,
+                                     collection_name=collection_name,
+                                     timeout=timeout)
 
     def build_drop_scope_request(self,
                                  bucket_name: str,
                                  scope_name: str,
                                  obs_handler: ObservableRequestHandler,
-                                 *options: object,
+                                 options: DropScopeOptions | None = None,
                                  **kwargs: object) -> DropScopeRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=CollectionMgmtOptionsBlock.DropScope,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span,
                                      bucket_name=bucket_name,
@@ -308,39 +336,27 @@ class CollectionMgmtRequestBuilder:
 
         timeout = final_args.pop('timeout', None)
 
-        op_args = {
-            "bucket_name": bucket_name,
-            "scope_name": scope_name,
-        }
-
-        req = DropScopeRequest(self._error_map, **op_args)
-
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return DropScopeRequest(self._error_map,
+                                bucket_name=bucket_name,
+                                scope_name=scope_name,
+                                timeout=timeout)
 
     def build_get_all_scopes_request(self,
                                      bucket_name: str,
                                      obs_handler: ObservableRequestHandler,
-                                     *options: object,
+                                     options: GetAllScopesOptions | None = None,
                                      **kwargs: object) -> GetAllScopesRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=CollectionMgmtOptionsBlock.GetAllScopes,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span, bucket_name=bucket_name)
         self._validate_bucket_name(bucket_name)
 
         timeout = final_args.pop('timeout', None)
 
-        op_args = {
-            "bucket_name": bucket_name,
-        }
-
-        req = GetAllScopesRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetAllScopesRequest(self._error_map,
+                                   bucket_name=bucket_name,
+                                   timeout=timeout)
 
     def build_update_collection_request(self,
                                         bucket_name: str,
@@ -348,9 +364,10 @@ class CollectionMgmtRequestBuilder:
                                         collection_name: str,
                                         settings: UpdateCollectionSettings,
                                         obs_handler: ObservableRequestHandler,
-                                        *options: object,
+                                        options: UpdateCollectionOptions | None = None,
                                         **kwargs: object) -> UpdateCollectionRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=CollectionMgmtOptionsBlock.UpdateCollection, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span,
                                      bucket_name=bucket_name,
@@ -363,20 +380,11 @@ class CollectionMgmtRequestBuilder:
 
         timeout = final_args.pop('timeout', None)
 
-        op_args = {
-            "bucket_name": bucket_name,
-            "scope_name": scope_name,
-            "collection_name": collection_name,
-        }
-
-        if settings is not None:
-            if settings.max_expiry is not None:
-                op_args["max_expiry"] = int(settings.max_expiry.total_seconds())
-            if settings.history is not None:
-                op_args["history"] = settings.history
-
-        req = UpdateCollectionRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        max_expiry, history = self._settings_fields(settings)
+        return UpdateCollectionRequest(self._error_map,
+                                       bucket_name=bucket_name,
+                                       scope_name=scope_name,
+                                       collection_name=collection_name,
+                                       max_expiry=max_expiry,
+                                       history=history,
+                                       timeout=timeout)

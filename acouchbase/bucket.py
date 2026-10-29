@@ -194,18 +194,19 @@ class AsyncBucket:
 
     def collections(self) -> CollectionManager:
         """
-        Get a :class:`~acouchbase.management.collections.CollectionManager` which can be used to manage the scopes and collections
-        of this bucket.
+        Get a :class:`~acouchbase.management.collections.CollectionManager` which can be used to manage the scopes and
+        collections of this bucket.
 
         Returns:
-            :class:`~acouchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
-        """  # noqa: E501
-        return CollectionManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
+            :class:`~acouchbase.management.collections.CollectionManager`: A
+            :class:`~couchbase.management.collections.CollectionManager` instance.
+        """
+        return CollectionManager(self._impl.collection_mgmt())
 
     def view_indexes(self) -> ViewIndexManager:
         """
-        Get a :class:`~acouchbase.management.views.ViewIndexManager` which can be used to manage the view design documents
-        and views of this bucket.
+        Get a :class:`~acouchbase.management.views.ViewIndexManager` which can be used to manage the view design
+        documents and views of this bucket.
 
         .. deprecated:: 4.6.0
 
@@ -214,9 +215,10 @@ class AsyncBucket:
             Index Service (GSI) and the Query Service (SQL++).
 
         Returns:
-            :class:`~acouchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
-        """  # noqa: E501
-        return ViewIndexManager(self._impl._client_adapter, self.name, self._impl.observability_instruments)
+            :class:`~acouchbase.management.views.ViewIndexManager`: A
+            :class:`~couchbase.management.views.ViewIndexManager` instance.
+        """
+        return ViewIndexManager(self._impl.view_index_mgmt())
 
 
 Bucket = AsyncBucket

@@ -15,17 +15,24 @@
 
 from __future__ import annotations
 
+import time
 from asyncio import AbstractEventLoop
-from typing import TYPE_CHECKING, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
 from couchbase.common.management.views import DesignDocument, DesignDocumentNamespace
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import ViewIndexMgmtOperationType
 from couchbase.protocol.classic._management._view_index_mgmt_req_builder import ViewIndexMgmtRequestBuilder
 
 if TYPE_CHECKING:
     from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.common._observability import ObservabilityInstruments
+    from couchbase.common.management.options import (DropDesignDocumentOptions,
+                                                     GetAllDesignDocumentsOptions,
+                                                     GetDesignDocumentOptions,
+                                                     PublishDesignDocumentOptions,
+                                                     UpsertDesignDocumentOptions)
     from couchbase.protocol.classic._management._view_index_mgmt_types import (DropDesignDocumentRequest,
                                                                                GetAllDesignDocumentsRequest,
                                                                                GetDesignDocumentRequest,
@@ -34,88 +41,137 @@ if TYPE_CHECKING:
 
 
 class AsyncViewIndexMgmtImpl:
-    def __init__(self, client_adapter: AsyncClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 bucket_name: str,
+                 observability_instruments: ObservabilityInstruments) -> None:
         self._client_adapter = client_adapter
-        self._request_builder = ViewIndexMgmtRequestBuilder()
+        self._bucket_name = bucket_name
+        self._request_builder = ViewIndexMgmtRequestBuilder(client_adapter.option_validation)
         self._observability_instruments = observability_instruments
 
     @property
     def loop(self) -> AbstractEventLoop:
-        """**INTERNAL**"""
+        """**INTERNAL** The loop the txcouchbase impl runs these coroutines on."""
         return self._client_adapter.loop
 
-    @property
-    def observability_instruments(self) -> ObservabilityInstruments:
-        """**INTERNAL**"""
-        return self._observability_instruments
+    async def drop_design_document(self,
+                                   design_doc_name: str,
+                                   namespace: DesignDocumentNamespace,
+                                   options: DropDesignDocumentOptions | None = None,
+                                   **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.ViewIndexDrop, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_drop_design_document_request(self._bucket_name,
+                                                                           design_doc_name,
+                                                                           namespace,
+                                                                           obs_handler,
+                                                                           options,
+                                                                           **kwargs)
+            await self._drop_design_document(req, obs_handler)
 
-    @property
-    def request_builder(self) -> ViewIndexMgmtRequestBuilder:
-        """**INTERNAL**"""
-        return self._request_builder
+    async def get_all_design_documents(self,
+                                       namespace: DesignDocumentNamespace,
+                                       options: GetAllDesignDocumentsOptions | None = None,
+                                       **kwargs: Any) -> Iterable[DesignDocument]:
+        async with ObservableRequestHandler(Op.ViewIndexGetAll, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_get_all_design_documents_request(self._bucket_name,
+                                                                               namespace,
+                                                                               obs_handler,
+                                                                               options,
+                                                                               **kwargs)
+            return await self._get_all_design_documents(req, obs_handler)
 
-    async def drop_design_document(
-        self,
-        req: DropDesignDocumentRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> None:
-        """**INTERNAL**"""
+    async def get_design_document(self,
+                                  design_doc_name: str,
+                                  namespace: DesignDocumentNamespace,
+                                  options: GetDesignDocumentOptions | None = None,
+                                  **kwargs: Any) -> DesignDocument:
+        async with ObservableRequestHandler(Op.ViewIndexGet, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_get_design_document_request(self._bucket_name,
+                                                                          design_doc_name,
+                                                                          namespace,
+                                                                          obs_handler,
+                                                                          options,
+                                                                          **kwargs)
+            return await self._get_design_document(req, obs_handler)
+
+    async def publish_design_document(self,
+                                      design_doc_name: str,
+                                      options: PublishDesignDocumentOptions | None = None,
+                                      **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.ViewIndexPublish, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_publish_design_document_request(self._bucket_name,
+                                                                              design_doc_name,
+                                                                              obs_handler,
+                                                                              options,
+                                                                              **kwargs)
+            await self._publish_design_document(req, obs_handler)
+
+    async def upsert_design_document(self,
+                                     design_doc_data: DesignDocument,
+                                     namespace: DesignDocumentNamespace,
+                                     options: UpsertDesignDocumentOptions | None = None,
+                                     **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.ViewIndexUpsert, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_upsert_design_document_request(self._bucket_name,
+                                                                             design_doc_data,
+                                                                             namespace,
+                                                                             obs_handler,
+                                                                             options,
+                                                                             **kwargs)
+            await self._upsert_design_document(req, obs_handler)
+
+    # The execute half of each operation.  The txcouchbase impl builds the request itself, inside
+    # the `start()` it hands to `defer()`, and returns one of these as the coroutine to run.
+    async def _drop_design_document(self,
+                                    req: DropDesignDocumentRequest,
+                                    obs_handler: ObservableRequestHandler) -> None:
         await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_all_design_documents(
-        self,
-        req: GetAllDesignDocumentsRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> Iterable[DesignDocument]:
-        """**INTERNAL**"""
+    async def _get_all_design_documents(self,
+                                        req: GetAllDesignDocumentsRequest,
+                                        obs_handler: ObservableRequestHandler) -> Iterable[DesignDocument]:
         ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
         raw_ddocs = ret.raw_result['design_documents']
         return [DesignDocument.from_json(ddoc) for ddoc in raw_ddocs]
 
-    async def get_design_document(
-        self,
-        req: GetDesignDocumentRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> DesignDocument:
-        """**INTERNAL**"""
+    async def _get_design_document(self,
+                                   req: GetDesignDocumentRequest,
+                                   obs_handler: ObservableRequestHandler) -> DesignDocument:
         ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-        raw_ddoc = ret.raw_result['document']
-        return DesignDocument.from_json(raw_ddoc)
+        return DesignDocument.from_json(ret.raw_result['document'])
 
-    async def publish_design_document(
-        self,
-        req: PublishDesignDocumentRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> None:
-        """**INTERNAL**"""
+    async def _publish_design_document(self,
+                                       req: PublishDesignDocumentRequest,
+                                       obs_handler: ObservableRequestHandler) -> None:
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=obs_handler.wrapped_span)
+        # The get and the upsert share one deadline, the publish timeout.
+        deadline = None if req.timeout is None else time.monotonic() + req.timeout / 1000
 
-        op_type = ViewIndexMgmtOperationType.ViewIndexGet
-        with ObservableRequestHandler(op_type, self._observability_instruments) as sub_obs_handler:
-            sub_obs_handler.create_http_span(bucket_name=req.bucket_name, parent_span=parent_span)
+        async with ObservableRequestHandler(Op.ViewIndexGet, self._observability_instruments) as sub_obs_handler:
             get_req = self._request_builder.build_get_design_document_request(
                 req.bucket_name,
                 req.design_doc_name,
                 DesignDocumentNamespace.DEVELOPMENT,
                 sub_obs_handler,
+                parent_span=parent_span,
             )
-            design_doc = await self.get_design_document(get_req, sub_obs_handler)
+            get_req.timeout = req.timeout
+            design_doc = await self._get_design_document(get_req, sub_obs_handler)
 
-        op_type = ViewIndexMgmtOperationType.ViewIndexUpsert
-        with ObservableRequestHandler(op_type, self._observability_instruments) as sub_obs_handler:
-            sub_obs_handler.create_http_span(bucket_name=req.bucket_name, parent_span=parent_span)
+        async with ObservableRequestHandler(Op.ViewIndexUpsert, self._observability_instruments) as sub_obs_handler:
             up_req = self._request_builder.build_upsert_design_document_request(
                 req.bucket_name,
                 design_doc,
                 DesignDocumentNamespace.PRODUCTION,
                 sub_obs_handler,
+                parent_span=parent_span,
             )
-            await self.upsert_design_document(up_req, sub_obs_handler)
+            if deadline is not None:
+                up_req.timeout = int((deadline - time.monotonic()) * 1e3)
+            await self._upsert_design_document(up_req, sub_obs_handler)
 
-    async def upsert_design_document(
-        self,
-        req: UpsertDesignDocumentRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> None:
-        """**INTERNAL**"""
+    async def _upsert_design_document(self,
+                                      req: UpsertDesignDocumentRequest,
+                                      obs_handler: ObservableRequestHandler) -> None:
         await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)

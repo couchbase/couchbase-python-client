@@ -33,7 +33,6 @@ from couchbase.exceptions import DesignDocumentNotFoundException
 from couchbase.management.options import (GetAllDesignDocumentsOptions,
                                           GetDesignDocumentOptions,
                                           PublishDesignDocumentOptions)
-from couchbase.management.views import View
 from tests.assert_helpers import cb_assert_eq
 from tests.environments.managers import TwistedTestEnvironmentViewIndexManager
 from tests.environments.twisted_environment import (CollectionStrategy,
@@ -48,7 +47,9 @@ from tests.view_defs import (MGMT_MAP_FUNCTION,
                              MGMT_SECONDARY_VIEW_NAME,
                              MGMT_VIEW_NAME,
                              mgmt_design_doc_name)
-from txcouchbase.management.views import DesignDocument, DesignDocumentNamespace
+from txcouchbase.management.views import (DesignDocument,
+                                          DesignDocumentNamespace,
+                                          View)
 
 
 class ViewIndexManagementTestSuite(SuiteRequirements):

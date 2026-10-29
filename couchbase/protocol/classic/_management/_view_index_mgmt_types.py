@@ -15,30 +15,41 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, fields
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    Optional)
+from typing import Any
 
-from couchbase.exceptions import DesignDocumentNotFoundException, RateLimitedException
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import MgmtOperationType, ViewIndexMgmtOperationType
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common.exceptions import (CouchbaseException,
+                                         DesignDocumentNotFoundException,
+                                         RateLimitedException)
+from couchbase.common.protocol import CouchbaseProtocol
+from couchbase.protocol.classic._bindings import ViewIndexMgmtBinding
 from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
+
+
+class ViewIndexMgmtOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    DropDesignDocument = 'DropDesignDocumentOptions'
+    GetAllDesignDocuments = 'GetAllDesignDocumentsOptions'
+    GetDesignDocument = 'GetDesignDocumentOptions'
+    PublishDesignDocument = 'PublishDesignDocumentOptions'
+    UpsertDesignDocument = 'UpsertDesignDocumentOptions'
+
 
 # we have these params on the top-level pycbc_core request
 OPARG_SKIP_LIST = ['error_map']
 _OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
+_FIELDS_CACHE: dict[type, list] = {}
 
 
 @dataclass
 class ViewIndexMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+                    obs_handler: ObservableRequestHandler | None = None,
+                    callback: Callable[..., None] | None = None,
+                    errback: Callable[..., None] | None = None) -> dict[str, Any]:
         cls = type(self)
         cached_fields = _FIELDS_CACHE.get(cls)
         if cached_fields is None:
@@ -74,24 +85,22 @@ class DropDesignDocumentRequest(ViewIndexMgmtRequest):
     bucket_name: str
     document_name: str
     ns: str
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return ViewIndexMgmtOperationType.ViewIndexDrop.value
+        return ViewIndexMgmtBinding.ViewIndexDrop.value
 
 
 @dataclass
 class GetAllDesignDocumentsRequest(ViewIndexMgmtRequest):
     bucket_name: str
     ns: str
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return ViewIndexMgmtOperationType.ViewIndexGetAll.value
+        return ViewIndexMgmtBinding.ViewIndexGetAll.value
 
 
 @dataclass
@@ -99,23 +108,22 @@ class GetDesignDocumentRequest(ViewIndexMgmtRequest):
     bucket_name: str
     document_name: str
     ns: str
-    timeout: Optional[int] = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return ViewIndexMgmtOperationType.ViewIndexGet.value
+        return ViewIndexMgmtBinding.ViewIndexGet.value
 
 
 @dataclass
 class UpsertDesignDocumentRequest(ViewIndexMgmtRequest):
     bucket_name: str
-    document: Dict[str, Any]
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
+    document: dict[str, Any]
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return ViewIndexMgmtOperationType.ViewIndexUpsert.value
+        return ViewIndexMgmtBinding.ViewIndexUpsert.value
 
 
 @dataclass
@@ -128,13 +136,11 @@ class PublishDesignDocumentRequest:
     """
     bucket_name: str
     design_doc_name: str
-
-    @property
-    def binding_method(self) -> str:
-        return MgmtOperationType.ViewIndexPublish.value
+    # Applied to each of the get and the upsert.
+    timeout: int | None = None
 
 
-VIEW_INDEX_MGMT_ERROR_MAP: Dict[str, Exception] = {
+VIEW_INDEX_MGMT_ERROR_MAP: dict[str, type[CouchbaseException]] = {
     r'not_found': DesignDocumentNotFoundException,
     r'.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException
 }

@@ -18,6 +18,8 @@ from __future__ import annotations
 from asyncio import AbstractEventLoop, Future
 from typing import TYPE_CHECKING, Any
 
+from acouchbase.protocol.classic._management._collection_mgmt_impl import AsyncCollectionMgmtImpl
+from acouchbase.protocol.classic._management._view_index_mgmt_impl import AsyncViewIndexMgmtImpl
 from acouchbase.protocol.classic._scope_impl import AsyncScopeImpl
 from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor
 from acouchbase.result import AsyncViewResult
@@ -154,6 +156,14 @@ class AsyncBucketImpl:
         await self.wait_until_bucket_connected()
         res = await self._client_adapter.execute_bucket_request(req)
         return PingResult(_ping_from_core(res.raw_result))
+
+    def collection_mgmt(self) -> AsyncCollectionMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncCollectionMgmtImpl(self._client_adapter, self._bucket_name, self.observability_instruments)
+
+    def view_index_mgmt(self) -> AsyncViewIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncViewIndexMgmtImpl(self._client_adapter, self._bucket_name, self.observability_instruments)
 
     def view_query(self,
                    design_doc: str,

@@ -30,12 +30,13 @@ from datetime import timedelta
 import pytest
 import pytest_asyncio
 
-from acouchbase.management.views import DesignDocument, DesignDocumentNamespace
+from acouchbase.management.views import (DesignDocument,
+                                         DesignDocumentNamespace,
+                                         View)
 from couchbase.exceptions import DesignDocumentNotFoundException
 from couchbase.management.options import (GetAllDesignDocumentsOptions,
                                           GetDesignDocumentOptions,
                                           PublishDesignDocumentOptions)
-from couchbase.management.views import View
 from tests.assert_helpers import cb_assert_eq
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,

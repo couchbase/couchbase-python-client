@@ -15,169 +15,46 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, fields
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Callable,
-                    Dict,
-                    Iterable,
-                    Optional)
+from typing import Any
 
-from couchbase.common._supportability import Supportability
-from couchbase.exceptions import (CollectionAlreadyExistsException,
-                                  CollectionNotFoundException,
-                                  QuotaLimitedException,
-                                  RateLimitedException,
-                                  ScopeAlreadyExistsException,
-                                  ScopeNotFoundException)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import CollectionMgmtOperationType
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common.exceptions import (CollectionAlreadyExistsException,
+                                         CollectionNotFoundException,
+                                         CouchbaseException,
+                                         QuotaLimitedException,
+                                         RateLimitedException,
+                                         ScopeAlreadyExistsException,
+                                         ScopeNotFoundException)
+from couchbase.common.protocol import CouchbaseProtocol
+from couchbase.protocol.classic._bindings import CollectionMgmtBinding
 from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
 
-if TYPE_CHECKING:
-    from datetime import timedelta
 
-
-class CreateCollectionSettings:
-    """
-        Specifies settings for a collection that will be created.
-    """
-
-    def __init__(self, max_expiry: Optional[timedelta] = None, history: Optional[bool] = None) -> None:
-        self._max_expiry = max_expiry
-        self._history = history
-
-    @property
-    def max_expiry(self) -> Optional[timedelta]:
-        """
-            Optional[timedelta]: The maximum expiry for documents in the collection.
-        """
-        return self._max_expiry
-
-    @property
-    def history(self) -> Optional[bool]:
-        """
-            Optional[bool]: Whether history retention override should be enabled in the collection. If not set, it will
-            default to the bucket-level setting
-        """
-        return self._history
-
-
-class UpdateCollectionSettings:
-    """
-        Specifies settings for a collection that will be updated.
-    """
-
-    def __init__(self, max_expiry: Optional[timedelta] = None, history: Optional[bool] = None) -> None:
-        self._max_expiry = max_expiry
-        self._history = history
-
-    @property
-    def max_expiry(self) -> Optional[timedelta]:
-        """
-            Optional[timedelta]: The maximum expiry for documents in the collection.
-        """
-        return self._max_expiry
-
-    @property
-    def history(self) -> Optional[bool]:
-        """
-            Optional[bool]: Whether history retention override should be enabled in the collection. If not set, it will
-            default to the bucket-level setting
-        """
-        return self._history
-
-
-class CollectionSpec:
-    def __init__(self,
-                 collection_name: str,
-                 scope_name: Optional[str] = '_default',
-                 max_expiry: Optional[timedelta] = None,
-                 max_ttl: Optional[timedelta] = None,
-                 history: Optional[bool] = None
-                 ) -> None:
-        self._name, self._scope_name = collection_name, scope_name
-        # in the event users utilize kwargs, set max_expiry if not set and max_ttl is set
-        if max_ttl is not None:
-            Supportability.class_property_deprecated('max_ttl', 'max_expiry')
-            if max_expiry is None:
-                max_expiry = max_ttl
-        self._max_expiry = max_expiry
-        self._history = history
-
-    @property
-    def max_expiry(self) -> Optional[timedelta]:
-        """
-            Optional[timedelta]: The expiry for documents in the collection.
-        """
-        return self._max_expiry
-
-    @property
-    def max_ttl(self) -> Optional[timedelta]:
-        """
-            Optional[timedelta]: The expiry for documents in the collection.
-
-            **DEPRECATED** Use :attr:`max_expiry` instead.
-        """
-        Supportability.class_property_deprecated('max_ttl', 'max_expiry')
-        return self._max_expiry
-
-    @property
-    def history(self) -> Optional[bool]:
-        """
-            Optional[bool]: Whether history retention is enabled in the collection. None represents the bucket-level
-            setting.
-        """
-        return self._history
-
-    @property
-    def name(self) -> str:
-        """
-            str: The name of the collection
-        """
-        return self._name
-
-    @property
-    def scope_name(self) -> str:
-        """
-            str: The name of the collection's scope
-        """
-        return self._scope_name
-
-
-class ScopeSpec:
-    def __init__(self, name: str, collections: Iterable[CollectionSpec]) -> None:
-        self._name = name
-        self._collections = collections
-
-    @property
-    def name(self) -> str:
-        """
-            str: The name of the scope
-        """
-        return self._name
-
-    @property
-    def collections(self) -> Iterable[CollectionSpec]:
-        """
-            List[:class:`.CollectionSpec`]: A list of the scope's collections.
-        """
-        return self._collections
+class CollectionMgmtOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    CreateCollection = 'CreateCollectionOptions'
+    CreateScope = 'CreateScopeOptions'
+    DropCollection = 'DropCollectionOptions'
+    DropScope = 'DropScopeOptions'
+    GetAllScopes = 'GetAllScopesOptions'
+    UpdateCollection = 'UpdateCollectionOptions'
 
 
 # we have these params on the top-level pycbc_core request
 OPARG_SKIP_LIST = ['error_map']
 _OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
+_FIELDS_CACHE: dict[type, list] = {}
 
 
 @dataclass
 class CollectionMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+                    obs_handler: ObservableRequestHandler | None = None,
+                    callback: Callable[..., None] | None = None,
+                    errback: Callable[..., None] | None = None) -> dict[str, Any]:
         cls = type(self)
         cached_fields = _FIELDS_CACHE.get(cls)
         if cached_fields is None:
@@ -213,24 +90,24 @@ class CreateCollectionRequest(CollectionMgmtRequest):
     bucket_name: str
     scope_name: str
     collection_name: str
-    max_expiry: Optional[int] = None
-    history: Optional[bool] = None
-    timeout: Optional[int] = None
+    max_expiry: int | None = None
+    history: bool | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return CollectionMgmtOperationType.CollectionCreate.value
+        return CollectionMgmtBinding.CollectionCreate.value
 
 
 @dataclass
 class CreateScopeRequest(CollectionMgmtRequest):
     bucket_name: str
     scope_name: str
-    timeout: Optional[int] = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return CollectionMgmtOperationType.ScopeCreate.value
+        return CollectionMgmtBinding.ScopeCreate.value
 
 
 @dataclass
@@ -238,32 +115,32 @@ class DropCollectionRequest(CollectionMgmtRequest):
     bucket_name: str
     scope_name: str
     collection_name: str
-    timeout: Optional[int] = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return CollectionMgmtOperationType.CollectionDrop.value
+        return CollectionMgmtBinding.CollectionDrop.value
 
 
 @dataclass
 class DropScopeRequest(CollectionMgmtRequest):
     bucket_name: str
     scope_name: str
-    timeout: Optional[int] = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return CollectionMgmtOperationType.ScopeDrop.value
+        return CollectionMgmtBinding.ScopeDrop.value
 
 
 @dataclass
 class GetAllScopesRequest(CollectionMgmtRequest):
     bucket_name: str
-    timeout: Optional[int] = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return CollectionMgmtOperationType.ScopeGetAll.value
+        return CollectionMgmtBinding.ScopeGetAll.value
 
 
 @dataclass
@@ -271,16 +148,16 @@ class UpdateCollectionRequest(CollectionMgmtRequest):
     bucket_name: str
     scope_name: str
     collection_name: str
-    max_expiry: Optional[int] = None
-    history: Optional[bool] = None
-    timeout: Optional[int] = None
+    max_expiry: int | None = None
+    history: bool | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return CollectionMgmtOperationType.CollectionUpdate.value
+        return CollectionMgmtBinding.CollectionUpdate.value
 
 
-COLLECTION_MGMT_ERROR_MAP: Dict[str, Exception] = {
+COLLECTION_MGMT_ERROR_MAP: dict[str, type[CouchbaseException]] = {
     r'.*Scope with.*name.*already exists': ScopeAlreadyExistsException,
     r'.*Scope with.*name.*not found': ScopeNotFoundException,
     r'.*Collection with.*name.*not found': CollectionNotFoundException,
