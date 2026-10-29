@@ -668,10 +668,11 @@ class AsyncCluster:
         indexes of this cluster.
 
         Returns:
-            :class:`~acouchbase.management.search.SearchIndexManager`: A :class:`~acouchbase.management.search.SearchIndexManager` instance.
+            :class:`~acouchbase.management.search.SearchIndexManager`: A
+            :class:`~acouchbase.management.search.SearchIndexManager` instance.
 
-        """  # noqa: E501
-        return SearchIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+        """
+        return SearchIndexManager(self._impl.search_index_mgmt())
 
     def eventing_functions(self) -> EventingFunctionManager:
         """
@@ -683,10 +684,11 @@ class AsyncCluster:
             but may still change as final consensus on its behavior has not yet been reached.
 
         Returns:
-            :class:`~acouchbase.management.eventing.EventingFunctionManager`: An :class:`~acouchbase.management.eventing.EventingFunctionManager` instance.
+            :class:`~acouchbase.management.eventing.EventingFunctionManager`: An
+            :class:`~acouchbase.management.eventing.EventingFunctionManager` instance.
 
-        """  # noqa: E501
-        return EventingFunctionManager(self._impl._client_adapter, self._impl.observability_instruments)
+        """
+        return EventingFunctionManager(self._impl.eventing_function_mgmt())
 
     @staticmethod
     async def connect(connstr: str, *options: ClusterOptions, **kwargs: Any) -> AsyncCluster:

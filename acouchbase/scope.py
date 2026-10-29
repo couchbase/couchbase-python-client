@@ -434,27 +434,23 @@ class AsyncScope:
         indexes of this scope.
 
         Returns:
-            :class:`~acouchbase.management.search.ScopeSearchIndexManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
+            :class:`~acouchbase.management.search.ScopeSearchIndexManager`: A
+            :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
 
-        """  # noqa: E501
-        return ScopeSearchIndexManager(self._impl._client_adapter,
-                                       self.bucket_name,
-                                       self.name,
-                                       self._impl.observability_instruments)
+        """
+        return ScopeSearchIndexManager(self._impl.search_index_mgmt())
 
     def eventing_functions(self) -> ScopeEventingFunctionManager:
         """
-        Get a :class:`~acouchbase.management.search.ScopeEventingFunctionManager` which can be used to manage the eventing
-        functions of this scope.
+        Get a :class:`~acouchbase.management.eventing.ScopeEventingFunctionManager` which can be used to manage the
+        eventing functions of this scope.
 
         Returns:
-            :class:`~acouchbase.management.search.ScopeEventingFunctionManager`: A :class:`~acouchbase.management.search.ScopeSearchIndexManager` instance.
+            :class:`~acouchbase.management.eventing.ScopeEventingFunctionManager`: A
+            :class:`~acouchbase.management.eventing.ScopeEventingFunctionManager` instance.
 
-        """  # noqa: E501
-        return ScopeEventingFunctionManager(self._impl._client_adapter,
-                                            self.bucket_name,
-                                            self.name,
-                                            self._impl.observability_instruments)
+        """
+        return ScopeEventingFunctionManager(self._impl.eventing_function_mgmt())
 
     @staticmethod
     def default_name() -> str:

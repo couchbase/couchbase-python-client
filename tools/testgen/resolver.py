@@ -398,14 +398,14 @@ PURE_HELPER_NAMESPACES = {
     'EnvironmentFeatures',
     'SD',
     'MutationState',
-    # A dataclass in couchbase.management.logic, one class for all three apis, with four
+    # A dataclass in couchbase.common.management, one class for all three apis, with four
     # methods that only read their arguments.  searchmgmt_t calls SearchIndex.from_json()
     # directly, and a bare CapWords receiver with no binding is reported rather than
     # guessed, so without this the four from-json tests read INCOMPLETE under acouchbase
     # and BLOCKED under txcouchbase on the strength of a pure dict-to-dataclass call.
     'SearchIndex',
     # The same situation as SearchIndex one class up: a dataclass in
-    # couchbase.management.logic serving all three apis, whose new_settings() reads its
+    # couchbase.common.management serving all three apis, whose new_settings() reads its
     # keyword arguments and returns an object.  Every function the eventing suites build
     # goes through it, so leaving it out puts fifteen sites in the unresolved report for a
     # call that does not touch the network.

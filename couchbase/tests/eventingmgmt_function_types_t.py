@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -22,6 +23,13 @@ import pytest
 from couchbase.common.management.eventing import (EventingFunction,
                                                   EventingFunctionBucketAccess,
                                                   EventingFunctionBucketBinding,
+                                                  EventingFunctionDcpBoundary,
+                                                  EventingFunctionDeploymentStatus,
+                                                  EventingFunctionKeyspace,
+                                                  EventingFunctionLanguageCompatibility,
+                                                  EventingFunctionLogLevel,
+                                                  EventingFunctionProcessingStatus,
+                                                  EventingFunctionSettings,
                                                   EventingFunctionUrlAuthBasic,
                                                   EventingFunctionUrlAuthBearer,
                                                   EventingFunctionUrlAuthDigest,
@@ -51,7 +59,13 @@ URL_BINDING_AUTH = [
 
 
 def _function(**overrides: Any) -> EventingFunction:
-    return EventingFunction.from_server({'name': 'test-function', **overrides})
+    return EventingFunction.from_server({'name': 'test-function', 'code': 'function OnUpdate(doc, meta) {}',
+                                         **overrides})
+
+
+def _keyspace(keyspace: EventingFunctionKeyspace | None) -> EventingFunctionKeyspace:
+    assert keyspace is not None
+    return keyspace
 
 
 def _url_binding(auth: Any) -> EventingFunctionUrlBinding:
@@ -77,21 +91,22 @@ class EventingFunctionTypesUnitTests:
                          source_keyspace={'bucket': 'src-bucket', 'scope': 'src-scope',
                                           'collection': 'src-collection'})
 
-        assert func.metadata_keyspace.bucket == 'meta-bucket'
-        assert func.metadata_keyspace.scope == 'meta-scope'
-        assert func.metadata_keyspace.collection == 'meta-collection'
-        assert func.source_keyspace.bucket == 'src-bucket'
-        assert func.source_keyspace.scope == 'src-scope'
-        assert func.source_keyspace.collection == 'src-collection'
+        metadata, source = _keyspace(func.metadata_keyspace), _keyspace(func.source_keyspace)
+        assert metadata.bucket == 'meta-bucket'
+        assert metadata.scope == 'meta-scope'
+        assert metadata.collection == 'meta-collection'
+        assert source.bucket == 'src-bucket'
+        assert source.scope == 'src-scope'
+        assert source.collection == 'src-collection'
 
     def test_keyspaces_default_scope_and_collection_from_server(self) -> None:
         # The server names the default scope and collection explicitly; the SDK reports them
         # as absent, so `scope` reads None rather than the string '_default'.
-        func = _function(metadata_keyspace=DEFAULT_KEYSPACE)
+        metadata = _keyspace(_function(metadata_keyspace=DEFAULT_KEYSPACE).metadata_keyspace)
 
-        assert func.metadata_keyspace.bucket == 'meta-bucket'
-        assert func.metadata_keyspace.scope is None
-        assert func.metadata_keyspace.collection is None
+        assert metadata.bucket == 'meta-bucket'
+        assert metadata.scope is None
+        assert metadata.collection is None
 
     def test_keyspaces_round_trip(self) -> None:
         func = _function(metadata_keyspace=FULL_KEYSPACE)
@@ -117,9 +132,10 @@ class EventingFunctionTypesUnitTests:
 
         assert binding.alias == 'alias'
         assert binding.access == EventingFunctionBucketAccess.ReadOnly
-        assert binding.name.bucket == 'bound-bucket'
-        assert binding.name.scope == 'bound-scope'
-        assert binding.name.collection == 'bound-collection'
+        name = _keyspace(binding.name)
+        assert name.bucket == 'bound-bucket'
+        assert name.scope == 'bound-scope'
+        assert name.collection == 'bound-collection'
 
     @pytest.mark.parametrize('access, expected, written',
                              [('r', EventingFunctionBucketAccess.ReadOnly, 'read_only'),
@@ -140,11 +156,53 @@ class EventingFunctionTypesUnitTests:
         assert binding.access is expected
         assert binding.as_dict()['access'] == written
 
-    def test_bucket_access_rejects_an_unknown_value(self) -> None:
-        with pytest.raises(InvalidArgumentException) as exc_info:
-            EventingFunctionBucketAccess.from_server('write_only')
+    def test_bucket_access_reads_an_unknown_value_as_unknown(self) -> None:
+        binding = EventingFunctionBucketBinding.from_server(
+            {'alias': 'alias', 'access': 'write_only', 'name': {'bucket': 'bound-bucket'}})
 
-        assert 'write_only' in str(exc_info.value)
+        assert binding.access is EventingFunctionBucketAccess.Unknown
+        assert binding.as_dict()['access'] == 'unknown'
+
+    # A server release can add a value, and reading the function must not fail on it.  Writing it
+    # back is refused by upsert_function, since the binding would send its default in its place.
+    @pytest.mark.parametrize('field, unknown',
+                             [('dcp_stream_boundary', EventingFunctionDcpBoundary.Unknown),
+                              ('deployment_status', EventingFunctionDeploymentStatus.Unknown),
+                              ('processing_status', EventingFunctionProcessingStatus.Unknown),
+                              ('log_level', EventingFunctionLogLevel.Unknown),
+                              ('language_compatibility', EventingFunctionLanguageCompatibility.Unknown)])
+    def test_a_setting_the_sdk_cannot_name_reads_as_unknown(self, field: str, unknown: object) -> None:
+        settings = EventingFunctionSettings.from_server({field: 'not-a-real-value'})
+
+        assert getattr(settings, field) is unknown
+        assert settings.as_dict()[field] == 'unknown'
+
+    # The binding leaves a missing access at read_write, the documented default.
+    def test_bucket_binding_without_access_omits_it(self) -> None:
+        binding = EventingFunctionBucketBinding(alias='alias', name=EventingFunctionKeyspace('bound-bucket'))
+
+        assert binding.as_dict() == {'alias': 'alias', 'name': {'bucket': 'bound-bucket'}}
+
+    def test_bucket_binding_without_a_name_is_rejected(self) -> None:
+        binding = EventingFunctionBucketBinding(alias='alias', access=EventingFunctionBucketAccess.ReadOnly)
+
+        with pytest.raises(InvalidArgumentException):
+            binding.as_dict()
+
+    def test_function_instance_id_from_server(self) -> None:
+        assert _function(function_instance_id='instance-id').function_instance_id == 'instance-id'
+
+    # The binding reads lcb_timeout in whole seconds, as it does execution_timeout.
+    def test_settings_send_lcb_timeout(self) -> None:
+        settings = EventingFunctionSettings(lcb_timeout=timedelta(seconds=5),
+                                            execution_timeout=timedelta(seconds=7))
+
+        assert settings.as_dict() == {'lcb_timeout': 5, 'execution_timeout': 7}
+
+    def test_settings_lcb_timeout_round_trip(self) -> None:
+        settings = EventingFunctionSettings(lcb_timeout=timedelta(seconds=5))
+
+        assert EventingFunctionSettings.from_server(settings.as_dict()).lcb_timeout == timedelta(seconds=5)
 
     # The four auth kinds, read three ways: out, in, and out and back.  Separate tests because
     # the table's first and third columns differ for two of the four, so one round-trip test

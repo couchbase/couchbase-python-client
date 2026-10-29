@@ -23,6 +23,8 @@ from couchbase.common._operations import Op
 from couchbase.common._streaming import RowIterator
 from couchbase.protocol.classic._cluster_types import StreamingTimeouts
 from couchbase.protocol.classic._collection_impl import CollectionImpl
+from couchbase.protocol.classic._management._eventing_function_mgmt_impl import EventingFunctionMgmtImpl
+from couchbase.protocol.classic._management._search_index_mgmt_impl import SearchIndexMgmtImpl
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._scope_req_builder import ScopeRequestBuilder
 from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
@@ -176,6 +178,18 @@ class ScopeImpl:
         obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
         req = self._request_builder.build_search_request(index, request, obs_handler, options, **kwargs)
         return self._search(req)
+
+    def eventing_function_mgmt(self) -> EventingFunctionMgmtImpl:
+        """**INTERNAL**"""
+        return EventingFunctionMgmtImpl(self._client_adapter,
+                                        self.observability_instruments,
+                                        scope_context=(self.bucket_name, self._scope_name))
+
+    def search_index_mgmt(self) -> SearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return SearchIndexMgmtImpl(self._client_adapter,
+                                   self.observability_instruments,
+                                   scope_context=(self.bucket_name, self._scope_name))
 
     def _search(self, req: SearchQueryRequest) -> SearchResult:
         self._client_adapter._ensure_not_closed()

@@ -30,10 +30,9 @@ each forwarding `*options` and `**kwargs`, because the suites drive both the opt
 and the keyword form.
 
 **`get_function_status` is the tenth method and is not a mirror.**  Every wait loop needs
-the state of one named function, and the SDK offers that only as `_get_status`, a private
-name.  This is a five-line wrapper over the public `functions_status()`: fetch every status,
-return the one whose name matches, return None if there is none.  It is the same answer, and
-no suite reaches a private attribute to get it.
+the state of one named function, and the SDK has no call for that.  This is a five-line
+wrapper over the public `functions_status()`: fetch every status, return the one whose name
+matches, return None if there is none.
 
 **The scope managers can be re-pointed, and the cluster managers cannot need to be.**  A
 cluster-level manager hangs off the cluster, which exists before any suite runs.  A

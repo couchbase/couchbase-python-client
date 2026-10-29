@@ -15,20 +15,54 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    List)
+__all__ = [
+    'EventingFunction',
+    'EventingFunctionBucketAccess',
+    'EventingFunctionBucketBinding',
+    'EventingFunctionConstantBinding',
+    'EventingFunctionDcpBoundary',
+    'EventingFunctionDeploymentStatus',
+    'EventingFunctionKeyspace',
+    'EventingFunctionLanguageCompatibility',
+    'EventingFunctionLogLevel',
+    'EventingFunctionManager',
+    'EventingFunctionProcessingStatus',
+    'EventingFunctionSettings',
+    'EventingFunctionState',
+    'EventingFunctionStatus',
+    'EventingFunctionUrlAuthBasic',
+    'EventingFunctionUrlAuthBearer',
+    'EventingFunctionUrlAuthDigest',
+    'EventingFunctionUrlBinding',
+    'EventingFunctionUrlNoAuth',
+    'EventingFunctionsStatus',
+    'ScopeEventingFunctionManager',
+]
 
-from acouchbase.protocol.classic._management._eventing_function_mgmt_impl import AsyncEventingFunctionMgmtImpl
+from typing import TYPE_CHECKING, Any
+
 from couchbase.common.management.eventing import (EventingFunction,
+                                                  EventingFunctionBucketAccess,
+                                                  EventingFunctionBucketBinding,
+                                                  EventingFunctionConstantBinding,
+                                                  EventingFunctionDcpBoundary,
+                                                  EventingFunctionDeploymentStatus,
+                                                  EventingFunctionKeyspace,
+                                                  EventingFunctionLanguageCompatibility,
+                                                  EventingFunctionLogLevel,
+                                                  EventingFunctionProcessingStatus,
+                                                  EventingFunctionSettings,
                                                   EventingFunctionsStatus,
-                                                  EventingFunctionStatus)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import EventingFunctionMgmtOperationType
+                                                  EventingFunctionState,
+                                                  EventingFunctionStatus,
+                                                  EventingFunctionUrlAuthBasic,
+                                                  EventingFunctionUrlAuthBearer,
+                                                  EventingFunctionUrlAuthDigest,
+                                                  EventingFunctionUrlBinding,
+                                                  EventingFunctionUrlNoAuth)
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.common._interfaces._eventing_function_mgmt import AsyncEventingFunctionMgmtInterface
     from couchbase.management.options import (DeployFunctionOptions,
                                               DropFunctionOptions,
                                               FunctionsStatusOptions,
@@ -41,256 +75,345 @@ if TYPE_CHECKING:
 
 
 class EventingFunctionManager:
+    """Performs management operations on eventing functions.
 
-    def __init__(self, client_adapter: AsyncClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
-        self._impl = AsyncEventingFunctionMgmtImpl(client_adapter, observability_instruments)
-        self._scope_context = None
+    For managing the eventing functions of a scope, :class:`.ScopeEventingFunctionManager` should be used.
+    """
+
+    def __init__(self, impl: AsyncEventingFunctionMgmtInterface) -> None:
+        self._impl = impl
 
     async def upsert_function(self,
-                              function,  # type: EventingFunction
-                              *options,  # type: UpsertFunctionOptions
-                              **kwargs  # type: Any
-                              ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingUpsertFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_upsert_function_request(function,
-                                                                           self._scope_context,
-                                                                           obs_handler,
-                                                                           *options,
-                                                                           **kwargs)
-            await self._impl.upsert_function(req, obs_handler)
+                              function: EventingFunction,
+                              options: UpsertFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        """Creates an eventing function, or replaces one of the same name.
+
+        Args:
+            function (:class:`.EventingFunction`): The function to create or replace.
+            options (:class:`~couchbase.management.options.UpsertFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the function is not an
+                :class:`.EventingFunction`, has no name or no code, or carries a value the SDK cannot send.
+            :class:`~couchbase.exceptions.EventingFunctionCompilationFailureException`: If the function's code does not
+                compile.
+            :class:`~couchbase.exceptions.EventingFunctionCollectionNotFoundException`: If a keyspace the function names
+                does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionIdenticalKeyspaceException`: If the source and metadata
+                keyspaces are the same.
+        """
+        await self._impl.upsert_function(function, options, **kwargs)
 
     async def drop_function(self,
-                            name,  # type: str
-                            *options,  # type: DropFunctionOptions
-                            **kwargs  # type: Any
-                            ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingDropFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_drop_function_request(
-                name, self._scope_context, obs_handler, *options, **kwargs)
-            await self._impl.drop_function(req, obs_handler)
+                            name: str,
+                            options: DropFunctionOptions | None = None,
+                            **kwargs: Any) -> None:
+        """Drops an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.DropFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotUnDeployedException`: If the function is deployed.
+        """
+        await self._impl.drop_function(name, options, **kwargs)
 
     async def deploy_function(self,
-                              name,  # type: str
-                              *options,  # type: DeployFunctionOptions
-                              **kwargs  # type: Any
-                              ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingDeployFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_deploy_function_request(
-                name, self._scope_context, obs_handler, *options, **kwargs)
-            await self._impl.deploy_function(req, obs_handler)
+                              name: str,
+                              options: DeployFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        """Deploys an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.DeployFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionAlreadyDeployedException`: If the function is already
+                deployed.
+        """
+        await self._impl.deploy_function(name, options, **kwargs)
 
     async def get_all_functions(self,
-                                *options,  # type: GetAllFunctionOptions
-                                **kwargs  # type: Any
-                                ) -> List[EventingFunction]:
-        op_type = EventingFunctionMgmtOperationType.EventingGetAllFunctions
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_all_functions_request(
-                self._scope_context, obs_handler, *options, **kwargs)
-            return await self._impl.get_all_functions(req, obs_handler)
+                                options: GetAllFunctionOptions | None = None,
+                                **kwargs: Any) -> list[EventingFunction]:
+        """Returns every eventing function.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Awaitable[list[:class:`.EventingFunction`]]: The functions.
+        """
+        return await self._impl.get_all_functions(options, **kwargs)
 
     async def get_function(self,
-                           name,  # type: str
-                           *options,  # type: GetFunctionOptions
-                           **kwargs  # type: Any
-                           ) -> EventingFunction:
-        op_type = EventingFunctionMgmtOperationType.EventingGetFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_function_request(
-                name, self._scope_context, obs_handler, *options, **kwargs)
-            return await self._impl.get_function(req, obs_handler)
+                           name: str,
+                           options: GetFunctionOptions | None = None,
+                           **kwargs: Any) -> EventingFunction:
+        """Returns an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.GetFunctionOptions`): Optional parameters for this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Awaitable[:class:`.EventingFunction`]: The function.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+        """
+        return await self._impl.get_function(name, options, **kwargs)
 
     async def pause_function(self,
-                             name,  # type: str
-                             *options,  # type: PauseFunctionOptions
-                             **kwargs  # type: Any
-                             ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingPauseFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_pause_function_request(
-                name, self._scope_context, obs_handler, *options, **kwargs)
-            await self._impl.pause_function(req, obs_handler)
+                             name: str,
+                             options: PauseFunctionOptions | None = None,
+                             **kwargs: Any) -> None:
+        """Pauses a deployed eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.PauseFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotDeployedException`: If the function is not deployed.
+        """
+        await self._impl.pause_function(name, options, **kwargs)
 
     async def resume_function(self,
-                              name,  # type: str
-                              *options,  # type: ResumeFunctionOptions
-                              **kwargs  # type: Any
-                              ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingResumeFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_resume_function_request(
-                name, self._scope_context, obs_handler, *options, **kwargs)
-            await self._impl.resume_function(req, obs_handler)
+                              name: str,
+                              options: ResumeFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        """Resumes a paused eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.ResumeFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotDeployedException`: If the function is not deployed.
+        """
+        await self._impl.resume_function(name, options, **kwargs)
 
     async def undeploy_function(self,
-                                name,  # type: str
-                                *options,  # type: UndeployFunctionOptions
-                                **kwargs  # type: Any
-                                ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingUndeployFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_undeploy_function_request(
-                name, self._scope_context, obs_handler, *options, **kwargs)
-            await self._impl.undeploy_function(req, obs_handler)
+                                name: str,
+                                options: UndeployFunctionOptions | None = None,
+                                **kwargs: Any) -> None:
+        """Undeploys an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.UndeployFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotDeployedException`: If the function is not deployed.
+        """
+        await self._impl.undeploy_function(name, options, **kwargs)
 
     async def functions_status(self,
-                               *options,  # type: FunctionsStatusOptions
-                               **kwargs  # type: Any
-                               ) -> EventingFunctionsStatus:
-        op_type = EventingFunctionMgmtOperationType.EventingGetStatus
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_functions_status_request(
-                self._scope_context, obs_handler, *options, **kwargs)
-            return await self._impl.get_functions_status(req, obs_handler)
+                               options: FunctionsStatusOptions | None = None,
+                               **kwargs: Any) -> EventingFunctionsStatus:
+        """Returns the status of every eventing function.
 
-    async def _get_status(self, name: str) -> EventingFunctionStatus:
-        statuses = await self.functions_status()
+        Args:
+            options (:class:`~couchbase.management.options.FunctionsStatusOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
-        if statuses.functions:
-            return next((f for f in statuses.functions if f.name == name), None)
-
-        return None
+        Returns:
+            Awaitable[:class:`.EventingFunctionsStatus`]: The status of each function.
+        """
+        return await self._impl.functions_status(options, **kwargs)
 
 
 class ScopeEventingFunctionManager:
+    """Performs management operations on the eventing functions of a scope."""
 
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 bucket_name: str,
-                 scope_name: str,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        self._impl = AsyncEventingFunctionMgmtImpl(client_adapter, observability_instruments)
-        self._scope_context = bucket_name, scope_name
+    def __init__(self, impl: AsyncEventingFunctionMgmtInterface) -> None:
+        self._impl = impl
 
     async def upsert_function(self,
-                              function,  # type: EventingFunction
-                              *options,  # type: UpsertFunctionOptions
-                              **kwargs  # type:  Any
-                              ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingUpsertFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_upsert_function_request(function,
-                                                                           self._scope_context,
-                                                                           obs_handler,
-                                                                           *options,
-                                                                           **kwargs)
-            await self._impl.upsert_function(req, obs_handler)
+                              function: EventingFunction,
+                              options: UpsertFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        """Creates an eventing function, or replaces one of the same name.
+
+        Args:
+            function (:class:`.EventingFunction`): The function to create or replace.
+            options (:class:`~couchbase.management.options.UpsertFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the function is not an
+                :class:`.EventingFunction`, has no name or no code, or carries a value the SDK cannot send.
+            :class:`~couchbase.exceptions.EventingFunctionCompilationFailureException`: If the function's code does not
+                compile.
+            :class:`~couchbase.exceptions.EventingFunctionCollectionNotFoundException`: If a keyspace the function names
+                does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionIdenticalKeyspaceException`: If the source and metadata
+                keyspaces are the same.
+        """
+        await self._impl.upsert_function(function, options, **kwargs)
 
     async def drop_function(self,
-                            name,  # type: str
-                            *options,  # type: DropFunctionOptions
-                            **kwargs  # type: Any
-                            ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingDropFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_drop_function_request(name,
-                                                                         self._scope_context,
-                                                                         obs_handler,
-                                                                         *options,
-                                                                         **kwargs)
-            await self._impl.drop_function(req, obs_handler)
+                            name: str,
+                            options: DropFunctionOptions | None = None,
+                            **kwargs: Any) -> None:
+        """Drops an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.DropFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotUnDeployedException`: If the function is deployed.
+        """
+        await self._impl.drop_function(name, options, **kwargs)
 
     async def deploy_function(self,
-                              name,  # type: str
-                              *options,  # type: DeployFunctionOptions
-                              **kwargs  # type: Any
-                              ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingDeployFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_deploy_function_request(name,
-                                                                           self._scope_context,
-                                                                           obs_handler,
-                                                                           *options,
-                                                                           **kwargs)
-            await self._impl.deploy_function(req, obs_handler)
+                              name: str,
+                              options: DeployFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        """Deploys an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.DeployFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionAlreadyDeployedException`: If the function is already
+                deployed.
+        """
+        await self._impl.deploy_function(name, options, **kwargs)
 
     async def get_all_functions(self,
-                                *options,  # type: GetAllFunctionOptions
-                                **kwargs  # type: Any
-                                ) -> List[EventingFunction]:
-        op_type = EventingFunctionMgmtOperationType.EventingGetAllFunctions
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_all_functions_request(self._scope_context,
-                                                                             obs_handler,
-                                                                             *options,
-                                                                             **kwargs)
-            return await self._impl.get_all_functions(req, obs_handler)
+                                options: GetAllFunctionOptions | None = None,
+                                **kwargs: Any) -> list[EventingFunction]:
+        """Returns every eventing function.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Awaitable[list[:class:`.EventingFunction`]]: The functions.
+        """
+        return await self._impl.get_all_functions(options, **kwargs)
 
     async def get_function(self,
-                           name,  # type: str
-                           *options,  # type: GetFunctionOptions
-                           **kwargs  # type: Any
-                           ) -> EventingFunction:
-        op_type = EventingFunctionMgmtOperationType.EventingGetFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_function_request(name,
-                                                                        self._scope_context,
-                                                                        obs_handler,
-                                                                        *options,
-                                                                        **kwargs)
-            return await self._impl.get_function(req, obs_handler)
+                           name: str,
+                           options: GetFunctionOptions | None = None,
+                           **kwargs: Any) -> EventingFunction:
+        """Returns an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.GetFunctionOptions`): Optional parameters for this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Awaitable[:class:`.EventingFunction`]: The function.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+        """
+        return await self._impl.get_function(name, options, **kwargs)
 
     async def pause_function(self,
-                             name,  # type: str
-                             *options,  # type: PauseFunctionOptions
-                             **kwargs  # type: Any
-                             ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingPauseFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_pause_function_request(name,
-                                                                          self._scope_context,
-                                                                          obs_handler,
-                                                                          *options,
-                                                                          **kwargs)
-            await self._impl.pause_function(req, obs_handler)
+                             name: str,
+                             options: PauseFunctionOptions | None = None,
+                             **kwargs: Any) -> None:
+        """Pauses a deployed eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.PauseFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotDeployedException`: If the function is not deployed.
+        """
+        await self._impl.pause_function(name, options, **kwargs)
 
     async def resume_function(self,
-                              name,  # type: str
-                              *options,  # type: ResumeFunctionOptions
-                              **kwargs  # type: Any
-                              ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingResumeFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_resume_function_request(name,
-                                                                           self._scope_context,
-                                                                           obs_handler,
-                                                                           *options,
-                                                                           **kwargs)
-            await self._impl.resume_function(req, obs_handler)
+                              name: str,
+                              options: ResumeFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        """Resumes a paused eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.ResumeFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotDeployedException`: If the function is not deployed.
+        """
+        await self._impl.resume_function(name, options, **kwargs)
 
     async def undeploy_function(self,
-                                name,  # type: str
-                                *options,  # type: UndeployFunctionOptions
-                                **kwargs  # type: Any
-                                ) -> None:
-        op_type = EventingFunctionMgmtOperationType.EventingUndeployFunction
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_undeploy_function_request(name,
-                                                                             self._scope_context,
-                                                                             obs_handler,
-                                                                             *options,
-                                                                             **kwargs)
-            await self._impl.undeploy_function(req, obs_handler)
+                                name: str,
+                                options: UndeployFunctionOptions | None = None,
+                                **kwargs: Any) -> None:
+        """Undeploys an eventing function.
+
+        Args:
+            name (str): The name of the eventing function.
+            options (:class:`~couchbase.management.options.UndeployFunctionOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
+            :class:`~couchbase.exceptions.EventingFunctionNotDeployedException`: If the function is not deployed.
+        """
+        await self._impl.undeploy_function(name, options, **kwargs)
 
     async def functions_status(self,
-                               *options,  # type: FunctionsStatusOptions
-                               **kwargs  # type: Any
-                               ) -> EventingFunctionsStatus:
-        op_type = EventingFunctionMgmtOperationType.EventingGetStatus
-        async with ObservableRequestHandler(op_type, self._impl.observability_instruments) as obs_handler:
-            req = self._impl.request_builder.build_get_functions_status_request(self._scope_context,
-                                                                                obs_handler,
-                                                                                *options,
-                                                                                **kwargs)
-            return await self._impl.get_functions_status(req, obs_handler)
+                               options: FunctionsStatusOptions | None = None,
+                               **kwargs: Any) -> EventingFunctionsStatus:
+        """Returns the status of every eventing function.
 
-    async def _get_status(self, name: str) -> EventingFunctionStatus:
-        statuses = await self.functions_status()
+        Args:
+            options (:class:`~couchbase.management.options.FunctionsStatusOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
-        if statuses.functions:
-            return next((f for f in statuses.functions if f.name == name), None)
-
-        return None
+        Returns:
+            Awaitable[:class:`.EventingFunctionsStatus`]: The status of each function.
+        """
+        return await self._impl.functions_status(options, **kwargs)

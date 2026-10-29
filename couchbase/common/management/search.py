@@ -15,23 +15,16 @@
 
 from __future__ import annotations
 
-import json
-from dataclasses import (dataclass,
-                         field,
-                         fields)
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    Optional,
-                    Union)
+__all__ = [
+    'SearchIndex',
+]
 
-from couchbase._utils import is_null_or_empty
-from couchbase.exceptions import (InvalidArgumentException,
-                                  QuotaLimitedException,
-                                  SearchIndexNotFoundException)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import SearchIndexMgmtOperationType
-from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
+import json
+from dataclasses import dataclass, field
+from typing import Any
+
+from couchbase.common._utils import is_null_or_empty
+from couchbase.common.exceptions import InvalidArgumentException
 
 
 @dataclass
@@ -55,19 +48,19 @@ class SearchIndex:
     name: str
     source_type: str = 'couchbase'
     idx_type: str = 'fulltext-index'
-    source_name: str = None
-    uuid: str = None
-    params: dict = field(default_factory=dict)
-    source_uuid: str = None
-    source_params: dict = field(default_factory=dict)
-    plan_params: dict = field(default_factory=dict)
+    source_name: str | None = None
+    uuid: str | None = None
+    params: dict[str, Any] = field(default_factory=dict)
+    source_uuid: str | None = None
+    source_params: dict[str, Any] = field(default_factory=dict)
+    plan_params: dict[str, Any] = field(default_factory=dict)
 
-    def is_valid(self):
+    def is_valid(self) -> bool:
         return not (is_null_or_empty(self.name)
                     or is_null_or_empty(self.idx_type)
                     or is_null_or_empty(self.source_type))
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, Any]:
         output = {
             'name': self.name,
             'type': self.idx_type,
@@ -88,7 +81,7 @@ class SearchIndex:
         return output
 
     @classmethod
-    def from_server(cls, json_data: Dict[str, Any]) -> SearchIndex:
+    def from_server(cls, json_data: dict[str, Any]) -> SearchIndex:
         params = {}
         params_json = json_data.get('params_json', None)
         if params_json:
@@ -104,9 +97,9 @@ class SearchIndex:
         if plan_params_json:
             plan_params = json.loads(plan_params_json)
 
-        return cls(json_data.get('name'),
-                   json_data.get('source_type'),
-                   json_data.get('type'),
+        return cls(json_data['name'],
+                   json_data['source_type'],
+                   json_data['type'],
                    json_data.get('source_name', None),
                    json_data.get('uuid', None),
                    params,
@@ -116,16 +109,17 @@ class SearchIndex:
                    )
 
     @classmethod
-    def from_json(cls, json_input: Union[str, Dict[str, Any]]) -> SearchIndex:
+    def from_json(cls, json_input: str | dict[str, Any]) -> SearchIndex:
         """ Creates a :class:`.SearchIndex` from a provided JSON str or Python dict derived from JSON.
 
         Args:
-            json_input (Union[str, Dict[str, Any]]): JSON representation of the search index.
+            json_input (str | dict[str, Any]): JSON representation of the search index.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided JSON is not str or dict.
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided JSON does not include an index name.
-        """  # noqa: E501
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided JSON does not include an index
+                name.
+        """
         json_data = json_input
         if isinstance(json_input, str):
             json_data = json.loads(json_input)
@@ -170,237 +164,3 @@ class SearchIndex:
                    source_uuid,
                    source_params,
                    plan_params)
-
-
-# we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['error_map']
-_OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
-
-
-@dataclass
-class SearchIndexMgmtRequest(MgmtRequest):
-
-    def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        cls = type(self)
-        cached_fields = _FIELDS_CACHE.get(cls)
-        if cached_fields is None:
-            cached_fields = [f for f in fields(cls) if f.name not in _OPARG_SKIP_SET]
-            _FIELDS_CACHE[cls] = cached_fields
-
-        mgmt_kwargs = {
-            f.name: getattr(self, f.name)
-            for f in cached_fields
-            if getattr(self, f.name) is not None
-        }
-
-        if callback is not None:
-            mgmt_kwargs['callback'] = callback
-
-        if errback is not None:
-            mgmt_kwargs['errback'] = errback
-
-        if obs_handler:
-            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
-            if obs_handler.is_legacy_tracer:
-                legacy_request_span = obs_handler.legacy_request_span
-                if legacy_request_span:
-                    mgmt_kwargs['parent_span'] = legacy_request_span
-            else:
-                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
-
-        return mgmt_kwargs
-
-
-@dataclass
-class AllowQueryingRequest(SearchIndexMgmtRequest):
-    index_name: str
-    allow: bool
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexControlQuery.value
-
-
-@dataclass
-class AnalyzeDocumentRequest(SearchIndexMgmtRequest):
-    index_name: str
-    encoded_document: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexAnalyzeDocument.value
-
-
-@dataclass
-class DisallowQueryingRequest(SearchIndexMgmtRequest):
-    index_name: str
-    allow: bool
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexControlQuery.value
-
-
-@dataclass
-class DropIndexRequest(SearchIndexMgmtRequest):
-    index_name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexDrop.value
-
-
-@dataclass
-class FreezePlanRequest(SearchIndexMgmtRequest):
-    index_name: str
-    freeze: bool
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze.value
-
-
-@dataclass
-class GetAllIndexesRequest(SearchIndexMgmtRequest):
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexGetAll.value
-
-
-@dataclass
-class GetAllIndexStatsRequest(SearchIndexMgmtRequest):
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchGetStats.value
-
-
-@dataclass
-class GetIndexedDocumentsCountRequest(SearchIndexMgmtRequest):
-    index_name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexGetDocumentsCount.value
-
-
-@dataclass
-class GetIndexRequest(SearchIndexMgmtRequest):
-    index_name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexGet.value
-
-
-@dataclass
-class GetIndexStatsRequest(SearchIndexMgmtRequest):
-    index_name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexGetStats.value
-
-
-@dataclass
-class PauseIngestRequest(SearchIndexMgmtRequest):
-    index_name: str
-    pause: bool
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexControlIngest.value
-
-
-@dataclass
-class ResumeIngestRequest(SearchIndexMgmtRequest):
-    index_name: str
-    pause: bool
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexControlIngest.value
-
-
-@dataclass
-class UnfreezePlanRequest(SearchIndexMgmtRequest):
-    index_name: str
-    freeze: bool
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexControlPlanFreeze.value
-
-
-@dataclass
-class UpsertIndexRequest(SearchIndexMgmtRequest):
-    index: Dict[str, Any]
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    client_context_id: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return SearchIndexMgmtOperationType.SearchIndexUpsert.value
-
-
-SEARCH_INDEX_MGMT_ERROR_MAP: Dict[str, Exception] = {
-    r'.*[iI]ndex not found.*': SearchIndexNotFoundException,
-    r'.*[Cc]reate[Ii]ndex, [Pp]repare failed, err: [Ee]xceeds indexes limit': QuotaLimitedException
-}

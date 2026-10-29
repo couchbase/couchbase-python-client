@@ -199,13 +199,11 @@ class Scope:
         indexes of this scope.
 
         Returns:
-            :class:`~txcouchbase.management.search.ScopeSearchIndexManager`: A :class:`~txcouchbase.management.search.ScopeSearchIndexManager` instance.
+            :class:`~txcouchbase.management.search.ScopeSearchIndexManager`: A
+            :class:`~txcouchbase.management.search.ScopeSearchIndexManager` instance.
 
-        """  # noqa: E501
-        return ScopeSearchIndexManager(self._impl._client_adapter,
-                                       self.bucket_name,
-                                       self.name,
-                                       self._impl.observability_instruments)
+        """
+        return ScopeSearchIndexManager(self._impl.search_index_mgmt())
 
     @staticmethod
     def default_name() -> str:

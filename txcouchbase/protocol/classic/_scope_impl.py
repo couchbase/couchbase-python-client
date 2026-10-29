@@ -30,6 +30,7 @@ from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 from txcouchbase.protocol.classic._collection_impl import TxCollectionImpl
+from txcouchbase.protocol.classic._management._search_index_mgmt_impl import TxSearchIndexMgmtImpl
 from txcouchbase.protocol.classic._streaming import submit_rows
 
 if TYPE_CHECKING:
@@ -51,6 +52,12 @@ class TxScopeImpl(AsyncScopeImpl):
     def collection(self, name: str) -> TxCollectionImpl:
         """**INTERNAL**"""
         return TxCollectionImpl(name, self)
+
+    def search_index_mgmt(self) -> TxSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return TxSearchIndexMgmtImpl(self._client_adapter,
+                                     self.observability_instruments,
+                                     scope_context=(self.bucket_name, self._scope_name))
 
     def analytics_query_deferred(self,
                                  statement: str,

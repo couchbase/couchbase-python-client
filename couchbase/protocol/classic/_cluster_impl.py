@@ -41,7 +41,9 @@ from couchbase.protocol.classic._cluster_types import (CreateConnectionRequest,
                                                        timeout_ms)
 from couchbase.protocol.classic._management._analytics_mgmt_impl import AnalyticsMgmtImpl
 from couchbase.protocol.classic._management._bucket_mgmt_impl import BucketMgmtImpl
+from couchbase.protocol.classic._management._eventing_function_mgmt_impl import EventingFunctionMgmtImpl
 from couchbase.protocol.classic._management._query_index_mgmt_impl import QueryIndexMgmtImpl
+from couchbase.protocol.classic._management._search_index_mgmt_impl import SearchIndexMgmtImpl
 from couchbase.protocol.classic._management._user_mgmt_impl import UserMgmtImpl
 from couchbase.protocol.classic._pycbc_core import pycbc_connection, pycbc_hdr_histogram
 from couchbase.protocol.classic._result import (_cluster_info_from_core,
@@ -253,6 +255,14 @@ class ClusterImpl:
     def user_mgmt(self) -> UserMgmtImpl:
         """**INTERNAL**"""
         return UserMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def search_index_mgmt(self) -> SearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return SearchIndexMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def eventing_function_mgmt(self) -> EventingFunctionMgmtImpl:
+        """**INTERNAL**"""
+        return EventingFunctionMgmtImpl(self._client_adapter, self.observability_instruments)
 
     def close_connection(self) -> None:
         """**INTERNAL**"""

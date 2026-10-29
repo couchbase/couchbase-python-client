@@ -15,29 +15,38 @@
 
 from __future__ import annotations
 
+__all__ = [
+    'EventingFunction',
+    'EventingFunctionBucketAccess',
+    'EventingFunctionBucketBinding',
+    'EventingFunctionConstantBinding',
+    'EventingFunctionDcpBoundary',
+    'EventingFunctionDeploymentStatus',
+    'EventingFunctionKeyspace',
+    'EventingFunctionLanguageCompatibility',
+    'EventingFunctionLogLevel',
+    'EventingFunctionProcessingStatus',
+    'EventingFunctionSettings',
+    'EventingFunctionState',
+    'EventingFunctionStatus',
+    'EventingFunctionUrlAuth',
+    'EventingFunctionUrlAuthBasic',
+    'EventingFunctionUrlAuthBearer',
+    'EventingFunctionUrlAuthDigest',
+    'EventingFunctionUrlBinding',
+    'EventingFunctionUrlNoAuth',
+    'EventingFunctionsStatus',
+]
+
 from dataclasses import dataclass, fields
 from datetime import timedelta
 from enum import Enum
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    List,
-                    Optional)
+from typing import Any
 
-from couchbase._utils import is_null_or_empty, timedelta_as_milliseconds
+from couchbase.common._transforms import timedelta_as_milliseconds
+from couchbase.common._utils import is_null_or_empty
+from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.n1ql import QueryScanConsistency
-from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
-                                  EventingFunctionCollectionNotFoundException,
-                                  EventingFunctionCompilationFailureException,
-                                  EventingFunctionIdenticalKeyspaceException,
-                                  EventingFunctionNotBootstrappedException,
-                                  EventingFunctionNotDeployedException,
-                                  EventingFunctionNotFoundException,
-                                  EventingFunctionNotUnDeployedException,
-                                  InvalidArgumentException)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import EventingFunctionMgmtOperationType
-from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
 
 
 class EventingFunctionBucketAccess(Enum):
@@ -49,16 +58,20 @@ class EventingFunctionBucketAccess(Enum):
         The eventing function has read-only bucket access
     ReadWrite (default)
         The eventing function has read and write bucket access.
+    Unknown
+        Couchbase Server returned an access the SDK does not recognize.
     """
 
     ReadOnly = "r"
     ReadWrite = "rw"
+    Unknown = "unknown"
 
     def to_str(self) -> str:
-        if self.value == 'r':
+        if self is EventingFunctionBucketAccess.ReadOnly:
             return 'read_only'
-        elif self.value == 'rw':
-            return 'read_write'
+        if self is EventingFunctionBucketAccess.Unknown:
+            return 'unknown'
+        return 'read_write'
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionBucketAccess:
@@ -67,7 +80,7 @@ class EventingFunctionBucketAccess(Enum):
         elif value in ['rw', 'read_write']:
             return cls.ReadWrite
         else:
-            raise InvalidArgumentException(f"Invalid value for bucket access: {value}")
+            return cls.Unknown
 
 
 class EventingFunctionDcpBoundary(Enum):
@@ -79,10 +92,13 @@ class EventingFunctionDcpBoundary(Enum):
         Start DCP stream from the beginning.
     FromNow
         Start DCP stream from present point.
+    Unknown
+        Couchbase Server returned a boundary the SDK does not recognize.
     """
 
     Everything = "everything"
     FromNow = "from_now"
+    Unknown = "unknown"
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionDcpBoundary:
@@ -91,7 +107,7 @@ class EventingFunctionDcpBoundary(Enum):
         elif value == "from_now":
             return cls.FromNow
         else:
-            raise InvalidArgumentException(f"Invalid value for DCP boundary: {value}")
+            return cls.Unknown
 
 
 class EventingFunctionDeploymentStatus(Enum):
@@ -103,12 +119,17 @@ class EventingFunctionDeploymentStatus(Enum):
         Indicates the function is not deployed.
     Deployed
         Indicates the function is deployed.
+    Unknown
+        Couchbase Server returned a status the SDK does not recognize.
     """
 
     Undeployed = False
     Deployed = True
+    Unknown = "unknown"
 
-    def to_str(self) -> to_str:
+    def to_str(self) -> str:
+        if self is EventingFunctionDeploymentStatus.Unknown:
+            return 'unknown'
         if self.value:
             return 'deployed'
 
@@ -121,7 +142,7 @@ class EventingFunctionDeploymentStatus(Enum):
         elif value == 'deployed':
             return cls.Deployed
         else:
-            raise InvalidArgumentException(f"Invalid value for deployment status: {value}")
+            return cls.Unknown
 
 
 class EventingFunctionProcessingStatus(Enum):
@@ -133,12 +154,17 @@ class EventingFunctionProcessingStatus(Enum):
         Indicates the eventing function is not running.
     Running
         Indicates the eventing function is running.
+    Unknown
+        Couchbase Server returned a status the SDK does not recognize.
     """
 
     Paused = False
     Running = True
+    Unknown = "unknown"
 
     def to_str(self) -> str:
+        if self is EventingFunctionProcessingStatus.Unknown:
+            return 'unknown'
         if self.value:
             return 'running'
 
@@ -151,7 +177,7 @@ class EventingFunctionProcessingStatus(Enum):
         elif value == 'running':
             return cls.Running
         else:
-            raise InvalidArgumentException(f"Invalid value for processing status: {value}")
+            return cls.Unknown
 
 
 class EventingFunctionLogLevel(Enum):
@@ -164,6 +190,8 @@ class EventingFunctionLogLevel(Enum):
     Warning
     Debug
     Trace
+    Unknown
+        Couchbase Server returned a level the SDK does not recognize.
     """
 
     Info = "INFO"
@@ -171,9 +199,12 @@ class EventingFunctionLogLevel(Enum):
     Warning = "WARNING"
     Debug = "DEBUG"
     Trace = "TRACE"
+    Unknown = "UNKNOWN"
 
     @classmethod
-    def from_server(cls, value) -> EventingFunctionLogLevel:
+    def from_server(cls, value: str) -> EventingFunctionLogLevel:
+        if not isinstance(value, str):
+            return cls.Unknown
         if value.upper() == "INFO":
             return cls.Info
         elif value.upper() == "ERROR":
@@ -185,7 +216,7 @@ class EventingFunctionLogLevel(Enum):
         elif value.upper() == "TRACE":
             return cls.Trace
         else:
-            raise InvalidArgumentException(f"Invalid value for log level: {value}")
+            return cls.Unknown
 
 
 class EventingFunctionLanguageCompatibility(Enum):
@@ -197,22 +228,20 @@ class EventingFunctionLanguageCompatibility(Enum):
     Version_6_5_0
     Version_6_6_2
     Version_7_2_0
+    Unknown
+        Couchbase Server returned a version the SDK does not recognize.
     """
 
     Version_6_0_0 = "6.0.0"
     Version_6_5_0 = "6.5.0"
     Version_6_6_2 = "6.6.2"
     Version_7_2_0 = "7.2.0"
+    Unknown = "unknown"
 
     def to_str(self) -> str:
-        if self.value == '6.0.0':
-            return 'version_6_0_0'
-        if self.value == '6.5.0':
-            return 'version_6_5_0'
-        if self.value == '6.6.2':
-            return 'version_6_6_2'
-        if self.value == '7.2.0':
-            return 'version_7_2_0'
+        if self is EventingFunctionLanguageCompatibility.Unknown:
+            return 'unknown'
+        return f"version_{self.value.replace('.', '_')}"
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionLanguageCompatibility:
@@ -225,7 +254,7 @@ class EventingFunctionLanguageCompatibility(Enum):
         elif value == "version_7_2_0":
             return cls.Version_7_2_0
         else:
-            raise InvalidArgumentException(f"Invalid value for language compatibility: {value}")
+            return cls.Unknown
 
 
 class EventingFunctionState(Enum):
@@ -288,19 +317,17 @@ class EventingFunctionKeyspace:
     components: bucket (required), scope (optional) and
     collection (optional)
 
-    :param bucket: bucket name
-    :type bucket: str
-    :param scope: scope name
-    :type scope: str, optional
-    :param collection: collection name
-    :type collection: str, optional
+    Args:
+        bucket (str): bucket name
+        scope (str, optional): scope name
+        collection (str, optional): collection name
     """
-    bucket: str = None
-    scope: str = None
-    collection: str = None
+    bucket: str | None = None
+    scope: str | None = None
+    collection: str | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
-        output = {
+    def as_dict(self) -> dict[str, Any]:
+        output: dict[str, Any] = {
             'bucket': self.bucket,
         }
         if self.scope:
@@ -314,20 +341,18 @@ class EventingFunctionKeyspace:
     @classmethod
     def from_server(cls,
                     bucket: str,
-                    scope: Optional[str] = None,
-                    collection: Optional[str] = None) -> EventingFunctionKeyspace:
+                    scope: str | None = None,
+                    collection: str | None = None) -> EventingFunctionKeyspace:
         """Returns a new `EventingFunctionKeyspace` object based
         on the JSON response received from Couchbase Server
 
-        :param bucket: bucket name
-        :type bucket: str
-        :param scope: scope name
-        :type scope: str, optional
-        :param collection: collection name
-        :type collection: str, optional
+        Args:
+            bucket (str): bucket name
+            scope (str, optional): scope name
+            collection (str, optional): collection name
 
-        :return: new `EventingFunctionKeyspace` object
-        :rtype: `EventingFunctionKeyspace`
+        Returns:
+            EventingFunctionKeyspace: new `EventingFunctionKeyspace` object
         """
         keyspace = cls(bucket)
         if not is_null_or_empty(scope) and scope != "_default":
@@ -343,38 +368,38 @@ class EventingFunctionKeyspace:
 class EventingFunctionBucketBinding:
     """Object representation for an eventing function bucket binding
 
-    :param alias: binding's alias
-    :type alias: str
-    :param name: binding's keyspace which consists of the bucket name, scope (optional) and collection (optional)
-    :type name: class:`couchbase.management.EventingFunctionKeyspace`
-    :param access: binding's bucket access
-    :type access: class:`EventingFunctionBucketAccess`
+    Args:
+        alias (str): binding's alias
+        name (EventingFunctionKeyspace): binding's keyspace which consists of the bucket name, scope (optional) and
+            collection (optional)
+        access (EventingFunctionBucketAccess): binding's bucket access
     """
 
-    alias: str = None
-    name: EventingFunctionKeyspace = None
-    access: EventingFunctionBucketAccess = None
+    alias: str | None = None
+    name: EventingFunctionKeyspace | None = None
+    access: EventingFunctionBucketAccess | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Returns a representation of the `EventingFunctionBucketBinding` that
         aligns with what Couchbase Server eventing spec.
 
-        :return: dict representation of the `EventingFunctionBucketBinding`
-        :rtype: Dict[str, Any]
+        Returns:
+            dict[str, Any]: dict representation of the `EventingFunctionBucketBinding`
         """
-        output = {'alias': self.alias,
-                  'access': self.access.to_str(),
-                  'name': self.name.as_dict()
-                  }
+        if self.name is None:
+            raise InvalidArgumentException('An EventingFunctionBucketBinding must have a name.')
+        output: dict[str, Any] = {'alias': self.alias, 'name': self.name.as_dict()}
+        if self.access is not None:
+            output['access'] = self.access.to_str()
 
         return output
 
     @classmethod
-    def from_server(cls, bucket_binding: Dict[str, Any]) -> EventingFunctionBucketBinding:
+    def from_server(cls, bucket_binding: dict[str, Any]) -> EventingFunctionBucketBinding:
         alias = bucket_binding.get('alias', None)
         name = bucket_binding.get('name', {})
         keyspace = EventingFunctionKeyspace.from_server(**name)
-        access = EventingFunctionBucketAccess.from_server(bucket_binding.get('access', None))
+        access = EventingFunctionBucketAccess.from_server(bucket_binding['access'])
         return cls(alias=alias, name=keyspace, access=access)
 
 
@@ -399,14 +424,13 @@ class EventingFunctionUrlAuthBasic(EventingFunctionUrlAuth):
     """Object representation for an eventing function URL binding
     basic authorization
 
-    :param username: auth username
-    :type username: str
-    :param password: auth password
-    :type password: str
+    Args:
+        username (str): auth username
+        password (str): auth password
     """
 
-    username: str = None
-    password: str = None
+    username: str | None = None
+    password: str | None = None
 
 
 @dataclass
@@ -414,14 +438,13 @@ class EventingFunctionUrlAuthDigest(EventingFunctionUrlAuth):
     """Object representation for an eventing function URL binding
     digest authorization
 
-    :param username: auth digest username
-    :type username: str
-    :param password: auth digest password
-    :type password: str
+    Args:
+        username (str): auth digest username
+        password (str): auth digest password
     """
 
-    username: str = None
-    password: str = None
+    username: str | None = None
+    password: str | None = None
 
 
 @dataclass
@@ -429,43 +452,39 @@ class EventingFunctionUrlAuthBearer(EventingFunctionUrlAuth):
     """Object representation for an eventing function URL binding
     bearer authorization
 
-    :param key: bearer key
-    :type key: str
+    Args:
+        key (str): bearer key
     """
 
-    key: str = None
+    key: str | None = None
 
 
 @dataclass
 class EventingFunctionUrlBinding:
     """Object representation for an eventing function URL binding
 
-    :param hostname: binding's hostname
-    :type hostname: str
-    :param alias: binding's alias
-    :type alias: str
-    :param allow_cookies: If the binding should allow cookies
-    :type allow_cookies: bool
-    :param validate_ssl_certificate: If the binding should validate SSL cert
-    :type validate_ssl_certificate: bool
-    :param auth: binding's authorization type
-    :type auth: class:`EventingFunctionUrlAuth`
+    Args:
+        hostname (str): binding's hostname
+        alias (str): binding's alias
+        allow_cookies (bool): If the binding should allow cookies
+        validate_ssl_certificate (bool): If the binding should validate SSL cert
+        auth (EventingFunctionUrlAuth): binding's authorization type
     """
 
-    hostname: str = None
-    alias: str = None
-    allow_cookies: bool = None
-    validate_ssl_certificate: bool = None
-    auth: EventingFunctionUrlAuth = None
+    hostname: str | None = None
+    alias: str | None = None
+    allow_cookies: bool | None = None
+    validate_ssl_certificate: bool | None = None
+    auth: EventingFunctionUrlAuth | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Returns a representation of the `EventingFunctionUrlBinding` that
         aligns with what Couchbase Server eventing spec.
 
-        :return: dict representation of the `EventingFunctionUrlBinding`
-        :rtype: Dict[str, Any]
+        Returns:
+            dict[str, Any]: dict representation of the `EventingFunctionUrlBinding`
         """
-        output = {
+        output: dict[str, Any] = {
             "hostname": self.hostname,
             "alias": self.alias,
             "allow_cookies": self.allow_cookies,
@@ -490,8 +509,8 @@ class EventingFunctionUrlBinding:
         return output
 
     @classmethod
-    def from_server(cls, url_binding: Dict[str, Any]) -> EventingFunctionUrlBinding:
-        input = {
+    def from_server(cls, url_binding: dict[str, Any]) -> EventingFunctionUrlBinding:
+        input: dict[str, Any] = {
             'alias': url_binding.get('alias', None),
             'hostname': url_binding.get('hostname', None),
             'allow_cookies': url_binding.get('allow_cookies', None),
@@ -517,27 +536,26 @@ class EventingFunctionUrlBinding:
 class EventingFunctionConstantBinding:
     """Object representation for an eventing function constant binding
 
-    :param alias: binding's alias
-    :type alias: str
-    :param literal: binding's value
-    :type literal: str
+    Args:
+        alias (str): binding's alias
+        literal (str): binding's value
     """
 
-    alias: str = None
-    literal: str = None
+    alias: str | None = None
+    literal: str | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Returns a representation of the `EventingFunctionConstantBinding` that
         aligns with what Couchbase Server eventing spec.
 
-        :return: dict representation of the `EventingFunctionConstantBinding`
-        :rtype: Dict[str, Any]
+        Returns:
+            dict[str, Any]: dict representation of the `EventingFunctionConstantBinding`
         """
 
         return {"alias": self.alias, "literal": self.literal}
 
     @classmethod
-    def from_server(cls, constant_binding: Dict[str, Any]) -> EventingFunctionConstantBinding:
+    def from_server(cls, constant_binding: dict[str, Any]) -> EventingFunctionConstantBinding:
         input = {
             'alias': constant_binding.get('alias', None),
             'literal': constant_binding.get('literal', None)
@@ -549,107 +567,83 @@ class EventingFunctionConstantBinding:
 class EventingFunctionSettings:
     """Object representation for an settings relevant to an eventing function
 
-    :param cpp_worker_thread_count: Number of threads each worker utilizes
-    :type cpp_worker_thread_count: int
-    :param description: Free form text for user to describe the eventing function
-    :type description: str
-    :param execution_timeout: Maximum time the eventing function can run before it is forcefully terminated (in seconds)
-    :type execution_timeout: timedelta
-    :param lcb_inst_capacity: Maximum number of libcouchbase connections that may be opened and pooled
-    :type lcb_inst_capacity: int
-    :param lcb_retry_count: Number of retries of retriable libcouchbase failures, 0 keeps trying till execution_timeout
-    :type lcb_retry_count: int
-    :param lcb_timeout: Maximum time the lcb command is waited until completion before we terminate the request
-        (in seconds)
-    :type lcb_timeout: timedelta
-    :param num_timer_partitions: Number of timer shards, defaults to number of vbuckets
-    :type num_timer_partitions: int
-    :param sock_batch_size: Batch size for messages from producer to consumer, normally not specified
-    :type sock_batch_size: int
-    :param tick_duration: Duration to log stats from this eventing function, in milliseconds
-    :type tick_duration: timedelta
-    :param timer_context_size: Size limit of timer context object
-    :type timer_context_size: int
-    :param user_prefix: Key prefix for all data stored in metadata by this eventing function
-    :type user_prefix: str
-    :param bucket_cache_size: Maximum size in bytes the bucket cache can grow to
-    :type bucket_cache_size: int
-    :param bucket_cache_age: Time in milliseconds after which a cached bucket object is considered stale
-    :type bucket_cache_age: timedelta
-    :param curl_max_allowed_resp_size: maximum allowable curl call response in MegaBytes
-    :type curl_max_allowed_resp_size: int
-    :param worker_count: Number of worker processes eventing function utilizes on each eventing node
-    :type worker_count: int
-    :param query_prepare_all: Automatically prepare all N1QL statements in the eventing function
-    :type query_prepare_all: bool
-    :param enable_applog_rotation: Enable rotating this eventing function's log() message files
-    :type enable_applog_rotation: bool
-    :param app_log_dir: Directory to write content of log() message files
-    :type app_log_dir: str
-    :param app_log_max_size: Rotate logs when file grows to this size in bytes approximately
-    :type app_log_max_size: int
-    :param app_log_max_files: Number of log() message files to retain when rotating
-    :type app_log_max_files: int
-    :param checkpoint_interval: Number of seconds before writing a progress checkpoint
-    :type checkpoint_interval: timedelta
-    :param dcp_stream_boundary: indicates where to start dcp stream from (beginning of time or present point)
-    :type dcp_stream_boundary: `EventingFunctionDcpBoundary`
-    :param deployment_status: Indicates if the function is deployed
-    :type deployment_status: `EventingFunctionDeploymentStatus`
-    :param processing_status: Indicates if the function is running
-    :type processing_status: `EventingFunctionProcessingStatus`
-    :param language_compatibility: Eventing language version this eventing function assumes in terms of syntax
-        and behavior
-    :type language_compatibility: `EventingFunctionLanguageCompatibility`
-    :param log_level: Level of detail in system logging
-    :type log_level: `EventingFunctionLogLevel`
-    :param query_consistency: Consistency level used by n1ql statements in the eventing function
-    :type query_consistency: `couchbase.cluster.QueryScanConsistency`
-    :param handler_headers: Code to automatically prepend to top of eventing function code
-    :type handler_headers: List[str]
-    :param handler_footers: Code to automatically prepend to top of eventing function code
-    :type handler_footers: List[str]
+    Args:
+        cpp_worker_thread_count (int): Number of threads each worker utilizes
+        description (str): Free form text for user to describe the eventing function
+        execution_timeout (timedelta): Maximum time the eventing function can run before it is forcefully terminated (in
+            seconds)
+        lcb_inst_capacity (int): Maximum number of libcouchbase connections that may be opened and pooled
+        lcb_retry_count (int): Number of retries of retriable libcouchbase failures, 0 keeps trying till
+            execution_timeout
+        lcb_timeout (timedelta): Maximum time the lcb command is waited until completion before we terminate the request
+            (in seconds)
+        num_timer_partitions (int): Number of timer shards, defaults to number of vbuckets
+        sock_batch_size (int): Batch size for messages from producer to consumer, normally not specified
+        tick_duration (timedelta): Duration to log stats from this eventing function, in milliseconds
+        timer_context_size (int): Size limit of timer context object
+        user_prefix (str): Key prefix for all data stored in metadata by this eventing function
+        bucket_cache_size (int): Maximum size in bytes the bucket cache can grow to
+        bucket_cache_age (timedelta): Time in milliseconds after which a cached bucket object is considered stale
+        curl_max_allowed_resp_size (int): maximum allowable curl call response in MegaBytes
+        worker_count (int): Number of worker processes eventing function utilizes on each eventing node
+        query_prepare_all (bool): Automatically prepare all N1QL statements in the eventing function
+        enable_applog_rotation (bool): Enable rotating this eventing function's log() message files
+        app_log_dir (str): Directory to write content of log() message files
+        app_log_max_size (int): Rotate logs when file grows to this size in bytes approximately
+        app_log_max_files (int): Number of log() message files to retain when rotating
+        checkpoint_interval (timedelta): Number of seconds before writing a progress checkpoint
+        dcp_stream_boundary (EventingFunctionDcpBoundary): indicates where to start dcp stream from (beginning of time
+            or present point)
+        deployment_status (EventingFunctionDeploymentStatus): Indicates if the function is deployed
+        processing_status (EventingFunctionProcessingStatus): Indicates if the function is running
+        language_compatibility (EventingFunctionLanguageCompatibility): Eventing language version this eventing function
+            assumes in terms of syntax and behavior
+        log_level (EventingFunctionLogLevel): Level of detail in system logging
+        query_consistency (QueryScanConsistency): Consistency level used by n1ql statements in the
+            eventing function
+        handler_headers (list[str]): Code to automatically prepend to top of eventing function code
+        handler_footers (list[str]): Code to automatically prepend to top of eventing function code
     """
 
-    cpp_worker_thread_count: int = None
-    description: str = None
-    execution_timeout: timedelta = None
-    lcb_inst_capacity: int = None
-    lcb_retry_count: int = None
-    lcb_timeout: timedelta = None
-    num_timer_partitions: int = None
-    sock_batch_size: int = None
-    tick_duration: timedelta = None
-    timer_context_size: int = None
-    user_prefix: str = None
-    bucket_cache_size: int = None
-    bucket_cache_age: timedelta = None
-    curl_max_allowed_resp_size: int = None
-    query_prepare_all: bool = None
-    worker_count: int = None
-    enable_applog_rotation: bool = None
-    app_log_dir: str = None
-    app_log_max_size: int = None
-    app_log_max_files: int = None
-    checkpoint_interval: timedelta = None
-    dcp_stream_boundary: EventingFunctionDcpBoundary = None
-    deployment_status: EventingFunctionDeploymentStatus = None
-    processing_status: EventingFunctionProcessingStatus = None
-    language_compatibility: EventingFunctionLanguageCompatibility = None
-    log_level: EventingFunctionLogLevel = None
-    query_consistency: QueryScanConsistency = None
-    handler_headers: List[str] = None
-    handler_footers: List[str] = None
+    cpp_worker_thread_count: int | None = None
+    description: str | None = None
+    execution_timeout: timedelta | None = None
+    lcb_inst_capacity: int | None = None
+    lcb_retry_count: int | None = None
+    lcb_timeout: timedelta | None = None
+    num_timer_partitions: int | None = None
+    sock_batch_size: int | None = None
+    tick_duration: timedelta | None = None
+    timer_context_size: int | None = None
+    user_prefix: str | None = None
+    bucket_cache_size: int | None = None
+    bucket_cache_age: timedelta | None = None
+    curl_max_allowed_resp_size: int | None = None
+    query_prepare_all: bool | None = None
+    worker_count: int | None = None
+    enable_applog_rotation: bool | None = None
+    app_log_dir: str | None = None
+    app_log_max_size: int | None = None
+    app_log_max_files: int | None = None
+    checkpoint_interval: timedelta | None = None
+    dcp_stream_boundary: EventingFunctionDcpBoundary | None = None
+    deployment_status: EventingFunctionDeploymentStatus | None = None
+    processing_status: EventingFunctionProcessingStatus | None = None
+    language_compatibility: EventingFunctionLanguageCompatibility | None = None
+    log_level: EventingFunctionLogLevel | None = None
+    query_consistency: QueryScanConsistency | None = None
+    handler_headers: list[str] | None = None
+    handler_footers: list[str] | None = None
 
-    def as_dict(self) -> Dict[str, Any]:  # noqa: C901
+    def as_dict(self) -> dict[str, Any]:  # noqa: C901
         """Returns a representation of the `EventingFunctionSettings` that
         aligns with what Couchbase Server eventing spec.
 
-        :return: dict representation of the `EventingFunctionSettings`
-        :rtype: Dict[str, Any]
+        Returns:
+            dict[str, Any]: dict representation of the `EventingFunctionSettings`
         """
 
-        output = {}
+        output: dict[str, Any] = {}
 
         if self.cpp_worker_thread_count:
             output['cpp_worker_count'] = self.cpp_worker_thread_count
@@ -684,6 +678,13 @@ class EventingFunctionSettings:
 
         if self.lcb_retry_count:
             output['lcb_retry_count'] = self.lcb_retry_count
+
+        if self.lcb_timeout:
+            if not isinstance(self.lcb_timeout, timedelta):
+                raise InvalidArgumentException(
+                    'EventingFunctionSettings lcb timeout should be a timedelta'
+                )
+            output['lcb_timeout'] = int(self.lcb_timeout.total_seconds())
 
         if self.query_consistency:
             if self.query_consistency.value in ['not_bounded', 'request_plus']:
@@ -749,14 +750,14 @@ class EventingFunctionSettings:
         return output
 
     @classmethod
-    def new_settings(cls, **kwargs: Dict[str, Any]) -> EventingFunctionSettings:
+    def new_settings(cls, **kwargs: Any) -> EventingFunctionSettings:
         """Returns a new `EventingFunctionSettings` object
 
-        :param kwargs: Keyword arguments to populate `EventingFunctionSettings` object
-        :type kwargs: dict
+        Args:
+            kwargs (dict): Keyword arguments to populate `EventingFunctionSettings` object
 
-        :return: new `EventingFunctionSettings` object
-        :rtype: `EventingFunctionSettings`
+        Returns:
+            EventingFunctionSettings: new `EventingFunctionSettings` object
         """
         if "dcp_stream_boundary" not in kwargs:
             kwargs["dcp_stream_boundary"] = None
@@ -781,8 +782,8 @@ class EventingFunctionSettings:
         return cls(**final_json)
 
     @classmethod
-    def from_server(cls, settings: Dict[str, Any]) -> EventingFunctionSettings:  # noqa: C901
-        input = {
+    def from_server(cls, settings: dict[str, Any]) -> EventingFunctionSettings:  # noqa: C901
+        input: dict[str, Any] = {
             'cpp_worker_thread_count': settings.get('cpp_worker_count', None),
             'description': settings.get('description', None),
             'lcb_inst_capacity': settings.get('lcb_inst_capacity', None),
@@ -857,54 +858,43 @@ class EventingFunctionSettings:
 class EventingFunction:
     """Object representation for settings relevant to an eventing function
 
-    :param name:
-    :type name: str
-    :param code:
-    :type code: str
-    :param version:
-    :type version: str
-    :param enforce_schema:
-    :type enforce_schema: bool
-    :param handler_uuid:
-    :type handler_uuid: int
-    :param function_instance_id:
-    :type function_instance_id: str
-    :param metadata_keyspace:
-    :type metadata_keyspace: `.generic.EventingFunctionKeyspace`
-    :param source_keyspace:
-    :type source_keyspace: `.generic.EventingFunctionKeyspace`
-    :param bucket_bindings:
-    :type bucket_bindings: List[`EventingFunctionBucketBinding`]
-    :param url_bindings:
-    :type url_bindings: List[`EventingFunctionUrlBinding`]
-    :param constant_bindings:
-    :type constant_bindings: List[`EventingFunctionConstantBinding`]
-    :param settings:
-    :type settings: `EventingFunctionSettings`
+    Args:
+        name (str):
+        code (str):
+        version (str):
+        enforce_schema (bool):
+        handler_uuid (int):
+        function_instance_id (str):
+        metadata_keyspace (EventingFunctionKeyspace):
+        source_keyspace (EventingFunctionKeyspace):
+        bucket_bindings (list[EventingFunctionBucketBinding]):
+        url_bindings (list[EventingFunctionUrlBinding]):
+        constant_bindings (list[EventingFunctionConstantBinding]):
+        settings (EventingFunctionSettings):
     """
 
-    name: str = None
-    code: str = None
-    version: str = None
-    enforce_schema: bool = None
-    handler_uuid: int = None
-    function_instance_id: str = None
-    metadata_keyspace: EventingFunctionKeyspace = None
-    source_keyspace: EventingFunctionKeyspace = None
-    bucket_bindings: List[EventingFunctionBucketBinding] = None
-    url_bindings: List[EventingFunctionUrlBinding] = None
-    constant_bindings: List[EventingFunctionConstantBinding] = None
-    settings: EventingFunctionSettings = None
+    name: str | None = None
+    code: str | None = None
+    version: str | None = None
+    enforce_schema: bool | None = None
+    handler_uuid: int | None = None
+    function_instance_id: str | None = None
+    metadata_keyspace: EventingFunctionKeyspace | None = None
+    source_keyspace: EventingFunctionKeyspace | None = None
+    bucket_bindings: list[EventingFunctionBucketBinding] | None = None
+    url_bindings: list[EventingFunctionUrlBinding] | None = None
+    constant_bindings: list[EventingFunctionConstantBinding] | None = None
+    settings: EventingFunctionSettings | None = None
 
-    def as_dict(self) -> Dict[str, Any]:  # noqa: C901
+    def as_dict(self) -> dict[str, Any]:  # noqa: C901
         """Returns a representation of the `EventingFunction` that
         aligns with what Couchbase Server eventing spec.
 
-        :return: dict representation of the `EventingFunction`
-        :rtype: Dict[str, Any]
+        Returns:
+            dict[str, Any]: dict representation of the `EventingFunction`
         """
 
-        output = {}
+        output: dict[str, Any] = {}
 
         if self.name:
             output['name'] = self.name
@@ -945,13 +935,14 @@ class EventingFunction:
         return output
 
     @classmethod
-    def from_server(cls, eventing_function: Dict[str, Any]) -> EventingFunction:
-        input = {
-            'name': eventing_function.get('name', None),
-            'code': eventing_function.get('code', None),
+    def from_server(cls, eventing_function: dict[str, Any]) -> EventingFunction:
+        input: dict[str, Any] = {
+            'name': eventing_function['name'],
+            'code': eventing_function['code'],
             'version': eventing_function.get('version', None),
             'enforce_schema': eventing_function.get('enforce_schema', None),
-            'handler_uuid': eventing_function.get('handler_uuid', None)
+            'handler_uuid': eventing_function.get('handler_uuid', None),
+            'function_instance_id': eventing_function.get('function_instance_id', None)
         }
 
         metadata_keyspace = eventing_function.get('metadata_keyspace', None)
@@ -988,36 +979,29 @@ class EventingFunctionStatus:
     Particularly useful when determining an interim state of an evening function (i.e,
     deploying, pausing, undeploying).
 
-    :param name: eventing function's name
-    :type name: str
-    :param num_bootstrapping_nodes: number of nodes for bootstrapping
-    :type num_bootstrapping_nodes: int
-    :param num_deployed_nodes: number of nodes eventing function is deployed on
-    :type num_deployed_nodes: int
-    :param state: composite status of eventing function
-    :type state: `EventingFunctionState`
-    :param deployment_status: Indicates if the function is deployed
-    :type deployment_status: `EventingFunctionDeploymentStatus`
-    :param processing_status: Indicates if the function is running
-    :type processing_status: `EventingFunctionProcessingStatus`
-    :param redeploy_required: Indicates if function needs to be redeployed
-    :type redeploy_required: bool
-    :param function_scope: Indicates the eventing function's scope
-    :type function_scope: Dict[str, Any]
+    Args:
+        name (str): eventing function's name
+        num_bootstrapping_nodes (int): number of nodes for bootstrapping
+        num_deployed_nodes (int): number of nodes eventing function is deployed on
+        state (EventingFunctionState): composite status of eventing function
+        deployment_status (EventingFunctionDeploymentStatus): Indicates if the function is deployed
+        processing_status (EventingFunctionProcessingStatus): Indicates if the function is running
+        redeploy_required (bool): Indicates if function needs to be redeployed
+        function_scope (dict[str, Any]): Indicates the eventing function's scope
     """
 
-    name: str = None
-    num_bootstrapping_nodes: int = None
-    num_deployed_nodes: int = None
-    state: EventingFunctionState = None
-    deployment_status: EventingFunctionDeploymentStatus = None
-    processing_status: EventingFunctionProcessingStatus = None
-    redeploy_required: bool = None
-    function_scope: Dict[str, Any] = None
+    name: str | None = None
+    num_bootstrapping_nodes: int | None = None
+    num_deployed_nodes: int | None = None
+    state: EventingFunctionState | None = None
+    deployment_status: EventingFunctionDeploymentStatus | None = None
+    processing_status: EventingFunctionProcessingStatus | None = None
+    redeploy_required: bool | None = None
+    function_scope: dict[str, Any] | None = None
 
     @classmethod
-    def from_server(cls, function_status: Dict[str, Any]) -> EventingFunctionStatus:
-        input = {
+    def from_server(cls, function_status: dict[str, Any]) -> EventingFunctionStatus:
+        input: dict[str, Any] = {
             'name': function_status.get('name', None),
             'num_bootstrapping_nodes': function_status.get('num_bootstrapping_nodes', None),
             'num_deployed_nodes': function_status.get('num_deployed_nodes', None),
@@ -1044,27 +1028,26 @@ class EventingFunctionStatus:
 class EventingFunctionsStatus:
     """Object representation for statuses for all eventing functions
 
-    :param num_eventing_nodes:
-    :type num_eventing_nodes: int
-    :param functions:
-    :type functions: List[`EventingFunctionStatus`]
+    Args:
+        num_eventing_nodes (int):
+        functions (list[EventingFunctionStatus]):
     """
 
-    num_eventing_nodes: int = None
-    functions: List[EventingFunctionStatus] = None
+    num_eventing_nodes: int | None = None
+    functions: list[EventingFunctionStatus] | None = None
 
     @classmethod
-    def from_server(cls, function_status: Dict[str, Any]) -> EventingFunctionsStatus:
+    def from_server(cls, function_status: dict[str, Any]) -> EventingFunctionsStatus:
         """Returns a new `EventingFunctionsStatus` object based
-        on the Dict[str, Any] response received from Couchbase Server
+        on the dict[str, Any] response received from Couchbase Server
 
-        :param function_status: Dict[str, Any]
-        :type function_status: dict
+        Args:
+            function_status (dict): dict[str, Any]
 
-        :return: new `EventingFunctionsStatus` object
-        :rtype: `EventingFunctionsStatus`
+        Returns:
+            EventingFunctionsStatus: new `EventingFunctionsStatus` object
         """
-        input = {
+        input: dict[str, Any] = {
             'num_eventing_nodes': function_status.get('num_eventing_nodes', None)
         }
         functions = function_status.get('functions', None)
@@ -1072,164 +1055,3 @@ class EventingFunctionsStatus:
             input['functions'] = [EventingFunctionStatus.from_server(f) for f in functions]
 
         return cls(**input)
-
-
-# we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['error_map']
-_OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
-
-
-@dataclass
-class EventingFunctionMgmtRequest(MgmtRequest):
-
-    def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        cls = type(self)
-        cached_fields = _FIELDS_CACHE.get(cls)
-        if cached_fields is None:
-            cached_fields = [f for f in fields(cls) if f.name not in _OPARG_SKIP_SET]
-            _FIELDS_CACHE[cls] = cached_fields
-
-        mgmt_kwargs = {
-            f.name: getattr(self, f.name)
-            for f in cached_fields
-            if getattr(self, f.name) is not None
-        }
-
-        if callback is not None:
-            mgmt_kwargs['callback'] = callback
-
-        if errback is not None:
-            mgmt_kwargs['errback'] = errback
-
-        if obs_handler:
-            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
-            if obs_handler.is_legacy_tracer:
-                legacy_request_span = obs_handler.legacy_request_span
-                if legacy_request_span:
-                    mgmt_kwargs['parent_span'] = legacy_request_span
-            else:
-                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
-
-        return mgmt_kwargs
-
-
-@dataclass
-class DeployFunctionRequest(EventingFunctionMgmtRequest):
-    name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingDeployFunction.value
-
-
-@dataclass
-class DropFunctionRequest(EventingFunctionMgmtRequest):
-    name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingDropFunction.value
-
-
-@dataclass
-class GetAllFunctionsRequest(EventingFunctionMgmtRequest):
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingGetAllFunctions.value
-
-
-@dataclass
-class GetFunctionRequest(EventingFunctionMgmtRequest):
-    name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingGetFunction.value
-
-
-@dataclass
-class GetFunctionsStatusRequest(EventingFunctionMgmtRequest):
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingGetStatus.value
-
-
-@dataclass
-class PauseFunctionRequest(EventingFunctionMgmtRequest):
-    name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingPauseFunction.value
-
-
-@dataclass
-class ResumeFunctionRequest(EventingFunctionMgmtRequest):
-    name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingResumeFunction.value
-
-
-@dataclass
-class UndeployFunctionRequest(EventingFunctionMgmtRequest):
-    name: str
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingUndeployFunction.value
-
-
-@dataclass
-class UpsertFunctionRequest(EventingFunctionMgmtRequest):
-    function: Dict[str, Any]
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return EventingFunctionMgmtOperationType.EventingUpsertFunction.value
-
-
-EVENTING_FUNCTION_MGMT_ERROR_MAP = {
-    r'.*ERR_APP_NOT_FOUND_TS': EventingFunctionNotFoundException,
-    r'.*ERR_HANDLER_COMPILATION': EventingFunctionCompilationFailureException,
-    r'.*ERR_APP_NOT_BOOTSTRAPPED': EventingFunctionNotBootstrappedException,
-    r'.*ERR_APP_NOT_DEPLOYED': EventingFunctionNotDeployedException,
-    r'.*ERR_APP_NOT_UNDEPLOYED': EventingFunctionNotUnDeployedException,
-    r'.*ERR_COLLECTION_MISSING': EventingFunctionCollectionNotFoundException,
-    r'.*ERR_APP_ALREADY_DEPLOYED': EventingFunctionAlreadyDeployedException,
-    r'.*ERR_SRC_MB_SAME': EventingFunctionIdenticalKeyspaceException
-}

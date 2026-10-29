@@ -15,98 +15,145 @@
 
 from __future__ import annotations
 
-from asyncio import AbstractEventLoop
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any
 
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
 from couchbase.common.management.eventing import EventingFunction, EventingFunctionsStatus
 from couchbase.protocol.classic._management._eventing_function_mgmt_req_builder import (
     EventingFunctionMgmtRequestBuilder)
 
 if TYPE_CHECKING:
     from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.common.management.eventing import (DeployFunctionRequest,
-                                                      DropFunctionRequest,
-                                                      GetAllFunctionsRequest,
-                                                      GetFunctionRequest,
-                                                      GetFunctionsStatusRequest,
-                                                      PauseFunctionRequest,
-                                                      ResumeFunctionRequest,
-                                                      UndeployFunctionRequest,
-                                                      UpsertFunctionRequest)
-    from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+    from couchbase.common._observability import ObservabilityInstruments
+    from couchbase.common.management.options import (DeployFunctionOptions,
+                                                     DropFunctionOptions,
+                                                     FunctionsStatusOptions,
+                                                     GetAllFunctionOptions,
+                                                     GetFunctionOptions,
+                                                     PauseFunctionOptions,
+                                                     ResumeFunctionOptions,
+                                                     UndeployFunctionOptions,
+                                                     UpsertFunctionOptions)
 
 
 class AsyncEventingFunctionMgmtImpl:
-    def __init__(self, client_adapter: AsyncClientAdapter, observability_instruments: ObservabilityInstruments) -> None:
+    def __init__(self,
+                 client_adapter: AsyncClientAdapter,
+                 observability_instruments: ObservabilityInstruments,
+                 scope_context: tuple[str, str] | None = None) -> None:
         self._client_adapter = client_adapter
-        self._request_builder = EventingFunctionMgmtRequestBuilder()
+        self._request_builder = EventingFunctionMgmtRequestBuilder(client_adapter.option_validation)
         self._observability_instruments = observability_instruments
+        self._scope_context = scope_context
 
-    @property
-    def loop(self) -> AbstractEventLoop:
-        """**INTERNAL**"""
-        return self._client_adapter.loop
+    async def upsert_function(self,
+                              function: EventingFunction,
+                              options: UpsertFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.EventingUpsertFunction, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_upsert_function_request(function,
+                                                                      self._scope_context,
+                                                                      obs_handler,
+                                                                      options,
+                                                                      **kwargs)
+            await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    @property
-    def observability_instruments(self) -> ObservabilityInstruments:
-        """**INTERNAL**"""
-        return self._observability_instruments
+    async def drop_function(self,
+                            name: str,
+                            options: DropFunctionOptions | None = None,
+                            **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.EventingDropFunction, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_drop_function_request(name,
+                                                                    self._scope_context,
+                                                                    obs_handler,
+                                                                    options,
+                                                                    **kwargs)
+            await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    @property
-    def request_builder(self) -> EventingFunctionMgmtRequestBuilder:
-        """**INTERNAL**"""
-        return self._request_builder
+    async def deploy_function(self,
+                              name: str,
+                              options: DeployFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.EventingDeployFunction, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_deploy_function_request(name,
+                                                                      self._scope_context,
+                                                                      obs_handler,
+                                                                      options,
+                                                                      **kwargs)
+            await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def deploy_function(self, req: DeployFunctionRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+    async def get_all_functions(self,
+                                options: GetAllFunctionOptions | None = None,
+                                **kwargs: Any) -> list[EventingFunction]:
+        async with ObservableRequestHandler(Op.EventingGetAllFunctions, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_get_all_functions_request(self._scope_context,
+                                                                        obs_handler,
+                                                                        options,
+                                                                        **kwargs)
+            ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+            raw_functions = ret.raw_result['functions']
+            return [EventingFunction.from_server(f) for f in raw_functions]
 
-    async def drop_function(self, req: DropFunctionRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+    async def get_function(self,
+                           name: str,
+                           options: GetFunctionOptions | None = None,
+                           **kwargs: Any) -> EventingFunction:
+        async with ObservableRequestHandler(Op.EventingGetFunction, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_get_function_request(name,
+                                                                   self._scope_context,
+                                                                   obs_handler,
+                                                                   options,
+                                                                   **kwargs)
+            ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+            raw_func = ret.raw_result['function']
+            return EventingFunction.from_server(raw_func)
 
-    async def get_all_functions(
-        self,
-        req: GetAllFunctionsRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> List[EventingFunction]:
-        """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-        raw_functions = ret.raw_result['functions']
-        return [EventingFunction.from_server(f) for f in raw_functions]
+    async def pause_function(self,
+                             name: str,
+                             options: PauseFunctionOptions | None = None,
+                             **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.EventingPauseFunction, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_pause_function_request(name,
+                                                                     self._scope_context,
+                                                                     obs_handler,
+                                                                     options,
+                                                                     **kwargs)
+            await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_function(
-        self,
-        req: GetFunctionRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> EventingFunction:
-        """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-        raw_func = ret.raw_result['function']
-        return EventingFunction.from_server(raw_func)
+    async def resume_function(self,
+                              name: str,
+                              options: ResumeFunctionOptions | None = None,
+                              **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.EventingResumeFunction, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_resume_function_request(name,
+                                                                      self._scope_context,
+                                                                      obs_handler,
+                                                                      options,
+                                                                      **kwargs)
+            await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def get_functions_status(
-        self,
-        req: GetFunctionsStatusRequest,
-        obs_handler: ObservableRequestHandler,
-    ) -> EventingFunctionsStatus:
-        """**INTERNAL**"""
-        ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-        raw_status = ret.raw_result['status']
-        return EventingFunctionsStatus.from_server(raw_status)
+    async def undeploy_function(self,
+                                name: str,
+                                options: UndeployFunctionOptions | None = None,
+                                **kwargs: Any) -> None:
+        async with ObservableRequestHandler(Op.EventingUndeployFunction,
+                                            self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_undeploy_function_request(name,
+                                                                        self._scope_context,
+                                                                        obs_handler,
+                                                                        options,
+                                                                        **kwargs)
+            await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
 
-    async def pause_function(self, req: PauseFunctionRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-
-    async def resume_function(self, req: ResumeFunctionRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-
-    async def undeploy_function(self, req: UndeployFunctionRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
-
-    async def upsert_function(self, req: UpsertFunctionRequest, obs_handler: ObservableRequestHandler) -> None:
-        """**INTERNAL**"""
-        await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+    async def functions_status(self,
+                               options: FunctionsStatusOptions | None = None,
+                               **kwargs: Any) -> EventingFunctionsStatus:
+        async with ObservableRequestHandler(Op.EventingGetStatus, self._observability_instruments) as obs_handler:
+            req = self._request_builder.build_get_functions_status_request(self._scope_context,
+                                                                           obs_handler,
+                                                                           options,
+                                                                           **kwargs)
+            ret = await self._client_adapter.execute_mgmt_request(req, obs_handler=obs_handler)
+            raw_status = ret.raw_result['status']
+            return EventingFunctionsStatus.from_server(raw_status)

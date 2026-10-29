@@ -26,7 +26,9 @@ from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
 from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
 from acouchbase.protocol.classic._management._analytics_mgmt_impl import AsyncAnalyticsMgmtImpl
 from acouchbase.protocol.classic._management._bucket_mgmt_impl import AsyncBucketMgmtImpl
+from acouchbase.protocol.classic._management._eventing_function_mgmt_impl import AsyncEventingFunctionMgmtImpl
 from acouchbase.protocol.classic._management._query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
+from acouchbase.protocol.classic._management._search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
 from acouchbase.protocol.classic._management._user_mgmt_impl import AsyncUserMgmtImpl
 from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor
 from acouchbase.result import (AsyncAnalyticsResult,
@@ -254,6 +256,14 @@ class AsyncClusterImpl:
     def user_mgmt(self) -> AsyncUserMgmtImpl:
         """**INTERNAL**"""
         return AsyncUserMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def search_index_mgmt(self) -> AsyncSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncSearchIndexMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def eventing_function_mgmt(self) -> AsyncEventingFunctionMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncEventingFunctionMgmtImpl(self._client_adapter, self.observability_instruments)
 
     async def close_connection(self) -> None:
         """**INTERNAL**"""

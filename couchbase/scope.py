@@ -406,21 +406,23 @@ class Scope:
         indexes of this scope.
 
         Returns:
-            :class:`~couchbase.management.search.ScopeSearchIndexManager`: A :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
+            :class:`~couchbase.management.search.ScopeSearchIndexManager`: A
+            :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
 
-        """  # noqa: E501
-        return ScopeSearchIndexManager(self._impl._client_adapter, self.bucket_name, self.name, self._impl.observability_instruments)  # noqa: E501
+        """
+        return ScopeSearchIndexManager(self._impl.search_index_mgmt())
 
     def eventing_functions(self) -> ScopeEventingFunctionManager:
         """
-        Get a :class:`~couchbase.management.search.ScopeEventingFunctionManager` which can be used to manage the eventing
-        functions of this scope.
+        Get a :class:`~couchbase.management.eventing.ScopeEventingFunctionManager` which can be used to manage the
+        eventing functions of this scope.
 
         Returns:
-            :class:`~couchbase.management.search.ScopeEventingFunctionManager`: A :class:`~couchbase.management.search.ScopeSearchIndexManager` instance.
+            :class:`~couchbase.management.eventing.ScopeEventingFunctionManager`: A
+            :class:`~couchbase.management.eventing.ScopeEventingFunctionManager` instance.
 
-        """  # noqa: E501
-        return ScopeEventingFunctionManager(self._impl._client_adapter, self.bucket_name, self.name, self._impl.observability_instruments)  # noqa: E501
+        """
+        return ScopeEventingFunctionManager(self._impl.eventing_function_mgmt())
 
     @staticmethod
     def default_name() -> str:

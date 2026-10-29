@@ -347,12 +347,14 @@ class Cluster:
 
     def search_indexes(self) -> SearchIndexManager:
         """
-        Get the SearchIndexManager.
+        Get a :class:`~txcouchbase.management.search.SearchIndexManager` which can be used to manage the search
+        indexes of this cluster.
 
-        :return:  A :class:`~.management.SearchIndexManager` with which you can create or modify analytics datasets,
-            dataverses, etc.. on the cluster.
+        Returns:
+            :class:`~txcouchbase.management.search.SearchIndexManager`: A
+            :class:`~txcouchbase.management.search.SearchIndexManager` instance.
         """
-        return SearchIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+        return SearchIndexManager(self._impl.search_index_mgmt())
 
 
 TxCluster = Cluster

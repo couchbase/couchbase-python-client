@@ -642,10 +642,11 @@ class Cluster:
         indexes of this cluster.
 
         Returns:
-            :class:`~couchbase.management.search.SearchIndexManager`: A :class:`~couchbase.management.search.SearchIndexManager` instance.
+            :class:`~couchbase.management.search.SearchIndexManager`: A
+            :class:`~couchbase.management.search.SearchIndexManager` instance.
 
-        """  # noqa: E501
-        return SearchIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+        """
+        return SearchIndexManager(self._impl.search_index_mgmt())
 
     def eventing_functions(self) -> EventingFunctionManager:
         """
@@ -657,10 +658,11 @@ class Cluster:
             but may still change as final consensus on its behavior has not yet been reached.
 
         Returns:
-            :class:`~couchbase.management.eventing.EventingFunctionManager`: An :class:`~couchbase.management.eventing.EventingFunctionManager` instance.
+            :class:`~couchbase.management.eventing.EventingFunctionManager`: An
+            :class:`~couchbase.management.eventing.EventingFunctionManager` instance.
 
-        """  # noqa: E501
-        return EventingFunctionManager(self._impl._client_adapter, self._impl.observability_instruments)
+        """
+        return EventingFunctionManager(self._impl.eventing_function_mgmt())
 
     @staticmethod
     def connect(connstr: str, *options: options.ClusterOptions, **kwargs: Any) -> Cluster:

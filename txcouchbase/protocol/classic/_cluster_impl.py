@@ -40,6 +40,7 @@ from txcouchbase.protocol.classic._deferred import defer
 from txcouchbase.protocol.classic._management._analytics_mgmt_impl import TxAnalyticsMgmtImpl
 from txcouchbase.protocol.classic._management._bucket_mgmt_impl import TxBucketMgmtImpl
 from txcouchbase.protocol.classic._management._query_index_mgmt_impl import TxQueryIndexMgmtImpl
+from txcouchbase.protocol.classic._management._search_index_mgmt_impl import TxSearchIndexMgmtImpl
 from txcouchbase.protocol.classic._management._user_mgmt_impl import TxUserMgmtImpl
 from txcouchbase.protocol.classic._streaming import submit_rows
 
@@ -111,6 +112,10 @@ class TxClusterImpl(AsyncClusterImpl):
     def user_mgmt(self) -> TxUserMgmtImpl:
         """**INTERNAL**"""
         return TxUserMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def search_index_mgmt(self) -> TxSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return TxSearchIndexMgmtImpl(self._client_adapter, self.observability_instruments)
 
     def close_connection_deferred(self) -> Deferred[None]:
         """**INTERNAL**"""

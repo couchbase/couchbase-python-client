@@ -50,7 +50,18 @@ from couchbase.common.management.buckets import (BucketSettings,
 from couchbase.common.management.collections import (CollectionSpec,
                                                      CreateCollectionSettings,
                                                      UpdateCollectionSettings)
-from couchbase.common.management.options import (ChangePasswordOptions,
+from couchbase.common.management.eventing import (EventingFunction,
+                                                  EventingFunctionBucketAccess,
+                                                  EventingFunctionBucketBinding,
+                                                  EventingFunctionDcpBoundary,
+                                                  EventingFunctionDeploymentStatus,
+                                                  EventingFunctionKeyspace,
+                                                  EventingFunctionLanguageCompatibility,
+                                                  EventingFunctionLogLevel,
+                                                  EventingFunctionProcessingStatus,
+                                                  EventingFunctionSettings)
+from couchbase.common.management.options import (AnalyzeDocumentSearchIndexOptions,
+                                                 ChangePasswordOptions,
                                                  ConnectLinkOptions,
                                                  CreateAnalyticsIndexOptions,
                                                  CreateCollectionOptions,
@@ -66,14 +77,19 @@ from couchbase.common.management.options import (ChangePasswordOptions,
                                                  DropPrimaryQueryIndexOptions,
                                                  DropQueryIndexOptions,
                                                  DropUserOptions,
+                                                 FunctionsStatusOptions,
                                                  GetAllQueryIndexOptions,
                                                  GetAllUsersOptions,
+                                                 GetFunctionOptions,
                                                  GetLinksAnalyticsOptions,
                                                  GetUserOptions,
                                                  PublishDesignDocumentOptions,
+                                                 UpsertFunctionOptions,
+                                                 UpsertSearchIndexOptions,
                                                  UpsertUserOptions,
                                                  WatchQueryIndexOptions)
 from couchbase.common.management.queries import QueryIndex
+from couchbase.common.management.search import SearchIndex
 from couchbase.common.management.users import (Group,
                                                Role,
                                                User)
@@ -85,9 +101,12 @@ from couchbase.protocol.classic._management._analytics_mgmt_impl import Analytic
 from couchbase.protocol.classic._management._analytics_mgmt_req_builder import AnalyticsMgmtRequestBuilder
 from couchbase.protocol.classic._management._bucket_mgmt_req_builder import BucketMgmtRequestBuilder
 from couchbase.protocol.classic._management._collection_mgmt_req_builder import CollectionMgmtRequestBuilder
+from couchbase.protocol.classic._management._eventing_function_mgmt_req_builder import (
+    EventingFunctionMgmtRequestBuilder)
 from couchbase.protocol.classic._management._query_index_mgmt_impl import QueryIndexMgmtImpl
 from couchbase.protocol.classic._management._query_index_mgmt_req_builder import QueryIndexMgmtRequestBuilder
 from couchbase.protocol.classic._management._query_index_mgmt_types import WatchIndexesRequest
+from couchbase.protocol.classic._management._search_index_mgmt_req_builder import SearchIndexMgmtRequestBuilder
 from couchbase.protocol.classic._management._user_mgmt_req_builder import UserMgmtRequestBuilder
 from couchbase.protocol.classic._management._view_index_mgmt_impl import ViewIndexMgmtImpl
 from couchbase.protocol.classic._management._view_index_mgmt_req_builder import ViewIndexMgmtRequestBuilder
@@ -111,6 +130,7 @@ CLOCK_TICK_MS = round(time.get_clock_info('monotonic').resolution * 1000)
 DATASET = 'test-dataset'
 DATAVERSE = 'test-dataverse'
 LINK = 'test-link'
+FUNCTION = 'test-function'
 DDOC = 'test-ddoc'
 
 
@@ -125,7 +145,9 @@ _BUCKET = BucketMgmtRequestBuilder()
 _COLL = CollectionMgmtRequestBuilder()
 _QUERY = QueryIndexMgmtRequestBuilder()
 _USER = UserMgmtRequestBuilder()
+_SEARCH = SearchIndexMgmtRequestBuilder()
 _ANALYTICS = AnalyticsMgmtRequestBuilder()
+_EVENTING = EventingFunctionMgmtRequestBuilder()
 
 _CollectionCase = tuple[str, Callable[[ObservableRequestHandler], Any], dict[str, Any]]
 
@@ -378,6 +400,61 @@ _USER_CASES: list[_UserCase] = [
       'domain': 'external', 'timeout': 2000}),
 ]
 
+_SearchCase = tuple[str, Callable[[ObservableRequestHandler], Any], dict[str, Any]]
+
+_SEARCH_SCOPE = (BUCKET, SCOPE)
+
+_SEARCH_CASES: list[_SearchCase] = [
+    ('allow querying',
+     lambda h: _SEARCH.build_allow_querying_request(INDEX, None, h),
+     {'index_name': INDEX, 'allow': True}),
+    ('allow querying, scope',
+     lambda h: _SEARCH.build_allow_querying_request(INDEX, _SEARCH_SCOPE, h),
+     {'index_name': INDEX, 'allow': True, 'bucket_name': BUCKET, 'scope_name': SCOPE}),
+    ('analyze document',
+     lambda h: _SEARCH.build_analyze_document_request(INDEX, {'a': 1}, None, h,
+                                                      AnalyzeDocumentSearchIndexOptions(timeout=TWO_SECONDS)),
+     {'index_name': INDEX, 'encoded_document': '{"a": 1}', 'timeout': 2000}),
+    ('disallow querying',
+     lambda h: _SEARCH.build_disallow_querying_request(INDEX, None, h),
+     {'index_name': INDEX, 'allow': False}),
+    ('drop',
+     lambda h: _SEARCH.build_drop_index_request(INDEX, _SEARCH_SCOPE, h),
+     {'index_name': INDEX, 'bucket_name': BUCKET, 'scope_name': SCOPE}),
+    ('freeze plan',
+     lambda h: _SEARCH.build_freeze_plan_request(INDEX, None, h),
+     {'index_name': INDEX, 'freeze': True}),
+    ('get all',
+     lambda h: _SEARCH.build_get_all_indexes_request(None, h),
+     {}),
+    ('get all stats',
+     lambda h: _SEARCH.build_get_all_index_stats_request(h, timeout=TWO_SECONDS),
+     {'timeout': 2000}),
+    ('get documents count',
+     lambda h: _SEARCH.build_get_indexed_documents_count_request(INDEX, None, h),
+     {'index_name': INDEX}),
+    ('get',
+     lambda h: _SEARCH.build_get_index_request(INDEX, _SEARCH_SCOPE, h),
+     {'index_name': INDEX, 'bucket_name': BUCKET, 'scope_name': SCOPE}),
+    ('get stats',
+     lambda h: _SEARCH.build_get_index_stats_request(INDEX, None, h),
+     {'index_name': INDEX}),
+    ('pause ingest',
+     lambda h: _SEARCH.build_pause_ingest_request(INDEX, None, h),
+     {'index_name': INDEX, 'pause': True}),
+    ('resume ingest',
+     lambda h: _SEARCH.build_resume_ingest_request(INDEX, None, h),
+     {'index_name': INDEX, 'pause': False}),
+    ('unfreeze plan',
+     lambda h: _SEARCH.build_unfreeze_plan_request(INDEX, None, h),
+     {'index_name': INDEX, 'freeze': False}),
+    ('upsert',
+     lambda h: _SEARCH.build_upsert_index_request(SearchIndex(INDEX, source_name=BUCKET, params={'a': 1}), None, h,
+                                                  UpsertSearchIndexOptions(timeout=TWO_SECONDS)),
+     {'index': {'name': INDEX, 'type': 'fulltext-index', 'source_type': 'couchbase', 'source_name': BUCKET,
+                'params_json': '{"a": 1}'},
+      'timeout': 2000}),
+]
 
 _AnalyticsCase = tuple[str, Callable[[ObservableRequestHandler], Any], dict[str, Any]]
 
@@ -461,13 +538,61 @@ _ANALYTICS_CASES: list[_AnalyticsCase] = [
                'username': 'u', 'password': 'p', 'encryption': {'level': 'none'}}}),
 ]
 
+_EventingCase = tuple[str, Callable[[ObservableRequestHandler], Any], dict[str, Any]]
+
+_EVENTING_SCOPE = (BUCKET, SCOPE)
+
+_EVENTING_CASES: list[_EventingCase] = [
+    ('deploy',
+     lambda h: _EVENTING.build_deploy_function_request(FUNCTION, None, h),
+     {'name': FUNCTION}),
+    ('deploy, scope',
+     lambda h: _EVENTING.build_deploy_function_request(FUNCTION, _EVENTING_SCOPE, h),
+     {'name': FUNCTION, 'bucket_name': BUCKET, 'scope_name': SCOPE}),
+    ('drop',
+     lambda h: _EVENTING.build_drop_function_request(FUNCTION, _EVENTING_SCOPE, h),
+     {'name': FUNCTION, 'bucket_name': BUCKET, 'scope_name': SCOPE}),
+    ('get all',
+     lambda h: _EVENTING.build_get_all_functions_request(None, h),
+     {}),
+    ('get',
+     lambda h: _EVENTING.build_get_function_request(FUNCTION, None, h, GetFunctionOptions(timeout=TWO_SECONDS)),
+     {'name': FUNCTION, 'timeout': 2000}),
+    ('functions status, scope',
+     lambda h: _EVENTING.build_get_functions_status_request(_EVENTING_SCOPE, h,
+                                                            FunctionsStatusOptions(timeout=TWO_SECONDS)),
+     {'bucket_name': BUCKET, 'scope_name': SCOPE, 'timeout': 2000}),
+    ('pause',
+     lambda h: _EVENTING.build_pause_function_request(FUNCTION, None, h),
+     {'name': FUNCTION}),
+    ('resume',
+     lambda h: _EVENTING.build_resume_function_request(FUNCTION, None, h),
+     {'name': FUNCTION}),
+    ('undeploy',
+     lambda h: _EVENTING.build_undeploy_function_request(FUNCTION, None, h, timeout=TWO_SECONDS),
+     {'name': FUNCTION, 'timeout': 2000}),
+    ('upsert',
+     lambda h: _EVENTING.build_upsert_function_request(
+         EventingFunction(FUNCTION, 'code', metadata_keyspace=EventingFunctionKeyspace(BUCKET),
+                          source_keyspace=EventingFunctionKeyspace(BUCKET, SCOPE, COLLECTION)),
+         _EVENTING_SCOPE, h, UpsertFunctionOptions(timeout=TWO_SECONDS)),
+     {'function': {'name': FUNCTION, 'code': 'code', 'metadata_keyspace': {'bucket': BUCKET},
+                   'source_keyspace': {'bucket': BUCKET, 'scope': SCOPE, 'collection': COLLECTION}},
+      'bucket_name': BUCKET, 'scope_name': SCOPE, 'timeout': 2000}),
+]
 
 # Each argument is of a type its parameter does not take, so the builder refuses it before it
 # builds a request.
+_NOT_AN_INDEX: Any = {'name': INDEX}
+_NOT_A_FUNCTION: Any = {'name': FUNCTION}
 _NOT_A_LINK: Any = LINK
 _NO_FIELDS: Any = None
 
 _REJECTED: list[tuple[str, Callable[[ObservableRequestHandler], Any], Op, str]] = [
+    ('search upsert, a dict',
+     lambda h: _SEARCH.build_upsert_index_request(_NOT_AN_INDEX, None, h),
+     Op.SearchIndexUpsert,
+     'Expected index to be a SearchIndex'),
     ('analytics create index, no fields',
      lambda h: _ANALYTICS.build_create_index_request(INDEX, DATASET, _NO_FIELDS, h),
      Op.AnalyticsIndexCreate,
@@ -489,6 +614,18 @@ _REJECTED: list[tuple[str, Callable[[ObservableRequestHandler], Any], Op, str]] 
                                                   WatchQueryIndexOptions(timeout=timedelta(seconds=2))),
      Op.QueryIndexWatchIndexes,
      'An iterable of index names must be provided when watching indexes.'),
+    ('eventing upsert, a dict',
+     lambda h: _EVENTING.build_upsert_function_request(_NOT_A_FUNCTION, None, h),
+     Op.EventingUpsertFunction,
+     'An EventingFunction must be provided when upserting an eventing function.'),
+    ('eventing upsert, no name',
+     lambda h: _EVENTING.build_upsert_function_request(EventingFunction(code='code'), None, h),
+     Op.EventingUpsertFunction,
+     'The EventingFunction must have a name.'),
+    ('eventing upsert, no code',
+     lambda h: _EVENTING.build_upsert_function_request(EventingFunction(FUNCTION), None, h),
+     Op.EventingUpsertFunction,
+     'The EventingFunction must have code.'),
 ]
 
 # A keyword no options class carries, under each mode that does not refuse it.
@@ -853,6 +990,20 @@ class UserMgmtRequestBuilderUnitTests:
         assert req.req_to_dict() == {'username': USER, 'domain': 'local'}
 
 
+class SearchIndexMgmtRequestBuilderUnitTests:
+
+    @pytest.mark.parametrize('build, expected',
+                             [pytest.param(b, e, id=i) for i, b, e in _SEARCH_CASES])
+    def test_request_dict(self, build: Callable[[ObservableRequestHandler], Any], expected: dict[str, Any]) -> None:
+        assert _quiet(build, Op.SearchIndexGet).req_to_dict() == expected
+
+    @pytest.mark.parametrize('mode', _LENIENT_MODES)
+    def test_unknown_keyword_is_not_sent(self, mode: OptionValidationMode | None) -> None:
+        builder = SearchIndexMgmtRequestBuilder(mode)
+        req = _quiet(lambda h: builder.build_get_index_request(INDEX, None, h, not_an_option=1), Op.SearchIndexGet)
+        assert req.req_to_dict() == {'index_name': INDEX}
+
+
 class AnalyticsMgmtRequestBuilderUnitTests:
 
     @pytest.mark.parametrize('build, expected',
@@ -897,6 +1048,76 @@ class AnalyticsMgmtRequestBuilderUnitTests:
         assert span.name == op.span_name
         assert span.status == SpanStatusCode.ERROR
         assert span.end_time is not None
+
+
+class _SpanRecorder:
+    """Records the span arguments a builder hands its observability handler."""
+
+    def __init__(self) -> None:
+        self.http_spans: list[dict[str, Any]] = []
+
+    def create_http_span(self, **options: Any) -> None:
+        self.http_spans.append(options)
+
+
+class EventingFunctionMgmtRequestBuilderUnitTests:
+
+    @pytest.mark.parametrize('build, expected',
+                             [pytest.param(b, e, id=i) for i, b, e in _EVENTING_CASES])
+    def test_request_dict(self, build: Callable[[ObservableRequestHandler], Any], expected: dict[str, Any]) -> None:
+        assert _quiet(build, Op.EventingGetFunction).req_to_dict() == expected
+
+    @pytest.mark.parametrize('mode', _LENIENT_MODES)
+    def test_unknown_keyword_is_not_sent(self, mode: OptionValidationMode | None) -> None:
+        builder = EventingFunctionMgmtRequestBuilder(mode)
+        req = _quiet(lambda h: builder.build_get_function_request(FUNCTION, None, h, not_an_option=1),
+                     Op.EventingGetFunction)
+        assert req.req_to_dict() == {'name': FUNCTION}
+
+    @pytest.mark.parametrize('function, message', [
+        (_NOT_A_FUNCTION, 'An EventingFunction must be provided when upserting an eventing function.'),
+        (EventingFunction(code='code'), 'The EventingFunction must have a name.'),
+        (EventingFunction(FUNCTION), 'The EventingFunction must have code.'),
+    ])
+    def test_a_rejected_upsert_has_a_span(self, function: Any, message: str) -> None:
+        recorder = _SpanRecorder()
+        with pytest.raises(InvalidArgumentException, match=message):
+            _EVENTING.build_upsert_function_request(function, None, cast(ObservableRequestHandler, recorder))
+        assert len(recorder.http_spans) == 1
+
+    @pytest.mark.parametrize('function, field', [
+        (EventingFunction(FUNCTION, 'code',
+                          settings=EventingFunctionSettings(dcp_stream_boundary=EventingFunctionDcpBoundary.Unknown)),
+         'settings.dcp_stream_boundary'),
+        (EventingFunction(FUNCTION, 'code',
+                          settings=EventingFunctionSettings(log_level=EventingFunctionLogLevel.Unknown)),
+         'settings.log_level'),
+        (EventingFunction(FUNCTION, 'code',
+                          settings=EventingFunctionSettings(
+                              deployment_status=EventingFunctionDeploymentStatus.Unknown)),
+         'settings.deployment_status'),
+        (EventingFunction(FUNCTION, 'code',
+                          settings=EventingFunctionSettings(
+                              processing_status=EventingFunctionProcessingStatus.Unknown)),
+         'settings.processing_status'),
+        (EventingFunction(FUNCTION, 'code',
+                          settings=EventingFunctionSettings(
+                              language_compatibility=EventingFunctionLanguageCompatibility.Unknown)),
+         'settings.language_compatibility'),
+        (EventingFunction(FUNCTION, 'code',
+                          bucket_bindings=[EventingFunctionBucketBinding('alias', EventingFunctionKeyspace(BUCKET),
+                                                                         EventingFunctionBucketAccess.Unknown)]),
+         'bucket_bindings[0].access'),
+    ])
+    def test_an_unknown_value_is_not_sent(self, function: EventingFunction, field: str) -> None:
+        with pytest.raises(InvalidArgumentException) as exc_info:
+            _quiet(lambda h: _EVENTING.build_upsert_function_request(function, None, h), Op.EventingUpsertFunction)
+        assert exc_info.value.message == f'The EventingFunction has a value the SDK cannot send: {field}.'
+
+    def test_get_function_span_names_the_scope(self) -> None:
+        recorder = _SpanRecorder()
+        _EVENTING.build_get_function_request(FUNCTION, _EVENTING_SCOPE, cast(ObservableRequestHandler, recorder))
+        assert recorder.http_spans == [{'parent_span': None, 'bucket_name': BUCKET, 'scope_name': SCOPE}]
 
 
 class MgmtArgumentTypeUnitTests:

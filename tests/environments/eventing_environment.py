@@ -127,8 +127,9 @@ class EventingEnvironment:
                          bucket=bucket_name,
                          note='the cluster reported no server version, so the version an '
                               'eventing function has to be stamped with cannot be built')
+        probe_name = function_name('probe')
         probe = EventingFunction(
-            function_name('probe'),
+            probe_name,
             SIMPLE_EVT_CODE,
             function_version(full),
             metadata_keyspace=EventingFunctionKeyspace(bucket_name,
@@ -138,7 +139,7 @@ class EventingEnvironment:
                                                      FUNCTION_SCOPE_NAME,
                                                      SOURCE_COLLECTION_NAME))
         TestEnvironment.try_n_times(10, 3, efm.upsert_function, probe)
-        EventingEnvironment.ensure_function_dropped(efm, probe.name)
+        EventingEnvironment.ensure_function_dropped(efm, probe_name)
 
     @staticmethod
     def setup_eventing(cb_env: SyncTestEnvironment,
@@ -209,8 +210,7 @@ class EventingEnvironment:
         """Poll until *name* reports *state*, or raise saying what it reported instead.
 
         Takes the manager rather than reading one off an environment, which is what lets the
-        two suites share it while each drives a different manager.  It also keeps the poll
-        off `efm._get_status`, which is private.
+        two suites share it while each drives a different manager.
 
         Raises rather than returning a flag, because every caller treats anything else as a
         failed transition, and keeps the two failures apart: a function this manager cannot

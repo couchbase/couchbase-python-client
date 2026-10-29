@@ -18,6 +18,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._collection_impl import AsyncCollectionImpl
+from acouchbase.protocol.classic._management._eventing_function_mgmt_impl import AsyncEventingFunctionMgmtImpl
+from acouchbase.protocol.classic._management._search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
 from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor
 from acouchbase.result import (AsyncAnalyticsResult,
                                AsyncQueryResult,
@@ -190,6 +192,18 @@ class AsyncScopeImpl:
         obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
         req = self._request_builder.build_search_request(index, request, obs_handler, options, **kwargs)
         return self._search(req)
+
+    def eventing_function_mgmt(self) -> AsyncEventingFunctionMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncEventingFunctionMgmtImpl(self._client_adapter,
+                                             self.observability_instruments,
+                                             scope_context=(self.bucket_name, self._scope_name))
+
+    def search_index_mgmt(self) -> AsyncSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncSearchIndexMgmtImpl(self._client_adapter,
+                                        self.observability_instruments,
+                                        scope_context=(self.bucket_name, self._scope_name))
 
     def _search(self, req: SearchQueryRequest) -> AsyncSearchResult:
         self._client_adapter._ensure_not_closed()

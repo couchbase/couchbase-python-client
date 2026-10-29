@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -91,6 +92,13 @@ from tests.manifest import validate_test_manifest
 from tests.test_features import ServerFeatures
 
 
+@dataclass
+class _SuiteFunction(EventingFunction):
+    # Every function the suites build has a name and code, so a test hands its name on as a str.
+    name: str
+    code: str
+
+
 class EventingFunctionManagementSuiteBase(SuiteRequirements):
     # Declares no test methods of its own, so pytest does not collect it as a suite.
 
@@ -127,24 +135,22 @@ class EventingFunctionManagementSuiteBase(SuiteRequirements):
                   cb_env: SyncTestEnvironment,
                   name: str,
                   *,
-                  source_keyspace: EventingFunctionKeyspace | None = None) -> EventingFunction:
+                  source_keyspace: EventingFunctionKeyspace | None = None) -> _SuiteFunction:
         # The keyspaces are the only place the two suites' functions differ.  A test that
         # varies one of the other parts assigns to the field after the fact.
         if source_keyspace is None:
             source_keyspace = self._source_keyspace(cb_env)
-        return EventingFunction(
+        return _SuiteFunction(
             name,
             SIMPLE_EVT_CODE,
             self._function_version(cb_env),
             metadata_keyspace=self._metadata_keyspace(cb_env),
             source_keyspace=source_keyspace,
             # FromNow, so a deploy has no backlog even if something later seeds the source
-            # keyspace.  new_settings takes `**kwargs: Dict[str, Any]`, which says each
-            # keyword's value is a dict rather than that the collected kwargs are one, so the
-            # checker rejects every call it has; the suppressions come off with PYCBC-1882.
+            # keyspace.
             settings=EventingFunctionSettings.new_settings(
-                dcp_stream_boundary=EventingFunctionDcpBoundary.FromNow,  # type: ignore[arg-type]  # PYCBC-1882
-                language_compatibility=EventingFunctionLanguageCompatibility.Version_6_6_2),  # type: ignore[arg-type]  # PYCBC-1882 # noqa: E501
+                dcp_stream_boundary=EventingFunctionDcpBoundary.FromNow,
+                language_compatibility=EventingFunctionLanguageCompatibility.Version_6_6_2),
             bucket_bindings=[
                 EventingFunctionBucketBinding(alias=BUCKET_BINDING_ALIAS,
                                               name=self._binding_keyspace(cb_env),
@@ -199,14 +205,15 @@ class EventingFunctionManagementSuiteBase(SuiteRequirements):
 
     @classmethod
     def _assert_keyspace(cls,
-                         found: EventingFunctionKeyspace,
-                         sent: EventingFunctionKeyspace,
+                         found: EventingFunctionKeyspace | None,
+                         sent: EventingFunctionKeyspace | None,
                          *,
                          what: str) -> None:
         # The scope and collection are compared only when the sent keyspace named them: the
         # server completes a bucket-only keyspace to the default scope and collection, so
         # requiring equality would fail on a keyspace that got exactly what it asked for.
-        cb_assert_isinstance(found, EventingFunctionKeyspace, what=what)
+        found = cb_assert_isinstance(found, EventingFunctionKeyspace, what=what)
+        assert sent is not None, f'{what} was not sent'
         parts = cls._keyspace_parts(found)
         cb_assert_eq(parts['bucket'], sent.bucket, what=f'{what} bucket')
         if sent.scope is not None:
@@ -227,14 +234,14 @@ class EventingFunctionManagementSuiteBase(SuiteRequirements):
         found_bindings = {b.alias: b for b in found.bucket_bindings or []}
         for binding in sent.bucket_bindings or []:
             assert binding.alias in found_bindings, \
-                f'bucket binding {binding.alias} missing, got {sorted(found_bindings)}'
+                f'bucket binding {binding.alias} missing, got {sorted(found_bindings, key=str)}'
             cls._assert_keyspace(found_bindings[binding.alias].name, binding.name,
                                  what=f'bucket binding {binding.alias}')
             cb_assert_eq(found_bindings[binding.alias].access, binding.access,
                          what=f'bucket binding {binding.alias} access')
 
-        settings = found.settings
-        cb_assert_isinstance(settings, EventingFunctionSettings, what='function settings')
+        settings = cb_assert_isinstance(found.settings, EventingFunctionSettings, what='function settings')
+        assert sent.settings is not None, 'function settings were not sent'
         cb_assert_eq(settings.dcp_stream_boundary, sent.settings.dcp_stream_boundary,
                      what='dcp stream boundary')
         cb_assert_eq(settings.language_compatibility, sent.settings.language_compatibility,
@@ -304,6 +311,7 @@ class EventingFunctionManagementSuiteBase(SuiteRequirements):
     def _assert_status_lists(statuses: EventingFunctionsStatus, name: str) -> None:
         cb_assert_isinstance(statuses, EventingFunctionsStatus, what='functions status')
         assert statuses.num_eventing_nodes is not None and statuses.num_eventing_nodes >= 1
+        assert statuses.functions is not None, 'functions status listed no functions'
         for status in statuses.functions:
             cb_assert_isinstance(status, EventingFunctionStatus, what='function status')
             cb_assert_isinstance(status.state, EventingFunctionState, what='function state')
@@ -355,13 +363,13 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
         return EventingFunctionKeyspace(eventing_bucket_name())
 
     @pytest.fixture(name='test_func')
-    def get_test_function(self, cb_env: SyncTestEnvironment) -> EventingFunction:
+    def get_test_function(self, cb_env: SyncTestEnvironment) -> _SuiteFunction:
         return self._function(cb_env, function_name())
 
     @pytest.fixture()
     def create_test_function(self,
                              cb_env: SyncTestEnvironment,
-                             test_func: EventingFunction) -> None:
+                             test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         efm.upsert_function(test_func)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Undeployed, test_func.name)
@@ -369,7 +377,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.fixture()
     def drop_test_function(self,
                            cb_env: SyncTestEnvironment,
-                           test_func: EventingFunction) -> Generator[None, None, None]:
+                           test_func: _SuiteFunction) -> Generator[None, None, None]:
         yield
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         EventingEnvironment.ensure_function_dropped(efm, test_func.name)
@@ -388,7 +396,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_upsert_function(self,
                              cb_env: SyncTestEnvironment,
-                             test_func: EventingFunction) -> None:
+                             test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         efm.upsert_function(test_func)
         found = TestEnvironment.try_n_times(5, 3, efm.get_function, test_func.name)
@@ -433,7 +441,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_get_function(self,
                           cb_env: SyncTestEnvironment,
-                          test_func: EventingFunction) -> None:
+                          test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         found = TestEnvironment.try_n_times(5, 3, efm.get_function, test_func.name)
         self._assert_round_trip(found, test_func)
@@ -448,7 +456,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_get_all_functions(self,
                                cb_env: SyncTestEnvironment,
-                               test_func: EventingFunction,
+                               test_func: _SuiteFunction,
                                created: list[str]) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         second = self._function(cb_env, function_name('second'))
@@ -460,8 +468,8 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
         by_name = {f.name: f for f in functions}
         # At least, not exactly: this manager sees every function in the cluster, so another
         # worker's functions can legitimately be in the listing alongside these two.
-        assert test_func.name in by_name, f'{test_func.name} not among {sorted(by_name)}'
-        assert second.name in by_name, f'{second.name} not among {sorted(by_name)}'
+        assert test_func.name in by_name, f'{test_func.name} not among {sorted(by_name, key=str)}'
+        assert second.name in by_name, f'{second.name} not among {sorted(by_name, key=str)}'
         for func in functions:
             self._assert_deserialized(func)
         self._assert_round_trip(by_name[test_func.name], test_func)
@@ -471,7 +479,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_functions_status(self,
                               cb_env: SyncTestEnvironment,
-                              test_func: EventingFunction) -> None:
+                              test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         statuses = efm.functions_status()
         self._assert_status_lists(statuses, test_func.name)
@@ -480,7 +488,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_deploy_function(self,
                              cb_env: SyncTestEnvironment,
-                             test_func: EventingFunction) -> None:
+                             test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         efm.deploy_function(test_func.name)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Deployed, test_func.name)
@@ -492,7 +500,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_deploy_function_fail(self,
                                   cb_env: SyncTestEnvironment,
-                                  test_func: EventingFunction) -> None:
+                                  test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         with pytest.raises(self.MISSING_FUNCTION_ERRORS):
             efm.deploy_function(MISSING_FUNCTION_NAME)
@@ -510,7 +518,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_drop_function(self,
                            cb_env: SyncTestEnvironment,
-                           test_func: EventingFunction) -> None:
+                           test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         efm.drop_function(test_func.name)
         TestEnvironment.try_n_times_till_exception(
@@ -521,7 +529,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_drop_function_fail(self,
                                 cb_env: SyncTestEnvironment,
-                                test_func: EventingFunction) -> None:
+                                test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         with pytest.raises((EventingFunctionNotDeployedException, EventingFunctionNotFoundException)):
             efm.drop_function(MISSING_FUNCTION_NAME)
@@ -535,7 +543,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_undeploy_function(self,
                                cb_env: SyncTestEnvironment,
-                               test_func: EventingFunction) -> None:
+                               test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         efm.deploy_function(test_func.name)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Deployed, test_func.name)
@@ -560,7 +568,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_pause_and_resume_function(self,
                                        cb_env: SyncTestEnvironment,
-                                       test_func: EventingFunction) -> None:
+                                       test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         efm.deploy_function(test_func.name)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Deployed, test_func.name)
@@ -581,7 +589,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_pause_function_fail(self,
                                  cb_env: SyncTestEnvironment,
-                                 test_func: EventingFunction) -> None:
+                                 test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         with pytest.raises(self.MISSING_FUNCTION_ERRORS):
             efm.pause_function(MISSING_FUNCTION_NAME)
@@ -599,7 +607,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_options_simple(self,
                             cb_env: SyncTestEnvironment,
-                            test_func: EventingFunction) -> None:
+                            test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         efm.upsert_function(test_func, UpsertFunctionOptions(timeout=timedelta(seconds=20)))
         found = TestEnvironment.try_n_times(5, 3, efm.get_function, test_func.name,
@@ -613,7 +621,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_constant_bindings(self,
                                cb_env: SyncTestEnvironment,
-                               test_func: EventingFunction) -> None:
+                               test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         test_func.constant_bindings = self._constant_bindings()
         efm.upsert_function(test_func)
@@ -625,7 +633,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_url_bindings(self,
                           cb_env: SyncTestEnvironment,
-                          test_func: EventingFunction) -> None:
+                          test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentEventingFunctionManager)
         test_func.url_bindings = self._url_bindings()
         efm.upsert_function(test_func)
@@ -637,7 +645,7 @@ class EventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBase):
     @pytest.mark.usefixtures('drop_test_function')
     def test_with_scope_and_collection(self,
                                        cb_env: SyncTestEnvironment,
-                                       test_func: EventingFunction) -> None:
+                                       test_func: _SuiteFunction) -> None:
         # The one function here whose source keyspace is narrowed below the bucket, so what
         # this adds is that a cluster-level manager streams a single collection when asked.
         test_func.source_keyspace = EventingFunctionKeyspace(eventing_bucket_name(),
@@ -705,13 +713,13 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
         return EventingFunctionKeyspace(scope_eventing_bucket_name())
 
     @pytest.fixture(name='test_func')
-    def get_test_function(self, cb_env: SyncTestEnvironment) -> EventingFunction:
+    def get_test_function(self, cb_env: SyncTestEnvironment) -> _SuiteFunction:
         return self._function(cb_env, function_name('scoped'))
 
     @pytest.fixture()
     def create_test_function(self,
                              cb_env: SyncTestEnvironment,
-                             test_func: EventingFunction) -> None:
+                             test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         efm.upsert_function(test_func)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Undeployed, test_func.name)
@@ -719,7 +727,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.fixture()
     def drop_test_function(self,
                            cb_env: SyncTestEnvironment,
-                           test_func: EventingFunction) -> Generator[None, None, None]:
+                           test_func: _SuiteFunction) -> Generator[None, None, None]:
         yield
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         EventingEnvironment.ensure_function_dropped(efm, test_func.name)
@@ -738,7 +746,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_upsert_function(self,
                              cb_env: SyncTestEnvironment,
-                             test_func: EventingFunction) -> None:
+                             test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         efm.upsert_function(test_func)
         found = TestEnvironment.try_n_times(5, 3, efm.get_function, test_func.name)
@@ -783,7 +791,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_get_function(self,
                           cb_env: SyncTestEnvironment,
-                          test_func: EventingFunction) -> None:
+                          test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         found = TestEnvironment.try_n_times(5, 3, efm.get_function, test_func.name)
         self._assert_round_trip(found, test_func)
@@ -798,7 +806,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_get_all_functions(self,
                                cb_env: SyncTestEnvironment,
-                               test_func: EventingFunction,
+                               test_func: _SuiteFunction,
                                created: list[str]) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         second = self._function(cb_env, function_name('scoped', 'second'))
@@ -810,8 +818,8 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
         by_name = {f.name: f for f in functions}
         # At least, not exactly: this manager sees every function in the cluster, so another
         # worker's functions can legitimately be in the listing alongside these two.
-        assert test_func.name in by_name, f'{test_func.name} not among {sorted(by_name)}'
-        assert second.name in by_name, f'{second.name} not among {sorted(by_name)}'
+        assert test_func.name in by_name, f'{test_func.name} not among {sorted(by_name, key=str)}'
+        assert second.name in by_name, f'{second.name} not among {sorted(by_name, key=str)}'
         for func in functions:
             self._assert_deserialized(func)
         self._assert_round_trip(by_name[test_func.name], test_func)
@@ -821,7 +829,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_functions_status(self,
                               cb_env: SyncTestEnvironment,
-                              test_func: EventingFunction) -> None:
+                              test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         statuses = efm.functions_status()
         self._assert_status_lists(statuses, test_func.name)
@@ -830,7 +838,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_deploy_function(self,
                              cb_env: SyncTestEnvironment,
-                             test_func: EventingFunction) -> None:
+                             test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         efm.deploy_function(test_func.name)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Deployed, test_func.name)
@@ -842,7 +850,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_deploy_function_fail(self,
                                   cb_env: SyncTestEnvironment,
-                                  test_func: EventingFunction) -> None:
+                                  test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         with pytest.raises(self.MISSING_FUNCTION_ERRORS):
             efm.deploy_function(MISSING_FUNCTION_NAME)
@@ -860,7 +868,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_drop_function(self,
                            cb_env: SyncTestEnvironment,
-                           test_func: EventingFunction) -> None:
+                           test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         efm.drop_function(test_func.name)
         TestEnvironment.try_n_times_till_exception(
@@ -871,7 +879,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_drop_function_fail(self,
                                 cb_env: SyncTestEnvironment,
-                                test_func: EventingFunction) -> None:
+                                test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         with pytest.raises((EventingFunctionNotDeployedException, EventingFunctionNotFoundException)):
             efm.drop_function(MISSING_FUNCTION_NAME)
@@ -885,7 +893,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_undeploy_function(self,
                                cb_env: SyncTestEnvironment,
-                               test_func: EventingFunction) -> None:
+                               test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         efm.deploy_function(test_func.name)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Deployed, test_func.name)
@@ -910,7 +918,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_pause_and_resume_function(self,
                                        cb_env: SyncTestEnvironment,
-                                       test_func: EventingFunction) -> None:
+                                       test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         efm.deploy_function(test_func.name)
         EventingEnvironment.wait_until_status(efm, EventingFunctionState.Deployed, test_func.name)
@@ -931,7 +939,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_pause_function_fail(self,
                                  cb_env: SyncTestEnvironment,
-                                 test_func: EventingFunction) -> None:
+                                 test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         with pytest.raises(self.MISSING_FUNCTION_ERRORS):
             efm.pause_function(MISSING_FUNCTION_NAME)
@@ -949,7 +957,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_options_simple(self,
                             cb_env: SyncTestEnvironment,
-                            test_func: EventingFunction) -> None:
+                            test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         efm.upsert_function(test_func, UpsertFunctionOptions(timeout=timedelta(seconds=20)))
         found = TestEnvironment.try_n_times(5, 3, efm.get_function, test_func.name,
@@ -963,7 +971,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_constant_bindings(self,
                                cb_env: SyncTestEnvironment,
-                               test_func: EventingFunction) -> None:
+                               test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         test_func.constant_bindings = self._constant_bindings()
         efm.upsert_function(test_func)
@@ -975,7 +983,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_url_bindings(self,
                           cb_env: SyncTestEnvironment,
-                          test_func: EventingFunction) -> None:
+                          test_func: _SuiteFunction) -> None:
         efm = cb_env.get_manager(TestEnvironmentScopeEventingFunctionManager)
         test_func.url_bindings = self._url_bindings()
         efm.upsert_function(test_func)
@@ -987,7 +995,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_with_scope_and_collection(self,
                                        cb_env: SyncTestEnvironment,
-                                       test_func: EventingFunction) -> None:
+                                       test_func: _SuiteFunction) -> None:
         # Every function this suite sends already names both keyspaces down to a collection,
         # so what is left to qualify is the bucket binding, which the baseline leaves whole.
         test_func.bucket_bindings = [
@@ -1007,7 +1015,7 @@ class ScopeEventingFunctionManagementTestSuite(EventingFunctionManagementSuiteBa
     @pytest.mark.usefixtures('drop_test_function')
     def test_scope_isolation(self,
                              cb_env: SyncTestEnvironment,
-                             test_func: EventingFunction) -> None:
+                             test_func: _SuiteFunction) -> None:
         # Running the same bodies through both managers leaves what a scope-level manager is
         # for untested: without this, a scope manager that quietly created cluster-level
         # functions satisfies every other test in this file.

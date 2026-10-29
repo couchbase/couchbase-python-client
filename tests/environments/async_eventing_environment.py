@@ -90,8 +90,9 @@ class AsyncEventingEnvironment:
                          bucket=bucket_name,
                          note='the cluster reported no server version, so the version an '
                               'eventing function has to be stamped with cannot be built')
+        probe_name = function_name('probe')
         probe = EventingFunction(
-            function_name('probe'),
+            probe_name,
             SIMPLE_EVT_CODE,
             function_version(full),
             metadata_keyspace=EventingFunctionKeyspace(bucket_name,
@@ -101,7 +102,7 @@ class AsyncEventingEnvironment:
                                                      FUNCTION_SCOPE_NAME,
                                                      SOURCE_COLLECTION_NAME))
         await AsyncTestEnvironment.try_n_times(10, 3, efm.upsert_function, probe)
-        await AsyncEventingEnvironment.ensure_function_dropped(efm, probe.name)
+        await AsyncEventingEnvironment.ensure_function_dropped(efm, probe_name)
 
     @staticmethod
     async def setup_eventing(cb_env: AsyncTestEnvironment,

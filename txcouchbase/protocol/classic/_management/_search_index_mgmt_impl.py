@@ -15,175 +15,251 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict,
-                    Iterable)
-
-from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
+from collections.abc import Coroutine, Iterable
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._management._search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
-from couchbase.common.management.search import SearchIndex
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from txcouchbase.protocol.classic._deferred import defer
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.common.management.search import (AllowQueryingRequest,
-                                                    AnalyzeDocumentRequest,
-                                                    DisallowQueryingRequest,
-                                                    DropIndexRequest,
-                                                    FreezePlanRequest,
-                                                    GetAllIndexesRequest,
-                                                    GetAllIndexStatsRequest,
-                                                    GetIndexedDocumentsCountRequest,
-                                                    GetIndexRequest,
-                                                    GetIndexStatsRequest,
-                                                    PauseIngestRequest,
-                                                    ResumeIngestRequest,
-                                                    UnfreezePlanRequest,
-                                                    UpsertIndexRequest)
+    from twisted.internet.defer import Deferred
+
+    from couchbase.common.management.options import (AllowQueryingSearchIndexOptions,
+                                                     AnalyzeDocumentSearchIndexOptions,
+                                                     DisallowQueryingSearchIndexOptions,
+                                                     DropSearchIndexOptions,
+                                                     FreezePlanSearchIndexOptions,
+                                                     GetAllSearchIndexesOptions,
+                                                     GetAllSearchIndexStatsOptions,
+                                                     GetSearchIndexedDocumentsCountOptions,
+                                                     GetSearchIndexOptions,
+                                                     GetSearchIndexStatsOptions,
+                                                     PauseIngestSearchIndexOptions,
+                                                     ResumeIngestSearchIndexOptions,
+                                                     UnfreezePlanSearchIndexOptions,
+                                                     UpsertSearchIndexOptions)
+    from couchbase.common.management.search import SearchIndex
 
 
 class TxSearchIndexMgmtImpl(AsyncSearchIndexMgmtImpl):
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        super().__init__(client_adapter, observability_instruments)
-
-    def _finish_span(self, result, obs_handler: ObservableRequestHandler):
-        """Callback to properly end the span on success or failure."""
-        if isinstance(result, Failure):
-            exc = result.value
-            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
-            return result
-        else:
-            obs_handler.__exit__(None, None, None)
-            return result
-
-    def allow_querying_deferred(self,
-                                req: AllowQueryingRequest,
-                                obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().allow_querying(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def analyze_document_deferred(self,
-                                  req: AnalyzeDocumentRequest,
-                                  obs_handler: ObservableRequestHandler) -> Deferred[Dict[str, Any]]:
-        """**INTERNAL**"""
-        coro = super().analyze_document(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def drop_index_deferred(self,
-                            req: DropIndexRequest,
-                            obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def disallow_querying_deferred(self,
-                                   req: DisallowQueryingRequest,
-                                   obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().disallow_querying(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def freeze_plan_deferred(self,
-                             req: FreezePlanRequest,
-                             obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().freeze_plan(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_all_indexes_deferred(self,
-                                 req: GetAllIndexesRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[Iterable[SearchIndex]]:
-        """**INTERNAL**"""
-        coro = super().get_all_indexes(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_all_index_stats_deferred(self,
-                                     req: GetAllIndexStatsRequest,
-                                     obs_handler: ObservableRequestHandler) -> Deferred[Dict[str, Any]]:
-        """**INTERNAL**"""
-        coro = super().get_all_index_stats(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_indexed_documents_count_deferred(self,
-                                             req: GetIndexedDocumentsCountRequest,
-                                             obs_handler: ObservableRequestHandler) -> Deferred[int]:
-        """**INTERNAL**"""
-        coro = super().get_indexed_documents_count(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_index_deferred(self,
-                           req: GetIndexRequest,
-                           obs_handler: ObservableRequestHandler) -> Deferred[SearchIndex]:
-        """**INTERNAL**"""
-        coro = super().get_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def get_index_stats_deferred(self,
-                                 req: GetIndexStatsRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[Dict[str, Any]]:
-        """**INTERNAL**"""
-        coro = super().get_index_stats(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def pause_ingest_deferred(self,
-                              req: PauseIngestRequest,
-                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().pause_ingest(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def resume_ingest_deferred(self,
-                               req: ResumeIngestRequest,
-                               obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().resume_ingest(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def unfreeze_plan_deferred(self,
-                               req: UnfreezePlanRequest,
-                               obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().unfreeze_plan(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
 
     def upsert_index_deferred(self,
-                              req: UpsertIndexRequest,
-                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().upsert_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                              index: SearchIndex,
+                              options: UpsertSearchIndexOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexUpsert, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_upsert_index_request(index,
+                                                                   self._scope_context,
+                                                                   obs_handler,
+                                                                   options,
+                                                                   **kwargs)
+            return self._upsert_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_index_deferred(self,
+                            index_name: str,
+                            options: DropSearchIndexOptions | None = None,
+                            **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_index_request(index_name,
+                                                                 self._scope_context,
+                                                                 obs_handler,
+                                                                 options,
+                                                                 **kwargs)
+            return self._drop_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_index_deferred(self,
+                           index_name: str,
+                           options: GetSearchIndexOptions | None = None,
+                           **kwargs: Any) -> Deferred[SearchIndex]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexGet, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, SearchIndex]:
+            req = self._request_builder.build_get_index_request(index_name,
+                                                                self._scope_context,
+                                                                obs_handler,
+                                                                options,
+                                                                **kwargs)
+            return self._get_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_all_indexes_deferred(self,
+                                 options: GetAllSearchIndexesOptions | None = None,
+                                 **kwargs: Any) -> Deferred[Iterable[SearchIndex]]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[SearchIndex]]:
+            req = self._request_builder.build_get_all_indexes_request(self._scope_context,
+                                                                      obs_handler,
+                                                                      options,
+                                                                      **kwargs)
+            return self._get_all_indexes(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_indexed_documents_count_deferred(self,
+                                             index_name: str,
+                                             options: GetSearchIndexedDocumentsCountOptions | None = None,
+                                             **kwargs: Any) -> Deferred[int]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexGetDocumentsCount, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, int]:
+            req = self._request_builder.build_get_indexed_documents_count_request(index_name,
+                                                                                  self._scope_context,
+                                                                                  obs_handler,
+                                                                                  options,
+                                                                                  **kwargs)
+            return self._get_indexed_documents_count(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def pause_ingest_deferred(self,
+                              index_name: str,
+                              options: PauseIngestSearchIndexOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexPauseIngest, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_pause_ingest_request(index_name,
+                                                                   self._scope_context,
+                                                                   obs_handler,
+                                                                   options,
+                                                                   **kwargs)
+            return self._pause_ingest(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def resume_ingest_deferred(self,
+                               index_name: str,
+                               options: ResumeIngestSearchIndexOptions | None = None,
+                               **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexResumeIngest, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_resume_ingest_request(index_name,
+                                                                    self._scope_context,
+                                                                    obs_handler,
+                                                                    options,
+                                                                    **kwargs)
+            return self._resume_ingest(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def allow_querying_deferred(self,
+                                index_name: str,
+                                options: AllowQueryingSearchIndexOptions | None = None,
+                                **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexAllowQuerying, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_allow_querying_request(index_name,
+                                                                     self._scope_context,
+                                                                     obs_handler,
+                                                                     options,
+                                                                     **kwargs)
+            return self._allow_querying(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def disallow_querying_deferred(self,
+                                   index_name: str,
+                                   options: DisallowQueryingSearchIndexOptions | None = None,
+                                   **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexDisallowQuerying, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_disallow_querying_request(index_name,
+                                                                        self._scope_context,
+                                                                        obs_handler,
+                                                                        options,
+                                                                        **kwargs)
+            return self._disallow_querying(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def freeze_plan_deferred(self,
+                             index_name: str,
+                             options: FreezePlanSearchIndexOptions | None = None,
+                             **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexFreezePlan, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_freeze_plan_request(index_name,
+                                                                  self._scope_context,
+                                                                  obs_handler,
+                                                                  options,
+                                                                  **kwargs)
+            return self._freeze_plan(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def unfreeze_plan_deferred(self,
+                               index_name: str,
+                               options: UnfreezePlanSearchIndexOptions | None = None,
+                               **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexUnfreezePlan, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_unfreeze_plan_request(index_name,
+                                                                    self._scope_context,
+                                                                    obs_handler,
+                                                                    options,
+                                                                    **kwargs)
+            return self._unfreeze_plan(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def analyze_document_deferred(self,
+                                  index_name: str,
+                                  document: Any,
+                                  options: AnalyzeDocumentSearchIndexOptions | None = None,
+                                  **kwargs: Any) -> Deferred[dict[str, Any]]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexAnalyzeDocument, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, dict[str, Any]]:
+            req = self._request_builder.build_analyze_document_request(index_name,
+                                                                       document,
+                                                                       self._scope_context,
+                                                                       obs_handler,
+                                                                       options,
+                                                                       **kwargs)
+            return self._analyze_document(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_index_stats_deferred(self,
+                                 index_name: str,
+                                 options: GetSearchIndexStatsOptions | None = None,
+                                 **kwargs: Any) -> Deferred[dict[str, Any]]:
+        obs_handler = ObservableRequestHandler(Op.SearchIndexGetStats, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, dict[str, Any]]:
+            req = self._request_builder.build_get_index_stats_request(index_name,
+                                                                      self._scope_context,
+                                                                      obs_handler,
+                                                                      options,
+                                                                      **kwargs)
+            return self._get_index_stats(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_all_index_stats_deferred(self,
+                                     options: GetAllSearchIndexStatsOptions | None = None,
+                                     **kwargs: Any) -> Deferred[dict[str, Any]]:
+        obs_handler = ObservableRequestHandler(Op.SearchGetStats, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, dict[str, Any]]:
+            req = self._request_builder.build_get_all_index_stats_request(obs_handler, options, **kwargs)
+            return self._get_all_index_stats(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
