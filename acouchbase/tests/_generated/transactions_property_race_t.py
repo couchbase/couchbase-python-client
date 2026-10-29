@@ -21,7 +21,10 @@ from __future__ import annotations
 
 import sys
 import threading
-from typing import Any, ClassVar
+from typing import (Any,
+                    ClassVar,
+                    Protocol,
+                    runtime_checkable)
 
 import pytest
 
@@ -29,15 +32,24 @@ from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterOptions
 from tests.manifest import validate_test_manifest
+from tests.test_features import TestProtocol
 
 CONNSTR = 'couchbase://localhost'
 NUM_THREADS = 16
-# How long the fake Transactions() takes to "construct", wide enough that a regression to a
+# How long the fake transactions impl takes to "construct", wide enough that a regression to a
 # bare check-then-set is hit by every thread in the stampede rather than by an unlucky one.
 CONSTRUCTION_DELAY = 0.05
 
 
+@runtime_checkable
+class _ClassicClusterImpl(Protocol):
+    # What these tests reach on classic's cluster impl, past the interface the facade holds it as.
+    _client_adapter: Any
+    _transactions: Any
+
+
 @pytest.mark.testgen_exclude('txcouchbase', reason='no transactions support in the twisted tree')
+@pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 class TransactionsPropertyRaceTestSuite:
     # Regression guard (PYCBC-1821, the >= 4.6.0 counterpart of PYCBC-1815).
     # `ClusterImpl.transactions` was a bare check-then-set, so threads racing the first
@@ -45,10 +57,11 @@ class TransactionsPropertyRaceTestSuite:
     # orphaned one still owns cleanup threads and a client-record registration.  Generated
     # rather than sync-only, which is the reason it is worth carrying: the async tree holds
     # an independent second copy of the same double-checked lock.  No live cluster is
-    # needed; the cluster is built with `skip_connect` and Transactions is swapped for a fake
-    # that holds the construction window open.  The property reaches the check-then-set only
-    # through a connection guard added by PYCBC-1928, so the two threaded tests stub that out
-    # and the guard has two tests of its own.
+    # needed; the cluster is built with `skip_connect` and the transactions impl is swapped
+    # for a fake that holds the construction window open.  The property reaches the
+    # check-then-set only through a connection guard added by PYCBC-1928, so the two threaded
+    # tests stub that out and the guard has two tests of its own.  Classic-only: the lock, the
+    # guard and the impl module the fake is patched into are all classic's.
 
     TEST_MANIFEST: ClassVar[list[str]] = [
         'test_close_during_first_access_closes_instance',
@@ -56,6 +69,12 @@ class TransactionsPropertyRaceTestSuite:
         'test_transactions_raises_when_closed',
         'test_transactions_raises_when_not_connected',
     ]
+
+    @staticmethod
+    def _classic_impl(cluster: Cluster) -> _ClassicClusterImpl:
+        impl = cluster._impl
+        assert isinstance(impl, _ClassicClusterImpl)
+        return impl
 
     @pytest.fixture(name='unconnected_cluster')
     def cluster_without_core_connection(self) -> Cluster:
@@ -69,7 +88,7 @@ class TransactionsPropertyRaceTestSuite:
                                                   monkeypatch: pytest.MonkeyPatch) -> Cluster:
         # A cluster built with `skip_connect` cannot pass that guard, so without this the two
         # threaded tests below would never reach the check-then-set they exist to drive.
-        monkeypatch.setattr(unconnected_cluster._impl._client_adapter, '_ensure_connected', lambda: None)
+        monkeypatch.setattr(self._classic_impl(unconnected_cluster)._client_adapter, '_ensure_connected', lambda: None)
         return unconnected_cluster
 
     @pytest.fixture(name='tracking_transactions')
@@ -78,17 +97,18 @@ class TransactionsPropertyRaceTestSuite:
                                   unconnected_cluster: Cluster) -> type[Any]:
         # Counts constructions under a lock, signals once one is in flight, and sleeps
         # briefly so the race window stays open regardless of scheduling.  The patch target
-        # is read off the impl rather than written out: each api tree resolves
-        # `Transactions` as a global of its own module, so a literal module path would patch
-        # the sync module and the fake would never be constructed in a generated copy.
+        # is read off the impl rather than written out: each api tree resolves its
+        # transactions impl, named after its cluster impl, as a global of its own module, so a
+        # literal module path would patch the sync module and the fake would never be
+        # constructed in a generated copy.
         lock = threading.Lock()
 
         class _Tracker:
             instances_created = 0
+            close_count = 0
             construction_started = threading.Event()
 
             def __init__(self, cluster: Any) -> None:
-                self.close_count = 0
                 with lock:
                     type(self).instances_created += 1
                 type(self).construction_started.set()
@@ -96,10 +116,11 @@ class TransactionsPropertyRaceTestSuite:
 
             def close(self) -> None:
                 with lock:
-                    self.close_count += 1
+                    type(self).close_count += 1
 
-        monkeypatch.setattr(sys.modules[type(unconnected_cluster._impl).__module__],
-                            'Transactions',
+        cluster_impl = type(unconnected_cluster._impl)
+        monkeypatch.setattr(sys.modules[cluster_impl.__module__],
+                            cluster_impl.__name__.replace('ClusterImpl', 'TransactionsImpl'),
                             _Tracker)
         return _Tracker
 
@@ -123,8 +144,9 @@ class TransactionsPropertyRaceTestSuite:
         txns = result.get('txns')
         assert txns is not None
         assert tracking_transactions.instances_created == 1
-        assert txns.close_count == 1, 'the instance published by the racing first access was never closed'
-        assert race_cluster._impl._transactions is None, 'a live Transactions outlived cluster.close()'
+        msg = 'the instance published by the racing first access was never closed'
+        assert tracking_transactions.close_count == 1, msg
+        assert self._classic_impl(race_cluster)._transactions is None, 'a live Transactions outlived cluster.close()'
 
     @pytest.mark.asyncio
     async def test_concurrent_first_access_returns_single_instance(self,

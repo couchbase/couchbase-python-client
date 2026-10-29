@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,48 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-from typing import TYPE_CHECKING
+"""The `couchbase.transactions.transaction_get_result` import path.
 
-from couchbase.result import ContentProxy
-from couchbase.transcoder import Transcoder
+The declarations live in `couchbase.common.transactions.transaction_get_result`, which every API
+shares, and are re-exported here.
+"""
 
-if TYPE_CHECKING:
-    from couchbase.protocol.classic._pycbc_core import transaction_get_result
+__all__ = [
+    'TransactionGetResult',
+]
 
-log = logging.getLogger(__name__)
-
-
-class TransactionGetResult:
-    def __init__(self,
-                 res,    # type: transaction_get_result
-                 transcoder  # type: Transcoder
-                 ):
-        self._res = res
-        self._transcoder = transcoder
-        self._decoded_value = None
-
-    @property
-    def id(self):
-        return self._res.get("id")
-
-    @property
-    def cas(self):
-        return self._res.get("cas")
-
-    @property
-    def content_as(self):
-        if self._decoded_value:
-            return ContentProxy(self._decoded_value)
-
-        if not self._decoded_value:
-            val, flags = self._res.get('value')
-            if val:
-                self._decoded_value = self._transcoder.decode_value(val, flags)
-                return ContentProxy(self._decoded_value)
-
-        log.debug('Result is missing decoded value ')
-        return ContentProxy('')
-
-    def __str__(self):
-        return f'TransactionGetResult{{id={self.id}, cas={self.cas}, value={self.content_as[str]} }}'
+from couchbase.common.transactions.transaction_get_result import TransactionGetResult  # noqa: F401

@@ -26,12 +26,9 @@
 #include "cpp_core_transactions_types.hxx"
 #include <core/cluster.hxx>
 #include <core/operations.hxx>
-#include <core/transactions/durability_level.hxx>
 #include <core/transactions/internal/exceptions_internal.hxx>
 #include <core/transactions/transaction_get_result.hxx>
 #include <core/utils/json.hxx>
-#include <couchbase/query_scan_consistency.hxx>
-#include <sstream>
 
 void
 pycbc::txns::dealloc_transactions(PyObject* obj)
@@ -61,339 +58,45 @@ pycbc::txns::dealloc_transaction_context(PyObject* obj)
   CB_LOG_DEBUG("dealloc transaction_context");
 }
 
-/* pycbc::txns::transaction_config type methods */
+/* the transaction options blocks, as the core reads them */
 
-void
-pycbc::txns::transaction_config__dealloc__(pycbc::txns::transaction_config* cfg)
-{
-  delete cfg->cfg;
-  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(cfg));
-  CB_LOG_DEBUG("dealloc transaction_config");
-}
-
+/**
+ * The three below hand an options block to the core type it is built for and answer with what
+ * the core made of it.  They are read by the transaction test suites and by nothing else: a
+ * block is a dict of wire keys, so asserting one against a literal would only restate the
+ * table it was built from, and the round trip is what catches a key the table spells one way
+ * and the binding reads another.
+ */
 PyObject*
-pycbc::txns::transaction_config__to_dict__(PyObject* self)
+pycbc::txns::transaction_config_as_dict([[maybe_unused]] PyObject* self, PyObject* pyObj_options)
 {
-  auto conf = reinterpret_cast<pycbc::txns::transaction_config*>(self);
-  PyObject* retval = PyDict_New();
-  add_field(retval, "durability_level", static_cast<int64_t>(conf->cfg->durability_level()));
-  add_field(retval,
-            "cleanup_window",
-            static_cast<int64_t>(conf->cfg->cleanup_config().cleanup_window().count()));
-  add_field(retval, "timeout", static_cast<int64_t>(conf->cfg->timeout().count()));
-  add_bool_field(
-    retval, "cleanup_lost_attempts", conf->cfg->cleanup_config().cleanup_lost_attempts());
-  add_bool_field(
-    retval, "cleanup_client_attempts", conf->cfg->cleanup_config().cleanup_client_attempts());
-  add_field(retval, "scan_consistency", cbpp_to_py(conf->cfg->query_config().scan_consistency()));
-  if (conf->cfg->metadata_collection()) {
-    std::string meta = fmt::format("{}.{}.{}",
-                                   conf->cfg->metadata_collection()->bucket,
-                                   conf->cfg->metadata_collection()->scope,
-                                   conf->cfg->metadata_collection()->collection);
-    add_field(retval, "metadata_collection", meta);
-  }
-  return retval;
-}
-
-static PyMethodDef transaction_config_methods[] = {
-  { "to_dict",
-    (PyCFunction)pycbc::txns::transaction_config__to_dict__,
-    METH_NOARGS,
-    PyDoc_STR("transaction_config as a dict") },
-  { NULL, NULL, 0, NULL }
-};
-
-PyObject*
-pycbc::txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
-{
-  PyObject* durability_level = nullptr;
-  PyObject* cleanup_window = nullptr;
-  PyObject* timeout = nullptr;
-  char* scan_consistency = nullptr;
-  PyObject* cleanup_lost_attempts = nullptr;
-  PyObject* cleanup_client_attempts = nullptr;
-  char* metadata_bucket = nullptr;
-  char* metadata_scope = nullptr;
-  char* metadata_collection = nullptr;
-
-  const char* kw_list[] = { "durability_level",
-                            "cleanup_window",
-                            "timeout",
-                            "cleanup_lost_attempts",
-                            "cleanup_client_attempts",
-                            "metadata_bucket",
-                            "metadata_scope",
-                            "metadata_collection",
-                            "scan_consistency",
-                            nullptr };
-  const char* kw_format = "|OOOOOssss";
-  auto self = reinterpret_cast<pycbc::txns::transaction_config*>(PyType_GenericAlloc(type, 0));
-
-  self->cfg = new cbtxns::transactions_config();
-
-  if (!PyArg_ParseTupleAndKeywords(args,
-                                   kwargs,
-                                   kw_format,
-                                   const_cast<char**>(kw_list),
-                                   &durability_level,
-                                   &cleanup_window,
-                                   &timeout,
-                                   &cleanup_lost_attempts,
-                                   &cleanup_client_attempts,
-                                   &metadata_bucket,
-                                   &metadata_scope,
-                                   &metadata_collection,
-                                   &scan_consistency)) {
-    PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_DECREF(self);
+  if (!PyDict_Check(pyObj_options)) {
+    PyErr_SetString(PyExc_ValueError, "expected a dict of transaction config options");
     return nullptr;
   }
-  if (nullptr != durability_level) {
-    self->cfg->durability_level(
-      static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
-  }
-  if (nullptr != cleanup_window) {
-    self->cfg->cleanup_config().cleanup_window(
-      std::chrono::microseconds(PyLong_AsUnsignedLongLong(cleanup_window)));
-  }
-  if (nullptr != timeout) {
-    self->cfg->timeout(std::chrono::microseconds(PyLong_AsUnsignedLongLong(timeout)));
-  }
-  if (nullptr != cleanup_lost_attempts) {
-    self->cfg->cleanup_config().cleanup_lost_attempts(!!PyObject_IsTrue(cleanup_lost_attempts));
-  }
-  if (nullptr != cleanup_client_attempts) {
-    self->cfg->cleanup_config().cleanup_client_attempts(!!PyObject_IsTrue(cleanup_client_attempts));
-  }
-  if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
-    auto keyspace =
-      cbtxns::transaction_keyspace{ metadata_bucket, metadata_scope, metadata_collection };
-    self->cfg->metadata_collection(keyspace);
-  }
-  if (nullptr != scan_consistency) {
-    PyObject* pyObj_str = PyUnicode_FromString(scan_consistency);
-    self->cfg->query_config().scan_consistency(
-      pycbc::py_to_cbpp<couchbase::query_scan_consistency>(pyObj_str));
-    Py_DECREF(pyObj_str);
-  }
-  return reinterpret_cast<PyObject*>(self);
-}
-
-static PyType_Slot transaction_config_slots[] = {
-  { Py_tp_new, (void*)pycbc::txns::transaction_config__new__ },
-  { Py_tp_dealloc, (void*)pycbc::txns::transaction_config__dealloc__ },
-  { Py_tp_methods, (void*)transaction_config_methods },
-  { Py_tp_doc, (void*)PyDoc_STR("Transaction configuration") },
-  { 0, nullptr }
-};
-
-static PyType_Spec transaction_config_spec = { "pycbc_core.transaction_config",
-                                               sizeof(pycbc::txns::transaction_config),
-                                               0,
-                                               Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-                                               transaction_config_slots };
-
-static PyObject* transaction_config_type_obj = nullptr;
-
-/* pycbc::txns::transaction_options type methods */
-
-void
-pycbc::txns::transaction_options__dealloc__(pycbc::txns::transaction_options* opts)
-{
-  delete opts->opts;
-  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(opts));
-  CB_LOG_DEBUG("dealloc transaction_options");
+  return pycbc::cbpp_to_py(pycbc::py_to_cbpp<cbtxns::transactions_config>(pyObj_options));
 }
 
 PyObject*
-pycbc::txns::transaction_options__to_dict__(PyObject* self)
+pycbc::txns::transaction_options_as_dict([[maybe_unused]] PyObject* self, PyObject* pyObj_options)
 {
-  auto opts = reinterpret_cast<pycbc::txns::transaction_options*>(self);
-  PyObject* retval = PyDict_New();
-  if (opts->opts->timeout()) {
-    add_field(retval, "timeout", static_cast<int64_t>(opts->opts->timeout()->count()));
-  }
-  if (opts->opts->durability_level()) {
-    add_field(
-      retval, "durability_level", static_cast<int64_t>(opts->opts->durability_level().value()));
-  }
-  if (opts->opts->scan_consistency()) {
-    add_field(retval, "scan_consistency", cbpp_to_py(*opts->opts->scan_consistency()));
-  }
-  if (opts->opts->metadata_collection()) {
-    std::string meta = fmt::format("{}.{}.{}",
-                                   opts->opts->metadata_collection()->bucket,
-                                   opts->opts->metadata_collection()->scope,
-                                   opts->opts->metadata_collection()->collection);
-    add_field(retval, "metadata_collection", meta);
-  }
-  return retval;
-}
-
-PyObject*
-pycbc::txns::transaction_options__str__(PyObject* self)
-{
-  auto opts = reinterpret_cast<pycbc::txns::transaction_options*>(self)->opts;
-  std::stringstream stream;
-  stream << "transaction_options{";
-  if (nullptr != opts) {
-    if (opts->durability_level()) {
-      stream << "durability: " << cbcoretxns::durability_level_to_string(*opts->durability_level())
-             << ", ";
-    }
-    if (opts->timeout()) {
-      stream << "timeout: " << opts->timeout()->count() << "ns, ";
-    }
-    if (opts->scan_consistency()) {
-      PyObject* sc_py = cbpp_to_py(*opts->scan_consistency());
-      stream << "scan_consistency: " << PyUnicode_AsUTF8(sc_py);
-      Py_DECREF(sc_py);
-    }
-  }
-  stream << "}";
-  return PyUnicode_FromString(stream.str().c_str());
-}
-
-static PyMethodDef transaction_options_methods[] = {
-  { "to_dict",
-    (PyCFunction)pycbc::txns::transaction_options__to_dict__,
-    METH_NOARGS,
-    PyDoc_STR("transaction_options as a dict") },
-  { NULL, NULL, 0, NULL }
-};
-
-PyObject*
-pycbc::txns::transaction_options__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
-{
-  PyObject* durability_level = nullptr;
-  PyObject* timeout = nullptr;
-  char* scan_consistency = nullptr;
-  char* metadata_bucket = nullptr;
-  char* metadata_scope = nullptr;
-  char* metadata_collection = nullptr;
-
-  const char* kw_list[] = {
-    "durability_level",    "timeout", "scan_consistency", "metadata_bucket", "metadata_scope",
-    "metadata_collection", nullptr
-  };
-  const char* kw_format = "|OOssss";
-  auto self = reinterpret_cast<pycbc::txns::transaction_options*>(PyType_GenericAlloc(type, 0));
-
-  self->opts = new cbtxns::transaction_options();
-  CB_LOG_DEBUG("transaction_options__new__ called");
-  if (!PyArg_ParseTupleAndKeywords(args,
-                                   kwargs,
-                                   kw_format,
-                                   const_cast<char**>(kw_list),
-                                   &durability_level,
-                                   &timeout,
-                                   &scan_consistency,
-                                   &metadata_bucket,
-                                   &metadata_scope,
-                                   &metadata_collection)) {
-    PyErr_SetString(PyExc_ValueError, "couldn't parse args");
-    Py_DECREF(self);
+  if (!PyDict_Check(pyObj_options)) {
+    PyErr_SetString(PyExc_ValueError, "expected a dict of transaction options");
     return nullptr;
   }
-  if (nullptr != durability_level) {
-    self->opts->durability_level(
-      static_cast<couchbase::durability_level>(PyLong_AsUnsignedLong(durability_level)));
-  }
-  if (nullptr != timeout) {
-    self->opts->timeout(std::chrono::microseconds(PyLong_AsUnsignedLongLong(timeout)));
-  }
-  if (nullptr != scan_consistency) {
-    PyObject* pyObj_str = PyUnicode_FromString(scan_consistency);
-    self->opts->scan_consistency(pycbc::py_to_cbpp<couchbase::query_scan_consistency>(pyObj_str));
-    Py_DECREF(pyObj_str);
-  }
-  if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
-    auto keyspace =
-      cbtxns::transaction_keyspace{ metadata_bucket, metadata_scope, metadata_collection };
-    self->opts->metadata_collection(keyspace);
-  }
-
-  return reinterpret_cast<PyObject*>(self);
-}
-
-static PyType_Slot transaction_options_slots[] = {
-  { Py_tp_new, (void*)pycbc::txns::transaction_options__new__ },
-  { Py_tp_str, (void*)pycbc::txns::transaction_options__str__ },
-  { Py_tp_dealloc, (void*)pycbc::txns::transaction_options__dealloc__ },
-  { Py_tp_methods, (void*)transaction_options_methods },
-  { Py_tp_doc, (void*)PyDoc_STR("Transaction options") },
-  { 0, nullptr }
-};
-
-static PyType_Spec transaction_options_spec = { "pycbc_core.transaction_options",
-                                                sizeof(pycbc::txns::transaction_options),
-                                                0,
-                                                Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-                                                transaction_options_slots };
-
-static PyObject* transaction_options_type_obj = nullptr;
-
-/* pycbc::txns::transaction_query_options type methods */
-
-void
-pycbc::txns::transaction_query_options__dealloc__(pycbc::txns::transaction_query_options* opts)
-{
-  delete opts->opts;
-  pycbc::free_heap_type_instance(reinterpret_cast<PyObject*>(opts));
-  CB_LOG_DEBUG("dealloc transaction_query_options");
+  return pycbc::cbpp_to_py(pycbc::py_to_cbpp<cbtxns::transaction_options>(pyObj_options));
 }
 
 PyObject*
-pycbc::txns::transaction_query_options__to_dict__(PyObject* self)
+pycbc::txns::transaction_query_options_as_dict([[maybe_unused]] PyObject* self,
+                                               PyObject* pyObj_options)
 {
-  auto opts = reinterpret_cast<pycbc::txns::transaction_query_options*>(self);
-  return pycbc::cbpp_to_py(*opts->opts);
-}
-
-static PyMethodDef transaction_query_options_methods[] = {
-  { "to_dict",
-    (PyCFunction)pycbc::txns::transaction_query_options__to_dict__,
-    METH_NOARGS,
-    PyDoc_STR("transaction_query_options as a dict") },
-  { NULL, NULL, 0, NULL }
-};
-
-PyObject*
-pycbc::txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
-{
-  PyObject* pyObj_query_args = nullptr;
-  const char* kw_list[] = { "query_args", nullptr };
-  const char* kw_format = "|O";
-  if (!PyArg_ParseTupleAndKeywords(
-        args, kwargs, kw_format, const_cast<char**>(kw_list), &pyObj_query_args)) {
-    PyErr_SetString(PyExc_ValueError, "couldn't parse args");
+  if (!PyDict_Check(pyObj_options)) {
+    PyErr_SetString(PyExc_ValueError, "expected a dict of transaction query options");
     return nullptr;
   }
-  auto self =
-    reinterpret_cast<pycbc::txns::transaction_query_options*>(PyType_GenericAlloc(type, 0));
-  auto opts =
-    pycbc::py_to_cbpp<couchbase::transactions::transaction_query_options>(pyObj_query_args);
-  self->opts = new couchbase::transactions::transaction_query_options(std::move(opts));
-  return reinterpret_cast<PyObject*>(self);
+  return pycbc::cbpp_to_py(pycbc::py_to_cbpp<cbtxns::transaction_query_options>(pyObj_options));
 }
-
-static PyType_Slot transaction_query_options_slots[] = {
-  { Py_tp_new, (void*)pycbc::txns::transaction_query_options__new__ },
-  { Py_tp_dealloc, (void*)pycbc::txns::transaction_query_options__dealloc__ },
-  { Py_tp_methods, (void*)transaction_query_options_methods },
-  { Py_tp_doc, (void*)PyDoc_STR("Transaction query options") },
-  { 0, nullptr }
-};
-
-static PyType_Spec transaction_query_options_spec = { "pycbc_core.transaction_query_options",
-                                                      sizeof(
-                                                        pycbc::txns::transaction_query_options),
-                                                      0,
-                                                      Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-                                                      transaction_query_options_slots };
-
-static PyObject* transaction_query_options_type_obj = nullptr;
 
 /* pycbc::txns::transaction_get_result type methods */
 
@@ -408,19 +111,13 @@ pycbc::txns::transaction_get_result__dealloc__(pycbc::txns::transaction_get_resu
 PyObject*
 pycbc::txns::transaction_get_result__str__(pycbc::txns::transaction_get_result* result)
 {
-  if (result->res->content().data.size() != 0) {
-    auto value = reinterpret_cast<const char*>(result->res->content().data.data());
-    auto flags = result->res->content().flags;
-    return PyUnicode_FromFormat("transaction_get_result:{key=%s, cas=%llu, value=%s, flags=%lu}",
-                                result->res->id().key().c_str(),
-                                result->res->cas(),
-                                value,
-                                flags);
-  } else {
-    return PyUnicode_FromFormat("transaction_get_result:{key=%s, cas=%llu}",
-                                result->res->id().key().c_str(),
-                                result->res->cas());
-  }
+  // The body is the application's data and is not NUL terminated, so the size stands in for it.
+  return PyUnicode_FromFormat(
+    "transaction_get_result:{key=%s, cas=%llu, value_size=%zu, flags=%lu}",
+    result->res->id().key().c_str(),
+    static_cast<unsigned long long>(result->res->cas().value()),
+    result->res->content().data.size(),
+    static_cast<unsigned long>(result->res->content().flags));
 }
 
 // TODO: a better way later, perhaps an exposed enum like operations
@@ -635,30 +332,6 @@ pycbc::txns::add_transaction_objects(PyObject* pyObj_module)
     return nullptr;
   }
 
-  transaction_config_type_obj = PyType_FromSpec(&transaction_config_spec);
-  if (transaction_config_type_obj == nullptr) {
-    return nullptr;
-  }
-  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_config_type_obj) < 0) {
-    return nullptr;
-  }
-
-  transaction_query_options_type_obj = PyType_FromSpec(&transaction_query_options_spec);
-  if (transaction_query_options_type_obj == nullptr) {
-    return nullptr;
-  }
-  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_query_options_type_obj) < 0) {
-    return nullptr;
-  }
-
-  transaction_options_type_obj = PyType_FromSpec(&transaction_options_spec);
-  if (transaction_options_type_obj == nullptr) {
-    return nullptr;
-  }
-  if (PyModule_AddType(pyObj_module, (PyTypeObject*)transaction_options_type_obj) < 0) {
-    return nullptr;
-  }
-
   transaction_get_multi_result_type_obj = PyType_FromSpec(&transaction_get_multi_result_spec);
   if (transaction_get_multi_result_type_obj == nullptr) {
     return nullptr;
@@ -695,8 +368,9 @@ pycbc::txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args
     return raise_invalid_argument("conn must be a pycbc_connection object", __FILE__, __LINE__);
   }
 
-  if (nullptr == pyObj_config) {
-    return raise_invalid_argument("expected a TransactionConfig object", __FILE__, __LINE__);
+  if (nullptr == pyObj_config || !PyDict_Check(pyObj_config)) {
+    return raise_invalid_argument(
+      "expected a dict of transaction config options", __FILE__, __LINE__);
   }
 
   // Extract pycbc_connection and get cluster reference
@@ -707,10 +381,10 @@ pycbc::txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args
 
   std::pair<std::error_code, std::shared_ptr<cbcoretxns::transactions>> res;
   try {
-    auto txn_config = reinterpret_cast<pycbc::txns::transaction_config*>(pyObj_config)->cfg;
+    auto txn_config = pycbc::py_to_cbpp<cbtxns::transactions_config>(pyObj_config);
     gil_release_guard no_gil;
     std::future<std::pair<std::error_code, std::shared_ptr<cbcoretxns::transactions>>> fut =
-      cbcoretxns::transactions::create(conn->conn->cluster(), *txn_config);
+      cbcoretxns::transactions::create(conn->conn->cluster(), txn_config);
     res = fut.get();
   } catch (const std::exception& e) {
     set_runtime_error_if_unset(e.what());
@@ -773,60 +447,6 @@ pycbc::txns::destroy_transactions([[maybe_unused]] PyObject* self, PyObject* arg
     return nullptr;
   }
   Py_RETURN_NONE;
-}
-
-std::string
-txn_external_exception_to_string(cbcoretxns::external_exception ext_exception)
-{
-  switch (ext_exception) {
-    case cbcoretxns::external_exception::UNKNOWN:
-      return "unknown";
-    case cbcoretxns::external_exception::COUCHBASE_EXCEPTION:
-      return "couchbase_exception";
-    case cbcoretxns::external_exception::NOT_SET:
-      return "not_set";
-    case cbcoretxns::external_exception::ACTIVE_TRANSACTION_RECORD_ENTRY_NOT_FOUND:
-      return "active_transaction_record_entry_not_found";
-    case cbcoretxns::external_exception::ACTIVE_TRANSACTION_RECORD_FULL:
-      return "active_transaction_record_full";
-    case cbcoretxns::external_exception::COMMIT_NOT_PERMITTED:
-      return "commit_not_permitted";
-    case cbcoretxns::external_exception::ACTIVE_TRANSACTION_RECORD_NOT_FOUND:
-      return "active_transaction_record_not_found";
-    case cbcoretxns::external_exception::CONCURRENT_OPERATIONS_DETECTED_ON_SAME_DOCUMENT:
-      return "concurrent_operations_detected_on_same_document";
-    case cbcoretxns::external_exception::DOCUMENT_ALREADY_IN_TRANSACTION:
-      return "document_already_in_transaction";
-    case cbcoretxns::external_exception::DOCUMENT_EXISTS_EXCEPTION:
-      return "document_exists_exception";
-    case cbcoretxns::external_exception::DOCUMENT_NOT_FOUND_EXCEPTION:
-      return "document_not_found_exception";
-    case cbcoretxns::external_exception::FEATURE_NOT_AVAILABLE_EXCEPTION:
-      return "feature_not_available_exception";
-    case cbcoretxns::external_exception::FORWARD_COMPATIBILITY_FAILURE:
-      return "forward_compatibility_failure";
-    case cbcoretxns::external_exception::ILLEGAL_STATE_EXCEPTION:
-      return "illegal_state_exception";
-    case cbcoretxns::external_exception::PARSING_FAILURE:
-      return "parsing_failure";
-    case cbcoretxns::external_exception::PREVIOUS_OPERATION_FAILED:
-      return "previous_operation_failed";
-    case cbcoretxns::external_exception::REQUEST_CANCELED_EXCEPTION:
-      return "request_canceled_exception";
-    case cbcoretxns::external_exception::ROLLBACK_NOT_PERMITTED:
-      return "rollback_not_permitted";
-    case cbcoretxns::external_exception::SERVICE_NOT_AVAILABLE_EXCEPTION:
-      return "service_not_available_exception";
-    case cbcoretxns::external_exception::TRANSACTION_ABORTED_EXTERNALLY:
-      return "transaction_aborted_externally";
-    case cbcoretxns::external_exception::TRANSACTION_ALREADY_ABORTED:
-      return "transaction_already_aborted";
-    case cbcoretxns::external_exception::TRANSACTION_ALREADY_COMMITTED:
-      return "transaction_already_committed";
-    case cbcoretxns::external_exception::DOCUMENT_UNRETRIEVABLE_EXCEPTION:
-      return "document_unretrievable_exception";
-  }
-  return "unknown";
 }
 
 PyObject*
@@ -1205,7 +825,14 @@ pycbc::txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* arg
     PyErr_SetString(PyExc_ValueError, "expected options");
     return nullptr;
   }
-  auto opt = reinterpret_cast<pycbc::txns::transaction_query_options*>(pyObj_options);
+  if (!PyDict_Check(pyObj_options)) {
+    PyErr_SetString(PyExc_ValueError, "expected a dict of transaction query options");
+    return nullptr;
+  }
+  // Converted here rather than below because the conversion reads Python objects and the
+  // call itself runs without the GIL.  `query` copies what it is given, so the local
+  // outlives nothing it needs to.
+  auto query_options = pycbc::py_to_cbpp<cbtxns::transaction_query_options>(pyObj_options);
   if ((nullptr == pyObj_callback) != (nullptr == pyObj_errback)) {
     PyErr_SetString(PyExc_ValueError,
                     "callback and errback must both be provided or both be omitted");
@@ -1219,7 +846,7 @@ pycbc::txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* arg
     gil_release_guard no_gil;
     ctx->ctx->query(
       statement,
-      *opt->opts,
+      query_options,
       [pyObj_callback, pyObj_errback, barrier](
         std::exception_ptr err, std::optional<couchbase::core::operations::query_response> resp) {
         handle_returning_query_result(pyObj_callback, pyObj_errback, barrier, err, resp);
@@ -1748,17 +1375,13 @@ pycbc::txns::create_transaction_context([[maybe_unused]] PyObject* self,
     PyErr_SetString(PyExc_ValueError, "passed null transactions");
     return nullptr;
   }
-  if (nullptr != pyObj_transaction_options) {
-    if (!PyObject_IsInstance(pyObj_transaction_options, transaction_options_type_obj)) {
-      PyErr_SetString(PyExc_ValueError, "expected a valid transaction_options object");
-      return nullptr;
-    }
+  if (nullptr != pyObj_transaction_options && Py_None != pyObj_transaction_options &&
+      !PyDict_Check(pyObj_transaction_options)) {
+    PyErr_SetString(PyExc_ValueError, "expected a dict of transaction options");
+    return nullptr;
   }
 
-  auto tx_options =
-    nullptr != pyObj_transaction_options && Py_None != pyObj_transaction_options
-      ? *(reinterpret_cast<pycbc::txns::transaction_options*>(pyObj_transaction_options)->opts)
-      : cbtxns::transaction_options();
+  auto tx_options = pycbc::py_to_cbpp<cbtxns::transaction_options>(pyObj_transaction_options);
   pycbc::txns::transaction_context* py_ctx = nullptr;
   try {
     py_ctx = new pycbc::txns::transaction_context(
@@ -1836,7 +1459,7 @@ pycbc::txns::transaction_commit([[maybe_unused]] PyObject* self, PyObject* args,
               exc_type = pycbc::txns::TxnExceptionType::TRANSACTION_EXPIRED;
               break;
           }
-          auto message = txn_external_exception_to_string(err->cause());
+          std::string message = err->what();
           pyObj_result = create_python_exception(exc_type, message.c_str());
         } else {
           pyObj_result = transaction_result_to_dict(res);

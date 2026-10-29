@@ -15,134 +15,111 @@
 
 from __future__ import annotations
 
-import logging
-from functools import wraps
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Awaitable,
-                    Callable,
-                    Coroutine,
-                    List,
-                    Optional,
-                    Tuple,
-                    Union)
+__all__ = [
+    'AttemptContext',
+    'Transactions',
+]
 
+import logging
+from collections.abc import (Awaitable,
+                             Callable,
+                             Coroutine)
+from typing import TYPE_CHECKING, Any
+
+from couchbase.common._capabilities import Capability, require
 from couchbase.common._supportability import Supportability
-from couchbase.exceptions import ErrorMapper
-from couchbase.options import (TransactionGetMultiOptions,
-                               TransactionGetMultiReplicasFromPreferredServerGroupOptions,
-                               TransactionGetOptions,
-                               TransactionGetReplicaFromPreferredServerGroupOptions,
-                               TransactionInsertOptions,
-                               TransactionQueryOptions,
-                               TransactionReplaceOptions)
-from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
-from couchbase.transactions import (TransactionGetMultiReplicasFromPreferredServerGroupResult,
-                                    TransactionGetMultiReplicasFromPreferredServerGroupSpec,
-                                    TransactionGetMultiResult,
-                                    TransactionGetMultiSpec,
-                                    TransactionGetResult,
-                                    TransactionQueryResults,
-                                    TransactionResult)
-from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
+from couchbase.common.exceptions import (TransactionExpired,
+                                         TransactionFailed,
+                                         TransactionOperationFailed)
+from couchbase.transactions.transaction_result import TransactionResult
 
 if TYPE_CHECKING:
-    from asyncio import AbstractEventLoop
-
     from acouchbase.collection import AsyncCollection
-    from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
-    from couchbase._utils import JSONType
-    from couchbase.options import TransactionOptions
-    from couchbase.protocol.classic._pycbc_core import transaction_options
-    from couchbase.protocol.classic._pycbc_core.pycbc_core_types import TransactionsCapsuleType
-    from couchbase.transcoder import Transcoder
-
-log = logging.getLogger(__name__)
-
-
-class AsyncWrapper:
-    @staticmethod
-    def call_async_fn(ftr, self, fn, *args, **kwargs):
-        try:
-            fn(self, *args, **kwargs)
-        except SystemError as e:
-            ftr.set_exception(e.__cause__)
-        except Exception as e:
-            ftr.set_exception(e)
-
-    @classmethod  # noqa: C901
-    def inject_callbacks(cls, return_cls):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                ftr = self._loop.create_future()
-                tc = kwargs.get('transcoder', self._transcoder)
-
-                def on_ok(res):
-                    log.debug('%s completed, with %s', fn.__name__, res)
-                    # BUG(PYCBC-1476): We might not need this once txn bug is fixed
-                    if isinstance(res, PycbcCoreException):
-                        self._loop.call_soon_threadsafe(ftr.set_exception, ErrorMapper.build_exception(res))
-                    else:
-                        try:
-                            if return_cls is TransactionGetResult:
-                                result = return_cls(res, tc)
-                            elif (return_cls is TransactionGetMultiResult
-                                  or return_cls is TransactionGetMultiReplicasFromPreferredServerGroupResult):
-                                result = return_cls(res, [spec.transcoder for spec in args[0]], tc)
-                            else:
-                                result = return_cls(res) if return_cls is not None else None
-                            self._loop.call_soon_threadsafe(ftr.set_result, result)
-                        except Exception as e:
-                            log.error('on_ok raised %s, %s', e, e.__cause__)
-                            self._loop.call_soon_threadsafe(ftr.set_exception, e)
-
-                def on_err(exc):
-                    log.error('%s got on_err called with %s', fn.__name__, exc)
-                    try:
-                        if not exc:
-                            exc = RuntimeError(f'unknown error calling {fn.__name__}')
-                        if isinstance(exc, PycbcCoreException):
-                            self._loop.call_soon_threadsafe(ftr.set_exception, ErrorMapper.build_exception(exc))
-                        else:
-                            self._loop.call_soon_threadsafe(ftr.set_exception, exc)
-                    except Exception as e:
-                        self._loop.call_soon_threadsafe(ftr.set_exception, e)
-
-                kwargs["callback"] = on_ok
-                kwargs["errback"] = on_err
-                AsyncWrapper.call_async_fn(ftr, self, fn, *args, **kwargs)
-                return ftr
-
-            return wrapped_fn
-
-        return decorator
+    from couchbase.common._interfaces._transactions import AsyncAttemptContextInterface, AsyncTransactionsInterface
+    from couchbase.common._utils import JSONType
+    from couchbase.options import (TransactionGetMultiOptions,
+                                   TransactionGetMultiReplicasFromPreferredServerGroupOptions,
+                                   TransactionGetOptions,
+                                   TransactionGetReplicaFromPreferredServerGroupOptions,
+                                   TransactionInsertOptions,
+                                   TransactionOptions,
+                                   TransactionQueryOptions,
+                                   TransactionReplaceOptions)
+    from couchbase.transactions import (TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                        TransactionGetMultiReplicasFromPreferredServerGroupSpec,
+                                        TransactionGetMultiResult,
+                                        TransactionGetMultiSpec,
+                                        TransactionGetResult,
+                                        TransactionQueryResults)
 
 
-class Transactions(TransactionsLogic):
+log = logging.getLogger('couchbase.transactions')
 
-    def __init__(self, cluster: AsyncClusterImpl) -> None:
-        self._loop = cluster.loop
-        super().__init__(cluster.connection,
-                         cluster.cluster_settings.transaction_config,
-                         cluster.cluster_settings.default_serializer)
+
+class Transactions:
+
+    def __init__(self, impl: AsyncTransactionsInterface) -> None:
+        self._impl = impl
 
     async def run(self,
-                  txn_logic,  # type: Callable[[AttemptContext], Coroutine[Any, Any, None]]
-                  transaction_options=None,  # type: Optional[TransactionOptions]
-                  **kwargs) -> TransactionResult:
-        opts = None
-        if transaction_options:
-            opts = transaction_options._base
+                  txn_logic: Callable[[AttemptContext], Coroutine[Any, Any, None]],
+                  transaction_options: TransactionOptions | None = None,
+                  **kwargs: Any) -> TransactionResult:
+        """ Run a set of operations within a transaction.
+
+        Args:
+            txn_logic (Callable[:class:`~acouchbase.transactions.AttemptContext`]): The coroutine function holding the
+                transaction logic to perform.
+            transaction_options (:class:`~couchbase.options.TransactionOptions`): Options to override those in the
+                :class:`~couchbase.options.TransactionConfig` for this transaction only.
+            **kwargs (dict[str, Any]): Override options for this transaction only - currently unimplemented.
+
+                .. deprecated:: 4.1.0
+                    The ``per_txn_config`` keyword is deprecated; pass ``transaction_options`` instead.
+
+        Returns:
+            :class:`~couchbase.transactions.TransactionResult`: Results of the transaction.
+
+        Raises:
+              :class:`~couchbase.exceptions.TransactionFailed`: If the transaction failed.
+              :class:`~couchbase.exceptions.TransactionExpired`: If the transaction expired.
+              :class:`~couchbase.exceptions.TransactionCommitAmbiguous`: If the transaction's commit was ambiguous. See
+                  :class:`~couchbase.exceptions.TransactionCommitAmbiguous` for a detailed description.
+        """
+        opts = transaction_options or None
         if 'per_txn_config' in kwargs:
             Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
             opts = kwargs.pop('per_txn_config', None)
 
-        txn_result = await super().run_async(txn_logic, AttemptContext(self._txns, self._loop, self._transcoder, opts))
-        return TransactionResult(**txn_result)
+        attempt = self._impl.begin_transaction(opts, **kwargs)
+        ctx = AttemptContext(attempt)
+        while True:
+            await attempt.begin_attempt()
+            try:
+                await txn_logic(ctx)
+            except TransactionOperationFailed as ex:
+                # The failed operation is recorded against the attempt, so committing does not
+                # commit: it hands the failure to the impl, which rolls back and either asks for
+                # another attempt or raises.
+                try:
+                    res = await attempt.commit()
+                except TransactionFailed as failed:
+                    raise TransactionFailed(failed.message, context=failed.error_context,
+                                            exc_info={'inner_cause': ex}) from None
+            except BaseException as ex:
+                # Cancelled or interrupted too: the staged mutations still hold their documents.
+                await attempt.rollback()
+                if isinstance(ex, TransactionExpired) or not isinstance(ex, Exception):
+                    raise ex from None
+                raise TransactionFailed(exc_info={'inner_cause': ex}) from None
+            else:
+                res = await attempt.commit()
+            if not res:
+                continue
+            return TransactionResult(res)
 
     # TODO: make async?
-    def close(self):
+    def close(self) -> None:
         """
         Close the transactions.   No transactions can be performed on this instance after this is called.  There
         is no need to call this, as the transactions close automatically when the transactions object goes out of scope.
@@ -151,52 +128,20 @@ class Transactions(TransactionsLogic):
             None
         """
         # stop transactions object -- ideally this is done before closing the cluster.
-        super().close()
+        self._impl.close()
         log.info("transactions closed")
 
 
-class AttemptContext(AttemptContextLogic):
+class AttemptContext:
 
-    def __init__(self,
-                 ctx,         # type: TransactionsCapsuleType
-                 loop,        # type: AbstractEventLoop
-                 transcoder,  # type: Transcoder
-                 opts         # type: Optional[transaction_options]
-                 ):
-        super().__init__(ctx, transcoder, loop, opts)
-
-    @AsyncWrapper.inject_callbacks(None)
-    def _new_attempt(self,
-                     **kwargs  # type: Any
-                     ) -> Awaitable[None]:
-        return super()._new_attempt_async(**kwargs)
-
-    @AsyncWrapper.inject_callbacks(None)
-    def _rollback(self,
-                  **kwargs  # type: Any
-                  ) -> Awaitable[None]:
-        return super()._rollback_async(**kwargs)
-
-    @AsyncWrapper.inject_callbacks(TransactionResult)
-    def _commit(self,
-                **kwargs  # type: Any
-                ) -> Awaitable[TransactionResult]:
-        return super()._commit_async(**kwargs)
-
-    @AsyncWrapper.inject_callbacks(TransactionGetResult)
-    def _get(self,
-             coll,     # type: AsyncCollection
-             key,      # type: str
-             **kwargs  # type: Any
-             ) -> Awaitable[TransactionGetResult]:
-        return super().get(coll, key, **kwargs)
+    def __init__(self, impl: AsyncAttemptContextInterface) -> None:
+        self._impl = impl
 
     def get(self,
-            coll,          # type: AsyncCollection
-            key,           # type: str
-            options=None,  # type: Optional[TransactionGetOptions]
-            **kwargs       # type: Any
-            ) -> Awaitable[TransactionGetResult]:
+            coll: AsyncCollection,
+            key: str,
+            options: TransactionGetOptions | None = None,
+            **kwargs: Any) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction.
 
@@ -204,7 +149,7 @@ class AttemptContext(AttemptContextLogic):
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
             options (:class:`~couchbase.options.TransactionGetOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetOptions`
 
         Returns:
@@ -212,27 +157,18 @@ class AttemptContext(AttemptContextLogic):
             for passing to other transaction operations. Or `None` if the document was not found.
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
-            no need to handle the exception, as the transaction will rollback regardless.
+                no need to handle the exception, as the transaction will rollback regardless.
 
         """
-        if 'transcoder' not in kwargs and isinstance(options, TransactionGetOptions):
-            kwargs['transcoder'] = options.get('transcoder', None)
-        return self._get(coll, key, **kwargs)
+        return self._impl.get(coll, key, options, **kwargs)
 
-    @AsyncWrapper.inject_callbacks(TransactionGetResult)
-    def _get_replica_from_preferred_server_group(self,
-                                                 coll,     # type: AsyncCollection
-                                                 key,      # type: str
-                                                 **kwargs  # type: Any
-                                                 ) -> Awaitable[TransactionGetResult]:
-        return super().get_replica_from_preferred_server_group(coll, key, **kwargs)
-
-    def get_replica_from_preferred_server_group(self,
-                                                coll,          # type: AsyncCollection
-                                                key,           # type: str
-                                                options=None,  # type: Optional[TransactionGetReplicaFromPreferredServerGroupOptions]  # noqa: E501
-                                                **kwargs       # type: Any
-                                                ) -> Awaitable[TransactionGetResult]:
+    def get_replica_from_preferred_server_group(
+            self,
+            coll: AsyncCollection,
+            key: str,
+            options: TransactionGetReplicaFromPreferredServerGroupOptions | None = None,
+            **kwargs: Any
+    ) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction from any replica in the preferred server group that is specified in
             the :class:`couchbase.options.ClusterOptions`.
@@ -242,7 +178,7 @@ class AttemptContext(AttemptContextLogic):
             key (str): document key.
             options (:class:`~couchbase.options.TransactionGetReplicaFromPreferredServerGroupOptions`): Optional
                 parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetReplicaFromPreferredServerGroupOptions`
 
         Returns:
@@ -255,100 +191,76 @@ class AttemptContext(AttemptContextLogic):
                 any replica in the preferred server group. The transaction will not rollback if this exception is
                 caught.
         """
-        if 'transcoder' not in kwargs and isinstance(options, TransactionGetReplicaFromPreferredServerGroupOptions):
-            kwargs['transcoder'] = options.get('transcoder', None)
-        return self._get_replica_from_preferred_server_group(coll, key, **kwargs)
-
-    @AsyncWrapper.inject_callbacks(TransactionGetMultiResult)
-    def _get_multi(self,
-                   specs,    # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec, ...]]
-                   **kwargs  # type: Any
-                   ) -> Awaitable[TransactionGetMultiResult]:
-        return super().get_multi(specs, **kwargs)
+        impl = require(self._impl, Capability.TRANSACTIONS_PREFERRED_SERVER_GROUP)
+        return impl.get_replica_from_preferred_server_group(coll, key, options, **kwargs)
 
     def get_multi(self,
-                  specs,         # type: Union[List[TransactionGetMultiSpec], Tuple[TransactionGetMultiSpec, ...]]
-                  options=None,  # type: Optional[TransactionGetMultiOptions]
-                  **kwargs       # type: Any
-                  ) -> Awaitable[TransactionGetMultiResult]:
+                  specs: list[TransactionGetMultiSpec] | tuple[TransactionGetMultiSpec, ...],
+                  options: TransactionGetMultiOptions | None = None,
+                  **kwargs: Any) -> Awaitable[TransactionGetMultiResult]:
         """
         Get a document within this transaction.
 
         Args:
-            specs (Union[List[:class:`~couchbase.transactions.TransactionGetMultiSpec`], Tuple[:class:`~couchbase.transactions.TransactionGetMultiSpec`]]):
+            specs (list[:class:`~couchbase.transactions.TransactionGetMultiSpec`] | tuple[:class:`~couchbase.transactions.TransactionGetMultiSpec`]):
                 The required information for the documents involved for this operation.
-            options (:class:`~couchbase.options.TransactionGetMultiOptions`, optional): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            options (:class:`~couchbase.options.TransactionGetMultiOptions`, optional): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetMultiOptions`
 
         Returns:
-            :class:`couchbase.transactions.TransactionGetMultiResult`: Document in collection, in a form useful for passing
-                to other transaction operations. Or `None` if the document was not found.
+            :class:`~couchbase.transactions.TransactionGetMultiResult`: Collection of results from the operation.
+
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """  # noqa: E501
-        if 'mode' not in kwargs and isinstance(options, TransactionGetMultiOptions):
-            kwargs['mode'] = options.get('mode', None)
-        return self._get_multi(specs, **kwargs)
+        return self._impl.get_multi(specs, options, **kwargs)
 
-    @AsyncWrapper.inject_callbacks(TransactionGetMultiReplicasFromPreferredServerGroupResult)
-    def _get_multi_replicas_from_preferred_server_group(self,
-                                                        specs,    # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]]  # noqa: E501
-                                                        **kwargs  # type: Any
-                                                        ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:  # noqa: E501
-        return super().get_multi_replicas_from_preferred_server_group(specs, **kwargs)
-
-    def get_multi_replicas_from_preferred_server_group(self,
-                                                       specs,         # type: Union[List[TransactionGetMultiReplicasFromPreferredServerGroupSpec], Tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]] # noqa: E501
-                                                       options=None,  # type: Optional[TransactionGetMultiReplicasFromPreferredServerGroupOptions]  # noqa: E501
-                                                       **kwargs       # type: Any
-                                                       ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:  # noqa: E501
+    def get_multi_replicas_from_preferred_server_group(
+            self,
+            specs: (list[TransactionGetMultiReplicasFromPreferredServerGroupSpec]
+                    | tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]),
+            options: TransactionGetMultiReplicasFromPreferredServerGroupOptions | None = None,
+            **kwargs: Any
+    ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:
         """
         Get multiple documents within this transaction from any replica.
 
         Args:
-            specs (Union[List[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`], Tuple[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`]]):
+            specs (list[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`] | tuple[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`]):
                 The required information for the documents involved for this operation.
-            options (:class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`, optional): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            options (:class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`, optional):
+                Optional parameters for this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`
 
         Returns:
-            :class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupResult`: Collection of results from the operation.
+            :class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupResult`: Collection of
+            results from the operation.
         Raises:
             :class:`~couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """  # noqa: E501
-        if 'mode' not in kwargs and isinstance(options, TransactionGetMultiReplicasFromPreferredServerGroupOptions):
-            kwargs['mode'] = options.get('mode', None)
-        return self._get_multi_replicas_from_preferred_server_group(specs, **kwargs)
-
-    @AsyncWrapper.inject_callbacks(TransactionGetResult)
-    def _insert(self,
-                coll,     # type: AsyncCollection
-                key,      # type: str
-                value,    # type: JSONType
-                **kwargs  # type: Any
-                ) -> Awaitable[TransactionGetResult]:
-        return super().insert(coll, key, value, **kwargs)
+        impl = require(self._impl, Capability.TRANSACTIONS_PREFERRED_SERVER_GROUP)
+        return impl.get_multi_replicas_from_preferred_server_group(specs, options, **kwargs)
 
     def insert(self,
-               coll,          # type: AsyncCollection
-               key,           # type: str
-               value,         # type: JSONType
-               options=None,  # type: Optional[TransactionInsertOptions]
-               **kwargs       # type: Any
-               ) -> Awaitable[TransactionGetResult]:
+               coll: AsyncCollection,
+               key: str,
+               value: JSONType,
+               options: TransactionInsertOptions | None = None,
+               **kwargs: Any) -> Awaitable[TransactionGetResult]:
         """
         Insert a new document within a transaction.
 
         Args:
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
-            value (:class:`couchbase._utils.JSONType):  Contents of the document.
+            value (:class:`couchbase.common._utils.JSONType):  Contents of the document.
             options (:class:`~couchbase.options.TransactionInsertOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionInsertOptions`
 
         Returns:
@@ -359,33 +271,22 @@ class AttemptContext(AttemptContextLogic):
                 no need to handle the exception, as the transaction will rollback regardless.
 
         """
-        if 'transcoder' not in kwargs and isinstance(options, TransactionInsertOptions):
-            kwargs['transcoder'] = options.get('transcoder', None)
-        return self._insert(coll, key, value, **kwargs)
-
-    @AsyncWrapper.inject_callbacks(TransactionGetResult)
-    def _replace(self,
-                 txn_get_result,  # type: TransactionGetResult
-                 value,           # type: JSONType
-                 **kwargs         # type: Any
-                 ) -> Awaitable[TransactionGetResult]:
-        return super().replace(txn_get_result, value, **kwargs)
+        return self._impl.insert(coll, key, value, options, **kwargs)
 
     def replace(self,
-                txn_get_result,  # type: TransactionGetResult
-                value,           # type: JSONType
-                options=None,    # type: Optional[TransactionReplaceOptions]
-                **kwargs         # type: Any
-                ) -> Awaitable[TransactionGetResult]:
+                txn_get_result: TransactionGetResult,
+                value: JSONType,
+                options: TransactionReplaceOptions | None = None,
+                **kwargs: Any) -> Awaitable[TransactionGetResult]:
         """
         Replace the contents of a document within a transaction.
 
         Args:
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to replace, gotten from a
               previous call to another transaction operation.
-            value (:class:`couchbase._utils.JSONType):  The new contents of the document.
+            value (:class:`couchbase.common._utils.JSONType):  The new contents of the document.
             options (:class:`~couchbase.options.TransactionReplaceOptions`): Optional parameters for this operation.
-            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionReplaceOptions`
 
         Returns:
@@ -395,42 +296,34 @@ class AttemptContext(AttemptContextLogic):
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """
-        if 'transcoder' not in kwargs and isinstance(options, TransactionReplaceOptions):
-            kwargs['transcoder'] = options.get('transcoder', None)
-        return self._replace(txn_get_result, value, **kwargs)
+        return self._impl.replace(txn_get_result, value, options, **kwargs)
 
-    @AsyncWrapper.inject_callbacks(None)
-    def remove(self,
-               txn_get_result,      # type: TransactionGetResult
-               **kwargs             # type: Any
-               ) -> Awaitable[None]:
+    def remove(self, txn_get_result: TransactionGetResult, **kwargs: Any) -> Awaitable[None]:
         """
         Remove a document in a transaction.
 
         Args:
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to delete.
-            **kwargs (Dict[str, Any]): currently unused.
+            **kwargs (dict[str, Any]): currently unused.
         Returns:
             Awaitable[None]
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """
-        return super().remove(txn_get_result, **kwargs)
+        return self._impl.remove(txn_get_result, **kwargs)
 
-    @AsyncWrapper.inject_callbacks(TransactionQueryResults)
     def query(self,
-              query,         # type: str
-              options=None,  # type: Optional[TransactionQueryOptions]
-              **kwargs       # type: Any
-              ) -> Awaitable[TransactionQueryResults]:
+              query: str,
+              options: TransactionQueryOptions | None = None,
+              **kwargs: Any) -> Awaitable[TransactionQueryResults]:
         """
         Perform a query within a transaction.
 
         Args:
             query (str): Query to perform.
             options (:class:`couchbase.transactions.TransactionQueryOptions`): Query options to use, if any.
-            **kwargs (Dict[str, Any]): currently unused.
+            **kwargs (dict[str, Any]): currently unused.
 
         Returns:
             Awaitable[:class:`couchbase.transactions.TransactionQueryResult`]
@@ -441,6 +334,4 @@ class AttemptContext(AttemptContextLogic):
                 necessarily be rolled back, a CouchbaseException other than TransactionOperationFailed will be raised.
                 If handled, the transaction will not rollback.
         """
-        if options is None:
-            options = TransactionQueryOptions()
-        return super().query(query, options, **kwargs)
+        return require(self._impl, Capability.TRANSACTIONS_QUERY).query(query, options, **kwargs)

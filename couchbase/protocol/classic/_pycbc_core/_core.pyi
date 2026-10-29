@@ -38,6 +38,8 @@ from couchbase.protocol.classic._pycbc_core.pycbc_core_types import (CreateNewAt
                                                                      CreateTransactionsRequest,
                                                                      DestroyTransactionsRequest,
                                                                      HdrPercentileReport,
+                                                                     ParsedTransactionOptions,
+                                                                     ParsedTransactionsConfig,
                                                                      ParsedTransactionsQueryOptions,
                                                                      TransactionCommitRequest,
                                                                      TransactionContextCapsuleType,
@@ -125,42 +127,12 @@ class pycbc_logger:
 # Transactions Core Types
 # ==========================================================================================
 
-class transaction_config:
-    def __init__(self,
-                 *,
-                 durability_level: Optional[int] = None,
-                 cleanup_window: Optional[int] = None,
-                 timeout: Optional[int] = None,
-                 cleanup_lost_attempts: Optional[bool] = None,
-                 cleanup_client_attempts: Optional[bool] = None,
-                 metadata_bucket: Optional[str] = None,
-                 metadata_collection: Optional[str] = None,
-                 metadata_scope: Optional[str] = None,
-                 scan_consistency: Optional[str] = None,
-                 ) -> None:
-        ...
-
-    def to_dict(self) -> Dict[str, Any]: ...
-
-class transaction_options:
-    def __init__(self,
-                 *,
-                 durability_level: Optional[int] = None,
-                 timeout: Optional[int] = None,
-                 scan_consistency: Optional[str] = None,
-                 metadata_collection: Optional[Dict[str, str]] = None,
-                 ) -> None:
-        ...
-
-    def to_dict(self) -> Dict[str, Any]: ...
-
-    def __str__(self) -> str: ...
-
-class transaction_query_options:
-    def __init__(self, query_args: ParsedTransactionsQueryOptions) -> None:
-        ...
-
-    def to_dict(self) -> Dict[str, Any]: ...
+# The three below hand an options block to the core type it is built for and answer with what
+# the core made of it.  They are read by the transaction test suites and by nothing else.
+def transaction_config_as_dict(options: ParsedTransactionsConfig) -> dict[str, Any]: ...
+def transaction_options_as_dict(options: ParsedTransactionOptions) -> dict[str, Any]: ...
+def transaction_query_options_as_dict(
+    options: ParsedTransactionsQueryOptions) -> dict[str, Any]: ...
 
 class transaction_get_result:
     def __init__(self) -> None: ...

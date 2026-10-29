@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,43 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import TYPE_CHECKING, overload
+"""The `couchbase.transactions.transaction_keyspace` import path.
 
-if TYPE_CHECKING:
-    from couchbase.logic.collection import CollectionLogic
+The declarations live in `couchbase.common.transactions.transaction_keyspace`, which every API
+shares, and are re-exported here.
+"""
 
+__all__ = [
+    'TransactionKeyspace',
+]
 
-class TransactionKeyspace:
-    @overload
-    def __init__(self,
-                 coll=None,  # type: CollectionLogic
-                 bucket=None,  # type: str
-                 scope=None,  # type: str
-                 collection=None  # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        self._bucket = None
-        self._scope = None
-        self._collection = None
-        if 'coll' in kwargs:
-            self._bucket = kwargs['coll']._impl.bucket_name
-            self._scope = kwargs['coll']._impl.scope_name
-            self._collection = kwargs['coll'].name
-        else:
-            self._bucket = kwargs['bucket']
-            self._scope = kwargs['scope']
-            self._collection = kwargs['collection']
-
-    @property
-    def bucket(self):
-        return self._bucket
-
-    @property
-    def scope(self):
-        return self._scope
-
-    @property
-    def collection(self):
-        return self._collection
+from couchbase.common.transactions.transaction_keyspace import TransactionKeyspace  # noqa: F401

@@ -106,30 +106,6 @@ enum TxnExceptionType {
   COUCHBASE_ERROR
 };
 
-struct transaction_config {
-  PyObject_HEAD cbtxns::transactions_config* cfg;
-};
-
-struct transaction_options {
-  PyObject_HEAD cbtxns::transaction_options* opts;
-};
-
-static PyObject*
-transaction_config__new__(PyTypeObject*, PyObject*, PyObject*);
-static void
-transaction_config__dealloc__(pycbc::txns::transaction_config*);
-static PyObject*
-transaction_config__to_dict__(PyObject*);
-
-static PyObject*
-transaction_options__new__(PyTypeObject*, PyObject*, PyObject*);
-static void
-transaction_options__dealloc__(pycbc::txns::transaction_options*);
-static PyObject*
-transaction_options__to_dict__(PyObject*);
-static PyObject*
-transaction_options__str__(PyObject*);
-
 struct transactions {
   std::shared_ptr<cbcoretxns::transactions> txns;
 
@@ -156,17 +132,6 @@ struct transaction_get_multi_result {
   PyObject_HEAD PyObject* content;
 };
 
-struct transaction_query_options {
-  PyObject_HEAD cbtxns::transaction_query_options* opts;
-};
-
-static PyObject*
-transaction_query_options__new__(PyTypeObject*, PyObject*, PyObject*);
-static void
-transaction_query_options__dealloc__(pycbc::txns::transaction_query_options*);
-static PyObject*
-transaction_query_options__to_dict__(PyObject*);
-
 static PyObject*
 transaction_get_result__new__(PyTypeObject*, PyObject*, PyObject*);
 static PyObject*
@@ -188,6 +153,13 @@ static void
 dealloc_transactions(PyObject* txns);
 static void
 dealloc_transaction_context(PyObject* ctx);
+
+PyObject*
+transaction_config_as_dict(PyObject*, PyObject*);
+PyObject*
+transaction_options_as_dict(PyObject*, PyObject*);
+PyObject*
+transaction_query_options_as_dict(PyObject*, PyObject*);
 
 PyObject*
 create_transactions(PyObject*, PyObject*, PyObject*);

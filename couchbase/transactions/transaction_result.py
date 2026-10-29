@@ -1,5 +1,4 @@
-
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,18 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-class TransactionResult(dict):
+"""The `couchbase.transactions.transaction_result` import path.
 
-    @property
-    def transaction_id(self) -> str:
-        return self.get("transaction_id", None)
+The declarations live in `couchbase.common.transactions.transaction_result`, which every API
+shares, and are re-exported here.
+"""
 
-    @property
-    def unstaging_complete(self) -> bool:
-        return self.get("unstaging_complete", None)
+__all__ = [
+    'TransactionResult',
+]
 
-    def __repr__(self):
-        return f"{type(self).__name__}({super().__repr__()})"
-
-    def __str__(self):
-        return f"{type(self).__name__}({super().__str__()})"
+from couchbase.common.transactions.transaction_result import TransactionResult  # noqa: F401

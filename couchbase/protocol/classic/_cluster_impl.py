@@ -53,6 +53,7 @@ from couchbase.protocol.classic._streaming import (AnalyticsStreamSpec,
                                                    ClassicStreamingExecutor,
                                                    QueryStreamSpec,
                                                    SearchStreamSpec)
+from couchbase.protocol.classic._transactions_impl import TransactionsImpl
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
@@ -213,7 +214,7 @@ class ClusterImpl:
         if self._transactions is None:
             with self._transactions_lock:
                 if self._transactions is None:
-                    self._transactions = Transactions(self)
+                    self._transactions = Transactions(TransactionsImpl(self))
         return self._transactions
 
     def bucket(self, name: str) -> BucketImpl:

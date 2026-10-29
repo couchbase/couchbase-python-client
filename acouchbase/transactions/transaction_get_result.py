@@ -1,4 +1,4 @@
-#  Copyright 2016-2022. Couchbase, Inc.
+#  Copyright 2016-2026. Couchbase, Inc.
 #  All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,5 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .attempt_context_logic import AttemptContextLogic  # noqa: F401
-from .transactions_logic import TransactionsLogic  # noqa: F401
+"""The `acouchbase.transactions.transaction_get_result` import path.
+
+The same objects as `couchbase.transactions.transaction_get_result`, re-exported so asyncio code
+imports them from its own package.
+"""
+
+__all__ = [
+    'TransactionGetResult',
+]
+
+from couchbase.common.transactions.transaction_get_result import TransactionGetResult  # noqa: F401

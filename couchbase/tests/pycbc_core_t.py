@@ -54,11 +54,8 @@ _CORE_TYPES = [
     _CoreType('pycbc_result', False, {}, _CYCLES),
     _CoreType('pycbc_scan_iterator', False, {}, _CYCLES),
     _CoreType('pycbc_streamed_result', False, {}, _CYCLES),
-    _CoreType('transaction_config', True, {}, _CYCLES),
     _CoreType('transaction_get_multi_result', True, {}, _CYCLES),
     _CoreType('transaction_get_result', True, {}, _CYCLES),
-    _CoreType('transaction_options', True, {}, _CYCLES),
-    _CoreType('transaction_query_options', True, {}, _CYCLES),
 ]
 
 # `transaction_operations` is an enum.Enum built during module init rather than one of our

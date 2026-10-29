@@ -307,6 +307,7 @@ not_generated:
   # sidecar, there being no generated file for a sidecar to merge into.
   api_specific_fake:
     - couchbase/tests/streaming_iterators_t.py
+    - couchbase/tests/transactions_run_t.py
 
   # Both trees have a connection lifecycle and neither can be written from the other's spelling
   # of it: close_bucket is execute_close_bucket_request under acouchbase and returns a future,

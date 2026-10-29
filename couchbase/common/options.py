@@ -2497,8 +2497,8 @@ class TransactionConfig(dict):
         cleanup_client_attempts (bool, optional):
         scan_consistency (:class:`~couchbase.n1ql.QueryScanConsistency`, optional): Specifies the consistency
             requirements when executing the query. Defaults to `NotBounded`.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The maximum time a transaction may run, across all its attempts, before it
+            expires. Defaults to 15 seconds.
     """
 
     def __init__(self, **kwargs: Unpack[TransactionConfigKwargs]) -> None:
@@ -2630,8 +2630,8 @@ class TransactionOptions(dict):
                 It has no effect. Transactions use the cluster's ``kv_durable_timeout``.
         scan_consistency (:class:`~couchbase.n1ql.QueryScanConsistency`, optional): Specifies the consistency
             requirements when executing the query. Defaults to `NotBounded`.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The maximum time this transaction may run, across all its attempts, before it
+            expires. Defaults to the ``timeout`` of the cluster's :class:`~couchbase.options.TransactionConfig`.
     """
 
     def __init__(self, **kwargs: Unpack[TransactionOptionsKwargs]) -> None:

@@ -23,22 +23,34 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncGenerator, Iterable
 from datetime import timedelta
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 import pytest_asyncio
 
 from acouchbase.cluster import Cluster
-from acouchbase.transactions import AttemptContext
+from acouchbase.transactions import (AttemptContext,
+                                     TransactionGetMultiMode,
+                                     TransactionGetMultiReplicasFromPreferredServerGroupMode,
+                                     TransactionGetMultiReplicasFromPreferredServerGroupResult,
+                                     TransactionGetMultiReplicasFromPreferredServerGroupSpec,
+                                     TransactionGetMultiResult,
+                                     TransactionGetMultiSpec,
+                                     TransactionKeyspace,
+                                     TransactionResult)
 from couchbase.auth import PasswordAuthenticator
+from couchbase.common.warnings import CouchbaseDeprecationWarning
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (BucketNotFoundException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
                                   FeatureUnavailableException,
+                                  InvalidArgumentException,
                                   InvalidIndexException,
                                   ParsingFailedException,
                                   TransactionException,
@@ -55,16 +67,9 @@ from couchbase.options import (ClusterOptions,
                                TransactionInsertOptions,
                                TransactionOptions,
                                TransactionQueryOptions,
-                               TransactionReplaceOptions)
-from couchbase.transactions import (TransactionGetMultiMode,
-                                    TransactionGetMultiReplicasFromPreferredServerGroupMode,
-                                    TransactionGetMultiReplicasFromPreferredServerGroupResult,
-                                    TransactionGetMultiReplicasFromPreferredServerGroupSpec,
-                                    TransactionGetMultiResult,
-                                    TransactionGetMultiSpec,
-                                    TransactionKeyspace,
-                                    TransactionResult)
-from couchbase.transcoder import RawBinaryTranscoder
+                               TransactionReplaceOptions,
+                               UpsertOptions)
+from couchbase.transcoder import RawBinaryTranscoder, RawJSONTranscoder
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
@@ -73,16 +78,14 @@ from tests.environments.async_environment import (AsyncTestEnvironment,
 from tests.environments.async_query_environment import AsyncQueryEnvironment
 from tests.environments.managers import AsyncTestEnvironmentQueryIndexManager
 from tests.manifest import validate_test_manifest
-from tests.skips import (server_label,
-                         skip_known_issue,
-                         skip_mock_limitation)
+from tests.skips import server_label, skip_mock_limitation
 from tests.suite_fixtures import TopologySuite
 from tests.test_features import (EnvironmentFeatures,
                                  ServerFeatures,
                                  TestProtocol)
 
-# What the _assert_option_* helpers accept.  The three classes share no base, only the
-# private `_base` holding the serialized form, so the union is the type.
+# What the _assert_option_* helpers accept.  The three classes share no base but `dict`,
+# and each goes to a different core type, so the union is the type.
 TxnOptionLike = TransactionConfig | TransactionOptions | TransactionQueryOptions
 
 
@@ -110,8 +113,10 @@ class TransactionTestSuite(TopologySuite):
         'test_binary',
         'test_binary_kwargs',
         'test_binary_not_supported',
+        'test_commit_past_expiry',
         'test_default_config',
         'test_get',
+        'test_get_debug_log_carries_no_body',
         'test_get_inner_exc_doc_not_found',
         'test_get_lambda_raises_doc_not_found',
         'test_get_multi_binary',
@@ -131,6 +136,7 @@ class TransactionTestSuite(TopologySuite):
         'test_insert_lambda_raises_doc_exists',
         'test_metadata_collection',
         'test_metadata_collection_not_found',
+        'test_options_without_transcoder',
         'test_per_txn_config',
         'test_query',
         'test_query_inner_exc_parsing_failure',
@@ -141,10 +147,12 @@ class TransactionTestSuite(TopologySuite):
         'test_remove_fail_bad_cas',
         'test_replace',
         'test_replace_fail_bad_cas',
+        'test_replace_fail_bad_cas_propagated',
         'test_rollback',
         'test_rollback_eating_exceptions',
         'test_scope_qualifier',
         'test_transaction_result',
+        'test_unknown_keyword',
     ]
 
     @pytest.fixture(scope='class')
@@ -184,7 +192,7 @@ class TransactionTestSuite(TopologySuite):
     # cluster (_remove_docs) are kept separate for that reason.
 
     def _assert_option_eq(self, cfg: TxnOptionLike, key: str, expected: Any, *, ctx: str = '') -> None:
-        value = cfg._base.to_dict().get(key, None)
+        value = TransactionOptionsUnitTests._core_view(cfg).get(key, None)
         assert value is not None, f'Option {key!r} is absent from the serialized config. {ctx}'
         cb_assert_eq(value, expected, what=f'option {key!r}', ctx=ctx)
 
@@ -324,6 +332,26 @@ class TransactionTestSuite(TopologySuite):
 
         # A user-raised exception is terminal: the txn must not retry the lambda.
         cb_assert_eq(num_attempts, 1, what='lambda attempts')
+
+    # Regression guard (PYCBC-1979): the result's text read the body as a C string, so the log
+    # carried the application's data and whatever followed it in memory.
+    @pytest.mark.asyncio
+    async def test_get_debug_log_carries_no_body(
+            self, cb_env: AsyncTestEnvironment, caplog: pytest.LogCaptureFixture) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        body = '{"user":"alice","balance":100}'
+        await cb_env.collection.upsert(key, body, UpsertOptions(transcoder=RawJSONTranscoder()))
+
+        async def txn_logic(ctx: AttemptContext) -> None:
+            await ctx.get(cb_env.collection, key)
+
+        with caplog.at_level(logging.DEBUG, logger='couchbase.transactions'):
+            await cb_env.cluster.transactions.run(txn_logic)
+        logged = [r.getMessage() for r in caplog.records if 'transaction_get_result:' in r.getMessage()]
+        assert logged, 'the get result must be logged at DEBUG.'
+        for message in logged:
+            assert 'alice' not in message
+            assert f'value_size={len(body)},' in message
 
     @pytest.mark.asyncio
     async def test_get_inner_exc_doc_not_found(self, cb_env: AsyncTestEnvironment) -> None:
@@ -676,7 +704,7 @@ class TransactionTestSuite(TopologySuite):
     @pytest.mark.parametrize('cls', [TransactionOptions, TransactionConfig])
     async def test_metadata_collection(self, cls: type[Any], cb_env: AsyncTestEnvironment) -> None:
         coll = cb_env.collection
-        cfg = cls(metadata_collection=TransactionKeyspace(coll=coll))
+        cfg = cls(metadata_collection=TransactionKeyspace.from_collection(coll))
         expected = f'{coll._impl.bucket_name}.{coll._impl.scope_name}.{coll.name}'
         self._assert_option_eq(cfg, 'metadata_collection', expected)
 
@@ -745,6 +773,27 @@ class TransactionTestSuite(TopologySuite):
         with pytest.raises(TransactionExpired):
             await cb_env.cluster.transactions.run(txn_logic,
                                                   TransactionOptions(timeout=timedelta(microseconds=1)))
+        res = await cb_env.collection.exists(key)
+        assert res.exists is False, 'An expired txn must not leave its staged insert behind.'
+
+    @pytest.mark.asyncio
+    async def test_commit_past_expiry(self, cb_env: AsyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        num_attempts = 0
+
+        # The insert lands inside the timeout and only the commit runs past it, so the expiry
+        # is the commit's final answer.  The core allows a new attempt until twice the
+        # timeout, so a loop that retried a failed commit would run the logic a second time.
+        async def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            await ctx.insert(cb_env.collection, key, {'some': 'thing'})
+            await AsyncTestEnvironment.sleep(2.5)
+
+        with pytest.raises(TransactionExpired):
+            await cb_env.cluster.transactions.run(txn_logic,
+                                                  TransactionOptions(timeout=timedelta(seconds=2)))
+        cb_assert_eq(num_attempts, 1, what='attempts')
         res = await cb_env.collection.exists(key)
         assert res.exists is False, 'An expired txn must not leave its staged insert behind.'
 
@@ -882,6 +931,22 @@ class TransactionTestSuite(TopologySuite):
         cb_assert_eq(res.content_as[dict], value, what='content after a failed txn')
 
     @pytest.mark.asyncio
+    async def test_options_without_transcoder(self, cb_env: AsyncTestEnvironment) -> None:
+        # An options object built without a transcoder uses the default one.
+        key, value = cb_env.get_new_doc()
+        new_value = {'some': 'thing else'}
+
+        async def txn_logic(ctx: AttemptContext) -> None:
+            await ctx.insert(cb_env.collection, key, value, TransactionInsertOptions())
+            get_res = await ctx.get(cb_env.collection, key, TransactionGetOptions())
+            cb_assert_eq(get_res.content_as[dict], value, what='content staged by insert')
+            await ctx.replace(get_res, new_value, TransactionReplaceOptions())
+
+        await cb_env.cluster.transactions.run(txn_logic)
+        result = await cb_env.collection.get(key)
+        cb_assert_eq(result.content_as[dict], new_value, what='committed content')
+
+    @pytest.mark.asyncio
     async def test_replace(self, cb_env: AsyncTestEnvironment) -> None:
         key, value = await cb_env.get_existing_doc()
         new_value = {'some': 'thing else'}
@@ -922,6 +987,29 @@ class TransactionTestSuite(TopologySuite):
 
         assert num_attempts > 1, f'Expected retries before expiry, saw {num_attempts} attempt(s).'
         # The txn failed, so the doc must still hold its original content.
+        res = await cb_env.collection.get(key)
+        cb_assert_eq(res.content_as[dict], value, what='content after a failed txn')
+
+    @pytest.mark.asyncio
+    async def test_replace_fail_bad_cas_propagated(self, cb_env: AsyncTestEnvironment) -> None:
+        key, value = await cb_env.get_existing_doc()
+        num_attempts = 0
+
+        # test_replace_fail_bad_cas with the failure left to propagate, which is how logic is
+        # normally written.  The cas mismatch is retryable whether or not the logic catches it.
+        async def txn_logic(ctx: AttemptContext) -> None:
+            nonlocal num_attempts
+            num_attempts += 1
+            rem_res = await ctx.get(cb_env.collection, key)
+            await ctx.replace(rem_res, {'foo': 'bar'})
+            await ctx.replace(rem_res, {'foo': 'baz'})
+
+        with pytest.raises(TransactionExpired) as exc_info:
+            await cb_env.cluster.transactions.run(txn_logic,
+                                                  TransactionOptions(timeout=timedelta(seconds=2)))
+        self._assert_expired_or(exc_info.value, 'expired in auto')
+
+        assert num_attempts > 1, f'Expected retries before expiry, saw {num_attempts} attempt(s).'
         res = await cb_env.collection.get(key)
         cb_assert_eq(res.content_as[dict], value, what='content after a failed txn')
 
@@ -976,12 +1064,11 @@ class TransactionTestSuite(TopologySuite):
 
     @pytest.mark.asyncio
     async def test_scope_qualifier(self, cb_env: AsyncTestEnvironment) -> None:
-        skip_known_issue(ticket='CBD-5091',
-                         note='pending transactions changes')
-        cfg = TransactionQueryOptions(scope=cb_env.collection._impl._scope)
-        expected = f'default:`{cb_env.collection._impl.bucket_name}`.`{cb_env.collection._impl.scope_name}`'
-        self._assert_option_eq(cfg, 'scope_qualifier', expected)
-        bucket, scope = cfg.split_scope_qualifier()
+        # The scope is held as the two names it stands for, and is not sent with the query.
+        cfg = TransactionQueryOptions(scope=cb_env.scope)
+        qualifier = cfg.split_scope_qualifier()
+        assert qualifier is not None, 'A scope must be split into its bucket and scope names.'
+        bucket, scope = qualifier
         cb_assert_eq(bucket, cb_env.collection._impl.bucket_name, what='split bucket name')
         cb_assert_eq(scope, cb_env.collection._impl.scope_name, what='split scope name')
 
@@ -998,6 +1085,34 @@ class TransactionTestSuite(TopologySuite):
         cb_assert_isinstance(result, TransactionResult, what='txn result')
         assert result.transaction_id is not None, 'A completed txn must report a transaction id.'
         assert result.unstaging_complete is True, 'A committed txn must report unstaging complete.'
+
+    @pytest.mark.asyncio
+    async def test_unknown_keyword(self, cb_env: AsyncTestEnvironment) -> None:
+        # A keyword an operation does not take raises Python's own TypeError at the call, before anything is
+        # staged. Caught here, the attempt carries on and commits with nothing staged by the rejected calls.
+        key, value = cb_env.get_new_doc()
+        new_key = cb_env.get_new_doc(key_only=True)
+        await cb_env.collection.insert(key, value)
+
+        async def txn_logic(ctx: AttemptContext) -> None:
+            with pytest.raises(TypeError, match="'bogus'"):
+                await ctx.get(cb_env.collection, key, bogus=True)
+            with pytest.raises(TypeError, match="'bogus'"):
+                await ctx.insert(cb_env.collection, new_key, value, bogus=True)
+            get_res = await ctx.get(cb_env.collection, key)
+            with pytest.raises(TypeError, match="'bogus'"):
+                await ctx.replace(get_res, value, bogus=True)
+            with pytest.raises(TypeError, match="'bogus'"):
+                await ctx.remove(get_res, bogus=True)
+            with pytest.raises(TypeError, match="'bogus'"):
+                await ctx.get_multi([TransactionGetMultiSpec(cb_env.collection, key)], bogus=True)
+            spec = TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key)
+            with pytest.raises(TypeError, match="'bogus'"):
+                await ctx.get_multi_replicas_from_preferred_server_group([spec], bogus=True)
+
+        await cb_env.cluster.transactions.run(txn_logic)
+        assert (await cb_env.collection.exists(key)).exists is True, 'A rejected remove must leave the document.'
+        assert (await cb_env.collection.exists(new_key)).exists is False, 'A rejected insert must stage nothing.'
 
 
 @pytest.mark.xdist_group('default_keyspace_indexes')
@@ -1031,19 +1146,84 @@ class TransactionTests(TransactionTestSuite):
         await teardown_async_environment(env, TransactionTestSuite, request.param)
 
 
+class TransactionKeyspaceUnitTests:
+
+    @staticmethod
+    def _collection() -> Any:
+        return SimpleNamespace(_impl=SimpleNamespace(bucket_name='b', scope_name='s'), name='c')
+
+    @staticmethod
+    def _names(keyspace: TransactionKeyspace) -> tuple[str, str, str]:
+        return keyspace.bucket, keyspace.scope, keyspace.collection
+
+    def test_names_by_position(self) -> None:
+        assert self._names(TransactionKeyspace('b', 's', 'c')) == ('b', 's', 'c')
+
+    def test_from_collection(self) -> None:
+        assert self._names(TransactionKeyspace.from_collection(self._collection())) == ('b', 's', 'c')
+
+    def test_coll_is_deprecated(self) -> None:
+        with pytest.warns(CouchbaseDeprecationWarning, match='TransactionKeyspace.from_collection'):
+            keyspace = TransactionKeyspace(coll=self._collection())
+        assert self._names(keyspace) == ('b', 's', 'c')
+
+    @pytest.mark.parametrize('bucket, scope, collection, missing', [
+        (None, 's', 'c', 'bucket'),
+        ('b', None, None, 'scope, collection'),
+        (None, None, None, 'bucket, scope, collection'),
+    ])
+    def test_a_missing_name_raises(self,
+                                   bucket: str | None,
+                                   scope: str | None,
+                                   collection: str | None,
+                                   missing: str) -> None:
+        with pytest.raises(InvalidArgumentException) as exc_info:
+            TransactionKeyspace(bucket, scope, collection)
+        assert exc_info.value.message == f'A TransactionKeyspace needs {missing}.'
+
+
+@pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 class TransactionOptionsUnitTests:
     # No cb_env: every test builds an options object and asserts on what it serializes.
     # Kept apart from TransactionTestSuite because a class-scoped autouse fixture cannot
     # resolve a parametrized cb_env for a test that never asked for one, and mixing the two
     # made the first such test poison the class scope for every test after it.
+    # Classic-only, because what a block serializes to is read back through classic's binding.
+    # TransactionTestSuite reads it the same way, through _core_view below.
+
+    @staticmethod
+    def _core_view(options: TxnOptionLike) -> dict[str, Any]:
+        """What the core makes of a transaction options block.
+
+        A block keeps the keys the caller wrote, and classic maps it as it hands it to the core, so
+        asserting on the block directly would check neither.  Mapping it the same way, handing it
+        to the core and reading back what the core stored is the assertion worth making.
+
+        The casts are the claim the wire table makes: a mapped block holds wire keys only, which is
+        the shape each TypedDict describes.
+        """
+        from couchbase.protocol.classic._pycbc_core import (transaction_config_as_dict,
+                                                            transaction_options_as_dict,
+                                                            transaction_query_options_as_dict)
+        from couchbase.protocol.classic._pycbc_core.pycbc_core_types import (ParsedTransactionOptions,
+                                                                             ParsedTransactionsConfig,
+                                                                             ParsedTransactionsQueryOptions)
+        from couchbase.protocol.classic._wire import transaction_wire
+
+        wired = transaction_wire(type(options).__name__, options)
+        if isinstance(options, TransactionConfig):
+            return transaction_config_as_dict(cast(ParsedTransactionsConfig, wired))
+        if isinstance(options, TransactionOptions):
+            return transaction_options_as_dict(cast(ParsedTransactionOptions, wired))
+        return transaction_query_options_as_dict(cast(ParsedTransactionsQueryOptions, wired))
 
     def _assert_option_eq(self, cfg: TxnOptionLike, key: str, expected: Any, *, ctx: str = '') -> None:
-        value = cfg._base.to_dict().get(key, None)
+        value = self._core_view(cfg).get(key, None)
         assert value is not None, f'Option {key!r} is absent from the serialized config. {ctx}'
         cb_assert_eq(value, expected, what=f'option {key!r}', ctx=ctx)
 
     def _assert_option_is(self, cfg: TxnOptionLike, key: str, expected: Any, *, ctx: str = '') -> None:
-        value = cfg._base.to_dict().get(key, None)
+        value = self._core_view(cfg).get(key, None)
         assert value is not None, f'Option {key!r} is absent from the serialized config. {ctx}'
         assert value is expected, (
             f'Option {key!r}: expected {expected!r} (identity), got {value!r}. {ctx}'
@@ -1081,10 +1261,10 @@ class TransactionOptionsUnitTests:
         cfg = cls(expiration_time=exp)
         # CXXCBC-391 made expiration_time an invalid key: it is accepted on the way in and
         # serialized as timeout, so both halves of that have to be checked.
-        assert cfg._base.to_dict().get('expiration_time', None) is None, (
+        assert self._core_view(cfg).get('expiration_time', None) is None, (
             'expiration_time must not survive serialization (CXXCBC-391).'
         )
-        cfg_timeout = cfg._base.to_dict().get('timeout', None)
+        cfg_timeout = self._core_view(cfg).get('timeout', None)
         cb_assert_eq(cfg_timeout, exp.total_seconds() * 1000 * 1000 * 1000,
                      what='timeout', ctx='serialized in nanoseconds')
 
@@ -1103,7 +1283,7 @@ class TransactionOptionsUnitTests:
                                         {'key1': 10, 'key2': 'something else'}])
     def test_named_params(self, params: dict[str, Any]) -> None:
         cfg = TransactionQueryOptions(named_parameters=params)
-        cfg_params = cfg._base.to_dict().get('named_parameters', None)
+        cfg_params = self._core_view(cfg).get('named_parameters', None)
         assert cfg_params is not None, 'named_parameters is absent from the serialized config.'
         cb_assert_isinstance(cfg_params, dict, what='named_parameters')
         # Each value is serialized to a JSON string, so compare after decoding.
@@ -1123,7 +1303,7 @@ class TransactionOptionsUnitTests:
     @pytest.mark.parametrize('params', [['a', 'b', 'c']])
     def test_positional_params(self, params: list[Any]) -> None:
         cfg = TransactionQueryOptions(positional_parameters=params)
-        cfg_params = cfg._base.to_dict().get('positional_parameters', None)
+        cfg_params = self._core_view(cfg).get('positional_parameters', None)
         assert cfg_params is not None, 'positional_parameters is absent from the serialized config.'
         cb_assert_isinstance(cfg_params, list, what='positional_parameters')
         for idx, p in enumerate(cfg_params):
@@ -1137,7 +1317,7 @@ class TransactionOptionsUnitTests:
     @pytest.mark.parametrize('raw', [{'key1': 'yo'}, {'key1': 5, 'key2': 'foo'}, {'key': [1, 2, 3]}])
     def test_raw(self, raw: dict[str, Any]) -> None:
         cfg = TransactionQueryOptions(raw=raw)
-        cfg_raw = cfg._base.to_dict().get('raw', None)
+        cfg_raw = self._core_view(cfg).get('raw', None)
         assert cfg_raw is not None, 'raw is absent from the serialized config.'
         cb_assert_isinstance(cfg_raw, dict, what='raw')
         for k in cfg_raw:
@@ -1153,17 +1333,13 @@ class TransactionOptionsUnitTests:
                                              QueryScanConsistency.NOT_BOUNDED,
                                              QueryScanConsistency.AT_PLUS])
     def test_scan_consistency(self, cls: type[Any], consistency: QueryScanConsistency) -> None:
-        cfg = None
-        try:
-            cfg = cls(scan_consistency=consistency)
-        except Exception:
-            # AT_PLUS is the only value these classes are expected to reject; anything
-            # else raising is a real failure.
-            if consistency != QueryScanConsistency.AT_PLUS:
-                pytest.fail(f'Unexpected exception building {cls.__name__} with '
-                            f'scan_consistency={consistency}.')
-        if cfg:
-            self._assert_option_eq(cfg, 'scan_consistency', consistency.value)
+        cfg = cls(scan_consistency=consistency)
+        if consistency == QueryScanConsistency.AT_PLUS:
+            # The one value transactions refuse, which classic refuses as it maps the block.
+            with pytest.raises(InvalidArgumentException):
+                self._core_view(cfg)
+            return
+        self._assert_option_eq(cfg, 'scan_consistency', consistency.value)
 
     def test_scan_wait(self) -> None:
         cfg = TransactionQueryOptions(scan_wait=timedelta(seconds=30))
@@ -1184,7 +1360,7 @@ class TransactionOptionsUnitTests:
                              ids=lambda level: f'DurabilityLevel.{level.name}')
     def test_transaction_config_durability(self, cls: type[Any], level: DurabilityLevel) -> None:
         cfg = cls(durability=ServerDurability(level))
-        cfg_level = cfg._base.to_dict().get('durability_level', None)
+        cfg_level = self._core_view(cfg).get('durability_level', None)
         assert cfg_level is not None, 'durability_level is absent from the serialized config.'
         # Serialized as the enum's value, so it has to be rebuilt before comparing.
         assert DurabilityLevel(cfg_level) is level, (

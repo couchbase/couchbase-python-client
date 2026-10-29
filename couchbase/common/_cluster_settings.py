@@ -417,10 +417,7 @@ class ClusterSettings:
         timeout_opts = build_timeout_options(cluster_opts)
         tracing_opts, orphan_opts, tracer = build_tracing_and_orphan_options(cluster_opts)
         metrics_opts, meter = build_metrics_options(cluster_opts, histogram_factory)
-        # BRIDGE: the legacy TransactionConfig, whose core config the old transactions logic reads.
-        # Removed by PYCBC-2007.
-        from couchbase.logic._legacy_options import TransactionConfig as LegacyTransactionConfig
-        transaction_cfg = cluster_opts.pop('transaction_config', LegacyTransactionConfig())
+        transaction_cfg = cluster_opts.pop('transaction_config', TransactionConfig())
         return cls(connection_str,
                    auth,
                    cluster_opts,

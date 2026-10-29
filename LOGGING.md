@@ -71,7 +71,7 @@ export PYCBC_LOG_LEVEL=info
 
 **What it configures**:
 - C++ SDK operations (connection, KV, queries, etc.)
-- Python SDK loggers: `couchbase.threshold`, `couchbase.metrics`, `couchbase.transactions.*`
+- Python SDK loggers: `couchbase.threshold`, `couchbase.metrics`, `couchbase.transactions`
 
 ---
 
@@ -216,14 +216,16 @@ Metrics logging reports operation latency percentiles.
 
 ---
 
-#### couchbase.transactions.*
+#### couchbase.transactions
 
-Transaction-related logging from Python components.
+Transaction-related logging from Python components, for both the blocking (`couchbase`) and the
+asyncio (`acouchbase`) API.
 
 **Loggers:**
-- `couchbase.transactions.transactions`
-- `couchbase.transactions.logic.transactions_logic`
-- `couchbase.transactions.logic.attempt_context_logic`
+- `couchbase.transactions`: creating and closing transactions at `INFO`, and each operation's
+  request and result at `DEBUG`. The asyncio API also logs a failed operation at `ERROR`; the
+  blocking API raises it to the caller without logging it.
+- `couchbase.transactions.transaction_get_result`: reading a result, at `DEBUG`
 
 ---
 
@@ -638,7 +640,7 @@ logging.getLogger('couchbase.metrics').setLevel(logging.WARNING)
 
 **Q: Where are transaction logs?**
 
-A: Transaction logs use `couchbase.transactions.*` loggers. Configure the `couchbase` parent logger to capture them:
+A: Transaction logs use the `couchbase.transactions` logger and its children, under both the blocking and the asyncio API. Configure the `couchbase` parent logger to capture them:
 
 ```python
 import logging

@@ -17,8 +17,8 @@
 
 `couchbase/protocol/classic/_option_wire.py` holds what each key is sent to the binding as, and
 `couchbase/common/_option_spec.py` what each options class accepts.  The request builders judge
-a caller's keywords and map them here.  The connection options arrive judged and kept as the
-caller wrote them, and are mapped here when the binding is handed them.
+a caller's keywords and map them here.  The connection and transaction options arrive judged and
+kept as the caller wrote them, and are mapped here when the binding is handed them.
 """
 
 from __future__ import annotations
@@ -231,3 +231,54 @@ def get_valid_multi_args(opt_type: type[dict[str, Any]],
 
     final_opts['per_key_options'] = final_key_opts
     return final_opts
+
+
+# One value read as several, each from a named attribute of it.  This is the one thing a
+# transform cannot say, because a transform answers with a value and these answer with keys.
+#
+# The attributes are named rather than assumed because the two value types spell them
+# differently, `.bucket`/`.scope`/`.collection` on a `TransactionKeyspace` against
+# `.bucket_name`/`.name` on a `Scope`.  A value type missing one is then wrong here, where it
+# can be read, instead of an `AttributeError` raised at whoever called the options class.
+EXPANDS: dict[str, dict[str, dict[str, str]]] = {
+    'TransactionConfig': {
+        'metadata_collection': {'metadata_bucket': 'bucket',
+                                'metadata_scope': 'scope',
+                                'metadata_collection': 'collection'},
+    },
+    'TransactionOptions': {
+        'metadata_collection': {'metadata_bucket': 'bucket',
+                                'metadata_scope': 'scope',
+                                'metadata_collection': 'collection'},
+    },
+    'TransactionQueryOptions': {
+        'scope': {'bucket_name': 'bucket_name',
+                  'scope_name': 'name'},
+    },
+}
+
+
+def expand(wired: dict[str, Any], expansions: dict[str, dict[str, str]]) -> dict[str, Any]:
+    """The keys a value object stands for, in place of the value object.
+
+    The key a `TransactionKeyspace` arrives under is also one of the three it leaves as, which is
+    why the value comes out before any of them goes in.
+    """
+    for key, targets in expansions.items():
+        if key not in wired:
+            continue
+        value = wired.pop(key)
+        for target, attribute in targets.items():
+            wired[target] = getattr(value, attribute)
+    return wired
+
+
+def transaction_wire(block: str, options: dict[str, Any]) -> dict[str, Any]:
+    """A transaction class's options as the binding reads them.
+
+    The class judged them and kept them as the caller wrote them, with no `None` among them, so
+    every transform here is handed a value it can convert.  It costs nothing at the binding,
+    where every destination is an optional that reads an absent key and an explicit `None` the
+    same way.
+    """
+    return expand(mapped(options, block), EXPANDS[block])

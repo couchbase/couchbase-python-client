@@ -31,6 +31,7 @@ from acouchbase.protocol.classic._management._query_index_mgmt_impl import Async
 from acouchbase.protocol.classic._management._search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
 from acouchbase.protocol.classic._management._user_mgmt_impl import AsyncUserMgmtImpl
 from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor
+from acouchbase.protocol.classic._transactions_impl import AsyncTransactionsImpl
 from acouchbase.result import (AsyncAnalyticsResult,
                                AsyncQueryResult,
                                AsyncSearchResult)
@@ -204,7 +205,7 @@ class AsyncClusterImpl:
     @property
     def transactions(self) -> Transactions:
         """**INTERNAL**"""
-        # Transactions.__init__ goes straight into the synchronous create_transactions (no executor
+        # AsyncTransactionsImpl.__init__ goes straight into the synchronous create_transactions (no executor
         # anywhere in the async path), which releases the GIL for a full cluster round-trip.
         # Use threading.Lock, not asyncio.Lock, for the same reason.
         self._client_adapter._ensure_not_closed()
@@ -212,7 +213,7 @@ class AsyncClusterImpl:
         if self._transactions is None:
             with self._transactions_lock:
                 if self._transactions is None:
-                    self._transactions = Transactions(self)
+                    self._transactions = Transactions(AsyncTransactionsImpl(self))
         return self._transactions
 
     def bucket(self, name: str) -> AsyncBucketImpl:
