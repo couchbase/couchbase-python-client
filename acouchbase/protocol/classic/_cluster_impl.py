@@ -24,7 +24,9 @@ from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
 from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
+from acouchbase.protocol.classic._management._analytics_mgmt_impl import AsyncAnalyticsMgmtImpl
 from acouchbase.protocol.classic._management._bucket_mgmt_impl import AsyncBucketMgmtImpl
+from acouchbase.protocol.classic._management._query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
 from acouchbase.protocol.classic._management._user_mgmt_impl import AsyncUserMgmtImpl
 from acouchbase.protocol.classic._streaming import ClassicAsyncStreamingExecutor
 from acouchbase.result import (AsyncAnalyticsResult,
@@ -240,6 +242,14 @@ class AsyncClusterImpl:
     def bucket_mgmt(self) -> AsyncBucketMgmtImpl:
         """**INTERNAL**"""
         return AsyncBucketMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def analytics_mgmt(self) -> AsyncAnalyticsMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncAnalyticsMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def query_index_mgmt(self) -> AsyncQueryIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncQueryIndexMgmtImpl(self._client_adapter, self.observability_instruments)
 
     def user_mgmt(self) -> AsyncUserMgmtImpl:
         """**INTERNAL**"""

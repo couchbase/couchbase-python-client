@@ -620,9 +620,10 @@ class Cluster:
         indexes of this cluster.
 
         Returns:
-            :class:`~couchbase.management.queries.QueryIndexManager`: A :class:`~couchbase.management.queries.QueryIndexManager` instance.
-        """  # noqa: E501
-        return QueryIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+            :class:`~couchbase.management.queries.QueryIndexManager`: A
+            :class:`~couchbase.management.queries.QueryIndexManager` instance.
+        """
+        return QueryIndexManager(self._impl.query_index_mgmt())
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """
@@ -630,9 +631,10 @@ class Cluster:
         dataverses, dataset, indexes and links of this cluster.
 
         Returns:
-            :class:`~couchbase.management.analytics.AnalyticsIndexManager`: An :class:`~couchbase.management.analytics.AnalyticsIndexManager` instance.
-        """  # noqa: E501
-        return AnalyticsIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+            :class:`~couchbase.management.analytics.AnalyticsIndexManager`: An
+            :class:`~couchbase.management.analytics.AnalyticsIndexManager` instance.
+        """
+        return AnalyticsIndexManager(self._impl.analytics_mgmt())
 
     def search_indexes(self) -> SearchIndexManager:
         """

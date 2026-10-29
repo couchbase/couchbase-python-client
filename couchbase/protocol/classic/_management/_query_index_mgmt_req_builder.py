@@ -15,107 +15,91 @@
 
 from __future__ import annotations
 
-from typing import (Any,
-                    Dict,
-                    List,
-                    Optional,
-                    Tuple,
-                    Union)
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
-from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic._legacy_options import forward_args
-from couchbase.logic.observability import ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.option_enums import OptionValidationMode
 from couchbase.protocol.classic._management._query_index_mgmt_types import (QUERY_INDEX_MGMT_ERROR_MAP,
                                                                             BuildDeferredIndexesRequest,
                                                                             CreateIndexRequest,
                                                                             DropIndexRequest,
                                                                             GetAllIndexesRequest,
+                                                                            QueryIndexMgmtOptionsBlock,
                                                                             WatchIndexesRequest)
+from couchbase.protocol.classic._wire import forward_args
+
+if TYPE_CHECKING:
+    from couchbase.common.management.options import (BuildDeferredQueryIndexOptions,
+                                                     CreatePrimaryQueryIndexOptions,
+                                                     CreateQueryIndexOptions,
+                                                     DropPrimaryQueryIndexOptions,
+                                                     DropQueryIndexOptions,
+                                                     GetAllQueryIndexOptions,
+                                                     WatchQueryIndexOptions)
 
 
 class QueryIndexMgmtRequestBuilder:
 
-    def __init__(self) -> None:
+    def __init__(self, option_validation: OptionValidationMode | None = None) -> None:
         self._error_map = QUERY_INDEX_MGMT_ERROR_MAP
+        self._option_validation = option_validation
 
-    def _get_create_index_op_args(self,  # noqa: C901
-                                  bucket_name: str,
-                                  keys: Union[List[str], Tuple[str, ...]],
-                                  *,
-                                  index_name: Optional[str] = None,
-                                  primary: Optional[bool] = False,
-                                  condition: Optional[str] = None,
-                                  collection_name: Optional[str] = None,
-                                  scope_name: Optional[str] = None,
-                                  ignore_if_exists: Optional[bool] = None,
-                                  deferred: Optional[bool] = None,
-                                  num_replicas: Optional[int] = None
-                                  ) -> Dict[str, Any]:
+    def _create_index_request(self,
+                              bucket_name: str,
+                              keys: Iterable[str],
+                              *,
+                              index_name: str | None = None,
+                              primary: bool | None = False,
+                              condition: str | None = None,
+                              collection_name: str | None = None,
+                              scope_name: str | None = None,
+                              ignore_if_exists: bool | None = None,
+                              deferred: bool | None = None,
+                              num_replicas: int | None = None,
+                              timeout: int | None = None
+                              ) -> CreateIndexRequest:
 
         if primary and keys:
-            # TODO(incorrect error): InvalidArgumentException
-            raise TypeError('Cannot create primary index with explicit keys')
+            raise InvalidArgumentException('Cannot create primary index with explicit keys')
         elif not primary and not keys:
-            # TODO(incorrect error): InvalidArgumentException
-            raise ValueError('Keys required for non-primary index')
+            raise InvalidArgumentException('Keys required for non-primary index')
 
         if condition and primary:
-            # TODO(incorrect error): InvalidArgumentException
-            raise ValueError('cannot specify condition for primary index')
+            raise InvalidArgumentException('cannot specify condition for primary index')
 
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        if index_name:
-            op_args['index_name'] = index_name
-        if primary is True:
-            op_args['is_primary'] = primary
-        if condition:
-            op_args['condition'] = condition
-        if keys and len(keys) > 0:
-            if isinstance(keys, list):
-                op_args['keys'] = keys
-            else:
-                op_args['keys'] = list(keys)
-        if ignore_if_exists is not None:
-            op_args['ignore_if_exists'] = ignore_if_exists
-        if scope_name is not None:
-            op_args['scope_name'] = scope_name
-        if collection_name is not None:
-            op_args['collection_name'] = collection_name
-        if deferred is not None:
-            op_args['deferred'] = deferred
-        if num_replicas is not None:
-            op_args['num_replicas'] = num_replicas
+        return CreateIndexRequest(self._error_map,
+                                  bucket_name=bucket_name,
+                                  index_name=index_name or None,
+                                  is_primary=primary or None,
+                                  condition=condition or None,
+                                  keys=list(keys) if keys else None,
+                                  ignore_if_exists=ignore_if_exists,
+                                  scope_name=scope_name,
+                                  collection_name=collection_name,
+                                  deferred=deferred,
+                                  num_replicas=num_replicas,
+                                  timeout=timeout)
 
-        return op_args
-
-    def _get_drop_index_op_args(self,
-                                bucket_name: str,
-                                *,
-                                index_name: Optional[str] = None,
-                                collection_name: Optional[str] = None,
-                                scope_name: Optional[str] = None,
-                                ignore_if_not_exists: Optional[bool] = None,
-                                ignore_if_missing: Optional[bool] = None,
-                                primary: Optional[bool] = None,
-                                ) -> Dict[str, Any]:
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        if index_name:
-            op_args['index_name'] = index_name
-        if primary is True:
-            op_args['is_primary'] = primary
-        # TODO: deprecate/remove ignore_missing
-        if ignore_if_not_exists is True or ignore_if_missing is True:
-            op_args['ignore_if_does_not_exist'] = True
-        if scope_name is not None:
-            op_args['scope_name'] = scope_name
-        if collection_name is not None:
-            op_args['collection_name'] = collection_name
-
-        return op_args
+    def _drop_index_request(self,
+                            bucket_name: str,
+                            *,
+                            index_name: str | None = None,
+                            collection_name: str | None = None,
+                            scope_name: str | None = None,
+                            ignore_if_not_exists: bool | None = None,
+                            primary: bool | None = None,
+                            timeout: int | None = None
+                            ) -> DropIndexRequest:
+        return DropIndexRequest(self._error_map,
+                                bucket_name=bucket_name,
+                                index_name=index_name or None,
+                                is_primary=primary or None,
+                                ignore_if_does_not_exist=ignore_if_not_exists or None,
+                                scope_name=scope_name,
+                                collection_name=collection_name,
+                                timeout=timeout)
 
     def _validate_bucket_name(self, bucket_name: str) -> None:
         if not isinstance(bucket_name, str):
@@ -125,16 +109,18 @@ class QueryIndexMgmtRequestBuilder:
         if not isinstance(index_name, str):
             raise InvalidArgumentException('The index_name must be provided when creating a secondary index.')
 
-    def _validate_index_names(self, index_names: Union[List[str], Tuple[str, ...]]) -> None:
-        if not isinstance(index_names, (list, tuple)):
+    def _validate_index_names(self, index_names: Iterable[str]) -> list[str]:
+        if isinstance(index_names, str) or not isinstance(index_names, Iterable):
             raise InvalidArgumentException(
-                'A list/tuple of at least one index_name must be provided when watching indexes.')
+                'An iterable of index names must be provided when watching indexes.')
+        return list(index_names)
 
-    def _validate_index_keys(self, keys: Union[List[str], Tuple[str, ...]]) -> None:
-        if not isinstance(keys, (list, tuple)):
+    def _validate_index_keys(self, keys: Iterable[str]) -> list[str]:
+        if isinstance(keys, str) or not isinstance(keys, Iterable):
             raise InvalidArgumentException('Index keys must be provided when creating a secondary index.')
+        return list(keys)
 
-    def _valid_collection_context(self, final_args: Dict[str, Any]) -> None:
+    def _valid_collection_context(self, final_args: dict[str, Any]) -> None:
         if 'scope_name' in final_args:
             raise InvalidArgumentException('scope_name cannot be set in the options when using the '
                                            'collection-level query index manager')
@@ -145,17 +131,18 @@ class QueryIndexMgmtRequestBuilder:
     def build_create_index_request(self,
                                    bucket_name: str,
                                    index_name: str,
-                                   keys: Union[List[str], Tuple[str, ...]],
+                                   keys: Iterable[str],
                                    obs_handler: ObservableRequestHandler,
-                                   collection_context: Optional[Tuple[str, str]] = None,
-                                   *options: object,
+                                   collection_context: tuple[str, str] | None = None,
+                                   options: CreateQueryIndexOptions | None = None,
                                    **kwargs: object) -> CreateIndexRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=QueryIndexMgmtOptionsBlock.CreateQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
         self._validate_index_name(index_name)
-        self._validate_index_keys(keys)
+        keys = self._validate_index_keys(keys)
         timeout = final_args.pop('timeout', None)
         if collection_context is not None:
             self._valid_collection_context(final_args)
@@ -165,26 +152,25 @@ class QueryIndexMgmtRequestBuilder:
             collection_name = final_args.pop('collection_name', None)
             scope_name = final_args.pop('scope_name', None)
 
-        op_args = self._get_create_index_op_args(bucket_name,
-                                                 keys,
-                                                 index_name=index_name,
-                                                 collection_name=collection_name,
-                                                 scope_name=scope_name,
-                                                 **final_args)
-
-        req = CreateIndexRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return self._create_index_request(bucket_name,
+                                          keys,
+                                          index_name=index_name,
+                                          collection_name=collection_name,
+                                          scope_name=scope_name,
+                                          condition=final_args.get('condition'),
+                                          ignore_if_exists=final_args.get('ignore_if_exists'),
+                                          deferred=final_args.get('deferred'),
+                                          num_replicas=final_args.get('num_replicas'),
+                                          timeout=timeout)
 
     def build_create_primary_index_request(self,
                                            bucket_name: str,
                                            obs_handler: ObservableRequestHandler,
-                                           collection_context: Optional[Tuple[str, str]] = None,
-                                           *options: object,
+                                           collection_context: tuple[str, str] | None = None,
+                                           options: CreatePrimaryQueryIndexOptions | None = None,
                                            **kwargs: object) -> CreateIndexRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=QueryIndexMgmtOptionsBlock.CreatePrimaryQueryIndex,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
@@ -197,27 +183,27 @@ class QueryIndexMgmtRequestBuilder:
             collection_name = final_args.pop('collection_name', None)
             scope_name = final_args.pop('scope_name', None)
 
-        op_args = self._get_create_index_op_args(bucket_name,
-                                                 [],
-                                                 primary=True,
-                                                 collection_name=collection_name,
-                                                 scope_name=scope_name,
-                                                 **final_args)
-
-        req = CreateIndexRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return self._create_index_request(bucket_name,
+                                          [],
+                                          primary=True,
+                                          collection_name=collection_name,
+                                          scope_name=scope_name,
+                                          index_name=final_args.get('index_name'),
+                                          condition=final_args.get('condition'),
+                                          ignore_if_exists=final_args.get('ignore_if_exists'),
+                                          deferred=final_args.get('deferred'),
+                                          num_replicas=final_args.get('num_replicas'),
+                                          timeout=timeout)
 
     def build_drop_index_request(self,
                                  bucket_name: str,
                                  index_name: str,
                                  obs_handler: ObservableRequestHandler,
-                                 collection_context: Optional[Tuple[str, str]] = None,
-                                 *options: object,
+                                 collection_context: tuple[str, str] | None = None,
+                                 options: DropQueryIndexOptions | None = None,
                                  **kwargs: object) -> DropIndexRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=QueryIndexMgmtOptionsBlock.DropQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
@@ -231,25 +217,21 @@ class QueryIndexMgmtRequestBuilder:
             collection_name = final_args.pop('collection_name', None)
             scope_name = final_args.pop('scope_name', None)
 
-        op_args = self._get_drop_index_op_args(bucket_name,
-                                               index_name=index_name,
-                                               collection_name=collection_name,
-                                               scope_name=scope_name,
-                                               **final_args)
-
-        req = DropIndexRequest(self._error_map, **op_args)
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return self._drop_index_request(bucket_name,
+                                        index_name=index_name,
+                                        collection_name=collection_name,
+                                        scope_name=scope_name,
+                                        ignore_if_not_exists=final_args.get('ignore_if_not_exists'),
+                                        timeout=timeout)
 
     def build_drop_primary_index_request(self,
                                          bucket_name: str,
                                          obs_handler: ObservableRequestHandler,
-                                         collection_context: Optional[Tuple[str, str]] = None,
-                                         *options: object,
+                                         collection_context: tuple[str, str] | None = None,
+                                         options: DropPrimaryQueryIndexOptions | None = None,
                                          **kwargs: object) -> DropIndexRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=QueryIndexMgmtOptionsBlock.DropPrimaryQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
@@ -262,26 +244,22 @@ class QueryIndexMgmtRequestBuilder:
             collection_name = final_args.pop('collection_name', None)
             scope_name = final_args.pop('scope_name', None)
 
-        op_args = self._get_drop_index_op_args(bucket_name,
-                                               primary=True,
-                                               collection_name=collection_name,
-                                               scope_name=scope_name,
-                                               **final_args)
-
-        req = DropIndexRequest(self._error_map, **op_args)
-
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return self._drop_index_request(bucket_name,
+                                        primary=True,
+                                        collection_name=collection_name,
+                                        scope_name=scope_name,
+                                        index_name=final_args.get('index_name'),
+                                        ignore_if_not_exists=final_args.get('ignore_if_not_exists'),
+                                        timeout=timeout)
 
     def build_get_all_indexes_request(self,
                                       bucket_name: str,
                                       obs_handler: ObservableRequestHandler,
-                                      collection_context: Optional[Tuple[str, str]] = None,
-                                      *options: object,
+                                      collection_context: tuple[str, str] | None = None,
+                                      options: GetAllQueryIndexOptions | None = None,
                                       **kwargs: object) -> GetAllIndexesRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=QueryIndexMgmtOptionsBlock.GetAllQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
@@ -294,28 +272,20 @@ class QueryIndexMgmtRequestBuilder:
             collection_name = final_args.pop('collection_name', None)
             scope_name = final_args.pop('scope_name', None)
 
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        if scope_name is not None:
-            op_args['scope_name'] = scope_name
-        if collection_name is not None:
-            op_args['collection_name'] = collection_name
-
-        req = GetAllIndexesRequest(self._error_map, **op_args)
-
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return GetAllIndexesRequest(self._error_map,
+                                    bucket_name=bucket_name,
+                                    scope_name=scope_name,
+                                    collection_name=collection_name,
+                                    timeout=timeout)
 
     def build_build_deferred_indexes_request(self,
                                              bucket_name: str,
                                              obs_handler: ObservableRequestHandler,
-                                             collection_context: Optional[Tuple[str, str]] = None,
-                                             *options: object,
+                                             collection_context: tuple[str, str] | None = None,
+                                             options: BuildDeferredQueryIndexOptions | None = None,
                                              **kwargs: object) -> BuildDeferredIndexesRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, options, block=QueryIndexMgmtOptionsBlock.BuildDeferredQueryIndex,
+                                  mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
@@ -328,33 +298,25 @@ class QueryIndexMgmtRequestBuilder:
             collection_name = final_args.pop('collection_name', None)
             scope_name = final_args.pop('scope_name', None)
 
-        op_args = {
-            'bucket_name': bucket_name,
-        }
-        if scope_name is not None:
-            op_args['scope_name'] = scope_name
-        if collection_name is not None:
-            op_args['collection_name'] = collection_name
-
-        req = BuildDeferredIndexesRequest(self._error_map, **op_args)
-
-        if timeout is not None:
-            req.timeout = timeout
-
-        return req
+        return BuildDeferredIndexesRequest(self._error_map,
+                                           bucket_name=bucket_name,
+                                           scope_name=scope_name,
+                                           collection_name=collection_name,
+                                           timeout=timeout)
 
     def build_watch_indexes_request(self,
                                     bucket_name: str,
-                                    index_names: Union[List[str], Tuple[str, ...]],
+                                    index_names: Iterable[str],
                                     obs_handler: ObservableRequestHandler,
-                                    collection_context: Optional[Tuple[str, str]] = None,
-                                    *options: object,
+                                    collection_context: tuple[str, str] | None = None,
+                                    options: WatchQueryIndexOptions | None = None,
                                     **kwargs: object) -> WatchIndexesRequest:
-        final_args = forward_args(kwargs, *options)
+        final_args = forward_args(
+            kwargs, options, block=QueryIndexMgmtOptionsBlock.WatchQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
         self._validate_bucket_name(bucket_name)
-        self._validate_index_names(index_names)
+        index_names = self._validate_index_names(index_names)
         timeout = final_args.pop('timeout', None)
         if timeout is None:
             raise InvalidArgumentException('Must specify a timeout when watching indexes.')
@@ -367,16 +329,10 @@ class QueryIndexMgmtRequestBuilder:
             scope_name = final_args.pop('scope_name', None)
 
         if final_args.get('watch_primary', False):
-            index_names.append('#primary')
+            index_names = [*index_names, '#primary']
 
-        op_args = {
-            'bucket_name': bucket_name,
-            'index_names': index_names,
-            'timeout': timeout,
-        }
-        if scope_name is not None:
-            op_args['scope_name'] = scope_name
-        if collection_name is not None:
-            op_args['collection_name'] = collection_name
-
-        return WatchIndexesRequest(self._error_map, **op_args)
+        return WatchIndexesRequest(bucket_name=bucket_name,
+                                   index_names=index_names,
+                                   timeout=timeout,
+                                   scope_name=scope_name,
+                                   collection_name=collection_name)

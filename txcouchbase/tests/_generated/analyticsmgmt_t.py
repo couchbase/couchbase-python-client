@@ -40,12 +40,6 @@ from couchbase.exceptions import (AnalyticsLinkExistsException,
                                   DataverseNotFoundException,
                                   InternalServerFailureException,
                                   InvalidArgumentException)
-from couchbase.management.analytics import (AnalyticsEncryptionLevel,
-                                            AnalyticsLinkType,
-                                            AzureBlobExternalAnalyticsLink,
-                                            CouchbaseAnalyticsEncryptionSettings,
-                                            CouchbaseRemoteAnalyticsLink,
-                                            S3ExternalAnalyticsLink)
 from couchbase.management.options import (ConnectLinkOptions,
                                           CreateAnalyticsIndexOptions,
                                           CreateDatasetOptions,
@@ -64,7 +58,14 @@ from tests.environments.twisted_environment import (CollectionStrategy,
                                                     teardown_twisted_environment)
 from tests.manifest import validate_test_manifest
 from tests.test_features import EnvironmentFeatures, ServerFeatures
-from txcouchbase.management.analytics import AnalyticsDataType, AnalyticsLink
+from txcouchbase.management.analytics import (AnalyticsDataType,
+                                              AnalyticsEncryptionLevel,
+                                              AnalyticsLink,
+                                              AnalyticsLinkType,
+                                              AzureBlobExternalAnalyticsLink,
+                                              CouchbaseAnalyticsEncryptionSettings,
+                                              CouchbaseRemoteAnalyticsLink,
+                                              S3ExternalAnalyticsLink)
 
 
 class AnalyticsManagementSuiteBase(SuiteRequirements):
@@ -637,7 +638,7 @@ class AnalyticsManagementTestSuite(AnalyticsManagementSuiteBase):
         def check_for_idx(idx: str) -> None:
             indexes = aixm.get_all_indexes()
             names = [index.name for index in indexes]
-            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names)}.'
+            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names, key=str)}.'
 
         TwistedTestEnvironment.try_n_times(10, 3, check_for_idx, self.INDEX_NAME, is_deferred=False)
 
@@ -698,7 +699,7 @@ class AnalyticsManagementTestSuite(AnalyticsManagementSuiteBase):
         def check_for_idx(idx: str) -> None:
             indexes = aixm.get_all_indexes()
             names = [index.name for index in indexes]
-            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names)}.'
+            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names, key=str)}.'
 
         TwistedTestEnvironment.try_n_times(10, 3, check_for_idx, self.INDEX_NAME, is_deferred=False)
         aixm.drop_index(self.INDEX_NAME,
@@ -720,7 +721,7 @@ class AnalyticsManagementTestSuite(AnalyticsManagementSuiteBase):
 
         datasets = aixm.get_all_datasets()
         local_ds = [ds for ds in datasets if ds.dataset_name == self.DATASET_NAME]
-        dataverses = sorted(ds.dataverse_name for ds in local_ds)
+        dataverses = sorted((ds.dataverse_name for ds in local_ds), key=str)
         cb_assert_eq(len(local_ds), 2, what=f'datasets named {self.DATASET_NAME!r}',
                      ctx=f'dataverses={dataverses}')
         assert 'Default' in dataverses, f'No copy in the Default dataverse. Found: {dataverses}.'

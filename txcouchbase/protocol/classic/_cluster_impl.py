@@ -37,7 +37,9 @@ from couchbase.result import (AnalyticsResult,
                               SearchResult)
 from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
 from txcouchbase.protocol.classic._deferred import defer
+from txcouchbase.protocol.classic._management._analytics_mgmt_impl import TxAnalyticsMgmtImpl
 from txcouchbase.protocol.classic._management._bucket_mgmt_impl import TxBucketMgmtImpl
+from txcouchbase.protocol.classic._management._query_index_mgmt_impl import TxQueryIndexMgmtImpl
 from txcouchbase.protocol.classic._management._user_mgmt_impl import TxUserMgmtImpl
 from txcouchbase.protocol.classic._streaming import submit_rows
 
@@ -97,6 +99,14 @@ class TxClusterImpl(AsyncClusterImpl):
     def bucket_mgmt(self) -> TxBucketMgmtImpl:
         """**INTERNAL**"""
         return TxBucketMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def analytics_mgmt(self) -> TxAnalyticsMgmtImpl:
+        """**INTERNAL**"""
+        return TxAnalyticsMgmtImpl(self._client_adapter, self.observability_instruments)
+
+    def query_index_mgmt(self) -> TxQueryIndexMgmtImpl:
+        """**INTERNAL**"""
+        return TxQueryIndexMgmtImpl(self._client_adapter, self.observability_instruments)
 
     def user_mgmt(self) -> TxUserMgmtImpl:
         """**INTERNAL**"""

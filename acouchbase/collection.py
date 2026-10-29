@@ -1074,12 +1074,7 @@ class AsyncCollection:
             :class:`~acouchbase.management.queries.CollectionQueryIndexManager`: A
             :class:`~acouchbase.management.queries.CollectionQueryIndexManager` instance.
         """
-        # BRIDGE: the manager builds its own impl until it is ported.  Removed by PYCBC-2005.
-        return CollectionQueryIndexManager(self._impl._client_adapter,
-                                           self._impl.bucket_name,
-                                           self._impl.scope_name,
-                                           self.name,
-                                           self._impl.observability_instruments)
+        return CollectionQueryIndexManager(self._impl.query_index_mgmt(), self._impl.bucket_name)
 
     @staticmethod
     def default_name() -> str:

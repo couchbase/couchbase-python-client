@@ -325,21 +325,25 @@ class Cluster:
 
     def query_indexes(self) -> QueryIndexManager:
         """
-        Get the QueryIndexManager.
+        Get a :class:`~txcouchbase.management.queries.QueryIndexManager` which can be used to manage the query
+        indexes of this cluster.
 
-        :return:  A :class:`~.management.queries.QueryIndexManager` with which you can
-              create or modify query indexes on the cluster.
+        Returns:
+            :class:`~txcouchbase.management.queries.QueryIndexManager`: A
+            :class:`~txcouchbase.management.queries.QueryIndexManager` instance.
         """
-        return QueryIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+        return QueryIndexManager(self._impl.query_index_mgmt())
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """
-        Get the AnalyticsIndexManager.
+        Get a :class:`~txcouchbase.management.analytics.AnalyticsIndexManager` which can be used to manage the analytics
+        dataverses, dataset, indexes and links of this cluster.
 
-        :return:  A :class:`~.management.AnalyticsIndexManager` with which you can create or modify analytics datasets,
-            dataverses, etc.. on the cluster.
+        Returns:
+            :class:`~txcouchbase.management.analytics.AnalyticsIndexManager`: An
+            :class:`~txcouchbase.management.analytics.AnalyticsIndexManager` instance.
         """
-        return AnalyticsIndexManager(self._impl.client_adapter, self._impl.observability_instruments)
+        return AnalyticsIndexManager(self._impl.analytics_mgmt())
 
     def search_indexes(self) -> SearchIndexManager:
         """

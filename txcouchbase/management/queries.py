@@ -15,20 +15,20 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Iterable)
+__all__ = [
+    'QueryIndex',
+    'QueryIndexManager',
+]
+
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import MgmtOperationType, QueryIndexMgmtOperationType
-from couchbase.protocol.classic._management._query_index_mgmt_types import QueryIndex
-from txcouchbase.protocol.classic._management._query_index_mgmt_impl import TxQueryIndexMgmtImpl
+from couchbase.common.management.queries import QueryIndex
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.common._interfaces._query_index_mgmt import TxQueryIndexMgmtInterface
     from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                               CreatePrimaryQueryIndexOptions,
                                               CreateQueryIndexOptions,
@@ -40,180 +40,151 @@ if TYPE_CHECKING:
 
 class QueryIndexManager:
 
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        self._impl = TxQueryIndexMgmtImpl(client_adapter, observability_instruments)
-        self._collection_ctx = None
+    def __init__(self, impl: TxQueryIndexMgmtInterface) -> None:
+        self._impl = impl
 
     def create_index(self,
-                     bucket_name,   # type: str
-                     index_name,    # type: str
-                     keys,        # type: Iterable[str]
-                     *options,      # type: CreateQueryIndexOptions
-                     **kwargs
-                     ) -> Deferred[None]:
-        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_create_index_request(bucket_name,
-                                                                        index_name,
-                                                                        keys,
-                                                                        obs_handler,
-                                                                        self._collection_ctx,
-                                                                        *options,
-                                                                        **kwargs)
-            d = self._impl.create_index_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                     bucket_name: str,
+                     index_name: str,
+                     keys: Iterable[str],
+                     options: CreateQueryIndexOptions | None = None,
+                     **kwargs: Any) -> Deferred[None]:
+        """Creates a new query index.
+
+        Args:
+            bucket_name (str): The name of the bucket this index is for.
+            index_name (str): The name of the index.
+            keys (Iterable[str]): The keys which this index should cover.
+            options (:class:`~couchbase.management.options.CreateQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name, index_name or keys
+                are invalid types.
+            :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
+        """
+        return self._impl.create_index_deferred(bucket_name, index_name, keys, options, **kwargs)
 
     def create_primary_index(self,
-                             bucket_name,   # type: str
-                             *options,      # type: CreatePrimaryQueryIndexOptions
-                             **kwargs
-                             ) -> Deferred[None]:
-        op_type = QueryIndexMgmtOperationType.QueryIndexCreate
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_create_primary_index_request(bucket_name,
-                                                                                obs_handler,
-                                                                                self._collection_ctx,
-                                                                                *options,
-                                                                                **kwargs)
-            d = self._impl.create_primary_index_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                             bucket_name: str,
+                             options: CreatePrimaryQueryIndexOptions | None = None,
+                             **kwargs: Any) -> Deferred[None]:
+        """Creates a new primary query index.
+
+        Args:
+            bucket_name (str): The name of the bucket this index is for.
+            options (:class:`~couchbase.management.options.CreatePrimaryQueryIndexOptions`): Optional parameters for
+                this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
+            :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
+        """
+        return self._impl.create_primary_index_deferred(bucket_name, options, **kwargs)
 
     def drop_index(self,
-                   bucket_name,     # type: str
-                   index_name,      # type: str
-                   *options,        # type: DropQueryIndexOptions
-                   **kwargs) -> Deferred[None]:
-        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_drop_index_request(bucket_name,
-                                                                      index_name,
-                                                                      obs_handler,
-                                                                      self._collection_ctx,
-                                                                      *options,
-                                                                      **kwargs)
-            d = self._impl.drop_index_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                   bucket_name: str,
+                   index_name: str,
+                   options: DropQueryIndexOptions | None = None,
+                   **kwargs: Any) -> Deferred[None]:
+        """Drops an existing query index.
+
+        Args:
+            bucket_name (str): The name of the bucket containing the index to drop.
+            index_name (str): The name of the index to drop.
+            options (:class:`~couchbase.management.options.DropQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name or index_name are
+                invalid types.
+            :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
+        """
+        return self._impl.drop_index_deferred(bucket_name, index_name, options, **kwargs)
 
     def drop_primary_index(self,
-                           bucket_name,     # type: str
-                           *options,        # type: DropPrimaryQueryIndexOptions
-                           **kwargs) -> Deferred[None]:
-        op_type = QueryIndexMgmtOperationType.QueryIndexDrop
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_drop_primary_index_request(bucket_name,
-                                                                              obs_handler,
-                                                                              self._collection_ctx,
-                                                                              *options,
-                                                                              **kwargs)
-            d = self._impl.drop_primary_index_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                           bucket_name: str,
+                           options: DropPrimaryQueryIndexOptions | None = None,
+                           **kwargs: Any) -> Deferred[None]:
+        """Drops an existing primary query index.
+
+        Args:
+            bucket_name (str): The name of the bucket this index to drop.
+            options (:class:`~couchbase.management.options.DropPrimaryQueryIndexOptions`): Optional parameters for
+                this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
+            :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
+        """
+        return self._impl.drop_primary_index_deferred(bucket_name, options, **kwargs)
 
     def get_all_indexes(self,
-                        bucket_name,    # type: str
-                        *options,       # type: GetAllQueryIndexOptions
-                        **kwargs        # type: Any
-                        ) -> Deferred[Iterable[QueryIndex]]:
-        op_type = QueryIndexMgmtOperationType.QueryIndexGetAll
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_get_all_indexes_request(bucket_name,
-                                                                           obs_handler,
-                                                                           self._collection_ctx,
-                                                                           *options,
-                                                                           **kwargs)
-            d = self._impl.get_all_indexes_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                        bucket_name: str,
+                        options: GetAllQueryIndexOptions | None = None,
+                        **kwargs: Any) -> Deferred[Iterable[QueryIndex]]:
+        """Returns a list of indexes for a specific bucket.
+
+        Args:
+            bucket_name (str): The name of the bucket to fetch indexes for.
+            options (:class:`~couchbase.management.options.GetAllQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Deferred[Iterable[:class:`.QueryIndex`]]: A list of indexes for a specific bucket.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
+        """
+        return self._impl.get_all_indexes_deferred(bucket_name, options, **kwargs)
 
     def build_deferred_indexes(self,
-                               bucket_name,     # type: str
-                               *options,        # type: BuildDeferredQueryIndexOptions
-                               **kwargs
-                               ) -> Deferred[None]:
-        """
-        Build Deferred builds all indexes which are currently in deferred state.
+                               bucket_name: str,
+                               options: BuildDeferredQueryIndexOptions | None = None,
+                               **kwargs: Any) -> Deferred[None]:
+        """Starts building any indexes which were previously created with ``deferred=True``.
 
-        :param str bucket_name: name of the bucket.
-        :param BuildDeferredQueryIndexOptions options: Options for building deferred indexes.
-        :param Any kwargs: Override corresponding value in options.
-        :raise: InvalidArgumentsException
+        Args:
+            bucket_name (str): The name of the bucket to perform build on.
+            options (:class:`~couchbase.management.options.BuildDeferredQueryIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
         """
-        op_type = QueryIndexMgmtOperationType.QueryIndexBuildDeferred
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_build_deferred_indexes_request(bucket_name,
-                                                                                  obs_handler,
-                                                                                  self._collection_ctx,
-                                                                                  *options,
-                                                                                  **kwargs)
-            d = self._impl.build_deferred_indexes_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+        return self._impl.build_deferred_indexes_deferred(bucket_name, options, **kwargs)
 
     def watch_indexes(self,
-                      bucket_name,  # type: str
-                      index_names,  # type: Iterable[str]
-                      *options,     # type: WatchQueryIndexOptions
-                      **kwargs      # type: Any
-                      ) -> Deferred[None]:
-        """
-        Watch polls indexes until they are online.
+                      bucket_name: str,
+                      index_names: Iterable[str],
+                      options: WatchQueryIndexOptions | None = None,
+                      **kwargs: Any) -> Deferred[None]:
+        """Waits for a number of indexes to finish creation and be ready to use.
 
-        :param str bucket_name: name of the bucket.
-        :param Iterable[str] index_names: name(s) of the index(es).
-        :param WatchQueryIndexOptions options: Options for request to watch indexes.
-        :param Any kwargs: Override corresponding valud in options.
-        :raises: QueryIndexNotFoundException
-        :raises: WatchQueryIndexTimeoutException
+        Args:
+            bucket_name (str): The name of the bucket to watch for indexes on.
+            index_names (Iterable[str]): The names of the indexes to watch.
+            options (:class:`~couchbase.management.options.WatchQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name or index_names are
+                invalid types.
+            :class:`~couchbase.exceptions.WatchQueryIndexTimeoutException`: If the specified timeout is reached
+                before all the specified indexes are ready to use.
         """
-        op_type = MgmtOperationType.QueryIndexWatchIndexes
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_watch_indexes_request(bucket_name,
-                                                                         index_names,
-                                                                         obs_handler,
-                                                                         self._collection_ctx,
-                                                                         *options,
-                                                                         **kwargs)
-            d = self._impl.watch_indexes_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+        return self._impl.watch_indexes_deferred(bucket_name, index_names, options, **kwargs)

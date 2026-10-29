@@ -15,96 +15,145 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING, List
-
-from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
+from collections.abc import Coroutine, Iterable
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._management._query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
-from couchbase.protocol.classic._management._query_index_mgmt_types import (BuildDeferredIndexesRequest,
-                                                                            CreateIndexRequest,
-                                                                            DropIndexRequest,
-                                                                            GetAllIndexesRequest,
-                                                                            QueryIndex,
-                                                                            WatchIndexesRequest)
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from txcouchbase.protocol.classic._deferred import defer
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
+    from twisted.internet.defer import Deferred
+
+    from couchbase.common.management.options import (BuildDeferredQueryIndexOptions,
+                                                     CreatePrimaryQueryIndexOptions,
+                                                     CreateQueryIndexOptions,
+                                                     DropPrimaryQueryIndexOptions,
+                                                     DropQueryIndexOptions,
+                                                     GetAllQueryIndexOptions,
+                                                     WatchQueryIndexOptions)
+    from couchbase.common.management.queries import QueryIndex
 
 
 class TxQueryIndexMgmtImpl(AsyncQueryIndexMgmtImpl):
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        super().__init__(client_adapter, observability_instruments)
 
-    def _finish_span(self, result, obs_handler):
-        """Callback to properly end the span on success or failure."""
-        if isinstance(result, Failure):
-            exc = result.value
-            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
-            return result
-        else:
-            obs_handler.__exit__(None, None, None)
-            return result
+    def create_index_deferred(self,
+                              bucket_name: str,
+                              index_name: str,
+                              keys: Iterable[str],
+                              options: CreateQueryIndexOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.QueryIndexCreate, self._observability_instruments)
 
-    def create_index_deferred(self, req: CreateIndexRequest, obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().create_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_create_index_request(bucket_name,
+                                                                   index_name,
+                                                                   keys,
+                                                                   obs_handler,
+                                                                   self._collection_context,
+                                                                   options,
+                                                                   **kwargs)
+            return self._create_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def create_primary_index_deferred(self,
-                                      req: CreateIndexRequest,
-                                      obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().create_primary_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                      bucket_name: str,
+                                      options: CreatePrimaryQueryIndexOptions | None = None,
+                                      **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.QueryIndexCreate, self._observability_instruments)
 
-    def drop_index_deferred(self, req: DropIndexRequest, obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_create_primary_index_request(bucket_name,
+                                                                           obs_handler,
+                                                                           self._collection_context,
+                                                                           options,
+                                                                           **kwargs)
+            return self._create_primary_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_index_deferred(self,
+                            bucket_name: str,
+                            index_name: str,
+                            options: DropQueryIndexOptions | None = None,
+                            **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.QueryIndexDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_index_request(bucket_name,
+                                                                 index_name,
+                                                                 obs_handler,
+                                                                 self._collection_context,
+                                                                 options,
+                                                                 **kwargs)
+            return self._drop_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def drop_primary_index_deferred(self,
-                                    req: DropIndexRequest,
-                                    obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_primary_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                    bucket_name: str,
+                                    options: DropPrimaryQueryIndexOptions | None = None,
+                                    **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.QueryIndexDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_primary_index_request(bucket_name,
+                                                                         obs_handler,
+                                                                         self._collection_context,
+                                                                         options,
+                                                                         **kwargs)
+            return self._drop_primary_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_all_indexes_deferred(self,
-                                 req: GetAllIndexesRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[List[QueryIndex]]:
-        """**INTERNAL**"""
-        coro = super().get_all_indexes(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                 bucket_name: str,
+                                 options: GetAllQueryIndexOptions | None = None,
+                                 **kwargs: Any) -> Deferred[Iterable[QueryIndex]]:
+        obs_handler = ObservableRequestHandler(Op.QueryIndexGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[QueryIndex]]:
+            req = self._request_builder.build_get_all_indexes_request(bucket_name,
+                                                                      obs_handler,
+                                                                      self._collection_context,
+                                                                      options,
+                                                                      **kwargs)
+            return self._get_all_indexes(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def build_deferred_indexes_deferred(self,
-                                        req: BuildDeferredIndexesRequest,
-                                        obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().build_deferred_indexes(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                        bucket_name: str,
+                                        options: BuildDeferredQueryIndexOptions | None = None,
+                                        **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.QueryIndexBuildDeferred, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_build_deferred_indexes_request(bucket_name,
+                                                                             obs_handler,
+                                                                             self._collection_context,
+                                                                             options,
+                                                                             **kwargs)
+            return self._build_deferred_indexes(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def watch_indexes_deferred(self,
-                               req: WatchIndexesRequest,
-                               obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().watch_indexes(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                               bucket_name: str,
+                               index_names: Iterable[str],
+                               options: WatchQueryIndexOptions | None = None,
+                               **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.QueryIndexWatchIndexes, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_watch_indexes_request(bucket_name,
+                                                                    index_names,
+                                                                    obs_handler,
+                                                                    self._collection_context,
+                                                                    options,
+                                                                    **kwargs)
+            return self._watch_indexes(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)

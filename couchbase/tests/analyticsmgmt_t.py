@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Generator, Iterable
+from urllib.parse import parse_qs
 
 import pytest
 
@@ -63,6 +64,33 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
 from tests.test_features import EnvironmentFeatures, ServerFeatures
+
+
+@pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
+                             reason='the analytics link classes are couchbase.management.analytics in every api tree')
+class AnalyticsManagementUnitTests:
+    # No TEST_MANIFEST, for the reason UserManagementUnitTests gives.  The suites below need a
+    # remote cluster or cloud credentials to create a link, so none of them reads one back.
+
+    def test_couchbase_remote_link_from_server(self) -> None:
+        # The shape the binding hands back for each couchbase link get_links returns.
+        raw = {'link_name': 'test-link', 'dataverse': 'test-dataverse', 'hostname': 'host', 'username': 'u',
+               'password': None,
+               'encryption': {'level': 'full', 'certificate': 'cert', 'client_certificate': 'client-cert',
+                              'client_key': None}}
+        link = CouchbaseRemoteAnalyticsLink.link_from_server_json(raw)
+        assert link.as_dict()['encryption'] == {'encryption_level': 'full', 'certificate': 'cert',
+                                                'client_certificate': 'client-cert'}
+
+    def test_azure_blob_form_encode(self) -> None:
+        link = AzureBlobExternalAnalyticsLink('test-dataverse', 'test-link', account_name='acct', account_key='key',
+                                              endpoint_suffix='core.windows.net')
+        assert parse_qs(link.form_encode().decode()) == {'dataverse': ['test-dataverse'],
+                                                         'name': ['test-link'],
+                                                         'type': ['azureblob'],
+                                                         'accountName': ['acct'],
+                                                         'accountKey': ['key'],
+                                                         'endpointSuffix': ['core.windows.net']}
 
 
 class AnalyticsManagementSuiteBase(SuiteRequirements):
@@ -635,7 +663,7 @@ class AnalyticsManagementTestSuite(AnalyticsManagementSuiteBase):
         def check_for_idx(idx: str) -> None:
             indexes = aixm.get_all_indexes()
             names = [index.name for index in indexes]
-            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names)}.'
+            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names, key=str)}.'
 
         TestEnvironment.try_n_times(10, 3, check_for_idx, self.INDEX_NAME)
 
@@ -696,7 +724,7 @@ class AnalyticsManagementTestSuite(AnalyticsManagementSuiteBase):
         def check_for_idx(idx: str) -> None:
             indexes = aixm.get_all_indexes()
             names = [index.name for index in indexes]
-            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names)}.'
+            assert idx in names, f'Index {idx!r} is absent. Present: {sorted(names, key=str)}.'
 
         TestEnvironment.try_n_times(10, 3, check_for_idx, self.INDEX_NAME)
         aixm.drop_index(self.INDEX_NAME,
@@ -718,7 +746,7 @@ class AnalyticsManagementTestSuite(AnalyticsManagementSuiteBase):
 
         datasets = aixm.get_all_datasets()
         local_ds = [ds for ds in datasets if ds.dataset_name == self.DATASET_NAME]
-        dataverses = sorted(ds.dataverse_name for ds in local_ds)
+        dataverses = sorted((ds.dataverse_name for ds in local_ds), key=str)
         cb_assert_eq(len(local_ds), 2, what=f'datasets named {self.DATASET_NAME!r}',
                      ctx=f'dataverses={dataverses}')
         assert 'Default' in dataverses, f'No copy in the Default dataverse. Found: {dataverses}.'

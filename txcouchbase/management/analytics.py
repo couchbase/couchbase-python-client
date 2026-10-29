@@ -15,25 +15,38 @@
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Dict,
-                    Iterable,
-                    Optional)
+__all__ = [
+    'AnalyticsDataType',
+    'AnalyticsDataset',
+    'AnalyticsEncryptionLevel',
+    'AnalyticsIndex',
+    'AnalyticsIndexManager',
+    'AnalyticsLink',
+    'AnalyticsLinkType',
+    'AzureBlobExternalAnalyticsLink',
+    'CouchbaseAnalyticsEncryptionSettings',
+    'CouchbaseRemoteAnalyticsLink',
+    'S3ExternalAnalyticsLink',
+]
+
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 from twisted.internet.defer import Deferred
 
 from couchbase.common.management.analytics import (AnalyticsDataset,
                                                    AnalyticsDataType,
+                                                   AnalyticsEncryptionLevel,
                                                    AnalyticsIndex,
-                                                   AnalyticsLink)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import AnalyticsMgmtOperationType
-from txcouchbase.protocol.classic._management._analytics_mgmt_impl import TxAnalyticsMgmtImpl
+                                                   AnalyticsLink,
+                                                   AnalyticsLinkType,
+                                                   AzureBlobExternalAnalyticsLink,
+                                                   CouchbaseAnalyticsEncryptionSettings,
+                                                   CouchbaseRemoteAnalyticsLink,
+                                                   S3ExternalAnalyticsLink)
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.logic.observability import ObservabilityInstruments
+    from couchbase.common._interfaces._analytics_mgmt import TxAnalyticsMgmtInterface
     from couchbase.management.options import (ConnectLinkOptions,
                                               CreateAnalyticsIndexOptions,
                                               CreateDatasetOptions,
@@ -52,268 +65,271 @@ if TYPE_CHECKING:
 
 
 class AnalyticsIndexManager:
+    """Performs management operations on analytics dataverses, datasets, indexes and links."""
 
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        self._impl = TxAnalyticsMgmtImpl(client_adapter, observability_instruments)
+    def __init__(self, impl: TxAnalyticsMgmtInterface) -> None:
+        self._impl = impl
 
     def create_dataverse(self,
-                         dataverse_name,    # type: str
-                         options=None,      # type: Optional[CreateDataverseOptions]
-                         **kwargs           # type: Any
-                         ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsDataverseCreate
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_create_dataverse_request(dataverse_name, obs_handler, options, **kwargs)  # noqa: E501
-            d = self._impl.create_dataverse_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                         dataverse_name: str,
+                         options: CreateDataverseOptions | None = None,
+                         **kwargs: Any) -> Deferred[None]:
+        """Creates a new analytics dataverse.
+
+        Args:
+            dataverse_name (str): The name of the dataverse to create.
+            options (:class:`~couchbase.management.options.CreateDataverseOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataverse_name is not a str.
+            :class:`~couchbase.exceptions.DataverseAlreadyExistsException`: If the dataverse already exists and
+                ignore_if_exists is not set.
+        """
+        return self._impl.create_dataverse_deferred(dataverse_name, options, **kwargs)
 
     def drop_dataverse(self,
-                       dataverse_name,    # type: str
-                       options=None,      # type: Optional[DropDataverseOptions]
-                       **kwargs           # type: Any
-                       ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsDataverseDrop
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_drop_dataverse_request(dataverse_name, obs_handler, options, **kwargs)  # noqa: E501
-            d = self._impl.drop_dataverse_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                       dataverse_name: str,
+                       options: DropDataverseOptions | None = None,
+                       **kwargs: Any) -> Deferred[None]:
+        """Drops an existing analytics dataverse.
+
+        Args:
+            dataverse_name (str): The name of the dataverse to drop.
+            options (:class:`~couchbase.management.options.DropDataverseOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataverse_name is not a str.
+            :class:`~couchbase.exceptions.DataverseNotFoundException`: If the dataverse does not exist and
+                ignore_if_not_exists is not set.
+        """
+        return self._impl.drop_dataverse_deferred(dataverse_name, options, **kwargs)
 
     def create_dataset(self,
-                       dataset_name,    # type: str
-                       bucket_name,     # type: str
-                       options=None,    # type: Optional[CreateDatasetOptions]
-                       **kwargs         # type: Any
-                       ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsDatasetCreate
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_create_dataset_request(dataset_name, bucket_name, obs_handler, options, **kwargs)  # noqa: E501
-            d = self._impl.create_dataset_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                       dataset_name: str,
+                       bucket_name: str,
+                       options: CreateDatasetOptions | None = None,
+                       **kwargs: Any) -> Deferred[None]:
+        """Creates a new analytics dataset over a bucket.
+
+        Args:
+            dataset_name (str): The name of the dataset to create.
+            bucket_name (str): The name of the bucket the dataset reads from.
+            options (:class:`~couchbase.management.options.CreateDatasetOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataset_name or bucket_name is not a str.
+            :class:`~couchbase.exceptions.DatasetAlreadyExistsException`: If the dataset already exists and
+                ignore_if_exists is not set.
+        """
+        return self._impl.create_dataset_deferred(dataset_name, bucket_name, options, **kwargs)
 
     def drop_dataset(self,
-                     dataset_name,  # type: str
-                     options=None,  # type: Optional[DropDatasetOptions]
-                     **kwargs       # type: Any
-                     ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsDatasetDrop
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_drop_dataset_request(dataset_name, obs_handler, options, **kwargs)
-            d = self._impl.drop_dataset_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                     dataset_name: str,
+                     options: DropDatasetOptions | None = None,
+                     **kwargs: Any) -> Deferred[None]:
+        """Drops an existing analytics dataset.
+
+        Args:
+            dataset_name (str): The name of the dataset to drop.
+            options (:class:`~couchbase.management.options.DropDatasetOptions`): Optional parameters for this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataset_name is not a str.
+            :class:`~couchbase.exceptions.DatasetNotFoundException`: If the dataset does not exist and
+                ignore_if_not_exists is not set.
+        """
+        return self._impl.drop_dataset_deferred(dataset_name, options, **kwargs)
 
     def get_all_datasets(self,
-                         options=None,   # type: Optional[GetAllDatasetOptions]
-                         **kwargs   # type: Any
-                         ) -> Deferred[Iterable[AnalyticsDataset]]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsDatasetGetAll
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_get_all_datasets_request(obs_handler, options, **kwargs)
-            d = self._impl.get_all_datasets_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                         options: GetAllDatasetOptions | None = None,
+                         **kwargs: Any) -> Deferred[Iterable[AnalyticsDataset]]:
+        """Returns every analytics dataset.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllDatasetOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Deferred[Iterable[:class:`.AnalyticsDataset`]]: The datasets.
+        """
+        return self._impl.get_all_datasets_deferred(options, **kwargs)
 
     def create_index(self,
-                     index_name,    # type: str
-                     dataset_name,  # type: str
-                     fields,        # type: Dict[str, AnalyticsDataType]
-                     options=None,  # type: Optional[CreateAnalyticsIndexOptions]
-                     **kwargs       # type: Any
-                     ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsIndexCreate
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_create_index_request(index_name, dataset_name, fields, obs_handler, options, **kwargs)  # noqa: E501
-            d = self._impl.create_index_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                     index_name: str,
+                     dataset_name: str,
+                     fields: dict[str, AnalyticsDataType],
+                     options: CreateAnalyticsIndexOptions | None = None,
+                     **kwargs: Any) -> Deferred[None]:
+        """Creates a new analytics index on a dataset.
+
+        Args:
+            index_name (str): The name of the index to create.
+            dataset_name (str): The name of the dataset to index.
+            fields (dict[str, :class:`.AnalyticsDataType`]): The fields the index covers, each mapped to its type.
+            options (:class:`~couchbase.management.options.CreateAnalyticsIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or dataset_name is not a str, or
+                fields is not a dict of :class:`.AnalyticsDataType` values.
+        """
+        return self._impl.create_index_deferred(index_name, dataset_name, fields, options, **kwargs)
 
     def drop_index(self,
-                   index_name,    # type: str
-                   dataset_name,  # type: str
-                   options=None,  # type: Optional[DropAnalyticsIndexOptions]
-                   **kwargs       # type: Any
-                   ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsIndexDrop
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_drop_index_request(index_name, dataset_name, obs_handler, options, **kwargs)  # noqa: E501
-            d = self._impl.drop_index_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                   index_name: str,
+                   dataset_name: str,
+                   options: DropAnalyticsIndexOptions | None = None,
+                   **kwargs: Any) -> Deferred[None]:
+        """Drops an existing analytics index.
+
+        Args:
+            index_name (str): The name of the index to drop.
+            dataset_name (str): The name of the dataset the index is on.
+            options (:class:`~couchbase.management.options.DropAnalyticsIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or dataset_name is not a str.
+        """
+        return self._impl.drop_index_deferred(index_name, dataset_name, options, **kwargs)
 
     def get_all_indexes(self,
-                        options=None,   # type: Optional[GetAllAnalyticsIndexesOptions]
-                        **kwargs   # type: Any
-                        ) -> Deferred[Iterable[AnalyticsIndex]]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsIndexGetAll
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_get_all_indexes_request(obs_handler, options, **kwargs)
-            d = self._impl.get_all_indexes_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                        options: GetAllAnalyticsIndexesOptions | None = None,
+                        **kwargs: Any) -> Deferred[Iterable[AnalyticsIndex]]:
+        """Returns every analytics index.
 
-    def connect_link(self,
-                     options=None,  # type: Optional[ConnectLinkOptions]
-                     **kwargs   # type: Any
-                     ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsLinkConnect
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_connect_link_request(obs_handler, options, **kwargs)
-            d = self._impl.connect_link_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+        Args:
+            options (:class:`~couchbase.management.options.GetAllAnalyticsIndexesOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
 
-    def disconnect_link(self,
-                        options=None,  # type: Optional[DisconnectLinkOptions]
-                        **kwargs   # type: Any
-                        ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsLinkDisconnect
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_disconnect_link_request(obs_handler, options, **kwargs)
-            d = self._impl.disconnect_link_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+        Returns:
+            Deferred[Iterable[:class:`.AnalyticsIndex`]]: The indexes.
+        """
+        return self._impl.get_all_indexes_deferred(options, **kwargs)
+
+    def connect_link(self, options: ConnectLinkOptions | None = None, **kwargs: Any) -> Deferred[None]:
+        """Connects a link, so that its datasets start receiving data.
+
+        Args:
+            options (:class:`~couchbase.management.options.ConnectLinkOptions`): Optional parameters for this operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+        """
+        return self._impl.connect_link_deferred(options, **kwargs)
+
+    def disconnect_link(self, options: DisconnectLinkOptions | None = None, **kwargs: Any) -> Deferred[None]:
+        """Disconnects a link, so that its datasets stop receiving data.
+
+        Args:
+            options (:class:`~couchbase.management.options.DisconnectLinkOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+        """
+        return self._impl.disconnect_link_deferred(options, **kwargs)
 
     def get_pending_mutations(self,
-                              options=None,     # type: Optional[GetPendingMutationsOptions]
-                              **kwargs     # type: Any
-                              ) -> Deferred[Dict[str, int]]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsGetPendingMutations
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_get_pending_mutations_request(obs_handler, options, **kwargs)
-            d = self._impl.get_pending_mutations_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                              options: GetPendingMutationsOptions | None = None,
+                              **kwargs: Any) -> Deferred[dict[str, int]]:
+        """Returns how many mutations each dataset has yet to process.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetPendingMutationsOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Deferred[dict[str, int]]: The number of pending mutations, keyed by dataverse and dataset name.
+        """
+        return self._impl.get_pending_mutations_deferred(options, **kwargs)
 
     def create_link(self,
-                    link,  # type: AnalyticsLink
-                    options=None,     # type: Optional[CreateLinkAnalyticsOptions]
-                    **kwargs          # type: Any
-                    ) -> Deferred[None]:
-        # We choose AnalyticsLinkCreateCouchbaseRemoteLink arbitrarily b/c the ObservableRequestHandler will
-        # translate all LinkCreate options in AnalyticsMgmtOperationType to the appropriate op name and
-        # the request builder will build the appropriate request type based on the link passed in.
-        op_type = AnalyticsMgmtOperationType.AnalyticsLinkCreateCouchbaseRemoteLink
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_create_link_request(link, obs_handler, options, **kwargs)
-            d = self._impl.create_link_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                    link: AnalyticsLink,
+                    options: CreateLinkAnalyticsOptions | None = None,
+                    **kwargs: Any) -> Deferred[None]:
+        """Creates a new analytics link.
+
+        Args:
+            link (:class:`.AnalyticsLink`): The link to create: a :class:`.CouchbaseRemoteAnalyticsLink`,
+                :class:`.S3ExternalAnalyticsLink` or :class:`.AzureBlobExternalAnalyticsLink`.
+            options (:class:`~couchbase.management.options.CreateLinkAnalyticsOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the link is not an :class:`.AnalyticsLink`, or
+                is not valid.
+            :class:`~couchbase.exceptions.AnalyticsLinkExistsException`: If the link already exists.
+            :class:`~couchbase.exceptions.DataverseNotFoundException`: If the link's dataverse does not exist.
+        """
+        return self._impl.create_link_deferred(link, options, **kwargs)
 
     def replace_link(self,
-                     link,  # type: AnalyticsLink
-                     options=None,     # type: Optional[ReplaceLinkAnalyticsOptions]
-                     **kwargs          # type: Any
-                     ) -> Deferred[None]:
-        # We choose AnalyticsLinkReplaceCouchbaseRemoteLink arbitrarily b/c the ObservableRequestHandler will
-        # translate all LinkReplace options in AnalyticsMgmtOperationType to the appropriate op name and
-        # the request builder will build the appropriate request type based on the link passed in.
-        op_type = AnalyticsMgmtOperationType.AnalyticsLinkReplaceCouchbaseRemoteLink
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_replace_link_request(link, obs_handler, options, **kwargs)
-            d = self._impl.replace_link_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                     link: AnalyticsLink,
+                     options: ReplaceLinkAnalyticsOptions | None = None,
+                     **kwargs: Any) -> Deferred[None]:
+        """Replaces an existing analytics link.
+
+        Args:
+            link (:class:`.AnalyticsLink`): The link to replace: a :class:`.CouchbaseRemoteAnalyticsLink`,
+                :class:`.S3ExternalAnalyticsLink` or :class:`.AzureBlobExternalAnalyticsLink`.
+            options (:class:`~couchbase.management.options.ReplaceLinkAnalyticsOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the link is not an :class:`.AnalyticsLink`, or
+                is not valid.
+            :class:`~couchbase.exceptions.AnalyticsLinkNotFoundException`: If the link does not exist.
+            :class:`~couchbase.exceptions.DataverseNotFoundException`: If the link's dataverse does not exist.
+        """
+        return self._impl.replace_link_deferred(link, options, **kwargs)
 
     def drop_link(self,
-                  link_name,  # type: str
-                  dataverse_name,  # type: str
-                  options=None,     # type: Optional[DropLinkAnalyticsOptions]
-                  **kwargs          # type: Any
-                  ) -> Deferred[None]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsLinkDrop
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_drop_link_request(link_name, dataverse_name, obs_handler, options, **kwargs)  # noqa: E501
-            d = self._impl.drop_link_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                  link_name: str,
+                  dataverse_name: str,
+                  options: DropLinkAnalyticsOptions | None = None,
+                  **kwargs: Any) -> Deferred[None]:
+        """Drops an existing analytics link.
+
+        Args:
+            link_name (str): The name of the link to drop.
+            dataverse_name (str): The name of the dataverse the link is in.
+            options (:class:`~couchbase.management.options.DropLinkAnalyticsOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the link_name or dataverse_name is not a str.
+            :class:`~couchbase.exceptions.AnalyticsLinkNotFoundException`: If the link does not exist.
+            :class:`~couchbase.exceptions.DataverseNotFoundException`: If the dataverse does not exist.
+        """
+        return self._impl.drop_link_deferred(link_name, dataverse_name, options, **kwargs)
 
     def get_links(self,
-                  options=None,  # type: Optional[GetLinksAnalyticsOptions]
-                  **kwargs       # type: Any
-                  ) -> Deferred[Iterable[AnalyticsLink]]:
-        op_type = AnalyticsMgmtOperationType.AnalyticsLinkGetAll
-        obs_handler = ObservableRequestHandler(op_type, self._impl.observability_instruments)
-        obs_handler.__enter__()
-        try:
-            req = self._impl.request_builder.build_get_links_request(obs_handler, options, **kwargs)
-            d = self._impl.get_links_deferred(req, obs_handler)
-            d.addBoth(self._impl._finish_span, obs_handler)
-            return d
-        except Exception as e:
-            obs_handler.__exit__(type(e), e, e.__traceback__)
-            raise
+                  options: GetLinksAnalyticsOptions | None = None,
+                  **kwargs: Any) -> Deferred[Iterable[AnalyticsLink]]:
+        """Returns the analytics links, all of them unless the options narrow the search.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetLinksAnalyticsOptions`): Optional parameters for this
+                operation.
+            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+
+        Returns:
+            Deferred[Iterable[:class:`.AnalyticsLink`]]: The links.
+
+        Raises:
+            :class:`~couchbase.exceptions.DataverseNotFoundException`: If the dataverse named in the options does not
+                exist.
+        """
+        return self._impl.get_links_deferred(options, **kwargs)

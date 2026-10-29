@@ -15,26 +15,26 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, fields
-from enum import Enum
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    Optional,
-                    Union)
+__all__ = [
+    'AnalyticsDataType',
+    'AnalyticsDataset',
+    'AnalyticsEncryptionLevel',
+    'AnalyticsIndex',
+    'AnalyticsLink',
+    'AnalyticsLinkType',
+    'AzureBlobExternalAnalyticsLink',
+    'CouchbaseAnalyticsEncryptionSettings',
+    'CouchbaseRemoteAnalyticsLink',
+    'S3ExternalAnalyticsLink',
+]
 
-from couchbase._utils import is_null_or_empty, to_form_str
-from couchbase.exceptions import (AnalyticsLinkExistsException,
-                                  AnalyticsLinkNotFoundException,
-                                  DatasetAlreadyExistsException,
-                                  DatasetNotFoundException,
-                                  DataverseAlreadyExistsException,
-                                  DataverseNotFoundException,
-                                  InvalidArgumentException)
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import AnalyticsMgmtOperationType
-from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
+
+from couchbase.common._utils import is_null_or_empty, to_form_str
+from couchbase.common.exceptions import InvalidArgumentException
 
 
 class AnalyticsDataType(Enum):
@@ -57,13 +57,13 @@ class AnalyticsEncryptionLevel(Enum):
 
 @dataclass
 class AnalyticsDataset:
-    dataset_name: str = None
-    dataverse_name: str = None
-    link_name: str = None
-    bucket_name: str = None
+    dataset_name: str | None = None
+    dataverse_name: str | None = None
+    link_name: str | None = None
+    bucket_name: str | None = None
 
     @classmethod
-    def from_server(cls, json_data: Dict[str, str]) -> AnalyticsDataset:
+    def from_server(cls, json_data: dict[str, str]) -> AnalyticsDataset:
         return cls(json_data['name'],
                    json_data['dataverse_name'],
                    json_data['link_name'],
@@ -72,10 +72,10 @@ class AnalyticsDataset:
 
 @dataclass
 class AnalyticsIndex:
-    name: str = None
-    dataset_name: str = None
-    dataverse_name: str = None
-    is_primary: bool = None
+    name: str | None = None
+    dataset_name: str | None = None
+    dataverse_name: str | None = None
+    is_primary: bool | None = None
 
 
 class AnalyticsLink(ABC):
@@ -86,7 +86,8 @@ class AnalyticsLink(ABC):
     def name(self) -> str:
         """Returns the name of the :class:`couchbase.analytics.AnalyticsLink`
 
-        :return: The name of the :class:`couchbase.analytics.AnalyticsLink`
+        Returns:
+            The name of the :class:`couchbase.analytics.AnalyticsLink`
         """
         pass
 
@@ -94,7 +95,8 @@ class AnalyticsLink(ABC):
     def dataverse_name(self) -> str:
         """Returns the name of the dataverse the :class:`couchbase.analytics.AnalyticsLink` belongs to
 
-        :return: The name of the dataverse
+        Returns:
+            The name of the dataverse
         """
         pass
 
@@ -104,7 +106,8 @@ class AnalyticsLink(ABC):
             to send as the body of a :func:`couchbase.management.analytics.CreateLink` or
             :func:`couchbase.management.analytics.ReplaceLink`
 
-        :return: A form encoded :class:`couchbase.analytics.AnalyticsLink`
+        Returns:
+            A form encoded :class:`couchbase.analytics.AnalyticsLink`
         """
         pass
 
@@ -113,9 +116,11 @@ class AnalyticsLink(ABC):
         """Ensures the :class:`couchbase.analytics.AnalyticsLink` is valid.
         Raises a :class:`couchbase.exceptions.InvalidArgumentException` if link is invalid.
 
-        :return: None
+        Returns:
+            None
 
-        :raises: :class:`couchbase.exceptions.InvalidArgumentException`
+        Raises:
+            :class:`couchbase.exceptions.InvalidArgumentException`: If the link is invalid.
         """
         pass
 
@@ -124,17 +129,19 @@ class AnalyticsLink(ABC):
         """Returns the :class:`couchbase.analytics.AnalyticsLinkType` of
         the :class:`couchbase.analytics.AnalyticsLink`
 
-        :return: The corresponding :class:`couchbase.analytics.AnalyticsLinkType`
-        of the :class:`couchbase.analytics.AnalyticsLink`
+        Returns:
+            The corresponding :class:`couchbase.analytics.AnalyticsLinkType`
+            of the :class:`couchbase.analytics.AnalyticsLink`
         """
         pass
 
     @abstractmethod
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Returns the :class:`couchbase.analytics.AnalyticsLink` as a dict,
             in the form the management API sends it in
 
-        :return: A dict representation of the :class:`couchbase.analytics.AnalyticsLink`
+        Returns:
+            A dict representation of the :class:`couchbase.analytics.AnalyticsLink`
         """
         pass
 
@@ -142,14 +149,12 @@ class AnalyticsLink(ABC):
 class CouchbaseAnalyticsEncryptionSettings:
 
     def __init__(self,
-                 encryption_level: Optional[AnalyticsEncryptionLevel] = None,
-                 certificate: Optional[Union[bytes, bytearray]] = None,
-                 client_certificate: Optional[Union[bytes, bytearray]] = None,
-                 client_key: Optional[Union[bytes, bytearray]] = None,
+                 encryption_level: AnalyticsEncryptionLevel | None = None,
+                 certificate: bytes | bytearray | None = None,
+                 client_certificate: bytes | bytearray | None = None,
+                 client_key: bytes | bytearray | None = None,
                  ) -> None:
-        self._encryption_level = encryption_level
-        if self._encryption_level is None:
-            self._encryption_level = AnalyticsEncryptionLevel.NONE
+        self._encryption_level = encryption_level if encryption_level is not None else AnalyticsEncryptionLevel.NONE
         self._certificate = certificate
         self._client_certificate = client_certificate
         self._client_key = client_key
@@ -163,30 +168,30 @@ class CouchbaseAnalyticsEncryptionSettings:
         self._encryption_level = value
 
     @property
-    def certificate(self) -> Optional[bytes]:
+    def certificate(self) -> bytes | bytearray | None:
         return self._certificate
 
     @certificate.setter
-    def certificate(self, value: Union[bytes, bytearray]) -> None:
+    def certificate(self, value: bytes | bytearray) -> None:
         self._certificate = value
 
     @property
-    def client_certificate(self) -> Optional[bytes]:
+    def client_certificate(self) -> bytes | bytearray | None:
         return self._client_certificate
 
     @client_certificate.setter
-    def client_certificate(self, value: Union[bytes, bytearray]) -> None:
+    def client_certificate(self, value: bytes | bytearray) -> None:
         self._client_certificate = value
 
     @property
-    def client_key(self) -> Optional[bytes]:
+    def client_key(self) -> bytes | bytearray | None:
         return self._client_key
 
     @client_key.setter
-    def client_key(self, value: Union[bytes, bytearray]) -> None:
+    def client_key(self, value: bytes | bytearray) -> None:
         self._client_key = value
 
-    def as_dict(self) -> Dict[str, str]:
+    def as_dict(self) -> dict[str, str]:
         encryption_dict = {
             'encryption_level': self.encryption_level.value
         }
@@ -199,23 +204,17 @@ class CouchbaseAnalyticsEncryptionSettings:
         return encryption_dict
 
     @classmethod
-    def from_server_json(cls, raw_data: Dict[str, Any]) -> CouchbaseAnalyticsEncryptionSettings:
+    def from_server_json(cls, raw_data: dict[str, Any]) -> CouchbaseAnalyticsEncryptionSettings:
 
-        encryption_settings = CouchbaseAnalyticsEncryptionSettings()
-        if raw_data['encryption'] == AnalyticsEncryptionLevel.NONE.value:
-            encryption_settings.encryption_level = AnalyticsEncryptionLevel.NONE
-        elif raw_data['encryption'] == AnalyticsEncryptionLevel.HALF.value:
-            encryption_settings.encryption_level = AnalyticsEncryptionLevel.HALF
-        elif raw_data['encryption'] == AnalyticsEncryptionLevel.FULL.value:
-            encryption_settings.encryption_level = AnalyticsEncryptionLevel.FULL
+        encryption_settings = CouchbaseAnalyticsEncryptionSettings(AnalyticsEncryptionLevel(raw_data['level']))
 
-        if 'certificate' in raw_data and not is_null_or_empty(raw_data['certificate']):
-            encryption_settings.certificate = bytes(
-                raw_data['certificate'], 'utf-8')
+        certificate = raw_data.get('certificate', None)
+        if isinstance(certificate, str) and not is_null_or_empty(certificate):
+            encryption_settings.certificate = bytes(certificate, 'utf-8')
 
-        if 'client_certificate' in raw_data and not is_null_or_empty(raw_data['client_certificate']):
-            encryption_settings.certificate = bytes(
-                raw_data['client_certificate'], 'utf-8')
+        client_certificate = raw_data.get('client_certificate', None)
+        if isinstance(client_certificate, str) and not is_null_or_empty(client_certificate):
+            encryption_settings.client_certificate = bytes(client_certificate, 'utf-8')
 
         return encryption_settings
 
@@ -226,8 +225,8 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
                  link_name: str,
                  hostname: str,
                  encryption: CouchbaseAnalyticsEncryptionSettings,
-                 username: Optional[str] = None,
-                 password: Optional[str] = None
+                 username: str | None = None,
+                 password: str | None = None
                  ) -> None:
         super().__init__()
         self._dataverse = dataverse
@@ -244,7 +243,7 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
         return self._dataverse
 
     def form_encode(self) -> bytes:
-        params = {}
+        params: dict[str, str | None] = {}
 
         if "/" not in self._dataverse:
             params["dataverse"] = self._dataverse
@@ -307,8 +306,8 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
     def link_type(self) -> AnalyticsLinkType:
         return AnalyticsLinkType.CouchbaseRemote
 
-    def as_dict(self) -> Dict[str, Any]:
-        link_dict = {
+    def as_dict(self) -> dict[str, Any]:
+        link_dict: dict[str, Any] = {
             'link_name': self.name(),
             'dataverse': self.dataverse_name(),
             'hostname': self._hostname,
@@ -324,7 +323,7 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
         return link_dict
 
     @classmethod
-    def link_from_server_json(cls, raw_data: Dict[str, Any]) -> CouchbaseRemoteAnalyticsLink:
+    def link_from_server_json(cls, raw_data: dict[str, Any]) -> CouchbaseRemoteAnalyticsLink:
 
         dataverse = raw_data['dataverse']
         link_name = raw_data['link_name']
@@ -344,9 +343,9 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
             link_name: str,
             access_key_id: str,
             region: str,
-            secret_access_key: Optional[str] = None,
-            session_token: Optional[str] = None,
-            service_endpoint: Optional[str] = None
+            secret_access_key: str | None = None,
+            session_token: str | None = None,
+            service_endpoint: str | None = None
     ) -> None:
         super().__init__()
         self._dataverse = dataverse
@@ -364,7 +363,7 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
         return self._dataverse
 
     def form_encode(self) -> bytes:
-        params = {}
+        params: dict[str, str | None] = {}
 
         if "/" not in self._dataverse:
             params["dataverse"] = self._dataverse
@@ -407,7 +406,7 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
     def link_type(self) -> AnalyticsLinkType:
         return AnalyticsLinkType.S3External
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         link_dict = {
             'link_name': self.name(),
             'dataverse': self.dataverse_name(),
@@ -424,7 +423,7 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
         return link_dict
 
     @classmethod
-    def link_from_server_json(cls, raw_data: Dict[str, Any]) -> S3ExternalAnalyticsLink:
+    def link_from_server_json(cls, raw_data: dict[str, Any]) -> S3ExternalAnalyticsLink:
 
         dataverse = raw_data['dataverse']
         link_name = raw_data['link_name']
@@ -441,12 +440,12 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
             self,
             dataverse: str,
             link_name: str,
-            connection_string: Optional[str] = None,
-            account_name: Optional[str] = None,
-            account_key: Optional[str] = None,
-            shared_access_signature: Optional[str] = None,
-            blob_endpoint: Optional[str] = None,
-            endpoint_suffix: Optional[str] = None,
+            connection_string: str | None = None,
+            account_name: str | None = None,
+            account_key: str | None = None,
+            shared_access_signature: str | None = None,
+            blob_endpoint: str | None = None,
+            endpoint_suffix: str | None = None,
     ) -> None:
         super().__init__()
         self._dataverse = dataverse
@@ -465,7 +464,7 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
         return self._dataverse
 
     def form_encode(self) -> bytes:
-        params = {}
+        params: dict[str, str | None] = {}
 
         if "/" not in self._dataverse:
             params["dataverse"] = self._dataverse
@@ -488,8 +487,8 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
         if not is_null_or_empty(self._blob_endpoint):
             params["blobEndpoint"] = self._blob_endpoint
 
-        if not is_null_or_empty(self._endpiont_suffix):
-            params["endpointSuffix"] = self._endpiont_suffix
+        if not is_null_or_empty(self._endpoint_suffix):
+            params["endpointSuffix"] = self._endpoint_suffix
 
         return to_form_str(params).encode()
 
@@ -512,7 +511,7 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
     def link_type(self) -> AnalyticsLinkType:
         return AnalyticsLinkType.AzureBlobExternal
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         link_dict = {
             'link_name': self.name(),
             'dataverse': self.dataverse_name(),
@@ -533,7 +532,7 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
         return link_dict
 
     @classmethod
-    def link_from_server_json(cls, raw_data: Dict[str, Any]) -> AzureBlobExternalAnalyticsLink:
+    def link_from_server_json(cls, raw_data: dict[str, Any]) -> AzureBlobExternalAnalyticsLink:
 
         dataverse = raw_data['dataverse']
         link_name = raw_data['link_name']
@@ -546,271 +545,3 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
                                               account_name=account_name,
                                               blob_endpoint=blob_endpoint,
                                               endpoint_suffix=endpoint_suffix)
-
-
-# we have these params on the top-level pycbc_core request
-OPARG_SKIP_LIST = ['error_map']
-_OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
-
-
-@dataclass
-class AnalyticsMgmtRequest(MgmtRequest):
-
-    def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
-        cls = type(self)
-        cached_fields = _FIELDS_CACHE.get(cls)
-        if cached_fields is None:
-            cached_fields = [f for f in fields(cls) if f.name not in _OPARG_SKIP_SET]
-            _FIELDS_CACHE[cls] = cached_fields
-
-        mgmt_kwargs = {
-            f.name: getattr(self, f.name)
-            for f in cached_fields
-            if getattr(self, f.name) is not None
-        }
-        if callback is not None:
-            mgmt_kwargs['callback'] = callback
-
-        if errback is not None:
-            mgmt_kwargs['errback'] = errback
-
-        if obs_handler:
-            # TODO(PYCBC-1746): Update once legacy tracing logic is removed
-            if obs_handler.is_legacy_tracer:
-                legacy_request_span = obs_handler.legacy_request_span
-                if legacy_request_span:
-                    mgmt_kwargs['parent_span'] = legacy_request_span
-            else:
-                mgmt_kwargs['wrapper_span_name'] = obs_handler.wrapper_span_name
-
-        return mgmt_kwargs
-
-
-@dataclass
-class ConnectLinkRequest(AnalyticsMgmtRequest):
-    dataverse_name: Optional[str] = None
-    link_name: Optional[str] = None
-    force: Optional[bool] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkConnect.value
-
-
-@dataclass
-class CreateDatasetRequest(AnalyticsMgmtRequest):
-    dataset_name: str
-    bucket_name: str
-    dataverse_name: Optional[str] = None
-    ignore_if_exists: Optional[bool] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsDatasetCreate.value
-
-
-@dataclass
-class CreateDataverseRequest(AnalyticsMgmtRequest):
-    dataverse_name: str
-    ignore_if_exists: Optional[bool] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsDataverseCreate.value
-
-
-@dataclass
-class CreateIndexRequest(AnalyticsMgmtRequest):
-    index_name: str
-    dataset_name: str
-    fields: Dict[str, str]
-    dataverse_name: Optional[str] = None
-    ignore_if_exists: Optional[bool] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsIndexCreate.value
-
-
-@dataclass
-class CreateAzureBlobExternalLinkRequest(AnalyticsMgmtRequest):
-    link: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkCreateAzureBlobExternalLink.value
-
-
-@dataclass
-class CreateCouchbaseRemoteLinkRequest(AnalyticsMgmtRequest):
-    link: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkCreateCouchbaseRemoteLink.value
-
-
-@dataclass
-class CreateS3ExternalLinkRequest(AnalyticsMgmtRequest):
-    link: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkCreateS3ExternalLink.value
-
-
-@dataclass
-class DisconnectLinkRequest(AnalyticsMgmtRequest):
-    dataverse_name: Optional[str] = None
-    link_name: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkDisconnect.value
-
-
-@dataclass
-class DropDatasetRequest(AnalyticsMgmtRequest):
-    dataset_name: str
-    dataverse_name: Optional[str] = None
-    ignore_if_does_not_exist: Optional[bool] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsDatasetDrop.value
-
-
-@dataclass
-class DropDataverseRequest(AnalyticsMgmtRequest):
-    dataverse_name: str
-    ignore_if_does_not_exist: Optional[bool] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsDataverseDrop.value
-
-
-@dataclass
-class DropIndexRequest(AnalyticsMgmtRequest):
-    index_name: str
-    dataset_name: str
-    dataverse_name: Optional[str] = None
-    ignore_if_does_not_exist: Optional[bool] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsIndexDrop.value
-
-
-@dataclass
-class DropLinkRequest(AnalyticsMgmtRequest):
-    link_name: str
-    dataverse_name: str
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkDrop.value
-
-
-@dataclass
-class GetAllDatasetsRequest(AnalyticsMgmtRequest):
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsDatasetGetAll.value
-
-
-@dataclass
-class GetAllIndexesRequest(AnalyticsMgmtRequest):
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsIndexGetAll.value
-
-
-@dataclass
-class GetLinksRequest(AnalyticsMgmtRequest):
-    dataverse_name: Optional[str] = None
-    link_name: Optional[str] = None
-    link_type: Optional[str] = None
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkGetAll.value
-
-
-@dataclass
-class GetPendingMutationsRequest(AnalyticsMgmtRequest):
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsGetPendingMutations.value
-
-
-@dataclass
-class ReplaceAzureBlobExternalLinkRequest(AnalyticsMgmtRequest):
-    link: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkReplaceAzureBlobExternalLink.value
-
-
-@dataclass
-class ReplaceCouchbaseRemoteLinkRequest(AnalyticsMgmtRequest):
-    link: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkReplaceCouchbaseRemoteLink.value
-
-
-@dataclass
-class ReplaceS3ExternalLinkRequest(AnalyticsMgmtRequest):
-    link: Dict[str, Any]
-    timeout: Optional[int] = None
-
-    @property
-    def binding_method(self) -> str:
-        return AnalyticsMgmtOperationType.AnalyticsLinkReplaceS3ExternalLink.value
-
-
-ANALYTICS_MGMT_ERROR_MAP: Dict[str, Exception] = {
-    r'.*24055.*already exists': AnalyticsLinkExistsException,
-    r'.*24006.*does not exist': AnalyticsLinkNotFoundException,
-    r'.*24034.*Cannot find': DataverseNotFoundException,
-    r'.*24025.*Cannot find analytics (collection)*': DatasetNotFoundException,
-    r'.*24039.*An analytics\s+(scope)*.*already exists': DataverseAlreadyExistsException,
-    r'.*24040.*An analytics\s+(collection)*.*already exists': DatasetAlreadyExistsException
-}
-
-
-CreateLinkRequest = Union[CreateAzureBlobExternalLinkRequest,
-                          CreateCouchbaseRemoteLinkRequest,
-                          CreateS3ExternalLinkRequest]
-
-ReplaceLinkRequest = Union[ReplaceAzureBlobExternalLinkRequest,
-                           ReplaceCouchbaseRemoteLinkRequest,
-                           ReplaceS3ExternalLinkRequest]

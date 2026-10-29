@@ -15,74 +15,43 @@
 
 from __future__ import annotations
 
-from dataclasses import (dataclass,
-                         field,
-                         fields)
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    List,
-                    Optional,
-                    Tuple,
-                    Union)
+from collections.abc import Callable
+from dataclasses import dataclass, fields
+from typing import Any
 
-from couchbase.exceptions import QueryIndexAlreadyExistsException, QueryIndexNotFoundException
-from couchbase.logic.observability import ObservableRequestHandler
-from couchbase.logic.operation_types import QueryIndexMgmtOperationType
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common.exceptions import (CouchbaseException,
+                                         QueryIndexAlreadyExistsException,
+                                         QueryIndexNotFoundException)
+from couchbase.common.protocol import CouchbaseProtocol
+from couchbase.protocol.classic._bindings import QueryIndexMgmtBinding
 from couchbase.protocol.classic._management._mgmt_req import MgmtRequest
 
 
-@dataclass
-class QueryIndex:
-    name: str
-    is_primary: bool
-    type: str
-    state: str
-    namespace: str
-    datastore_id: str
-    keyspace: str
-    index_key: list = field(default_factory=list)
-    condition: str = None
-    bucket_name: str = None
-    scope_name: str = None
-    collection_name: str = None
-    partition: str = None
-
-    @classmethod
-    def from_server(cls, json_data: Dict[str, Any]) -> QueryIndex:
-
-        bucket_name = json_data.get('bucket_name', None)
-        if bucket_name is None:
-            bucket_name = json_data.get('keyspace_id', None)
-        return cls(json_data.get('name'),
-                   bool(json_data.get('is_primary')),
-                   json_data.get('type'),
-                   json_data.get('state'),
-                   json_data.get('namespace_id'),
-                   json_data.get('datastore_id'),
-                   json_data.get('keyspace_id'),
-                   json_data.get('index_key', []),
-                   json_data.get('condition', None),
-                   bucket_name,
-                   json_data.get('scope_name', None),
-                   json_data.get('collection_name', None),
-                   json_data.get('partition', None)
-                   )
+class QueryIndexMgmtOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
+    BuildDeferredQueryIndex = 'BuildDeferredQueryIndexOptions'
+    CreatePrimaryQueryIndex = 'CreatePrimaryQueryIndexOptions'
+    CreateQueryIndex = 'CreateQueryIndexOptions'
+    DropPrimaryQueryIndex = 'DropPrimaryQueryIndexOptions'
+    DropQueryIndex = 'DropQueryIndexOptions'
+    GetAllQueryIndex = 'GetAllQueryIndexOptions'
+    WatchQueryIndex = 'WatchQueryIndexOptions'
 
 
 # we have these params on the top-level pycbc_core request
 OPARG_SKIP_LIST = ['error_map']
 _OPARG_SKIP_SET = frozenset(OPARG_SKIP_LIST)
-_FIELDS_CACHE: Dict[type, list] = {}
+_FIELDS_CACHE: dict[type, list] = {}
 
 
 @dataclass
 class QueryIndexMgmtRequest(MgmtRequest):
 
     def req_to_dict(self,
-                    obs_handler: Optional[ObservableRequestHandler] = None,
-                    callback: Optional[Callable[..., None]] = None,
-                    errback: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+                    obs_handler: ObservableRequestHandler | None = None,
+                    callback: Callable[..., None] | None = None,
+                    errback: Callable[..., None] | None = None) -> dict[str, Any]:
         cls = type(self)
         cached_fields = _FIELDS_CACHE.get(cls)
         if cached_fields is None:
@@ -116,75 +85,72 @@ class QueryIndexMgmtRequest(MgmtRequest):
 @dataclass
 class CreateIndexRequest(QueryIndexMgmtRequest):
     bucket_name: str
-    index_name: Optional[str] = None
-    is_primary: Optional[bool] = None
-    condition: Optional[str] = None
-    keys: Optional[List[str]] = None
-    ignore_if_exists: Optional[bool] = None
-    scope_name: Optional[str] = None
-    collection_name: Optional[str] = None
-    deferred: Optional[bool] = None
-    num_replicas: Optional[int] = None
-    timeout: Optional[int] = None
+    index_name: str | None = None
+    is_primary: bool | None = None
+    condition: str | None = None
+    keys: list[str] | None = None
+    ignore_if_exists: bool | None = None
+    scope_name: str | None = None
+    collection_name: str | None = None
+    deferred: bool | None = None
+    num_replicas: int | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return QueryIndexMgmtOperationType.QueryIndexCreate.value
+        return QueryIndexMgmtBinding.QueryIndexCreate.value
 
 
 @dataclass
 class DropIndexRequest(QueryIndexMgmtRequest):
     bucket_name: str
-    index_name: Optional[str] = None
-    is_primary: Optional[bool] = None
-    ignore_if_does_not_exist: Optional[bool] = None
-    scope_name: Optional[str] = None
-    collection_name: Optional[str] = None
-    timeout: Optional[int] = None
+    index_name: str | None = None
+    is_primary: bool | None = None
+    ignore_if_does_not_exist: bool | None = None
+    scope_name: str | None = None
+    collection_name: str | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return QueryIndexMgmtOperationType.QueryIndexDrop.value
+        return QueryIndexMgmtBinding.QueryIndexDrop.value
 
 
 @dataclass
 class GetAllIndexesRequest(QueryIndexMgmtRequest):
     bucket_name: str
-    scope_name: Optional[str] = None
-    collection_name: Optional[str] = None
-    timeout: Optional[int] = None
+    scope_name: str | None = None
+    collection_name: str | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return QueryIndexMgmtOperationType.QueryIndexGetAll.value
+        return QueryIndexMgmtBinding.QueryIndexGetAll.value
 
 
 @dataclass
 class BuildDeferredIndexesRequest(QueryIndexMgmtRequest):
     bucket_name: str
-    scope_name: Optional[str] = None
-    collection_name: Optional[str] = None
-    timeout: Optional[int] = None
+    scope_name: str | None = None
+    collection_name: str | None = None
+    timeout: int | None = None
 
     @property
     def binding_method(self) -> str:
-        return QueryIndexMgmtOperationType.QueryIndexBuildDeferred.value
+        return QueryIndexMgmtBinding.QueryIndexBuildDeferred.value
 
 
 @dataclass
-class WatchIndexesRequest(QueryIndexMgmtRequest):
+class WatchIndexesRequest:
+    """Request for watch_indexes, which polls get_all_indexes and has no binding call of its own."""
     bucket_name: str
-    index_names: Union[List[str], Tuple[str, ...]]
+    index_names: list[str]
     timeout: int
-    scope_name: Optional[str] = None
-    collection_name: Optional[str] = None
-
-    @property
-    def binding_method(self) -> str:
-        return 'watch_indexes'
+    scope_name: str | None = None
+    collection_name: str | None = None
 
 
-QUERY_INDEX_MGMT_ERROR_MAP: Dict[str, Exception] = {
+QUERY_INDEX_MGMT_ERROR_MAP: dict[str, type[CouchbaseException]] = {
     r'.*[iI]ndex.*already exists.*': QueryIndexAlreadyExistsException,
     r'.*[iI]ndex.*[nN]ot [fF]ound.*': QueryIndexNotFoundException
 }

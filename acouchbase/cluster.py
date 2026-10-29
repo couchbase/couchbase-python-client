@@ -646,9 +646,10 @@ class AsyncCluster:
         indexes of this cluster.
 
         Returns:
-            :class:`~acouchbase.management.queries.QueryIndexManager`: A :class:`~acouchbase.management.queries.QueryIndexManager` instance.
-        """  # noqa: E501
-        return QueryIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+            :class:`~acouchbase.management.queries.QueryIndexManager`: A
+            :class:`~acouchbase.management.queries.QueryIndexManager` instance.
+        """
+        return QueryIndexManager(self._impl.query_index_mgmt())
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
         """
@@ -656,9 +657,10 @@ class AsyncCluster:
         dataverses, dataset, indexes and links of this cluster.
 
         Returns:
-            :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: An :class:`~acouchbase.management.analytics.AnalyticsIndexManager` instance.
-        """  # noqa: E501
-        return AnalyticsIndexManager(self._impl._client_adapter, self._impl.observability_instruments)
+            :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: An
+            :class:`~acouchbase.management.analytics.AnalyticsIndexManager` instance.
+        """
+        return AnalyticsIndexManager(self._impl.analytics_mgmt())
 
     def search_indexes(self) -> SearchIndexManager:
         """

@@ -78,6 +78,8 @@ class QueryIndexManagementSuiteBase(SuiteRequirements):
     IX_KEYS = ('fld1', 'fld2')
     NAMED_PRIMARY = 'namedPrimary'
     PARTITIONED_IX_NAME = 'idx_fld1'
+    # The indexes test_watch creates without deferring: ix0 to ix4, every odd one.
+    _BUILT = ['ix1', 'ix3']
     PARTITION = 'HASH(`fld1`)'
     CONDITION = '((`fld1` = 1) and (`fld2` = 2))'
 
@@ -321,9 +323,14 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         index_names = [i.name for i in indexes]
         qixm.build_deferred_indexes()
         qixm.watch_indexes(index_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))
-        # Watching an already-built set again must also succeed, including the primary.
+        # Watching an already-built set again must also succeed, including the primary.  The
+        # primary is added to a copy: the caller's list is left as it was, and a tuple works too.
+        watched = list(index_names)
         qixm.watch_indexes(index_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30),
                                                                watch_primary=True))
+        assert index_names == watched
+        qixm.watch_indexes(tuple(index_names), WatchQueryIndexOptions(timeout=timedelta(seconds=30),
+                                                                      watch_primary=True))
 
         with pytest.raises(QueryIndexNotFoundException):
             qixm.watch_indexes(['idontexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
@@ -430,6 +437,8 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         with pytest.raises(WatchQueryIndexTimeoutException):
             qixm.watch_indexes([i.name for i in indexes],
                                WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
+        # The built half alone comes online: an unbuilt index the watch was not given is not waited on.
+        qixm.watch_indexes(self._BUILT, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))
 
 
 class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
@@ -659,9 +668,17 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
         qixm.watch_indexes(cb_env.bucket.name,
                            index_names,
                            WatchQueryIndexOptions(timeout=timedelta(seconds=30), **ns))
-        # Watching an already-built set again must also succeed, including the primary.
+        # Watching an already-built set again must also succeed, including the primary.  The
+        # primary is added to a copy: the caller's list is left as it was, and a tuple works too.
+        watched = list(index_names)
         qixm.watch_indexes(cb_env.bucket.name,
                            index_names,
+                           WatchQueryIndexOptions(timeout=timedelta(seconds=30),
+                                                  watch_primary=True,
+                                                  **ns))
+        assert index_names == watched
+        qixm.watch_indexes(cb_env.bucket.name,
+                           tuple(index_names),
                            WatchQueryIndexOptions(timeout=timedelta(seconds=30),
                                                   watch_primary=True,
                                                   **ns))
@@ -819,6 +836,10 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
             qixm.watch_indexes(cb_env.bucket.name,
                                [i.name for i in indexes],
                                WatchQueryIndexOptions(timeout=timedelta(seconds=5), **ns))
+        # The built half alone comes online: an unbuilt index the watch was not given is not waited on.
+        qixm.watch_indexes(cb_env.bucket.name,
+                           self._BUILT,
+                           WatchQueryIndexOptions(timeout=timedelta(seconds=30), **ns))
 
 
 class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
@@ -1111,6 +1132,10 @@ class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
             qixm.watch_indexes(cb_env.bucket.name,
                                [i.name for i in indexes],
                                WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
+        # The built half alone comes online: an unbuilt index the watch was not given is not waited on.
+        qixm.watch_indexes(cb_env.bucket.name,
+                           self._BUILT,
+                           WatchQueryIndexOptions(timeout=timedelta(seconds=30)))
 
 
 # Excluded from txcouchbase with its suite class above; without this the concrete class

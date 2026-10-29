@@ -15,186 +15,228 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import (TYPE_CHECKING,
-                    Dict,
-                    Iterable)
-
-from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
+from collections.abc import Coroutine, Iterable
+from typing import TYPE_CHECKING, Any
 
 from acouchbase.protocol.classic._management._analytics_mgmt_impl import AsyncAnalyticsMgmtImpl
-from couchbase.common.management.analytics import (AnalyticsDataset,
-                                                   AnalyticsIndex,
-                                                   AnalyticsLink)
-from couchbase.logic.observability import ObservabilityInstruments, ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._operations import Op
+from txcouchbase.protocol.classic._deferred import defer
 
 if TYPE_CHECKING:
-    from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
-    from couchbase.common.management.analytics import (ConnectLinkRequest,
-                                                       CreateDatasetRequest,
-                                                       CreateDataverseRequest,
-                                                       CreateIndexRequest,
-                                                       CreateLinkRequest,
-                                                       DisconnectLinkRequest,
-                                                       DropDatasetRequest,
-                                                       DropDataverseRequest,
-                                                       DropIndexRequest,
-                                                       DropLinkRequest,
-                                                       GetAllDatasetsRequest,
-                                                       GetAllIndexesRequest,
-                                                       GetLinksRequest,
-                                                       GetPendingMutationsRequest,
-                                                       ReplaceLinkRequest)
+    from twisted.internet.defer import Deferred
+
+    from couchbase.common.management.analytics import (AnalyticsDataset,
+                                                       AnalyticsDataType,
+                                                       AnalyticsIndex,
+                                                       AnalyticsLink)
+    from couchbase.common.management.options import (ConnectLinkOptions,
+                                                     CreateAnalyticsIndexOptions,
+                                                     CreateDatasetOptions,
+                                                     CreateDataverseOptions,
+                                                     CreateLinkAnalyticsOptions,
+                                                     DisconnectLinkOptions,
+                                                     DropAnalyticsIndexOptions,
+                                                     DropDatasetOptions,
+                                                     DropDataverseOptions,
+                                                     DropLinkAnalyticsOptions,
+                                                     GetAllAnalyticsIndexesOptions,
+                                                     GetAllDatasetOptions,
+                                                     GetLinksAnalyticsOptions,
+                                                     GetPendingMutationsOptions,
+                                                     ReplaceLinkAnalyticsOptions)
 
 
 class TxAnalyticsMgmtImpl(AsyncAnalyticsMgmtImpl):
-    def __init__(self,
-                 client_adapter: AsyncClientAdapter,
-                 observability_instruments: ObservabilityInstruments) -> None:
-        super().__init__(client_adapter, observability_instruments)
-
-    def _finish_span(self, result, obs_handler: ObservableRequestHandler):
-        """Callback to properly end the span on success or failure."""
-        if isinstance(result, Failure):
-            exc = result.value
-            obs_handler.__exit__(type(exc), exc, exc.__traceback__)
-            return result
-        else:
-            obs_handler.__exit__(None, None, None)
-            return result
-
-    def connect_link_deferred(self,
-                              req: ConnectLinkRequest,
-                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().connect_link(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def create_dataset_deferred(self,
-                                req: CreateDatasetRequest,
-                                obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().create_dataset(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
 
     def create_dataverse_deferred(self,
-                                  req: CreateDataverseRequest,
-                                  obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().create_dataverse(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                  dataverse_name: str,
+                                  options: CreateDataverseOptions | None = None,
+                                  **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsDataverseCreate, self._observability_instruments)
 
-    def create_index_deferred(self,
-                              req: CreateIndexRequest,
-                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().create_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_create_dataverse_request(dataverse_name, obs_handler, options, **kwargs)
+            return self._create_dataverse(req, obs_handler)
 
-    def create_link_deferred(self,
-                             req: CreateLinkRequest,
-                             obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().create_link(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def disconnect_link_deferred(self,
-                                 req: DisconnectLinkRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().disconnect_link(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
-
-    def drop_dataset_deferred(self,
-                              req: DropDatasetRequest,
-                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_dataset(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        return defer(self.loop, obs_handler, start)
 
     def drop_dataverse_deferred(self,
-                                req: DropDataverseRequest,
-                                obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_dataverse(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                dataverse_name: str,
+                                options: DropDataverseOptions | None = None,
+                                **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsDataverseDrop, self._observability_instruments)
 
-    def drop_index_deferred(self,
-                            req: DropIndexRequest,
-                            obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_index(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_dataverse_request(dataverse_name, obs_handler, options, **kwargs)
+            return self._drop_dataverse(req, obs_handler)
 
-    def drop_link_deferred(self,
-                           req: DropLinkRequest,
-                           obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().drop_link(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        return defer(self.loop, obs_handler, start)
+
+    def create_dataset_deferred(self,
+                                dataset_name: str,
+                                bucket_name: str,
+                                options: CreateDatasetOptions | None = None,
+                                **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsDatasetCreate, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_create_dataset_request(dataset_name,
+                                                                     bucket_name,
+                                                                     obs_handler,
+                                                                     options,
+                                                                     **kwargs)
+            return self._create_dataset(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_dataset_deferred(self,
+                              dataset_name: str,
+                              options: DropDatasetOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsDatasetDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_dataset_request(dataset_name, obs_handler, options, **kwargs)
+            return self._drop_dataset(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_all_datasets_deferred(self,
-                                  req: GetAllDatasetsRequest,
-                                  obs_handler: ObservableRequestHandler) -> Deferred[Iterable[AnalyticsDataset]]:
-        """**INTERNAL**"""
-        coro = super().get_all_datasets(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                  options: GetAllDatasetOptions | None = None,
+                                  **kwargs: Any) -> Deferred[Iterable[AnalyticsDataset]]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsDatasetGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[AnalyticsDataset]]:
+            req = self._request_builder.build_get_all_datasets_request(obs_handler, options, **kwargs)
+            return self._get_all_datasets(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def create_index_deferred(self,
+                              index_name: str,
+                              dataset_name: str,
+                              fields: dict[str, AnalyticsDataType],
+                              options: CreateAnalyticsIndexOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsIndexCreate, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_create_index_request(index_name,
+                                                                   dataset_name,
+                                                                   fields,
+                                                                   obs_handler,
+                                                                   options,
+                                                                   **kwargs)
+            return self._create_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_index_deferred(self,
+                            index_name: str,
+                            dataset_name: str,
+                            options: DropAnalyticsIndexOptions | None = None,
+                            **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsIndexDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_index_request(index_name,
+                                                                 dataset_name,
+                                                                 obs_handler,
+                                                                 options,
+                                                                 **kwargs)
+            return self._drop_index(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_all_indexes_deferred(self,
-                                 req: GetAllIndexesRequest,
-                                 obs_handler: ObservableRequestHandler) -> Deferred[Iterable[AnalyticsIndex]]:
-        """**INTERNAL**"""
-        coro = super().get_all_indexes(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                 options: GetAllAnalyticsIndexesOptions | None = None,
+                                 **kwargs: Any) -> Deferred[Iterable[AnalyticsIndex]]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsIndexGetAll, self._observability_instruments)
 
-    def get_links_deferred(self,
-                           req: GetLinksRequest,
-                           obs_handler: ObservableRequestHandler) -> Deferred[Iterable[AnalyticsLink]]:
-        """**INTERNAL**"""
-        coro = super().get_links(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+        def start() -> Coroutine[Any, Any, Iterable[AnalyticsIndex]]:
+            req = self._request_builder.build_get_all_indexes_request(obs_handler, options, **kwargs)
+            return self._get_all_indexes(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def connect_link_deferred(self, options: ConnectLinkOptions | None = None, **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsLinkConnect, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_connect_link_request(obs_handler, options, **kwargs)
+            return self._connect_link(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def disconnect_link_deferred(self, options: DisconnectLinkOptions | None = None, **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsLinkDisconnect, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_disconnect_link_request(obs_handler, options, **kwargs)
+            return self._disconnect_link(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_pending_mutations_deferred(self,
-                                       req: GetPendingMutationsRequest,
-                                       obs_handler: ObservableRequestHandler) -> Deferred[Dict[str, int]]:
-        """**INTERNAL**"""
-        coro = super().get_pending_mutations(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                                       options: GetPendingMutationsOptions | None = None,
+                                       **kwargs: Any) -> Deferred[dict[str, int]]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsGetPendingMutations, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, dict[str, int]]:
+            req = self._request_builder.build_get_pending_mutations_request(obs_handler, options, **kwargs)
+            return self._get_pending_mutations(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def create_link_deferred(self,
+                             link: AnalyticsLink,
+                             options: CreateLinkAnalyticsOptions | None = None,
+                             **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsLinkCreate, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_create_link_request(link, obs_handler, options, **kwargs)
+            return self._create_link(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
 
     def replace_link_deferred(self,
-                              req: ReplaceLinkRequest,
-                              obs_handler: ObservableRequestHandler) -> Deferred[None]:
-        """**INTERNAL**"""
-        coro = super().replace_link(req, obs_handler)
-        future = asyncio.ensure_future(coro, loop=self.loop)
-        d = Deferred.fromFuture(future)
-        return d
+                              link: AnalyticsLink,
+                              options: ReplaceLinkAnalyticsOptions | None = None,
+                              **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsLinkReplace, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_replace_link_request(link, obs_handler, options, **kwargs)
+            return self._replace_link(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def drop_link_deferred(self,
+                           link_name: str,
+                           dataverse_name: str,
+                           options: DropLinkAnalyticsOptions | None = None,
+                           **kwargs: Any) -> Deferred[None]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsLinkDrop, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, None]:
+            req = self._request_builder.build_drop_link_request(link_name,
+                                                                dataverse_name,
+                                                                obs_handler,
+                                                                options,
+                                                                **kwargs)
+            return self._drop_link(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_links_deferred(self,
+                           options: GetLinksAnalyticsOptions | None = None,
+                           **kwargs: Any) -> Deferred[Iterable[AnalyticsLink]]:
+        obs_handler = ObservableRequestHandler(Op.AnalyticsLinkGetAll, self._observability_instruments)
+
+        def start() -> Coroutine[Any, Any, Iterable[AnalyticsLink]]:
+            req = self._request_builder.build_get_links_request(obs_handler, options, **kwargs)
+            return self._get_links(req, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
