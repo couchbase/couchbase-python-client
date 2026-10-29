@@ -2,14 +2,7 @@ from __future__ import annotations
 
 import os
 from copy import deepcopy
-from typing import (Any,
-                    Dict,
-                    FrozenSet,
-                    List,
-                    Optional,
-                    Set,
-                    Tuple,
-                    Union)
+from typing import Any
 
 from tools.autogen.core.binding_autogen_types import (BindingConfigCppEnumType,
                                                       BindingConfigCppTypes,
@@ -72,11 +65,11 @@ class BindingBuilder:
 
     def __init__(self, cpp_parser_config: CppTypeParserConfig) -> None:
         self._cpp_parser = CppTypeParser(cpp_parser_config)
-        self._cpp_types: List[BindingCppType] = []
-        self._cpp_variants: List[BindingCppVariant] = []
+        self._cpp_types: list[BindingCppType] = []
+        self._cpp_variants: list[BindingCppVariant] = []
         # Alternative sets of every tagged variant, keyed order-independently for coverage checks.
-        self._tagged_variant_alternatives: Set[FrozenSet[str]] = set()
-        self._cpp_enums: List[BindingEnumType] = []
+        self._tagged_variant_alternatives: set[frozenset[str]] = set()
+        self._cpp_enums: list[BindingEnumType] = []
         self._kv_ops = []
         self._kv_multi_ops = []
         self._streaming_ops = []
@@ -87,34 +80,34 @@ class BindingBuilder:
         return self._cpp_parser
 
     @property
-    def cpp_enums(self) -> List[BindingEnumType]:
+    def cpp_enums(self) -> list[BindingEnumType]:
         return self._cpp_enums
 
     @property
-    def cpp_types(self) -> List[BindingCppType]:
+    def cpp_types(self) -> list[BindingCppType]:
         return self._cpp_types
 
     @property
-    def cpp_variants(self) -> List[BindingCppVariant]:
+    def cpp_variants(self) -> list[BindingCppVariant]:
         return self._cpp_variants
 
     @property
-    def kv_ops(self) -> List[BindingKeyValueOp]:
+    def kv_ops(self) -> list[BindingKeyValueOp]:
         return self._kv_ops
 
     @property
-    def kv_multi_ops(self) -> List[BindingKeyValueMultiOp]:
+    def kv_multi_ops(self) -> list[BindingKeyValueMultiOp]:
         return self._kv_multi_ops
 
     @property
-    def mgmt_op_groups(self) -> List[BindingMgmtGroup]:
+    def mgmt_op_groups(self) -> list[BindingMgmtGroup]:
         return self._mgmt_op_groups
 
     @property
-    def streaming_ops(self) -> List[BindingStreamingOp]:
+    def streaming_ops(self) -> list[BindingStreamingOp]:
         return self._streaming_ops
 
-    def get_cpp_type(self, cpp_ft: Union[CppField, CppType]) -> str:  # noqa: C901
+    def get_cpp_type(self, cpp_ft: CppField | CppType) -> str:  # noqa: C901
         cpp_type = ''
         if 'cpp_type' not in cpp_ft:
             if 'of' in cpp_ft:
@@ -150,7 +143,7 @@ class BindingBuilder:
 
         return cpp_type
 
-    def get_couchbase_special_py_type(self, cpp_type: str) -> Optional[str]:  # noqa: C901
+    def get_couchbase_special_py_type(self, cpp_type: str) -> str | None:  # noqa: C901
         if cpp_type == 'couchbase::core::json_string':
             return 'bytes'
         if cpp_type == 'couchbase::cas':
@@ -167,7 +160,7 @@ class BindingBuilder:
         if cpp_type == 'std::monostate':
             return 'None'
         if cpp_type == 'std::error_code':
-            return 'int'
+            return 'CppErrorCode | None'
         if cpp_type == 'couchbase::core::tracing::wrapper_sdk_span':
             raise RuntimeError('Python type for couchbase::core::tracing::wrapper_sdk_span is not supported.')
         if cpp_type == 'couchbase::tracing::request_span':
@@ -177,7 +170,7 @@ class BindingBuilder:
         name_tokens = op_name.split('_')
         return ''.join([t.capitalize() for t in name_tokens])
 
-    def get_py_type_primitive(self, cpp_type: str) -> Optional[str]:
+    def get_py_type_primitive(self, cpp_type: str) -> str | None:
         if cpp_type in self.CPP_PY_INT_TYPES:
             return 'int'
         if cpp_type == 'std::string':
@@ -209,95 +202,48 @@ class BindingBuilder:
 
         raise RuntimeError(f'Unable to find py type match for: {cpp_type}')
 
-    def get_py_type(self, cpp_ft: Union[CppField, CppType]) -> str:  # noqa: C901
-        py_type = ''
+    def get_py_type(self, cpp_ft: CppField | CppType) -> str:
         if ('cpp_type' in cpp_ft and cpp_ft['cpp_type']['name'] == 'std::vector'
                 and 'of' in cpp_ft['cpp_type'] and cpp_ft['cpp_type']['of']['name'] == 'std::byte'):
             return 'bytes'
 
         if 'cpp_type' not in cpp_ft:
             if 'of' not in cpp_ft:
-                returned_type = self.get_py_type_helper(cpp_ft['name'])
-                if returned_type is None:
-                    print(f"bad return type for {cpp_ft['name']}")
-                py_type += returned_type
-            else:
-                of_key = 'of'
-                if cpp_ft['name'] == 'std::optional':
-                    py_type += "Optional["
-                elif cpp_ft['name'] in ['std::vector', 'std::array']:
-                    py_type += "List["
-                elif cpp_ft['name'] in 'std::set':
-                    py_type += "Set["
-                elif cpp_ft['name'] == 'std::map':
-                    key = self.get_py_type_helper(cpp_ft['of']['name'])
-                    py_type += f'Dict[{key}, '
-                    of_key = 'to'
-                elif cpp_ft['name'] == 'std::variant':
-                    raise NotImplementedError('Nested std::variant is not yet implement.')
-                py_type += self.get_py_type(cpp_ft[of_key])
+                return self.get_py_type_helper(cpp_ft['name'])
+            return self.get_py_container_type(cpp_ft)
+        if 'of' in cpp_ft['cpp_type']:
+            if cpp_ft['cpp_type']['name'] == 'std::variant':
+                sub_types = [self.get_py_type(sub_type) for sub_type in cpp_ft['cpp_type']['of']]
+                members = [t for t in sub_types if t != 'None']
+                if len(members) < len(sub_types):
+                    members.append('None')
+                return ' | '.join(members)
+            return self.get_py_container_type(cpp_ft['cpp_type'])
+        return self.get_py_type_helper(cpp_ft['cpp_type']['name'])
 
-                if cpp_ft['name'] == 'std::shared_ptr':
-                    pass
-                elif cpp_ft['name'] == 'std::optional':
-                    # for TypedDict, we don't want to set an Optional[...] = None;
-                    # this is okay (and sometimes necessary) for dataclasses
-                    py_type += "]"
-                else:
-                    py_type += ']'
-        elif 'of' in cpp_ft['cpp_type']:
-            of_key = 'of'
-            if cpp_ft['cpp_type']['name'] == 'std::optional':
-                py_type += "Optional["
-            elif cpp_ft['cpp_type']['name'] in ['std::vector', 'std::array']:
-                py_type += "List["
-            elif cpp_ft['cpp_type']['name'] in 'std::set':
-                py_type += "Set["
-            elif cpp_ft['cpp_type']['name'] == 'std::map':
-                key = self.get_py_type_helper(cpp_ft['cpp_type']['of']['name'])
-                py_type += f'Dict[{key}, '
-                of_key = 'to'
-            elif cpp_ft['cpp_type']['name'] == 'std::variant':
-                py_sub_type = 'Union['
-                sub_types = []
-                for sub_type in cpp_ft['cpp_type']['of']:
-                    next_sub_type = self.get_py_type(sub_type)
-                    if next_sub_type == 'None':
-                        py_sub_type = f'Optional[{py_sub_type}'
-                    else:
-                        sub_types.append(next_sub_type)
-                py_sub_type += ', '.join(sub_types)
-                if py_sub_type.startswith('Optional'):
-                    py_sub_type += ']'
-                py_sub_type += ']'
-                py_type += py_sub_type
-                return py_type
-
-            py_type += self.get_py_type(cpp_ft['cpp_type'][of_key])
-
-            if cpp_ft['cpp_type']['name'] == 'std::shared_ptr':
-                pass
-            elif cpp_ft['cpp_type']['name'] == 'std::optional':
-                # for TypedDict, we don't want to set an Optional[...] = None;
-                # this is okay (and sometimes necessary) for dataclasses
-                py_type += "]"
-            else:
-                py_type += ']'
-        else:
-            returned_type = self.get_py_type_helper(cpp_ft['cpp_type']['name'])
-            if returned_type is None:
-                print(f"bad return type for {cpp_ft['cpp_type']['name']}")
-            py_type += returned_type
-
-        return py_type
+    def get_py_container_type(self, container: CppType) -> str:
+        name = container['name']
+        if name == 'std::variant':
+            raise NotImplementedError('Nested std::variant is not yet implement.')
+        if name == 'std::map':
+            key = self.get_py_type_helper(container['of']['name'])
+            return f'dict[{key}, {self.get_py_type(container["to"])}]'
+        inner = self.get_py_type(container['of'])
+        if name == 'std::optional':
+            return f'{inner} | None'
+        if name in ['std::vector', 'std::array']:
+            return f'list[{inner}]'
+        if name in 'std::set':
+            return f'set[{inner}]'
+        return inner
 
     def build_binding_req_fields(self,
                                  cpp_type: CppParsedType,
-                                 required_fields: List[str],
-                                 ignored_fields: List[str],
-                                 binding_dict: Dict[str, Any],
-                                 is_kv_op: Optional[bool] = None,
-                                 skip_if_empty_fields: List[str] = None) -> List[Dict[str, Any]]:
+                                 required_fields: list[str],
+                                 ignored_fields: list[str],
+                                 binding_dict: dict[str, Any],
+                                 is_kv_op: bool | None = None,
+                                 skip_if_empty_fields: list[str] = None) -> list[dict[str, Any]]:
         fields = []
         for field in cpp_type['fields']:
             # we override parent_span w/ a std::shared_ptr<couchbase::core::tracing::wrapper_sdk_span>
@@ -336,9 +282,9 @@ class BindingBuilder:
 
     def update_binding_resp_fields(self,
                                    cpp_type: CppParsedType,
-                                   ignored_fields: List[str],
-                                   binding_dict: Dict[str, Any],
-                                   response_override: Optional[str] = None) -> None:
+                                   ignored_fields: list[str],
+                                   binding_dict: dict[str, Any],
+                                   response_override: str | None = None) -> None:
 
         fields = []
         for field in cpp_type['fields']:
@@ -365,13 +311,13 @@ class BindingBuilder:
     def build_binding_dict(self,
                            header_path: str,
                            struct_name_full: str,
-                           required_fields: List[str],
-                           ignored_fields: List[str],
+                           required_fields: list[str],
+                           ignored_fields: list[str],
                            use_req_fields: bool,
-                           is_kv_op: Optional[bool] = None,
-                           response_override: Optional[str] = None,
-                           skip_if_empty_fields: Optional[str] = None,
-                           allow_empty_fields: Optional[bool] = None) -> Dict[str, Any]:
+                           is_kv_op: bool | None = None,
+                           response_override: str | None = None,
+                           skip_if_empty_fields: str | None = None,
+                           allow_empty_fields: bool | None = None) -> dict[str, Any]:
 
         cpp_types = self._cpp_parser.parse_op(header_path)
         cpp_type_match = next((cpp_type for cpp_type in cpp_types if struct_name_full == cpp_type['struct_name']), None)
@@ -417,8 +363,8 @@ class BindingBuilder:
     def build_binding_kv_op(self,
                             header_path: str,
                             op: BindingConfigOp,
-                            ignored_request_fields: List[str],
-                            ignored_response_fields: List[str]) -> List[BindingKeyValueOp]:
+                            ignored_request_fields: list[str],
+                            ignored_response_fields: list[str]) -> list[BindingKeyValueOp]:
         op_header_path = os.path.join(op.get('header_path', header_path), op['header_file'])
         # build request side of operation
         op_req_dict = self.build_binding_dict(op_header_path,
@@ -501,11 +447,11 @@ class BindingBuilder:
                     op_header: str,
                     ops_prefix: str,
                     structs_prefix: str,
-                    op_with_legacy_durability: List[str],
-                    op_overrides: List[BindingConfigOp],
-                    required_request_fields: List[str],
-                    ignored_request_fields: List[str],
-                    ignored_response_fields: List[str],
+                    op_with_legacy_durability: list[str],
+                    op_overrides: list[BindingConfigOp],
+                    required_request_fields: list[str],
+                    ignored_request_fields: list[str],
+                    ignored_response_fields: list[str],
                     is_mutation_op: bool) -> None:
         op_name = op_header[len(ops_prefix):-4]  # remove .hxx
         req_struct_name = f'{structs_prefix}{op_name}_request'
@@ -590,7 +536,7 @@ class BindingBuilder:
             for f in op.request_fields:
                 if f['py_name'] in ['id', 'value', 'flags']:
                     continue
-                if f['py_type'].startswith('Optional'):
+                if f['py_type'].endswith(' | None'):
                     optional_option_fields.append(BindingMultiOpField(f['py_name'],
                                                                       f['py_type'],
                                                                       f.get('is_ignored', False)))
@@ -598,9 +544,9 @@ class BindingBuilder:
                     option_fields.append(BindingMultiOpField(f['py_name'], f['py_type'], f.get('is_ignored', False)))
 
             if op.is_mutation:
-                doc_list_type = 'Tuple[str, Tuple[bytes, int]]'
+                doc_list_type = 'tuple[str, tuple[bytes, int]]'
             else:
-                doc_list_type = 'List[str]'
+                doc_list_type = 'list[str]'
 
             options_name = f'Cpp{op.pretty_name}MultiOptions'
 
@@ -610,7 +556,7 @@ class BindingBuilder:
                 BindingMultiOpField('collection_name', 'str', False),
                 BindingMultiOpField('doc_list', doc_list_type, False),
                 BindingMultiOpField('op_args', options_name, False),
-                BindingMultiOpField('per_key_args', f'Dict[str, {options_name}]', False),
+                BindingMultiOpField('per_key_args', f'dict[str, {options_name}]', False),
             ]
 
             self._kv_multi_ops.append(BindingKeyValueMultiOp(op.name,
@@ -625,7 +571,7 @@ class BindingBuilder:
     def build_binding_streaming_op(self,
                                    header_path: str,
                                    op: BindingConfigOp,
-                                   ignored_request_fields: List[str]) -> BindingStreamingOp:
+                                   ignored_request_fields: list[str]) -> BindingStreamingOp:
         op_header_path = os.path.join(op.get('header_path', header_path), op['header_file'])
         # build request side of operation
         op_req_dict = self.build_binding_dict(op_header_path,
@@ -646,8 +592,8 @@ class BindingBuilder:
                            op_header: str,
                            ops_prefix: str,
                            structs_prefix: str,
-                           op_overrides: List[BindingConfigOp],
-                           ignored_request_fields: List[str]) -> None:
+                           op_overrides: list[BindingConfigOp],
+                           ignored_request_fields: list[str]) -> None:
         # views are weird...or annoying
         if op_header.startswith('document_view'):
             op_name = op_header[:-4]  # remove .hxx
@@ -690,8 +636,8 @@ class BindingBuilder:
     def build_binding_mgmt_op(self,
                               header_path: str,
                               op: BindingConfigOp,
-                              ignored_request_fields: List[str],
-                              ignored_response_fields: List[str]) -> BindingMgmtOp:
+                              ignored_request_fields: list[str],
+                              ignored_response_fields: list[str]) -> BindingMgmtOp:
         op_header_path = os.path.join(op.get('header_path', header_path), op['header_file'])
         # build request side of operation
         op_req_dict = self.build_binding_dict(op_header_path,
@@ -721,9 +667,9 @@ class BindingBuilder:
     def build_mgmt_templated_ops(self,
                                  header_path: str,
                                  op: BindingConfigOp,
-                                 cpp_request_templates: List[str],
-                                 ignored_request_fields: List[str],
-                                 ignored_response_fields: List[str]) -> List[BindingMgmtOp]:
+                                 cpp_request_templates: list[str],
+                                 ignored_request_fields: list[str],
+                                 ignored_response_fields: list[str]) -> list[BindingMgmtOp]:
         templated_ops = []
         for idx, template in enumerate(cpp_request_templates):
             op_copy = deepcopy(op)
@@ -756,9 +702,9 @@ class BindingBuilder:
                       header_path: str,
                       op_header: str,
                       structs_prefix: str,
-                      op_overrides: List[BindingConfigOp],
-                      ignored_request_fields: List[str],
-                      ignored_response_fields: List[str]) -> Union[BindingMgmtOp, List[BindingMgmtOp]]:
+                      op_overrides: list[BindingConfigOp],
+                      ignored_request_fields: list[str],
+                      ignored_response_fields: list[str]) -> BindingMgmtOp | list[BindingMgmtOp]:
         op_name = op_header[:-4]  # remove .hxx
         req_struct_name = f'{structs_prefix}{op_name}_request'
 
@@ -795,8 +741,8 @@ class BindingBuilder:
                                     mgmt_group_ops: BindingConfigMgmtOperations,
                                     base_header_path: str,
                                     base_structs_prefix: str,
-                                    base_ignored_request_fields: List[str],
-                                    base_ignored_response_fields: List[str]) -> List[BindingMgmtOp]:
+                                    base_ignored_request_fields: list[str],
+                                    base_ignored_response_fields: list[str]) -> list[BindingMgmtOp]:
         header_path = mgmt_group_ops.get('header_path', base_header_path)
 
         ignored_request_fields = mgmt_group_ops.get('ignored_cpp_request_fields', base_ignored_request_fields)
@@ -867,7 +813,7 @@ class BindingBuilder:
 
         print('Finished processing C++ core types.')
 
-    def resolve_cpp_variant(self, config_variant: BindingConfigCppVariant) -> Tuple[str, str, str, List[str]]:
+    def resolve_cpp_variant(self, config_variant: BindingConfigCppVariant) -> tuple[str, str, str, list[str]]:
         """Locate a core std::variant from either config addressing form.
 
         Returns (label, full_name, name, alternatives), where full_name is the C++ type the
@@ -898,7 +844,7 @@ class BindingBuilder:
         full_name = f"std::variant<{', '.join(alternatives)}>"
         return (f'{core_struct}::{field}', full_name, f"{core_struct.split('::')[-1]}_{field}", alternatives)
 
-    def set_cpp_core_variants(self, config_cpp_variants: List[BindingConfigCppVariant]) -> None:
+    def set_cpp_core_variants(self, config_cpp_variants: list[BindingConfigCppVariant]) -> None:
         """Build the tagged-union converters for the core's std::variant types.
 
         A std::variant carries no discriminator on the Python side, so each alternative is
@@ -976,7 +922,7 @@ class BindingBuilder:
         })
 
     @staticmethod
-    def split_variant_alternatives(cpp_type: str) -> Optional[List[str]]:
+    def split_variant_alternatives(cpp_type: str) -> list[str] | None:
         """Split the alternatives out of an emitted `std::variant<...>` type string.
 
         Returns None when the type holds no variant.  Only commas at nesting depth zero split,
@@ -1006,7 +952,7 @@ class BindingBuilder:
         alternatives.append(current.strip())
         return alternatives
 
-    def iter_binding_fields(self) -> List[Tuple[str, Dict[str, Any]]]:
+    def iter_binding_fields(self) -> list[tuple[str, dict[str, Any]]]:
         """Every field the C++ templates turn into an extract_field/add_field call."""
         owners = [(t.full_name, t.fields) for t in self._cpp_types]
         for op in self._kv_ops:
@@ -1059,7 +1005,7 @@ class BindingBuilder:
 
         print('Finished checking std::variant field coverage.')
 
-    def set_cpp_core_enum_types(self, cpp_config_enums: List[BindingConfigCppEnumType]) -> None:
+    def set_cpp_core_enum_types(self, cpp_config_enums: list[BindingConfigCppEnumType]) -> None:
         print('\nProcessing C++ core enums...')
         for cpp_config_enum in cpp_config_enums:
             full_name = cpp_config_enum['core_enum']

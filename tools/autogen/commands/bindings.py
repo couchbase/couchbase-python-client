@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from typing import Optional, Tuple
 
 import click
 
@@ -103,13 +102,13 @@ def _post_process(output_files, repo_root: Path, skip_format: bool, skip_restore
     is_flag=True,
     help='Run in verbose mode'
 )
-def generate(llvm_version: Optional[str],  # noqa: C901
-             llvm_includedir: Optional[str],
-             llvm_libdir: Optional[str],
-             system_headers: Optional[str],
-             config_path: Optional[Path],
-             templates_path: Optional[Path],
-             output_path: Optional[Path],
+def generate(llvm_version: str | None,  # noqa: C901
+             llvm_includedir: str | None,
+             llvm_libdir: str | None,
+             system_headers: str | None,
+             config_path: Path | None,
+             templates_path: Path | None,
+             output_path: Path | None,
              dry_run: bool,
              skip_version_check: bool,
              no_format: bool,
@@ -238,12 +237,12 @@ def generate(llvm_version: Optional[str],  # noqa: C901
     is_flag=True,
     help='Run in verbose mode'
 )
-def inspect(llvm_version: Optional[str],  # noqa: C901
-            llvm_includedir: Optional[str],
-            llvm_libdir: Optional[str],
-            system_headers: Optional[str],
-            type_filters: Tuple[str, ...],
-            headers: Tuple[str, ...],
+def inspect(llvm_version: str | None,  # noqa: C901
+            llvm_includedir: str | None,
+            llvm_libdir: str | None,
+            system_headers: str | None,
+            type_filters: tuple[str, ...],
+            headers: tuple[str, ...],
             as_json: bool,
             no_resolve: bool,
             verbose: bool):
@@ -333,7 +332,7 @@ def inspect(llvm_version: Optional[str],  # noqa: C901
     is_flag=True,
     help='Skip the pre-commit pass over the generated files'
 )
-def tidy(config_path: Optional[Path], output_path: Optional[Path], no_format: bool):
+def tidy(config_path: Path | None, output_path: Path | None, no_format: bool):
     """Format generated files and restore the ones that did not really change.
 
     This is the tail of `bindings generate`, runnable on its own for when generation and

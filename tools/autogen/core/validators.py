@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 try:
     from importlib import metadata
 except ImportError:
@@ -11,7 +9,7 @@ except ImportError:
     import importlib_metadata as metadata  # type: ignore
 
 
-def get_pip_clang_version() -> Optional[str]:
+def get_pip_clang_version() -> str | None:
     """Get the version of the installed 'clang' pip package."""
     try:
         return metadata.version("clang")
@@ -19,7 +17,7 @@ def get_pip_clang_version() -> Optional[str]:
         return None
 
 
-def parse_version(version_str: str) -> Tuple[int, ...]:
+def parse_version(version_str: str) -> tuple[int, ...]:
     """Parse a version string into a tuple of integers."""
     try:
         # Handle cases like '18.1.1' or '18.0.0-rc1'
@@ -29,7 +27,7 @@ def parse_version(version_str: str) -> Tuple[int, ...]:
         return (0,)
 
 
-def validate_llvm_compatibility(system_llvm_version: str) -> Optional[str]:
+def validate_llvm_compatibility(system_llvm_version: str) -> str | None:
     """
     Check if the system LLVM version is compatible with the pip-installed clang.
     Returns a warning message if a potential incompatibility is detected.

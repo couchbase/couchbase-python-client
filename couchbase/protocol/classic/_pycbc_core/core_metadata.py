@@ -15,9 +15,7 @@
 
 
 import json
-from typing import (List,
-                    Optional,
-                    Tuple)
+from typing import Any
 
 from couchbase.protocol.classic._pycbc_core import CXXCBC_METADATA
 
@@ -34,7 +32,7 @@ _METADATA_KEYS = [
 ]
 
 
-def get_metadata(as_str=False, detailed=False):
+def get_metadata(as_str: bool = False, detailed: bool = False) -> dict[str, Any] | str:
     """
     Get metadata about the C++ client library.
 
@@ -50,12 +48,12 @@ def get_metadata(as_str=False, detailed=False):
     return json.dumps(metadata) if as_str is True else metadata
 
 
-def get_transactions_protocol() -> Optional[Tuple[Optional[float], Optional[List[str]]]]:
+def get_transactions_protocol() -> tuple[float | None, list[str] | None] | None:
     """
     Get the transactions protocol version and supported extensions.
 
     Returns:
-        Optional[Tuple[Optional[float], Optional[List[str]]]]: The transactions protocol version and
+        tuple[float | None, list[str] | None] | None: The transactions protocol version and
         support extensions, if found in the cxx client's metadata.
     """
     if not _CXXCBC_METADATA_JSON:

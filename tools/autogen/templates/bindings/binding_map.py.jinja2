@@ -1,17 +1,10 @@
-        # streaming operations
-        self._op_map.update({
-          {% for op in streaming_operations -%}
-            StreamingOperationType.{{op.pretty_name}}.value: self._conn.pycbc_{{op.name}},
-          {% endfor %}
-        })
-        {% for mgmt_group in mgmt_groups %}
-        # {{mgmt_group.pretty_name}} management operations
-        self._op_map.update({
+          {% for mgmt_group in mgmt_groups %}
+            # {{mgmt_group.pretty_name}} management operations
           {% for op in mgmt_group.operations -%}
-            {{mgmt_group.pretty_name}}MgmtOperationType.{{op.pretty_name}}.value: self._conn.pycbc_{{op.name}},
+            {{op.name}}=self._conn.pycbc_{{op.name}},
           {% endfor -%}
-        })
-        {% endfor %}
+          {% endfor -%}
+        )
 
     def _load_kv_ops(self) -> PycbcConnectionKVOps:
         """**INTERNAL**"""

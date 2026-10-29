@@ -263,6 +263,7 @@ not_generated:
     - couchbase/tests/analytics_params_t.py
     - couchbase/tests/bucket_settings_req_builder_t.py
     - couchbase/tests/bucketmgmt_bucket_settings_t.py
+    - couchbase/tests/classic_bindings_t.py
     - couchbase/tests/classic_streaming_t.py
     - couchbase/tests/classic_wire_t.py
     - couchbase/tests/cluster_req_builder_t.py

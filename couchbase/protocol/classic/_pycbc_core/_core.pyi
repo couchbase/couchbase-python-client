@@ -15,16 +15,13 @@
 
 from __future__ import annotations
 
+import logging
 import sys
+from collections.abc import Callable
+from enum import Enum
 from typing import (Any,
-                    Callable,
-                    Dict,
                     Generic,
-                    List,
-                    Optional,
-                    Tuple,
-                    TypeVar,
-                    Union)
+                    TypeVar)
 
 if sys.version_info >= (3, 11):
     from typing import Unpack
@@ -35,7 +32,6 @@ import couchbase.protocol.classic._pycbc_core.binding_cpp_types as CppTypes
 from couchbase.common.exceptions import _ExceptionInfo
 from couchbase.protocol.classic._pycbc_core.pycbc_core_types import (CreateNewAttemptContextRequest,
                                                                      CreateTransactionContextRequest,
-                                                                     CreateTransactionsRequest,
                                                                      DestroyTransactionsRequest,
                                                                      HdrPercentileReport,
                                                                      ParsedTransactionOptions,
@@ -68,23 +64,23 @@ def shutdown_logger() -> None:
 class pycbc_result(Generic[T]):
 
     raw_result: T
-    core_span: Optional[Any]
-    start_time: Optional[int]
-    end_time: Optional[int]
-    multi_resp_all_okay: Optional[bool]
+    core_span: Any | None
+    start_time: int | None
+    end_time: int | None
+    multi_resp_all_okay: bool | None
 
     def __init__(self) -> None: ...
 
 
 class pycbc_streamed_result(Generic[T]):
 
-    core_span: Optional[Any]
-    start_time: Optional[int]
-    end_time: Optional[int]
+    core_span: Any | None
+    start_time: int | None
+    end_time: int | None
 
     def __iter__(self) -> pycbc_streamed_result[T]: ...
 
-    def __next__(self) -> Union[T, pycbc_exception, None]: ...
+    def __next__(self) -> T | pycbc_exception | None: ...
 
     def cancel(self) -> None: ...
 
@@ -95,7 +91,7 @@ class pycbc_scan_iterator(Generic[T]):
 
     def __iter__(self) -> pycbc_scan_iterator[T]: ...
 
-    def __next__(self) -> Union[T, pycbc_exception]: ...
+    def __next__(self) -> T | pycbc_exception: ...
 
     def cancel_scan(self) -> None: ...
 
@@ -104,9 +100,9 @@ class pycbc_scan_iterator(Generic[T]):
 
 class pycbc_exception:
 
-    core_span: Optional[Any]
-    start_time: Optional[int]
-    end_time: Optional[int]
+    core_span: Any | None
+    start_time: int | None
+    end_time: int | None
 
     def err(self) -> int: ...
 
@@ -114,13 +110,23 @@ class pycbc_exception:
 
     def strerror(self) -> str: ...
 
-    def error_context(self) -> Optional[Dict[str, Any]]: ...
+    def error_context(self) -> dict[str, Any] | None: ...
 
-    def error_info(self) -> Optional[_ExceptionInfo]: ...
+    def error_info(self) -> _ExceptionInfo | None: ...
 
 
 class pycbc_logger:
-    ...
+    def configure_logging_sink(self, logger: logging.Logger, level: int) -> None: ...
+
+    def create_logger(self, level: str, filename: str = ..., enable_console: int = ...) -> None: ...
+
+    def enable_protocol_logger(self, filename: str) -> None: ...
+
+    def is_console_logger(self) -> bool: ...
+
+    def is_file_logger(self) -> bool: ...
+
+    def shutdown_sink(self) -> None: ...
 
 
 # ==========================================================================================
@@ -134,6 +140,16 @@ def transaction_options_as_dict(options: ParsedTransactionOptions) -> dict[str, 
 def transaction_query_options_as_dict(
     options: ParsedTransactionsQueryOptions) -> dict[str, Any]: ...
 
+class transaction_operations(Enum):
+    GET = 1
+    GET_REPLICA_FROM_PREFERRED_SERVER_GROUP = 2
+    GET_MULTI = 3
+    GET_MULTI_REPLICAS_FROM_PREFERRED_SERVER_GROUP = 4
+    REPLACE = 5
+    INSERT = 6
+    REMOVE = 7
+    QUERY = 8
+
 class transaction_get_result:
     def __init__(self) -> None: ...
 
@@ -144,7 +160,7 @@ class transaction_get_result:
 class transaction_get_multi_result:
 
     @property
-    def content(self): List[Tuple[Any, int]]
+    def content(self) -> list[tuple[Any, int]]: ...
 
     def __init__(self) -> None: ...
 
@@ -153,10 +169,11 @@ class transaction_get_multi_result:
 # Transactions Operations
 # ==========================================================================================
 
-def create_new_attempt_context(**kwargs: Unpack[CreateNewAttemptContextRequest]) -> None:
+def create_new_attempt_context(**kwargs: Unpack[CreateNewAttemptContextRequest]) -> Exception | None:
     ...
 
-def create_transactions(**kwargs: Unpack[CreateTransactionsRequest]) -> TransactionsCapsuleType:
+def create_transactions(conn: pycbc_connection,
+                        config: ParsedTransactionsConfig) -> TransactionsCapsuleType | pycbc_exception:
     ...
 
 def create_transaction_context(**kwargs: Unpack[CreateTransactionContextRequest]) -> TransactionContextCapsuleType:
@@ -165,7 +182,7 @@ def create_transaction_context(**kwargs: Unpack[CreateTransactionContextRequest]
 def destroy_transactions(**kwargs: Unpack[DestroyTransactionsRequest]) -> None:
     ...
 
-def transaction_commit(**kwargs: Unpack[TransactionCommitRequest]) -> None:
+def transaction_commit(**kwargs: Unpack[TransactionCommitRequest]) -> dict[str, Any] | Exception | None:
     ...
 
 def transaction_get_multi_op(**kwargs: Unpack[TransactionGetMultiOpRequest]) -> Any:
@@ -177,7 +194,7 @@ def transaction_op(**kwargs: Unpack[TransactionOpRequest]) -> Any:
 def transaction_query_op(**kwargs: Unpack[TransactionQueryOpRequest]) -> Any:
     ...
 
-def transaction_rollback(**kwargs: Unpack[TransactionRollbackRequest]) -> None:
+def transaction_rollback(**kwargs: Unpack[TransactionRollbackRequest]) -> Exception | None:
     ...
 
 # ==========================================================================================
@@ -227,7 +244,7 @@ class pycbc_hdr_histogram:
         """
         ...
 
-    def get_percentiles_and_reset(self, percentiles: List[float]) -> HdrPercentileReport:
+    def get_percentiles_and_reset(self, percentiles: list[float]) -> HdrPercentileReport:
         """Get multiple percentiles and reset histogram.
 
         Args:
@@ -252,35 +269,35 @@ class pycbc_kv_request:
     scope: str
     collection: str
     key: str
-    access_deleted: Optional[bool]
-    cas: Optional[int]
-    create_as_deleted: Optional[bool]
-    delta: Optional[int]
-    durability_level: Optional[int]
-    effective_projections: Optional[List[str]]
-    expiry: Optional[int]
-    flags: Optional[int]
-    initial_value: Optional[int]
-    lock_time: Optional[int]
-    persist_to: Optional[int]
-    preserve_array_indexes: Optional[bool]
-    preserve_expiry: Optional[bool]
-    projections: Optional[List[str]]
-    read_preference: Optional[int]
-    replicate_to: Optional[int]
-    revive_document: Optional[bool]
-    specs: Optional[List[CppTypes.CppSubdocCommand]]
-    store_semantics: Optional[int]
-    timeout: Optional[int]
-    value: Optional[bytes]
-    with_expiry: Optional[bool]
-    parent_span: Optional[Any]
-    wrapper_span_name: Optional[str]
-    callback: Optional[Callable]
-    errback: Optional[Callable]
-    with_metrics: Optional[bool]
+    access_deleted: bool | None
+    cas: int | None
+    create_as_deleted: bool | None
+    delta: int | None
+    durability_level: int | None
+    effective_projections: list[str] | None
+    expiry: int | None
+    flags: int | None
+    initial_value: int | None
+    lock_time: int | None
+    persist_to: int | None
+    preserve_array_indexes: bool | None
+    preserve_expiry: bool | None
+    projections: list[str] | None
+    read_preference: int | None
+    replicate_to: int | None
+    revive_document: bool | None
+    specs: list[CppTypes.CppSubdocCommand] | None
+    store_semantics: int | None
+    timeout: int | None
+    value: bytes | None
+    with_expiry: bool | None
+    parent_span: Any | None
+    wrapper_span_name: str | None
+    callback: Callable | None
+    errback: Callable | None
+    with_metrics: bool | None
 
-    def __init__(self, opcode: int) -> None: ...
+    def __init__(self) -> None: ...
 
 # ==========================================================================================
 # pycbc Connection
@@ -325,10 +342,10 @@ class pycbc_connection:
     def pycbc_diagnostics(self, **kwargs: Unpack[CppTypes.CppDiagnosticsRequest]) -> pycbc_result[CppTypes.CppDiagnosticsResult]:
         ...
 
-    def pycbc_ping(self, **kwargs: Unpack[CppTypes.CppPingRequest]) -> pycbc_result[CppTypes.CppDiagnosticsResult]:
+    def pycbc_ping(self, **kwargs: Unpack[CppTypes.CppPingRequest]) -> pycbc_result[CppTypes.CppPingResult]:
         ...
 
-    def pycbc_get_connection_info(self) -> Dict[str, Any]:
+    def pycbc_get_connection_info(self) -> dict[str, Any]:
         ...
 
     # ==========================================================================================
@@ -342,13 +359,13 @@ class pycbc_connection:
     # Observability Operations
     # ==========================================================================================
 
-    def pycbc_get_cluster_labels(self) -> Dict[str, str]:
+    def pycbc_get_cluster_labels(self) -> dict[str, str]:
         ...
 
 # ====================================================================================================
 # AUTOGENERATED SECTION START - DO NOT EDIT MANUALLY
-# Generated-On: 2026-04-25 14:10:17
-# Content-Hash: dd9ed2155f49c923d294bbac55effba3
+# Generated-On: 2026-10-06 14:45:12
+# Content-Hash: 3a6ee640f8056add95054880097bfea6
 # ====================================================================================================
     # ==========================================================================================
     # Key-Value Operations
@@ -449,118 +466,118 @@ class pycbc_connection:
     # ==========================================================================================
 
     def pycbc_append_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppAppendResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppAppendResponse]]:
         ...
 
     def pycbc_append_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppAppendResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppAppendResponse]]:
         ...
 
     def pycbc_decrement_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppDecrementResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppDecrementResponse]]:
         ...
 
     def pycbc_decrement_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppDecrementResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppDecrementResponse]]:
         ...
 
     def pycbc_exists_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppExistsResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppExistsResponse]]:
         ...
 
     def pycbc_get_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppGetResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppGetResponse]]:
         ...
 
     def pycbc_get_all_replicas_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, pycbc_streamed_result[Any]]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, pycbc_streamed_result[Any]]]:
         ...
 
     def pycbc_get_and_lock_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppGetAndLockResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppGetAndLockResponse]]:
         ...
 
     def pycbc_get_any_replica_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppGetAnyReplicaResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppGetAnyReplicaResponse]]:
         ...
 
     def pycbc_increment_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppIncrementResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppIncrementResponse]]:
         ...
 
     def pycbc_increment_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppIncrementResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppIncrementResponse]]:
         ...
 
     def pycbc_insert_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppInsertResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppInsertResponse]]:
         ...
 
     def pycbc_insert_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppInsertResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppInsertResponse]]:
         ...
 
     def pycbc_prepend_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppPrependResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppPrependResponse]]:
         ...
 
     def pycbc_prepend_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppPrependResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppPrependResponse]]:
         ...
 
     def pycbc_remove_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppRemoveResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppRemoveResponse]]:
         ...
 
     def pycbc_remove_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppRemoveResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppRemoveResponse]]:
         ...
 
     def pycbc_replace_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppReplaceResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppReplaceResponse]]:
         ...
 
     def pycbc_replace_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppReplaceResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppReplaceResponse]]:
         ...
 
     def pycbc_touch_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppTouchResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppTouchResponse]]:
         ...
 
     def pycbc_unlock_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppUnlockResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppUnlockResponse]]:
         ...
 
     def pycbc_upsert_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppUpsertResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppUpsertResponse]]:
         ...
 
     def pycbc_upsert_with_legacy_durability_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.CppUpsertResponse]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.CppUpsertResponse]]:
         ...
 
     # ==========================================================================================
@@ -689,9 +706,6 @@ class pycbc_connection:
         ...
 
     def pycbc_collection_update(self, **kwargs: Unpack[CppTypes.CppCollectionUpdateRequest]) -> pycbc_result[CppTypes.CppCollectionUpdateResponse]:
-        ...
-
-    def pycbc_collections_manifest_get(self, **kwargs: Unpack[CppTypes.CppCollectionsManifestGetRequest]) -> pycbc_result[CppTypes.CppCollectionsManifestGetResponse]:
         ...
 
     def pycbc_scope_create(self, **kwargs: Unpack[CppTypes.CppScopeCreateRequest]) -> pycbc_result[CppTypes.CppScopeCreateResponse]:
@@ -850,6 +864,6 @@ class pycbc_connection:
 
 # ====================================================================================================
 # AUTOGENERATED SECTION END - DO NOT EDIT MANUALLY
-# Generated-On: 2026-04-25 14:10:17
-# Content-Hash: dd9ed2155f49c923d294bbac55effba3
+# Generated-On: 2026-10-06 14:45:12
+# Content-Hash: 3a6ee640f8056add95054880097bfea6
 # ====================================================================================================

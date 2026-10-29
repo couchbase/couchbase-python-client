@@ -6,11 +6,7 @@ import subprocess
 import sys
 from functools import reduce
 from pathlib import Path
-from typing import (Dict,
-                    List,
-                    Optional,
-                    Tuple,
-                    TypedDict)
+from typing import TypedDict
 
 import clang.cindex
 
@@ -55,11 +51,11 @@ TEMPLATED_REQUESTS = {
 
 
 class CppTypeParserConfig(TypedDict, total=False):
-    llvm_clang_version: Optional[str] = None
-    llvm_libdir: Optional[str] = None
-    llvm_includedir: Optional[str] = None
-    system_headers: Optional[str] = None
-    verbose: Optional[bool] = None
+    llvm_clang_version: str | None = None
+    llvm_libdir: str | None = None
+    llvm_includedir: str | None = None
+    system_headers: str | None = None
+    verbose: bool | None = None
 
 
 class CppTypeParser:
@@ -125,7 +121,7 @@ class CppTypeParser:
         if self._verbose:
             print(f'Include paths={self._include_paths}')
 
-    def _parse_translation_unit(self, file_path: str) -> Tuple[clang.cindex.TranslationUnit, str]:
+    def _parse_translation_unit(self, file_path: str) -> tuple[clang.cindex.TranslationUnit, str]:
         header_path = os.path.join(CXX_CLIENT_ROOT, file_path)
         index = clang.cindex.Index.create()
         suppress_warnings = ['-Wno-nullability-completeness', '-Wno-deprecated-literal-operator']
@@ -135,7 +131,7 @@ class CppTypeParser:
             args = ['-std=c++17', f'-isysroot{os.getcwd()}'] + self._include_paths + suppress_warnings
         return index.parse(header_path, args=args), header_path
 
-    def parse_op(self, file_path: str) -> List[CppParsedType]:
+    def parse_op(self, file_path: str) -> list[CppParsedType]:
         translation_unit, header_path = self._parse_translation_unit(file_path)
 
         self._op_types = []
@@ -143,7 +139,7 @@ class CppTypeParser:
         self.traverse(translation_unit.cursor, [], header_path)
         return self._op_types
 
-    def parse_enum(self, file_path: str) -> List[CppParsedEnum]:
+    def parse_enum(self, file_path: str) -> list[CppParsedEnum]:
         translation_unit, header_path = self._parse_translation_unit(file_path)
 
         self._op_types = []
@@ -151,7 +147,7 @@ class CppTypeParser:
         self.traverse(translation_unit.cursor, [], header_path)
         return self._op_enums
 
-    def parse_variant_alias(self, file_path: str, full_name: str) -> List[str]:
+    def parse_variant_alias(self, file_path: str, full_name: str) -> list[str]:
         """Resolve a `using X = std::variant<...>` alias to its alternative type names.
 
         Returns the alternatives in declaration order, which is also the variant index order.
@@ -170,9 +166,9 @@ class CppTypeParser:
 
     def _find_type_alias(self,
                          node: clang.cindex.Cursor,
-                         namespace: List[str],
+                         namespace: list[str],
                          main_file: str,
-                         full_name: str) -> Optional[clang.cindex.Cursor]:
+                         full_name: str) -> clang.cindex.Cursor | None:
         if node.location.file is not None and node.location.file.name != main_file:
             return None
 
@@ -192,7 +188,7 @@ class CppTypeParser:
 
         return None
 
-    def parse_variant_field(self, file_path: str, struct_name: str, field_name: str) -> List[str]:
+    def parse_variant_field(self, file_path: str, struct_name: str, field_name: str) -> list[str]:
         """Resolve an inline `std::variant<...>` field declaration to its alternative type names.
 
         Returns the alternatives in declaration order, which is also the variant index order.
@@ -212,10 +208,10 @@ class CppTypeParser:
 
     def _find_struct_field(self,  # noqa: C901
                            node: clang.cindex.Cursor,
-                           namespace: List[str],
+                           namespace: list[str],
                            main_file: str,
                            struct_name: str,
-                           field_name: str) -> Optional[clang.cindex.Cursor]:
+                           field_name: str) -> clang.cindex.Cursor | None:
         if node.location.file is not None and node.location.file.name != main_file:
             return None
 
@@ -360,7 +356,7 @@ class CppTypeParser:
         for child in node.get_children():
             self.traverse(child, namespace, main_file)
 
-    def is_included_type(self, name: str, with_durability: Optional[bool] = False) -> bool:
+    def is_included_type(self, name: str, with_durability: bool | None = False) -> bool:
 
         # TODO(brett19): This should be generalized somehow...
         if "is_compound_operation" in name:
@@ -380,11 +376,11 @@ class CppTypeParser:
         #         return True
         return True
 
-    def parse_type(self, type_: str) -> Dict[str, str]:
+    def parse_type(self, type_: str) -> dict[str, str]:
         type_str = type_.get_canonical().spelling
         return self.parse_type_str(type_str)
 
-    def parse_type_str(self, type_str: str) -> Dict[str, str]:  # noqa: C901
+    def parse_type_str(self, type_str: str) -> dict[str, str]:  # noqa: C901
         if type_str == "std::mutex":
             return {"name": "std::mutex"}
         if type_str == "std::string":
@@ -528,7 +524,7 @@ class CppTypeParser:
         return list(map(lambda p: p.format(CXX_CLIENT_CACHE, cpm_hash_dir), includes))
 
     @staticmethod
-    def list_headers_in_dir(path: str, file_startswith: Optional[str] = None) -> List[str]:
+    def list_headers_in_dir(path: str, file_startswith: str | None = None) -> list[str]:
         # enumerates a folder but keeps the full pathing for the files returned
         # and removes certain files we don't want (like non-hxx, _json.hxx or _fmt.hxx)
 
@@ -547,7 +543,7 @@ class CppTypeParser:
         return files
 
     @staticmethod
-    def sh(command: str, piped: Optional[bool] = False) -> Tuple[str, int]:
+    def sh(command: str, piped: bool | None = False) -> tuple[str, int]:
         try:
             if piped is True:
                 proc = subprocess.Popen(command,

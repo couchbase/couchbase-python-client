@@ -15,15 +15,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import (Any,
-                    Callable,
-                    Dict,
-                    List,
                     Literal,
-                    Optional,
-                    Set,
-                    TypedDict,
-                    Union)
+                    TypedDict)
 
 # ==========================================================================================
 # C++ Core Types
@@ -31,17 +26,17 @@ from typing import (Any,
 
 
 class CppDocumentId(TypedDict, total=False):
-    bucket: Optional[str]
-    scope: Optional[str]
-    collection: Optional[str]
-    key: Optional[str]
+    bucket: str | None
+    scope: str | None
+    collection: str | None
+    key: str | None
 
 
 class CppMutationToken(TypedDict, total=False):
-    partition_id: Optional[int]
-    partition_uuid: Optional[int]
-    sequence_number: Optional[int]
-    bucket_name: Optional[str]
+    partition_id: int
+    partition_uuid: int
+    sequence_number: int
+    bucket_name: str
 
 
 class CppErrorCode(TypedDict):
@@ -50,25 +45,25 @@ class CppErrorCode(TypedDict):
 
 
 class CppSubdocField(TypedDict, total=False):
-    path: Optional[str]
-    value: Optional[bytes]
-    index: Optional[int]
-    exists: Optional[bool]
-    opcode: Optional[int]
-    status: Optional[int]
+    path: str | None
+    value: bytes | None
+    index: int | None
+    exists: bool | None
+    opcode: int | None
+    status: int | None
 
 
 class CppSubdocSpec(TypedDict, total=False):
-    opcode: Optional[int]
-    path: Optional[str]
-    value: Optional[bytes]
-    flags: Optional[int]
-    index: Optional[int]
+    opcode: int | None
+    path: str | None
+    value: bytes | None
+    flags: int | None
+    index: int | None
 
 
 class CppQueryContext(TypedDict, total=False):
-    bucket_name: Optional[str]
-    scope_name: Optional[str]
+    bucket_name: str | None
+    scope_name: str | None
 
 
 class CppTimeoutDefaults(TypedDict):
@@ -97,16 +92,16 @@ class CppTimeoutDefaults(TypedDict):
 
 
 class CppWrapperSdkSpan(TypedDict, total=False):
-    attributes: Optional[Dict[str, Union[str, int]]]
-    children: Optional[List[CppWrapperSdkChildSpan]]
+    attributes: dict[str, str | int] | None
+    children: list[CppWrapperSdkChildSpan] | None
 
 
 class CppWrapperSdkChildSpan(TypedDict, total=False):
     name: str
     start: int
     end: int
-    attributes: Optional[Dict[str, Union[str, int]]]
-    children: Optional[List[CppWrapperSdkChildSpan]]
+    attributes: dict[str, str | int] | None
+    children: list[CppWrapperSdkChildSpan] | None
 
 
 # ==========================================================================================
@@ -115,31 +110,31 @@ class CppWrapperSdkChildSpan(TypedDict, total=False):
 
 class CppConnectRequest(TypedDict, total=False):
     connstr: str
-    auth: Dict[str, Any]
-    options: Dict[str, Any]
-    callback: Optional[Callable[..., None]]
-    errback: Optional[Callable[..., None]]
+    auth: dict[str, Any]
+    options: dict[str, Any]
+    callback: Callable[..., None] | None
+    errback: Callable[..., None] | None
 
 
 class CppCloseRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    errback: Optional[Callable[..., None]]
+    callback: Callable[..., None] | None
+    errback: Callable[..., None] | None
 
 
 class CppOpenBucketRequest(TypedDict, total=False):
     bucket_name: str
-    callback: Optional[Callable[..., None]]
-    errback: Optional[Callable[..., None]]
+    callback: Callable[..., None] | None
+    errback: Callable[..., None] | None
 
 
 class CppCloseBucketRequest(TypedDict, total=False):
     bucket_name: str
-    callback: Optional[Callable[..., None]]
-    errback: Optional[Callable[..., None]]
+    callback: Callable[..., None] | None
+    errback: Callable[..., None] | None
 
 
 class CppUpdateCredentialsRequest(TypedDict):
-    auth: Dict[str, Any]
+    auth: dict[str, Any]
 
 # ==========================================================================================
 # Diagnostic Operations
@@ -147,18 +142,18 @@ class CppUpdateCredentialsRequest(TypedDict):
 
 
 class CppDiagnosticsRequest(TypedDict, total=False):
-    report_id: Optional[str]
-    callback: Optional[Callable[..., None]]
-    errback: Optional[Callable[..., None]]
+    report_id: str | None
+    callback: Callable[..., None] | None
+    errback: Callable[..., None] | None
 
 
 class CppPingRequest(TypedDict, total=False):
-    services: Set[str]
-    bucket_name: Optional[str]
-    report_id: Optional[str]
-    timetout: Optional[int]
-    callback: Optional[Callable[..., None]]
-    errback: Optional[Callable[..., None]]
+    services: set[str]
+    bucket_name: str | None
+    report_id: str | None
+    timeout: int | None
+    callback: Callable[..., None] | None
+    errback: Callable[..., None] | None
 
 # ==========================================================================================
 # Key-Value Range Scan Operations
@@ -169,13 +164,13 @@ class CppRangeScanRequest(TypedDict, total=False):
     bucket: str
     scope: str
     collection: str
-    scan_type: Union[CppRangeScan, CppRangeScanPrefixScan, CppRangeScanSamplingScan]
-    orchestrator_options: Optional[CppRangeScanOrchestratorOptions]
+    scan_type: CppRangeScan | CppRangeScanPrefixScan | CppRangeScanSamplingScan
+    orchestrator_options: CppRangeScanOrchestratorOptions | None
 
 # ====================================================================================================
 # AUTOGENERATED SECTION START - DO NOT EDIT MANUALLY
-# Generated-On: 2026-09-22 16:25:53
-# Content-Hash: e21a0375a469ba431fb1f652a7e98279
+# Generated-On: 2026-10-06 14:45:11
+# Content-Hash: f75e68c02c685f635aac38322e43ddd8
 # ====================================================================================================
 # ==========================================================================================
 # C++ Core Types
@@ -185,12 +180,12 @@ class CppRangeScanRequest(TypedDict, total=False):
 class CppAnalyticsAzureBlobExternalLink(TypedDict, total=False):
     link_name: str
     dataverse: str
-    connection_string: Optional[str]
-    account_name: Optional[str]
-    account_key: Optional[str]
-    shared_access_signature: Optional[str]
-    blob_endpoint: Optional[str]
-    endpoint_suffix: Optional[str]
+    connection_string: str | None
+    account_name: str | None
+    account_key: str | None
+    shared_access_signature: str | None
+    blob_endpoint: str | None
+    endpoint_suffix: str | None
 
 
 class CppAnalyticsCouchbaseRemoteLink(TypedDict, total=False):
@@ -198,15 +193,15 @@ class CppAnalyticsCouchbaseRemoteLink(TypedDict, total=False):
     dataverse: str
     hostname: str
     encryption: CppAnalyticsCouchbaseRemoteLinkEncryptionSettings
-    username: Optional[str]
-    password: Optional[str]
+    username: str | None
+    password: str | None
 
 
 class CppAnalyticsCouchbaseRemoteLinkEncryptionSettings(TypedDict, total=False):
     level: str
-    certificate: Optional[str]
-    client_certificate: Optional[str]
-    client_key: Optional[str]
+    certificate: str | None
+    client_certificate: str | None
+    client_key: str | None
 
 
 class CppAnalyticsDataset(TypedDict, total=False):
@@ -263,9 +258,9 @@ class CppAnalyticsMetaData(TypedDict, total=False):
     client_context_id: str
     status: str
     metrics: CppAnalyticsMetrics
-    errors: List[CppAnalyticsProblem]
-    warnings: List[CppAnalyticsProblem]
-    signature: Optional[str]
+    errors: list[CppAnalyticsProblem]
+    warnings: list[CppAnalyticsProblem]
+    signature: str | None
 
 
 class CppAnalyticsMetrics(TypedDict, total=False):
@@ -289,8 +284,8 @@ class CppAnalyticsS3ExternalLink(TypedDict, total=False):
     access_key_id: str
     secret_access_key: str
     region: str
-    session_token: Optional[str]
-    service_endpoint: Optional[str]
+    session_token: str | None
+    service_endpoint: str | None
 
 
 class CppBucketInfo(TypedDict, total=False):
@@ -298,8 +293,8 @@ class CppBucketInfo(TypedDict, total=False):
     uuid: str
     number_of_nodes: int
     number_of_replicas: int
-    bucket_capabilities: List[str]
-    server_groups: Dict[str, CppServerGroup]
+    bucket_capabilities: list[str]
+    server_groups: dict[str, CppServerGroup]
     storage_backend: str
     # config_json
 
@@ -308,8 +303,8 @@ class CppBucketSettingNode(TypedDict, total=False):
     hostname: str
     status: str
     version: str
-    services: List[str]
-    ports: Dict[str, int]
+    services: list[str]
+    ports: dict[str, int]
 
 
 class CppBucketSettings(TypedDict, total=False):
@@ -321,23 +316,23 @@ class CppBucketSettings(TypedDict, total=False):
     eviction_policy: str
     conflict_resolution_type: str
     storage_backend: str
-    capabilities: List[str]
-    nodes: List[CppBucketSettingNode]
-    max_expiry: Optional[int]
-    minimum_durability_level: Optional[int]
-    num_replicas: Optional[int]
-    replica_indexes: Optional[bool]
-    flush_enabled: Optional[bool]
-    history_retention_collection_default: Optional[bool]
-    history_retention_bytes: Optional[int]
-    history_retention_duration: Optional[int]
-    num_vbuckets: Optional[int]
+    capabilities: list[str]
+    nodes: list[CppBucketSettingNode]
+    max_expiry: int | None
+    minimum_durability_level: int | None
+    num_replicas: int | None
+    replica_indexes: bool | None
+    flush_enabled: bool | None
+    history_retention_collection_default: bool | None
+    history_retention_bytes: int | None
+    history_retention_duration: int | None
+    num_vbuckets: int | None
 
 
 class CppClusterInfo(TypedDict, total=False):
-    nodes: List[CppClusterInfoNode]
-    buckets: List[CppClusterInfoBucket]
-    services: Set[str]
+    nodes: list[CppClusterInfoNode]
+    buckets: list[CppClusterInfoBucket]
+    services: set[str]
 
 
 class CppClusterInfoBucket(TypedDict, total=False):
@@ -352,32 +347,32 @@ class CppClusterInfoNode(TypedDict, total=False):
     hostname: str
     os: str
     version: str
-    services: List[str]
+    services: list[str]
 
 
 class CppCollectionsManifest(TypedDict, total=False):
-    id: List[int]
+    id: list[int]
     uid: int
-    scopes: List[CppCollectionsManifestScope]
+    scopes: list[CppCollectionsManifestScope]
 
 
 class CppCollectionsManifestCollection(TypedDict, total=False):
     uid: int
     name: str
     max_expiry: int
-    history: Optional[bool]
+    history: bool | None
 
 
 class CppCollectionsManifestScope(TypedDict, total=False):
     uid: int
     name: str
-    collections: List[CppCollectionsManifestCollection]
+    collections: list[CppCollectionsManifestCollection]
 
 
 class CppDiagnosticsResult(TypedDict, total=False):
     id: str
     sdk: str
-    services: Dict[str, List[CppEndpointDiagInfo]]
+    services: dict[str, list[CppEndpointDiagInfo]]
     version: int
 
 
@@ -387,9 +382,9 @@ class CppEndpointDiagInfo(TypedDict, total=False):
     remote: str
     local: str
     state: str
-    last_activity: Optional[int]
-    bucket: Optional[str]
-    details: Optional[str]
+    last_activity: int | None
+    bucket: str | None
+    details: str | None
 
 
 class CppEndpointPingInfo(TypedDict, total=False):
@@ -399,8 +394,8 @@ class CppEndpointPingInfo(TypedDict, total=False):
     remote: str
     local: str
     state: str
-    bucket: Optional[str]
-    error: Optional[str]
+    bucket: str | None
+    error: str | None
 
 
 class CppEventingFunction(TypedDict, total=False):
@@ -408,15 +403,15 @@ class CppEventingFunction(TypedDict, total=False):
     code: str
     metadata_keyspace: CppEventingFunctionKeyspace
     source_keyspace: CppEventingFunctionKeyspace
-    bucket_bindings: List[CppEventingFunctionBucketBinding]
-    url_bindings: List[CppEventingFunctionUrlBinding]
-    constant_bindings: List[CppEventingFunctionConstantBinding]
+    bucket_bindings: list[CppEventingFunctionBucketBinding]
+    url_bindings: list[CppEventingFunctionUrlBinding]
+    constant_bindings: list[CppEventingFunctionConstantBinding]
     settings: CppEventingFunctionSettings
     # internal
-    version: Optional[str]
-    enforce_schema: Optional[bool]
-    handler_uuid: Optional[int]
-    function_instance_id: Optional[str]
+    version: str | None
+    enforce_schema: bool | None
+    handler_uuid: int | None
+    function_instance_id: str | None
 
 
 class CppEventingFunctionBucketBinding(TypedDict, total=False):
@@ -432,40 +427,40 @@ class CppEventingFunctionConstantBinding(TypedDict, total=False):
 
 class CppEventingFunctionKeyspace(TypedDict, total=False):
     bucket: str
-    scope: Optional[str]
-    collection: Optional[str]
+    scope: str | None
+    collection: str | None
 
 
 class CppEventingFunctionSettings(TypedDict, total=False):
-    handler_headers: List[str]
-    handler_footers: List[str]
-    cpp_worker_count: Optional[int]
-    dcp_stream_boundary: Optional[str]
-    description: Optional[str]
-    deployment_status: Optional[str]
-    processing_status: Optional[str]
-    log_level: Optional[str]
-    language_compatibility: Optional[str]
-    execution_timeout: Optional[int]
-    lcb_inst_capacity: Optional[int]
-    lcb_retry_count: Optional[int]
-    lcb_timeout: Optional[int]
-    query_consistency: Optional[str]
-    num_timer_partitions: Optional[int]
-    sock_batch_size: Optional[int]
-    tick_duration: Optional[int]
-    timer_context_size: Optional[int]
-    user_prefix: Optional[str]
-    bucket_cache_size: Optional[int]
-    bucket_cache_age: Optional[int]
-    curl_max_allowed_resp_size: Optional[int]
-    query_prepare_all: Optional[bool]
-    worker_count: Optional[int]
-    enable_app_log_rotation: Optional[bool]
-    app_log_dir: Optional[str]
-    app_log_max_size: Optional[int]
-    app_log_max_files: Optional[int]
-    checkpoint_interval: Optional[int]
+    handler_headers: list[str]
+    handler_footers: list[str]
+    cpp_worker_count: int | None
+    dcp_stream_boundary: str | None
+    description: str | None
+    deployment_status: str | None
+    processing_status: str | None
+    log_level: str | None
+    language_compatibility: str | None
+    execution_timeout: int | None
+    lcb_inst_capacity: int | None
+    lcb_retry_count: int | None
+    lcb_timeout: int | None
+    query_consistency: str | None
+    num_timer_partitions: int | None
+    sock_batch_size: int | None
+    tick_duration: int | None
+    timer_context_size: int | None
+    user_prefix: str | None
+    bucket_cache_size: int | None
+    bucket_cache_age: int | None
+    curl_max_allowed_resp_size: int | None
+    query_prepare_all: bool | None
+    worker_count: int | None
+    enable_app_log_rotation: bool | None
+    app_log_dir: str | None
+    app_log_max_size: int | None
+    app_log_max_files: int | None
+    checkpoint_interval: int | None
 
 
 class CppEventingFunctionState(TypedDict, total=False):
@@ -476,7 +471,7 @@ class CppEventingFunctionState(TypedDict, total=False):
     deployment_status: str
     processing_status: str
     # internal
-    redeploy_required: Optional[bool]
+    redeploy_required: bool | None
 
 
 class CppEventingFunctionUrlAuthBasic(TypedDict, total=False):
@@ -501,8 +496,8 @@ class CppEventingFunctionUrlBinding(TypedDict, total=False):
     hostname: str
     allow_cookies: bool
     validate_ssl_certificate: bool
-    auth: Union[CppEventingFunctionUrlNoAuth, CppEventingFunctionUrlAuthBasic,
-                CppEventingFunctionUrlAuthDigest, CppEventingFunctionUrlAuthBearer]
+    auth: (CppEventingFunctionUrlNoAuth | CppEventingFunctionUrlAuthBasic | CppEventingFunctionUrlAuthDigest |
+           CppEventingFunctionUrlAuthBearer)
 
 
 class CppEventingFunctionUrlNoAuth(TypedDict, total=False):
@@ -517,7 +512,7 @@ class CppEventingProblem(TypedDict, total=False):
 
 class CppEventingStatus(TypedDict, total=False):
     num_eventing_nodes: int
-    functions: List[CppEventingFunctionState]
+    functions: list[CppEventingFunctionState]
 
 
 class CppGetAllReplicasResponseEntry(TypedDict, total=False):
@@ -529,7 +524,7 @@ class CppGetAllReplicasResponseEntry(TypedDict, total=False):
 
 
 class CppLookupInAllReplicasResponseEntry(TypedDict, total=False):
-    fields: List[CppLookupInEntry]
+    fields: list[CppLookupInEntry]
     cas: int
     deleted: bool
     is_replica: bool
@@ -543,7 +538,7 @@ class CppLookupInAnyReplicaResponseEntry(TypedDict, total=False):
     exists: bool
     opcode: int
     status: int
-    ec: Optional[CppErrorCode]
+    ec: CppErrorCode | None
 
 
 class CppLookupInEntry(TypedDict, total=False):
@@ -553,7 +548,7 @@ class CppLookupInEntry(TypedDict, total=False):
     exists: bool
     opcode: int
     status: int
-    ec: Optional[CppErrorCode]
+    ec: CppErrorCode | None
 
 
 class CppLookupInResponseEntry(TypedDict, total=False):
@@ -563,7 +558,7 @@ class CppLookupInResponseEntry(TypedDict, total=False):
     exists: bool
     opcode: int
     status: int
-    ec: Optional[CppErrorCode]
+    ec: CppErrorCode | None
 
 
 class CppMutateInResponseEntry(TypedDict, total=False):
@@ -572,13 +567,13 @@ class CppMutateInResponseEntry(TypedDict, total=False):
     original_index: int
     opcode: int
     status: int
-    ec: Optional[CppErrorCode]
+    ec: CppErrorCode | None
 
 
 class CppPingResult(TypedDict, total=False):
     id: str
     sdk: str
-    services: Dict[str, List[CppEndpointPingInfo]]
+    services: dict[str, list[CppEndpointPingInfo]]
     version: int
 
 
@@ -587,12 +582,12 @@ class CppQueryIndex(TypedDict, total=False):
     name: str
     state: str
     type: str
-    index_key: List[str]
+    index_key: list[str]
     bucket_name: str
-    partition: Optional[str]
-    condition: Optional[str]
-    scope_name: Optional[str]
-    collection_name: Optional[str]
+    partition: str | None
+    condition: str | None
+    scope_name: str | None
+    collection_name: str | None
 
 
 class CppQueryIndexBuildDeferredProblem(TypedDict, total=False):
@@ -619,11 +614,11 @@ class CppQueryMetaData(TypedDict, total=False):
     request_id: str
     client_context_id: str
     status: str
-    metrics: Optional[CppQueryMetrics]
-    signature: Optional[str]
-    profile: Optional[str]
-    warnings: Optional[List[CppQueryProblem]]
-    errors: Optional[List[CppQueryProblem]]
+    metrics: CppQueryMetrics | None
+    signature: str | None
+    profile: str | None
+    warnings: list[CppQueryProblem] | None
+    errors: list[CppQueryProblem] | None
 
 
 class CppQueryMetrics(TypedDict, total=False):
@@ -640,14 +635,14 @@ class CppQueryMetrics(TypedDict, total=False):
 class CppQueryProblem(TypedDict, total=False):
     code: int
     message: str
-    reason: Optional[int]
-    retry: Optional[bool]
+    reason: int | None
+    retry: bool | None
 
 
 class CppRangeScan(TypedDict, total=False):
     scan_type: Literal['range_scan']
-    from_: Optional[CppRangeScanScanTerm]
-    to: Optional[CppRangeScanScanTerm]
+    from_: CppRangeScanScanTerm | None
+    to: CppRangeScanScanTerm | None
 
 
 class CppRangeScanCancelOptions(TypedDict, total=False):
@@ -679,8 +674,8 @@ class CppRangeScanCreateOptions(TypedDict, total=False):
     ids_only: bool
     # retry_strategy
     # internal
-    scan_type: Optional[Union[CppRangeScan, CppRangeScanPrefixScan, CppRangeScanSamplingScan]]
-    snapshot_requirements: Optional[CppRangeSnapshotRequirements]
+    scan_type: CppRangeScan | CppRangeScanPrefixScan | CppRangeScanSamplingScan | None
+    snapshot_requirements: CppRangeSnapshotRequirements | None
 
 
 class CppRangeScanCreateResult(TypedDict, total=False):
@@ -690,7 +685,7 @@ class CppRangeScanCreateResult(TypedDict, total=False):
 
 class CppRangeScanItem(TypedDict, total=False):
     key: str
-    body: Optional[CppRangeScanItemBody]
+    body: CppRangeScanItemBody | None
 
 
 class CppRangeScanItemBody(TypedDict, total=False):
@@ -703,7 +698,7 @@ class CppRangeScanItemBody(TypedDict, total=False):
 
 
 class CppRangeScanMutationState(TypedDict, total=False):
-    tokens: List[CppMutationToken]
+    tokens: list[CppMutationToken]
 
 
 class CppRangeScanOrchestratorOptions(TypedDict, total=False):
@@ -713,7 +708,7 @@ class CppRangeScanOrchestratorOptions(TypedDict, total=False):
     concurrency: int
     # retry_strategy
     timeout: int
-    consistent_with: Optional[CppRangeScanMutationState]
+    consistent_with: CppRangeScanMutationState | None
 
 
 class CppRangeScanPrefixScan(TypedDict, total=False):
@@ -724,7 +719,7 @@ class CppRangeScanPrefixScan(TypedDict, total=False):
 class CppRangeScanSamplingScan(TypedDict, total=False):
     scan_type: Literal['sampling_scan']
     limit: int
-    seed: Optional[int]
+    seed: int | None
 
 
 class CppRangeScanScanTerm(TypedDict, total=False):
@@ -740,65 +735,65 @@ class CppRangeSnapshotRequirements(TypedDict, total=False):
 
 class CppRbacGroup(TypedDict, total=False):
     name: str
-    roles: List[CppRbacRole]
-    description: Optional[str]
-    ldap_group_reference: Optional[str]
+    roles: list[CppRbacRole]
+    description: str | None
+    ldap_group_reference: str | None
 
 
 class CppRbacOrigin(TypedDict, total=False):
     type: str
-    name: Optional[str]
+    name: str | None
 
 
 class CppRbacRole(TypedDict, total=False):
     name: str
-    bucket: Optional[str]
-    scope: Optional[str]
-    collection: Optional[str]
+    bucket: str | None
+    scope: str | None
+    collection: str | None
 
 
 class CppRbacRoleAndDescription(TypedDict, total=False):
     display_name: str
     description: str
     name: str
-    bucket: Optional[str]
-    scope: Optional[str]
-    collection: Optional[str]
+    bucket: str | None
+    scope: str | None
+    collection: str | None
 
 
 class CppRbacRoleAndOrigins(TypedDict, total=False):
-    origins: List[CppRbacOrigin]
+    origins: list[CppRbacOrigin]
     name: str
-    bucket: Optional[str]
-    scope: Optional[str]
-    collection: Optional[str]
+    bucket: str | None
+    scope: str | None
+    collection: str | None
 
 
 class CppRbacUser(TypedDict, total=False):
     username: str
-    groups: Set[str]
-    roles: List[CppRbacRole]
-    display_name: Optional[str]
-    password: Optional[str]
+    groups: set[str]
+    roles: list[CppRbacRole]
+    display_name: str | None
+    password: str | None
 
 
 class CppRbacUserAndMetadata(TypedDict, total=False):
     domain: str
-    effective_roles: List[CppRbacRoleAndOrigins]
-    external_groups: Set[str]
+    effective_roles: list[CppRbacRoleAndOrigins]
+    external_groups: set[str]
     username: str
-    groups: Set[str]
-    roles: List[CppRbacRole]
-    password_changed: Optional[str]
-    display_name: Optional[str]
-    password: Optional[str]
+    groups: set[str]
+    roles: list[CppRbacRole]
+    password_changed: str | None
+    display_name: str | None
+    password: str | None
 
 
 class CppSearchDateRangeFacet(TypedDict, total=False):
     name: str
     count: int
-    start: Optional[str]
-    end: Optional[str]
+    start: str | None
+    end: str | None
 
 
 class CppSearchFacet(TypedDict, total=False):
@@ -807,9 +802,9 @@ class CppSearchFacet(TypedDict, total=False):
     total: int
     missing: int
     other: int
-    terms: List[CppSearchTermFacet]
-    date_ranges: List[CppSearchDateRangeFacet]
-    numeric_ranges: List[CppSearchNumericRangeFacet]
+    terms: list[CppSearchTermFacet]
+    date_ranges: list[CppSearchDateRangeFacet]
+    numeric_ranges: list[CppSearchNumericRangeFacet]
 
 
 class CppSearchIndex(TypedDict, total=False):
@@ -830,13 +825,13 @@ class CppSearchLocation(TypedDict, total=False):
     position: int
     start_offset: int
     end_offset: int
-    array_positions: Optional[List[int]]
+    array_positions: list[int] | None
 
 
 class CppSearchMetaData(TypedDict, total=False):
     client_context_id: str
     metrics: CppSearchMetrics
-    errors: Dict[str, str]
+    errors: dict[str, str]
 
 
 class CppSearchMetrics(TypedDict, total=False):
@@ -850,16 +845,16 @@ class CppSearchMetrics(TypedDict, total=False):
 class CppSearchNumericRangeFacet(TypedDict, total=False):
     name: str
     count: int
-    min: Optional[Union[int, float]]
-    max: Optional[Union[int, float]]
+    min: int | float | None
+    max: int | float | None
 
 
 class CppSearchRow(TypedDict, total=False):
     index: str
     id: str
     score: float
-    locations: List[CppSearchLocation]
-    fragments: Dict[str, List[str]]
+    locations: list[CppSearchLocation]
+    fragments: dict[str, list[str]]
     fields: str
     explanation: str
 
@@ -870,13 +865,13 @@ class CppSearchScoringNone(TypedDict, total=False):
 
 class CppSearchScoringReciprocalRankFusion(TypedDict, total=False):
     scoring_type: Literal['reciprocal_rank_fusion']
-    rank_constant: Optional[int]
-    window_size: Optional[int]
+    rank_constant: int | None
+    window_size: int | None
 
 
 class CppSearchScoringRelativeScoreFusion(TypedDict, total=False):
     scoring_type: Literal['relative_score_fusion']
-    window_size: Optional[int]
+    window_size: int | None
 
 
 class CppSearchTermFacet(TypedDict, total=False):
@@ -886,7 +881,7 @@ class CppSearchTermFacet(TypedDict, total=False):
 
 class CppServerGroup(TypedDict, total=False):
     name: str
-    nodes: List[CppServerNode]
+    nodes: list[CppServerNode]
 
 
 class CppServerNode(TypedDict, total=False):
@@ -894,8 +889,8 @@ class CppServerNode(TypedDict, total=False):
     server_index: int
     default_network: CppServerNodeAddress
     external_network: CppServerNodeAddress
-    active_vbuckets: Set[int]
-    replica_vbuckets: Set[int]
+    active_vbuckets: set[int]
+    replica_vbuckets: set[int]
 
 
 class CppServerNodeAddress(TypedDict, total=False):
@@ -915,19 +910,19 @@ class CppSubdocCommand(TypedDict, total=False):
 class CppViewDesignDocument(TypedDict, total=False):
     name: str
     ns: str
-    views: Dict[str, CppViewDesignDocumentView]
-    rev: Optional[str]
+    views: dict[str, CppViewDesignDocumentView]
+    rev: str | None
 
 
 class CppViewDesignDocumentView(TypedDict, total=False):
     name: str
-    map: Optional[str]
-    reduce: Optional[str]
+    map: str | None
+    reduce: str | None
 
 
 class CppViewMetadata(TypedDict, total=False):
-    total_rows: Optional[int]
-    debug_info: Optional[str]
+    total_rows: int | None
+    debug_info: str | None
 
 
 class CppViewProblem(TypedDict, total=False):
@@ -938,7 +933,7 @@ class CppViewProblem(TypedDict, total=False):
 class CppViewRow(TypedDict, total=False):
     key: str
     value: str
-    id: Optional[str]
+    id: str | None
 
 
 # ==========================================================================================
@@ -1012,7 +1007,7 @@ class CppGetProjectedResponse(TypedDict, total=False):
     value: bytes
     cas: int
     flags: int
-    expiry: Optional[int]
+    expiry: int | None
 
 
 class CppIncrementResponse(TypedDict, total=False):
@@ -1039,14 +1034,14 @@ class CppInsertWithLegacyDurabilityResponse(TypedDict, total=False):
 class CppLookupInResponse(TypedDict, total=False):
     # ctx
     cas: int
-    fields: List[CppLookupInResponseEntry]
+    fields: list[CppLookupInResponseEntry]
     deleted: bool
 
 
 class CppLookupInAnyReplicaResponse(TypedDict, total=False):
     # ctx
     cas: int
-    fields: List[CppLookupInAnyReplicaResponseEntry]
+    fields: list[CppLookupInAnyReplicaResponseEntry]
     deleted: bool
     is_replica: bool
 
@@ -1055,7 +1050,7 @@ class CppMutateInResponse(TypedDict, total=False):
     # ctx
     cas: int
     token: CppMutationToken
-    fields: List[CppMutateInResponseEntry]
+    fields: list[CppMutateInResponseEntry]
     deleted: bool
 
 
@@ -1121,21 +1116,21 @@ class CppAnalyticsRequest(TypedDict, total=False):
     statement: str
     readonly: bool
     priority: bool
-    raw: Dict[str, bytes]
-    positional_parameters: List[bytes]
-    named_parameters: Dict[str, bytes]
+    raw: dict[str, bytes]
+    positional_parameters: list[bytes]
+    named_parameters: dict[str, bytes]
     # row_callback
     # body_str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scan_consistency: Optional[str]
-    scope_name: Optional[str]
-    scope_qualifier: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scan_consistency: str | None
+    scope_name: str | None
+    scope_qualifier: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppDocumentViewRequest(TypedDict, total=False):
@@ -1143,32 +1138,32 @@ class CppDocumentViewRequest(TypedDict, total=False):
     document_name: str
     view_name: str
     ns: str
-    keys: List[str]
+    keys: list[str]
     debug: bool
-    raw: Dict[str, str]
-    query_string: List[str]
+    raw: dict[str, str]
+    query_string: list[str]
     # row_callback
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    consistency: Optional[str]
-    end_key: Optional[str]
-    end_key_doc_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    full_set: Optional[bool]
-    group: Optional[bool]
-    group_level: Optional[int]
-    inclusive_end: Optional[bool]
-    key: Optional[str]
-    limit: Optional[int]
-    on_error: Optional[str]
-    order: Optional[str]
-    parent_span: Optional[Any]
-    reduce: Optional[bool]
-    skip: Optional[int]
-    start_key: Optional[str]
-    start_key_doc_id: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    consistency: str | None
+    end_key: str | None
+    end_key_doc_id: str | None
+    errback: Callable[..., None] | None
+    full_set: bool | None
+    group: bool | None
+    group_level: int | None
+    inclusive_end: bool | None
+    key: str | None
+    limit: int | None
+    on_error: str | None
+    order: str | None
+    parent_span: Any | None
+    reduce: bool | None
+    skip: int | None
+    start_key: str | None
+    start_key_doc_id: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppQueryRequest(TypedDict, total=False):
@@ -1178,30 +1173,30 @@ class CppQueryRequest(TypedDict, total=False):
     readonly: bool
     flex_index: bool
     preserve_expiry: bool
-    mutation_state: List[CppMutationToken]
-    raw: Dict[str, bytes]
-    positional_parameters: List[bytes]
-    named_parameters: Dict[str, bytes]
+    mutation_state: list[CppMutationToken]
+    raw: dict[str, bytes]
+    positional_parameters: list[bytes]
+    named_parameters: dict[str, bytes]
     # row_callback
     # ctx
     # extract_encoded_plan
     # body_str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    max_parallelism: Optional[int]
-    parent_span: Optional[Any]
-    pipeline_batch: Optional[int]
-    pipeline_cap: Optional[int]
-    profile: Optional[str]
-    query_context: Optional[str]
-    scan_cap: Optional[int]
-    scan_consistency: Optional[str]
-    scan_wait: Optional[int]
-    send_to_node: Optional[str]
-    timeout: Optional[int]
-    use_replica: Optional[bool]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    max_parallelism: int | None
+    parent_span: Any | None
+    pipeline_batch: int | None
+    pipeline_cap: int | None
+    profile: str | None
+    query_context: str | None
+    scan_cap: int | None
+    scan_consistency: str | None
+    scan_wait: int | None
+    send_to_node: str | None
+    timeout: int | None
+    use_replica: bool | None
+    wrapper_span_name: str | None
 
 
 class CppSearchRequest(TypedDict, total=False):
@@ -1209,35 +1204,34 @@ class CppSearchRequest(TypedDict, total=False):
     query: bytes
     disable_scoring: bool
     include_locations: bool
-    highlight_fields: List[str]
-    fields: List[str]
-    collections: List[str]
-    mutation_state: List[CppMutationToken]
-    sort_specs: List[str]
-    facets: Dict[str, str]
-    raw: Dict[str, bytes]
+    highlight_fields: list[str]
+    fields: list[str]
+    collections: list[str]
+    mutation_state: list[CppMutationToken]
+    sort_specs: list[str]
+    facets: dict[str, str]
+    raw: dict[str, bytes]
     # row_callback
     # body_str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    explain: Optional[bool]
-    highlight_style: Optional[str]
-    limit: Optional[int]
-    log_request: Optional[bool]
-    log_response: Optional[bool]
-    parent_span: Optional[Any]
-    scan_consistency: Optional[str]
-    scope_name: Optional[str]
-    scoring: Optional[Union[CppSearchScoringNone,
-                            CppSearchScoringReciprocalRankFusion, CppSearchScoringRelativeScoreFusion]]
-    show_request: Optional[bool]
-    skip: Optional[int]
-    timeout: Optional[int]
-    vector_query_combination: Optional[str]
-    vector_search: Optional[bytes]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    explain: bool | None
+    highlight_style: str | None
+    limit: int | None
+    log_request: bool | None
+    log_response: bool | None
+    parent_span: Any | None
+    scan_consistency: str | None
+    scope_name: str | None
+    scoring: CppSearchScoringNone | CppSearchScoringReciprocalRankFusion | CppSearchScoringRelativeScoreFusion | None
+    show_request: bool | None
+    skip: int | None
+    timeout: int | None
+    vector_query_combination: str | None
+    vector_search: bytes | None
+    wrapper_span_name: str | None
 
 
 # ==========================================================================================
@@ -1249,123 +1243,123 @@ class CppAnalyticsDatasetCreateRequest(TypedDict, total=False):
     dataset_name: str
     bucket_name: str
     ignore_if_exists: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    condition: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    condition: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsDatasetCreateResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsManagementProblem]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsDatasetDropRequest(TypedDict, total=False):
     dataverse_name: str
     dataset_name: str
     ignore_if_does_not_exist: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsDatasetDropResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsManagementProblem]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsDatasetGetAllRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsDatasetGetAllResponse(TypedDict, total=False):
     # ctx
     status: str
-    datasets: List[CppAnalyticsDataset]
-    errors: List[CppAnalyticsManagementProblem]
+    datasets: list[CppAnalyticsDataset]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsDataverseCreateRequest(TypedDict, total=False):
     dataverse_name: str
     ignore_if_exists: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsDataverseCreateResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsManagementProblem]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsDataverseDropRequest(TypedDict, total=False):
     dataverse_name: str
     ignore_if_does_not_exist: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsDataverseDropResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsManagementProblem]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsGetPendingMutationsRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsGetPendingMutationsResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsManagementProblem]
-    stats: Dict[str, int]
+    errors: list[CppAnalyticsManagementProblem]
+    stats: dict[str, int]
 
 
 class CppAnalyticsIndexCreateRequest(TypedDict, total=False):
     dataverse_name: str
     dataset_name: str
     index_name: str
-    fields: Dict[str, str]
+    fields: dict[str, str]
     ignore_if_exists: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsIndexCreateResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsManagementProblem]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsIndexDropRequest(TypedDict, total=False):
@@ -1373,179 +1367,179 @@ class CppAnalyticsIndexDropRequest(TypedDict, total=False):
     dataset_name: str
     index_name: str
     ignore_if_does_not_exist: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsIndexDropResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsManagementProblem]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsIndexGetAllRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsIndexGetAllResponse(TypedDict, total=False):
     # ctx
     status: str
-    indexes: List[CppAnalyticsIndex]
-    errors: List[CppAnalyticsManagementProblem]
+    indexes: list[CppAnalyticsIndex]
+    errors: list[CppAnalyticsManagementProblem]
 
 
 class CppAnalyticsLinkConnectRequest(TypedDict, total=False):
     dataverse_name: str
     link_name: str
     force: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkConnectResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsLinkConnectProblem]
+    errors: list[CppAnalyticsLinkConnectProblem]
 
 
 class CppAnalyticsLinkCreateAzureBlobExternalLinkRequest(TypedDict, total=False):
     link: CppAnalyticsAzureBlobExternalLink
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkCreateResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsLinkCreateProblem]
+    errors: list[CppAnalyticsLinkCreateProblem]
 
 
 class CppAnalyticsLinkCreateCouchbaseRemoteLinkRequest(TypedDict, total=False):
     link: CppAnalyticsCouchbaseRemoteLink
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkCreateS3ExternalLinkRequest(TypedDict, total=False):
     link: CppAnalyticsS3ExternalLink
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkDisconnectRequest(TypedDict, total=False):
     dataverse_name: str
     link_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkDisconnectResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsLinkDisconnectProblem]
+    errors: list[CppAnalyticsLinkDisconnectProblem]
 
 
 class CppAnalyticsLinkDropRequest(TypedDict, total=False):
     link_name: str
     dataverse_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkDropResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsLinkDropProblem]
+    errors: list[CppAnalyticsLinkDropProblem]
 
 
 class CppAnalyticsLinkGetAllRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    dataverse_name: Optional[str]
-    errback: Optional[Callable[..., None]]
-    link_name: Optional[str]
-    link_type: Optional[str]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    dataverse_name: str | None
+    errback: Callable[..., None] | None
+    link_name: str | None
+    link_type: str | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkGetAllResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsLinkGetAllProblem]
-    couchbase: List[CppAnalyticsCouchbaseRemoteLink]
-    s3: List[CppAnalyticsS3ExternalLink]
-    azure_blob: List[CppAnalyticsAzureBlobExternalLink]
+    errors: list[CppAnalyticsLinkGetAllProblem]
+    couchbase: list[CppAnalyticsCouchbaseRemoteLink]
+    s3: list[CppAnalyticsS3ExternalLink]
+    azure_blob: list[CppAnalyticsAzureBlobExternalLink]
 
 
 class CppAnalyticsLinkReplaceAzureBlobExternalLinkRequest(TypedDict, total=False):
     link: CppAnalyticsAzureBlobExternalLink
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkReplaceResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppAnalyticsLinkReplaceProblem]
+    errors: list[CppAnalyticsLinkReplaceProblem]
 
 
 class CppAnalyticsLinkReplaceCouchbaseRemoteLinkRequest(TypedDict, total=False):
     link: CppAnalyticsCouchbaseRemoteLink
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppAnalyticsLinkReplaceS3ExternalLinkRequest(TypedDict, total=False):
     link: CppAnalyticsS3ExternalLink
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 # ==========================================================================================
@@ -1554,12 +1548,12 @@ class CppAnalyticsLinkReplaceS3ExternalLinkRequest(TypedDict, total=False):
 
 class CppBucketCreateRequest(TypedDict, total=False):
     bucket: CppBucketSettings
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppBucketCreateResponse(TypedDict, total=False):
@@ -1569,12 +1563,12 @@ class CppBucketCreateResponse(TypedDict, total=False):
 
 class CppBucketDescribeRequest(TypedDict, total=False):
     name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppBucketDescribeResponse(TypedDict, total=False):
@@ -1584,12 +1578,12 @@ class CppBucketDescribeResponse(TypedDict, total=False):
 
 class CppBucketDropRequest(TypedDict, total=False):
     name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppBucketDropResponse(TypedDict, total=False):
@@ -1598,12 +1592,12 @@ class CppBucketDropResponse(TypedDict, total=False):
 
 class CppBucketFlushRequest(TypedDict, total=False):
     name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppBucketFlushResponse(TypedDict, total=False):
@@ -1612,12 +1606,12 @@ class CppBucketFlushResponse(TypedDict, total=False):
 
 class CppBucketGetRequest(TypedDict, total=False):
     name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppBucketGetResponse(TypedDict, total=False):
@@ -1626,27 +1620,27 @@ class CppBucketGetResponse(TypedDict, total=False):
 
 
 class CppBucketGetAllRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppBucketGetAllResponse(TypedDict, total=False):
     # ctx
-    buckets: List[CppBucketSettings]
+    buckets: list[CppBucketSettings]
 
 
 class CppBucketUpdateRequest(TypedDict, total=False):
     bucket: CppBucketSettings
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppBucketUpdateResponse(TypedDict, total=False):
@@ -1660,12 +1654,12 @@ class CppBucketUpdateResponse(TypedDict, total=False):
 # ==========================================================================================
 
 class CppClusterDescribeRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppClusterDescribeResponse(TypedDict, total=False):
@@ -1674,12 +1668,12 @@ class CppClusterDescribeResponse(TypedDict, total=False):
 
 
 class CppClusterDeveloperPreviewEnableRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppClusterDeveloperPreviewEnableResponse(TypedDict, total=False):
@@ -1694,14 +1688,14 @@ class CppCollectionCreateRequest(TypedDict, total=False):
     bucket_name: str
     scope_name: str
     collection_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    history: Optional[bool]
-    max_expiry: Optional[int]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    history: bool | None
+    max_expiry: int | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppCollectionCreateResponse(TypedDict, total=False):
@@ -1713,12 +1707,12 @@ class CppCollectionDropRequest(TypedDict, total=False):
     bucket_name: str
     scope_name: str
     collection_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppCollectionDropResponse(TypedDict, total=False):
@@ -1730,14 +1724,14 @@ class CppCollectionUpdateRequest(TypedDict, total=False):
     bucket_name: str
     scope_name: str
     collection_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    history: Optional[bool]
-    max_expiry: Optional[int]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    history: bool | None
+    max_expiry: int | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppCollectionUpdateResponse(TypedDict, total=False):
@@ -1745,32 +1739,15 @@ class CppCollectionUpdateResponse(TypedDict, total=False):
     uid: int
 
 
-class CppCollectionsManifestGetRequest(TypedDict, total=False):
-    id: CppDocumentId
-    partition: int
-    opaque: int
-    # retries
-    callback: Optional[Callable[..., None]]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
-
-
-class CppCollectionsManifestGetResponse(TypedDict, total=False):
-    # ctx
-    manifest: CppCollectionsManifest
-
-
 class CppScopeCreateRequest(TypedDict, total=False):
     bucket_name: str
     scope_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppScopeCreateResponse(TypedDict, total=False):
@@ -1781,12 +1758,12 @@ class CppScopeCreateResponse(TypedDict, total=False):
 class CppScopeDropRequest(TypedDict, total=False):
     bucket_name: str
     scope_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppScopeDropResponse(TypedDict, total=False):
@@ -1796,12 +1773,12 @@ class CppScopeDropResponse(TypedDict, total=False):
 
 class CppScopeGetAllRequest(TypedDict, total=False):
     bucket_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppScopeGetAllResponse(TypedDict, total=False):
@@ -1815,156 +1792,156 @@ class CppScopeGetAllResponse(TypedDict, total=False):
 
 class CppEventingDeployFunctionRequest(TypedDict, total=False):
     name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingDeployFunctionResponse(TypedDict, total=False):
     # ctx
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 class CppEventingDropFunctionRequest(TypedDict, total=False):
     name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingDropFunctionResponse(TypedDict, total=False):
     # ctx
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 class CppEventingGetAllFunctionsRequest(TypedDict, total=False):
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingGetAllFunctionsResponse(TypedDict, total=False):
     # ctx
-    functions: List[CppEventingFunction]
-    error: Optional[CppEventingProblem]
+    functions: list[CppEventingFunction]
+    error: CppEventingProblem | None
 
 
 class CppEventingGetFunctionRequest(TypedDict, total=False):
     name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingGetFunctionResponse(TypedDict, total=False):
     # ctx
     function: CppEventingFunction
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 class CppEventingGetStatusRequest(TypedDict, total=False):
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingGetStatusResponse(TypedDict, total=False):
     # ctx
     status: CppEventingStatus
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 class CppEventingPauseFunctionRequest(TypedDict, total=False):
     name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingPauseFunctionResponse(TypedDict, total=False):
     # ctx
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 class CppEventingResumeFunctionRequest(TypedDict, total=False):
     name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingResumeFunctionResponse(TypedDict, total=False):
     # ctx
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 class CppEventingUndeployFunctionRequest(TypedDict, total=False):
     name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingUndeployFunctionResponse(TypedDict, total=False):
     # ctx
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 class CppEventingUpsertFunctionRequest(TypedDict, total=False):
     function: CppEventingFunction
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppEventingUpsertFunctionResponse(TypedDict, total=False):
     # ctx
-    error: Optional[CppEventingProblem]
+    error: CppEventingProblem | None
 
 
 # ==========================================================================================
@@ -1976,38 +1953,38 @@ class CppQueryIndexBuildRequest(TypedDict, total=False):
     scope_name: str
     collection_name: str
     query_ctx: CppQueryContext
-    index_names: List[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    index_names: list[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppQueryIndexBuildResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppQueryIndexBuildProblem]
+    errors: list[CppQueryIndexBuildProblem]
 
 
 class CppQueryIndexBuildDeferredRequest(TypedDict, total=False):
     bucket_name: str
     query_ctx: CppQueryContext
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    collection_name: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    collection_name: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppQueryIndexBuildDeferredResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppQueryIndexBuildDeferredProblem]
+    errors: list[CppQueryIndexBuildDeferredProblem]
 
 
 class CppQueryIndexCreateRequest(TypedDict, total=False):
@@ -2015,25 +1992,25 @@ class CppQueryIndexCreateRequest(TypedDict, total=False):
     scope_name: str
     collection_name: str
     index_name: str
-    keys: List[str]
+    keys: list[str]
     query_ctx: CppQueryContext
     is_primary: bool
     ignore_if_exists: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    condition: Optional[str]
-    deferred: Optional[bool]
-    errback: Optional[Callable[..., None]]
-    num_replicas: Optional[int]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    condition: str | None
+    deferred: bool | None
+    errback: Callable[..., None] | None
+    num_replicas: int | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppQueryIndexCreateResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppQueryIndexCreateProblem]
+    errors: list[CppQueryIndexCreateProblem]
 
 
 class CppQueryIndexDropRequest(TypedDict, total=False):
@@ -2044,18 +2021,18 @@ class CppQueryIndexDropRequest(TypedDict, total=False):
     query_ctx: CppQueryContext
     is_primary: bool
     ignore_if_does_not_exist: bool
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppQueryIndexDropResponse(TypedDict, total=False):
     # ctx
     status: str
-    errors: List[CppQueryIndexDropProblem]
+    errors: list[CppQueryIndexDropProblem]
 
 
 class CppQueryIndexGetAllRequest(TypedDict, total=False):
@@ -2063,18 +2040,18 @@ class CppQueryIndexGetAllRequest(TypedDict, total=False):
     scope_name: str
     collection_name: str
     query_ctx: CppQueryContext
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppQueryIndexGetAllResponse(TypedDict, total=False):
     # ctx
     status: str
-    indexes: List[CppQueryIndex]
+    indexes: list[CppQueryIndex]
 
 
 class CppQueryIndexGetAllDeferredRequest(TypedDict, total=False):
@@ -2082,18 +2059,18 @@ class CppQueryIndexGetAllDeferredRequest(TypedDict, total=False):
     scope_name: str
     collection_name: str
     query_ctx: CppQueryContext
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppQueryIndexGetAllDeferredResponse(TypedDict, total=False):
     # ctx
     status: str
-    index_names: List[str]
+    index_names: list[str]
 
 
 # ==========================================================================================
@@ -2101,12 +2078,12 @@ class CppQueryIndexGetAllDeferredResponse(TypedDict, total=False):
 # ==========================================================================================
 
 class CppSearchGetStatsRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchGetStatsResponse(TypedDict, total=False):
@@ -2117,14 +2094,14 @@ class CppSearchGetStatsResponse(TypedDict, total=False):
 class CppSearchIndexAnalyzeDocumentRequest(TypedDict, total=False):
     index_name: str
     encoded_document: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexAnalyzeDocumentResponse(TypedDict, total=False):
@@ -2137,14 +2114,14 @@ class CppSearchIndexAnalyzeDocumentResponse(TypedDict, total=False):
 class CppSearchIndexControlIngestRequest(TypedDict, total=False):
     index_name: str
     pause: bool
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexControlIngestResponse(TypedDict, total=False):
@@ -2156,14 +2133,14 @@ class CppSearchIndexControlIngestResponse(TypedDict, total=False):
 class CppSearchIndexControlPlanFreezeRequest(TypedDict, total=False):
     index_name: str
     freeze: bool
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexControlPlanFreezeResponse(TypedDict, total=False):
@@ -2175,14 +2152,14 @@ class CppSearchIndexControlPlanFreezeResponse(TypedDict, total=False):
 class CppSearchIndexControlQueryRequest(TypedDict, total=False):
     index_name: str
     allow: bool
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexControlQueryResponse(TypedDict, total=False):
@@ -2193,14 +2170,14 @@ class CppSearchIndexControlQueryResponse(TypedDict, total=False):
 
 class CppSearchIndexDropRequest(TypedDict, total=False):
     index_name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexDropResponse(TypedDict, total=False):
@@ -2211,14 +2188,14 @@ class CppSearchIndexDropResponse(TypedDict, total=False):
 
 class CppSearchIndexGetRequest(TypedDict, total=False):
     index_name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexGetResponse(TypedDict, total=False):
@@ -2229,33 +2206,33 @@ class CppSearchIndexGetResponse(TypedDict, total=False):
 
 
 class CppSearchIndexGetAllRequest(TypedDict, total=False):
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexGetAllResponse(TypedDict, total=False):
     # ctx
     status: str
     impl_version: str
-    indexes: List[CppSearchIndex]
+    indexes: list[CppSearchIndex]
 
 
 class CppSearchIndexGetDocumentsCountRequest(TypedDict, total=False):
     index_name: str
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexGetDocumentsCountResponse(TypedDict, total=False):
@@ -2267,12 +2244,12 @@ class CppSearchIndexGetDocumentsCountResponse(TypedDict, total=False):
 
 class CppSearchIndexGetStatsRequest(TypedDict, total=False):
     index_name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexGetStatsResponse(TypedDict, total=False):
@@ -2284,14 +2261,14 @@ class CppSearchIndexGetStatsResponse(TypedDict, total=False):
 
 class CppSearchIndexUpsertRequest(TypedDict, total=False):
     index: CppSearchIndex
-    bucket_name: Optional[str]
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    scope_name: Optional[str]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    bucket_name: str | None
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    scope_name: str | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppSearchIndexUpsertResponse(TypedDict, total=False):
@@ -2308,12 +2285,12 @@ class CppSearchIndexUpsertResponse(TypedDict, total=False):
 
 class CppChangePasswordRequest(TypedDict, total=False):
     newPassword: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppChangePasswordResponse(TypedDict, total=False):
@@ -2322,12 +2299,12 @@ class CppChangePasswordResponse(TypedDict, total=False):
 
 class CppGroupDropRequest(TypedDict, total=False):
     name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppGroupDropResponse(TypedDict, total=False):
@@ -2336,12 +2313,12 @@ class CppGroupDropResponse(TypedDict, total=False):
 
 class CppGroupGetRequest(TypedDict, total=False):
     name: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppGroupGetResponse(TypedDict, total=False):
@@ -2350,57 +2327,57 @@ class CppGroupGetResponse(TypedDict, total=False):
 
 
 class CppGroupGetAllRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppGroupGetAllResponse(TypedDict, total=False):
     # ctx
-    groups: List[CppRbacGroup]
+    groups: list[CppRbacGroup]
 
 
 class CppGroupUpsertRequest(TypedDict, total=False):
     group: CppRbacGroup
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppGroupUpsertResponse(TypedDict, total=False):
     # ctx
-    errors: List[str]
+    errors: list[str]
 
 
 class CppRoleGetAllRequest(TypedDict, total=False):
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppRoleGetAllResponse(TypedDict, total=False):
     # ctx
-    roles: List[CppRbacRoleAndDescription]
+    roles: list[CppRbacRoleAndDescription]
 
 
 class CppUserDropRequest(TypedDict, total=False):
     username: str
     domain: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppUserDropResponse(TypedDict, total=False):
@@ -2410,12 +2387,12 @@ class CppUserDropResponse(TypedDict, total=False):
 class CppUserGetRequest(TypedDict, total=False):
     username: str
     domain: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppUserGetResponse(TypedDict, total=False):
@@ -2425,33 +2402,33 @@ class CppUserGetResponse(TypedDict, total=False):
 
 class CppUserGetAllRequest(TypedDict, total=False):
     domain: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppUserGetAllResponse(TypedDict, total=False):
     # ctx
-    users: List[CppRbacUserAndMetadata]
+    users: list[CppRbacUserAndMetadata]
 
 
 class CppUserUpsertRequest(TypedDict, total=False):
     domain: str
     user: CppRbacUser
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppUserUpsertResponse(TypedDict, total=False):
     # ctx
-    errors: List[str]
+    errors: list[str]
 
 
 # ==========================================================================================
@@ -2462,12 +2439,12 @@ class CppViewIndexDropRequest(TypedDict, total=False):
     bucket_name: str
     document_name: str
     ns: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppViewIndexDropResponse(TypedDict, total=False):
@@ -2478,12 +2455,12 @@ class CppViewIndexGetRequest(TypedDict, total=False):
     bucket_name: str
     document_name: str
     ns: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppViewIndexGetResponse(TypedDict, total=False):
@@ -2494,28 +2471,28 @@ class CppViewIndexGetResponse(TypedDict, total=False):
 class CppViewIndexGetAllRequest(TypedDict, total=False):
     bucket_name: str
     ns: str
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppViewIndexGetAllResponse(TypedDict, total=False):
     # ctx
-    design_documents: List[CppViewDesignDocument]
+    design_documents: list[CppViewDesignDocument]
 
 
 class CppViewIndexUpsertRequest(TypedDict, total=False):
     bucket_name: str
     document: CppViewDesignDocument
-    callback: Optional[Callable[..., None]]
-    client_context_id: Optional[str]
-    errback: Optional[Callable[..., None]]
-    parent_span: Optional[Any]
-    timeout: Optional[int]
-    wrapper_span_name: Optional[str]
+    callback: Callable[..., None] | None
+    client_context_id: str | None
+    errback: Callable[..., None] | None
+    parent_span: Any | None
+    timeout: int | None
+    wrapper_span_name: str | None
 
 
 class CppViewIndexUpsertResponse(TypedDict, total=False):
@@ -2523,8 +2500,8 @@ class CppViewIndexUpsertResponse(TypedDict, total=False):
 
 # ====================================================================================================
 # AUTOGENERATED SECTION END - DO NOT EDIT MANUALLY
-# Generated-On: 2026-09-22 16:25:53
-# Content-Hash: e21a0375a469ba431fb1f652a7e98279
+# Generated-On: 2026-10-06 14:45:11
+# Content-Hash: f75e68c02c685f635aac38322e43ddd8
 # ====================================================================================================
 
 

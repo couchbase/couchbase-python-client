@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import (List,
-                    Literal,
-                    Optional,
-                    TypedDict,
-                    Union)
+from typing import Literal, TypedDict
 
 # ============================================================================
 # bindings.yaml config types
@@ -14,17 +10,17 @@ from typing import (List,
 
 class BindingConfigOpRequest(TypedDict, total=False):
     core_struct: str
-    header_path: Optional[str] = None
-    required_fields: Optional[List[str]] = None
-    skip_if_empty_fields: Optional[List[str]] = None
-    with_legacy_durability: Optional[bool] = None
+    header_path: str | None = None
+    required_fields: list[str] | None = None
+    skip_if_empty_fields: list[str] | None = None
+    with_legacy_durability: bool | None = None
 
 
 class BindingConfigOpResponse(TypedDict, total=False):
     core_struct: str
-    header_path: Optional[str] = None
-    input_missing_err_msg: Optional[str] = None
-    response_override: Optional[str] = None
+    header_path: str | None = None
+    input_missing_err_msg: str | None = None
+    response_override: str | None = None
 
 
 class BindingConfigOp(TypedDict, total=False):
@@ -32,61 +28,61 @@ class BindingConfigOp(TypedDict, total=False):
     header_file: str
     request: BindingConfigOpRequest
     response: BindingConfigOpResponse
-    header_path: Optional[str] = None
-    skip_response: Optional[bool] = None
-    is_mutation: Optional[bool] = None
-    has_multi: Optional[bool] = None
-    is_streaming_op: Optional[bool] = None
-    cpp_request_templates: Optional[List[str]] = None
-    streaming_op_name: Optional[str] = None
+    header_path: str | None = None
+    skip_response: bool | None = None
+    is_mutation: bool | None = None
+    has_multi: bool | None = None
+    is_streaming_op: bool | None = None
+    cpp_request_templates: list[str] | None = None
+    streaming_op_name: str | None = None
 
 # override is the same as BindingOpConfig, but all except op_name are optional
 
 
 class BindingConfigOpOverride(TypedDict, total=False):
     op_name: str
-    header_file: Optional[str] = None
-    request: Optional[BindingConfigOpRequest] = None
-    response: Optional[BindingConfigOpResponse] = None
-    header_path: Optional[str] = None
-    skip_response: Optional[bool] = None
-    is_mutation: Optional[bool] = None
-    has_multi: Optional[bool] = None
-    is_streaming_op: Optional[bool] = None
-    cpp_request_templates: Optional[List[str]] = None
-    streaming_op_name: Optional[str] = None
+    header_file: str | None = None
+    request: BindingConfigOpRequest | None = None
+    response: BindingConfigOpResponse | None = None
+    header_path: str | None = None
+    skip_response: bool | None = None
+    is_mutation: bool | None = None
+    has_multi: bool | None = None
+    is_streaming_op: bool | None = None
+    cpp_request_templates: list[str] | None = None
+    streaming_op_name: str | None = None
 
 
 class BindingConfigKeyValueOperations(TypedDict):
     header_path: str
     structs_prefix: str
     ops_prefix: str
-    mutation_operation_headers: List[str]
-    operation_headers: List[str]
-    with_legacy_durability: List[str]
-    operation_overrides: Optional[List[BindingConfigOpOverride]] = None
-    required_cpp_request_fields: Optional[List[str]] = None
-    ignored_cpp_request_fields: Optional[List[str]] = None
-    ignored_cpp_response_fields: Optional[List[str]] = None
+    mutation_operation_headers: list[str]
+    operation_headers: list[str]
+    with_legacy_durability: list[str]
+    operation_overrides: list[BindingConfigOpOverride] | None = None
+    required_cpp_request_fields: list[str] | None = None
+    ignored_cpp_request_fields: list[str] | None = None
+    ignored_cpp_response_fields: list[str] | None = None
 
 
 class BindingConfigStreamingOperations(TypedDict):
     header_path: str
     structs_prefix: str
     ops_prefix: str
-    operation_headers: List[str]
-    operation_overrides: Optional[List[BindingConfigOpOverride]] = None
-    ignored_cpp_request_fields: Optional[List[str]] = None
-    ignored_cpp_response_fields: Optional[List[str]] = None
+    operation_headers: list[str]
+    operation_overrides: list[BindingConfigOpOverride] | None = None
+    ignored_cpp_request_fields: list[str] | None = None
+    ignored_cpp_response_fields: list[str] | None = None
 
 
 class BindingConfigMgmtOperations(TypedDict):
-    operation_headers: List[str]
-    operation_overrides: Optional[List[BindingConfigOpOverride]] = None
-    header_path: Optional[str] = None
-    structs_prefix: Optional[str] = None
-    ignored_cpp_request_fields: Optional[List[str]] = None
-    ignored_cpp_response_fields: Optional[List[str]] = None
+    operation_headers: list[str]
+    operation_overrides: list[BindingConfigOpOverride] | None = None
+    header_path: str | None = None
+    structs_prefix: str | None = None
+    ignored_cpp_request_fields: list[str] | None = None
+    ignored_cpp_response_fields: list[str] | None = None
 
 
 class BindingConfigMgmt(TypedDict):
@@ -96,25 +92,25 @@ class BindingConfigMgmt(TypedDict):
     bucket: BindingConfigMgmtOperations
     cluster: BindingConfigMgmtOperations
     collection: BindingConfigMgmtOperations
-    ignored_cpp_request_fields: Optional[List[str]] = None
-    ignored_cpp_response_fields: Optional[List[str]] = None
+    ignored_cpp_request_fields: list[str] | None = None
+    ignored_cpp_response_fields: list[str] | None = None
 
 
 class BindingConfigCppType(TypedDict, total=False):
     core_struct: str
     header_file: str
-    py_type: Optional[str] = None
-    required_fields: Optional[List[str]] = None
-    ignored_fields: Optional[List[str]] = None
-    skip_if_empty_fields: Optional[List[str]] = None
-    input_missing_err_msg: Optional[str] = None
-    skip_request: Optional[bool] = None
-    allow_empty_fields: Optional[bool] = None
+    py_type: str | None = None
+    required_fields: list[str] | None = None
+    ignored_fields: list[str] | None = None
+    skip_if_empty_fields: list[str] | None = None
+    input_missing_err_msg: str | None = None
+    skip_request: bool | None = None
+    allow_empty_fields: bool | None = None
 
 
 class BindingConfigCppTypes(TypedDict):
-    types: List[BindingConfigCppType]
-    ignored_fields: Optional[List[str]] = None
+    types: list[BindingConfigCppType]
+    ignored_fields: list[str] | None = None
 
 
 class BindingConfigCppVariantAlternative(TypedDict, total=False):
@@ -130,44 +126,44 @@ class BindingConfigCppVariant(TypedDict, total=False):
     field: str
     header_file: str
     discriminator: str
-    alternatives: List[BindingConfigCppVariantAlternative]
-    input_missing_err_msg: Optional[str] = None
+    alternatives: list[BindingConfigCppVariantAlternative]
+    input_missing_err_msg: str | None = None
 
 
 class BindingConfigCppEnumType(TypedDict, total=False):
     core_enum: str
     header_file: str
-    default: Union[str, int]
+    default: str | int
     enum_type: str
-    py_type: Optional[str] = None
-    mapping_name: Optional[str] = None
-    use_hex: Optional[bool] = False
+    py_type: str | None = None
+    mapping_name: str | None = None
+    use_hex: bool | None = False
 
 
 class BindingConfigFileOutput:
     name: str
     filename: str
-    templates: Union[List[str], str]
+    templates: list[str] | str
     output_path: str
 
 
 class BindingConfigMetadata(TypedDict):
     version: str
     description: str
-    file_outputs: List[BindingConfigFileOutput]
+    file_outputs: list[BindingConfigFileOutput]
 
 
 class BindingConfigSchema(TypedDict):
     metadata: BindingConfigMetadata
-    operation_headers: List[str]
+    operation_headers: list[str]
     key_value: BindingConfigKeyValueOperations
     streaming: BindingConfigStreamingOperations
     management: BindingConfigMgmt
-    cpp_core_type_headers: List[str]
+    cpp_core_type_headers: list[str]
     cpp_core_types: BindingConfigCppTypes
-    cpp_core_variants: List[BindingConfigCppVariant]
-    cpp_core_enums: List[BindingConfigCppEnumType]
-    cpp_core_enum_headers: List[str]
+    cpp_core_variants: list[BindingConfigCppVariant]
+    cpp_core_enums: list[BindingConfigCppEnumType]
+    cpp_core_enum_headers: list[str]
 
 
 # ============================================================================
@@ -180,31 +176,31 @@ class CppType(TypedDict):
 
 class CppField(TypedDict):
     name: str
-    cpp_type: Union[CppType, CppNestedField]
+    cpp_type: CppType | CppNestedField
 
 
 class CppEnumValue(TypedDict):
     name: str
-    value: Union[int, str]
+    value: int | str
 
 # field can recurse
 
 
 class CppNestedField(TypedDict):
     name: Literal['std::optional', 'std::shared_ptr', 'std::vector', 'std::map', 'std::variant']
-    of: Union[CppType, CppField]
-    to: Optional[Union[CppType, CppField]]
+    of: CppType | CppField
+    to: CppType | CppField | None
 
 
 class CppParsedType(TypedDict):
     struct_name: str
-    fields: List[CppField]
+    fields: list[CppField]
 
 
 class CppParsedEnum(TypedDict):
     name: str
     type: CppType
-    values: List[CppEnumValue]
+    values: list[CppEnumValue]
 
 # ============================================================================
 # Binding types (ready to go into the template generator)
@@ -214,7 +210,7 @@ class CppParsedEnum(TypedDict):
 @dataclass
 class PyType:
     name: str
-    module: Optional[str] = None
+    module: str | None = None
 
 
 @dataclass
@@ -241,16 +237,16 @@ class BindingKeyValueOp:
     pretty_name: str                        # e.g. GetWithLegacyDurability
     request_struct: str                     # e.g. get_request
     request_struct_full: str                # e.g. couchbase::core::operations::get_request
-    request_fields: List[BindingOpField]
+    request_fields: list[BindingOpField]
     response_struct: str                    # e.g. get_response
     response_struct_full: str               # e.g. couchbase::core::operations::get_response
-    response_fields: List[BindingOpField]
+    response_fields: list[BindingOpField]
     requires_doc_id: bool = True
-    response_override: Optional[str] = None
-    is_mutation: Optional[bool] = None
-    request_only: Optional[bool] = None
-    has_multi: Optional[bool] = None
-    is_streaming_op: Optional[bool] = None
+    response_override: str | None = None
+    is_mutation: bool | None = None
+    request_only: bool | None = None
+    has_multi: bool | None = None
+    is_streaming_op: bool | None = None
 
 
 @dataclass
@@ -258,9 +254,9 @@ class BindingKeyValueMultiOp:
     name: str                                 # e.g. get
     pretty_name: str
     options_name: str
-    request_fields: List[BindingMultiOpField]
-    option_fields: List[BindingMultiOpField]
-    is_streaming_op: Optional[bool] = None
+    request_fields: list[BindingMultiOpField]
+    option_fields: list[BindingMultiOpField]
+    is_streaming_op: bool | None = None
 
 
 @dataclass
@@ -270,8 +266,8 @@ class BindingStreamingOp:
     streaming_op_name: str
     request_struct: str
     request_struct_full: str
-    request_fields: List[BindingOpField]
-    request_only: Optional[bool] = True
+    request_fields: list[BindingOpField]
+    request_only: bool | None = True
 
 
 @dataclass
@@ -280,31 +276,31 @@ class BindingMgmtOp:
     pretty_name: str
     request_struct: str
     request_struct_full: str
-    request_fields: List[BindingOpField]
+    request_fields: list[BindingOpField]
     response_struct: str
     response_struct_full: str
-    response_fields: List[BindingOpField]
-    request_only: Optional[bool] = None
-    is_templated: Optional[bool] = None
-    templated_pretty_name: Optional[str] = None
+    response_fields: list[BindingOpField]
+    request_only: bool | None = None
+    is_templated: bool | None = None
+    templated_pretty_name: str | None = None
 
 
 @dataclass
 class BindingMgmtGroup:
     name: str
     pretty_name: str
-    operations: List[BindingMgmtOp]
+    operations: list[BindingMgmtOp]
 
 
 @dataclass
 class BindingCppType:
     name: str
     full_name: str
-    fields: List[BindingOpField]
+    fields: list[BindingOpField]
     header: str
     py_type: str
-    input_missing_err_msg: Optional[str] = None
-    skip_request: Optional[bool] = None
+    input_missing_err_msg: str | None = None
+    skip_request: bool | None = None
 
 
 @dataclass
@@ -319,8 +315,8 @@ class BindingCppVariant:
     full_name: str                          # the alias, or the expanded std::variant<...> for an inline variant
     header: str
     discriminator: str                      # Python dict key holding the alternative tag
-    alternatives: List[BindingVariantAlternative]
-    input_missing_err_msg: Optional[str] = None
+    alternatives: list[BindingVariantAlternative]
+    input_missing_err_msg: str | None = None
 
 
 @dataclass
@@ -337,5 +333,5 @@ class BindingEnumType:
     enum_type: str  # "ENUM", "INT_ENUM" or "INT16_ENUM"
     mapping_name: str
     header: str
-    enum_values: List[BindingEnumValue]
+    enum_values: list[BindingEnumValue]
     py_type: str

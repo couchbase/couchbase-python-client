@@ -2,23 +2,40 @@ from __future__ import annotations
 
 import hashlib
 import re
+import textwrap
 from dataclasses import asdict
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import (Any,
-                    Dict,
-                    List,
-                    Optional,
-                    Pattern,
-                    Tuple,
-                    Union)
+from re import Pattern
+from typing import Any
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
 
+from tools.autogen.core import operations
 from tools.autogen.core.binding_autogen_types import BindingConfigSchema
 from tools.autogen.core.binding_builder import BindingBuilder
+
+# A field sits four columns into its class, and the repo's line limit is what it has to fit inside.
+FIELD_INDENT = 4
+LINE_LIMIT = 120
+
+
+def _field(name: str, py_type: str) -> str:
+    """A field declaration, wrapped when a union runs past the line limit.
+
+    `autopep8` splits a long line only inside brackets, and a union written `A | B` has none, so
+    the break is put in here and the union parenthesized to hold it.
+    """
+    line = f'{name}: {py_type}'
+    if FIELD_INDENT + len(line) <= LINE_LIMIT or ' | ' not in py_type:
+        return line
+    opening = f'{name}: ('
+    body = textwrap.wrap(py_type + ')', width=LINE_LIMIT - FIELD_INDENT,
+                         initial_indent=' ' * len(opening), subsequent_indent=' ' * len(opening),
+                         break_long_words=False, break_on_hyphens=False)
+    return opening + body[0].lstrip() + ''.join('\n' + ' ' * FIELD_INDENT + b for b in body[1:])
 
 
 class BindingFileType(Enum):
@@ -29,7 +46,7 @@ class BindingFileType(Enum):
     PycbcCore = '_core'
     BindingCppTypes = 'binding_cpp_types'
     BindingMapTypes = 'binding_map_types'
-    OperationTypes = 'operation_types'
+    ClassicBindings = 'classic_bindings'
     BindingMap = 'binding_map'
     PycbcDictKeysHxx = 'pycbc_dict_keys_hxx'
     PycbcDictKeysCxx = 'pycbc_dict_keys_cxx'
@@ -81,6 +98,7 @@ class BindingGenerator:
         self._jinja_env.filters['is_kv_type'] = lambda header: any(
             header.startswith(p) for p in _KV_TYPE_HEADER_PREFIXES
         )
+        self._jinja_env.filters['field'] = _field
 
     @staticmethod
     def load_binding_schema_yaml(schema_file: Path) -> BindingConfigSchema:
@@ -92,7 +110,7 @@ class BindingGenerator:
 
         return schema
 
-    def _get_kv_binding_fields(self) -> List[Dict[str, Any]]:
+    def _get_kv_binding_fields(self) -> list[dict[str, Any]]:
         field_map: dict[str, dict[str, Any]] = {}
         for op in self._binding_builder.kv_ops:
             for f in op.request_fields:
@@ -116,7 +134,7 @@ class BindingGenerator:
             kv_binding_fields.append(field_map[py_name])
         return kv_binding_fields
 
-    def _build_operations_context(self) -> Dict[str, Any]:
+    def _build_operations_context(self) -> dict[str, Any]:
         kv_ops = []
         for op in self._binding_builder.kv_ops:
             new_op = {
@@ -184,7 +202,7 @@ class BindingGenerator:
             'kv_binding_fields': self._get_kv_binding_fields()
         }
 
-    def _build_operations_context_simple(self) -> Dict[str, Any]:
+    def _build_operations_context_simple(self) -> dict[str, Any]:
         kv_ops = []
         for op in self._binding_builder.kv_ops:
             kv_ops.append({
@@ -197,13 +215,6 @@ class BindingGenerator:
             kv_multi_ops.append({
                 'name': op.name,
                 'pretty_name': op.pretty_name,
-            })
-
-        streaming_ops = []
-        for op in self._binding_builder.streaming_ops:
-            streaming_ops.append({
-                'name': op.streaming_op_name,
-                'pretty_name': self._binding_builder.get_pretty_name(op.streaming_op_name),
             })
 
         mgmt_groups = []
@@ -224,7 +235,6 @@ class BindingGenerator:
         return {
             'key_value_operations': sorted(kv_ops, key=lambda o: o['pretty_name']),
             'key_value_multi_operations': sorted(kv_multi_ops, key=lambda o: o['pretty_name']),
-            'streaming_operations': sorted(streaming_ops, key=lambda o: o['pretty_name']),
             'mgmt_groups': sorted(mgmt_groups, key=lambda g: g['pretty_name'])
         }
 
@@ -241,17 +251,17 @@ class BindingGenerator:
         return output_dir / file_output['filename']
 
     @property
-    def output_files(self) -> List[Path]:
+    def output_files(self) -> list[Path]:
         """Every file this generator is configured to produce."""
         return [self._get_output_file(bft) for bft in BindingFileType]
 
-    def _get_rendered_content(self, template_name: str, context: Dict[str, Any]) -> str:
+    def _get_rendered_content(self, template_name: str, context: dict[str, Any]) -> str:
         template = self._jinja_env.get_template(template_name)
         return template.render(**context)
 
     def _get_section_pattern(self,
                              section_pattern: str,
-                             comment_style: Optional[str] = None) -> Pattern[str]:
+                             comment_style: str | None = None) -> Pattern[str]:
         # Escaping spaces just in case
         pattern_esc = re.escape(section_pattern)
 
@@ -271,8 +281,8 @@ class BindingGenerator:
                                section_pattern: str,
                                timestamp: str,
                                checksum: str,
-                               num_equals: Optional[int] = None,
-                               comment_style: Optional[str] = None) -> Tuple[str, str]:
+                               num_equals: int | None = None,
+                               comment_style: str | None = None) -> tuple[str, str]:
         if comment_style is None:
             comment_style = '#'
 
@@ -299,7 +309,7 @@ class BindingGenerator:
 
     def _get_template(self,
                       binding_file_type: BindingFileType,
-                      index: Optional[int] = None) -> Union[List[str], str]:
+                      index: int | None = None) -> list[str] | str:
         file_output = next((fo for fo in self._schema['metadata']
                            ['file_outputs'] if fo['name'] == binding_file_type.value), None)
         if file_output is None:
@@ -312,7 +322,7 @@ class BindingGenerator:
 
         return file_output['templates']
 
-    def _process_python_cpp_type_fields(self, ops: List[Dict[str, Any]]) -> None:
+    def _process_python_cpp_type_fields(self, ops: list[dict[str, Any]]) -> None:
         for op in ops:
             ordered_ops = []
             optional_ops = []
@@ -321,14 +331,14 @@ class BindingGenerator:
                 if f['py_name'] == 'from':
                     f['py_name'] = f"{f['py_name']}_"
 
-                if f['py_type'].startswith('Optional'):
+                if f['py_type'].endswith(' | None'):
                     optional_ops.append(f)
                 else:
                     ordered_ops.append(f)
 
             op['fields'] = ordered_ops + optional_ops
 
-    def _process_python_op_fields(self, ops: List[Dict[str, Any]]) -> None:  # noqa: C901
+    def _process_python_op_fields(self, ops: list[dict[str, Any]]) -> None:  # noqa: C901
         for op in ops:
             ordered_ops = []
             optional_ops = []
@@ -338,7 +348,7 @@ class BindingGenerator:
                     # don't normally want _ at the end, but we cannot have names that are Python keywords
                     if f['py_name'] == 'from':
                         f['py_name'] = f"{f['py_name']}_"
-                    if f['py_type'].startswith('Optional'):
+                    if f['py_type'].endswith(' | None'):
                         optional_ops.append(f)
                     else:
                         ordered_ops.append(f)
@@ -347,16 +357,16 @@ class BindingGenerator:
                 for name in {'callback', 'errback'}:
                     optional_ops.append({
                         'py_name': name,
-                        'py_type': 'Optional[Callable[..., None]]'
+                        'py_type': 'Callable[..., None] | None'
                     })
                 # observability params
                 optional_ops.append({
                     'py_name': 'wrapper_span_name',
-                    'py_type': 'Optional[str]'
+                    'py_type': 'str | None'
                 })
                 optional_ops.append({
                     'py_name': 'parent_span',
-                    'py_type': 'Optional[Any]'
+                    'py_type': 'Any | None'
                 })
 
                 op['request_fields'] = ordered_ops + sorted(optional_ops, key=lambda o: o['py_name'])
@@ -367,7 +377,7 @@ class BindingGenerator:
             if response_fields:
                 all_ignored = True
                 for f in response_fields:
-                    if f['py_type'].startswith('Optional'):
+                    if f['py_type'].endswith(' | None'):
                         optional_ops.append(f)
                     else:
                         ordered_ops.append(f)
@@ -384,8 +394,8 @@ class BindingGenerator:
                             new_content: str,
                             start_marker: str,
                             end_marker: str,
-                            comment_style: Optional[str] = None,
-                            use_rstrip: Optional[bool] = None) -> None:
+                            comment_style: str | None = None,
+                            use_rstrip: bool | None = None) -> None:
         if not output_file.exists():
             raise RuntimeError(f'Output file not found: {output_file}')
 
@@ -591,16 +601,19 @@ class BindingGenerator:
                                  end_marker,
                                  use_rstrip=True)
 
-    def generate_operation_types_template(self) -> None:
+    def generate_classic_bindings_template(self) -> None:
         context = self._build_operations_context_simple()
-        template_name = self._get_template(BindingFileType.OperationTypes)
+        # A binding with no `Op` row is called by its binding member rather than looked up by an
+        # operation, so `KV_OPCODE` holds only the bindings an operation names.
+        context['op_names'] = {row.name for row in operations.load(self._output_root).rows}
+        template_name = self._get_template(BindingFileType.ClassicBindings)
         code = self._get_rendered_content(template_name, context)
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         checksum = hashlib.md5(code.encode('utf-8')).hexdigest()
 
         section_pattern = 'SECTION'
         start_marker, end_marker = self._get_start_end_markers(section_pattern, timestamp, checksum)
-        output_file = self._get_output_file(BindingFileType.OperationTypes)
+        output_file = self._get_output_file(BindingFileType.ClassicBindings)
         self._substitute_content(output_file,
                                  section_pattern,
                                  code,
@@ -711,7 +724,7 @@ class BindingGenerator:
         self.generate_pycbc_connection_template()
         self.generate_binding_cpp_types_template()
         self.generate_pycbc_core_pyi_template()
-        self.generate_operation_types_template()
+        self.generate_classic_bindings_template()
         self.generate_binding_map_types_template()
         self.generate_binding_map_template()
         self.generate_pycbc_dict_keys_template()

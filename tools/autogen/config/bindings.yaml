@@ -30,10 +30,10 @@ metadata:
       filename: binding_map_types.py
       templates: binding_map_types.py.jinja2
       output_path: "couchbase/protocol/classic/_pycbc_core"
-    - name: operation_types
-      filename: operation_types.py
-      templates: operation_types.py.jinja2
-      output_path: "couchbase/logic"
+    - name: classic_bindings
+      filename: _bindings.py
+      templates: classic_bindings.py.jinja2
+      output_path: "couchbase/protocol/classic"
     - name: binding_map
       filename: _binding_map.py
       templates: binding_map.py.jinja2
@@ -121,6 +121,8 @@ key_value:
     - document_touch.hxx
     - document_unlock.hxx
   operation_overrides:
+    - op_name: get_and_touch
+      has_multi: false
     - op_name: get_all_replicas
       is_streaming_op: true
       response:
@@ -206,7 +208,6 @@ management:
     ignored_cpp_request_fields: [retries]
     operation_headers:
       - collection_create.hxx
-      - collections_manifest_get.hxx
       - collection_drop.hxx
       - collection_update.hxx
       - scope_create.hxx

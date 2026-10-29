@@ -1,43 +1,32 @@
 # ==========================================================================================
 # Key-Value Operations
 # ==========================================================================================
-class KeyValueOperationCode(IntEnum):
+class KeyValueBinding(IntEnum):
     {% for op in key_value_operations -%}
     {{op.pretty_name}} = {{loop.index0}}
     {% endfor %}
 
-class KeyValueOperationType(Enum):
-    {% for op in key_value_operations -%}
-    {{op.pretty_name}} = '{{op.name}}'
-    {% endfor %}
 # ==========================================================================================
 # Key-Value Multi Operations
 # ==========================================================================================
-class KeyValueMultiOperationCode(IntEnum):
+class KeyValueMultiBinding(IntEnum):
     {% for op in key_value_multi_operations -%}
     {{op.pretty_name}}Multi = {{loop.index0 + key_value_operations|length}}
     {% endfor %}
 
-    def get_single_op_code(self) -> KeyValueOperationCode:
-        # Subtract the offset ({{key_value_operations|length}}) and cast to KeyValueOperationCode
-        return KeyValueOperationCode(self.value - {{key_value_operations|length}})
-
-class KeyValueMultiOperationType(Enum):
-    {% for op in key_value_multi_operations -%}
-    {{op.pretty_name}}Multi = '{{op.name}}_multi'
-    {% endfor %}
-# ==========================================================================================
-# Streaming Operations
-# ==========================================================================================
-class StreamingOperationType(Enum):
-    {% for op in streaming_operations -%}
-    {{op.pretty_name}} = '{{op.name}}'
-    {% endfor %}
+KV_OPCODE: Final[dict[tuple[Op, bool], KeyValueBinding | KeyValueMultiBinding]] = {
+    {% for op in key_value_operations if op.pretty_name|replace('WithLegacyDurability', '') in op_names -%}
+    (Op.{{op.pretty_name|replace('WithLegacyDurability', '')}}, {{'WithLegacyDurability' in op.pretty_name}}): KeyValueBinding.{{op.pretty_name}},
+    {% endfor -%}
+    {% for op in key_value_multi_operations if op.pretty_name|replace('WithLegacyDurability', '') ~ 'Multi' in op_names -%}
+    (Op.{{op.pretty_name|replace('WithLegacyDurability', '')}}Multi, {{'WithLegacyDurability' in op.pretty_name}}): KeyValueMultiBinding.{{op.pretty_name}}Multi,
+    {% endfor -%}
+}
 {% for mgmt_group in mgmt_groups %}
 # ==========================================================================================
 # {{mgmt_group.pretty_name}} Management Operations
 # ==========================================================================================
-class {{mgmt_group.pretty_name}}MgmtOperationType(Enum):
+class {{mgmt_group.pretty_name}}MgmtBinding(Enum):
     {% for op in mgmt_group.operations -%}
     {{op.pretty_name}} = '{{op.name}}'
     {% endfor %}

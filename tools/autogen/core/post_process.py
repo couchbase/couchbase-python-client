@@ -12,9 +12,6 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import (List,
-                    Optional,
-                    Tuple)
 
 # Generated-On changes every run and Content-Hash is derived from the body, so neither line
 # says anything about whether the generated output actually changed.
@@ -25,7 +22,7 @@ def strip_run_metadata(content: str) -> str:
     return RUN_METADATA_RE.sub('', content)
 
 
-def run_pre_commit(paths: List[Path], repo_root: Path) -> Tuple[bool, str]:
+def run_pre_commit(paths: list[Path], repo_root: Path) -> tuple[bool, str]:
     """Run the repo's pre-commit fixers over ``paths`` only.
 
     Returns (ran, output).  Scoped with --files so unrelated files are never touched and
@@ -50,7 +47,7 @@ def run_pre_commit(paths: List[Path], repo_root: Path) -> Tuple[bool, str]:
     return True, output
 
 
-def _git_head_content(path: Path, repo_root: Path) -> Optional[str]:
+def _git_head_content(path: Path, repo_root: Path) -> str | None:
     rel_path = path.relative_to(repo_root)
     completed = subprocess.run(['git', 'show', f'HEAD:{rel_path}'],
                                cwd=repo_root,
@@ -62,7 +59,7 @@ def _git_head_content(path: Path, repo_root: Path) -> Optional[str]:
     return completed.stdout
 
 
-def restore_unchanged(paths: List[Path], repo_root: Path) -> Tuple[List[Path], List[Path]]:
+def restore_unchanged(paths: list[Path], repo_root: Path) -> tuple[list[Path], list[Path]]:
     """Restore generated files whose only delta against HEAD is the run metadata.
 
     This is safe by construction: a file is only restored when its content is byte-identical

@@ -9,11 +9,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import (Any,
-                    Dict,
-                    List,
-                    Optional,
-                    Tuple)
+from typing import Any
 
 from tools.autogen.core.binding_builder import BindingBuilder
 from tools.autogen.core.cpp_type_parser import CXX_CLIENT_ROOT
@@ -27,7 +23,7 @@ def _definition_pattern(leaf_name: str) -> re.Pattern:
     return re.compile(rf'^\s*(?:struct|class)\s+{re.escape(leaf_name)}\s*(?:final\s*)?[:{{]', re.MULTILINE)
 
 
-def find_headers_for_struct(struct_name: str) -> List[str]:
+def find_headers_for_struct(struct_name: str) -> list[str]:
     """Return C++ client relative header paths that *define* ``struct_name``."""
     leaf_name = struct_name.split('::')[-1]
     pattern = _definition_pattern(leaf_name)
@@ -53,14 +49,14 @@ def find_headers_for_struct(struct_name: str) -> List[str]:
     return sorted(matches)
 
 
-def _matches_filter(struct_name: str, type_filters: List[str]) -> bool:
+def _matches_filter(struct_name: str, type_filters: list[str]) -> bool:
     if not type_filters:
         return True
     leaf_name = struct_name.split('::')[-1]
     return any(tf == struct_name or tf == leaf_name or tf in struct_name for tf in type_filters)
 
 
-def _describe_field(builder: BindingBuilder, field: Dict[str, Any]) -> Dict[str, str]:
+def _describe_field(builder: BindingBuilder, field: dict[str, Any]) -> dict[str, str]:
     described = {'cpp_name': field['name'], 'canonical': field['cpp_type'].get('name', '')}
     # A resolution failure here is itself the interesting signal, so report it rather than raise.
     for key, resolve in (('cpp_type', builder.get_cpp_type), ('py_type', builder.get_py_type)):
@@ -72,9 +68,9 @@ def _describe_field(builder: BindingBuilder, field: Dict[str, Any]) -> Dict[str,
 
 
 def inspect_types(builder: BindingBuilder,
-                  headers: List[str],
-                  type_filters: List[str],
-                  resolve_types: Optional[bool] = True) -> Tuple[List[Dict[str, Any]], List[str]]:
+                  headers: list[str],
+                  type_filters: list[str],
+                  resolve_types: bool | None = True) -> tuple[list[dict[str, Any]], list[str]]:
     """Parse ``headers`` and return (records, unresolved) for structs matching ``type_filters``.
 
     When no headers are given, the defining header for each type filter is located by scanning

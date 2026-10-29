@@ -49,7 +49,14 @@ add_constants(PyObject* module)
   if (PyModule_AddIntConstant(module, "FMT_LEGACY_MASK", PYCBC_FMT_LEGACY_MASK) < 0) {
     return -1;
   }
-  if (PyModule_AddIntConstant(module, "FMT_COMMON_MASK", PYCBC_FMT_COMMON_MASK) < 0) {
+  // 0xFF000000 does not fit the C long PyModule_AddIntConstant takes on Windows.
+  PyObject* common_mask = PyLong_FromUnsignedLong(PYCBC_FMT_COMMON_MASK);
+  if (common_mask == nullptr) {
+    return -1;
+  }
+  int add_rc = PyModule_AddObjectRef(module, "FMT_COMMON_MASK", common_mask);
+  Py_DECREF(common_mask);
+  if (add_rc < 0) {
     return -1;
   }
 

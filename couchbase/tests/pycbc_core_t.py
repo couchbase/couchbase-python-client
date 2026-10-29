@@ -27,6 +27,10 @@ import pytest
 
 import couchbase
 from couchbase.protocol.classic._pycbc_core import _core
+from tests.test_features import TestProtocol
+
+# What is checked here is classic's binding itself.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 
 class _CoreType(NamedTuple):
@@ -192,3 +196,15 @@ class PycbcCoreTypeUnitTests:
             assert subclassable is core_type.subclassable, (f'{core_type.name} subclassable='
                                                             f'{subclassable}, table says '
                                                             f'{core_type.subclassable}.')
+
+
+class PycbcCoreConstantUnitTests:
+
+    # couchbase.common.constants writes the flags out so it imports without `_core`; the core
+    # encodes and decodes with its own copy, and the two must agree on every name either side
+    # defines.
+    def test_format_flags_match_the_core(self) -> None:
+        from couchbase import constants
+        core_flags = {name: value for name, value in vars(_core).items() if name.startswith('FMT_')}
+        sdk_flags = {name: value for name, value in vars(constants).items() if name.startswith('FMT_')}
+        assert sdk_flags == core_flags

@@ -16,13 +16,13 @@
     {% for op in key_value_multi_operations %}
     {% if op.is_streaming_op -%}
     def pycbc_{{op.name}}_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, pycbc_streamed_result[Any]]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, pycbc_streamed_result[Any]]]:
         ...
     {% else -%}
     def pycbc_{{op.name}}_multi(
-        self, request_list: List[pycbc_kv_request]
-    ) -> pycbc_result[Dict[str, CppTypes.{{op.response}}]]:
+        self, request_list: list[pycbc_kv_request]
+    ) -> pycbc_result[dict[str, CppTypes.{{op.response}}]]:
         ...
     {% endif -%}
     {% endfor %}
