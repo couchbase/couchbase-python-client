@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import sys
 import textwrap
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from rich import box
 from rich.console import Console, RenderableType

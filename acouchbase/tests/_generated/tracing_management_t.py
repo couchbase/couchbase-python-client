@@ -32,6 +32,7 @@ from acouchbase.management.collections import UpdateCollectionSettings
 from acouchbase.management.search import SearchIndex
 from acouchbase.management.users import Role, User
 from acouchbase.management.views import DesignDocumentNamespace
+from couchbase.common._operations import Op
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   BucketNotFlushableException,
@@ -43,7 +44,6 @@ from couchbase.exceptions import (BucketAlreadyExistsException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException,
                                   SearchIndexNotFoundException)
-from couchbase.logic.observability import OpName
 from couchbase.management.options import CreateQueryIndexOptions, WatchQueryIndexOptions
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
@@ -158,43 +158,43 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
         settings = CreateBucketSettings(name=bucket_name, ram_quota_mb=100, flush_enabled=False)
 
         await bm.create_bucket(settings)
-        http_validator.validate_http_op(OpName.BucketCreate, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketCreate, bucket_name=bucket_name)
         cb_env.consistency.wait_until_bucket_present(bucket_name)
 
         http_validator.reset()
         await bm.get_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketGet, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketGet, bucket_name=bucket_name)
 
         http_validator.reset()
         await bm.get_all_buckets()
         # No bucket name: the operation is about every bucket, so there is not one to carry.
-        http_validator.validate_http_op(OpName.BucketGetAll)
+        http_validator.validate_http_op(Op.BucketGetAll)
 
         http_validator.reset()
         with pytest.raises(BucketAlreadyExistsException):
             await bm.create_bucket(settings)
-        http_validator.validate_http_op(OpName.BucketCreate, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketCreate, validate_error=True, bucket_name=bucket_name)
 
         # The bucket was created with flush disabled, so this is refused by the server.
         http_validator.reset()
         with pytest.raises(BucketNotFlushableException):
             await bm.flush_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketFlush, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketFlush, validate_error=True, bucket_name=bucket_name)
 
         http_validator.reset()
         await bm.drop_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketDrop, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketDrop, bucket_name=bucket_name)
         cb_env.consistency.wait_until_bucket_dropped(bucket_name)
 
         http_validator.reset()
         with pytest.raises(BucketDoesNotExistException):
             await bm.drop_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketDrop, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketDrop, validate_error=True, bucket_name=bucket_name)
 
         http_validator.reset()
         with pytest.raises(BucketDoesNotExistException):
             await bm.get_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketGet, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketGet, validate_error=True, bucket_name=bucket_name)
 
     # ------------------------------------------------------------------
     # Refused by the client, and still traced
@@ -215,7 +215,7 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
         bm = cb_env.get_manager(AsyncTestEnvironmentBucketManager)
         with pytest.raises((InvalidArgumentException, KeyError)):
             await bm.create_bucket(self._nameless_settings(cb_env))
-        http_validator.validate_http_op(OpName.BucketCreate, validate_error=True, error_before_dispatch=True)
+        http_validator.validate_http_op(Op.BucketCreate, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_bucket_update_invalid_settings(self,
@@ -224,7 +224,7 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
         bm = cb_env.get_manager(AsyncTestEnvironmentBucketManager)
         with pytest.raises((InvalidArgumentException, KeyError)):
             await bm.update_bucket(self._nameless_settings(cb_env))
-        http_validator.validate_http_op(OpName.BucketUpdate, validate_error=True, error_before_dispatch=True)
+        http_validator.validate_http_op(Op.BucketUpdate, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_bucket_describe_invalid_name(self,
@@ -233,7 +233,7 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
         bm = cb_env.get_manager(AsyncTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             await bm.bucket_describe(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketDescribe, validate_error=True, error_before_dispatch=True)
+        http_validator.validate_http_op(Op.BucketDescribe, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_bucket_drop_invalid_name(self,
@@ -242,7 +242,7 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
         bm = cb_env.get_manager(AsyncTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             await bm.drop_bucket(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketDrop, validate_error=True, error_before_dispatch=True)
+        http_validator.validate_http_op(Op.BucketDrop, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_bucket_flush_invalid_name(self,
@@ -251,7 +251,7 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
         bm = cb_env.get_manager(AsyncTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             await bm.flush_bucket(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketFlush, validate_error=True, error_before_dispatch=True)
+        http_validator.validate_http_op(Op.BucketFlush, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_bucket_get_invalid_name(self,
@@ -260,7 +260,7 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
         bm = cb_env.get_manager(AsyncTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             await bm.get_bucket(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketGet, validate_error=True, error_before_dispatch=True)
+        http_validator.validate_http_op(Op.BucketGet, validate_error=True, error_before_dispatch=True)
 
     # ------------------------------------------------------------------
     # Handed a parent span
@@ -271,9 +271,9 @@ class BucketManagementTracingTestSuite(ManagementTracingSuiteBase):
                                               cb_env: AsyncTestEnvironment,
                                               http_validator: HttpSpanValidator) -> None:
         bm = cb_env.get_manager(AsyncTestEnvironmentBucketManager)
-        parent = http_validator.new_parent_span(OpName.BucketGetAll)
+        parent = http_validator.new_parent_span(Op.BucketGetAll)
         await bm.get_all_buckets(parent_span=parent)
-        http_validator.validate_http_op(OpName.BucketGetAll, parent_span=parent)
+        http_validator.validate_http_op(Op.BucketGetAll, parent_span=parent)
 
 
 class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
@@ -303,7 +303,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         collection_name = mgr.get_collection_name()
 
         await mgr.create_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeCreate,
+        http_validator.validate_http_op(Op.ScopeCreate,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
         cb_env.consistency.wait_until_scope_present(bucket_name, scope_name)
@@ -311,19 +311,19 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         http_validator.reset()
         await mgr.get_all_scopes()
         # The bucket and nothing below it: the operation is about every scope on it.
-        http_validator.validate_http_op(OpName.ScopeGetAll, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.ScopeGetAll, bucket_name=bucket_name)
 
         http_validator.reset()
         with pytest.raises(ScopeAlreadyExistsException):
             await mgr.create_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeCreate,
+        http_validator.validate_http_op(Op.ScopeCreate,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
 
         http_validator.reset()
         await mgr.create_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionCreate,
+        http_validator.validate_http_op(Op.CollectionCreate,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
                                         collection_name=collection_name)
@@ -332,7 +332,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         http_validator.reset()
         with pytest.raises(CollectionAlreadyExistsException):
             await mgr.create_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionCreate,
+        http_validator.validate_http_op(Op.CollectionCreate,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
@@ -340,7 +340,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
 
         http_validator.reset()
         await mgr.drop_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionDrop,
+        http_validator.validate_http_op(Op.CollectionDrop,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
                                         collection_name=collection_name)
@@ -348,7 +348,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
 
         http_validator.reset()
         await mgr.drop_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeDrop,
+        http_validator.validate_http_op(Op.ScopeDrop,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
         cb_env.consistency.wait_until_scope_dropped(bucket_name, scope_name)
@@ -356,7 +356,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         http_validator.reset()
         with pytest.raises((CollectionNotFoundException, ScopeNotFoundException)):
             await mgr.drop_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionDrop,
+        http_validator.validate_http_op(Op.CollectionDrop,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
@@ -365,7 +365,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         http_validator.reset()
         with pytest.raises(ScopeNotFoundException):
             await mgr.drop_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeDrop,
+        http_validator.validate_http_op(Op.ScopeDrop,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
@@ -384,7 +384,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         mgr = cb_env.get_manager(AsyncTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             await mgr.create_scope(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.ScopeCreate,
+        http_validator.validate_http_op(Op.ScopeCreate,
                                         validate_error=True,
                                         error_before_dispatch=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
@@ -396,7 +396,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         mgr = cb_env.get_manager(AsyncTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             await mgr.drop_scope(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.ScopeDrop,
+        http_validator.validate_http_op(Op.ScopeDrop,
                                         validate_error=True,
                                         error_before_dispatch=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
@@ -408,7 +408,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         mgr = cb_env.get_manager(AsyncTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             await mgr.create_collection(EMPTY_NAME, EMPTY_NAME)
-        http_validator.validate_http_op(OpName.CollectionCreate,
+        http_validator.validate_http_op(Op.CollectionCreate,
                                         validate_error=True,
                                         error_before_dispatch=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
@@ -420,7 +420,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         mgr = cb_env.get_manager(AsyncTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             await mgr.drop_collection(EMPTY_NAME, EMPTY_NAME)
-        http_validator.validate_http_op(OpName.CollectionDrop,
+        http_validator.validate_http_op(Op.CollectionDrop,
                                         validate_error=True,
                                         error_before_dispatch=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
@@ -432,7 +432,7 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
         mgr = cb_env.get_manager(AsyncTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             await mgr.update_collection(EMPTY_NAME, EMPTY_NAME, UpdateCollectionSettings())
-        http_validator.validate_http_op(OpName.CollectionUpdate,
+        http_validator.validate_http_op(Op.CollectionUpdate,
                                         validate_error=True,
                                         error_before_dispatch=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
@@ -446,9 +446,9 @@ class CollectionManagementTracingTestSuite(ManagementTracingSuiteBase):
                                              cb_env: AsyncTestEnvironment,
                                              http_validator: HttpSpanValidator) -> None:
         mgr = cb_env.get_manager(AsyncTestEnvironmentCollectionMgmtManager)
-        parent = http_validator.new_parent_span(OpName.ScopeGetAll)
+        parent = http_validator.new_parent_span(Op.ScopeGetAll)
         await mgr.get_all_scopes(parent_span=parent)
-        http_validator.validate_http_op(OpName.ScopeGetAll,
+        http_validator.validate_http_op(Op.ScopeGetAll,
                                         parent_span=parent,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
 
@@ -486,17 +486,17 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         bucket_name = cb_env.bucket.name
 
         await qixm.create_primary_index(bucket_name, deferred=True)
-        http_validator.validate_http_op(OpName.QueryIndexCreate)
+        http_validator.validate_http_op(Op.QueryIndexCreate)
 
         http_validator.reset()
         indexes = await qixm.get_all_indexes(bucket_name)
         assert len(indexes) == 1
-        http_validator.validate_http_op(OpName.QueryIndexGetAll)
+        http_validator.validate_http_op(Op.QueryIndexGetAll)
 
         http_validator.reset()
         with pytest.raises(QueryIndexAlreadyExistsException):
             await qixm.create_primary_index(bucket_name, deferred=True)
-        http_validator.validate_http_op(OpName.QueryIndexCreate,
+        http_validator.validate_http_op(Op.QueryIndexCreate,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -506,19 +506,19 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
                                     f'ix{n}',
                                     [f'fld{n}'],
                                     CreateQueryIndexOptions(deferred=True))
-            http_validator.validate_http_op(OpName.QueryIndexCreate)
+            http_validator.validate_http_op(Op.QueryIndexCreate)
 
         http_validator.reset()
         indexes = await qixm.get_all_indexes(bucket_name)
         assert len(indexes) == self.NUM_SECONDARY_INDEXES + 1
-        http_validator.validate_http_op(OpName.QueryIndexGetAll)
+        http_validator.validate_http_op(Op.QueryIndexGetAll)
 
         index_names = [i.name for i in indexes]
 
         http_validator.reset()
         with pytest.raises(QueryIndexAlreadyExistsException):
             await qixm.create_index(bucket_name, index_names[0], ['fld0'], CreateQueryIndexOptions(deferred=True))
-        http_validator.validate_http_op(OpName.QueryIndexCreate,
+        http_validator.validate_http_op(Op.QueryIndexCreate,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -534,8 +534,8 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         # that step is still checked where this one is broken.
         build_deferred_failure: AssertionError | None = None
         try:
-            http_validator.validate_http_op(OpName.QueryIndexBuildDeferred,
-                                            nested_ops=[OpName.QueryIndexGetAllDeferred])
+            http_validator.validate_http_op(Op.QueryIndexBuildDeferred,
+                                            nested_ops=[Op.QueryIndexGetAllDeferred])
         except AssertionError as ex:
             build_deferred_failure = ex
 
@@ -543,8 +543,8 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         await qixm.watch_indexes(bucket_name, index_names, WatchQueryIndexOptions(timeout=self.WATCH_TIMEOUT))
         # watch_indexes polls with get_all_indexes, and the poll is a span underneath the
         # watch's own rather than a span in its place.
-        http_validator.validate_http_op(OpName.QueryIndexWatchIndexes,
-                                        nested_ops=[OpName.QueryIndexGetAll])
+        http_validator.validate_http_op(Op.QueryIndexWatchIndexes,
+                                        nested_ops=[Op.QueryIndexGetAll])
 
         if build_deferred_failure is not None:
             pytest.xfail(f'CXXCBC-1053: build_deferred_indexes span tree. {build_deferred_failure}')
@@ -560,7 +560,7 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             await qixm.create_index(EMPTY_NAME, EMPTY_NAME, ['key1'])
-        http_validator.validate_http_op(OpName.QueryIndexCreate,
+        http_validator.validate_http_op(Op.QueryIndexCreate,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -571,7 +571,7 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             await qixm.create_primary_index(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexCreate,
+        http_validator.validate_http_op(Op.QueryIndexCreate,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -582,7 +582,7 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             await qixm.drop_index(EMPTY_NAME, EMPTY_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexDrop,
+        http_validator.validate_http_op(Op.QueryIndexDrop,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -593,7 +593,7 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             await qixm.drop_primary_index(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexDrop,
+        http_validator.validate_http_op(Op.QueryIndexDrop,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -604,7 +604,7 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             await qixm.get_all_indexes(NO_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexGetAll,
+        http_validator.validate_http_op(Op.QueryIndexGetAll,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -615,7 +615,7 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             await qixm.build_deferred_indexes(NO_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexBuildDeferred,
+        http_validator.validate_http_op(Op.QueryIndexBuildDeferred,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -626,7 +626,7 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             await qixm.watch_indexes(EMPTY_NAME, [])
-        http_validator.validate_http_op(OpName.QueryIndexWatchIndexes,
+        http_validator.validate_http_op(Op.QueryIndexWatchIndexes,
                                         validate_error=True,
                                         error_before_dispatch=True)
 
@@ -639,9 +639,9 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
                                                    cb_env: AsyncTestEnvironment,
                                                    http_validator: HttpSpanValidator) -> None:
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
-        parent = http_validator.new_parent_span(OpName.QueryIndexGetAll)
+        parent = http_validator.new_parent_span(Op.QueryIndexGetAll)
         await qixm.get_all_indexes(cb_env.bucket.name, parent_span=parent)
-        http_validator.validate_http_op(OpName.QueryIndexGetAll, parent_span=parent)
+        http_validator.validate_http_op(Op.QueryIndexGetAll, parent_span=parent)
 
 
 class AnalyticsManagementTracingTestSuite(ManagementTracingSuiteBase):
@@ -660,7 +660,7 @@ class AnalyticsManagementTracingTestSuite(ManagementTracingSuiteBase):
         # reaches the analytics service and is labelled with it.
         aixm = cb_env.get_manager(AsyncTestEnvironmentAnalyticsIndexManager)
         await aixm.get_all_datasets()
-        http_validator.validate_http_op(OpName.AnalyticsDatasetGetAll)
+        http_validator.validate_http_op(Op.AnalyticsDatasetGetAll)
 
     # ------------------------------------------------------------------
     # Handed a parent span
@@ -671,9 +671,9 @@ class AnalyticsManagementTracingTestSuite(ManagementTracingSuiteBase):
                                                           cb_env: AsyncTestEnvironment,
                                                           http_validator: HttpSpanValidator) -> None:
         aixm = cb_env.get_manager(AsyncTestEnvironmentAnalyticsIndexManager)
-        parent = http_validator.new_parent_span(OpName.AnalyticsDatasetGetAll)
+        parent = http_validator.new_parent_span(Op.AnalyticsDatasetGetAll)
         await aixm.get_all_datasets(parent_span=parent)
-        http_validator.validate_http_op(OpName.AnalyticsDatasetGetAll, parent_span=parent)
+        http_validator.validate_http_op(Op.AnalyticsDatasetGetAll, parent_span=parent)
 
 
 # Excluded from txcouchbase: there is no Twisted eventing function manager in the test
@@ -695,7 +695,7 @@ class EventingManagementTracingTestSuite(ManagementTracingSuiteBase):
         # The one eventing operation that needs no function deployed first.
         efm = cb_env.get_manager(AsyncTestEnvironmentEventingFunctionManager)
         await efm.get_all_functions()
-        http_validator.validate_http_op(OpName.EventingGetAllFunctions)
+        http_validator.validate_http_op(Op.EventingGetAllFunctions)
 
     # ------------------------------------------------------------------
     # Handed a parent span
@@ -706,9 +706,9 @@ class EventingManagementTracingTestSuite(ManagementTracingSuiteBase):
                                                           cb_env: AsyncTestEnvironment,
                                                           http_validator: HttpSpanValidator) -> None:
         efm = cb_env.get_manager(AsyncTestEnvironmentEventingFunctionManager)
-        parent = http_validator.new_parent_span(OpName.EventingGetAllFunctions)
+        parent = http_validator.new_parent_span(Op.EventingGetAllFunctions)
         await efm.get_all_functions(parent_span=parent)
-        http_validator.validate_http_op(OpName.EventingGetAllFunctions, parent_span=parent)
+        http_validator.validate_http_op(Op.EventingGetAllFunctions, parent_span=parent)
 
 
 class SearchIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
@@ -726,7 +726,7 @@ class SearchIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         index = SearchIndex(name=search_index_name(), source_name=cb_env.bucket.name)
 
         await sixm.upsert_index(index)
-        http_validator.validate_http_op(OpName.SearchIndexUpsert)
+        http_validator.validate_http_op(Op.SearchIndexUpsert)
 
         # The upsert returns before every node holds the definition, so a read sent to another
         # node can still answer index not found.  Wait it out untraced; the traced read is next.
@@ -742,15 +742,15 @@ class SearchIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
             ) from exc
         http_validator.reset()
         await sixm.get_index(index.name)
-        http_validator.validate_http_op(OpName.SearchIndexGet)
+        http_validator.validate_http_op(Op.SearchIndexGet)
 
         http_validator.reset()
         await sixm.get_all_indexes()
-        http_validator.validate_http_op(OpName.SearchIndexGetAll)
+        http_validator.validate_http_op(Op.SearchIndexGetAll)
 
         http_validator.reset()
         await sixm.drop_index(index.name)
-        http_validator.validate_http_op(OpName.SearchIndexDrop)
+        http_validator.validate_http_op(Op.SearchIndexDrop)
 
         # The drop also returns before every node has applied it, so a second drop sent to another
         # node can still find the index and succeed.  Wait until a read misses it, untraced.
@@ -759,7 +759,7 @@ class SearchIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         http_validator.reset()
         with pytest.raises(SearchIndexNotFoundException):
             await sixm.drop_index(index.name)
-        http_validator.validate_http_op(OpName.SearchIndexDrop, validate_error=True)
+        http_validator.validate_http_op(Op.SearchIndexDrop, validate_error=True)
 
     # ------------------------------------------------------------------
     # Handed a parent span
@@ -770,9 +770,9 @@ class SearchIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
                                                     cb_env: AsyncTestEnvironment,
                                                     http_validator: HttpSpanValidator) -> None:
         sixm = cb_env.get_manager(AsyncTestEnvironmentSearchIndexManager)
-        parent = http_validator.new_parent_span(OpName.SearchIndexGetAll)
+        parent = http_validator.new_parent_span(Op.SearchIndexGetAll)
         await sixm.get_all_indexes(parent_span=parent)
-        http_validator.validate_http_op(OpName.SearchIndexGetAll, parent_span=parent)
+        http_validator.validate_http_op(Op.SearchIndexGetAll, parent_span=parent)
 
 
 class UserManagementTracingTestSuite(ManagementTracingSuiteBase):
@@ -790,20 +790,20 @@ class UserManagementTracingTestSuite(ManagementTracingSuiteBase):
         user = User(username=TEST_USERNAME, password='password123!', roles=[Role(name='admin')])
 
         await um.upsert_user(user)
-        http_validator.validate_http_op(OpName.UserUpsert)
+        http_validator.validate_http_op(Op.UserUpsert)
         cb_env.consistency.wait_until_user_present(TEST_USERNAME)
 
         http_validator.reset()
         await um.get_user(TEST_USERNAME)
-        http_validator.validate_http_op(OpName.UserGet)
+        http_validator.validate_http_op(Op.UserGet)
 
         http_validator.reset()
         await um.get_all_users()
-        http_validator.validate_http_op(OpName.UserGetAll)
+        http_validator.validate_http_op(Op.UserGetAll)
 
         http_validator.reset()
         await um.drop_user(TEST_USERNAME)
-        http_validator.validate_http_op(OpName.UserDrop)
+        http_validator.validate_http_op(Op.UserDrop)
         cb_env.consistency.wait_until_user_dropped(TEST_USERNAME)
 
         # The base exception, not UserNotFoundException: the delete endpoint answers "User was
@@ -813,7 +813,7 @@ class UserManagementTracingTestSuite(ManagementTracingSuiteBase):
         http_validator.reset()
         with pytest.raises(CouchbaseException):
             await um.drop_user(TEST_USERNAME)
-        http_validator.validate_http_op(OpName.UserDrop, validate_error=True)
+        http_validator.validate_http_op(Op.UserDrop, validate_error=True)
 
     # ------------------------------------------------------------------
     # Handed a parent span
@@ -824,9 +824,9 @@ class UserManagementTracingTestSuite(ManagementTracingSuiteBase):
                                             cb_env: AsyncTestEnvironment,
                                             http_validator: HttpSpanValidator) -> None:
         um = cb_env.get_manager(AsyncTestEnvironmentUserManager)
-        parent = http_validator.new_parent_span(OpName.UserGetAll)
+        parent = http_validator.new_parent_span(Op.UserGetAll)
         await um.get_all_users(parent_span=parent)
-        http_validator.validate_http_op(OpName.UserGetAll, parent_span=parent)
+        http_validator.validate_http_op(Op.UserGetAll, parent_span=parent)
 
 
 class ViewIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
@@ -844,7 +844,7 @@ class ViewIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         # The bucket and nothing else: a design document belongs to a bucket, not a scope.
         mgr = cb_env.get_manager(AsyncTestEnvironmentViewIndexManager)
         await mgr.get_all_design_documents(DesignDocumentNamespace.PRODUCTION)
-        http_validator.validate_http_op(OpName.ViewIndexGetAll, bucket_name=cb_env.bucket.name)
+        http_validator.validate_http_op(Op.ViewIndexGetAll, bucket_name=cb_env.bucket.name)
 
     # ------------------------------------------------------------------
     # Handed a parent span
@@ -855,9 +855,9 @@ class ViewIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
                                                                    cb_env: AsyncTestEnvironment,
                                                                    http_validator: HttpSpanValidator) -> None:
         mgr = cb_env.get_manager(AsyncTestEnvironmentViewIndexManager)
-        parent = http_validator.new_parent_span(OpName.ViewIndexGetAll)
+        parent = http_validator.new_parent_span(Op.ViewIndexGetAll)
         await mgr.get_all_design_documents(DesignDocumentNamespace.PRODUCTION, parent_span=parent)
-        http_validator.validate_http_op(OpName.ViewIndexGetAll,
+        http_validator.validate_http_op(Op.ViewIndexGetAll,
                                         parent_span=parent,
                                         bucket_name=cb_env.bucket.name)
 

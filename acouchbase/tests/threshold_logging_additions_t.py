@@ -25,13 +25,12 @@ from typing import (Any,
 
 import pytest
 
+from couchbase.common._observability.observability_types import DispatchAttributeName, OpAttributeName
 from couchbase.common._observability.threshold_logging import (ThresholdLoggingReporter,
                                                                ThresholdLoggingSpan,
                                                                ThresholdLoggingTracer)
-from couchbase.logic.observability.observability_types import (DispatchAttributeName,
-                                                               OpAttributeName,
-                                                               ServiceType)
-from couchbase.logic.options import ClusterTracingOptionsBase
+from couchbase.common._operations import ServiceType
+from couchbase.options import ClusterTracingOptions
 from tests.manifest import validate_test_manifest
 from tests.observability_test_impls import RecordingReporter
 
@@ -65,8 +64,8 @@ class AsyncThresholdLoggingTests:
         tracers: list[ThresholdLoggingTracer] = []
 
         def _make(sample_size: int) -> tuple[ThresholdLoggingTracer, RecordingReporter]:
-            config = {'tracing_threshold_kv': KV_THRESHOLD, 'tracing_threshold_queue_size': sample_size}
-            tracer = ThresholdLoggingTracer(cast(ClusterTracingOptionsBase, config))
+            tracer = ThresholdLoggingTracer(ClusterTracingOptions(tracing_threshold_kv=KV_THRESHOLD,
+                                                                  tracing_threshold_queue_size=sample_size))
             tracer._reporter.stop()
             reporter = RecordingReporter()
             tracer._reporter = cast(ThresholdLoggingReporter, reporter)
@@ -116,7 +115,7 @@ class AsyncThresholdLoggingTests:
 
             root.end(end_time=time_ns())
 
-            assert root._total_server_duration_ns == 500
+            assert root._total_server_duration_ns == 500_000
             assert root._span_snapshot is not None
 
         assert len(reporter.records) == iterations

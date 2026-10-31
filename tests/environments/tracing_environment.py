@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 
-from couchbase.logic.observability import CollectionDetails
+from couchbase.common._observability import KeyspaceDetails
 from tests.environments.test_environment import TestEnvironment
 from tests.observability_test_impls import (InertTracer,
                                             LegacyRecordingTracer,
@@ -91,11 +91,9 @@ class TracingEnvironment:
         """The tracer the suite's cluster was actually built with.
 
         Read back off the cluster for the same reason the meter is: a suite that asserted on a
-        tracer the cluster is not using would pass while testing nothing.  `WrappedTracer` is
-        the SDK's own record of which of the two tracer bases it found, so unwrapping it here is
-        reading the SDK's answer rather than repeating the question.
+        tracer the cluster is not using would pass while testing nothing.
         """
-        tracer = cb_env.cluster._impl.observability_instruments.tracer.tracer
+        tracer = cb_env.cluster_view.tracer
         assert isinstance(tracer, (RecordingTracer, LegacyRecordingTracer,
                                    InertTracer, ThresholdRecordingTracer)), (
             f'cluster was not built with a test tracer, found {type(tracer).__name__!r}; the '
@@ -105,10 +103,10 @@ class TracingEnvironment:
         return tracer
 
     @staticmethod
-    def collection_details(cb_env: TestEnvironment) -> CollectionDetails:
-        return CollectionDetails(bucket_name=cb_env.bucket.name,
-                                 scope_name=cb_env.scope.name,
-                                 collection_name=cb_env.collection.name)
+    def collection_details(cb_env: TestEnvironment) -> KeyspaceDetails:
+        return KeyspaceDetails(bucket_name=cb_env.bucket.name,
+                               scope_name=cb_env.scope.name,
+                               collection_name=cb_env.collection.name)
 
     @staticmethod
     def kv_span_validator(cb_env: TestEnvironment) -> KeyValueSpanValidator:

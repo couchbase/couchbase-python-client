@@ -23,7 +23,7 @@ from collections.abc import Generator
 
 import pytest
 
-from couchbase.logic.observability import OpName
+from couchbase.common._operations import Op
 from tests.environments.metrics_environment import MetricsEnvironment
 from tests.environments.test_environment import TestProtocol
 from tests.environments.twisted_environment import (ConnectionStrategy,
@@ -33,6 +33,7 @@ from tests.environments.twisted_environment import (ConnectionStrategy,
                                                     run_in_reactor_thread,
                                                     teardown_twisted_environment)
 from tests.manifest import validate_test_manifest
+from tests.observability_ops import span_name
 from tests.observability_test_impls import LegacyRecordingMeter
 
 
@@ -74,27 +75,27 @@ class LegacyMetricsTestSuite(SuiteRequirements):
     def test_get(self, cb_env: TwistedTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.get, key)
-        assert legacy_meter.measured_op_names() == [OpName.Get.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Get)]
 
     def test_insert(self, cb_env: TwistedTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key, value = cb_env.get_new_doc()
         run_in_reactor_thread(cb_env.collection.insert, key, value)
-        assert legacy_meter.measured_op_names() == [OpName.Insert.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Insert)]
 
     def test_remove(self, cb_env: TwistedTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.remove, key)
-        assert legacy_meter.measured_op_names() == [OpName.Remove.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Remove)]
 
     def test_replace(self, cb_env: TwistedTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key, value = cb_env.get_existing_doc()
         run_in_reactor_thread(cb_env.collection.replace, key, value)
-        assert legacy_meter.measured_op_names() == [OpName.Replace.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Replace)]
 
     def test_upsert(self, cb_env: TwistedTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key, value = cb_env.get_existing_doc()
         run_in_reactor_thread(cb_env.collection.upsert, key, value)
-        assert legacy_meter.measured_op_names() == [OpName.Upsert.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Upsert)]
 
 
 class LegacyMetricsTests(LegacyMetricsTestSuite):

@@ -214,13 +214,11 @@ def _load_async_classes() -> dict[str, Any]:
     from acouchbase.management.search import SearchIndexManager
     from acouchbase.management.users import UserManager
     from acouchbase.management.views import ViewIndexManager
-    from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
     from acouchbase.scope import AsyncScope
     from acouchbase.transactions.transactions import AttemptContext, Transactions
     from tests.environments.async_environment import AsyncTestEnvironment
     return {
         'AsyncCluster': AsyncCluster,
-        'AsyncClusterImpl': AsyncClusterImpl,
         'AsyncBucket': AsyncBucket,
         'AsyncScope': AsyncScope,
         'AsyncCollection': AsyncCollection,
@@ -258,12 +256,11 @@ def _load_async_classes() -> dict[str, Any]:
 
 # Tier 3.  Keyed by (class name, method name); each entry names why static analysis fails.
 OVERRIDES: dict[tuple[str, str], Resolution] = {
-    # acouchbase.cluster.QueryResult is one class serving both APIs.  rows() branches on
-    # isinstance(self._request, AsyncN1QLRequest) and returns __aiter__() or __iter__();
-    # execute() delegates to a request whose execute() returns a Future under async and a
-    # list under sync.  Neither is `async def` and neither carries a return annotation, so
-    # tiers 1 and 2 both answer no.  This is the streaming surface, and it is the entire
-    # reason a hand-maintained table has to exist at all.
+    # The suites name the sync result classes, and acouchbase's are different classes whose
+    # rows() returns an async iterator and whose execute() a coroutine.  Neither is
+    # `async def` and neither carries a return annotation, so tiers 1 and 2 both answer no.
+    # This is the streaming surface, and it is the entire reason a hand-maintained table has
+    # to exist at all.
     ('QueryResult', 'execute'): Resolution(Kind.AWAIT, 'runtime-dispatching result type'),
     ('QueryResult', 'rows'): Resolution(Kind.ASYNC_ITER, 'runtime-dispatching result type'),
     ('SearchResult', 'rows'): Resolution(Kind.ASYNC_ITER, 'runtime-dispatching result type'),
@@ -278,9 +275,9 @@ OVERRIDES: dict[tuple[str, str], Resolution] = {
     # test_range_scan_cancel iterates an async iterator with a plain `for`, and only
     # a real server catches it.  See the assertion under RESULT_TYPES.
     ('ScanResults', 'rows'): Resolution(Kind.ASYNC_ITER, 'runtime-dispatching result type'),
-    # The fifth streaming result type, added with the views suites.  Same runtime dispatch as
-    # the three above: ViewResult.rows() branches on isinstance(self._request, AsyncViewRequest)
-    # and returns __aiter__() or __iter__().  Stated even though the views suites read rows only
+    # The fifth streaming result type, added with the views suites.  The same split as the
+    # three above: acouchbase's AsyncViewResult.rows() returns __aiter__() where the sync
+    # ViewResult returns __iter__().  Stated even though the views suites read rows only
     # through their environment, because RESULT_TYPES below answers SYNC for anything not here
     # and a wrong answer is worse than a reported miss.
     ('ViewResult', 'rows'): Resolution(Kind.ASYNC_ITER, 'runtime-dispatching result type'),
@@ -356,17 +353,6 @@ STATIC_CTOR_TYPES = {
 # Attribute (not call) types.
 ATTR_RETURN_TYPES = {
     ('AsyncCluster', 'transactions'): 'Transactions',
-    # The one private attribute in this model, and it is here because credentials_t reaches
-    # through it twice: `cluster._impl.get_connection_info()` is the only way to see the
-    # credentials the core is holding, and the method is marked **INTERNAL** in both impls.
-    # Without this entry the base resolves to AsyncCluster, `_impl` answers None, and the call
-    # is reported unresolved, which reads INCOMPLETE on a test that is in fact correct: tier 1
-    # answers SYNC for get_connection_info once it can see AsyncClusterImpl, because that impl
-    # declares it a plain `def` over execute_cluster_request_sync.
-    #
-    # cluster_t reaches `cluster._impl.connected`, which is an attribute rather than a call and
-    # so never reached the resolver at all.  This is the first call on an impl.
-    ('AsyncCluster', '_impl'): 'AsyncClusterImpl',
 }
 
 # The sync-only test-infrastructure classes.  Reaching one of these from an async suite is
@@ -514,10 +500,9 @@ NEEDS_ASYNC_OVERRIDE = {
 #
 #   2. The bridging happens in a different place.  Under acouchbase `cluster.query()`
 #      returns a QueryResult immediately and the *rows* are async.  Under txcouchbase
-#      `cluster.query()` returns `Deferred[QueryResult]` and the rows are an ordinary
-#      iterator: QueryResult.rows() branches on `isinstance(self._request,
-#      AsyncN1QLRequest)`, and a TxN1QLRequest is not one, so it returns __iter__().
-#      Nothing about the async transform can be relabelled into this one.
+#      `cluster.query()` returns `Deferred[QueryResult]`, the sync result class, and the
+#      rows are an ordinary iterator.  Nothing about the async transform can be relabelled
+#      into this one.
 
 TX_ENV_ATTR_TYPES = {
     'cluster': 'TxCluster',
@@ -561,23 +546,16 @@ TX_OVERRIDES: dict[tuple[str, str], Resolution] = {
     # about, so leaving these out would give the right answer for the wrong reason, and the
     # assertion below could not tell the difference.  That is exactly how ScanResults.rows()
     # reached a generated file broken on the acouchbase side.
-    ('QueryResult', 'rows'): Resolution(Kind.SYNC, 'TxN1QLRequest is not an AsyncN1QLRequest, '
-                                                   'so rows() returns __iter__()'),
-    ('SearchResult', 'rows'): Resolution(Kind.SYNC, 'same runtime dispatch, sync branch'),
-    ('AnalyticsResult', 'rows'): Resolution(Kind.SYNC, 'same runtime dispatch, sync branch'),
-    ('ViewResult', 'rows'): Resolution(Kind.SYNC, 'same runtime dispatch, sync branch'),
+    ('QueryResult', 'rows'): Resolution(Kind.SYNC, 'the sync QueryResult, so rows() returns __iter__()'),
+    ('SearchResult', 'rows'): Resolution(Kind.SYNC, 'the sync SearchResult, so rows() returns __iter__()'),
+    ('AnalyticsResult', 'rows'): Resolution(Kind.SYNC, 'the sync AnalyticsResult, so rows() returns __iter__()'),
+    ('ViewResult', 'rows'): Resolution(Kind.SYNC, 'the sync ViewResult, so rows() returns __iter__()'),
     # ScanResults has no txcouchbase form at all: TxCollection has no scan() and there is no
     # txcouchbase.kv_range_scan module.  Reaching this is a suite-targeting mistake, so say
     # so rather than answering SYNC.
     ('ScanResults', 'rows'): Resolution(Kind.UNKNOWN, 'txcouchbase has no KV range scan'),
-    # The shared QueryResult.execute() delegates to the request, and txcouchbase's
-    # N1QLRequest has execute_query() and no execute().  A generated call would raise
-    # AttributeError at runtime.  This is the fact that keeps query_t and querymgmt_t off
-    # the txcouchbase target list; the resolver states it so that a suite added to that list
-    # by mistake is reported rather than silently emitted.
-    ('QueryResult', 'execute'): Resolution(Kind.UNKNOWN,
-                                           'txcouchbase N1QLRequest has execute_query(), not '
-                                           'execute(); iterate rows() instead'),
+    # The rows are already in when the Deferred fires, so execute() returns them as a list.
+    ('QueryResult', 'execute'): Resolution(Kind.SYNC, 'the sync QueryResult, so execute() returns a list'),
 }
 
 TX_CALL_RETURN_TYPES = {

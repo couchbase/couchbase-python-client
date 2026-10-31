@@ -24,7 +24,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 
-from couchbase.logic.observability import OpName
+from couchbase.common._operations import Op
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   ConnectionStrategy,
                                                   SuiteRequirements,
@@ -33,6 +33,7 @@ from tests.environments.async_environment import (AsyncTestEnvironment,
 from tests.environments.metrics_environment import MetricsEnvironment
 from tests.environments.test_environment import TestProtocol
 from tests.manifest import validate_test_manifest
+from tests.observability_ops import span_name
 from tests.observability_test_impls import LegacyRecordingMeter
 
 
@@ -75,31 +76,31 @@ class LegacyMetricsTestSuite(SuiteRequirements):
     async def test_get(self, cb_env: AsyncTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.get(key)
-        assert legacy_meter.measured_op_names() == [OpName.Get.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Get)]
 
     @pytest.mark.asyncio
     async def test_insert(self, cb_env: AsyncTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key, value = cb_env.get_new_doc()
         await cb_env.collection.insert(key, value)
-        assert legacy_meter.measured_op_names() == [OpName.Insert.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Insert)]
 
     @pytest.mark.asyncio
     async def test_remove(self, cb_env: AsyncTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.remove(key)
-        assert legacy_meter.measured_op_names() == [OpName.Remove.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Remove)]
 
     @pytest.mark.asyncio
     async def test_replace(self, cb_env: AsyncTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key, value = await cb_env.get_existing_doc()
         await cb_env.collection.replace(key, value)
-        assert legacy_meter.measured_op_names() == [OpName.Replace.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Replace)]
 
     @pytest.mark.asyncio
     async def test_upsert(self, cb_env: AsyncTestEnvironment, legacy_meter: LegacyRecordingMeter) -> None:
         key, value = await cb_env.get_existing_doc()
         await cb_env.collection.upsert(key, value)
-        assert legacy_meter.measured_op_names() == [OpName.Upsert.value]
+        assert legacy_meter.measured_op_names() == [span_name(Op.Upsert)]
 
 
 class LegacyMetricsTests(LegacyMetricsTestSuite):

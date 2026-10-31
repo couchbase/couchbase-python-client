@@ -26,9 +26,9 @@ from typing import Any
 import pytest
 import pytest_asyncio
 
+from couchbase.common._operations import Op
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException
-from couchbase.logic.observability import OpName
 from couchbase.options import (AppendOptions,
                                DecrementOptions,
                                IncrementOptions,
@@ -128,25 +128,25 @@ class BinaryTracingTestSuite(TopologySuite):
     async def test_append(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         await cb_env.collection.binary().append(key, b'XXX')
-        kv_validator.validate_kv_op(OpName.Append)
+        kv_validator.validate_kv_op(Op.Append)
 
     @pytest.mark.asyncio
     async def test_prepend(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         await cb_env.collection.binary().prepend(key, b'XXX')
-        kv_validator.validate_kv_op(OpName.Prepend)
+        kv_validator.validate_kv_op(Op.Prepend)
 
     @pytest.mark.asyncio
     async def test_increment(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         await cb_env.collection.binary().increment(key)
-        kv_validator.validate_kv_op(OpName.Increment)
+        kv_validator.validate_kv_op(Op.Increment)
 
     @pytest.mark.asyncio
     async def test_decrement(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         await cb_env.collection.binary().decrement(key)
-        kv_validator.validate_kv_op(OpName.Decrement)
+        kv_validator.validate_kv_op(Op.Decrement)
 
     # ------------------------------------------------------------------
     # Operations that carry a durability requirement
@@ -162,7 +162,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         opts = AppendOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         await cb_env.collection.binary().append(key, b'XXX', opts)
-        kv_validator.validate_kv_op(OpName.Append, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Append, durability=MAJORITY_LABEL)
 
     @pytest.mark.asyncio
     @SYNC_WRITE_AMBIGUOUS_RERUN
@@ -174,7 +174,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         opts = PrependOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         await cb_env.collection.binary().prepend(key, b'XXX', opts)
-        kv_validator.validate_kv_op(OpName.Prepend, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Prepend, durability=MAJORITY_LABEL)
 
     @pytest.mark.asyncio
     @SYNC_WRITE_AMBIGUOUS_RERUN
@@ -186,7 +186,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         opts = IncrementOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         await cb_env.collection.binary().increment(key, opts)
-        kv_validator.validate_kv_op(OpName.Increment, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Increment, durability=MAJORITY_LABEL)
 
     @pytest.mark.asyncio
     @SYNC_WRITE_AMBIGUOUS_RERUN
@@ -198,7 +198,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         opts = DecrementOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         await cb_env.collection.binary().decrement(key, opts)
-        kv_validator.validate_kv_op(OpName.Decrement, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Decrement, durability=MAJORITY_LABEL)
 
     # ------------------------------------------------------------------
     # Operations the server refuses, which still produce a full span tree
@@ -208,13 +208,13 @@ class BinaryTracingTestSuite(TopologySuite):
     async def test_append_missing_key(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().append(AsyncTestEnvironment.NOT_A_KEY, b'XXX')
-        kv_validator.validate_kv_op(OpName.Append, validate_error=True)
+        kv_validator.validate_kv_op(Op.Append, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_prepend_missing_key(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().prepend(AsyncTestEnvironment.NOT_A_KEY, b'XXX')
-        kv_validator.validate_kv_op(OpName.Prepend, validate_error=True)
+        kv_validator.validate_kv_op(Op.Prepend, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_increment_missing_key(
@@ -222,7 +222,7 @@ class BinaryTracingTestSuite(TopologySuite):
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().increment(AsyncTestEnvironment.NOT_A_KEY,
                                                        IncrementOptions(initial=NEGATIVE_INITIAL))
-        kv_validator.validate_kv_op(OpName.Increment, validate_error=True)
+        kv_validator.validate_kv_op(Op.Increment, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_decrement_missing_key(
@@ -230,7 +230,7 @@ class BinaryTracingTestSuite(TopologySuite):
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().decrement(AsyncTestEnvironment.NOT_A_KEY,
                                                        DecrementOptions(initial=NEGATIVE_INITIAL))
-        kv_validator.validate_kv_op(OpName.Decrement, validate_error=True)
+        kv_validator.validate_kv_op(Op.Decrement, validate_error=True)
 
     # ------------------------------------------------------------------
     # Operations the client refuses, which never reach the wire
@@ -242,7 +242,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().append(key, NON_BINARY_VALUE)
-        kv_validator.validate_kv_op(OpName.Append, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.Append, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_prepend_invalid_value(
@@ -250,7 +250,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().prepend(key, NON_BINARY_VALUE)
-        kv_validator.validate_kv_op(OpName.Prepend, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.Prepend, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_increment_invalid_initial(self, cb_env: AsyncTestEnvironment,
@@ -258,7 +258,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().increment(key, IncrementOptions(initial=UNWRAPPED_INITIAL))
-        kv_validator.validate_kv_op(OpName.Increment, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.Increment, validate_error=True, error_before_dispatch=True)
 
     @pytest.mark.asyncio
     async def test_decrement_invalid_initial(self, cb_env: AsyncTestEnvironment,
@@ -266,7 +266,7 @@ class BinaryTracingTestSuite(TopologySuite):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().decrement(key, DecrementOptions(initial=UNWRAPPED_INITIAL))
-        kv_validator.validate_kv_op(OpName.Decrement, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.Decrement, validate_error=True, error_before_dispatch=True)
 
     # ------------------------------------------------------------------
     # Operations handed a parent span
@@ -277,48 +277,48 @@ class BinaryTracingTestSuite(TopologySuite):
     @pytest.mark.asyncio
     async def test_append_with_parent(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Append)
+        parent = kv_validator.new_parent_span(Op.Append)
         await cb_env.collection.binary().append(key, b'XXX', AppendOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Append, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Append, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Append)
+        parent = kv_validator.new_parent_span(Op.Append)
         await cb_env.collection.binary().append(key, b'XXX', span=parent)
-        kv_validator.validate_kv_op(OpName.Append, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Append, parent_span=parent)
 
     @pytest.mark.asyncio
     async def test_prepend_with_parent(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Prepend)
+        parent = kv_validator.new_parent_span(Op.Prepend)
         await cb_env.collection.binary().prepend(key, b'XXX', PrependOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Prepend, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Prepend, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Prepend)
+        parent = kv_validator.new_parent_span(Op.Prepend)
         await cb_env.collection.binary().prepend(key, b'XXX', span=parent)
-        kv_validator.validate_kv_op(OpName.Prepend, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Prepend, parent_span=parent)
 
     @pytest.mark.asyncio
     async def test_increment_with_parent(
             self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Increment)
+        parent = kv_validator.new_parent_span(Op.Increment)
         await cb_env.collection.binary().increment(key, IncrementOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Increment, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Increment, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Increment)
+        parent = kv_validator.new_parent_span(Op.Increment)
         await cb_env.collection.binary().increment(key, span=parent)
-        kv_validator.validate_kv_op(OpName.Increment, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Increment, parent_span=parent)
 
     @pytest.mark.asyncio
     async def test_decrement_with_parent(
             self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Decrement)
+        parent = kv_validator.new_parent_span(Op.Decrement)
         await cb_env.collection.binary().decrement(key, DecrementOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Decrement, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Decrement, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Decrement)
+        parent = kv_validator.new_parent_span(Op.Decrement)
         await cb_env.collection.binary().decrement(key, span=parent)
-        kv_validator.validate_kv_op(OpName.Decrement, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Decrement, parent_span=parent)
 
 
 class BinaryTracingTests(BinaryTracingTestSuite):

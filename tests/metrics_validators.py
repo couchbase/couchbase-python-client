@@ -39,33 +39,29 @@ where what varies is which service and how much of the bucket/scope/collection t
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import (Any,
-                    Optional,
-                    Union)
+from typing import Any
 
+from couchbase.common._observability import KeyspaceDetails, OpAttributeName
 from couchbase.common._observability.no_op import NoOpMeter
 from couchbase.common._operations import Op
-from couchbase.logic.observability import (CollectionDetails,
-                                           OpAttributeName,
-                                           OpName)
-from tests.observability_ops import as_op_name, service_for
+from tests.observability_ops import service_for, span_name
 from tests.observability_test_impls import (InertMeter,
                                             RecordingMeter,
                                             RecordingValueRecorder,
                                             TestMeterType)
 
 
-def _describe(meter: TestMeterType, op_name: Optional[OpName] = None) -> str:
+def _describe(meter: TestMeterType, op_name: Op | None = None) -> str:
     """Context for an assertion message: what was asked for, and what the meter actually holds."""
     parts = []
     if op_name is not None:
-        parts.append(f'op={op_name.value!r}')
+        parts.append(f'op={span_name(op_name)!r}')
     held = {name: [r.op_name for r in recorders] for name, recorders in meter.recorders.items()}
     parts.append(f'meter={held}')
     return ' | '.join(parts)
 
 
-def _expect(attrs: Any, attribute: OpAttributeName, expected: Union[str, int], ctx: str) -> None:
+def _expect(attrs: Any, attribute: OpAttributeName, expected: str | int, ctx: str) -> None:
     actual = attrs.get(attribute.value)
     assert actual == expected, (
         f'{attribute.value}: expected {expected!r}, got {actual!r}. {ctx}'
@@ -81,7 +77,7 @@ class KeyValueMeterValidator:
 
     def __init__(self,
                  meter: TestMeterType,
-                 collection_details: CollectionDetails,
+                 collection_details: KeyspaceDetails,
                  supports_cluster_labels: bool) -> None:
         self._meter = meter
         self._collection_details = collection_details
@@ -91,7 +87,7 @@ class KeyValueMeterValidator:
         self._meter.clear()
 
     def validate_kv_op(self,
-                       op_name: OpName,
+                       op_name: Op,
                        validate_error: bool = False,
                        expect_collection_labels: bool = True) -> None:
         """Assert on the one recorder the operation under test produced.
@@ -109,8 +105,8 @@ class KeyValueMeterValidator:
         self._validate_recorded(op_name, validate_error, expect_collection_labels)
 
     def validate_multi_kv_op(self,
-                             multi_op_name: OpName,
-                             sub_op_name: OpName,
+                             multi_op_name: Op,
+                             sub_op_name: Op,
                              expected_count: int,
                              validate_error: bool = False) -> None:
         """Assert on the recorders a multi-key operation produced, one per key.
@@ -124,7 +120,7 @@ class KeyValueMeterValidator:
         recorded at all, and asking for zero says that rather than passing vacuously.
 
         **Every recorder is checked, by position.**  The obvious alternative, a list of
-        expected operations looked up by name, cannot work here: the list is `[OpName.Get] *
+        expected operations looked up by name, cannot work here: the list is `[Op.Get] *
         len(keys)` and a lookup returns the first match, so three identical entries re-read one
         recorder.  Only a count assertion would know the other two existed, and nothing at all
         would look at their attributes.
@@ -155,15 +151,15 @@ class KeyValueMeterValidator:
         )
 
         for recorder in recorders:
-            assert recorder.op_name != multi_op_name.value, (
+            assert recorder.op_name != span_name(multi_op_name), (
                 f'the multi operation was measured as a whole as well as per key. {ctx}'
             )
             assert recorder.values, f'recorder was created but nothing was recorded into it. {ctx}'
             self._validate_attributes(recorder, sub_op_name, validate_error, True, ctx)
 
     def validate_ds_op(self,
-                       ds_op_name: OpName,
-                       sub_ops: Sequence[tuple[OpName, bool]]) -> None:
+                       ds_op_name: Op,
+                       sub_ops: Sequence[tuple[Op, bool]]) -> None:
         """Assert on the recorders a datastructure operation produced, in order.
 
         A datastructure operation is not measured under its own name: `cb_list.append(...)`
@@ -193,13 +189,13 @@ class KeyValueMeterValidator:
 
         recorders = self._meter.recorders[OpAttributeName.MeterOperationDuration.value]
         recorded = [r.op_name for r in recorders]
-        expected = [op.value for op, _ in sub_ops]
+        expected = [span_name(op) for op, _ in sub_ops]
         assert recorded == expected, (
             f'the operation performed {recorded}, expected {expected}. {ctx}'
         )
 
         for recorder, (sub_op, with_error) in zip(recorders, sub_ops):
-            assert recorder.op_name != ds_op_name.value, (
+            assert recorder.op_name != span_name(ds_op_name), (
                 f'the datastructure operation was measured under its own name. {ctx}'
             )
             assert recorder.values, f'recorder was created but nothing was recorded into it. {ctx}'
@@ -209,7 +205,7 @@ class KeyValueMeterValidator:
     # The two halves of the parametrization
     # ------------------------------------------------------------------
 
-    def _validate_no_op(self, op_name: OpName) -> None:
+    def _validate_no_op(self, op_name: Op) -> None:
         """A no-op meter must be handed the operation and then never asked to record it.
 
         `ObservableRequestHandler` caches an `ObservableRequestHandlerNoOpMeterImpl` whose
@@ -225,7 +221,7 @@ class KeyValueMeterValidator:
         )
 
     def _validate_recorded(self,
-                           op_name: OpName,
+                           op_name: Op,
                            validate_error: bool,
                            expect_collection_labels: bool) -> None:
         assert isinstance(self._meter, RecordingMeter), (
@@ -251,7 +247,7 @@ class KeyValueMeterValidator:
 
     def _validate_attributes(self,
                              recorder: RecordingValueRecorder,
-                             op_name: OpName,
+                             op_name: Op,
                              validate_error: bool,
                              expect_collection_labels: bool,
                              ctx: str) -> None:
@@ -260,7 +256,7 @@ class KeyValueMeterValidator:
 
         _expect(attrs, OpAttributeName.SystemName, 'couchbase', ctx)
         _expect(attrs, OpAttributeName.ReservedUnit, OpAttributeName.ReservedUnitSeconds.value, ctx)
-        _expect(attrs, OpAttributeName.OperationName, op_name.value, ctx)
+        _expect(attrs, OpAttributeName.OperationName, span_name(op_name), ctx)
         _expect(attrs, OpAttributeName.Service, 'kv', ctx)
 
         if expect_collection_labels:
@@ -324,12 +320,11 @@ class HttpMeterValidator:
         self._meter.clear()
 
     def validate_http_op(self,
-                         op_name: OpName | Op,
+                         op_name: Op,
                          validate_error: bool = False,
-                         bucket_name: Optional[str] = None,
-                         scope_name: Optional[str] = None,
-                         collection_name: Optional[str] = None) -> None:
-        op_name = as_op_name(op_name)
+                         bucket_name: str | None = None,
+                         scope_name: str | None = None,
+                         collection_name: str | None = None) -> None:
         if isinstance(self._meter, NoOpMeter):
             assert isinstance(self._meter, InertMeter), (
                 f'no-op validation needs a meter that would record if asked, '
@@ -359,7 +354,7 @@ class HttpMeterValidator:
 
         _expect(attrs, OpAttributeName.SystemName, 'couchbase', ctx)
         _expect(attrs, OpAttributeName.ReservedUnit, OpAttributeName.ReservedUnitSeconds.value, ctx)
-        _expect(attrs, OpAttributeName.OperationName, op_name.value, ctx)
+        _expect(attrs, OpAttributeName.OperationName, span_name(op_name), ctx)
         _expect(attrs, OpAttributeName.Service, service_for(op_name).value, ctx)
 
         for attribute, expected in ((OpAttributeName.BucketName, bucket_name),

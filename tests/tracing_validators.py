@@ -44,22 +44,18 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import (Any,
-                    Optional,
-                    Union,
-                    cast)
+from typing import Any, cast
 
+from couchbase.common._observability import (DispatchAttributeName,
+                                             KeyspaceDetails,
+                                             OpAttributeName)
 from couchbase.common._operations import Op
-from couchbase.logic.observability import (CollectionDetails,
-                                           DispatchAttributeName,
-                                           OpAttributeName,
-                                           OpName)
 from couchbase.observability.tracing import SpanStatusCode
 from tests.observability_ops import (DS_OPS,
                                      DS_REMOVE_OPS,
                                      ENCODING_OPS,
-                                     as_op_name,
-                                     service_for)
+                                     service_for,
+                                     span_name)
 from tests.observability_test_impls import (PARENT_SPAN_PREFIX,
                                             InertSpan,
                                             InertTracer,
@@ -78,19 +74,23 @@ ENCODING_SPAN = OpAttributeName.EncodingSpanName.value
 # A sub-operation of a datastructure operation, and whether it was expected to fail.  The first
 # call against a datastructure that does not exist yet fails, creates the document and retries,
 # so a sequence of three with the first marked failed is the normal create-then-mutate shape.
-DsSubOps = Sequence[tuple[OpName, bool]]
+DsSubOps = Sequence[tuple[Op, bool]]
+
+# The root spans one call opens, in order, for a call that opens more than one: each a
+# datastructure operation with its sub-operations, or, paired with None, a key-value operation.
+DsRoots = Sequence[tuple[Op, DsSubOps | None]]
 
 # Operations the core answers with the first sub-operation to respond, cancelling the rest.  The
 # multi form does that once per key.
-FIRST_RESPONSE_OPS = frozenset({OpName.GetAnyReplica, OpName.GetAnyReplicaMulti, OpName.LookupInAnyReplica})
+FIRST_RESPONSE_OPS = frozenset({Op.GetAnyReplica, Op.GetAnyReplicaMulti, Op.LookupInAnyReplica})
 
 
-def _describe(span: Optional[TestSpanProtocol] = None,
-              op_name: Optional[OpName] = None,
-              extra: Optional[str] = None) -> str:
+def _describe(span: TestSpanProtocol | None = None,
+              op_name: Op | str | None = None,
+              extra: str | None = None) -> str:
     parts = []
     if op_name is not None:
-        parts.append(f'op={op_name.value!r}')
+        parts.append(f'op={span_name(op_name)!r}')
     if span is not None:
         parts.append(f'span={span.name!r}')
         parts.append(f'attrs={sorted(span.attributes)}')
@@ -101,7 +101,7 @@ def _describe(span: Optional[TestSpanProtocol] = None,
 
 
 def _expect(attributes: Mapping[str, Any],
-            attribute: Union[OpAttributeName, DispatchAttributeName],
+            attribute: OpAttributeName | DispatchAttributeName,
             expected: Any,
             ctx: str) -> None:
     actual = attributes.get(attribute.value)
@@ -118,7 +118,7 @@ def _expect_absent(attributes: Mapping[str, Any], attribute: OpAttributeName, ct
 
 
 def _expect_type(attributes: Mapping[str, Any],
-                 attribute: Union[OpAttributeName, DispatchAttributeName],
+                 attribute: OpAttributeName | DispatchAttributeName,
                  expected_type: type,
                  ctx: str) -> None:
     actual = attributes.get(attribute.value)
@@ -169,7 +169,7 @@ def _elapsed(span: TestSpanProtocol) -> int:
     return end - start
 
 
-def _socket(address: Optional[Any], port: Optional[Any]) -> Optional[str]:
+def _socket(address: Any | None, port: Any | None) -> str | None:
     """The address:port string the threshold-logging span builds from a dispatch span.
 
     `None` only when neither half was recorded, which is how the SDK writes it: either half
@@ -184,34 +184,34 @@ def _socket(address: Optional[Any], port: Optional[Any]) -> Optional[str]:
 class _KvExpectations:
     """What one key-value span, at any depth in the tree, should carry."""
     span: TestSpanProtocol
-    op_name: OpName
-    collection_details: CollectionDetails
-    parent_span: Optional[TestSpanProtocol] = None
+    # A str for a span the core makes underneath the SDK's, which only has the name the core gave it.
+    op_name: Op | str
+    collection_details: KeyspaceDetails
+    parent_span: TestSpanProtocol | None = None
     validate_error: bool = False
-    durability: Optional[str] = None
-    server_duration_gt_zero: Optional[bool] = None
-    multi_op_key_count: Optional[int] = None
+    durability: str | None = None
+    server_duration_gt_zero: bool | None = None
+    multi_op_key_count: int | None = None
     retry_count_gt_zero: bool = False
     error_before_dispatch: bool = False
     skip_dispatch: bool = False
     # Set only while walking underneath a datastructure operation, which is the one case where
     # how many encoding spans a `mutate_in` should have depends on what enclosed it.
-    ds_op_name: Optional[OpName] = None
-    ds_sub_ops: Optional[DsSubOps] = None
+    ds_op_name: Op | None = None
 
 
 @dataclass
 class _HttpExpectations:
     """What one http span, at any depth in the tree, should carry."""
     span: TestSpanProtocol
-    op_name: OpName
-    parent_span: Optional[TestSpanProtocol] = None
+    op_name: Op
+    parent_span: TestSpanProtocol | None = None
     validate_error: bool = False
     error_before_dispatch: bool = False
-    statement: Optional[str] = None
-    bucket_name: Optional[str] = None
-    scope_name: Optional[str] = None
-    collection_name: Optional[str] = None
+    statement: str | None = None
+    bucket_name: str | None = None
+    scope_name: str | None = None
+    collection_name: str | None = None
     # Set for a span the C++ core created underneath an operation, rather than one the SDK
     # created from the caller's arguments.  See `_validate_base_span` for what it turns off.
     core_created: bool = False
@@ -243,7 +243,7 @@ class _SpanTreeValidator:
         """Drop every span the tracer holds, so the next assertion is about one operation."""
         self._tracer.clear_spans()
 
-    def new_parent_span(self, op_name: OpName | Op) -> TestRequestSpanType:
+    def new_parent_span(self, op_name: Op) -> TestRequestSpanType:
         """Clear the tracer and open a parent span for the next operation to hang under.
 
         The name is not cosmetic.  A threshold-logging span asks, as it ends, whether it should
@@ -259,10 +259,9 @@ class _SpanTreeValidator:
         the legacy span is let through, rather than one suppression at every call site.
         """
         self.reset()
-        op_name = as_op_name(op_name)
-        return cast(TestRequestSpanType, self._tracer.request_span(f'{PARENT_SPAN_PREFIX}{op_name.value}_span'))
+        return cast(TestRequestSpanType, self._tracer.request_span(f'{PARENT_SPAN_PREFIX}{span_name(op_name)}_span'))
 
-    def _end_parent_span(self, parent_span: Optional[TestSpanProtocol]) -> None:
+    def _end_parent_span(self, parent_span: TestSpanProtocol | None) -> None:
         if parent_span is None:
             return
         # `CouchbaseSpan` calls it `finish`; every span since calls it `end`.
@@ -272,14 +271,14 @@ class _SpanTreeValidator:
             assert isinstance(parent_span, (RecordingSpan, InertSpan, ThresholdRecordingSpan))
             parent_span.end()
 
-    def _root_span(self, op_name: OpName, parent_span: Optional[TestSpanProtocol]) -> TestSpanProtocol:
+    def _root_span(self, op_name: Op, parent_span: TestSpanProtocol | None) -> TestSpanProtocol:
         """The operation's own span, whether it sits on the tracer or under a parent."""
         roots = self._tracer.spans
         ctx = _describe(op_name=op_name, extra=f'tracer_roots={[s.name for s in roots]}')
         _expect_count(roots, 1, 'root spans on the tracer', ctx)
         if parent_span is None:
-            span = self._tracer.get_span_by_name(op_name.value)
-            assert span is not None, f'no span named {op_name.value!r} on the tracer. {ctx}'
+            span = self._tracer.get_span_by_name(span_name(op_name))
+            assert span is not None, f'no span named {span_name(op_name)!r} on the tracer. {ctx}'
             return span
 
         assert roots[0] is parent_span, (
@@ -292,7 +291,7 @@ class _SpanTreeValidator:
         )
         return span
 
-    def _assert_no_request_span(self, parent_span: Optional[TestSpanProtocol]) -> None:
+    def _assert_no_request_span(self, parent_span: TestSpanProtocol | None) -> None:
         """The operation failed so early that no span was ever created.
 
         A parent the test opened is still there, so what is asserted is that nothing was added
@@ -306,7 +305,7 @@ class _SpanTreeValidator:
             _expect_count(roots, 1, 'root spans on the tracer', ctx)
             _expect_count(parent_span.children, 0, 'children of the parent span', ctx)
 
-    def _validate_inert(self, parent_span: Optional[TestSpanProtocol]) -> None:
+    def _validate_inert(self, parent_span: TestSpanProtocol | None) -> None:
         """The SDK never asked the no-op tracer for a span.
 
         A parent the test opened is the only thing that can be there, because the test opened it
@@ -417,14 +416,15 @@ class _SpanTreeValidator:
 
         if not check_server_duration:
             return
+        # The core reports server duration in microseconds; the span keeps nanoseconds.
         total_server = sum(d.attributes.get(DispatchAttributeName.ServerDuration.value, 0) for d in dispatch_spans)
-        assert total_server == span._total_server_duration_ns, (
-            f'total server duration: the dispatch spans reported {total_server}ns, the '
+        assert total_server * 1000 == span._total_server_duration_ns, (
+            f'total server duration: the dispatch spans reported {total_server}us, the '
             f'operation span rolled up {span._total_server_duration_ns}ns. {ctx}'
         )
         last_server = last.attributes.get(DispatchAttributeName.ServerDuration.value, 0)
-        assert last_server == span._server_duration_ns, (
-            f'server duration: the last dispatch span reported {last_server}ns, the operation '
+        assert last_server * 1000 == span._server_duration_ns, (
+            f'server duration: the last dispatch span reported {last_server}us, the operation '
             f'span reported {span._server_duration_ns}ns. {ctx}'
         )
 
@@ -460,27 +460,27 @@ class KeyValueSpanValidator(_SpanTreeValidator):
 
     def __init__(self,
                  tracer: TestTracerType,
-                 collection_details: CollectionDetails,
+                 collection_details: KeyspaceDetails,
                  supports_cluster_labels: bool) -> None:
         super().__init__(tracer, supports_cluster_labels)
         self._collection_details = collection_details
 
     def validate_kv_op(self,
-                       op_name: OpName,
-                       parent_span: Optional[TestSpanProtocol] = None,
+                       op_name: Op,
+                       parent_span: TestSpanProtocol | None = None,
                        validate_error: bool = False,
-                       durability: Optional[str] = None,
-                       server_duration_gt_zero: Optional[bool] = None,
-                       multi_op_key_count: Optional[int] = None,
-                       nested_ops: Optional[Sequence[OpName]] = None,
+                       durability: str | None = None,
+                       server_duration_gt_zero: bool | None = None,
+                       multi_op_key_count: int | None = None,
+                       nested_ops: Sequence[Op | str] | None = None,
                        retry_count_gt_zero: bool = False,
                        error_before_dispatch: bool = False,
                        expect_request_span: bool = True) -> None:
         """One key-value operation's span, and everything underneath it.
 
-        `nested_ops` names the operations the SDK runs underneath this one and gives each its
-        own span: a replica read is a `get` plus a `get_replica`, and each of those is a full
-        operation span with its own dispatch.  `multi_op_key_count` says the operation covered
+        `nested_ops` names the operations run underneath this one, each with its own span: a
+        replica read is a `get` plus a `get_replica`, spans the core makes and names, and each of
+        those is a full operation span with its own dispatch.  `multi_op_key_count` says the operation covered
         that many keys, so the counts underneath scale with it.  `server_duration_gt_zero=False`
         says at least one dispatch reported a server duration but not necessarily all of them,
         which is what a replica read looks like when one replica answers instantly.
@@ -511,9 +511,9 @@ class KeyValueSpanValidator(_SpanTreeValidator):
             self._validate_span(expectations)
 
     def validate_ds_op(self,
-                       ds_op_name: OpName,
+                       ds_op_name: Op,
                        sub_ops: DsSubOps,
-                       parent_span: Optional[TestSpanProtocol] = None,
+                       parent_span: TestSpanProtocol | None = None,
                        absorbed: bool = False) -> None:
         """A datastructure operation's span, and the key-value sub-operations under it.
 
@@ -530,7 +530,39 @@ class KeyValueSpanValidator(_SpanTreeValidator):
             self._validate_inert(parent_span)
             return
 
-        span = self._root_span(ds_op_name, parent_span)
+        self._validate_ds_span(self._root_span(ds_op_name, parent_span), ds_op_name, sub_ops, parent_span, absorbed)
+
+    def validate_ds_roots(self, expected: DsRoots) -> None:
+        """Every root span one call opened, in order, for a call that opens more than one.
+
+        The deprecated collection-level methods are built from one another rather than given a
+        span of their own: `queue_pop` is a `list_get` and then a `list_remove`, each its own
+        root.
+        """
+        if self._is_inert:
+            self._validate_inert(None)
+            return
+
+        roots = cast(Sequence[TestSpanProtocol], self._tracer.spans)
+        recorded = [span.name for span in roots]
+        names = [span_name(op_name) for op_name, _ in expected]
+        assert recorded == names, f'root spans: expected {names}, found {recorded}.'
+        for span, (op_name, sub_ops) in zip(roots, expected):
+            if sub_ops is not None:
+                self._validate_ds_span(span, op_name, sub_ops, None, absorbed=False)
+                continue
+            expectations = _KvExpectations(span, op_name, self._collection_details)
+            if self._is_threshold:
+                self._validate_threshold_kv_span(expectations)
+            else:
+                self._validate_span(expectations)
+
+    def _validate_ds_span(self,
+                          span: TestSpanProtocol,
+                          ds_op_name: Op,
+                          sub_ops: DsSubOps,
+                          parent_span: TestSpanProtocol | None,
+                          absorbed: bool) -> None:
         ctx = _describe(span=span, op_name=ds_op_name)
 
         if self._is_threshold:
@@ -559,7 +591,7 @@ class KeyValueSpanValidator(_SpanTreeValidator):
                                             skip_dispatch=True))
 
         recorded = [child.name for child in span.children]
-        expected = [sub_op.value for sub_op, _ in sub_ops]
+        expected = [span_name(sub_op) for sub_op, _ in sub_ops]
         assert recorded == expected, (
             f'datastructure sub-operations: expected {expected}, found {recorded}. {ctx}'
         )
@@ -569,15 +601,14 @@ class KeyValueSpanValidator(_SpanTreeValidator):
                                                 self._collection_details,
                                                 parent_span=span,
                                                 validate_error=errored,
-                                                ds_op_name=ds_op_name,
-                                                ds_sub_ops=sub_ops))
+                                                ds_op_name=ds_op_name))
 
     def _validate_base_span(self, expectations: _KvExpectations) -> None:
         span, op_name = expectations.span, expectations.op_name
-        self._validate_request_span(span, op_name.value, validate_error=expectations.validate_error)
+        self._validate_request_span(span, span_name(op_name), validate_error=expectations.validate_error)
         ctx = _describe(span=span, op_name=op_name)
         details = expectations.collection_details
-        _expect(span.attributes, OpAttributeName.OperationName, op_name.value, ctx)
+        _expect(span.attributes, OpAttributeName.OperationName, span_name(op_name), ctx)
         _expect(span.attributes, OpAttributeName.Service, 'kv', ctx)
         _expect(span.attributes, OpAttributeName.BucketName, details['bucket_name'], ctx)
         _expect(span.attributes, OpAttributeName.ScopeName, details['scope_name'], ctx)
@@ -635,7 +666,7 @@ class KeyValueSpanValidator(_SpanTreeValidator):
         any mix.  Where the count cannot be derived it is a floor rather than an equality.
         """
         count = expectations.multi_op_key_count or 1
-        if expectations.op_name is not OpName.MutateIn:
+        if expectations.op_name is not Op.MutateIn:
             return count, True
         ds_op_name = expectations.ds_op_name
         if ds_op_name in DS_REMOVE_OPS:
@@ -665,11 +696,11 @@ class KeyValueSpanValidator(_SpanTreeValidator):
             )
             self._validate_request_span(encoding_span, ENCODING_SPAN)
 
-    def _validate_nested(self, expectations: _KvExpectations, nested_ops: Sequence[OpName]) -> None:
+    def _validate_nested(self, expectations: _KvExpectations, nested_ops: Sequence[Op | str]) -> None:
         """An operation whose work the SDK does through other operations, each with its own span."""
         span = expectations.span
         ctx = _describe(span=span, op_name=expectations.op_name,
-                        extra=f'nested_ops={[op.value for op in nested_ops]}')
+                        extra=f'nested_ops={[span_name(op) for op in nested_ops]}')
         self._validate_base_span(expectations)
         per_op_count = expectations.multi_op_key_count or 1
         _expect_count(span.children, len(nested_ops) * per_op_count,
@@ -682,8 +713,8 @@ class KeyValueSpanValidator(_SpanTreeValidator):
         first_response = expectations.op_name in FIRST_RESPONSE_OPS
         dispatch_spans: list[TestSpanProtocol] = []
         for nested_op in nested_ops:
-            child_spans = _children_named(span, nested_op.value)
-            _expect_count(child_spans, per_op_count, f'spans for nested op {nested_op.value!r}',
+            child_spans = _children_named(span, span_name(nested_op))
+            _expect_count(child_spans, per_op_count, f'spans for nested op {span_name(nested_op)!r}',
                           ctx, at_least=True)
             for child_span in child_spans:
                 if first_response and not self._is_complete_sub_op(child_span):
@@ -764,17 +795,16 @@ class HttpSpanValidator(_SpanTreeValidator):
     """
 
     def validate_http_op(self,
-                         op_name: OpName | Op,
-                         parent_span: Optional[TestSpanProtocol] = None,
+                         op_name: Op,
+                         parent_span: TestSpanProtocol | None = None,
                          validate_error: bool = False,
-                         statement: Optional[str] = None,
-                         nested_ops: Optional[Sequence[OpName | Op]] = None,
+                         statement: str | None = None,
+                         nested_ops: Sequence[Op] | None = None,
                          error_before_dispatch: bool = False,
                          expect_request_span: bool = True,
-                         bucket_name: Optional[str] = None,
-                         scope_name: Optional[str] = None,
-                         collection_name: Optional[str] = None) -> None:
-        op_name = as_op_name(op_name)
+                         bucket_name: str | None = None,
+                         scope_name: str | None = None,
+                         collection_name: str | None = None) -> None:
         self._end_parent_span(parent_span)
         if self._is_inert:
             self._validate_inert(parent_span)
@@ -795,13 +825,13 @@ class HttpSpanValidator(_SpanTreeValidator):
         if self._is_threshold:
             self._validate_threshold_http_span(expectations)
         elif nested_ops:
-            self._validate_nested(expectations, [as_op_name(o) for o in nested_ops])
+            self._validate_nested(expectations, nested_ops)
         else:
             self._validate_span(expectations)
 
     def _validate_base_span(self, expectations: _HttpExpectations) -> None:
         span, op_name = expectations.span, expectations.op_name
-        self._validate_request_span(span, op_name.value, validate_error=expectations.validate_error)
+        self._validate_request_span(span, span_name(op_name), validate_error=expectations.validate_error)
         ctx = _describe(span=span, op_name=op_name)
         _expect(span.attributes, OpAttributeName.Service, service_for(op_name).value, ctx)
         if expectations.core_created:
@@ -812,7 +842,7 @@ class HttpSpanValidator(_SpanTreeValidator):
             # the deprecated path does not carry it down to a core-created span (PYCBC-1919),
             # which is a gap in that path rather than something for this assertion to encode.
             return
-        _expect(span.attributes, OpAttributeName.OperationName, op_name.value, ctx)
+        _expect(span.attributes, OpAttributeName.OperationName, span_name(op_name), ctx)
         for attribute, expected in ((OpAttributeName.BucketName, expectations.bucket_name),
                                     (OpAttributeName.ScopeName, expectations.scope_name),
                                     (OpAttributeName.CollectionName, expectations.collection_name),
@@ -839,7 +869,7 @@ class HttpSpanValidator(_SpanTreeValidator):
         for dispatch_span in dispatch_spans:
             self._validate_dispatch_span(dispatch_span, span)
 
-    def _validate_nested(self, expectations: _HttpExpectations, nested_ops: Sequence[OpName]) -> None:
+    def _validate_nested(self, expectations: _HttpExpectations, nested_ops: Sequence[Op]) -> None:
         """An http operation the SDK carries out through others, each with its own span.
 
         Unlike the key-value case the child count is not knowable: a manager operation may poll,
@@ -847,15 +877,15 @@ class HttpSpanValidator(_SpanTreeValidator):
         """
         span = expectations.span
         ctx = _describe(span=span, op_name=expectations.op_name,
-                        extra=f'nested_ops={[op.value for op in nested_ops]}')
+                        extra=f'nested_ops={[span_name(op) for op in nested_ops]}')
         self._validate_base_span(expectations)
         _expect_count(span.children, len(nested_ops), 'children of the nested operation span',
                       ctx, at_least=True)
 
         dispatch_spans: list[TestSpanProtocol] = []
         for nested_op in nested_ops:
-            child_spans = _children_named(span, nested_op.value)
-            _expect_count(child_spans, 1, f'spans for nested op {nested_op.value!r}', ctx, at_least=True)
+            child_spans = _children_named(span, span_name(nested_op))
+            _expect_count(child_spans, 1, f'spans for nested op {span_name(nested_op)!r}', ctx, at_least=True)
             for child_span in child_spans:
                 dispatch_spans.extend(_children_named(child_span, DISPATCH_SPAN))
                 self._validate_span(_HttpExpectations(child_span,
@@ -874,4 +904,4 @@ class HttpSpanValidator(_SpanTreeValidator):
         self._validate_threshold_verdict(span)
 
 
-SpanValidator = Union[KeyValueSpanValidator, HttpSpanValidator]
+SpanValidator = KeyValueSpanValidator | HttpSpanValidator

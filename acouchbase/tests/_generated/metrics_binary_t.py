@@ -25,8 +25,8 @@ from typing import Any
 import pytest
 import pytest_asyncio
 
+from couchbase.common._operations import Op
 from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException
-from couchbase.logic.observability import OpName
 from couchbase.options import (DecrementOptions,
                                IncrementOptions,
                                SignedInt64)
@@ -54,7 +54,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
     # the recorder it produced.  The suite runs twice, once per `MeterType`: `Basic` asserts on
     # what was recorded, `NoOp` asserts the SDK never asked the meter for anything.
     #
-    # Twelve named tests rather than five parametrized over `OpName`, covering the same twelve
+    # Twelve named tests rather than five parametrized over `Op`, covering the same twelve
     # cases.  An operation reached through `getattr` has no type for the generator to read, so
     # the generated suites would call it without awaiting it, and an unawaited coroutine
     # records nothing: the `Basic` half would fail far from the cause and the `NoOp` half would
@@ -101,25 +101,25 @@ class BinaryMetricsTestSuite(SuiteRequirements):
     async def test_append(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         await cb_env.collection.binary().append(key, b'XXX')
-        kv_validator.validate_kv_op(OpName.Append)
+        kv_validator.validate_kv_op(Op.Append)
 
     @pytest.mark.asyncio
     async def test_prepend(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.BYTES_EMPTY, key_only=True)
         await cb_env.collection.binary().prepend(key, b'XXX')
-        kv_validator.validate_kv_op(OpName.Prepend)
+        kv_validator.validate_kv_op(Op.Prepend)
 
     @pytest.mark.asyncio
     async def test_increment(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         await cb_env.collection.binary().increment(key)
-        kv_validator.validate_kv_op(OpName.Increment)
+        kv_validator.validate_kv_op(Op.Increment)
 
     @pytest.mark.asyncio
     async def test_decrement(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.COUNTER, key_only=True)
         await cb_env.collection.binary().decrement(key)
-        kv_validator.validate_kv_op(OpName.Decrement)
+        kv_validator.validate_kv_op(Op.Decrement)
 
     # ------------------------------------------------------------------
     # Operations that reach the server and are refused there
@@ -131,7 +131,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
                                       kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().append(MISSING_KEY, b'XXX')
-        kv_validator.validate_kv_op(OpName.Append, validate_error=True)
+        kv_validator.validate_kv_op(Op.Append, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_prepend_missing_key(self,
@@ -139,7 +139,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
                                        kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().prepend(MISSING_KEY, b'XXX')
-        kv_validator.validate_kv_op(OpName.Prepend, validate_error=True)
+        kv_validator.validate_kv_op(Op.Prepend, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_increment_missing_key(self,
@@ -149,7 +149,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
         # counter document and the operation succeeds, which is a different test.
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().increment(MISSING_KEY, IncrementOptions(initial=SignedInt64(-1)))
-        kv_validator.validate_kv_op(OpName.Increment, validate_error=True)
+        kv_validator.validate_kv_op(Op.Increment, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_decrement_missing_key(self,
@@ -157,7 +157,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
                                          kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.binary().decrement(MISSING_KEY, DecrementOptions(initial=SignedInt64(-1)))
-        kv_validator.validate_kv_op(OpName.Decrement, validate_error=True)
+        kv_validator.validate_kv_op(Op.Decrement, validate_error=True)
 
     # ------------------------------------------------------------------
     # Operations refused by the client, before anything is dispatched
@@ -170,7 +170,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().append(key, NON_BINARY_VALUE)
-        kv_validator.validate_kv_op(OpName.Append, validate_error=True)
+        kv_validator.validate_kv_op(Op.Append, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_prepend_invalid_value(self,
@@ -179,7 +179,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().prepend(key, NON_BINARY_VALUE)
-        kv_validator.validate_kv_op(OpName.Prepend, validate_error=True)
+        kv_validator.validate_kv_op(Op.Prepend, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_increment_invalid_initial(self,
@@ -188,7 +188,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().increment(key, IncrementOptions(initial=UNWRAPPED_INITIAL))
-        kv_validator.validate_kv_op(OpName.Increment, validate_error=True)
+        kv_validator.validate_kv_op(Op.Increment, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_decrement_invalid_initial(self,
@@ -197,7 +197,7 @@ class BinaryMetricsTestSuite(SuiteRequirements):
         key = cb_env.get_new_doc(key_only=True)
         with pytest.raises((InvalidArgumentException, ValueError)):
             await cb_env.collection.binary().decrement(key, DecrementOptions(initial=UNWRAPPED_INITIAL))
-        kv_validator.validate_kv_op(OpName.Decrement, validate_error=True)
+        kv_validator.validate_kv_op(Op.Decrement, validate_error=True)
 
 
 class BinaryMetricsTests(BinaryMetricsTestSuite):

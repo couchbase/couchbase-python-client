@@ -17,12 +17,12 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
+from couchbase.common._operations import Op
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability import OpName
 from couchbase.options import (ExistsMultiOptions,
                                GetAllReplicasMultiOptions,
                                GetAndLockMultiOptions,
@@ -48,8 +48,8 @@ NUM_KEYS = 3
 ONE_SECOND = timedelta(seconds=1)
 HALF_SECOND = timedelta(milliseconds=500)
 # The replica reads run the active copy and the replicas as separate operations, each with its
-# own span underneath the one the caller asked for, per key.
-REPLICA_READ_OPS = [OpName.Get, OpName.GetReplica]
+# own span underneath the one the caller asked for, per key, which the core makes and names.
+REPLICA_READ_OPS = ['get', 'get_replica']
 
 
 class KeyValueMultiTracingTestSuite(SuiteRequirements):
@@ -93,32 +93,32 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
         return validator
 
     @pytest.mark.parametrize('multi_op, nested_ops', [
-        (OpName.ExistsMulti, None),
-        (OpName.GetMulti, None),
-        (OpName.GetAllReplicasMulti, REPLICA_READ_OPS),
-        (OpName.GetAnyReplicaMulti, REPLICA_READ_OPS),
+        (Op.ExistsMulti, None),
+        (Op.GetMulti, None),
+        (Op.GetAllReplicasMulti, REPLICA_READ_OPS),
+        (Op.GetAnyReplicaMulti, REPLICA_READ_OPS),
     ])
     def test_multi_kv_op(self,
                          cb_env: SyncTestEnvironment,
                          kv_validator: KeyValueSpanValidator,
-                         multi_op: OpName,
-                         nested_ops: Optional[list[OpName]]) -> None:
+                         multi_op: Op,
+                         nested_ops: list[Op] | None) -> None:
         keys = list(cb_env.get_docs(NUM_KEYS))
         operation = getattr(cb_env.collection, multi_op.value)
         operation(keys)
         kv_validator.validate_kv_op(multi_op, nested_ops=nested_ops, multi_op_key_count=NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, nested_ops', [
-        (OpName.GetMulti, None),
-        (OpName.GetAllReplicasMulti, REPLICA_READ_OPS),
-        (OpName.GetAnyReplicaMulti, REPLICA_READ_OPS),
-        (OpName.GetAndLockMulti, None),
+        (Op.GetMulti, None),
+        (Op.GetAllReplicasMulti, REPLICA_READ_OPS),
+        (Op.GetAnyReplicaMulti, REPLICA_READ_OPS),
+        (Op.GetAndLockMulti, None),
     ])
     def test_multi_kv_op_with_error(self,
                                     cb_env: SyncTestEnvironment,
                                     kv_validator: KeyValueSpanValidator,
-                                    multi_op: OpName,
-                                    nested_ops: Optional[list[OpName]]) -> None:
+                                    multi_op: Op,
+                                    nested_ops: list[Op] | None) -> None:
         # `return_exceptions=False` turns every missing key into a raise, and raising is what
         # puts the error status on the span; left to itself a multi operation collects failures
         # into the result instead.
@@ -126,13 +126,13 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
         # Stopping at the first failure means the later keys are never attempted, so there is
         # one key's worth of spans underneath rather than three.  The deprecated tracer does
         # not short-circuit that way and still produces all three.
-        if multi_op is OpName.GetAnyReplicaMulti and not kv_validator.is_legacy:
+        if multi_op is Op.GetAnyReplicaMulti and not kv_validator.is_legacy:
             key_count = 1
         else:
             key_count = NUM_KEYS
         operation = getattr(cb_env.collection, multi_op.value)
         with pytest.raises(Exception):
-            if multi_op is OpName.GetAndLockMulti:
+            if multi_op is Op.GetAndLockMulti:
                 operation(keys, ONE_SECOND, return_exceptions=False)
             else:
                 operation(keys, return_exceptions=False)
@@ -142,53 +142,53 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
                                     validate_error=True)
 
     @pytest.mark.parametrize('multi_op', [
-        OpName.InsertMulti,
-        OpName.RemoveMulti,
-        OpName.ReplaceMulti,
-        OpName.TouchMulti,
-        OpName.UpsertMulti,
+        Op.InsertMulti,
+        Op.RemoveMulti,
+        Op.ReplaceMulti,
+        Op.TouchMulti,
+        Op.UpsertMulti,
     ])
     def test_multi_mutation_op(self,
                                cb_env: SyncTestEnvironment,
                                kv_validator: KeyValueSpanValidator,
-                               multi_op: OpName) -> None:
+                               multi_op: Op) -> None:
         docs: Any
-        if multi_op is OpName.InsertMulti:
+        if multi_op is Op.InsertMulti:
             docs = cb_env.get_new_docs(NUM_KEYS)
-        elif multi_op in (OpName.ReplaceMulti, OpName.UpsertMulti):
+        elif multi_op in (Op.ReplaceMulti, Op.UpsertMulti):
             docs = cb_env.get_docs(NUM_KEYS)
         else:
             docs = list(cb_env.get_docs(NUM_KEYS))
 
         operation = getattr(cb_env.collection, multi_op.value)
-        if multi_op is OpName.TouchMulti:
+        if multi_op is Op.TouchMulti:
             operation(docs, ONE_SECOND)
         else:
             operation(docs)
         kv_validator.validate_kv_op(multi_op, multi_op_key_count=NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op', [
-        OpName.RemoveMulti,
-        OpName.ReplaceMulti,
-        OpName.TouchMulti,
+        Op.RemoveMulti,
+        Op.ReplaceMulti,
+        Op.TouchMulti,
     ])
     def test_multi_mutation_op_with_error(self,
                                           cb_env: SyncTestEnvironment,
                                           kv_validator: KeyValueSpanValidator,
-                                          multi_op: OpName) -> None:
+                                          multi_op: Op) -> None:
         # Insert and upsert are absent for a reason rather than an oversight: an insert against
         # a key that does not exist succeeds, and an upsert always does, so neither has a
         # per-key failure to produce.
         docs: Any
         keys = [cb_env.get_new_doc(key_only=True) for _ in range(NUM_KEYS)]
-        if multi_op is OpName.ReplaceMulti:
+        if multi_op is Op.ReplaceMulti:
             docs = {key: {'test': 'data'} for key in keys}
         else:
             docs = keys
 
         operation = getattr(cb_env.collection, multi_op.value)
         with pytest.raises(Exception):
-            if multi_op is OpName.TouchMulti:
+            if multi_op is Op.TouchMulti:
                 operation(docs, ONE_SECOND, return_exceptions=False)
             else:
                 operation(docs, return_exceptions=False)
@@ -202,24 +202,24 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
         # cleared between the two.
         keys = list(cb_env.get_docs(NUM_KEYS))
         locked = cb_env.collection.get_and_lock_multi(keys, HALF_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndLockMulti, multi_op_key_count=NUM_KEYS)
+        kv_validator.validate_kv_op(Op.GetAndLockMulti, multi_op_key_count=NUM_KEYS)
 
         kv_validator.reset()
         cb_env.collection.unlock_multi(locked)
-        kv_validator.validate_kv_op(OpName.UnlockMulti, multi_op_key_count=NUM_KEYS)
+        kv_validator.validate_kv_op(Op.UnlockMulti, multi_op_key_count=NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, opts_cls, nested_ops', [
-        (OpName.ExistsMulti, ExistsMultiOptions, None),
-        (OpName.GetMulti, GetMultiOptions, None),
-        (OpName.GetAllReplicasMulti, GetAllReplicasMultiOptions, REPLICA_READ_OPS),
-        (OpName.GetAnyReplicaMulti, GetAnyReplicaMultiOptions, REPLICA_READ_OPS),
+        (Op.ExistsMulti, ExistsMultiOptions, None),
+        (Op.GetMulti, GetMultiOptions, None),
+        (Op.GetAllReplicasMulti, GetAllReplicasMultiOptions, REPLICA_READ_OPS),
+        (Op.GetAnyReplicaMulti, GetAnyReplicaMultiOptions, REPLICA_READ_OPS),
     ])
     def test_multi_kv_op_with_parent(self,
                                      cb_env: SyncTestEnvironment,
                                      kv_validator: KeyValueSpanValidator,
-                                     multi_op: OpName,
+                                     multi_op: Op,
                                      opts_cls: Any,
-                                     nested_ops: Optional[list[OpName]]) -> None:
+                                     nested_ops: list[Op] | None) -> None:
         keys = list(cb_env.get_docs(NUM_KEYS))
         parent = kv_validator.new_parent_span(multi_op)
         operation = getattr(cb_env.collection, multi_op.value)
@@ -230,28 +230,28 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
                                     multi_op_key_count=NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, opts_cls', [
-        (OpName.InsertMulti, InsertMultiOptions),
-        (OpName.RemoveMulti, RemoveMultiOptions),
-        (OpName.ReplaceMulti, ReplaceMultiOptions),
-        (OpName.TouchMulti, TouchMultiOptions),
-        (OpName.UpsertMulti, UpsertMultiOptions),
+        (Op.InsertMulti, InsertMultiOptions),
+        (Op.RemoveMulti, RemoveMultiOptions),
+        (Op.ReplaceMulti, ReplaceMultiOptions),
+        (Op.TouchMulti, TouchMultiOptions),
+        (Op.UpsertMulti, UpsertMultiOptions),
     ])
     def test_multi_mutation_op_with_parent(self,
                                            cb_env: SyncTestEnvironment,
                                            kv_validator: KeyValueSpanValidator,
-                                           multi_op: OpName,
+                                           multi_op: Op,
                                            opts_cls: Any) -> None:
         docs: Any
-        if multi_op is OpName.InsertMulti:
+        if multi_op is Op.InsertMulti:
             docs = cb_env.get_new_docs(NUM_KEYS)
-        elif multi_op in (OpName.ReplaceMulti, OpName.UpsertMulti):
+        elif multi_op in (Op.ReplaceMulti, Op.UpsertMulti):
             docs = cb_env.get_docs(NUM_KEYS)
         else:
             docs = list(cb_env.get_docs(NUM_KEYS))
 
         parent = kv_validator.new_parent_span(multi_op)
         operation = getattr(cb_env.collection, multi_op.value)
-        if multi_op is OpName.TouchMulti:
+        if multi_op is Op.TouchMulti:
             operation(docs, ONE_SECOND, opts_cls(parent_span=parent))
         else:
             operation(docs, opts_cls(parent_span=parent))
@@ -261,33 +261,33 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
                                          cb_env: SyncTestEnvironment,
                                          kv_validator: KeyValueSpanValidator) -> None:
         keys = list(cb_env.get_docs(NUM_KEYS))
-        parent = kv_validator.new_parent_span(OpName.GetAndLockMulti)
+        parent = kv_validator.new_parent_span(Op.GetAndLockMulti)
         lock_opts = GetAndLockMultiOptions(parent_span=parent)
         locked = cb_env.collection.get_and_lock_multi(keys, HALF_SECOND, lock_opts)
-        kv_validator.validate_kv_op(OpName.GetAndLockMulti, parent_span=parent, multi_op_key_count=NUM_KEYS)
+        kv_validator.validate_kv_op(Op.GetAndLockMulti, parent_span=parent, multi_op_key_count=NUM_KEYS)
 
-        parent = kv_validator.new_parent_span(OpName.UnlockMulti)
+        parent = kv_validator.new_parent_span(Op.UnlockMulti)
         unlock_opts = UnlockMultiOptions(parent_span=parent)
         cb_env.collection.unlock_multi(locked, unlock_opts)
-        kv_validator.validate_kv_op(OpName.UnlockMulti, parent_span=parent, multi_op_key_count=NUM_KEYS)
+        kv_validator.validate_kv_op(Op.UnlockMulti, parent_span=parent, multi_op_key_count=NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, keys_as_mapping', [
-        (OpName.ExistsMulti, True),
-        (OpName.GetMulti, True),
-        (OpName.GetAllReplicasMulti, True),
-        (OpName.GetAndLockMulti, True),
-        (OpName.GetAnyReplicaMulti, True),
-        (OpName.InsertMulti, False),
-        (OpName.RemoveMulti, True),
-        (OpName.ReplaceMulti, False),
-        (OpName.TouchMulti, True),
-        (OpName.UnlockMulti, True),
-        (OpName.UpsertMulti, False),
+        (Op.ExistsMulti, True),
+        (Op.GetMulti, True),
+        (Op.GetAllReplicasMulti, True),
+        (Op.GetAndLockMulti, True),
+        (Op.GetAnyReplicaMulti, True),
+        (Op.InsertMulti, False),
+        (Op.RemoveMulti, True),
+        (Op.ReplaceMulti, False),
+        (Op.TouchMulti, True),
+        (Op.UnlockMulti, True),
+        (Op.UpsertMulti, False),
     ])
     def test_multi_kv_op_not_dispatched(self,
                                         cb_env: SyncTestEnvironment,
                                         kv_validator: KeyValueSpanValidator,
-                                        multi_op: OpName,
+                                        multi_op: Op,
                                         keys_as_mapping: bool) -> None:
         # An operation taking a list of keys is given a mapping, and one taking a mapping is
         # given a list.  The client rejects it without reaching the bindings, so the request
@@ -298,7 +298,7 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
         argument: Any = {key: {'test': 'data'} for key in keys} if keys_as_mapping else keys
         operation = getattr(cb_env.collection, multi_op.value)
         with pytest.raises(InvalidArgumentException):
-            if multi_op in (OpName.GetAndLockMulti, OpName.TouchMulti):
+            if multi_op in (Op.GetAndLockMulti, Op.TouchMulti):
                 operation(argument, ONE_SECOND, return_exceptions=False)
             else:
                 operation(argument, return_exceptions=False)
@@ -306,7 +306,7 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
                                     multi_op_key_count=NUM_KEYS,
                                     validate_error=True,
                                     error_before_dispatch=True,
-                                    expect_request_span=multi_op is not OpName.UnlockMulti)
+                                    expect_request_span=multi_op is not Op.UnlockMulti)
 
 
 class KeyValueMultiTracingTests(KeyValueMultiTracingTestSuite):

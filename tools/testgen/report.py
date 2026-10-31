@@ -7,7 +7,7 @@ leaves one unresolved is the outcome worth acting on, and it is invisible in a t
 from __future__ import annotations
 
 import os
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from rich.text import Text
 

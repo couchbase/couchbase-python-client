@@ -21,17 +21,17 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
 import couchbase.subdocument as SD
+from couchbase.common._operations import Op
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException)
-from couchbase.logic.observability import OpName
 from couchbase.options import (ExistsOptions,
                                GetAllReplicasOptions,
                                GetAndLockOptions,
@@ -74,9 +74,9 @@ UNOWNED_CAS = 12345
 # than something the type checker has to be told to ignore.
 INVALID_PROJECT: Any = [1, 2, 3]
 # The replica reads run the active copy and the replicas as separate operations, each with its
-# own span underneath the one the caller asked for.
-REPLICA_READ_OPS = [OpName.Get, OpName.GetReplica]
-SUBDOC_REPLICA_READ_OPS = [OpName.LookupIn, OpName.LookupInReplica]
+# own span underneath the one the caller asked for, which the core makes and names.
+REPLICA_READ_OPS = ['get', 'get_replica']
+SUBDOC_REPLICA_READ_OPS = ['lookup_in', 'lookup_in_replica']
 # MAJORITY rather than PERSIST_TO_MAJORITY: the span carries whichever level was asked for, and
 # a persisted write waits on disk on more than one node, which a loaded cluster has been measured
 # taking past 9s.  The persisted levels are covered by the durability suites.
@@ -117,7 +117,7 @@ class ErrorTranscoder(Transcoder):
     def encode_value(self, value: Any) -> tuple[bytes, int]:
         raise EncodingFailure('transcoder error')
 
-    def decode_value(self, value: bytes, flags: Optional[int]) -> Any:
+    def decode_value(self, value: bytes, flags: int | None) -> Any:
         raise EncodingFailure('transcoder error')
 
 
@@ -128,7 +128,7 @@ class KeyValueTracingTestSuite(TopologySuite):
     # checks the SDK's own roll-ups against the child spans they were rolled up from, and `NoOp`
     # asserts the SDK never asked for a span at all.
     #
-    # Named tests rather than one parametrized over `OpName`.  An operation reached through
+    # Named tests rather than one parametrized over `Op`.  An operation reached through
     # `getattr` has no type for the generator to read, so the generated suites would call it
     # without awaiting it, and an unawaited coroutine produces no spans: the assertion would
     # fail somewhere far from the cause, or pass under `NoOp` where empty is the expectation.
@@ -232,34 +232,34 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_insert(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_new_doc()
         run_in_reactor_thread(cb_env.collection.insert, key, value)
-        kv_validator.validate_kv_op(OpName.Insert)
+        kv_validator.validate_kv_op(Op.Insert)
 
     def test_replace(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_existing_doc()
         run_in_reactor_thread(cb_env.collection.replace, key, value)
-        kv_validator.validate_kv_op(OpName.Replace)
+        kv_validator.validate_kv_op(Op.Replace)
 
     def test_upsert(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_existing_doc()
         run_in_reactor_thread(cb_env.collection.upsert, key, value)
-        kv_validator.validate_kv_op(OpName.Upsert)
+        kv_validator.validate_kv_op(Op.Upsert)
 
     def test_exists(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.exists, key)
-        kv_validator.validate_kv_op(OpName.Exists)
+        kv_validator.validate_kv_op(Op.Exists)
 
     def test_get(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.get, key)
-        kv_validator.validate_kv_op(OpName.Get)
+        kv_validator.validate_kv_op(Op.Get)
 
     @pytest.mark.usefixtures('check_replicas_configured')
     @pytest.mark.usefixtures('check_replicas_online')
     def test_get_all_replicas(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.get_all_replicas, key)
-        kv_validator.validate_kv_op(OpName.GetAllReplicas, nested_ops=REPLICA_READ_OPS)
+        kv_validator.validate_kv_op(Op.GetAllReplicas, nested_ops=REPLICA_READ_OPS)
 
     @ANY_REPLICA_OPEN_SIBLING_RERUN
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -270,29 +270,29 @@ class KeyValueTracingTestSuite(TopologySuite):
         # Whichever copy answers first wins, and a copy that answers out of a local cache can
         # report no server time at all, so what is asserted is that one of them reached a
         # server rather than that all of them did.
-        kv_validator.validate_kv_op(OpName.GetAnyReplica,
+        kv_validator.validate_kv_op(Op.GetAnyReplica,
                                     nested_ops=REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
 
     def test_get_and_lock(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.get_and_lock, key, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndLock)
+        kv_validator.validate_kv_op(Op.GetAndLock)
 
     def test_get_and_touch(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.get_and_touch, key, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndTouch)
+        kv_validator.validate_kv_op(Op.GetAndTouch)
 
     def test_touch(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.touch, key, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.Touch)
+        kv_validator.validate_kv_op(Op.Touch)
 
     def test_lookup_in(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.lookup_in, key, LOOKUP_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.LookupIn)
+        kv_validator.validate_kv_op(Op.LookupIn)
 
     @pytest.mark.usefixtures('check_subdoc_replica_read_supported')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -300,7 +300,7 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_lookup_in_all_replicas(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.lookup_in_all_replicas, key, LOOKUP_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.LookupInAllReplicas, nested_ops=SUBDOC_REPLICA_READ_OPS)
+        kv_validator.validate_kv_op(Op.LookupInAllReplicas, nested_ops=SUBDOC_REPLICA_READ_OPS)
 
     @ANY_REPLICA_OPEN_SIBLING_RERUN
     @pytest.mark.usefixtures('check_subdoc_replica_read_supported')
@@ -309,26 +309,26 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_lookup_in_any_replica(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.lookup_in_any_replica, key, LOOKUP_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.LookupInAnyReplica,
+        kv_validator.validate_kv_op(Op.LookupInAnyReplica,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
 
     def test_mutate_in(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.mutate_in, key, MUTATE_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.MutateIn)
+        kv_validator.validate_kv_op(Op.MutateIn)
 
     def test_remove(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         run_in_reactor_thread(cb_env.collection.remove, key)
-        kv_validator.validate_kv_op(OpName.Remove)
+        kv_validator.validate_kv_op(Op.Remove)
 
     def test_unlock(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         result = run_in_reactor_thread(cb_env.collection.get_and_lock, key, FIVE_SECONDS)
         kv_validator.reset()
         run_in_reactor_thread(cb_env.collection.unlock, key, result.cas)
-        kv_validator.validate_kv_op(OpName.Unlock)
+        kv_validator.validate_kv_op(Op.Unlock)
 
     def test_upsert_with_retries(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         # The lock is held for a second, so the upsert retries until the lock lapses and then
@@ -343,7 +343,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         run_in_reactor_thread(
             cb_env.collection.upsert, key, {'foo': 'bar'},
             UpsertOptions(timeout=timedelta(seconds=10)))
-        kv_validator.validate_kv_op(OpName.Upsert, retry_count_gt_zero=True)
+        kv_validator.validate_kv_op(Op.Upsert, retry_count_gt_zero=True)
 
     # ------------------------------------------------------------------
     # Operations that carry a durability requirement
@@ -357,7 +357,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         key, value = cb_env.get_new_doc()
         opts = InsertOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         run_in_reactor_thread(cb_env.collection.insert, key, value, opts)
-        kv_validator.validate_kv_op(OpName.Insert, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Insert, durability=MAJORITY_LABEL)
 
     @SYNC_WRITE_AMBIGUOUS_RERUN
     @pytest.mark.usefixtures('check_sync_durability_supported')
@@ -367,7 +367,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         key, value = cb_env.get_existing_doc()
         opts = ReplaceOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         run_in_reactor_thread(cb_env.collection.replace, key, value, opts)
-        kv_validator.validate_kv_op(OpName.Replace, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Replace, durability=MAJORITY_LABEL)
 
     @SYNC_WRITE_AMBIGUOUS_RERUN
     @pytest.mark.usefixtures('check_sync_durability_supported')
@@ -377,7 +377,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         key, value = cb_env.get_existing_doc()
         opts = UpsertOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         run_in_reactor_thread(cb_env.collection.upsert, key, value, opts)
-        kv_validator.validate_kv_op(OpName.Upsert, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Upsert, durability=MAJORITY_LABEL)
 
     @SYNC_WRITE_AMBIGUOUS_RERUN
     @pytest.mark.usefixtures('check_sync_durability_supported')
@@ -388,7 +388,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         key = cb_env.get_existing_doc(key_only=True)
         opts = MutateInOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         run_in_reactor_thread(cb_env.collection.mutate_in, key, MUTATE_IN_SPECS, opts)
-        kv_validator.validate_kv_op(OpName.MutateIn, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.MutateIn, durability=MAJORITY_LABEL)
 
     @SYNC_WRITE_AMBIGUOUS_RERUN
     @pytest.mark.usefixtures('check_sync_durability_supported')
@@ -398,7 +398,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         key = cb_env.get_existing_doc(key_only=True)
         opts = RemoveOptions(durability=MAJORITY, timeout=SERVER_DURABLE_TIMEOUT)
         run_in_reactor_thread(cb_env.collection.remove, key, opts)
-        kv_validator.validate_kv_op(OpName.Remove, durability=MAJORITY_LABEL)
+        kv_validator.validate_kv_op(Op.Remove, durability=MAJORITY_LABEL)
 
     # ------------------------------------------------------------------
     # Operations the server refuses, which still produce a full span tree
@@ -408,18 +408,18 @@ class KeyValueTracingTestSuite(TopologySuite):
         key, value = cb_env.get_existing_doc()
         with pytest.raises(DocumentExistsException):
             run_in_reactor_thread(cb_env.collection.insert, key, value)
-        kv_validator.validate_kv_op(OpName.Insert, validate_error=True)
+        kv_validator.validate_kv_op(Op.Insert, validate_error=True)
 
     def test_replace_missing_key(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         _, value = cb_env.get_new_doc()
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.replace, TwistedTestEnvironment.NOT_A_KEY, value)
-        kv_validator.validate_kv_op(OpName.Replace, validate_error=True)
+        kv_validator.validate_kv_op(Op.Replace, validate_error=True)
 
     def test_get_missing_key(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.get, TwistedTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.Get, validate_error=True)
+        kv_validator.validate_kv_op(Op.Get, validate_error=True)
 
     @pytest.mark.usefixtures('check_replicas_configured')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -429,7 +429,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         # could be retrieved.
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.get_all_replicas, TwistedTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.GetAllReplicas, nested_ops=REPLICA_READ_OPS, validate_error=True)
+        kv_validator.validate_kv_op(Op.GetAllReplicas, nested_ops=REPLICA_READ_OPS, validate_error=True)
 
     @pytest.mark.usefixtures('check_replicas_configured')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -437,7 +437,7 @@ class KeyValueTracingTestSuite(TopologySuite):
                                          kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentUnretrievableException):
             run_in_reactor_thread(cb_env.collection.get_any_replica, TwistedTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.GetAnyReplica,
+        kv_validator.validate_kv_op(Op.GetAnyReplica,
                                     nested_ops=REPLICA_READ_OPS,
                                     validate_error=True,
                                     server_duration_gt_zero=False)
@@ -446,23 +446,23 @@ class KeyValueTracingTestSuite(TopologySuite):
                                       kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.get_and_lock, TwistedTestEnvironment.NOT_A_KEY, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndLock, validate_error=True)
+        kv_validator.validate_kv_op(Op.GetAndLock, validate_error=True)
 
     def test_get_and_touch_missing_key(self, cb_env: TwistedTestEnvironment,
                                        kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.get_and_touch, TwistedTestEnvironment.NOT_A_KEY, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndTouch, validate_error=True)
+        kv_validator.validate_kv_op(Op.GetAndTouch, validate_error=True)
 
     def test_touch_missing_key(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.touch, TwistedTestEnvironment.NOT_A_KEY, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.Touch, validate_error=True)
+        kv_validator.validate_kv_op(Op.Touch, validate_error=True)
 
     def test_lookup_in_missing_key(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.lookup_in, TwistedTestEnvironment.NOT_A_KEY, LOOKUP_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.LookupIn, validate_error=True)
+        kv_validator.validate_kv_op(Op.LookupIn, validate_error=True)
 
     @pytest.mark.usefixtures('check_subdoc_replica_read_supported')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -472,7 +472,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.lookup_in_all_replicas,
                                   TwistedTestEnvironment.NOT_A_KEY, LOOKUP_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.LookupInAllReplicas,
+        kv_validator.validate_kv_op(Op.LookupInAllReplicas,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS,
                                     validate_error=True)
 
@@ -484,7 +484,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         with pytest.raises(DocumentUnretrievableException):
             run_in_reactor_thread(cb_env.collection.lookup_in_any_replica,
                                   TwistedTestEnvironment.NOT_A_KEY, LOOKUP_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.LookupInAnyReplica,
+        kv_validator.validate_kv_op(Op.LookupInAnyReplica,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS,
                                     validate_error=True,
                                     server_duration_gt_zero=False)
@@ -492,17 +492,17 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_mutate_in_missing_key(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.mutate_in, TwistedTestEnvironment.NOT_A_KEY, MUTATE_IN_SPECS)
-        kv_validator.validate_kv_op(OpName.MutateIn, validate_error=True)
+        kv_validator.validate_kv_op(Op.MutateIn, validate_error=True)
 
     def test_remove_missing_key(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.remove, TwistedTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.Remove, validate_error=True)
+        kv_validator.validate_kv_op(Op.Remove, validate_error=True)
 
     def test_unlock_invalid_cas(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.unlock, TwistedTestEnvironment.NOT_A_KEY, UNOWNED_CAS)
-        kv_validator.validate_kv_op(OpName.Unlock, validate_error=True)
+        kv_validator.validate_kv_op(Op.Unlock, validate_error=True)
 
     # ------------------------------------------------------------------
     # Operations the client refuses, which never reach the wire
@@ -512,7 +512,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         key = cb_env.get_existing_doc(key_only=True)
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(cb_env.collection.get, key, GetOptions(project=INVALID_PROJECT))
-        kv_validator.validate_kv_op(OpName.Get, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.Get, validate_error=True, error_before_dispatch=True)
 
     def test_mutate_in_preserve_expiry_conflict(self, cb_env: TwistedTestEnvironment,
                                                 kv_validator: KeyValueSpanValidator) -> None:
@@ -522,7 +522,7 @@ class KeyValueTracingTestSuite(TopologySuite):
             run_in_reactor_thread(cb_env.collection.mutate_in, key,
                                   (SD.insert('make', 'New Make'),),
                                   MutateInOptions(preserve_expiry=True))
-        kv_validator.validate_kv_op(OpName.MutateIn, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.MutateIn, validate_error=True, error_before_dispatch=True)
 
     def test_replace_preserve_expiry_conflict(self, cb_env: TwistedTestEnvironment,
                                               kv_validator: KeyValueSpanValidator) -> None:
@@ -531,26 +531,26 @@ class KeyValueTracingTestSuite(TopologySuite):
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(cb_env.collection.replace, key, value,
                                   ReplaceOptions(preserve_expiry=True, expiry=FIVE_SECONDS))
-        kv_validator.validate_kv_op(OpName.Replace, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.Replace, validate_error=True, error_before_dispatch=True)
 
     def test_upsert_encoding_error(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_new_doc()
         with pytest.raises(EncodingFailure):
             run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=ErrorTranscoder()))
-        kv_validator.validate_kv_op(OpName.Upsert, validate_error=True, error_before_dispatch=True)
+        kv_validator.validate_kv_op(Op.Upsert, validate_error=True, error_before_dispatch=True)
 
     def test_insert_negative_expiry(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         # The expiry is rejected while the options are still being read, before any span exists.
         key, value = cb_env.get_new_doc()
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(cb_env.collection.insert, key, value, InsertOptions(expiry=NEGATIVE_EXPIRY))
-        kv_validator.validate_kv_op(OpName.Insert, expect_request_span=False)
+        kv_validator.validate_kv_op(Op.Insert, expect_request_span=False)
 
     def test_upsert_negative_expiry(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_existing_doc()
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(expiry=NEGATIVE_EXPIRY))
-        kv_validator.validate_kv_op(OpName.Upsert, expect_request_span=False)
+        kv_validator.validate_kv_op(Op.Upsert, expect_request_span=False)
 
     # ------------------------------------------------------------------
     # Operations handed a parent span
@@ -564,67 +564,67 @@ class KeyValueTracingTestSuite(TopologySuite):
 
     def test_insert_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_new_doc()
-        parent = kv_validator.new_parent_span(OpName.Insert)
+        parent = kv_validator.new_parent_span(Op.Insert)
         run_in_reactor_thread(cb_env.collection.insert, key, value, InsertOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Insert, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Insert, parent_span=parent)
 
         key, value = cb_env.get_new_doc()
-        parent = kv_validator.new_parent_span(OpName.Insert)
+        parent = kv_validator.new_parent_span(Op.Insert)
         run_in_reactor_thread(cb_env.collection.insert, key, value, span=parent)
-        kv_validator.validate_kv_op(OpName.Insert, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Insert, parent_span=parent)
 
     def test_replace_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_existing_doc()
-        parent = kv_validator.new_parent_span(OpName.Replace)
+        parent = kv_validator.new_parent_span(Op.Replace)
         run_in_reactor_thread(cb_env.collection.replace, key, value, ReplaceOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Replace, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Replace, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Replace)
+        parent = kv_validator.new_parent_span(Op.Replace)
         run_in_reactor_thread(cb_env.collection.replace, key, value, span=parent)
-        kv_validator.validate_kv_op(OpName.Replace, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Replace, parent_span=parent)
 
     def test_upsert_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key, value = cb_env.get_existing_doc()
-        parent = kv_validator.new_parent_span(OpName.Upsert)
+        parent = kv_validator.new_parent_span(Op.Upsert)
         run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Upsert, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Upsert, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Upsert)
+        parent = kv_validator.new_parent_span(Op.Upsert)
         run_in_reactor_thread(cb_env.collection.upsert, key, value, span=parent)
-        kv_validator.validate_kv_op(OpName.Upsert, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Upsert, parent_span=parent)
 
     def test_exists_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Exists)
+        parent = kv_validator.new_parent_span(Op.Exists)
         run_in_reactor_thread(cb_env.collection.exists, key, ExistsOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Exists, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Exists, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Exists)
+        parent = kv_validator.new_parent_span(Op.Exists)
         run_in_reactor_thread(cb_env.collection.exists, key, span=parent)
-        kv_validator.validate_kv_op(OpName.Exists, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Exists, parent_span=parent)
 
     def test_get_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Get)
+        parent = kv_validator.new_parent_span(Op.Get)
         run_in_reactor_thread(cb_env.collection.get, key, GetOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Get, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Get, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.Get)
+        parent = kv_validator.new_parent_span(Op.Get)
         run_in_reactor_thread(cb_env.collection.get, key, span=parent)
-        kv_validator.validate_kv_op(OpName.Get, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Get, parent_span=parent)
 
     @pytest.mark.usefixtures('check_replicas_configured')
     @pytest.mark.usefixtures('check_replicas_online')
     def test_get_all_replicas_with_parent(self, cb_env: TwistedTestEnvironment,
                                           kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.GetAllReplicas)
+        parent = kv_validator.new_parent_span(Op.GetAllReplicas)
         run_in_reactor_thread(cb_env.collection.get_all_replicas, key, GetAllReplicasOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.GetAllReplicas, parent_span=parent, nested_ops=REPLICA_READ_OPS)
+        kv_validator.validate_kv_op(Op.GetAllReplicas, parent_span=parent, nested_ops=REPLICA_READ_OPS)
 
-        parent = kv_validator.new_parent_span(OpName.GetAllReplicas)
+        parent = kv_validator.new_parent_span(Op.GetAllReplicas)
         run_in_reactor_thread(cb_env.collection.get_all_replicas, key, span=parent)
-        kv_validator.validate_kv_op(OpName.GetAllReplicas, parent_span=parent, nested_ops=REPLICA_READ_OPS)
+        kv_validator.validate_kv_op(Op.GetAllReplicas, parent_span=parent, nested_ops=REPLICA_READ_OPS)
 
     @ANY_REPLICA_OPEN_SIBLING_RERUN
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -632,16 +632,16 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_get_any_replica_with_parent(self, cb_env: TwistedTestEnvironment,
                                          kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.GetAnyReplica)
+        parent = kv_validator.new_parent_span(Op.GetAnyReplica)
         run_in_reactor_thread(cb_env.collection.get_any_replica, key, GetAnyReplicaOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.GetAnyReplica,
+        kv_validator.validate_kv_op(Op.GetAnyReplica,
                                     parent_span=parent,
                                     nested_ops=REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
 
-        parent = kv_validator.new_parent_span(OpName.GetAnyReplica)
+        parent = kv_validator.new_parent_span(Op.GetAnyReplica)
         run_in_reactor_thread(cb_env.collection.get_any_replica, key, span=parent)
-        kv_validator.validate_kv_op(OpName.GetAnyReplica,
+        kv_validator.validate_kv_op(Op.GetAnyReplica,
                                     parent_span=parent,
                                     nested_ops=REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
@@ -649,48 +649,48 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_get_and_lock_with_parent(self, cb_env: TwistedTestEnvironment,
                                       kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.GetAndLock)
+        parent = kv_validator.new_parent_span(Op.GetAndLock)
         run_in_reactor_thread(cb_env.collection.get_and_lock, key, ONE_SECOND, GetAndLockOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.GetAndLock, parent_span=parent)
+        kv_validator.validate_kv_op(Op.GetAndLock, parent_span=parent)
 
         # A fresh key, because the one above is still locked.
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.GetAndLock)
+        parent = kv_validator.new_parent_span(Op.GetAndLock)
         run_in_reactor_thread(cb_env.collection.get_and_lock, key, ONE_SECOND, span=parent)
-        kv_validator.validate_kv_op(OpName.GetAndLock, parent_span=parent)
+        kv_validator.validate_kv_op(Op.GetAndLock, parent_span=parent)
 
     def test_get_and_touch_with_parent(self, cb_env: TwistedTestEnvironment,
                                        kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.GetAndTouch)
+        parent = kv_validator.new_parent_span(Op.GetAndTouch)
         run_in_reactor_thread(cb_env.collection.get_and_touch, key, ONE_SECOND, GetAndTouchOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.GetAndTouch, parent_span=parent)
+        kv_validator.validate_kv_op(Op.GetAndTouch, parent_span=parent)
 
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.GetAndTouch)
+        parent = kv_validator.new_parent_span(Op.GetAndTouch)
         run_in_reactor_thread(cb_env.collection.get_and_touch, key, ONE_SECOND, span=parent)
-        kv_validator.validate_kv_op(OpName.GetAndTouch, parent_span=parent)
+        kv_validator.validate_kv_op(Op.GetAndTouch, parent_span=parent)
 
     def test_touch_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Touch)
+        parent = kv_validator.new_parent_span(Op.Touch)
         run_in_reactor_thread(cb_env.collection.touch, key, ONE_SECOND, TouchOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Touch, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Touch, parent_span=parent)
 
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Touch)
+        parent = kv_validator.new_parent_span(Op.Touch)
         run_in_reactor_thread(cb_env.collection.touch, key, ONE_SECOND, span=parent)
-        kv_validator.validate_kv_op(OpName.Touch, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Touch, parent_span=parent)
 
     def test_lookup_in_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.LookupIn)
+        parent = kv_validator.new_parent_span(Op.LookupIn)
         run_in_reactor_thread(cb_env.collection.lookup_in, key, LOOKUP_IN_SPECS, LookupInOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.LookupIn, parent_span=parent)
+        kv_validator.validate_kv_op(Op.LookupIn, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.LookupIn)
+        parent = kv_validator.new_parent_span(Op.LookupIn)
         run_in_reactor_thread(cb_env.collection.lookup_in, key, LOOKUP_IN_SPECS, span=parent)
-        kv_validator.validate_kv_op(OpName.LookupIn, parent_span=parent)
+        kv_validator.validate_kv_op(Op.LookupIn, parent_span=parent)
 
     @pytest.mark.usefixtures('check_subdoc_replica_read_supported')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -698,17 +698,17 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_lookup_in_all_replicas_with_parent(self, cb_env: TwistedTestEnvironment,
                                                 kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.LookupInAllReplicas)
+        parent = kv_validator.new_parent_span(Op.LookupInAllReplicas)
         run_in_reactor_thread(cb_env.collection.lookup_in_all_replicas, key,
                               LOOKUP_IN_SPECS,
                               LookupInAllReplicasOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.LookupInAllReplicas,
+        kv_validator.validate_kv_op(Op.LookupInAllReplicas,
                                     parent_span=parent,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS)
 
-        parent = kv_validator.new_parent_span(OpName.LookupInAllReplicas)
+        parent = kv_validator.new_parent_span(Op.LookupInAllReplicas)
         run_in_reactor_thread(cb_env.collection.lookup_in_all_replicas, key, LOOKUP_IN_SPECS, span=parent)
-        kv_validator.validate_kv_op(OpName.LookupInAllReplicas,
+        kv_validator.validate_kv_op(Op.LookupInAllReplicas,
                                     parent_span=parent,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS)
 
@@ -719,54 +719,54 @@ class KeyValueTracingTestSuite(TopologySuite):
     def test_lookup_in_any_replica_with_parent(self, cb_env: TwistedTestEnvironment,
                                                kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.LookupInAnyReplica)
+        parent = kv_validator.new_parent_span(Op.LookupInAnyReplica)
         run_in_reactor_thread(cb_env.collection.lookup_in_any_replica, key,
                               LOOKUP_IN_SPECS,
                               LookupInAnyReplicaOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.LookupInAnyReplica,
+        kv_validator.validate_kv_op(Op.LookupInAnyReplica,
                                     parent_span=parent,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
 
-        parent = kv_validator.new_parent_span(OpName.LookupInAnyReplica)
+        parent = kv_validator.new_parent_span(Op.LookupInAnyReplica)
         run_in_reactor_thread(cb_env.collection.lookup_in_any_replica, key, LOOKUP_IN_SPECS, span=parent)
-        kv_validator.validate_kv_op(OpName.LookupInAnyReplica,
+        kv_validator.validate_kv_op(Op.LookupInAnyReplica,
                                     parent_span=parent,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
 
     def test_mutate_in_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.MutateIn)
+        parent = kv_validator.new_parent_span(Op.MutateIn)
         run_in_reactor_thread(cb_env.collection.mutate_in, key, MUTATE_IN_SPECS, MutateInOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.MutateIn, parent_span=parent)
+        kv_validator.validate_kv_op(Op.MutateIn, parent_span=parent)
 
-        parent = kv_validator.new_parent_span(OpName.MutateIn)
+        parent = kv_validator.new_parent_span(Op.MutateIn)
         run_in_reactor_thread(cb_env.collection.mutate_in, key, MUTATE_IN_SPECS, span=parent)
-        kv_validator.validate_kv_op(OpName.MutateIn, parent_span=parent)
+        kv_validator.validate_kv_op(Op.MutateIn, parent_span=parent)
 
     def test_remove_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Remove)
+        parent = kv_validator.new_parent_span(Op.Remove)
         run_in_reactor_thread(cb_env.collection.remove, key, RemoveOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Remove, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Remove, parent_span=parent)
 
         key = cb_env.get_existing_doc(key_only=True)
-        parent = kv_validator.new_parent_span(OpName.Remove)
+        parent = kv_validator.new_parent_span(Op.Remove)
         run_in_reactor_thread(cb_env.collection.remove, key, span=parent)
-        kv_validator.validate_kv_op(OpName.Remove, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Remove, parent_span=parent)
 
     def test_unlock_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
         result = run_in_reactor_thread(cb_env.collection.get_and_lock, key, FIVE_SECONDS)
-        parent = kv_validator.new_parent_span(OpName.Unlock)
+        parent = kv_validator.new_parent_span(Op.Unlock)
         run_in_reactor_thread(cb_env.collection.unlock, key, result.cas, UnlockOptions(parent_span=parent))
-        kv_validator.validate_kv_op(OpName.Unlock, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Unlock, parent_span=parent)
 
         result = run_in_reactor_thread(cb_env.collection.get_and_lock, key, FIVE_SECONDS)
-        parent = kv_validator.new_parent_span(OpName.Unlock)
+        parent = kv_validator.new_parent_span(Op.Unlock)
         run_in_reactor_thread(cb_env.collection.unlock, key, result.cas, span=parent)
-        kv_validator.validate_kv_op(OpName.Unlock, parent_span=parent)
+        kv_validator.validate_kv_op(Op.Unlock, parent_span=parent)
 
 
 class KeyValueTracingTests(KeyValueTracingTestSuite):

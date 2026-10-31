@@ -20,8 +20,8 @@ from typing import Any
 
 import pytest
 
+from couchbase.common._operations import Op
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability import OpName
 from couchbase.options import (DecrementMultiOptions,
                                IncrementMultiOptions,
                                SignedInt64)
@@ -75,75 +75,75 @@ class BinaryMultiMetricsTestSuite(SuiteRequirements):
         return validator
 
     @pytest.mark.parametrize('multi_op, sub_op', [
-        (OpName.AppendMulti, OpName.Append),
-        (OpName.PrependMulti, OpName.Prepend),
+        (Op.AppendMulti, Op.Append),
+        (Op.PrependMulti, Op.Prepend),
     ])
     def test_multi_binary_mutation_op(self,
                                       cb_env: SyncTestEnvironment,
                                       kv_validator: KeyValueMeterValidator,
-                                      multi_op: OpName,
-                                      sub_op: OpName) -> None:
+                                      multi_op: Op,
+                                      sub_op: Op) -> None:
         keys = cb_env.get_multiple_existing_docs_by_type(DocType.BYTES_EMPTY, NUM_KEYS)
         operation = getattr(cb_env.collection.binary(), multi_op.value)
         operation({key: b'extra' for key in keys})
         kv_validator.validate_multi_kv_op(multi_op, sub_op, NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, sub_op', [
-        (OpName.AppendMulti, OpName.Append),
-        (OpName.PrependMulti, OpName.Prepend),
+        (Op.AppendMulti, Op.Append),
+        (Op.PrependMulti, Op.Prepend),
     ])
     def test_multi_binary_mutation_op_with_error(self,
                                                  cb_env: SyncTestEnvironment,
                                                  kv_validator: KeyValueMeterValidator,
-                                                 multi_op: OpName,
-                                                 sub_op: OpName) -> None:
+                                                 multi_op: Op,
+                                                 sub_op: Op) -> None:
         keys = [cb_env.get_new_doc(key_only=True) for _ in range(NUM_KEYS)]
         operation = getattr(cb_env.collection.binary(), multi_op.value)
         operation({key: b'XXX' for key in keys})
         kv_validator.validate_multi_kv_op(multi_op, sub_op, NUM_KEYS, validate_error=True)
 
     @pytest.mark.parametrize('multi_op, sub_op', [
-        (OpName.DecrementMulti, OpName.Decrement),
-        (OpName.IncrementMulti, OpName.Increment),
+        (Op.DecrementMulti, Op.Decrement),
+        (Op.IncrementMulti, Op.Increment),
     ])
     def test_multi_binary_counter_op(self,
                                      cb_env: SyncTestEnvironment,
                                      kv_validator: KeyValueMeterValidator,
-                                     multi_op: OpName,
-                                     sub_op: OpName) -> None:
+                                     multi_op: Op,
+                                     sub_op: Op) -> None:
         keys = cb_env.get_multiple_existing_docs_by_type(DocType.COUNTER, NUM_KEYS)
         operation = getattr(cb_env.collection.binary(), multi_op.value)
         operation(keys)
         kv_validator.validate_multi_kv_op(multi_op, sub_op, NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, sub_op', [
-        (OpName.DecrementMulti, OpName.Decrement),
-        (OpName.IncrementMulti, OpName.Increment),
+        (Op.DecrementMulti, Op.Decrement),
+        (Op.IncrementMulti, Op.Increment),
     ])
     def test_multi_binary_counter_op_with_error(self,
                                                 cb_env: SyncTestEnvironment,
                                                 kv_validator: KeyValueMeterValidator,
-                                                multi_op: OpName,
-                                                sub_op: OpName) -> None:
+                                                multi_op: Op,
+                                                sub_op: Op) -> None:
         keys = cb_env.get_new_counter_doc_keys(NUM_KEYS)
         operation = getattr(cb_env.collection.binary(), multi_op.value)
-        if multi_op is OpName.IncrementMulti:
+        if multi_op is Op.IncrementMulti:
             operation(keys, IncrementMultiOptions(initial=NEGATIVE_INITIAL))
         else:
             operation(keys, DecrementMultiOptions(initial=NEGATIVE_INITIAL))
         kv_validator.validate_multi_kv_op(multi_op, sub_op, NUM_KEYS, validate_error=True)
 
     @pytest.mark.parametrize('multi_op, sub_op, keys_as_mapping', [
-        (OpName.AppendMulti, OpName.Append, False),
-        (OpName.DecrementMulti, OpName.Decrement, True),
-        (OpName.IncrementMulti, OpName.Increment, True),
-        (OpName.PrependMulti, OpName.Prepend, False),
+        (Op.AppendMulti, Op.Append, False),
+        (Op.DecrementMulti, Op.Decrement, True),
+        (Op.IncrementMulti, Op.Increment, True),
+        (Op.PrependMulti, Op.Prepend, False),
     ])
     def test_multi_binary_op_not_dispatched(self,
                                             cb_env: SyncTestEnvironment,
                                             kv_validator: KeyValueMeterValidator,
-                                            multi_op: OpName,
-                                            sub_op: OpName,
+                                            multi_op: Op,
+                                            sub_op: Op,
                                             keys_as_mapping: bool) -> None:
         # append and prepend take a mapping and are given a list; increment and decrement take
         # a list and are given a mapping.  Nothing is measured either way: no per-key work

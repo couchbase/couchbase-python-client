@@ -24,8 +24,8 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 
+from couchbase.common._operations import Op
 from couchbase.exceptions import InvalidArgumentException, QueueEmpty
-from couchbase.logic.observability import OpName
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   ConnectionStrategy,
                                                   SuiteRequirements,
@@ -40,14 +40,14 @@ from tests.metrics_validators import KeyValueMeterValidator
 # out at each of the fifty-odd steps below.  The two CREATE_ forms are the first write and the
 # first read against a document that is not there yet: the operation is attempted, fails, the
 # document is inserted, and the operation is retried.
-CREATE_THEN_MUTATE = [(OpName.MutateIn, True), (OpName.Insert, False), (OpName.MutateIn, False)]
-CREATE_THEN_LOOKUP = [(OpName.LookupIn, True), (OpName.Insert, False), (OpName.LookupIn, False)]
-MUTATE = [(OpName.MutateIn, False)]
-FAILED_MUTATE = [(OpName.MutateIn, True)]
-LOOKUP = [(OpName.LookupIn, False)]
+CREATE_THEN_MUTATE = [(Op.MutateIn, True), (Op.Insert, False), (Op.MutateIn, False)]
+CREATE_THEN_LOOKUP = [(Op.LookupIn, True), (Op.Insert, False), (Op.LookupIn, False)]
+MUTATE = [(Op.MutateIn, False)]
+FAILED_MUTATE = [(Op.MutateIn, True)]
+LOOKUP = [(Op.LookupIn, False)]
 # Reading the whole document, which is what the operations that need every element do.
-FULL_GET = [(OpName.Get, False)]
-REMOVE = [(OpName.Remove, False)]
+FULL_GET = [(Op.Get, False)]
+REMOVE = [(Op.Remove, False)]
 
 
 class DatastructuresMetricsTestSuite(SuiteRequirements):
@@ -97,61 +97,61 @@ class DatastructuresMetricsTestSuite(SuiteRequirements):
         cb_list = cb_env.collection.couchbase_list(key)
 
         await cb_list.append('world')
-        kv_validator.validate_ds_op(OpName.ListAppend, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.ListAppend, CREATE_THEN_MUTATE)
 
         kv_validator.reset()
         assert str(await cb_list.get_at(0)) == 'world'
-        kv_validator.validate_ds_op(OpName.ListGetAt, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListGetAt, LOOKUP)
 
         kv_validator.reset()
         await cb_list.prepend('hello')
-        kv_validator.validate_ds_op(OpName.ListPrepend, MUTATE)
+        kv_validator.validate_ds_op(Op.ListPrepend, MUTATE)
 
         kv_validator.reset()
         assert str(await cb_list.get_at(0)) == 'hello'
-        kv_validator.validate_ds_op(OpName.ListGetAt, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListGetAt, LOOKUP)
 
         kv_validator.reset()
         assert str(await cb_list.get_at(1)) == 'world'
-        kv_validator.validate_ds_op(OpName.ListGetAt, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListGetAt, LOOKUP)
 
         kv_validator.reset()
         assert 2 == await cb_list.size()
-        kv_validator.validate_ds_op(OpName.ListSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListSize, LOOKUP)
 
         kv_validator.reset()
         await cb_list.remove_at(1)
-        kv_validator.validate_ds_op(OpName.ListRemoveAt, MUTATE)
+        kv_validator.validate_ds_op(Op.ListRemoveAt, MUTATE)
 
         kv_validator.reset()
         await cb_list.append('world')
-        kv_validator.validate_ds_op(OpName.ListAppend, MUTATE)
+        kv_validator.validate_ds_op(Op.ListAppend, MUTATE)
 
         kv_validator.reset()
         await cb_list.set_at(1, 'after')
-        kv_validator.validate_ds_op(OpName.ListSetAt, MUTATE)
+        kv_validator.validate_ds_op(Op.ListSetAt, MUTATE)
 
         kv_validator.reset()
         assert ['hello', 'after'] == await cb_list.get_all()
-        kv_validator.validate_ds_op(OpName.ListGetAll, FULL_GET)
+        kv_validator.validate_ds_op(Op.ListGetAll, FULL_GET)
 
         kv_validator.reset()
         assert 1 == await cb_list.index_of('after')
-        kv_validator.validate_ds_op(OpName.ListIndexOf, FULL_GET)
+        kv_validator.validate_ds_op(Op.ListIndexOf, FULL_GET)
 
         kv_validator.reset()
         await cb_list.clear()
-        kv_validator.validate_ds_op(OpName.ListClear, REMOVE)
+        kv_validator.validate_ds_op(Op.ListClear, REMOVE)
 
         # The document is gone, so a second clear's remove fails, and the list catches it.
         kv_validator.reset()
         await cb_list.clear()
-        kv_validator.validate_ds_op(OpName.ListClear, [(OpName.Remove, True)])
+        kv_validator.validate_ds_op(Op.ListClear, [(Op.Remove, True)])
 
         # Clearing removes the document, so the next read is a first read again.
         kv_validator.reset()
         assert 0 == await cb_list.size()
-        kv_validator.validate_ds_op(OpName.ListSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.ListSize, CREATE_THEN_LOOKUP)
 
     @pytest.mark.asyncio
     async def test_map(self,
@@ -161,62 +161,62 @@ class DatastructuresMetricsTestSuite(SuiteRequirements):
         cb_map = cb_env.collection.couchbase_map(key)
 
         await cb_map.add('key1', 'val1')
-        kv_validator.validate_ds_op(OpName.MapAdd, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.MapAdd, CREATE_THEN_MUTATE)
 
         kv_validator.reset()
         assert await cb_map.get('key1') == 'val1'
-        kv_validator.validate_ds_op(OpName.MapGet, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapGet, LOOKUP)
 
         kv_validator.reset()
         assert 1 == await cb_map.size()
-        kv_validator.validate_ds_op(OpName.MapSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapSize, LOOKUP)
 
         # A subdoc mutation that fails on a missing path, so it reaches the server and is
         # measured like any other failure rather than being refused before dispatch.
         kv_validator.reset()
         with pytest.raises(InvalidArgumentException):
             await cb_map.remove('key2')
-        kv_validator.validate_ds_op(OpName.MapRemove, FAILED_MUTATE)
+        kv_validator.validate_ds_op(Op.MapRemove, FAILED_MUTATE)
 
         kv_validator.reset()
         await cb_map.add('key2', 'val2')
-        kv_validator.validate_ds_op(OpName.MapAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.MapAdd, MUTATE)
 
         kv_validator.reset()
         assert ['key1', 'key2'] == await cb_map.keys()
-        kv_validator.validate_ds_op(OpName.MapKeys, FULL_GET)
+        kv_validator.validate_ds_op(Op.MapKeys, FULL_GET)
 
         kv_validator.reset()
         assert ['val1', 'val2'] == await cb_map.values()
-        kv_validator.validate_ds_op(OpName.MapValues, FULL_GET)
+        kv_validator.validate_ds_op(Op.MapValues, FULL_GET)
 
         kv_validator.reset()
         assert await cb_map.exists('key1') is True
-        kv_validator.validate_ds_op(OpName.MapExists, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapExists, LOOKUP)
 
         kv_validator.reset()
         assert await cb_map.exists('no-key') is False
-        kv_validator.validate_ds_op(OpName.MapExists, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapExists, LOOKUP)
 
         kv_validator.reset()
         assert [('key1', 'val1'), ('key2', 'val2')] == list(await cb_map.items())
-        kv_validator.validate_ds_op(OpName.MapItems, FULL_GET)
+        kv_validator.validate_ds_op(Op.MapItems, FULL_GET)
 
         kv_validator.reset()
         await cb_map.remove('key1')
-        kv_validator.validate_ds_op(OpName.MapRemove, MUTATE)
+        kv_validator.validate_ds_op(Op.MapRemove, MUTATE)
 
         kv_validator.reset()
         assert 1 == await cb_map.size()
-        kv_validator.validate_ds_op(OpName.MapSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapSize, LOOKUP)
 
         kv_validator.reset()
         await cb_map.clear()
-        kv_validator.validate_ds_op(OpName.MapClear, REMOVE)
+        kv_validator.validate_ds_op(Op.MapClear, REMOVE)
 
         kv_validator.reset()
         assert 0 == await cb_map.size()
-        kv_validator.validate_ds_op(OpName.MapSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.MapSize, CREATE_THEN_LOOKUP)
 
     @pytest.mark.asyncio
     async def test_queue(self,
@@ -226,59 +226,59 @@ class DatastructuresMetricsTestSuite(SuiteRequirements):
         cb_queue = cb_env.collection.couchbase_queue(key)
 
         await cb_queue.push(1)
-        kv_validator.validate_ds_op(OpName.QueuePush, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, CREATE_THEN_MUTATE)
 
         kv_validator.reset()
         await cb_queue.push(2)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         await cb_queue.push(3)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         # A pop reads the tail and then removes it, so it is two operations where a push is
         # one.
         kv_validator.reset()
         assert await cb_queue.pop() == 1
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, False)])
 
         kv_validator.reset()
         assert await cb_queue.pop() == 2
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, False)])
 
         kv_validator.reset()
         assert await cb_queue.pop() == 3
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, False)])
 
         # The queue is empty, so the read succeeds and the remove is what fails.
         kv_validator.reset()
         with pytest.raises(QueueEmpty):
             await cb_queue.pop()
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, True)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, True)])
 
         kv_validator.reset()
         await cb_queue.push(1)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         await cb_queue.push(2)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         await cb_queue.push(3)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         assert await cb_queue.size() == 3
-        kv_validator.validate_ds_op(OpName.QueueSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.QueueSize, LOOKUP)
 
         kv_validator.reset()
         await cb_queue.clear()
-        kv_validator.validate_ds_op(OpName.QueueClear, REMOVE)
+        kv_validator.validate_ds_op(Op.QueueClear, REMOVE)
 
         kv_validator.reset()
         assert 0 == await cb_queue.size()
-        kv_validator.validate_ds_op(OpName.QueueSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.QueueSize, CREATE_THEN_LOOKUP)
 
     @pytest.mark.asyncio
     async def test_set(self,
@@ -288,67 +288,67 @@ class DatastructuresMetricsTestSuite(SuiteRequirements):
         cb_set = cb_env.collection.couchbase_set(key)
 
         await cb_set.add(123)
-        kv_validator.validate_ds_op(OpName.SetAdd, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, CREATE_THEN_MUTATE)
 
         # Adding a value the set already holds still costs the mutation that finds out, and that
         # mutation fails.  The set catches the failure and returns False.
         kv_validator.reset()
         assert await cb_set.add(123) is False
-        kv_validator.validate_ds_op(OpName.SetAdd, FAILED_MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, FAILED_MUTATE)
 
         kv_validator.reset()
         assert 1 == await cb_set.size()
-        kv_validator.validate_ds_op(OpName.SetSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.SetSize, LOOKUP)
 
         kv_validator.reset()
         assert await cb_set.contains(123) is True
-        kv_validator.validate_ds_op(OpName.SetContains, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetContains, FULL_GET)
 
         kv_validator.reset()
         await cb_set.remove(123)
-        kv_validator.validate_ds_op(OpName.SetRemove, [(OpName.Get, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.SetRemove, [(Op.Get, False), (Op.MutateIn, False)])
 
         kv_validator.reset()
         assert 0 == await cb_set.size()
-        kv_validator.validate_ds_op(OpName.SetSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.SetSize, LOOKUP)
 
         # Removing a value the set does not hold stops at the read: there is no index to
         # mutate, so the second operation never happens.
         kv_validator.reset()
         await cb_set.remove(123)
-        kv_validator.validate_ds_op(OpName.SetRemove, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetRemove, FULL_GET)
 
         kv_validator.reset()
         assert await cb_set.contains(123) is False
-        kv_validator.validate_ds_op(OpName.SetContains, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetContains, FULL_GET)
 
         kv_validator.reset()
         await cb_set.add(1)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         await cb_set.add(2)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         await cb_set.add(3)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         await cb_set.add(4)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         assert [1, 2, 3, 4] == await cb_set.values()
-        kv_validator.validate_ds_op(OpName.SetValues, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetValues, FULL_GET)
 
         kv_validator.reset()
         await cb_set.clear()
-        kv_validator.validate_ds_op(OpName.SetClear, REMOVE)
+        kv_validator.validate_ds_op(Op.SetClear, REMOVE)
 
         kv_validator.reset()
         assert 0 == await cb_set.size()
-        kv_validator.validate_ds_op(OpName.SetSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.SetSize, CREATE_THEN_LOOKUP)
 
 
 class DatastructuresMetricsTests(DatastructuresMetricsTestSuite):

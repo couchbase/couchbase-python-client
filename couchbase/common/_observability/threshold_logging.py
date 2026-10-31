@@ -143,6 +143,12 @@ _PROCESSED_ATTRIBUTE_KEYS = frozenset({
 })
 
 
+def _server_duration_ns(value: object) -> int:
+    # The dispatch span's server duration attribute is in microseconds, and every duration here is
+    # kept in nanoseconds.
+    return int(cast(int, value)) * 1000
+
+
 @dataclass(frozen=True)
 class ThresholdLoggingSpanSnapshot:
     """Immutable snapshot of span state for threshold logging."""
@@ -380,7 +386,7 @@ class ThresholdLoggingSpan(RequestSpan):
             if key == _ATTR_SERVICE:
                 span._service_type = ServiceType(value)
             elif key == _DISP_SERVER_DURATION:
-                int_val = int(cast(int, value))
+                int_val = _server_duration_ns(value)
                 span._server_duration_ns = int_val
                 span._total_server_duration_ns += int_val
             elif key == _DISP_LOCAL_ID:
@@ -412,7 +418,7 @@ class ThresholdLoggingSpan(RequestSpan):
             server_duration: int | None = None
             for key, value in attributes.items():
                 if key == _DISP_SERVER_DURATION:
-                    server_duration = int(value)
+                    server_duration = _server_duration_ns(value)
                     span._server_duration_ns = server_duration
                 elif key == _DISP_LOCAL_ID:
                     span._local_id = str(value)

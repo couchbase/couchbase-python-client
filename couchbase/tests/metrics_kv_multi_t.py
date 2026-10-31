@@ -21,8 +21,8 @@ from typing import Any
 
 import pytest
 
+from couchbase.common._operations import Op
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.logic.observability import OpName
 from tests.environments.metrics_environment import MeterType, MetricsEnvironment
 from tests.environments.test_environment import (ConnectionStrategy,
                                                  SuiteRequirements,
@@ -75,65 +75,65 @@ class KeyValueMultiMetricsTestSuite(SuiteRequirements):
         return validator
 
     @pytest.mark.parametrize('multi_op, sub_op', [
-        (OpName.ExistsMulti, OpName.Exists),
-        (OpName.GetMulti, OpName.Get),
-        (OpName.GetAllReplicasMulti, OpName.GetAllReplicas),
-        (OpName.GetAnyReplicaMulti, OpName.GetAnyReplica),
+        (Op.ExistsMulti, Op.Exists),
+        (Op.GetMulti, Op.Get),
+        (Op.GetAllReplicasMulti, Op.GetAllReplicas),
+        (Op.GetAnyReplicaMulti, Op.GetAnyReplica),
     ])
     def test_multi_kv_op(self,
                          cb_env: SyncTestEnvironment,
                          kv_validator: KeyValueMeterValidator,
-                         multi_op: OpName,
-                         sub_op: OpName) -> None:
+                         multi_op: Op,
+                         sub_op: Op) -> None:
         keys = list(cb_env.get_docs(NUM_KEYS))
         operation = getattr(cb_env.collection, multi_op.value)
         operation(keys)
         kv_validator.validate_multi_kv_op(multi_op, sub_op, NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, sub_op', [
-        (OpName.GetMulti, OpName.Get),
-        (OpName.GetAllReplicasMulti, OpName.GetAllReplicas),
-        (OpName.GetAnyReplicaMulti, OpName.GetAnyReplica),
-        (OpName.GetAndLockMulti, OpName.GetAndLock),
+        (Op.GetMulti, Op.Get),
+        (Op.GetAllReplicasMulti, Op.GetAllReplicas),
+        (Op.GetAnyReplicaMulti, Op.GetAnyReplica),
+        (Op.GetAndLockMulti, Op.GetAndLock),
     ])
     def test_multi_kv_op_with_error(self,
                                     cb_env: SyncTestEnvironment,
                                     kv_validator: KeyValueMeterValidator,
-                                    multi_op: OpName,
-                                    sub_op: OpName) -> None:
+                                    multi_op: Op,
+                                    sub_op: Op) -> None:
         # No `pytest.raises`: a multi operation collects its failures into the result rather
         # than raising, which is what `return_exceptions` is for.  Under test is that each
         # failed key was still measured.
         keys = [cb_env.get_new_doc(key_only=True) for _ in range(NUM_KEYS)]
         operation = getattr(cb_env.collection, multi_op.value)
-        if multi_op is OpName.GetAndLockMulti:
+        if multi_op is Op.GetAndLockMulti:
             operation(keys, ONE_SECOND)
         else:
             operation(keys)
         kv_validator.validate_multi_kv_op(multi_op, sub_op, NUM_KEYS, validate_error=True)
 
     @pytest.mark.parametrize('multi_op, sub_op', [
-        (OpName.InsertMulti, OpName.Insert),
-        (OpName.RemoveMulti, OpName.Remove),
-        (OpName.ReplaceMulti, OpName.Replace),
-        (OpName.TouchMulti, OpName.Touch),
-        (OpName.UpsertMulti, OpName.Upsert),
+        (Op.InsertMulti, Op.Insert),
+        (Op.RemoveMulti, Op.Remove),
+        (Op.ReplaceMulti, Op.Replace),
+        (Op.TouchMulti, Op.Touch),
+        (Op.UpsertMulti, Op.Upsert),
     ])
     def test_multi_mutation_op(self,
                                cb_env: SyncTestEnvironment,
                                kv_validator: KeyValueMeterValidator,
-                               multi_op: OpName,
-                               sub_op: OpName) -> None:
+                               multi_op: Op,
+                               sub_op: Op) -> None:
         docs: Any
-        if multi_op is OpName.InsertMulti:
+        if multi_op is Op.InsertMulti:
             docs = cb_env.get_new_docs(NUM_KEYS)
-        elif multi_op in (OpName.ReplaceMulti, OpName.UpsertMulti):
+        elif multi_op in (Op.ReplaceMulti, Op.UpsertMulti):
             docs = cb_env.get_docs(NUM_KEYS)
         else:
             docs = list(cb_env.get_docs(NUM_KEYS))
 
         operation = getattr(cb_env.collection, multi_op.value)
-        if multi_op is OpName.TouchMulti:
+        if multi_op is Op.TouchMulti:
             operation(docs, ONE_SECOND)
         else:
             operation(docs)
@@ -147,30 +147,30 @@ class KeyValueMultiMetricsTestSuite(SuiteRequirements):
         # cleared between the two.
         keys = list(cb_env.get_docs(NUM_KEYS))
         locked = cb_env.collection.get_and_lock_multi(keys, HALF_SECOND)
-        kv_validator.validate_multi_kv_op(OpName.GetAndLockMulti, OpName.GetAndLock, NUM_KEYS)
+        kv_validator.validate_multi_kv_op(Op.GetAndLockMulti, Op.GetAndLock, NUM_KEYS)
 
         kv_validator.reset()
         cb_env.collection.unlock_multi(locked)
-        kv_validator.validate_multi_kv_op(OpName.UnlockMulti, OpName.Unlock, NUM_KEYS)
+        kv_validator.validate_multi_kv_op(Op.UnlockMulti, Op.Unlock, NUM_KEYS)
 
     @pytest.mark.parametrize('multi_op, sub_op, keys_as_mapping', [
-        (OpName.ExistsMulti, OpName.Exists, True),
-        (OpName.GetMulti, OpName.Get, True),
-        (OpName.GetAllReplicasMulti, OpName.GetAllReplicas, True),
-        (OpName.GetAndLockMulti, OpName.GetAndLock, True),
-        (OpName.GetAnyReplicaMulti, OpName.GetAnyReplica, True),
-        (OpName.InsertMulti, OpName.Insert, False),
-        (OpName.RemoveMulti, OpName.Remove, True),
-        (OpName.ReplaceMulti, OpName.Replace, False),
-        (OpName.TouchMulti, OpName.Touch, True),
-        (OpName.UnlockMulti, OpName.Unlock, True),
-        (OpName.UpsertMulti, OpName.Upsert, False),
+        (Op.ExistsMulti, Op.Exists, True),
+        (Op.GetMulti, Op.Get, True),
+        (Op.GetAllReplicasMulti, Op.GetAllReplicas, True),
+        (Op.GetAndLockMulti, Op.GetAndLock, True),
+        (Op.GetAnyReplicaMulti, Op.GetAnyReplica, True),
+        (Op.InsertMulti, Op.Insert, False),
+        (Op.RemoveMulti, Op.Remove, True),
+        (Op.ReplaceMulti, Op.Replace, False),
+        (Op.TouchMulti, Op.Touch, True),
+        (Op.UnlockMulti, Op.Unlock, True),
+        (Op.UpsertMulti, Op.Upsert, False),
     ])
     def test_multi_kv_op_not_dispatched(self,
                                         cb_env: SyncTestEnvironment,
                                         kv_validator: KeyValueMeterValidator,
-                                        multi_op: OpName,
-                                        sub_op: OpName,
+                                        multi_op: Op,
+                                        sub_op: Op,
                                         keys_as_mapping: bool) -> None:
         # An operation taking a list of keys is given a mapping, and one taking a mapping is
         # given a list.  The client rejects it without reaching the bindings, so unlike the
@@ -180,7 +180,7 @@ class KeyValueMultiMetricsTestSuite(SuiteRequirements):
         argument: Any = {key: {'test': 'data'} for key in keys} if keys_as_mapping else keys
         operation = getattr(cb_env.collection, multi_op.value)
         with pytest.raises(InvalidArgumentException):
-            if multi_op in (OpName.GetAndLockMulti, OpName.TouchMulti):
+            if multi_op in (Op.GetAndLockMulti, Op.TouchMulti):
                 operation(argument, ONE_SECOND, return_exceptions=False)
             else:
                 operation(argument, return_exceptions=False)

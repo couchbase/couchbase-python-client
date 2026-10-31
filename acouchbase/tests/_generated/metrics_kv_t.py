@@ -21,17 +21,17 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 import pytest_asyncio
 
 import couchbase.subdocument as SD
+from couchbase.common._operations import Op
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException)
-from couchbase.logic.observability import OpName
 from couchbase.options import (GetOptions,
                                InsertOptions,
                                MutateInOptions,
@@ -75,7 +75,7 @@ class ErrorTranscoder(Transcoder):
     def encode_value(self, value: Any) -> tuple[bytes, int]:
         raise EncodingFailure('transcoder error')
 
-    def decode_value(self, value: bytes, flags: Optional[int]) -> Any:
+    def decode_value(self, value: bytes, flags: int | None) -> Any:
         raise EncodingFailure('transcoder error')
 
 
@@ -84,7 +84,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
     # recorder it produced.  The suite runs twice, once per `MeterType`: `Basic` asserts on what
     # was recorded, `NoOp` asserts the SDK never asked the meter for anything.
     #
-    # Thirty-six named tests rather than twelve parametrized over `OpName`, covering the same
+    # Thirty-six named tests rather than twelve parametrized over `Op`, covering the same
     # thirty-six cases.  An operation reached through `getattr` has no type for the generator to
     # read, so the generated suites would call it without awaiting it, and an unawaited
     # coroutine records nothing: half the cases would then pass while testing nothing, `NoOp`
@@ -166,61 +166,61 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
     async def test_exists(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.exists(key)
-        kv_validator.validate_kv_op(OpName.Exists)
+        kv_validator.validate_kv_op(Op.Exists)
 
     @pytest.mark.asyncio
     async def test_get(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.get(key)
-        kv_validator.validate_kv_op(OpName.Get)
+        kv_validator.validate_kv_op(Op.Get)
 
     @pytest.mark.asyncio
     async def test_get_all_replicas(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.get_all_replicas(key)
-        kv_validator.validate_kv_op(OpName.GetAllReplicas)
+        kv_validator.validate_kv_op(Op.GetAllReplicas)
 
     @pytest.mark.asyncio
     async def test_get_any_replica(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.get_any_replica(key)
-        kv_validator.validate_kv_op(OpName.GetAnyReplica)
+        kv_validator.validate_kv_op(Op.GetAnyReplica)
 
     @pytest.mark.asyncio
     async def test_get_and_lock(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.get_and_lock(key, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndLock)
+        kv_validator.validate_kv_op(Op.GetAndLock)
 
     @pytest.mark.asyncio
     async def test_get_and_touch(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.get_and_touch(key, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndTouch)
+        kv_validator.validate_kv_op(Op.GetAndTouch)
 
     @pytest.mark.asyncio
     async def test_touch(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.touch(key, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.Touch)
+        kv_validator.validate_kv_op(Op.Touch)
 
     @pytest.mark.asyncio
     async def test_insert(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key, value = cb_env.get_new_doc()
         await cb_env.collection.insert(key, value)
-        kv_validator.validate_kv_op(OpName.Insert)
+        kv_validator.validate_kv_op(Op.Insert)
 
     @pytest.mark.asyncio
     async def test_replace(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key, value = await cb_env.get_existing_doc()
         await cb_env.collection.replace(key, value)
-        kv_validator.validate_kv_op(OpName.Replace)
+        kv_validator.validate_kv_op(Op.Replace)
 
     @pytest.mark.asyncio
     async def test_upsert(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key, value = await cb_env.get_existing_doc()
         await cb_env.collection.upsert(key, value)
-        kv_validator.validate_kv_op(OpName.Upsert)
+        kv_validator.validate_kv_op(Op.Upsert)
 
     @pytest.mark.asyncio
     async def test_remove(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
@@ -230,7 +230,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         # Clearing here rather than relying on the fixture is what leaves only the remove.
         kv_validator.reset()
         await cb_env.collection.remove(key)
-        kv_validator.validate_kv_op(OpName.Remove)
+        kv_validator.validate_kv_op(Op.Remove)
 
     @pytest.mark.asyncio
     async def test_unlock(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
@@ -238,13 +238,13 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         result = await cb_env.collection.get_and_lock(key, FIVE_SECONDS)
         kv_validator.reset()
         await cb_env.collection.unlock(key, result.cas)
-        kv_validator.validate_kv_op(OpName.Unlock)
+        kv_validator.validate_kv_op(Op.Unlock)
 
     @pytest.mark.asyncio
     async def test_lookup_in(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.lookup_in(key, (SD.get('batch'),))
-        kv_validator.validate_kv_op(OpName.LookupIn)
+        kv_validator.validate_kv_op(Op.LookupIn)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_replica_read_supported')
@@ -253,7 +253,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                           kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.lookup_in_all_replicas(key, (SD.get('batch'),))
-        kv_validator.validate_kv_op(OpName.LookupInAllReplicas)
+        kv_validator.validate_kv_op(Op.LookupInAllReplicas)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_replica_read_supported')
@@ -262,13 +262,13 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                          kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.lookup_in_any_replica(key, (SD.get('batch'),))
-        kv_validator.validate_kv_op(OpName.LookupInAnyReplica)
+        kv_validator.validate_kv_op(Op.LookupInAnyReplica)
 
     @pytest.mark.asyncio
     async def test_mutate_in(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         key = await cb_env.get_existing_doc(key_only=True)
         await cb_env.collection.mutate_in(key, (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model')))
-        kv_validator.validate_kv_op(OpName.MutateIn)
+        kv_validator.validate_kv_op(Op.MutateIn)
 
     # ------------------------------------------------------------------
     # Operations that reach the server and are refused there
@@ -278,7 +278,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
     async def test_get_missing_key(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.get(AsyncTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.Get, validate_error=True)
+        kv_validator.validate_kv_op(Op.Get, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_get_all_replicas_missing_key(self,
@@ -286,7 +286,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                                 kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.get_all_replicas(AsyncTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.GetAllReplicas, validate_error=True)
+        kv_validator.validate_kv_op(Op.GetAllReplicas, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_get_any_replica_missing_key(self,
@@ -294,7 +294,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                                kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentUnretrievableException):
             await cb_env.collection.get_any_replica(AsyncTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.GetAnyReplica, validate_error=True)
+        kv_validator.validate_kv_op(Op.GetAnyReplica, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_get_and_lock_missing_key(self,
@@ -302,7 +302,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                             kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.get_and_lock(AsyncTestEnvironment.NOT_A_KEY, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndLock, validate_error=True)
+        kv_validator.validate_kv_op(Op.GetAndLock, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_get_and_touch_missing_key(self,
@@ -310,13 +310,13 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                              kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.get_and_touch(AsyncTestEnvironment.NOT_A_KEY, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.GetAndTouch, validate_error=True)
+        kv_validator.validate_kv_op(Op.GetAndTouch, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_touch_missing_key(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.touch(AsyncTestEnvironment.NOT_A_KEY, ONE_SECOND)
-        kv_validator.validate_kv_op(OpName.Touch, validate_error=True)
+        kv_validator.validate_kv_op(Op.Touch, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_insert_existing_key(
@@ -324,7 +324,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         key, value = await cb_env.get_existing_doc()
         with pytest.raises(DocumentExistsException):
             await cb_env.collection.insert(key, value)
-        kv_validator.validate_kv_op(OpName.Insert, validate_error=True)
+        kv_validator.validate_kv_op(Op.Insert, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_replace_missing_key(
@@ -332,26 +332,26 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         key, value = cb_env.get_new_doc()
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.replace(key, value)
-        kv_validator.validate_kv_op(OpName.Replace, validate_error=True)
+        kv_validator.validate_kv_op(Op.Replace, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_remove_missing_key(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.remove(AsyncTestEnvironment.NOT_A_KEY)
-        kv_validator.validate_kv_op(OpName.Remove, validate_error=True)
+        kv_validator.validate_kv_op(Op.Remove, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_unlock_missing_key(self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.unlock(AsyncTestEnvironment.NOT_A_KEY, UNOWNED_CAS)
-        kv_validator.validate_kv_op(OpName.Unlock, validate_error=True)
+        kv_validator.validate_kv_op(Op.Unlock, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_lookup_in_missing_key(
             self, cb_env: AsyncTestEnvironment, kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.lookup_in(AsyncTestEnvironment.NOT_A_KEY, (SD.get('batch'),))
-        kv_validator.validate_kv_op(OpName.LookupIn, validate_error=True)
+        kv_validator.validate_kv_op(Op.LookupIn, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_replica_read_supported')
@@ -360,7 +360,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                                       kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.lookup_in_all_replicas(AsyncTestEnvironment.NOT_A_KEY, (SD.get('batch'),))
-        kv_validator.validate_kv_op(OpName.LookupInAllReplicas, validate_error=True)
+        kv_validator.validate_kv_op(Op.LookupInAllReplicas, validate_error=True)
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures('check_replica_read_supported')
@@ -369,7 +369,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
                                                      kv_validator: KeyValueMeterValidator) -> None:
         with pytest.raises(DocumentUnretrievableException):
             await cb_env.collection.lookup_in_any_replica(AsyncTestEnvironment.NOT_A_KEY, (SD.get('batch'),))
-        kv_validator.validate_kv_op(OpName.LookupInAnyReplica, validate_error=True)
+        kv_validator.validate_kv_op(Op.LookupInAnyReplica, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_mutate_in_missing_key(
@@ -377,7 +377,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.mutate_in(AsyncTestEnvironment.NOT_A_KEY,
                                               (SD.upsert('make', 'New Make'), SD.replace('model', 'New Model')))
-        kv_validator.validate_kv_op(OpName.MutateIn, validate_error=True)
+        kv_validator.validate_kv_op(Op.MutateIn, validate_error=True)
 
     # ------------------------------------------------------------------
     # Operations refused by the client, after the request span exists
@@ -389,7 +389,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         key = await cb_env.get_existing_doc(key_only=True)
         with pytest.raises(InvalidArgumentException):
             await cb_env.collection.get(key, GetOptions(project=INVALID_PROJECT))
-        kv_validator.validate_kv_op(OpName.Get, validate_error=True)
+        kv_validator.validate_kv_op(Op.Get, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_mutate_in_invalid_preserve_expiry(self,
@@ -400,7 +400,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
             await cb_env.collection.mutate_in(key,
                                               (SD.insert('make', 'New Make'),),
                                               MutateInOptions(preserve_expiry=True))
-        kv_validator.validate_kv_op(OpName.MutateIn, validate_error=True)
+        kv_validator.validate_kv_op(Op.MutateIn, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_replace_invalid_preserve_expiry(self,
@@ -409,7 +409,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         key, value = await cb_env.get_existing_doc()
         with pytest.raises(InvalidArgumentException):
             await cb_env.collection.replace(key, value, ReplaceOptions(preserve_expiry=True, expiry=FIVE_SECONDS))
-        kv_validator.validate_kv_op(OpName.Replace, validate_error=True)
+        kv_validator.validate_kv_op(Op.Replace, validate_error=True)
 
     @pytest.mark.asyncio
     async def test_upsert_encoding_error(
@@ -417,7 +417,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         key, value = cb_env.get_new_doc()
         with pytest.raises(EncodingFailure):
             await cb_env.collection.upsert(key, value, UpsertOptions(transcoder=ErrorTranscoder()))
-        kv_validator.validate_kv_op(OpName.Upsert, validate_error=True)
+        kv_validator.validate_kv_op(Op.Upsert, validate_error=True)
 
     # ------------------------------------------------------------------
     # Operations refused before the request span exists
@@ -429,7 +429,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         key, value = await cb_env.get_existing_doc()
         with pytest.raises(InvalidArgumentException):
             await cb_env.collection.insert(key, value, InsertOptions(expiry=NEGATIVE_EXPIRY))
-        kv_validator.validate_kv_op(OpName.Insert, validate_error=True, expect_collection_labels=False)
+        kv_validator.validate_kv_op(Op.Insert, validate_error=True, expect_collection_labels=False)
 
     @pytest.mark.asyncio
     async def test_upsert_invalid_expiry(
@@ -437,7 +437,7 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
         key, value = await cb_env.get_existing_doc()
         with pytest.raises(InvalidArgumentException):
             await cb_env.collection.upsert(key, value, UpsertOptions(expiry=NEGATIVE_EXPIRY))
-        kv_validator.validate_kv_op(OpName.Upsert, validate_error=True, expect_collection_labels=False)
+        kv_validator.validate_kv_op(Op.Upsert, validate_error=True, expect_collection_labels=False)
 
 
 class KeyValueMetricsTests(KeyValueMetricsTestSuite):

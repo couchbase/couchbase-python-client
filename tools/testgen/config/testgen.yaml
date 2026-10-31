@@ -164,15 +164,15 @@ suites:
   # all three impls from one options object and compares eight settings fields.
   #
   # ConnectionTestSuite does generate, because what it asserts is what the *core* reports back
-  # through cluster._impl.get_connection_info(), and that is per-tree code.  txcouchbase is
+  # through the cluster impl's get_connection_info(), and that is per-tree code.  txcouchbase is
   # excluded at both the suite and the concrete class: every test starts from Cluster.connect.
   - source: couchbase/tests/connection_t.py
     targets: [acouchbase]
 
-  # txcouchbase.Cluster has no set_authenticator, and txcouchbase/protocol/classic/_cluster_impl.py has
-  # neither update_credentials nor get_connection_info, so there is nothing for a generated
-  # copy to call.  Listed with one target rather than carrying a testgen_exclude because both
-  # of its classes would be excluded and one of them for a different reason.
+  # txcouchbase.Cluster has no set_authenticator, so nothing reaches the update_credentials its
+  # cluster impl inherits from the async one, and there is nothing for a generated copy to call.
+  # Listed with one target rather than carrying a testgen_exclude because both of its classes
+  # would be excluded and one of them for a different reason.
   #
   # JwtAuthenticatorUnitTests is excluded from the acouchbase target at the class.  It is
   # cluster-free and there is no acouchbase.auth: every tree imports JwtAuthenticator from
@@ -306,9 +306,10 @@ not_generated:
     - couchbase/tests/tracing_binary_multi_t.py
     - couchbase/tests/tracing_kv_multi_t.py
 
-  # The row iterators' executor is driven through a stand-in rather than through a server, and
-  # the stand-in is API-specific.  acouchbase carries a hand-written counterpart, not a
-  # sidecar, there being no generated file for a sidecar to merge into.
+  # Driven through a stand-in rather than through a server, and the stand-in is API-specific: the
+  # row iterators' executor, and the transactions impl whose primitives `run` awaits under
+  # acouchbase.  acouchbase carries a hand-written counterpart to each, not a sidecar, there being
+  # no generated file for a sidecar to merge into.
   api_specific_fake:
     - couchbase/tests/streaming_iterators_t.py
     - couchbase/tests/transactions_run_t.py

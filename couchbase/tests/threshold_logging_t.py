@@ -26,11 +26,10 @@ from typing import (Any,
 
 import pytest
 
+from couchbase.common._observability.observability_types import DispatchAttributeName, OpAttributeName
 from couchbase.common._observability.threshold_logging import ThresholdLoggingReporter, ThresholdLoggingTracer
-from couchbase.logic.observability.observability_types import (DispatchAttributeName,
-                                                               OpAttributeName,
-                                                               ServiceType)
-from couchbase.logic.options import ClusterTracingOptionsBase
+from couchbase.common._operations import ServiceType
+from couchbase.options import ClusterTracingOptions
 from tests.manifest import validate_test_manifest
 from tests.observability_test_impls import RecordingReporter
 
@@ -78,9 +77,7 @@ class ThresholdLoggingTestSuite:
         tracers: list[ThresholdLoggingTracer] = []
 
         def _make(config: dict[str, Any]) -> ThresholdLoggingTracer:
-            # The tracer reads the tracing options under the keys a caller writes, which is what
-            # these configs spell, so they go in as they are.
-            tracer = ThresholdLoggingTracer(cast(ClusterTracingOptionsBase, config))
+            tracer = ThresholdLoggingTracer(ClusterTracingOptions(**config))
             tracer._reporter.stop()
             tracers.append(tracer)
             return tracer
@@ -299,7 +296,8 @@ class ThresholdLoggingTestSuite:
         dispatch_span.set_attribute(DispatchAttributeName.PeerPort.value, 11210)
         dispatch_span.set_attribute(DispatchAttributeName.ServerAddress.value, '1.2.3.5')
         dispatch_span.set_attribute(DispatchAttributeName.ServerPort.value, 11210)
-        dispatch_span.set_attribute(DispatchAttributeName.ServerDuration.value, 300_000)
+        # In microseconds, as the core reports it.
+        dispatch_span.set_attribute(DispatchAttributeName.ServerDuration.value, 300)
         dispatch_span.end(end_time=dispatch_end_ns)
 
         op_span.end(end_time=op_start_ns + 1_000_000)
@@ -400,7 +398,7 @@ class ThresholdLoggingTestSuite:
                 root.end(end_time=time_ns())
 
                 assert root._total_dispatch_duration_ns > 0
-                assert root._total_server_duration_ns == 1_000
+                assert root._total_server_duration_ns == 1_000_000
                 assert root._span_snapshot is not None
         finally:
             sys.setswitchinterval(original_interval)
@@ -430,7 +428,7 @@ class ThresholdLoggingTestSuite:
                 dispatch = tracer.request_span(OpAttributeName.DispatchSpanName.value,
                                                parent_span=parent,
                                                start_time=parent_start + 500_000)
-                dispatch.set_attribute(DispatchAttributeName.ServerDuration.value, 300_000)
+                dispatch.set_attribute(DispatchAttributeName.ServerDuration.value, 300)
                 dispatch.set_attribute(DispatchAttributeName.LocalId.value, f'local_{thread_id}')
                 dispatch.set_attribute(DispatchAttributeName.OperationId.value, f'op_{thread_id}')
                 dispatch.end(end_time=parent_start + 900_000)

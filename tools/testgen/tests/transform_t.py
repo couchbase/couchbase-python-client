@@ -96,16 +96,16 @@ def test_a_renamed_call_is_renamed_inside_its_parentheses() -> None:
 
 
 def test_a_split_import_in_a_function_keeps_its_indentation() -> None:
-    """BucketType has no acouchbase counterpart, so the import becomes two."""
+    """CollectionQueryIndexManager has no txcouchbase counterpart, so the import becomes two."""
     src = ('class Thing:\n\n'
            '    def test_x(self) -> None:\n'
-           '        from couchbase.management.buckets import BucketSettings, BucketType\n'
-           '        assert BucketSettings and BucketType\n')
+           '        from couchbase.management.queries import CollectionQueryIndexManager, QueryIndexManager\n'
+           '        assert CollectionQueryIndexManager and QueryIndexManager\n')
 
-    out = _generated(src, AsyncTransformer)
+    out = _generated(src, TwistedTransformer)
 
-    assert ('        from acouchbase.management.buckets import BucketSettings\n'
-            '        from couchbase.management.buckets import BucketType\n') in out
+    assert ('        from txcouchbase.management.queries import QueryIndexManager\n'
+            '        from couchbase.management.queries import CollectionQueryIndexManager\n') in out
     ast.parse(out)
 
 

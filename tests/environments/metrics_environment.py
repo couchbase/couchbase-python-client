@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 
-from couchbase.logic.observability import CollectionDetails, MeterProtocol
+from couchbase.common._observability import KeyspaceDetails, MeterProtocol
 from tests.environments.test_environment import TestEnvironment
 from tests.environments.tracing_environment import expects_cluster_labels
 from tests.metrics_validators import HttpMeterValidator, KeyValueMeterValidator
@@ -81,11 +81,9 @@ class MetricsEnvironment:
 
         Read back off the cluster rather than remembered by the fixture that made it.  The
         fixture would have to hand it to every consumer, and a suite that asserted on a meter
-        the cluster is not using would pass while testing nothing.  Reaching through `_impl`
-        buys that guarantee, and it is the same reach `cluster._impl._cluster_info` already
-        makes elsewhere in this tree.
+        the cluster is not using would pass while testing nothing.
         """
-        return cb_env.cluster._impl.observability_instruments.meter
+        return cb_env.cluster_view.meter
 
     @staticmethod
     def meter(cb_env: TestEnvironment) -> TestMeterType:
@@ -108,18 +106,18 @@ class MetricsEnvironment:
         return meter
 
     @staticmethod
-    def collection_details(cb_env: TestEnvironment) -> CollectionDetails:
+    def collection_details(cb_env: TestEnvironment) -> KeyspaceDetails:
         """Where the suite's operations land, in the shape the SDK labels them with.
 
-        Constructed rather than written as a dict literal.  `CollectionDetails` is the
+        Constructed rather than written as a dict literal.  `KeyspaceDetails` is the
         SDK's own `TypedDict` and its members are `bucket_name`, `scope_name` and
         `collection_name`, none of which are the words a reader would reach for unprompted.
         Calling it puts those names at the construction site, where a near-miss like `'bucket'`
         or `'scope'` is a keyword error rather than a key nothing ever reads.
         """
-        return CollectionDetails(bucket_name=cb_env.bucket.name,
-                                 scope_name=cb_env.scope.name,
-                                 collection_name=cb_env.collection.name)
+        return KeyspaceDetails(bucket_name=cb_env.bucket.name,
+                               scope_name=cb_env.scope.name,
+                               collection_name=cb_env.collection.name)
 
     @staticmethod
     def kv_meter_validator(cb_env: TestEnvironment) -> KeyValueMeterValidator:

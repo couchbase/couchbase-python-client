@@ -63,11 +63,10 @@ import threading
 from collections.abc import Mapping, Sequence
 from typing import (TYPE_CHECKING,
                     Any,
-                    Optional,
                     Protocol,
-                    Union,
                     cast)
 
+from couchbase.common._observability import OpAttributeName
 from couchbase.common._observability._clock import now_ns
 from couchbase.common._observability.no_op import (NoOpMeter,
                                                    NoOpSpan,
@@ -77,9 +76,7 @@ from couchbase.common._observability.threshold_logging import (_IGNORED_MULTI_OP
                                                                ThresholdLoggingSpan,
                                                                ThresholdLoggingSpanSnapshot,
                                                                ThresholdLoggingTracer)
-from couchbase.logic.observability import (OpAttributeName,
-                                           OpName,
-                                           ServiceType)
+from couchbase.common._operations import Op, ServiceType
 from couchbase.metrics import CouchbaseMeter, CouchbaseValueRecorder
 from couchbase.observability.metrics import ValueRecorder
 from couchbase.observability.tracing import (RequestSpan,
@@ -87,9 +84,10 @@ from couchbase.observability.tracing import (RequestSpan,
                                              SpanAttributeValue,
                                              SpanStatusCode)
 from couchbase.tracing import CouchbaseSpan, CouchbaseTracer
+from tests.observability_ops import span_name
 
 if TYPE_CHECKING:
-    from couchbase.logic.options import ClusterTracingOptionsBase
+    from couchbase.options import ClusterTracingOptions
 
 # The name every parent span a suite opens must start with.  The threshold-logging span asks
 # whether it should be judged against a service threshold, and a span the test opened is not an
@@ -172,13 +170,13 @@ class RecordingValueRecorder(ValueRecorder):
 
     def __init__(self, name: str, tags: Mapping[str, str]) -> None:
         self.name = name
-        self.op_name: Optional[str] = None
+        self.op_name: str | None = None
         if tags and OpAttributeName.OperationName.value in tags:
             self.op_name = tags[OpAttributeName.OperationName.value]
         self.attributes = tags
-        self.values: list[Union[int, float]] = []
+        self.values: list[int | float] = []
 
-    def record_value(self, value: Union[int, float]) -> None:
+    def record_value(self, value: int | float) -> None:
         self.values.append(value)
 
 
@@ -198,9 +196,9 @@ class RecordingMeter:
         self.recorders.setdefault(name, []).append(recorder)
         return recorder
 
-    def get_value_recorder_by_op_name(self, op_name: OpName) -> Optional[RecordingValueRecorder]:
+    def get_value_recorder_by_op_name(self, op_name: Op) -> RecordingValueRecorder | None:
         named = self.recorders.get(OpAttributeName.MeterOperationDuration.value, [])
-        return next((r for r in named if r.op_name == op_name.value), None)
+        return next((r for r in named if r.op_name == span_name(op_name)), None)
 
     def clear(self) -> None:
         self.recorders = {}
@@ -233,7 +231,7 @@ class InertMeter(NoOpMeter):
         self.recorders = {}
 
 
-TestMeterType = Union[InertMeter, RecordingMeter]
+TestMeterType = InertMeter | RecordingMeter
 
 
 class LegacyValueRecorder(CouchbaseValueRecorder):
@@ -248,10 +246,10 @@ class LegacyValueRecorder(CouchbaseValueRecorder):
     def __init__(self, name: str, tags: Mapping[str, str]) -> None:
         super().__init__()
         self.name = name
-        self.op_name: Optional[str] = tags.get(OpAttributeName.OperationName.value) if tags else None
-        self.values: list[Union[int, float]] = []
+        self.op_name: str | None = tags.get(OpAttributeName.OperationName.value) if tags else None
+        self.values: list[int | float] = []
 
-    def record_value(self, value: Union[int, float]) -> None:
+    def record_value(self, value: int | float) -> None:
         self.values.append(value)
 
 
@@ -274,7 +272,7 @@ class LegacyRecordingMeter(CouchbaseMeter):
         self.recorders.append(recorder)
         return recorder
 
-    def measured_op_names(self) -> list[Optional[str]]:
+    def measured_op_names(self) -> list[str | None]:
         """The operation name of every duration recorder that was handed a latency.
 
         Filtering on `values` rather than on the recorder merely existing is what lets one
@@ -311,13 +309,13 @@ class TestSpanProtocol(Protocol):
     def children(self) -> Sequence[TestSpanProtocol]: ...
 
     @property
-    def parent_span(self) -> Optional[TestSpanProtocol]: ...
+    def parent_span(self) -> TestSpanProtocol | None: ...
 
     @property
-    def start_time(self) -> Optional[int]: ...
+    def start_time(self) -> int | None: ...
 
     @property
-    def end_time(self) -> Optional[int]: ...
+    def end_time(self) -> int | None: ...
 
     @property
     def status(self) -> SpanStatusCode: ...
@@ -333,12 +331,12 @@ class RecordingSpan(RequestSpan):
 
     def __init__(self,
                  name: str,
-                 parent_span: Optional[RecordingSpan] = None,
-                 start_time: Optional[int] = None) -> None:
+                 parent_span: RecordingSpan | None = None,
+                 start_time: int | None = None) -> None:
         self._name = name
         self.parent_span = parent_span
-        self.start_time: Optional[int] = start_time if start_time is not None else now_ns()
-        self.end_time: Optional[int] = None
+        self.start_time: int | None = start_time if start_time is not None else now_ns()
+        self.end_time: int | None = None
         self.attributes: dict[str, Any] = {}
         self.events: dict[str, Any] = {}
         self.status = SpanStatusCode.UNSET
@@ -356,14 +354,14 @@ class RecordingSpan(RequestSpan):
 
     def add_event(self,
                   name: str,
-                  attributes: Optional[Mapping[str, SpanAttributeValue]] = None,
-                  timestamp: Optional[int] = None) -> None:
+                  attributes: Mapping[str, SpanAttributeValue] | None = None,
+                  timestamp: int | None = None) -> None:
         self.events[name] = attributes
 
     def set_status(self, status: SpanStatusCode) -> None:
         self.status = status
 
-    def end(self, end_time: Optional[int] = None) -> None:
+    def end(self, end_time: int | None = None) -> None:
         self.end_time = end_time if end_time is not None else now_ns()
 
 
@@ -379,12 +377,12 @@ class InertSpan(NoOpSpan):
 
     def __init__(self,
                  name: str,
-                 parent_span: Optional[InertSpan] = None,
-                 start_time: Optional[int] = None) -> None:
+                 parent_span: InertSpan | None = None,
+                 start_time: int | None = None) -> None:
         super().__init__(name, parent_span=parent_span, start_time=start_time)
         self.parent_span = parent_span
-        self.start_time: Optional[int] = start_time
-        self.end_time: Optional[int] = None
+        self.start_time: int | None = start_time
+        self.end_time: int | None = None
         self.attributes: dict[str, Any] = {}
         self.status = SpanStatusCode.UNSET
         self.children: list[InertSpan] = []
@@ -411,25 +409,25 @@ class ThresholdRecordingSpan(ThresholdLoggingSpan):
 
     def __init__(self,
                  name: str,
-                 parent_span: Optional[ThresholdRecordingSpan] = None,
-                 start_time: Optional[int] = None,
-                 tracer: Optional[ThresholdRecordingTracer] = None) -> None:
+                 parent_span: ThresholdRecordingSpan | None = None,
+                 start_time: int | None = None,
+                 tracer: ThresholdRecordingTracer | None = None) -> None:
         super().__init__(name, parent_span=parent_span, start_time=start_time, tracer=tracer)
         self.children: list[ThresholdRecordingSpan] = []
         self.attributes: dict[str, Any] = {}
 
     @property
-    def parent_span(self) -> Optional[ThresholdRecordingSpan]:
+    def parent_span(self) -> ThresholdRecordingSpan | None:
         parent = self._parent_span
         assert parent is None or isinstance(parent, ThresholdRecordingSpan)
         return parent
 
     @property
-    def start_time(self) -> Optional[int]:
+    def start_time(self) -> int | None:
         return self._start_time_ns
 
     @property
-    def end_time(self) -> Optional[int]:
+    def end_time(self) -> int | None:
         return self._end_time_ns
 
     @property
@@ -446,7 +444,7 @@ class ThresholdRecordingSpan(ThresholdLoggingSpan):
         assert self._span_snapshot is not None, f'span {self._name!r} has not ended'
         return self._span_snapshot
 
-    def end(self, end_time: Optional[int] = None) -> None:
+    def end(self, end_time: int | None = None) -> None:
         super().end(end_time=end_time)
         # A span the SDK creates internally is not a candidate for the threshold report, and
         # neither is a parent the test itself opened.  Checking one anyway would put a
@@ -481,12 +479,12 @@ class LegacyRecordingSpan(CouchbaseSpan):
     because the shared surface has it, and it stays `UNSET` forever, which is the true answer.
     """
 
-    def __init__(self, name: str, parent_span: Optional[LegacyRecordingSpan] = None) -> None:
+    def __init__(self, name: str, parent_span: LegacyRecordingSpan | None = None) -> None:
         super().__init__(span=self)
         self._name = name
         self.parent_span = parent_span
-        self.start_time: Optional[int] = now_ns()
-        self.end_time: Optional[int] = None
+        self.start_time: int | None = now_ns()
+        self.end_time: int | None = None
         self.attributes: dict[str, Any] = {}
         self.status = SpanStatusCode.UNSET
         self.children: list[LegacyRecordingSpan] = []
@@ -510,8 +508,8 @@ class RecordingTracer(RequestTracer):
 
     def request_span(self,
                      name: str,
-                     parent_span: Optional[RequestSpan] = None,
-                     start_time: Optional[int] = None) -> RecordingSpan:
+                     parent_span: RequestSpan | None = None,
+                     start_time: int | None = None) -> RecordingSpan:
         # The SDK only ever hands back a span this tracer made, so the assertion is a check on
         # the wiring rather than a narrowing convenience.
         assert parent_span is None or isinstance(parent_span, RecordingSpan)
@@ -519,7 +517,7 @@ class RecordingTracer(RequestTracer):
         _attach(span, parent_span, self.spans)
         return span
 
-    def get_span_by_name(self, name: str) -> Optional[RecordingSpan]:
+    def get_span_by_name(self, name: str) -> RecordingSpan | None:
         return next((s for s in self.spans if s.name == name), None)
 
     def clear_spans(self) -> None:
@@ -544,14 +542,14 @@ class InertTracer(NoOpTracer):
 
     def request_span(self,
                      name: str,
-                     parent_span: Optional[RequestSpan] = None,
-                     start_time: Optional[int] = None) -> InertSpan:
+                     parent_span: RequestSpan | None = None,
+                     start_time: int | None = None) -> InertSpan:
         assert parent_span is None or isinstance(parent_span, InertSpan)
         span = InertSpan(name, parent_span=parent_span, start_time=start_time)
         _attach(span, parent_span, self.spans)
         return span
 
-    def get_span_by_name(self, name: str) -> Optional[InertSpan]:
+    def get_span_by_name(self, name: str) -> InertSpan | None:
         return next((s for s in self.spans if s.name == name), None)
 
     def clear_spans(self) -> None:
@@ -567,8 +565,8 @@ class ThresholdRecordingTracer(ThresholdLoggingTracer):
     reporter afterwards, so the handoff is exercised too.
     """
 
-    def __init__(self, config: Optional[dict[str, int]] = None) -> None:
-        super().__init__(cast('ClusterTracingOptionsBase', config))
+    def __init__(self, config: dict[str, int] | None = None) -> None:
+        super().__init__(cast('ClusterTracingOptions', config))
         self.spans: list[ThresholdRecordingSpan] = []
         self.over_threshold_spans: list[ThresholdLoggingSpanSnapshot] = []
         self.under_threshold_spans: list[ThresholdLoggingSpanSnapshot] = []
@@ -578,8 +576,8 @@ class ThresholdRecordingTracer(ThresholdLoggingTracer):
 
     def request_span(self,
                      name: str,
-                     parent_span: Optional[RequestSpan] = None,
-                     start_time: Optional[int] = None) -> ThresholdRecordingSpan:
+                     parent_span: RequestSpan | None = None,
+                     start_time: int | None = None) -> ThresholdRecordingSpan:
         assert parent_span is None or isinstance(parent_span, ThresholdRecordingSpan)
         span = ThresholdRecordingSpan(name, parent_span=parent_span, start_time=start_time, tracer=self)
         _attach(span, parent_span, self.spans)
@@ -603,7 +601,7 @@ class ThresholdRecordingTracer(ThresholdLoggingTracer):
         """The configured threshold for a service, so a suite need not reach for a private."""
         return self._get_service_type_threshold(service_type)
 
-    def get_span_by_name(self, name: str) -> Optional[ThresholdRecordingSpan]:
+    def get_span_by_name(self, name: str) -> ThresholdRecordingSpan | None:
         return next((s for s in self.spans if s.name == name), None)
 
     def clear_spans(self) -> None:
@@ -623,7 +621,7 @@ class LegacyRecordingTracer(CouchbaseTracer):
     def __init__(self) -> None:
         self.spans: list[LegacyRecordingSpan] = []
 
-    def start_span(self, name: str, parent: Optional[CouchbaseSpan] = None) -> LegacyRecordingSpan:
+    def start_span(self, name: str, parent: CouchbaseSpan | None = None) -> LegacyRecordingSpan:
         assert parent is None or isinstance(parent, LegacyRecordingSpan)
         span = LegacyRecordingSpan(name, parent_span=parent)
         _attach(span, parent, self.spans)
@@ -631,20 +629,19 @@ class LegacyRecordingTracer(CouchbaseTracer):
 
     def request_span(self,
                      name: str,
-                     parent_span: Optional[CouchbaseSpan] = None,
-                     start_time: Optional[int] = None) -> LegacyRecordingSpan:
+                     parent_span: CouchbaseSpan | None = None,
+                     start_time: int | None = None) -> LegacyRecordingSpan:
         return self.start_span(name, parent_span)
 
-    def get_span_by_name(self, name: str) -> Optional[LegacyRecordingSpan]:
+    def get_span_by_name(self, name: str) -> LegacyRecordingSpan | None:
         return next((s for s in self.spans if s.name == name), None)
 
     def clear_spans(self) -> None:
         self.spans = []
 
 
-TestSpanType = Union[RecordingSpan, InertSpan, ThresholdRecordingSpan, LegacyRecordingSpan]
 # The three test spans that are a `RequestSpan`, which is what an SDK option takes as
 # `parent_span`.  The legacy span goes through the same option at runtime, and
 # `_SpanTreeValidator.new_parent_span` says why it is typed as if it did not.
-TestRequestSpanType = Union[RecordingSpan, InertSpan, ThresholdRecordingSpan]
-TestTracerType = Union[RecordingTracer, InertTracer, ThresholdRecordingTracer, LegacyRecordingTracer]
+TestRequestSpanType = RecordingSpan | InertSpan | ThresholdRecordingSpan
+TestTracerType = RecordingTracer | InertTracer | ThresholdRecordingTracer | LegacyRecordingTracer

@@ -19,8 +19,10 @@ from collections.abc import Generator
 
 import pytest
 
-from couchbase.exceptions import InvalidArgumentException, QueueEmpty
-from couchbase.logic.observability import OpName
+from couchbase.common._operations import Op
+from couchbase.exceptions import (DocumentNotFoundException,
+                                  InvalidArgumentException,
+                                  QueueEmpty)
 from tests.environments.test_environment import (ConnectionStrategy,
                                                  SuiteRequirements,
                                                  SyncTestEnvironment,
@@ -36,14 +38,14 @@ from tests.tracing_validators import KeyValueSpanValidator
 # whether its span should carry an error status.  The two CREATE_ forms are the first write and the
 # first read against a document that is not there yet: the operation is attempted, fails, the
 # document is inserted, and the operation is retried.
-CREATE_THEN_MUTATE = [(OpName.MutateIn, True), (OpName.Insert, False), (OpName.MutateIn, False)]
-CREATE_THEN_LOOKUP = [(OpName.LookupIn, True), (OpName.Insert, False), (OpName.LookupIn, False)]
-MUTATE = [(OpName.MutateIn, False)]
-FAILED_MUTATE = [(OpName.MutateIn, True)]
-LOOKUP = [(OpName.LookupIn, False)]
+CREATE_THEN_MUTATE = [(Op.MutateIn, True), (Op.Insert, False), (Op.MutateIn, False)]
+CREATE_THEN_LOOKUP = [(Op.LookupIn, True), (Op.Insert, False), (Op.LookupIn, False)]
+MUTATE = [(Op.MutateIn, False)]
+FAILED_MUTATE = [(Op.MutateIn, True)]
+LOOKUP = [(Op.LookupIn, False)]
 # Reading the whole document, which is what the operations that need every element do.
-FULL_GET = [(OpName.Get, False)]
-REMOVE = [(OpName.Remove, False)]
+FULL_GET = [(Op.Get, False)]
+REMOVE = [(Op.Remove, False)]
 
 
 class DatastructuresTracingTestSuite(SuiteRequirements):
@@ -92,61 +94,61 @@ class DatastructuresTracingTestSuite(SuiteRequirements):
         cb_list = cb_env.collection.couchbase_list(key)
 
         cb_list.append('world')
-        kv_validator.validate_ds_op(OpName.ListAppend, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.ListAppend, CREATE_THEN_MUTATE)
 
         kv_validator.reset()
         assert str(cb_list.get_at(0)) == 'world'
-        kv_validator.validate_ds_op(OpName.ListGetAt, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListGetAt, LOOKUP)
 
         kv_validator.reset()
         cb_list.prepend('hello')
-        kv_validator.validate_ds_op(OpName.ListPrepend, MUTATE)
+        kv_validator.validate_ds_op(Op.ListPrepend, MUTATE)
 
         kv_validator.reset()
         assert str(cb_list.get_at(0)) == 'hello'
-        kv_validator.validate_ds_op(OpName.ListGetAt, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListGetAt, LOOKUP)
 
         kv_validator.reset()
         assert str(cb_list.get_at(1)) == 'world'
-        kv_validator.validate_ds_op(OpName.ListGetAt, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListGetAt, LOOKUP)
 
         kv_validator.reset()
         assert 2 == cb_list.size()
-        kv_validator.validate_ds_op(OpName.ListSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.ListSize, LOOKUP)
 
         kv_validator.reset()
         cb_list.remove_at(1)
-        kv_validator.validate_ds_op(OpName.ListRemoveAt, MUTATE)
+        kv_validator.validate_ds_op(Op.ListRemoveAt, MUTATE)
 
         kv_validator.reset()
         cb_list.append('world')
-        kv_validator.validate_ds_op(OpName.ListAppend, MUTATE)
+        kv_validator.validate_ds_op(Op.ListAppend, MUTATE)
 
         kv_validator.reset()
         cb_list.set_at(1, 'after')
-        kv_validator.validate_ds_op(OpName.ListSetAt, MUTATE)
+        kv_validator.validate_ds_op(Op.ListSetAt, MUTATE)
 
         kv_validator.reset()
         assert ['hello', 'after'] == cb_list.get_all()
-        kv_validator.validate_ds_op(OpName.ListGetAll, FULL_GET)
+        kv_validator.validate_ds_op(Op.ListGetAll, FULL_GET)
 
         kv_validator.reset()
         assert 1 == cb_list.index_of('after')
-        kv_validator.validate_ds_op(OpName.ListIndexOf, FULL_GET)
+        kv_validator.validate_ds_op(Op.ListIndexOf, FULL_GET)
 
         kv_validator.reset()
         cb_list.clear()
-        kv_validator.validate_ds_op(OpName.ListClear, REMOVE)
+        kv_validator.validate_ds_op(Op.ListClear, REMOVE)
 
         # The document is gone, so a second clear's remove fails, and the list catches it.
         kv_validator.reset()
         cb_list.clear()
-        kv_validator.validate_ds_op(OpName.ListClear, [(OpName.Remove, True)], absorbed=True)
+        kv_validator.validate_ds_op(Op.ListClear, [(Op.Remove, True)], absorbed=True)
 
         # Clearing removes the document, so the next read is a first read again.
         kv_validator.reset()
         assert 0 == cb_list.size()
-        kv_validator.validate_ds_op(OpName.ListSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.ListSize, CREATE_THEN_LOOKUP)
 
     def test_map(self,
                  cb_env: SyncTestEnvironment,
@@ -155,62 +157,62 @@ class DatastructuresTracingTestSuite(SuiteRequirements):
         cb_map = cb_env.collection.couchbase_map(key)
 
         cb_map.add('key1', 'val1')
-        kv_validator.validate_ds_op(OpName.MapAdd, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.MapAdd, CREATE_THEN_MUTATE)
 
         kv_validator.reset()
         assert cb_map.get('key1') == 'val1'
-        kv_validator.validate_ds_op(OpName.MapGet, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapGet, LOOKUP)
 
         kv_validator.reset()
         assert 1 == cb_map.size()
-        kv_validator.validate_ds_op(OpName.MapSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapSize, LOOKUP)
 
         # A subdoc mutation that fails on a missing path, so it reaches the server and its
         # span carries an error status rather than being refused before dispatch.
         kv_validator.reset()
         with pytest.raises(InvalidArgumentException):
             cb_map.remove('key2')
-        kv_validator.validate_ds_op(OpName.MapRemove, FAILED_MUTATE)
+        kv_validator.validate_ds_op(Op.MapRemove, FAILED_MUTATE)
 
         kv_validator.reset()
         cb_map.add('key2', 'val2')
-        kv_validator.validate_ds_op(OpName.MapAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.MapAdd, MUTATE)
 
         kv_validator.reset()
         assert ['key1', 'key2'] == cb_map.keys()
-        kv_validator.validate_ds_op(OpName.MapKeys, FULL_GET)
+        kv_validator.validate_ds_op(Op.MapKeys, FULL_GET)
 
         kv_validator.reset()
         assert ['val1', 'val2'] == cb_map.values()
-        kv_validator.validate_ds_op(OpName.MapValues, FULL_GET)
+        kv_validator.validate_ds_op(Op.MapValues, FULL_GET)
 
         kv_validator.reset()
         assert cb_map.exists('key1') is True
-        kv_validator.validate_ds_op(OpName.MapExists, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapExists, LOOKUP)
 
         kv_validator.reset()
         assert cb_map.exists('no-key') is False
-        kv_validator.validate_ds_op(OpName.MapExists, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapExists, LOOKUP)
 
         kv_validator.reset()
         assert [('key1', 'val1'), ('key2', 'val2')] == list(cb_map.items())
-        kv_validator.validate_ds_op(OpName.MapItems, FULL_GET)
+        kv_validator.validate_ds_op(Op.MapItems, FULL_GET)
 
         kv_validator.reset()
         cb_map.remove('key1')
-        kv_validator.validate_ds_op(OpName.MapRemove, MUTATE)
+        kv_validator.validate_ds_op(Op.MapRemove, MUTATE)
 
         kv_validator.reset()
         assert 1 == cb_map.size()
-        kv_validator.validate_ds_op(OpName.MapSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.MapSize, LOOKUP)
 
         kv_validator.reset()
         cb_map.clear()
-        kv_validator.validate_ds_op(OpName.MapClear, REMOVE)
+        kv_validator.validate_ds_op(Op.MapClear, REMOVE)
 
         kv_validator.reset()
         assert 0 == cb_map.size()
-        kv_validator.validate_ds_op(OpName.MapSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.MapSize, CREATE_THEN_LOOKUP)
 
     def test_queue(self,
                    cb_env: SyncTestEnvironment,
@@ -219,59 +221,59 @@ class DatastructuresTracingTestSuite(SuiteRequirements):
         cb_queue = cb_env.collection.couchbase_queue(key)
 
         cb_queue.push(1)
-        kv_validator.validate_ds_op(OpName.QueuePush, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, CREATE_THEN_MUTATE)
 
         kv_validator.reset()
         cb_queue.push(2)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         cb_queue.push(3)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         # A pop reads the tail and then removes it, so it is two operations where a push is
         # one.
         kv_validator.reset()
         assert cb_queue.pop() == 1
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, False)])
 
         kv_validator.reset()
         assert cb_queue.pop() == 2
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, False)])
 
         kv_validator.reset()
         assert cb_queue.pop() == 3
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, False)])
 
         # The queue is empty, so the read succeeds and the remove is what fails.
         kv_validator.reset()
         with pytest.raises(QueueEmpty):
             cb_queue.pop()
-        kv_validator.validate_ds_op(OpName.QueuePop, [(OpName.LookupIn, False), (OpName.MutateIn, True)])
+        kv_validator.validate_ds_op(Op.QueuePop, [(Op.LookupIn, False), (Op.MutateIn, True)])
 
         kv_validator.reset()
         cb_queue.push(1)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         cb_queue.push(2)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         cb_queue.push(3)
-        kv_validator.validate_ds_op(OpName.QueuePush, MUTATE)
+        kv_validator.validate_ds_op(Op.QueuePush, MUTATE)
 
         kv_validator.reset()
         assert cb_queue.size() == 3
-        kv_validator.validate_ds_op(OpName.QueueSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.QueueSize, LOOKUP)
 
         kv_validator.reset()
         cb_queue.clear()
-        kv_validator.validate_ds_op(OpName.QueueClear, REMOVE)
+        kv_validator.validate_ds_op(Op.QueueClear, REMOVE)
 
         kv_validator.reset()
         assert 0 == cb_queue.size()
-        kv_validator.validate_ds_op(OpName.QueueSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.QueueSize, CREATE_THEN_LOOKUP)
 
     def test_set(self,
                  cb_env: SyncTestEnvironment,
@@ -280,67 +282,215 @@ class DatastructuresTracingTestSuite(SuiteRequirements):
         cb_set = cb_env.collection.couchbase_set(key)
 
         cb_set.add(123)
-        kv_validator.validate_ds_op(OpName.SetAdd, CREATE_THEN_MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, CREATE_THEN_MUTATE)
 
         # Adding a value the set already holds still costs the mutation that finds out, and that
         # mutation fails.  The set catches the failure and returns False.
         kv_validator.reset()
         assert cb_set.add(123) is False
-        kv_validator.validate_ds_op(OpName.SetAdd, FAILED_MUTATE, absorbed=True)
+        kv_validator.validate_ds_op(Op.SetAdd, FAILED_MUTATE, absorbed=True)
 
         kv_validator.reset()
         assert 1 == cb_set.size()
-        kv_validator.validate_ds_op(OpName.SetSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.SetSize, LOOKUP)
 
         kv_validator.reset()
         assert cb_set.contains(123) is True
-        kv_validator.validate_ds_op(OpName.SetContains, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetContains, FULL_GET)
 
         kv_validator.reset()
         cb_set.remove(123)
-        kv_validator.validate_ds_op(OpName.SetRemove, [(OpName.Get, False), (OpName.MutateIn, False)])
+        kv_validator.validate_ds_op(Op.SetRemove, [(Op.Get, False), (Op.MutateIn, False)])
 
         kv_validator.reset()
         assert 0 == cb_set.size()
-        kv_validator.validate_ds_op(OpName.SetSize, LOOKUP)
+        kv_validator.validate_ds_op(Op.SetSize, LOOKUP)
 
         # Removing a value the set does not hold stops at the read: there is no index to
         # mutate, so the second operation never happens.
         kv_validator.reset()
         cb_set.remove(123)
-        kv_validator.validate_ds_op(OpName.SetRemove, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetRemove, FULL_GET)
 
         kv_validator.reset()
         assert cb_set.contains(123) is False
-        kv_validator.validate_ds_op(OpName.SetContains, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetContains, FULL_GET)
 
         kv_validator.reset()
         cb_set.add(1)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         cb_set.add(2)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         cb_set.add(3)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         cb_set.add(4)
-        kv_validator.validate_ds_op(OpName.SetAdd, MUTATE)
+        kv_validator.validate_ds_op(Op.SetAdd, MUTATE)
 
         kv_validator.reset()
         assert [1, 2, 3, 4] == cb_set.values()
-        kv_validator.validate_ds_op(OpName.SetValues, FULL_GET)
+        kv_validator.validate_ds_op(Op.SetValues, FULL_GET)
 
         kv_validator.reset()
         cb_set.clear()
-        kv_validator.validate_ds_op(OpName.SetClear, REMOVE)
+        kv_validator.validate_ds_op(Op.SetClear, REMOVE)
 
         kv_validator.reset()
         assert 0 == cb_set.size()
-        kv_validator.validate_ds_op(OpName.SetSize, CREATE_THEN_LOOKUP)
+        kv_validator.validate_ds_op(Op.SetSize, CREATE_THEN_LOOKUP)
+
+
+# Excluded from generation as a whole class, for the reason datastructures_t gives.
+@pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
+                             reason='list_/map_/set_/queue_ exist only on the sync Collection')
+@pytest.mark.filterwarnings('ignore::couchbase.common.warnings.CouchbaseDeprecationWarning')
+class LegacyDatastructuresTracingTestSuite(SuiteRequirements):
+    # The deprecated collection-level methods.  Eleven have a span of their own; the other six
+    # are built from those and record what they are built from, which is pinned here as it is.
+    # When the removal lands this class and its concrete subclass are deleted alongside them.
+
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
+    CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
+    NUM_DOCS = 0
+
+    TEST_MANIFEST = [
+        'test_list',
+        'test_map',
+        'test_queue',
+        'test_set',
+    ]
+
+    @pytest.fixture(name='kv_validator')
+    def kv_validator_fixture(self, cb_env: SyncTestEnvironment) -> KeyValueSpanValidator:
+        validator = TracingEnvironment.kv_span_validator(cb_env)
+        validator.reset()
+        return validator
+
+    def test_list(self,
+                  cb_env: SyncTestEnvironment,
+                  kv_validator: KeyValueSpanValidator) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.list_append(key, 'world')
+        kv_validator.validate_ds_op(Op.ListAppend, FAILED_MUTATE)
+
+        kv_validator.reset()
+        cb_env.collection.list_append(key, 'world', create=True)
+        kv_validator.validate_ds_op(Op.ListAppend, CREATE_THEN_MUTATE)
+
+        kv_validator.reset()
+        assert cb_env.collection.list_get(key, 0) == 'world'
+        kv_validator.validate_ds_op(Op.ListGetAt, LOOKUP)
+
+        kv_validator.reset()
+        cb_env.collection.list_prepend(key, 'hello')
+        kv_validator.validate_ds_op(Op.ListPrepend, MUTATE)
+
+        kv_validator.reset()
+        assert 2 == cb_env.collection.list_size(key)
+        kv_validator.validate_ds_op(Op.ListSize, LOOKUP)
+
+        kv_validator.reset()
+        cb_env.collection.list_remove(key, 1)
+        kv_validator.validate_ds_op(Op.ListRemoveAt, MUTATE)
+
+        kv_validator.reset()
+        cb_env.collection.list_append(key, 'world')
+        kv_validator.validate_ds_op(Op.ListAppend, MUTATE)
+
+        kv_validator.reset()
+        cb_env.collection.list_set(key, 1, 'after')
+        kv_validator.validate_ds_op(Op.ListSetAt, MUTATE)
+
+    def test_map(self,
+                 cb_env: SyncTestEnvironment,
+                 kv_validator: KeyValueSpanValidator) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+
+        cb_env.collection.map_add(key, 'key1', 'val1', create=True)
+        kv_validator.validate_ds_op(Op.MapAdd, CREATE_THEN_MUTATE)
+
+        kv_validator.reset()
+        assert cb_env.collection.map_get(key, 'key1') == 'val1'
+        kv_validator.validate_ds_op(Op.MapGet, LOOKUP)
+
+        kv_validator.reset()
+        assert 1 == cb_env.collection.map_size(key)
+        kv_validator.validate_ds_op(Op.MapSize, LOOKUP)
+
+        kv_validator.reset()
+        with pytest.raises(IndexError):
+            cb_env.collection.map_remove(key, 'key2')
+        kv_validator.validate_ds_op(Op.MapRemove, FAILED_MUTATE)
+
+        kv_validator.reset()
+        cb_env.collection.map_remove(key, 'key1')
+        kv_validator.validate_ds_op(Op.MapRemove, MUTATE)
+
+    def test_queue(self,
+                   cb_env: SyncTestEnvironment,
+                   kv_validator: KeyValueSpanValidator) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+
+        cb_env.collection.queue_push(key, 1, create=True)
+        kv_validator.validate_ds_op(Op.ListPrepend, CREATE_THEN_MUTATE)
+
+        kv_validator.reset()
+        cb_env.collection.queue_push(key, 2)
+        kv_validator.validate_ds_op(Op.ListPrepend, MUTATE)
+
+        kv_validator.reset()
+        assert 2 == cb_env.collection.queue_size(key)
+        kv_validator.validate_ds_op(Op.ListSize, LOOKUP)
+
+        kv_validator.reset()
+        assert cb_env.collection.queue_pop(key) == 1
+        kv_validator.validate_ds_roots([(Op.ListGetAt, LOOKUP), (Op.ListRemoveAt, MUTATE)])
+
+        kv_validator.reset()
+        assert cb_env.collection.queue_pop(key) == 2
+        kv_validator.validate_ds_roots([(Op.ListGetAt, LOOKUP), (Op.ListRemoveAt, MUTATE)])
+
+        # The queue is empty, so the read succeeds and the remove is what fails.
+        kv_validator.reset()
+        with pytest.raises(QueueEmpty):
+            cb_env.collection.queue_pop(key)
+        kv_validator.validate_ds_roots([(Op.ListGetAt, LOOKUP), (Op.ListRemoveAt, FAILED_MUTATE)])
+
+    def test_set(self,
+                 cb_env: SyncTestEnvironment,
+                 kv_validator: KeyValueSpanValidator) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+
+        cb_env.collection.set_add(key, 123, create=True)
+        kv_validator.validate_ds_op(Op.SetAdd, CREATE_THEN_MUTATE)
+
+        kv_validator.reset()
+        assert cb_env.collection.set_add(key, 123) is None
+        kv_validator.validate_ds_op(Op.SetAdd, FAILED_MUTATE, absorbed=True)
+
+        kv_validator.reset()
+        assert 1 == cb_env.collection.set_size(key)
+        kv_validator.validate_ds_op(Op.ListSize, LOOKUP)
+
+        kv_validator.reset()
+        assert cb_env.collection.set_contains(key, 123) is True
+        kv_validator.validate_kv_op(Op.Get)
+
+        kv_validator.reset()
+        cb_env.collection.set_remove(key, 123)
+        kv_validator.validate_ds_roots([(Op.Get, None), (Op.ListRemoveAt, MUTATE)])
+
+        # Removing a value the set does not hold stops at the read.
+        kv_validator.reset()
+        assert cb_env.collection.set_remove(key, 123) is None
+        kv_validator.validate_kv_op(Op.Get)
 
 
 class DatastructuresTracingTests(DatastructuresTracingTestSuite):
@@ -362,3 +512,26 @@ class DatastructuresTracingTests(DatastructuresTracingTestSuite):
                                 tracer=TracingEnvironment.make_tracer(request.param))
         yield env
         teardown_environment(env, DatastructuresTracingTestSuite)
+
+
+@pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
+                             reason='concrete class for a suite excluded from generation')
+class LegacyDatastructuresTracingTests(LegacyDatastructuresTracingTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(LegacyDatastructuresTracingTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env', params=[TracingType.Basic,
+                                                          TracingType.Legacy,
+                                                          TracingType.NoOp,
+                                                          TracingType.ThresholdLogging])
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment,
+                                   request: pytest.FixtureRequest
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env,
+                                LegacyDatastructuresTracingTestSuite,
+                                tracer=TracingEnvironment.make_tracer(request.param))
+        yield env
+        teardown_environment(env, LegacyDatastructuresTracingTestSuite)

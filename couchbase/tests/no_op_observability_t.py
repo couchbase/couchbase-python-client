@@ -15,27 +15,27 @@
 
 from __future__ import annotations
 
-from typing import Optional, cast
+from typing import cast
 
+from couchbase.common._observability.handler import (ObservableRequestHandler,
+                                                     ObservableRequestHandlerMeterImpl,
+                                                     ObservableRequestHandlerNoOpMeterImpl,
+                                                     ObservableRequestHandlerNoOpTracerImpl,
+                                                     ObservableRequestHandlerTracerImpl)
 from couchbase.common._observability.no_op import (NoOpMeter,
                                                    NoOpSpan,
                                                    NoOpTracer)
-from couchbase.logic.observability.handler import (ObservableRequestHandler,
-                                                   ObservableRequestHandlerMeterImpl,
-                                                   ObservableRequestHandlerNoOpMeterImpl,
-                                                   ObservableRequestHandlerNoOpTracerImpl,
-                                                   ObservableRequestHandlerTracerImpl)
-from couchbase.logic.observability.observability_types import (MeterProtocol,
-                                                               ObservabilityInstruments,
-                                                               TracerProtocol,
-                                                               WrappedTracer)
-from couchbase.logic.operation_types import KeyValueOperationType
+from couchbase.common._observability.observability_types import (MeterProtocol,
+                                                                 ObservabilityInstruments,
+                                                                 TracerProtocol,
+                                                                 WrappedTracer)
+from couchbase.common._operations import Op
 from couchbase.observability.tracing import RequestTracer
 from tests.observability_test_impls import RecordingMeter, RecordingTracer
 
 
-def _instruments(tracer: Optional[RequestTracer] = None,
-                 meter: Optional[MeterProtocol] = None) -> ObservabilityInstruments:
+def _instruments(tracer: RequestTracer | None = None,
+                 meter: MeterProtocol | None = None) -> ObservabilityInstruments:
     # The cast is not about these test implementations.  `RequestTracerProtocol.request_span` declares
     # `parent_span: Optional[RequestSpanProtocol]` while the ABC every tracer derives from
     # declares the narrower `Optional[RequestSpan]`, so no subclass of the documented base
@@ -89,8 +89,8 @@ class ObservabilityInstrumentsCacheUnitTests:
 
     def test_noop_impls_are_reused_across_op_types(self) -> None:
         instruments = _instruments()
-        first = ObservableRequestHandler(KeyValueOperationType.Get, instruments)
-        second = ObservableRequestHandler(KeyValueOperationType.Upsert, instruments)
+        first = ObservableRequestHandler(Op.Get, instruments)
+        second = ObservableRequestHandler(Op.Upsert, instruments)
 
         assert isinstance(first._tracer_impl, ObservableRequestHandlerNoOpTracerImpl)
         assert isinstance(first._meter_impl, ObservableRequestHandlerNoOpMeterImpl)
@@ -102,15 +102,15 @@ class ObservabilityInstrumentsCacheUnitTests:
         # Two clusters in one process each hold their own instruments, so a cache shared
         # across instances would hand one cluster's handler the other's impl.
         one, other = _instruments(), _instruments()
-        first = ObservableRequestHandler(KeyValueOperationType.Get, one)
-        second = ObservableRequestHandler(KeyValueOperationType.Get, other)
+        first = ObservableRequestHandler(Op.Get, one)
+        second = ObservableRequestHandler(Op.Get, other)
 
         assert first._tracer_impl is not second._tracer_impl
         assert first._meter_impl is not second._meter_impl
 
     def test_real_instruments_record_the_false_sentinel(self) -> None:
         instruments = _instruments(tracer=RecordingTracer(), meter=RecordingMeter())
-        handler = ObservableRequestHandler(KeyValueOperationType.Get, instruments)
+        handler = ObservableRequestHandler(Op.Get, instruments)
 
         # False records that there was something to check and nothing to cache, which is what
         # keeps the next handler on this instruments from checking again.
@@ -129,7 +129,7 @@ class ObservabilityInstrumentsCacheUnitTests:
         meter = NoOpMeter()
         warmed = ObservabilityInstruments(tracer, meter, is_noop=True)
         cold = ObservabilityInstruments(tracer, meter, is_noop=True)
-        ObservableRequestHandler(KeyValueOperationType.Get, warmed)
+        ObservableRequestHandler(Op.Get, warmed)
 
         assert warmed._cached_noop_tracer_impl is not None
         assert cold._cached_noop_tracer_impl is None

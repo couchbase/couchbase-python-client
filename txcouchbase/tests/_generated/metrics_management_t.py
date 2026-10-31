@@ -26,6 +26,7 @@ from uuid import uuid4
 
 import pytest
 
+from couchbase.common._operations import Op
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   BucketNotFlushableException,
@@ -37,7 +38,6 @@ from couchbase.exceptions import (BucketAlreadyExistsException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException,
                                   SearchIndexNotFoundException)
-from couchbase.logic.observability import OpName
 from couchbase.management.options import CreateQueryIndexOptions, WatchQueryIndexOptions
 from tests.environments.managers import (TwistedTestEnvironmentAnalyticsIndexManager,
                                          TwistedTestEnvironmentBucketManager,
@@ -149,43 +149,43 @@ class BucketManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         settings = CreateBucketSettings(name=bucket_name, ram_quota_mb=100, flush_enabled=False)
 
         bm.create_bucket(settings)
-        http_validator.validate_http_op(OpName.BucketCreate, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketCreate, bucket_name=bucket_name)
         cb_env.consistency.wait_until_bucket_present(bucket_name)
 
         http_validator.reset()
         bm.get_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketGet, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketGet, bucket_name=bucket_name)
 
         http_validator.reset()
         bm.get_all_buckets()
         # No bucket name: the operation is about every bucket, so there is not one to carry.
-        http_validator.validate_http_op(OpName.BucketGetAll)
+        http_validator.validate_http_op(Op.BucketGetAll)
 
         http_validator.reset()
         with pytest.raises(BucketAlreadyExistsException):
             bm.create_bucket(settings)
-        http_validator.validate_http_op(OpName.BucketCreate, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketCreate, validate_error=True, bucket_name=bucket_name)
 
         # The bucket was created with flush disabled, so this is refused by the server.
         http_validator.reset()
         with pytest.raises(BucketNotFlushableException):
             bm.flush_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketFlush, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketFlush, validate_error=True, bucket_name=bucket_name)
 
         http_validator.reset()
         bm.drop_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketDrop, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketDrop, bucket_name=bucket_name)
         cb_env.consistency.wait_until_bucket_dropped(bucket_name)
 
         http_validator.reset()
         with pytest.raises(BucketDoesNotExistException):
             bm.drop_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketDrop, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketDrop, validate_error=True, bucket_name=bucket_name)
 
         http_validator.reset()
         with pytest.raises(BucketDoesNotExistException):
             bm.get_bucket(bucket_name)
-        http_validator.validate_http_op(OpName.BucketGet, validate_error=True, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.BucketGet, validate_error=True, bucket_name=bucket_name)
 
     # ------------------------------------------------------------------
     # Refused by the client, and still measured
@@ -205,7 +205,7 @@ class BucketManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         bm = cb_env.get_manager(TwistedTestEnvironmentBucketManager)
         with pytest.raises((InvalidArgumentException, KeyError)):
             bm.create_bucket(self._nameless_settings(cb_env))
-        http_validator.validate_http_op(OpName.BucketCreate, validate_error=True)
+        http_validator.validate_http_op(Op.BucketCreate, validate_error=True)
 
     def test_bucket_update_invalid_settings(self,
                                             cb_env: TwistedTestEnvironment,
@@ -213,7 +213,7 @@ class BucketManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         bm = cb_env.get_manager(TwistedTestEnvironmentBucketManager)
         with pytest.raises((InvalidArgumentException, KeyError)):
             bm.update_bucket(self._nameless_settings(cb_env))
-        http_validator.validate_http_op(OpName.BucketUpdate, validate_error=True)
+        http_validator.validate_http_op(Op.BucketUpdate, validate_error=True)
 
     def test_bucket_describe_invalid_name(self,
                                           cb_env: TwistedTestEnvironment,
@@ -221,7 +221,7 @@ class BucketManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         bm = cb_env.get_manager(TwistedTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             bm.bucket_describe(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketDescribe, validate_error=True)
+        http_validator.validate_http_op(Op.BucketDescribe, validate_error=True)
 
     def test_bucket_drop_invalid_name(self,
                                       cb_env: TwistedTestEnvironment,
@@ -229,7 +229,7 @@ class BucketManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         bm = cb_env.get_manager(TwistedTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             bm.drop_bucket(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketDrop, validate_error=True)
+        http_validator.validate_http_op(Op.BucketDrop, validate_error=True)
 
     def test_bucket_flush_invalid_name(self,
                                        cb_env: TwistedTestEnvironment,
@@ -237,7 +237,7 @@ class BucketManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         bm = cb_env.get_manager(TwistedTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             bm.flush_bucket(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketFlush, validate_error=True)
+        http_validator.validate_http_op(Op.BucketFlush, validate_error=True)
 
     def test_bucket_get_invalid_name(self,
                                      cb_env: TwistedTestEnvironment,
@@ -245,7 +245,7 @@ class BucketManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         bm = cb_env.get_manager(TwistedTestEnvironmentBucketManager)
         with pytest.raises(InvalidArgumentException):
             bm.get_bucket(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.BucketGet, validate_error=True)
+        http_validator.validate_http_op(Op.BucketGet, validate_error=True)
 
 
 class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
@@ -273,7 +273,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         collection_name = mgr.get_collection_name()
 
         mgr.create_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeCreate,
+        http_validator.validate_http_op(Op.ScopeCreate,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
         cb_env.consistency.wait_until_scope_present(bucket_name, scope_name)
@@ -281,19 +281,19 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         http_validator.reset()
         mgr.get_all_scopes()
         # The bucket and nothing below it: the operation is about every scope on it.
-        http_validator.validate_http_op(OpName.ScopeGetAll, bucket_name=bucket_name)
+        http_validator.validate_http_op(Op.ScopeGetAll, bucket_name=bucket_name)
 
         http_validator.reset()
         with pytest.raises(ScopeAlreadyExistsException):
             mgr.create_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeCreate,
+        http_validator.validate_http_op(Op.ScopeCreate,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
 
         http_validator.reset()
         mgr.create_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionCreate,
+        http_validator.validate_http_op(Op.CollectionCreate,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
                                         collection_name=collection_name)
@@ -302,7 +302,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         http_validator.reset()
         with pytest.raises(CollectionAlreadyExistsException):
             mgr.create_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionCreate,
+        http_validator.validate_http_op(Op.CollectionCreate,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
@@ -310,7 +310,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
 
         http_validator.reset()
         mgr.drop_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionDrop,
+        http_validator.validate_http_op(Op.CollectionDrop,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
                                         collection_name=collection_name)
@@ -318,7 +318,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
 
         http_validator.reset()
         mgr.drop_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeDrop,
+        http_validator.validate_http_op(Op.ScopeDrop,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
         cb_env.consistency.wait_until_scope_dropped(bucket_name, scope_name)
@@ -326,7 +326,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         http_validator.reset()
         with pytest.raises((CollectionNotFoundException, ScopeNotFoundException)):
             mgr.drop_collection(scope_name, collection_name)
-        http_validator.validate_http_op(OpName.CollectionDrop,
+        http_validator.validate_http_op(Op.CollectionDrop,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name,
@@ -335,7 +335,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         http_validator.reset()
         with pytest.raises(ScopeNotFoundException):
             mgr.drop_scope(scope_name)
-        http_validator.validate_http_op(OpName.ScopeDrop,
+        http_validator.validate_http_op(Op.ScopeDrop,
                                         validate_error=True,
                                         bucket_name=bucket_name,
                                         scope_name=scope_name)
@@ -353,7 +353,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         mgr = cb_env.get_manager(TwistedTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             mgr.create_scope(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.ScopeCreate,
+        http_validator.validate_http_op(Op.ScopeCreate,
                                         validate_error=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
 
@@ -363,7 +363,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         mgr = cb_env.get_manager(TwistedTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             mgr.drop_scope(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.ScopeDrop,
+        http_validator.validate_http_op(Op.ScopeDrop,
                                         validate_error=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
 
@@ -373,7 +373,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         mgr = cb_env.get_manager(TwistedTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             mgr.create_collection(EMPTY_NAME, EMPTY_NAME)
-        http_validator.validate_http_op(OpName.CollectionCreate,
+        http_validator.validate_http_op(Op.CollectionCreate,
                                         validate_error=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
 
@@ -383,7 +383,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         mgr = cb_env.get_manager(TwistedTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             mgr.drop_collection(EMPTY_NAME, EMPTY_NAME)
-        http_validator.validate_http_op(OpName.CollectionDrop,
+        http_validator.validate_http_op(Op.CollectionDrop,
                                         validate_error=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
 
@@ -393,7 +393,7 @@ class CollectionManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         mgr = cb_env.get_manager(TwistedTestEnvironmentCollectionMgmtManager)
         with pytest.raises(InvalidArgumentException):
             mgr.update_collection(EMPTY_NAME, EMPTY_NAME, UpdateCollectionSettings())
-        http_validator.validate_http_op(OpName.CollectionUpdate,
+        http_validator.validate_http_op(Op.CollectionUpdate,
                                         validate_error=True,
                                         bucket_name=cb_env.collection_mgmt_bucket.name)
 
@@ -427,17 +427,17 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         bucket_name = cb_env.bucket.name
 
         qixm.create_primary_index(bucket_name, deferred=True)
-        http_validator.validate_http_op(OpName.QueryIndexCreate)
+        http_validator.validate_http_op(Op.QueryIndexCreate)
 
         http_validator.reset()
         indexes = qixm.get_all_indexes(bucket_name)
         assert len(indexes) == 1
-        http_validator.validate_http_op(OpName.QueryIndexGetAll)
+        http_validator.validate_http_op(Op.QueryIndexGetAll)
 
         http_validator.reset()
         with pytest.raises(QueryIndexAlreadyExistsException):
             qixm.create_primary_index(bucket_name, deferred=True)
-        http_validator.validate_http_op(OpName.QueryIndexCreate, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexCreate, validate_error=True)
 
         for n in range(self.NUM_SECONDARY_INDEXES):
             http_validator.reset()
@@ -445,19 +445,19 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
                               f'ix{n}',
                               [f'fld{n}'],
                               CreateQueryIndexOptions(deferred=True))
-            http_validator.validate_http_op(OpName.QueryIndexCreate)
+            http_validator.validate_http_op(Op.QueryIndexCreate)
 
         http_validator.reset()
         indexes = qixm.get_all_indexes(bucket_name)
         assert len(indexes) == self.NUM_SECONDARY_INDEXES + 1
-        http_validator.validate_http_op(OpName.QueryIndexGetAll)
+        http_validator.validate_http_op(Op.QueryIndexGetAll)
 
         index_names = [i.name for i in indexes]
 
         http_validator.reset()
         with pytest.raises(QueryIndexAlreadyExistsException):
             qixm.create_index(bucket_name, index_names[0], ['fld0'], CreateQueryIndexOptions(deferred=True))
-        http_validator.validate_http_op(OpName.QueryIndexCreate, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexCreate, validate_error=True)
 
         qixm.build_deferred_indexes(bucket_name)
 
@@ -465,7 +465,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm.watch_indexes(bucket_name, index_names, WatchQueryIndexOptions(timeout=self.WATCH_TIMEOUT))
         # watch_indexes polls with get_all_indexes, so what the meter holds is the poll, and
         # asserting on the watch itself would be asserting on an operation that records nothing.
-        http_validator.validate_http_op(OpName.QueryIndexGetAll)
+        http_validator.validate_http_op(Op.QueryIndexGetAll)
 
     # ------------------------------------------------------------------
     # Refused by the client, and still measured
@@ -477,7 +477,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             qixm.create_index(EMPTY_NAME, EMPTY_NAME, ['key1'])
-        http_validator.validate_http_op(OpName.QueryIndexCreate, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexCreate, validate_error=True)
 
     def test_query_index_create_primary_invalid_name(self,
                                                      cb_env: TwistedTestEnvironment,
@@ -485,7 +485,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             qixm.create_primary_index(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexCreate, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexCreate, validate_error=True)
 
     def test_query_index_drop_invalid_name(self,
                                            cb_env: TwistedTestEnvironment,
@@ -493,7 +493,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             qixm.drop_index(EMPTY_NAME, EMPTY_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexDrop, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexDrop, validate_error=True)
 
     def test_query_index_drop_primary_invalid_name(self,
                                                    cb_env: TwistedTestEnvironment,
@@ -501,7 +501,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             qixm.drop_primary_index(EMPTY_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexDrop, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexDrop, validate_error=True)
 
     def test_query_index_get_all_invalid_name(self,
                                               cb_env: TwistedTestEnvironment,
@@ -509,7 +509,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             qixm.get_all_indexes(NO_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexGetAll, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexGetAll, validate_error=True)
 
     def test_query_index_build_deferred_invalid_name(self,
                                                      cb_env: TwistedTestEnvironment,
@@ -517,7 +517,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             qixm.build_deferred_indexes(NO_NAME)
-        http_validator.validate_http_op(OpName.QueryIndexBuildDeferred, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexBuildDeferred, validate_error=True)
 
     def test_query_index_watch_invalid_name(self,
                                             cb_env: TwistedTestEnvironment,
@@ -525,7 +525,7 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm = cb_env.get_manager(TwistedTestEnvironmentQueryIndexManager)
         with pytest.raises(InvalidArgumentException):
             qixm.watch_indexes(EMPTY_NAME, [])
-        http_validator.validate_http_op(OpName.QueryIndexWatchIndexes, validate_error=True)
+        http_validator.validate_http_op(Op.QueryIndexWatchIndexes, validate_error=True)
 
 
 class AnalyticsManagementMetricsTestSuite(ManagementMetricsSuiteBase):
@@ -543,7 +543,7 @@ class AnalyticsManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         # reaches the analytics service and is labelled with it.
         aixm = cb_env.get_manager(TwistedTestEnvironmentAnalyticsIndexManager)
         aixm.get_all_datasets()
-        http_validator.validate_http_op(OpName.AnalyticsDatasetGetAll)
+        http_validator.validate_http_op(Op.AnalyticsDatasetGetAll)
 
 
 class SearchIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
@@ -560,7 +560,7 @@ class SearchIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         index = SearchIndex(name=search_index_name(), source_name=cb_env.bucket.name)
 
         sixm.upsert_index(index)
-        http_validator.validate_http_op(OpName.SearchIndexUpsert)
+        http_validator.validate_http_op(Op.SearchIndexUpsert)
 
         # The upsert returns before every node holds the definition, so a read sent to another
         # node can still answer index not found.  Wait it out unmeasured; the measured read is next.
@@ -576,15 +576,15 @@ class SearchIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
             ) from exc
         http_validator.reset()
         sixm.get_index(index.name)
-        http_validator.validate_http_op(OpName.SearchIndexGet)
+        http_validator.validate_http_op(Op.SearchIndexGet)
 
         http_validator.reset()
         sixm.get_all_indexes()
-        http_validator.validate_http_op(OpName.SearchIndexGetAll)
+        http_validator.validate_http_op(Op.SearchIndexGetAll)
 
         http_validator.reset()
         sixm.drop_index(index.name)
-        http_validator.validate_http_op(OpName.SearchIndexDrop)
+        http_validator.validate_http_op(Op.SearchIndexDrop)
 
         # The drop also returns before every node has applied it, so a second drop sent to another
         # node can still find the index and succeed.  Wait until a read misses it, unmeasured.
@@ -593,7 +593,7 @@ class SearchIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         http_validator.reset()
         with pytest.raises(SearchIndexNotFoundException):
             sixm.drop_index(index.name)
-        http_validator.validate_http_op(OpName.SearchIndexDrop, validate_error=True)
+        http_validator.validate_http_op(Op.SearchIndexDrop, validate_error=True)
 
 
 class UserManagementMetricsTestSuite(ManagementMetricsSuiteBase):
@@ -610,20 +610,20 @@ class UserManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         user = User(username=TEST_USERNAME, password='password123!', roles=[Role(name='admin')])
 
         um.upsert_user(user)
-        http_validator.validate_http_op(OpName.UserUpsert)
+        http_validator.validate_http_op(Op.UserUpsert)
         cb_env.consistency.wait_until_user_present(TEST_USERNAME)
 
         http_validator.reset()
         um.get_user(TEST_USERNAME)
-        http_validator.validate_http_op(OpName.UserGet)
+        http_validator.validate_http_op(Op.UserGet)
 
         http_validator.reset()
         um.get_all_users()
-        http_validator.validate_http_op(OpName.UserGetAll)
+        http_validator.validate_http_op(Op.UserGetAll)
 
         http_validator.reset()
         um.drop_user(TEST_USERNAME)
-        http_validator.validate_http_op(OpName.UserDrop)
+        http_validator.validate_http_op(Op.UserDrop)
         cb_env.consistency.wait_until_user_dropped(TEST_USERNAME)
 
         # The base exception, not UserNotFoundException: the delete endpoint answers "User was
@@ -633,7 +633,7 @@ class UserManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         http_validator.reset()
         with pytest.raises(CouchbaseException):
             um.drop_user(TEST_USERNAME)
-        http_validator.validate_http_op(OpName.UserDrop, validate_error=True)
+        http_validator.validate_http_op(Op.UserDrop, validate_error=True)
 
 
 class ViewIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
@@ -649,7 +649,7 @@ class ViewIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         # The bucket and nothing else: a design document belongs to a bucket, not a scope.
         mgr = cb_env.get_manager(TwistedTestEnvironmentViewIndexManager)
         mgr.get_all_design_documents(DesignDocumentNamespace.PRODUCTION)
-        http_validator.validate_http_op(OpName.ViewIndexGetAll, bucket_name=cb_env.bucket.name)
+        http_validator.validate_http_op(Op.ViewIndexGetAll, bucket_name=cb_env.bucket.name)
 
 
 @pytest.mark.xdist_group('bucket_lifecycle')

@@ -58,11 +58,13 @@ ACB_NAME_MAP = {
     'EventingEnvironment': 'AsyncEventingEnvironment',
     'QueryIndexManagementEnvironment': 'AsyncQueryIndexManagementEnvironment',
     'CollectionQueryIndexManagementEnvironment': 'AsyncCollectionQueryIndexManagementEnvironment',
-    # BRIDGE: the streaming result types each area's async class replaces as it arrives.  Each
-    # has its own class in acouchbase.result, and the sync class is not its base, so an
-    # annotation or an isinstance check naming the sync class is wrong under asyncio.
-    # API_SPECIFIC_MODULES is what moves the import to match.  Removed by PYCBC-2013.
+    # The five streaming result types.  Each has its own class in acouchbase.result, and the
+    # sync class is not its base, so an annotation or an isinstance check naming the sync class
+    # is wrong under asyncio.  API_SPECIFIC_MODULES is what moves the import to match.
+    'QueryResult': 'AsyncQueryResult',
+    'AnalyticsResult': 'AsyncAnalyticsResult',
     'SearchResult': 'AsyncSearchResult',
+    'ViewResult': 'AsyncViewResult',
     'ScanResultIterable': 'AsyncScanResultIterable',
 }
 
@@ -98,7 +100,7 @@ TXCB_NAME_MAP = {
 }
 
 # Module paths that have an api-specific counterpart.  Everything else in `couchbase.*`
-# (options, exceptions, result types, subdocument) is shared and must NOT be rewritten:
+# (options, exceptions, subdocument) is shared and must NOT be rewritten:
 # acouchbase re-exports some of it and not the rest, so a blanket prefix swap produces
 # imports that do not exist.
 API_MODULES = {
@@ -121,7 +123,7 @@ API_MODULES = {
 # Nor couchbase.kv_range_scan: the scan types are api-independent and have no counterpart.
 
 # Module paths that have a counterpart under one api and not the other.  `couchbase.result`
-# is the one case: acouchbase.result holds the async streaming results, and txcouchbase
+# is the one case: acouchbase.result holds the five async streaming results, and txcouchbase
 # returns the sync ones, so it has no result module to name.  A name moves when
 # acouchbase.result has it and stays in `couchbase.result` when it does not, which is the
 # split split_names() makes.
@@ -1154,13 +1156,9 @@ class SuiteTransformer:
     def rewrite_imports(self) -> None:
         """Re-resolve each imported *name* against the api-specific module.
 
-        The obvious implementation, swap `couchbase.` for `acouchbase.` in the module
-        path, is wrong.  A module such
-        as `couchbase.management.buckets` does have an acouchbase counterpart, but the
-        counterpart re-exports only the manager classes; the shared enums (BucketType,
-        StorageBackend, ConflictResolutionType) stay behind in the sync module.  The same
-        holds for `couchbase.kv_range_scan` (RangeScan, ScanTerm, PrefixScan, SamplingScan)
-        and `couchbase.transactions` (TransactionGetMultiMode).  A per-module rewrite emits
+        The obvious implementation, swap `couchbase.` for `txcouchbase.` in the module
+        path, is wrong.  `couchbase.management.queries` does have a txcouchbase
+        counterpart, but it has no CollectionQueryIndexManager.  A per-module rewrite emits
         a file that parses, imports an existing module, and then fails at collection with
         ImportError on a name that module never had.
 
