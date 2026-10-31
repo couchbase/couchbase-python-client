@@ -27,34 +27,22 @@ dist mode that honours the suites' `xdist_group` marks.
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from tests.skips import server_label, skip_protocol_mismatch
 
 if TYPE_CHECKING:
     from tests.couchbase_config import ConfigSource
 
 
-@pytest.hookimpl(wrapper=True)
-def pytest_runtest_setup(item: pytest.Item) -> Generator[None, None, None]:
-    # Runs after the default setup hook (wrapper), so fixtures (including
-    # couchbase_test_config) are already resolved into item.funcargs.
-    yield
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    # Before the fixtures set up, so a skipped test builds no environment it would not use.
     marker = item.get_closest_marker('unsupported_protocol')
     if marker is None:
         return
-    # funcargs lives on Function, not the base Item type this hook is declared with.
-    funcargs = getattr(item, 'funcargs', {})
-    config = funcargs.get('couchbase_test_config')
-    if config is None:
-        return
-    if config.protocol in marker.args:
-        skip_protocol_mismatch(unsupported=','.join(getattr(p, 'name', str(p)) for p in marker.args),
-                               active=config.protocol,
-                               server=server_label(config.is_mock_server))
+    # At call time, for the reason _config_source() gives.
+    from tests.couchbase_config import skip_unsupported_protocol
+    skip_unsupported_protocol(marker.args)
 
 
 # Every `xdist_group` a suite may name, and the cluster state its members share.  Only

@@ -40,17 +40,17 @@ from typing import (TYPE_CHECKING,
 
 import pytest
 
-from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CouchbaseException,
                                   DocumentNotFoundException,
-                                  InternalServerFailureException,
                                   UnAmbiguousTimeoutException)
 from tests.couchbase_config import CouchbaseConfig
 from tests.data_provider import DataProvider
 from tests.environments import CouchbaseTestEnvironmentException
 from tests.environments.managers import TwistedTestEnvironmentCollectionManager
-from tests.environments.test_environment import (CollectionHandle,
+from tests.environments.test_environment import (CONNECT_PROBE_KEY,
+                                                 CONNECT_RETRIED,
+                                                 CollectionHandle,
                                                  CollectionStrategy,
                                                  ConnectionStrategy,
                                                  DocType,
@@ -58,7 +58,7 @@ from tests.environments.test_environment import (CollectionHandle,
                                                  TestEnvironment,
                                                  TopologyFacts,
                                                  check_suite_features)
-from tests.skips import env_degraded, server_label
+from tests.protocols import view_of
 from tests.test_utils import RetryHelper
 from txcouchbase.bucket import Bucket as TwistedBucket
 from txcouchbase.cluster import Cluster as TwistedCluster
@@ -156,13 +156,14 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
             settings = self.try_n_times(10, 1, bm.get_bucket, self._bucket.name, is_deferred=False)
             replicas = settings.get('num_replicas')
 
-        ping_res = rit(self._bucket.ping)
-        kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
+        kv_endpoints: int | None = None
+        if self.cluster_view.reports_topology:
+            kv_endpoints = self._kv_endpoint_count(rit(self._bucket.ping))
 
         return TopologyFacts(
             num_nodes=self._node_count(),
             test_bucket_replicas=replicas,
-            test_bucket_kv_endpoints=0 if kv_endpoints is None else len(kv_endpoints),
+            test_bucket_kv_endpoints=kv_endpoints,
         )
 
     def _kv_knows_current_collection(self) -> None:
@@ -395,9 +396,8 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
     #
     # Note what is NOT overridden and why, because it is the more interesting half:
     #
-    #   _count_rows      the shared QueryResult dispatches on request type, and under
-    #   assert_rows_*    txcouchbase self._request is a TxN1QLRequest, so rows() returns a
-    #                    plain __iter__().  The inherited synchronous body is correct.  The
+    #   _count_rows      txcouchbase hands back the sync QueryResult, so rows() returns a
+    #   assert_rows_*    plain __iter__().  The inherited synchronous body is correct.  The
     #                    Deferred lives on cluster.query() itself, not on the iteration,
     #                    which is the opposite of acouchbase: there query() returns
     #                    immediately and the *rows* are async.  The two APIs put the
@@ -488,32 +488,26 @@ class TwistedTestEnvironment(TestEnvironment[TwistedCluster,
         opts = cls._build_cluster_options(config, kwargs)
 
         env_args: dict[str, Any] = {}
-        okay = False
-        cluster = bucket = None
-        for _ in range(3):
+        for attempt in range(1, 4):
             try:
                 cluster = TwistedCluster(conn_string, opts)
                 rit(cluster.on_connect)
                 bucket = cluster.bucket(f'{config.bucket_name}')
                 rit(bucket.on_connect)
-                rit(cluster.cluster_info)
-                env_args['cluster'] = cluster
-                env_args['bucket'] = bucket
-                env_args['default_collection'] = bucket.default_collection()
-                okay = True
+                default_collection = bucket.default_collection()
+                try:
+                    rit(default_collection.get, CONNECT_PROBE_KEY)
+                except DocumentNotFoundException:
+                    pass
+                if view_of(cluster, config.protocol).reads_cluster_info:
+                    rit(cluster.cluster_info)
+                env_args.update(cluster=cluster, bucket=bucket, default_collection=default_collection)
                 break
-            # See the sync environment's get_environment for what is retried.
-            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException, InternalServerFailureException):
-                continue
-
-        if not okay:
-            # See the sync environment's get_environment for why both branches collapse into
-            # one env-degraded raise.
-            env_degraded(stage='connect',
-                         server=server_label(config.is_mock_server),
-                         attempts=3,
-                         note=('CAVES did not become reachable' if config.is_mock_server
-                               else 'check the environment (e.g. VPN)'))
+            except CONNECT_RETRIED as ex:
+                if attempt == 3:
+                    cls._connect_failed(config, ex, attempt)
+            except Exception as ex:
+                cls._connect_failed(config, ex, attempt)
 
         env_args.update(**kwargs)
         return cls(**env_args)

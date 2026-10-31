@@ -29,18 +29,18 @@ from acouchbase.bucket import AsyncBucket
 from acouchbase.cluster import AsyncCluster, get_event_loop
 from acouchbase.collection import AsyncCollection
 from acouchbase.scope import AsyncScope
-from couchbase.diagnostics import ServiceType
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CouchbaseException,
                                   DocumentNotFoundException,
-                                  InternalServerFailureException,
                                   UnAmbiguousTimeoutException)
 from couchbase.options import TransactionConfig
 from tests.couchbase_config import CouchbaseConfig
 from tests.environments import CouchbaseTestEnvironmentException
 from tests.environments.managers import AsyncTestEnvironmentCollectionManager
-from tests.environments.test_environment import (CollectionHandle,
+from tests.environments.test_environment import (CONNECT_PROBE_KEY,
+                                                 CONNECT_RETRIED,
+                                                 CollectionHandle,
                                                  CollectionStrategy,
                                                  ConnectionStrategy,
                                                  DocType,
@@ -48,7 +48,7 @@ from tests.environments.test_environment import (CollectionHandle,
                                                  TestEnvironment,
                                                  TopologyFacts,
                                                  check_suite_features)
-from tests.skips import env_degraded, server_label
+from tests.protocols import view_of
 from tests.test_utils import RetryHelper
 
 
@@ -221,13 +221,14 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
             settings = await AsyncTestEnvironment.try_n_times(10, 1, bm.get_bucket, self._bucket.name)
             replicas = settings.get('num_replicas')
 
-        ping_res = await self._bucket.ping()
-        kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
+        kv_endpoints: int | None = None
+        if self.cluster_view.reports_topology:
+            kv_endpoints = self._kv_endpoint_count(await self._bucket.ping())
 
         return TopologyFacts(
             num_nodes=self._node_count(),
             test_bucket_replicas=replicas,
-            test_bucket_kv_endpoints=0 if kv_endpoints is None else len(kv_endpoints),
+            test_bucket_kv_endpoints=kv_endpoints,
         )
 
     async def _kv_knows_current_collection(self) -> None:  # type: ignore[override]
@@ -374,30 +375,25 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
         opts = cls._build_cluster_options(config, kwargs)
 
         env_args: dict[str, Any] = {}
-        okay = False
-        for _ in range(3):
+        for attempt in range(1, 4):
             try:
                 cluster = await AsyncCluster.connect(conn_string, opts)
-                env_args['cluster'] = cluster
                 bucket = cluster.bucket(f'{config.bucket_name}')
                 await bucket.on_connect()
-                env_args['bucket'] = bucket
-                await cluster.cluster_info()
-                env_args['default_collection'] = bucket.default_collection()
-                okay = True
+                default_collection = bucket.default_collection()
+                try:
+                    await default_collection.get(CONNECT_PROBE_KEY)
+                except DocumentNotFoundException:
+                    pass
+                if view_of(cluster, config.protocol).reads_cluster_info:
+                    await cluster.cluster_info()
+                env_args.update(cluster=cluster, bucket=bucket, default_collection=default_collection)
                 break
-            # See the sync environment's get_environment for what is retried.
-            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException, InternalServerFailureException):
-                continue
-
-        if not okay:
-            # See the sync environment's get_environment for why both branches collapse into
-            # one env-degraded raise.
-            env_degraded(stage='connect',
-                         server=server_label(config.is_mock_server),
-                         attempts=3,
-                         note=('CAVES did not become reachable' if config.is_mock_server
-                               else 'check the environment (e.g. VPN)'))
+            except CONNECT_RETRIED as ex:
+                if attempt == 3:
+                    cls._connect_failed(config, ex, attempt)
+            except Exception as ex:
+                cls._connect_failed(config, ex, attempt)
 
         env_args.update(**kwargs)
         return cls(**env_args)

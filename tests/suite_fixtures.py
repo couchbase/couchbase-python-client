@@ -84,7 +84,14 @@ class TopologySuite(SuiteRequirements):
 
     @pytest.fixture(scope='class')
     def num_nodes(self, cb_env: TestEnvironment) -> int:
-        return cb_env.topology.num_nodes
+        num_nodes = cb_env.topology.num_nodes
+        if num_nodes is None:
+            # Unknown, not one: read as a single node, the multi-node skips would fire and
+            # look legitimate.
+            skip_topology(nodes='unknown',
+                          protocol=cb_env.protocol.value,
+                          note='the protocol cannot see the cluster nodes')
+        return num_nodes
 
     @pytest.fixture(scope='class')
     def num_replicas(self, cb_env: TestEnvironment) -> int:
@@ -144,6 +151,10 @@ class TopologySuite(SuiteRequirements):
                                  server=server_label(cb_env.is_mock_server),
                                  note='GoCAVES is inconsistent with replicas')
         online = cb_env.topology.test_bucket_kv_endpoints
+        if online is None:
+            skip_topology(kv_endpoints='unknown',
+                          protocol=cb_env.protocol.value,
+                          note='the protocol cannot see the KV endpoints')
         needed = num_replicas + 1
         if online < needed:
             # Two very different situations, which the taxonomy forces apart.  A cluster with

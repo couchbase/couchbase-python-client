@@ -270,6 +270,7 @@ not_generated:
     - couchbase/tests/cluster_req_builder_t.py
     - couchbase/tests/collection_req_builder_t.py
     - couchbase/tests/diagnostics_t.py
+    - couchbase/tests/env_bringup_t.py
     - couchbase/tests/eventingmgmt_function_types_t.py
     - couchbase/tests/exceptions_t.py
     - couchbase/tests/kv_options_completeness_t.py

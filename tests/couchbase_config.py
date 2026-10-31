@@ -18,13 +18,14 @@ from __future__ import annotations
 import os
 import pathlib
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from configparser import ConfigParser
 from typing import NamedTuple
 
 import pytest
 
 from tests.environments import CouchbaseTestEnvironmentException
+from tests.skips import server_label, skip_protocol_mismatch
 from tests.test_features import TestProtocol
 
 from .mock_server import CavesMockServer, MockServer
@@ -44,6 +45,7 @@ _ENV_PASSWORD = "PYCBC_PASSWORD"
 _ENV_BUCKET = "PYCBC_BUCKET"
 _ENV_SERVER_ENABLED = "PYCBC_SERVER_ENABLED"
 _ENV_COUCHBASE2 = "PYCBC_COUCHBASE2"
+_ENV_CONNSTR_PARAMS = "PYCBC_CONNSTR_PARAMS"
 _ENV_GOCAVES_ENABLED = "PYCBC_GOCAVES_ENABLED"
 _ENV_GOCAVES_VERSION = "PYCBC_GOCAVES_VERSION"
 _ENV_GOCAVES_PATH = "PYCBC_GOCAVES_PATH"
@@ -89,6 +91,18 @@ def _section_enabled(env_name: str, ini: ConfigParser, section: str) -> tuple[bo
     return ini.getboolean(section, "enabled", fallback=False), 'ini'
 
 
+def _couchbase2_enabled(ini: ConfigParser) -> bool:
+    """Whether the [realserver] target is reached over couchbase2, env var first.
+
+    Read by the loader for the connection string's scheme and by describe_config_source()
+    for the protocol gates, so the run is gated as the protocol it connects with.
+    """
+    from_env = _env_bool(_ENV_COUCHBASE2)
+    if from_env is not None:
+        return from_env
+    return ini.getboolean("realserver", "is_couchbase2", fallback=False)
+
+
 class ConfigSource(NamedTuple):
     """What a run resolved its server from, for reporting before anything connects."""
 
@@ -99,6 +113,8 @@ class ConfigSource(NamedTuple):
     decided_by: str
     host: str | None
     port: int | None
+    # couchbase2 only on a real server; the mock speaks classic alone.
+    protocol: TestProtocol
 
     def summary(self) -> str:
         if self.server == 'real':
@@ -117,7 +133,8 @@ def describe_config_source() -> ConfigSource:
 
     Deliberately not CouchbaseConfig.load_config(): that starts GoCAVES as part of resolving
     the [gocaves] section, so calling it to build a header would start a second mock.  This
-    reads the same file and the same env vars and constructs nothing.
+    reads the same file and the same env vars and constructs nothing, which is also why
+    skip_unsupported_protocol() reads the run's protocol here.
     """
     ini = ConfigParser()
     ini.read(CONFIG_FILE)
@@ -130,17 +147,32 @@ def describe_config_source() -> ConfigSource:
     # a header that disagrees with the loader is the defect this whole mechanism exists to fix.
     if real_enabled and mock_enabled:
         decided_by = real_by if real_by == mock_by else f'{real_by}, {mock_by}'
-        return ConfigSource(CONFIG_FILE, 'conflict', decided_by, None, None)
+        return ConfigSource(CONFIG_FILE, 'conflict', decided_by, None, None, TestProtocol.CLASSIC)
 
     if real_enabled:
         host = _env_str(_ENV_HOST) or ini.get("realserver", "host", fallback="localhost")
         port = _env_int(_ENV_PORT) or ini.getint("realserver", "port", fallback=8091)
-        return ConfigSource(CONFIG_FILE, 'real', real_by, host, port)
+        protocol = TestProtocol.COUCHBASE2 if _couchbase2_enabled(ini) else TestProtocol.CLASSIC
+        return ConfigSource(CONFIG_FILE, 'real', real_by, host, port, protocol)
 
     if mock_enabled:
-        return ConfigSource(CONFIG_FILE, 'mock', mock_by, None, None)
+        return ConfigSource(CONFIG_FILE, 'mock', mock_by, None, None, TestProtocol.CLASSIC)
 
-    return ConfigSource(CONFIG_FILE, 'none', real_by, None, None)
+    return ConfigSource(CONFIG_FILE, 'none', real_by, None, None, TestProtocol.CLASSIC)
+
+
+def skip_unsupported_protocol(unsupported: Sequence[TestProtocol]) -> None:
+    """Skip the running test when this run's protocol is one of *unsupported*.
+
+    Both protocol gates come here, the `unsupported_protocol` mark and a class's
+    UNSUPPORTED_PROTOCOLS.  The protocol is read without connecting, so a cluster-free test
+    can be declared classic-only, and a cluster test skips before its environment is built.
+    """
+    source = describe_config_source()
+    if source.protocol in unsupported:
+        skip_protocol_mismatch(unsupported=','.join(p.name for p in unsupported),
+                               active=source.protocol,
+                               server=server_label(source.server == 'mock'))
 
 
 def _gocaves_binary_spec(ini: ConfigParser) -> tuple[str, str, str]:
@@ -190,6 +222,8 @@ class CouchbaseConfig:
         self.mock_server_enabled: bool = False
         self.mock_server: MockServer | None = None
         self.couchbase2_enabled: bool = False
+        # Query-string parameters for a real server's connection string, without the `?`.
+        self.connstr_params: str = ""
 
     # ------------------------------------------------------------------
     # Properties
@@ -207,9 +241,9 @@ class CouchbaseConfig:
     def protocol(self) -> TestProtocol:
         """Which wire protocol this run targets, read off the connection-string scheme.
 
-        The scheme is the only input, and that is what keeps the protocol gates and the
-        connection agreeing: the SDK facade dispatches on the same string, so a run cannot
-        be gated as one protocol and connected as another.
+        The SDK facade dispatches on the same string.  The protocol gates read
+        ConfigSource.protocol instead, which needs no cluster; both come from
+        _couchbase2_enabled(), and protocol_gates_t holds the two to agreeing.
         """
         scheme = self.get_connection_string().split('://', 1)[0]
         if scheme == 'couchbase2':
@@ -238,8 +272,12 @@ class CouchbaseConfig:
         if self.mock_server_enabled and self.mock_server is not None:
             return self.mock_server.connstr
         if self.couchbase2_enabled:
-            return f"couchbase2://{self.host}:{self.port}"
-        return f"couchbase://{self.host}"
+            connstr = f"couchbase2://{self.host}:{self.port}"
+        else:
+            connstr = f"couchbase://{self.host}"
+        if self.connstr_params:
+            connstr = f"{connstr}?{self.connstr_params}"
+        return connstr
 
     def get_username_and_pw(self) -> tuple[str, str]:
         return self.admin_username, self.admin_password
@@ -271,13 +309,7 @@ class CouchbaseConfig:
 
         config.real_server_enabled = True
 
-        # couchbase2
-        cb2_env = _env_bool(_ENV_COUCHBASE2)
-        config.couchbase2_enabled = (
-            cb2_env
-            if cb2_env is not None
-            else ini.getboolean("realserver", "is_couchbase2", fallback=False)
-        )
+        config.couchbase2_enabled = _couchbase2_enabled(ini)
 
         # connection details, env vars shadow ini values
         # is not None (not `or`) so a falsy-but-valid value like port 0 isn't dropped
@@ -306,6 +338,10 @@ class CouchbaseConfig:
         )
 
         config.bucket_password = ini.get("realserver", "bucket_password", fallback="")
+
+        env_params = _env_str(_ENV_CONNSTR_PARAMS)
+        params = env_params if env_params is not None else ini.get("realserver", "connstr_params", fallback="")
+        config.connstr_params = params.lstrip("?")
 
     @classmethod
     def _load_gocaves_config(

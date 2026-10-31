@@ -37,9 +37,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import (Any,
-                    ClassVar,
-                    Optional)
+from typing import Any, ClassVar
 
 
 class TwistedObjects:
@@ -47,7 +45,7 @@ class TwistedObjects:
     # writes into `sys.modules`, and it answers reactor attributes by delegation.  There is no
     # class to name here, which is why this is `Any` rather than an interface.
     _REACTOR: ClassVar[Any] = None
-    _TWISTED_THREAD: ClassVar[Optional[threading.Thread]] = None
+    _TWISTED_THREAD: ClassVar[threading.Thread | None] = None
 
 
 def run_in_reactor_thread(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:

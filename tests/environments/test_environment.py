@@ -74,13 +74,13 @@ from couchbase.transcoder import (JSONTranscoder,
                                   RawStringTranscoder)
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
 from tests.consistency import ConsistencyChecker
-from tests.couchbase_config import CouchbaseConfig
+from tests.couchbase_config import CouchbaseConfig, skip_unsupported_protocol
 from tests.data_provider import DataProvider
 from tests.environments import CouchbaseTestEnvironmentException
+from tests.protocols import ClusterView, view_of
 from tests.skips import (env_degraded,
                          server_label,
-                         skip_feature_unsupported,
-                         skip_protocol_mismatch)
+                         skip_feature_unsupported)
 from tests.test_features import (EnvironmentFeatures,
                                  ServerContext,
                                  ServerFeatures,
@@ -212,6 +212,15 @@ class SuiteRequirements:
     TEST_MANIFEST: ClassVar[list[str]] = []
 
 
+# A key no test writes.  The connect loops read it from the default collection as their liveness
+# probe and expect DocumentNotFoundException.
+CONNECT_PROBE_KEY = 'tests-connect-probe'
+
+# What the connect loops retry: a timeout, or a transient 500 from the cluster manager on
+# `/pools/default`.  Anything else will not clear on a retry and fails the attempt that raised it.
+CONNECT_RETRIED = (UnAmbiguousTimeoutException, AmbiguousTimeoutException, InternalServerFailureException)
+
+
 # ---------------------------------------------------------------------------
 # CollectionHandle / CollectionPool
 # ---------------------------------------------------------------------------
@@ -235,10 +244,15 @@ class TopologyFacts:
     test_bucket_replicas is None when the suite declares no bucket manager, since there is then
     nothing that can read it.  The fixture exposing it reports that as a broken environment
     rather than substituting a number.
+
+    num_nodes and test_bucket_kv_endpoints are None when the protocol cannot see them, which is
+    couchbase2's case: the gateway hides the cluster behind it.  The fixtures skip on None rather
+    than read it as one node, which would fire the multi-node skips for a reason that looks
+    legitimate.
     """
-    num_nodes: int
+    num_nodes: int | None
     test_bucket_replicas: int | None
-    test_bucket_kv_endpoints: int
+    test_bucket_kv_endpoints: int | None
 
 
 @dataclass
@@ -581,7 +595,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
 
     @property
     def is_developer_preview(self) -> bool | None:
-        return self._cluster._impl.is_developer_preview
+        return self.cluster_view.is_developer_preview
 
     @property
     def is_mock_server(self) -> bool:
@@ -605,6 +619,11 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         rather than no value at all, which is the case UNSUPPORTED_PROTOCOLS cannot express.
         """
         return self._config.protocol
+
+    @property
+    def cluster_view(self) -> ClusterView:
+        """What the cluster's protocol reports about it that no public API gives without I/O."""
+        return view_of(self._cluster, self.protocol)
 
     @property
     def named_collection(self) -> CollectionT | None:
@@ -652,15 +671,15 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
 
     @property
     def server_version(self) -> str | None:
-        return self._cluster._impl.server_version
+        return self.cluster_view.server_version
 
     @property
     def server_version_full(self) -> str | None:
-        return self._cluster._impl.server_version_full
+        return self.cluster_view.server_version_full
 
     @property
     def server_version_short(self) -> float | None:
-        return self._cluster._impl.server_version_short
+        return self.cluster_view.server_version_short
 
     @property
     def server_version_patch(self) -> int | None:
@@ -949,11 +968,8 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         nothing while reading as though it asserts something, which is the failure
         assert_rows_exact's docstring describes.
 
-        This is also what the `.execute()` it replaced did.  `couchbase/n1ql.py` implements
-        that as `[r for r in list(self)]` and every caller here discarded the list, but it
-        exists only on the sync and acouchbase requests: `txcouchbase.n1ql.N1QLRequest`
-        defines `execute_query()` and no `execute()`, so a suite written on `.execute()`
-        cannot be generated for txcouchbase at all.
+        This is also what the `.execute()` it replaced did, building a list every caller here
+        discarded.
         """
         self._count_rows(result)
 
@@ -1151,12 +1167,23 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
                                  server=srv,
                                  note=f'CollectionStrategy.{collection_strategy.name} requires Collections')
 
-    def _node_count(self) -> int:
-        """Node count from the connect-time cluster info.  Style-agnostic: no I/O, no await."""
-        cluster_info = self._cluster._impl.cluster_info
-        assert cluster_info is not None, 'Cluster is not connected.'
-        assert cluster_info.nodes is not None, 'Cluster info carries no node list.'
-        return len(cluster_info.nodes)
+    def _node_count(self) -> int | None:
+        """Style-agnostic: no I/O, no await.  None when the protocol cannot see the nodes."""
+        view = self.cluster_view
+        if not view.reports_topology:
+            return None
+        node_count = view.node_count
+        if node_count is None:
+            env_degraded(stage='topology',
+                         protocol=self.protocol.value,
+                         server=server_label(self.is_mock_server),
+                         note='the cluster reports no node count')
+        return node_count
+
+    @staticmethod
+    def _kv_endpoint_count(ping_res: Any) -> int:
+        kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
+        return 0 if kv_endpoints is None else len(kv_endpoints)
 
     def _collect_topology(self) -> TopologyFacts:
         """Read the topology facts.  Overridden per api style; this is the only I/O involved.
@@ -1174,13 +1201,14 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
             settings = TestEnvironment.try_n_times(10, 1, bm.get_bucket, self._bucket.name)
             replicas = settings.get('num_replicas')
 
-        ping_res = self._bucket.ping()
-        kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
+        kv_endpoints: int | None = None
+        if self.cluster_view.reports_topology:
+            kv_endpoints = self._kv_endpoint_count(self._bucket.ping())
 
         return TopologyFacts(
             num_nodes=self._node_count(),
             test_bucket_replicas=replicas,
-            test_bucket_kv_endpoints=0 if kv_endpoints is None else len(kv_endpoints),
+            test_bucket_kv_endpoints=kv_endpoints,
         )
 
     def setup(self,
@@ -1427,6 +1455,29 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
 
         return opts
 
+    @staticmethod
+    def _connect_failed(config: CouchbaseConfig, error: Exception, attempts: int) -> NoReturn:
+        """Report a connect that failed, shared by the three api styles' connect loops.
+
+        One raise, carrying which target it was, rather than a skip on the mock and a raise on
+        a real server.  A connection failure is not an accurate representation of the state of
+        the test either way, and skipping means a mock run drops every test in the suite and
+        still reports green.  Only `CONNECT_RETRIED` is retried; anything else fails on the attempt
+        that raised it, with the error named.
+        """
+        if isinstance(error, (UnAmbiguousTimeoutException, AmbiguousTimeoutException)):
+            note = 'CAVES did not become reachable' if config.is_mock_server else 'check the environment (e.g. VPN)'
+        elif isinstance(error, InternalServerFailureException):
+            note = 'the cluster manager answered 500 on every attempt'
+        else:
+            note = 'connecting raised something that is not retried'
+        env_degraded(stage='connect',
+                     server=server_label(config.is_mock_server),
+                     connstr=config.get_connection_string(),
+                     attempts=attempts,
+                     error=f'{type(error).__name__}: {error}',
+                     note=note)
+
     @classmethod
     def get_environment(cls, **kwargs: Any) -> TestEnvironment:
         """Create a brand-new TestEnvironment (new Cluster connection)."""
@@ -1438,33 +1489,25 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         opts = cls._build_cluster_options(config, kwargs)
 
         env_args: dict[str, Any] = {}
-        okay = False
-        for _ in range(3):
+        for attempt in range(1, 4):
             try:
                 cluster = Cluster.connect(conn_string, opts)
-                env_args['cluster'] = cluster
                 bucket = cluster.bucket(f'{config.bucket_name}')
-                env_args['bucket'] = bucket
-                cluster.cluster_info()
-                env_args['default_collection'] = bucket.default_collection()
-                okay = True
+                default_collection = bucket.default_collection()
+                # The liveness probe is a KV round trip, which every protocol serves.
+                try:
+                    default_collection.get(CONNECT_PROBE_KEY)
+                except DocumentNotFoundException:
+                    pass
+                if view_of(cluster, config.protocol).reads_cluster_info:
+                    cluster.cluster_info()
+                env_args.update(cluster=cluster, bucket=bucket, default_collection=default_collection)
                 break
-            # A timeout, or a transient 500 from the cluster manager on `/pools/default`.
-            # Anything else is raised as it is: it will not clear on a retry, and the
-            # env-degraded message below would hide what it was.
-            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException, InternalServerFailureException):
-                continue
-
-        if not okay:
-            # One raise, carrying which target it was, rather than a skip on the mock and a
-            # raise on a real server.  A connection failure is not an accurate representation
-            # of the state of the test either way, and skipping means a mock run drops every
-            # test in the suite and still reports green.
-            env_degraded(stage='connect',
-                         server=server_label(config.is_mock_server),
-                         attempts=3,
-                         note=('CAVES did not become reachable' if config.is_mock_server
-                               else 'check the environment (e.g. VPN)'))
+            except CONNECT_RETRIED as ex:
+                if attempt == 3:
+                    cls._connect_failed(config, ex, attempt)
+            except Exception as ex:
+                cls._connect_failed(config, ex, attempt)
 
         env_args.update(**kwargs)
         return cls(**env_args)
@@ -1689,16 +1732,5 @@ def check_required_features(request: pytest.FixtureRequest) -> None:
 
 @pytest.fixture(scope='class', autouse=True)
 def check_unsupported_protocols(request: pytest.FixtureRequest) -> None:
-    """Skip the class when the active protocol is in UNSUPPORTED_PROTOCOLS (empty = all run).
-
-    cb_env is resolved lazily for the same reason as check_required_features above.
-    """
-    unsupported: list[TestProtocol] = getattr(request.cls, 'UNSUPPORTED_PROTOCOLS', [])
-    if not unsupported:
-        return
-    cb_env: TestEnvironment = request.getfixturevalue('cb_env')
-    active = cb_env.config.protocol
-    if active in unsupported:
-        skip_protocol_mismatch(unsupported=','.join(p.name for p in unsupported),
-                               active=active,
-                               server=server_label(cb_env.is_mock_server))
+    """Skip the class when the active protocol is in UNSUPPORTED_PROTOCOLS (empty = all run)."""
+    skip_unsupported_protocol(getattr(request.cls, 'UNSUPPORTED_PROTOCOLS', []))
