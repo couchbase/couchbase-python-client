@@ -66,6 +66,12 @@ if TYPE_CHECKING:
 _T = TypeVar('_T')
 
 
+def _map_path(mapkey: str) -> str:
+    # A map key is one field of the document, so it is quoted as a single path element: a dot or a
+    # bracket in it would otherwise address a nested field.  A backtick is escaped by doubling it.
+    return '`' + mapkey.replace('`', '``') + '`'
+
+
 def _first_value(sd_res: LookupInResult) -> Any:
     """The decoded value of a one-spec lookup, or None where the spec failed.
 
@@ -282,7 +288,7 @@ class CouchbaseMap(_Datastructure):
 
         """
         with self._span(Op.MapAdd) as span:
-            await self._mutate_in(upsert(mapkey, value), span)
+            await self._mutate_in(upsert(_map_path(mapkey), value), span)
 
     async def get(self, mapkey: str) -> Any:
         """Fetches a specific key from the map.
@@ -295,7 +301,7 @@ class CouchbaseMap(_Datastructure):
 
         """
         with self._span(Op.MapGet) as span:
-            sd_res = await self._lookup_in(subdoc_get(mapkey), span)
+            sd_res = await self._lookup_in(subdoc_get(_map_path(mapkey)), span)
             return _first_value(sd_res)
 
     async def remove(self, mapkey: str) -> None:
@@ -310,7 +316,7 @@ class CouchbaseMap(_Datastructure):
         """
         with self._span(Op.MapRemove) as span:
             try:
-                await self._mutate_in(remove(mapkey), span, create=False)
+                await self._mutate_in(remove(_map_path(mapkey)), span, create=False)
             except PathNotFoundException:
                 raise InvalidArgumentException(message=f'Key: {mapkey} is not in the map.') from None
 
@@ -336,7 +342,7 @@ class CouchbaseMap(_Datastructure):
 
         """
         with self._span(Op.MapExists) as span:
-            return (await self._lookup_in(subdoc_exists(key), span)).exists(0)
+            return (await self._lookup_in(subdoc_exists(_map_path(key)), span)).exists(0)
 
     async def keys(self) -> list[str]:
         """Returns a list of all the keys which exist in the map.

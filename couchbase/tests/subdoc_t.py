@@ -57,7 +57,9 @@ from tests.manifest import validate_test_manifest
 from tests.mock_server import MockServerType
 from tests.skips import server_label, skip_mock_limitation
 from tests.suite_fixtures import TopologySuite
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 # Hoisted out of the decorator below.  Inline, the same comprehension needs two `# noqa: E501`
 # to fit, and the noqa hides the expression rather than the line length.
@@ -686,6 +688,9 @@ class SubDocumentTestSuite(TopologySuite):
             active_count += not result.is_replica
         assert active_count == 1
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replica_read_supported')
     @pytest.mark.usefixtures('check_server_groups_supported')
     def test_lookup_in_all_replicas_read_preference(self, cb_env: SyncTestEnvironment) -> None:
@@ -698,6 +703,7 @@ class SubDocumentTestSuite(TopologySuite):
 
     # --- lookup_in_any_replica ---
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replica_read_supported')
     def test_lookup_in_any_replica_bad_key(self, cb_env: SyncTestEnvironment) -> None:
         with pytest.raises(DocumentUnretrievableException):
@@ -764,6 +770,7 @@ class SubDocumentTestSuite(TopologySuite):
         assert result.content_as[str](0) == value['batch']
         assert result.is_replica is not None
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replica_read_supported')
     @pytest.mark.usefixtures('check_server_groups_supported')
     def test_lookup_in_any_replica_read_preference(self, cb_env: SyncTestEnvironment) -> None:

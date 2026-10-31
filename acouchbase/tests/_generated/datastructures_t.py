@@ -55,6 +55,7 @@ class DatastructuresTestSuite(SuiteRequirements):
     TEST_MANIFEST = [
         'test_list',
         'test_map',
+        'test_map_keys_are_fields_not_paths',
         'test_queue',
         'test_sets',
     ]
@@ -158,6 +159,25 @@ class DatastructuresTestSuite(SuiteRequirements):
 
         await cb_map.clear()
         assert 0 == await cb_map.size()
+
+    # A map key names one field of the document, whatever characters it holds.
+    @pytest.mark.asyncio
+    async def test_map_keys_are_fields_not_paths(self, cb_env: AsyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        cb_map = cb_env.collection.couchbase_map(key)
+
+        await cb_map.add('user', {'name': 'bob'})
+        await cb_map.add('user.name', 'alice')
+        await cb_map.add('tags[0]', 'first')
+
+        assert await cb_map.get('user.name') == 'alice'
+        assert await cb_map.get('user') == {'name': 'bob'}
+        assert await cb_map.get('tags[0]') == 'first'
+        assert await cb_map.exists('user.name') is True
+
+        await cb_map.remove('user.name')
+
+        assert sorted(await cb_map.keys()) == ['tags[0]', 'user']
 
     @pytest.mark.asyncio
     async def test_queue(self, cb_env: AsyncTestEnvironment) -> None:

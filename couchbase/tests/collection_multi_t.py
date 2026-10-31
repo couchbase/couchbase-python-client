@@ -29,7 +29,7 @@ from typing import Any, cast
 
 import pytest
 
-from couchbase._utils import JSONType
+from couchbase.common._utils import JSONType
 from couchbase.exceptions import (CouchbaseException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
@@ -65,6 +65,7 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  verify_seeded_docs_readable)
 from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
+from tests.test_features import TestProtocol
 
 
 class CollectionMultiTestSuite(TopologySuite):
@@ -226,6 +227,9 @@ class CollectionMultiTestSuite(TopologySuite):
                 assert isinstance(replica.is_replica, bool)
                 assert replica.content_as[dict] == keys_and_docs[k]
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replicas_online')
     @pytest.mark.usefixtures('check_server_groups_supported')
     def test_multi_get_all_replicas_read_preference(self, cb_env: SyncTestEnvironment) -> None:
@@ -240,6 +244,7 @@ class CollectionMultiTestSuite(TopologySuite):
         assert all(map(lambda r: isinstance(r, DocumentUnretrievableException), res.exceptions.values())) is True
         assert len(res.results) == 0
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replicas_online')
     def test_multi_get_any_replica_fail(self, cb_env: SyncTestEnvironment) -> None:
         keys = list(self.FAKE_DOCS.keys())
@@ -275,6 +280,7 @@ class CollectionMultiTestSuite(TopologySuite):
             assert isinstance(v.is_replica, bool)
             assert v.content_as[dict] == keys_and_docs[k]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replicas_online')
     @pytest.mark.usefixtures('check_server_groups_supported')
     def test_multi_get_any_replica_read_preference(self, cb_env: SyncTestEnvironment) -> None:

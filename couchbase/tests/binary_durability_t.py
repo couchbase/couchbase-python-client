@@ -55,6 +55,7 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
+from tests.test_features import TestProtocol
 
 # CXXCBC-1056: the core gives the observe poll behind ClientDurability a fixed 5s, whatever the
 # operation timeout, so a loaded cluster can report a write ambiguous that went on to persist
@@ -110,6 +111,9 @@ class BinaryDurabilityTestSuite(TopologySuite):
         stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert stored.content_as[str] == 'foo'
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_append_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -118,6 +122,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().append(key, 'foo', AppendOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_append_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -135,6 +140,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         result = cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
         assert result.content == value - 1
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_decrement_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -143,6 +149,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_decrement_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -160,6 +167,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         result = cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
         assert result.content == value + 1
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_increment_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -168,6 +176,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_increment_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -186,6 +195,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert stored.content_as[str] == 'foo'
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_prepend_fail(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -194,6 +204,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().prepend(key, 'foo', PrependOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_prepend_single_node(self, cb_env: SyncTestEnvironment, num_replicas: int) -> None:
@@ -213,6 +224,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert stored.content_as[str] == 'foo'
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -232,6 +244,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         result = cb_env.collection.binary().decrement(key, opts)
         assert result.content == value - 1
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -251,6 +264,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         result = cb_env.collection.binary().increment(key, opts)
         assert result.content == value + 1
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -275,6 +289,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert stored.content_as[str] == 'foo'
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')

@@ -56,7 +56,9 @@ from tests.manifest import validate_test_manifest
 from tests.mock_server import MockServerType
 from tests.skips import server_label, skip_mock_limitation
 from tests.suite_fixtures import TopologySuite
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 from txcouchbase.collection import Collection
 
 
@@ -275,6 +277,9 @@ class CollectionTestSuite(TopologySuite):
         if num_replicas > 0:
             assert replica_cnt >= active_cnt
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas_online")
     @pytest.mark.usefixtures("check_server_groups_supported")
@@ -287,6 +292,7 @@ class CollectionTestSuite(TopologySuite):
                                   key,
                                   GetAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_get_and_lock(self, cb_env: TwistedTestEnvironment) -> None:
         key, value = cb_env.get_existing_doc()
         result = run_in_reactor_thread(cb_env.collection.get_and_lock, key, timedelta(seconds=3))
@@ -352,11 +358,13 @@ class CollectionTestSuite(TopologySuite):
         assert isinstance(result.is_replica, bool)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_replicas_online")
     def test_get_any_replica_fail(self, cb_env: TwistedTestEnvironment) -> None:
         with pytest.raises(DocumentUnretrievableException):
             run_in_reactor_thread(cb_env.collection.get_any_replica, 'not-a-key')
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas_online")
     @pytest.mark.usefixtures("check_server_groups_supported")

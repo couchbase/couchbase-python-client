@@ -54,6 +54,12 @@ if TYPE_CHECKING:
     from couchbase.transcoder import Transcoder
 
 
+def _map_path(mapkey: str) -> str:
+    # A map key is one field of the document, so it is quoted as a single path element: a dot or a
+    # bracket in it would otherwise address a nested field.  A backtick is escaped by doubling it.
+    return '`' + mapkey.replace('`', '``') + '`'
+
+
 class LegacyDatastructures:
     """Performs each operation through the classic `CollectionImpl` it belongs to."""
 
@@ -229,7 +235,7 @@ class LegacyDatastructures:
         with ObservableRequestHandler(Op.MapAdd, self._impl.observability_instruments) as ds_obs_handler:
             self._start_ds_span(ds_obs_handler, kwargs)
             with ObservableRequestHandler(Op.MutateIn, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_upsert(mapkey, value)
+                op = subdoc_upsert(_map_path(mapkey), value)
                 build = partial(self._impl.request_builder.build_mutate_in_request,
                                 key, (op,), obs_handler, None, **kwargs)
                 req, serializer = build()
@@ -248,7 +254,7 @@ class LegacyDatastructures:
         with ObservableRequestHandler(Op.MapGet, self._impl.observability_instruments) as ds_obs_handler:
             self._start_ds_span(ds_obs_handler, kwargs)
             with ObservableRequestHandler(Op.LookupIn, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_get(mapkey)
+                op = subdoc_get(_map_path(mapkey))
                 req, serializer = self._impl.request_builder.build_lookup_in_request(key, (op,), obs_handler, None,
                                                                                      **kwargs)
                 sd_res = self._execute_legacy_ds_op(self._impl._lookup_in,
@@ -263,7 +269,7 @@ class LegacyDatastructures:
         with ObservableRequestHandler(Op.MapRemove, self._impl.observability_instruments) as ds_obs_handler:
             self._start_ds_span(ds_obs_handler, kwargs)
             with ObservableRequestHandler(Op.MutateIn, self._impl.observability_instruments) as obs_handler:
-                op = subdoc_remove(mapkey)
+                op = subdoc_remove(_map_path(mapkey))
                 req, serializer = self._impl.request_builder.build_mutate_in_request(key, (op,), obs_handler, None,
                                                                                      **kwargs)
                 sd_res = self._execute_legacy_ds_op(self._impl._mutate_in,

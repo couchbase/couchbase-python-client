@@ -62,6 +62,7 @@ from tests.environments.twisted_environment import (CollectionStrategy,
 from tests.manifest import validate_test_manifest
 from tests.skips import skip_topology
 from tests.suite_fixtures import TopologySuite
+from tests.test_features import TestProtocol
 
 # CXXCBC-1056: the core gives the observe poll behind ClientDurability a fixed 5s, whatever the
 # operation timeout, so a loaded cluster can report a write ambiguous that went on to persist
@@ -120,6 +121,9 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_insert_fail(self, cb_env: TwistedTestEnvironment, num_replicas: int) -> None:
@@ -147,6 +151,7 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_mutate_in_fail(self, cb_env: TwistedTestEnvironment, num_replicas: int) -> None:
@@ -171,6 +176,7 @@ class DurabilityTestSuite(TopologySuite):
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.get, key)
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_remove_fail(self, cb_env: TwistedTestEnvironment, num_replicas: int) -> None:
@@ -194,6 +200,7 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_replace_fail(self, cb_env: TwistedTestEnvironment, num_replicas: int) -> None:
@@ -218,6 +225,7 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_upsert_fail(self, cb_env: TwistedTestEnvironment, num_replicas: int) -> None:
@@ -230,6 +238,7 @@ class DurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     def test_client_durable_upsert_single_node(self, cb_env: TwistedTestEnvironment, num_replicas: int) -> None:
@@ -261,6 +270,7 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -287,6 +297,7 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -309,6 +320,7 @@ class DurabilityTestSuite(TopologySuite):
         with pytest.raises(DocumentNotFoundException):
             run_in_reactor_thread(cb_env.collection.get, key)
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -329,6 +341,7 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -349,6 +362,7 @@ class DurabilityTestSuite(TopologySuite):
         result = run_in_reactor_thread(cb_env.collection.get, key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')

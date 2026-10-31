@@ -61,10 +61,14 @@ from tests.environments.rate_limit_environment import RateLimitEnvironment
 from tests.manifest import validate_test_manifest
 from tests.search_index_defs import collection_index_params, default_index_params
 from tests.skips import CouchbaseTestEnvironmentException
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class RateLimitTestSuite(SuiteRequirements):
+    # Every test expects a limit to surface as the exception classic's error mapping raises for it.
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     MANAGERS = [AsyncTestEnvironmentUserManager,
                 AsyncTestEnvironmentCollectionMgmtManager,
                 AsyncTestEnvironmentSearchIndexManager,

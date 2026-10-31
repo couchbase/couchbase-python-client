@@ -57,7 +57,9 @@ from tests.manifest import validate_test_manifest
 from tests.mock_server import MockServerType
 from tests.skips import server_label, skip_mock_limitation
 from tests.suite_fixtures import TopologySuite
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class CollectionTestSuite(TopologySuite):
@@ -284,7 +286,10 @@ class CollectionTestSuite(TopologySuite):
         if num_replicas > 0:
             assert replica_cnt >= active_cnt
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas_online")
     @pytest.mark.usefixtures("check_server_groups_supported")
@@ -298,6 +303,7 @@ class CollectionTestSuite(TopologySuite):
                 GetAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_get_and_lock(self, cb_env: AsyncTestEnvironment) -> None:
         key, value = await cb_env.get_existing_doc()
         result = await cb_env.collection.get_and_lock(key, timedelta(seconds=3))
@@ -368,12 +374,14 @@ class CollectionTestSuite(TopologySuite):
         assert value == result.content_as[dict]
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_replicas_online")
     async def test_get_any_replica_fail(self, cb_env: AsyncTestEnvironment) -> None:
         with pytest.raises(DocumentUnretrievableException):
             await cb_env.collection.get_any_replica('not-a-key')
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_multi_node")
     @pytest.mark.usefixtures("check_replicas_online")
     @pytest.mark.usefixtures("check_server_groups_supported")

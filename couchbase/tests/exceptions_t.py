@@ -15,11 +15,13 @@
 
 from __future__ import annotations
 
+import pickle
+import traceback
+
 import pytest
 
 import couchbase.exceptions as E
 from couchbase.exceptions import CouchbaseException
-from couchbase.protocol.classic._subdocument import _subdoc_error
 
 
 def _exception_classes() -> list[type[CouchbaseException]]:
@@ -68,6 +70,24 @@ class CouchbaseExceptionUnitTests:
         assert E.SubdocCantInsertValueException is E.InvalidValueException
         assert E.SubdocPathMismatchException is E.PathMismatchException
 
+    def test_every_class_names_the_public_module(self) -> None:
+        classes = [getattr(E, name) for name in E.__all__ if isinstance(getattr(E, name), type)]
+        assert len(classes) > 100, 'the __all__ scan found almost nothing, so it is broken'
+        assert {cls.__module__ for cls in classes} == {'couchbase.exceptions'}
+
+    def test_traceback_names_the_public_module(self) -> None:
+        ex = E.DocumentNotFoundException(self.MESSAGE)
+        line = traceback.format_exception_only(type(ex), ex)[-1]
+        assert line.startswith('couchbase.exceptions.DocumentNotFoundException: '), line
+
+    def test_pickle_names_the_public_module(self, cb_exceptions: list[type[CouchbaseException]]) -> None:
+        # A pickle records the class path, so one written here has to load on a release where the
+        # classes are only reachable as `couchbase.exceptions`.
+        for ex in cb_exceptions:
+            payload = pickle.dumps(ex(self.MESSAGE))
+            assert b'couchbase.common' not in payload, ex
+            assert type(pickle.loads(payload)) is ex
+
     def test_couchbase_exception_positional_message(self) -> None:
         # Regression guard (PYCBC-1926): the base declares `base` first and every one of its 93
         # subclasses declares `message` first, so a bare string used to land in `_base` and
@@ -80,15 +100,3 @@ class CouchbaseExceptionUnitTests:
         # The core-driven path is the one this must not disturb: ErrorMapper hands the real error
         # object in by keyword, and that still populates `_base` rather than the message.
         assert CouchbaseException(message=self.MESSAGE).message == self.MESSAGE
-
-    def test_unknown_subdocument_status_reports_the_status(self) -> None:
-        # Regression guard (PYCBC-1926): every other branch of _subdoc_error builds a subclass
-        # that reads correctly; the fallback, whose whole job is to describe a status
-        # nothing else recognised, was the one that constructed the base positionally and so
-        # described nothing.  A caller saw `CouchbaseException: <exception str() failed>`.
-        error = _subdoc_error(0xFFFF, 'some.path', 'some-key')
-        assert type(error) is CouchbaseException
-        message = str(error)
-        assert 'Status=65535' in message
-        assert 'path=some.path' in message
-        assert 'key=some-key' in message

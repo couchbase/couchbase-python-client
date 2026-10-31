@@ -33,7 +33,7 @@ from __future__ import annotations
 import json
 from collections.abc import Generator
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
@@ -62,6 +62,7 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
+from tests.test_features import TestProtocol
 
 # A bytes value that is not text and not JSON, for the RawBinaryTranscoder hex tests.
 HEX_CONTENT = bytes.fromhex('ff0102030405060708090a0b0c0d0e0f'
@@ -86,7 +87,7 @@ class ZeroFlagsTranscoder(Transcoder):
     def encode_value(self, value: Any) -> tuple[bytes, int]:
         return json.dumps(value, ensure_ascii=False).encode('utf-8'), 0
 
-    def decode_value(self, value: bytes, flags: Optional[int]) -> Any:
+    def decode_value(self, value: bytes, flags: int | None) -> Any:
         # Ignoring flags is the point of the class, not an oversight.
         return json.loads(value.decode('utf-8'))
 
@@ -264,6 +265,9 @@ class KeyValueOpTranscoderTestSuite(SuiteRequirements):
                                                    GetOptions(transcoder=tc),
                                                    expected_exceptions=(DocumentNotFoundException,))
 
+    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
+    # error mapping raises.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_get_and_lock(self, cb_env: SyncTestEnvironment) -> None:
         key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         tc = RawBinaryTranscoder()

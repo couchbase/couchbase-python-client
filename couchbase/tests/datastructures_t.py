@@ -54,6 +54,7 @@ class DatastructuresTestSuite(SuiteRequirements):
     TEST_MANIFEST = [
         'test_list',
         'test_map',
+        'test_map_keys_are_fields_not_paths',
         'test_next_before_iterating_ends_at_once',
         'test_queue',
         'test_sets',
@@ -157,6 +158,24 @@ class DatastructuresTestSuite(SuiteRequirements):
         cb_map.clear()
         assert 0 == cb_map.size()
 
+    # A map key names one field of the document, whatever characters it holds.
+    def test_map_keys_are_fields_not_paths(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+        cb_map = cb_env.collection.couchbase_map(key)
+
+        cb_map.add('user', {'name': 'bob'})
+        cb_map.add('user.name', 'alice')
+        cb_map.add('tags[0]', 'first')
+
+        assert cb_map.get('user.name') == 'alice'
+        assert cb_map.get('user') == {'name': 'bob'}
+        assert cb_map.get('tags[0]') == 'first'
+        assert cb_map.exists('user.name') is True
+
+        cb_map.remove('user.name')
+
+        assert sorted(cb_map.keys()) == ['tags[0]', 'user']
+
     @pytest.mark.testgen_exclude('acouchbase',
                                  reason='the async list and queue fetch the document on the first __anext__')
     def test_next_before_iterating_ends_at_once(self, cb_env: SyncTestEnvironment) -> None:
@@ -242,10 +261,12 @@ class DatastructuresTestSuite(SuiteRequirements):
 # rather than an accurate statement that the api has nothing to test here.
 @pytest.mark.testgen_exclude('acouchbase', 'txcouchbase',
                              reason='list_/map_/set_/queue_ exist only on the sync Collection')
+@pytest.mark.filterwarnings('ignore::couchbase.common.warnings.CouchbaseDeprecationWarning')
 class LegacyDatastructuresTestSuite(SuiteRequirements):
-    # Kept until the methods are.  Every one of them carries a deprecation warning naming the
-    # object-API replacement DatastructuresTestSuite above covers, so when the removal lands
-    # this class and its concrete subclass are deleted alongside them.
+    # Kept until the methods are.  Every one of them warns, naming the object-API replacement
+    # DatastructuresTestSuite above covers; supportability_t asserts the warnings, so they are
+    # silenced here.  When the removal lands this class and its concrete subclass are deleted
+    # alongside them.
 
     NUM_DOCS = 0
 
@@ -253,6 +274,7 @@ class LegacyDatastructuresTestSuite(SuiteRequirements):
         'test_list',
         'test_list_index_zero_of_an_empty_list',
         'test_map',
+        'test_map_keys_are_fields_not_paths',
         'test_queue',
         'test_sets',
     ]
@@ -321,6 +343,19 @@ class LegacyDatastructuresTestSuite(SuiteRequirements):
 
         cb_env.collection.map_remove(key, 'key1')
         assert 0 == cb_env.collection.map_size(key)
+
+    def test_map_keys_are_fields_not_paths(self, cb_env: SyncTestEnvironment) -> None:
+        key = cb_env.get_new_doc(key_only=True)
+
+        cb_env.collection.map_add(key, 'user', {'name': 'bob'}, create=True)
+        cb_env.collection.map_add(key, 'user.name', 'alice')
+
+        assert cb_env.collection.map_get(key, 'user.name') == 'alice'
+        assert cb_env.collection.map_get(key, 'user') == {'name': 'bob'}
+
+        cb_env.collection.map_remove(key, 'user.name')
+
+        assert cb_env.collection.get(key).content_as[dict] == {'user': {'name': 'bob'}}
 
     def test_queue(self, cb_env: SyncTestEnvironment) -> None:
         key = cb_env.get_new_doc(key_only=True)
