@@ -13,32 +13,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+__all__ = [
+    'configure_logging',
+    'enable_protocol_logger_to_save_network_traffic_to_file',
+    'get_metadata',
+    'get_transactions_protocol',
+]
+
 import platform
-
-try:
-    # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
-    # This is particularly helpful on M1 macs (PYCBC-1386).
-    import ssl  # noqa: F401 # nopep8 # isort:skip # noqa: E402
-    import couchbase.protocol.classic._pycbc_core  # noqa: F401 # nopep8 # isort:skip # noqa: E402
-except ImportError:
-    import os  # nopep8 # isort:skip # noqa: E402
-    import sys  # nopep8 # isort:skip # noqa: E402
-    # should only need to do this on Windows w/ Python >= 3.8 due to the changes made for how DLLs are resolved
-    if sys.platform.startswith('win32') and (3, 8) <= sys.version_info:
-        open_ssl_dir = os.getenv('PYCBC_OPENSSL_DIR')
-        # if not set by environment, try to use libcrypto and libssl that comes w/ Windows Python install
-        if not open_ssl_dir:
-            for p in sys.path:
-                if os.path.split(p)[-1] == 'DLLs':
-                    open_ssl_dir = p
-                    break
-
-        if open_ssl_dir:
-            os.add_dll_directory(open_ssl_dir)
-        else:
-            print(('PYCBC: Caught import error. '
-                   'Most likely due to not finding OpenSSL libraries. '
-                   'Set PYCBC_OPENSSL_DIR to location where OpenSSL libraries can be found.'))
+from typing import TYPE_CHECKING, Any
 
 try:
     from couchbase._version import __version__
@@ -54,16 +37,28 @@ except Exception:  # nosec
     pass
 
 
-# Import logging configuration - auto-configures on import
-import couchbase.protocol.classic._logging_config  # nopep8 # isort:skip # noqa: F401, E402
-
-# Import public API functions
-from couchbase.protocol.classic._logging_config import (  # nopep8 # isort:skip # noqa: F401, E402
+# Applies PYCBC_LOG_LEVEL on import
+from couchbase.common._logging import (  # nopep8 # isort:skip # noqa: F401, E402
     configure_logging,
     enable_protocol_logger_to_save_network_traffic_to_file,
 )
 
-from couchbase.protocol.classic._pycbc_core.core_metadata import (  # nopep8 # isort:skip # noqa: F401, E402
-    get_metadata,
-    get_transactions_protocol,
+# The categories a user writes a warnings filter against
+from couchbase.common.warnings import (  # nopep8 # isort:skip # noqa: F401, E402
+    CouchbaseApplicabilityWarning,
+    CouchbaseDeprecationWarning,
+    CouchbaseOptionWarning,
+    CouchbaseWarning,
 )
+
+if TYPE_CHECKING:
+    from couchbase.protocol.classic._pycbc_core.core_metadata import get_metadata  # noqa: F401
+    from couchbase.protocol.classic._pycbc_core.core_metadata import get_transactions_protocol  # noqa: F401
+
+
+# Read from the C++ core, so they load the binding only when asked for.
+def __getattr__(name: str) -> Any:
+    if name in ('get_metadata', 'get_transactions_protocol'):
+        from couchbase.protocol.classic._pycbc_core import core_metadata
+        return getattr(core_metadata, name)
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

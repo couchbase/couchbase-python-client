@@ -23,6 +23,7 @@ from typing import ClassVar
 import pytest
 
 from tests.manifest import validate_test_manifest
+from tests.test_features import TestProtocol
 
 
 class LoggingSmokeTestSuite:
@@ -30,8 +31,7 @@ class LoggingSmokeTestSuite:
     # none of what it asserts differs per api.
     #
     # The shape it holds in place: the four logging callables are importable from `couchbase`,
-    # the loggers sit under a single `couchbase` parent, and importing the pieces in either
-    # order works.
+    # and the loggers sit under a single `couchbase` parent.
     #
     # The imports are bare on purpose.  Wrapping one in `try: ... except ImportError:
     # pytest.fail(...)` changes nothing about what fails, and replaces the traceback naming the
@@ -43,20 +43,9 @@ class LoggingSmokeTestSuite:
         'test_enable_protocol_logger_callable',
         'test_get_metadata_callable',
         'test_get_transactions_protocol_callable',
-        'test_import_core_metadata_module',
-        'test_import_logging_config_module',
         'test_logger_hierarchy',
         'test_logger_names_correct',
-        'test_no_circular_imports',
     ]
-
-    def test_import_logging_config_module(self) -> None:
-        import couchbase.protocol.classic._logging_config
-        assert couchbase.protocol.classic._logging_config is not None
-
-    def test_import_core_metadata_module(self) -> None:
-        from couchbase.protocol.classic._pycbc_core import core_metadata
-        assert core_metadata is not None
 
     def test_configure_logging_callable(self) -> None:
         from couchbase import configure_logging
@@ -98,33 +87,6 @@ class LoggingSmokeTestSuite:
         assert threshold_logger.parent is parent
         assert metrics_logger.parent is parent
 
-    def test_no_circular_imports(self) -> None:
-        import couchbase
-        assert couchbase is not None
-
-        # Force a fresh execution of each module rather than trusting the already-imported
-        # one, since a cycle only shows up while the module body is running.
-        #
-        # Both entries are restored afterwards.  A re-import binds a *new* module object to
-        # sys.modules while every module that did `from ... import X` keeps the old one, so
-        # leaving the new object in place hands a split identity to whatever runs next.
-        fresh_imports = ['couchbase.protocol.classic._logging_config',
-                         'couchbase.protocol.classic._pycbc_core.core_metadata']
-        saved = {name: sys.modules[name] for name in fresh_imports if name in sys.modules}
-        try:
-            for name in fresh_imports:
-                sys.modules.pop(name, None)
-
-            import couchbase.protocol.classic._logging_config
-            assert couchbase.protocol.classic._logging_config is not None
-
-            from couchbase.protocol.classic._pycbc_core import core_metadata
-            assert core_metadata is not None
-        finally:
-            for name in fresh_imports:
-                sys.modules.pop(name, None)
-            sys.modules.update(saved)
-
     def test_backward_compat_imports(self) -> None:
         # The four names below were defined in couchbase/__init__.py before the logging move.
         # Importing them from `couchbase` has to keep working regardless of where they now live.
@@ -160,3 +122,43 @@ class LoggingSmokeTests(LoggingSmokeTestSuite):
         for logger, level, handlers in saved:
             logger.setLevel(level)
             logger.handlers[:] = handlers
+
+
+@pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+class ClassicLoggingSmokeTests:
+    # Classic's logging modules import, and import fresh in either order.
+
+    def test_import_logging_config_module(self) -> None:
+        import couchbase.protocol.classic._logging_config
+        assert couchbase.protocol.classic._logging_config is not None
+
+    def test_import_core_metadata_module(self) -> None:
+        from couchbase.protocol.classic._pycbc_core import core_metadata
+        assert core_metadata is not None
+
+    def test_no_circular_imports(self) -> None:
+        import couchbase
+        assert couchbase is not None
+
+        # Force a fresh execution of each module rather than trusting the already-imported
+        # one, since a cycle only shows up while the module body is running.
+        #
+        # Both entries are restored afterwards.  A re-import binds a *new* module object to
+        # sys.modules while every module that did `from ... import X` keeps the old one, so
+        # leaving the new object in place hands a split identity to whatever runs next.
+        fresh_imports = ['couchbase.protocol.classic._logging_config',
+                         'couchbase.protocol.classic._pycbc_core.core_metadata']
+        saved = {name: sys.modules[name] for name in fresh_imports if name in sys.modules}
+        try:
+            for name in fresh_imports:
+                sys.modules.pop(name, None)
+
+            import couchbase.protocol.classic._logging_config
+            assert couchbase.protocol.classic._logging_config is not None
+
+            from couchbase.protocol.classic._pycbc_core import core_metadata
+            assert core_metadata is not None
+        finally:
+            for name in fresh_imports:
+                sys.modules.pop(name, None)
+            sys.modules.update(saved)

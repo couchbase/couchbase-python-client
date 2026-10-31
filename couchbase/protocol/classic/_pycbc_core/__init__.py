@@ -13,8 +13,52 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import importlib
+import os
+import sys
 
-from ._core import (CXXCBC_METADATA,
+# Importing ssl first lets Python locate OpenSSL for the extension, which matters on Apple silicon (PYCBC-1386).
+import ssl  # noqa: F401 # isort:skip
+
+_OPENSSL_DIR_ENV_VAR = 'PYCBC_OPENSSL_DIR'
+
+
+def _add_openssl_dll_directory() -> bool:
+    """Windows resolves an extension's DLLs only from registered directories.  Registers the one named by the
+    environment, or else the interpreter's own DLLs directory, which ships libssl and libcrypto."""
+    if sys.platform != 'win32':
+        return False
+    openssl_dir = os.getenv(_OPENSSL_DIR_ENV_VAR) or next(
+        (p for p in sys.path if os.path.split(p)[-1] == 'DLLs'), None)
+    if not openssl_dir:
+        return False
+    os.add_dll_directory(openssl_dir)
+    return True
+
+
+def _binding_import_error(exc: ImportError) -> ImportError:
+    if isinstance(exc, ModuleNotFoundError) and exc.name == f'{__name__}._core':
+        return ImportError(f'The Couchbase SDK native extension ({exc.name}) is not installed. '
+                           'Reinstall the couchbase package, or build it from source.',
+                           name=exc.name, path=exc.path)
+    message = f'The Couchbase SDK native extension could not be loaded: {exc}'
+    if sys.platform == 'win32':
+        message += f' If OpenSSL was not found, set {_OPENSSL_DIR_ENV_VAR} to the directory holding its libraries.'
+    return ImportError(message, name=exc.name, path=exc.path)
+
+
+# Not `from . import _core`, which reports a missing extension as a plain ImportError naming this package.
+try:
+    importlib.import_module(f'{__name__}._core')
+except ImportError as exc:
+    if isinstance(exc, ModuleNotFoundError) or not _add_openssl_dll_directory():
+        raise _binding_import_error(exc) from exc
+    try:
+        importlib.import_module(f'{__name__}._core')
+    except ImportError as retry_exc:
+        raise _binding_import_error(retry_exc) from retry_exc
+
+from ._core import (CXXCBC_METADATA,  # noqa: E402 # isort:skip
                     FMT_BYTES,
                     FMT_COMMON_MASK,
                     FMT_JSON,
@@ -80,3 +124,6 @@ __all__ = [
     'transaction_query_options_as_dict',
     'transaction_rollback',
 ]
+
+# Last, since it reads the names above: hands the core's logger to the shared logging configuration.
+import couchbase.protocol.classic._logging_config  # noqa: E402,F401 # isort:skip

@@ -73,6 +73,13 @@ export PYCBC_LOG_LEVEL=info
 - C++ SDK operations (connection, KV, queries, etc.)
 - Python SDK loggers: `couchbase.threshold`, `couchbase.metrics`, `couchbase.transactions`
 
+**If your application already configures logging**, the SDK sets only the level of the `couchbase`
+logger and leaves its records to the handlers you installed, on the `couchbase` logger or on the root
+logger. It adds a console handler of its own only when nothing else would handle the records. The
+root logger is never changed.
+
+An unrecognized value logs a warning and uses `info`. `warn` is accepted as `warning`.
+
 ---
 
 #### PYCBC_LOG_FILE
@@ -85,7 +92,14 @@ export PYCBC_LOG_LEVEL=debug
 export PYCBC_LOG_FILE=/var/log/couchbase-sdk.log
 ```
 
-**Result**: All SDK logs (C++ and Python) are written to the specified file.
+**Result**: SDK logs are written to files named from the specified path:
+
+- The C++ core writes `couchbase-sdk.log.000000.txt`, and starts the next numbered file
+  (`couchbase-sdk.log.000001.txt`, and so on) when the current one passes 100 MiB. A restarted
+  application appends to the highest-numbered file. Older files are not deleted, so at `trace` and
+  `debug` levels clean them up yourself.
+- The Python SDK writes its own records to `couchbase-sdk.log`, the path exactly as given. These
+  records also reach any handlers your application has configured.
 
 ---
 
@@ -93,7 +107,8 @@ export PYCBC_LOG_FILE=/var/log/couchbase-sdk.log
 
 Optional. When using `PYCBC_LOG_FILE`, also output to console.
 
-**Values:** `0` (disabled, default) or `1` (enabled)
+**Values:** `0` (disabled, default) or `1` (enabled). `true`, `yes` and `on` also enable it; any other value
+leaves it disabled.
 
 **Example:**
 ```bash
@@ -469,8 +484,8 @@ couchbase_logger.propagate = False  # Prevent propagation
    - Wrong: `PYCBC_LOGLEVEL`, `PYCBC_LOG`, `COUCHBASE_LOG_LEVEL`
 
 3. **Invalid log level value**
-   - Valid: `trace`, `debug`, `info`, `warning`, `error`, `critical`, `off`
-   - Invalid: `verbose`, `warn` (use `warning`), `fatal`
+   - Valid: `trace`, `debug`, `info`, `warn`, `warning`, `error`, `critical`, `off`
+   - Any other value, such as `verbose` or `fatal`, logs a warning and uses `info`
 
 ---
 
