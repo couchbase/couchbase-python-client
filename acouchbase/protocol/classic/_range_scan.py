@@ -28,10 +28,11 @@ if TYPE_CHECKING:
 
 
 class ClassicAsyncRangeScanExecutor(AsyncStreamingExecutor[ScanResult, None]):
-    """Classic's asyncio range scan executor: each read waits on the core in a worker thread.
+    """Classic's asyncio range scan executor: the scan starts, and each read waits, in a worker thread.
 
-    The binding offers no callback for the scan, so a read can only wait.  The reads are
-    sequential, so one worker serves the whole scan.
+    The binding offers no callback for the scan, so a read can only wait.  Starting the scan waits
+    on the server too, and on the loop it would stop every other operation from completing until it
+    returned.  The calls are sequential, so one worker serves the whole scan.
     """
 
     def __init__(self,
@@ -44,7 +45,7 @@ class ClassicAsyncRangeScanExecutor(AsyncStreamingExecutor[ScanResult, None]):
         self._released = False
 
     async def submit(self) -> None:
-        self._stream.submit()
+        await self._loop.run_in_executor(self._worker, self._stream.submit)
 
     async def next_row(self) -> ScanResult:
         return await self._loop.run_in_executor(self._worker, self._stream.fetch, StopAsyncIteration)

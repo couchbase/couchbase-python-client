@@ -18,10 +18,10 @@
 # below is named into ClusterCloseTestSuite rather than into the file.
 #
 # The bar for living here is that the test asserts something only the async api can be
-# asked.  `couchbase.Cluster(conn_string, opts)` returns with `connected` already True,
-# because the sync constructor connects; `acouchbase.Cluster(conn_string, opts)` returns
-# unconnected, because connecting is what `on_connect()` is for.  So "close a cluster that
-# was never connected" has no sync form to be generated from.  txcouchbase constructs the
+# asked.  `couchbase.Cluster(conn_string, opts)` returns connected, because the sync
+# constructor connects; `acouchbase.Cluster(conn_string, opts)` returns unconnected, because
+# connecting is what `on_connect()` is for.  So "close a cluster that was never connected"
+# has no sync form to be generated from.  txcouchbase constructs the
 # same lazy way, but ClusterCloseTestSuite is excluded there whole, so there is no generated
 # class to merge into.
 from __future__ import annotations
@@ -44,6 +44,5 @@ class ClusterCloseTestSuite:
         conn_string = cb_env.config.get_connection_string()
         username, pw = cb_env.config.get_username_and_pw()
         cluster = Cluster(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
-        assert cluster._impl.connected is False
+        # Returning is the assertion: closing a cluster nothing has awaited does not raise.
         await cluster.close()
-        assert cluster._impl.connected is False

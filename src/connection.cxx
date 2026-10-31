@@ -23,7 +23,9 @@
 #include <core/range_scan_orchestrator.hxx>
 #include <core/timeout_defaults.hxx>
 #include <core/utils/connection_string.hxx>
+#include <optional>
 #include <stdexcept>
+#include <tuple>
 
 namespace pycbc
 {
@@ -595,14 +597,33 @@ Connection::handle_range_scan_op(PyObject* kwargs)
         "orchestrator_options must be a dictionary", __FILE__, __LINE__);
     }
 
+    auto orchestrator_options =
+      py_to_cbpp<couchbase::core::range_scan_orchestrator_options>(pyObj_orchestrator_opts);
+
+    // The generated converter dispatches on the tag the request builder writes into the dict.
+    auto scan_type = py_to_cbpp<std::variant<std::monostate,
+                                             couchbase::core::range_scan,
+                                             couchbase::core::prefix_scan,
+                                             couchbase::core::sampling_scan>>(pyObj_scan_type);
+    if (PyErr_Occurred() != nullptr) {
+      return nullptr;
+    }
+
+    // Starting a scan waits on the server twice, for the bucket configuration and for the scan
+    // itself, so both waits release the GIL.
     auto barrier = std::make_shared<std::promise<
       std::pair<std::error_code, std::shared_ptr<couchbase::core::topology::configuration>>>>();
     auto f = barrier->get_future();
-    cluster_.with_bucket_configuration(bucket_name,
-                                       [barrier](std::error_code ec, auto config) mutable {
-                                         barrier->set_value({ ec, std::move(config) });
-                                       });
-    auto [ec, bucket_config] = f.get();
+    std::error_code ec;
+    std::shared_ptr<couchbase::core::topology::configuration> bucket_config;
+    {
+      gil_release_guard no_gil;
+      cluster_.with_bucket_configuration(bucket_name,
+                                         [barrier](std::error_code err, auto config) mutable {
+                                           barrier->set_value({ err, std::move(config) });
+                                         });
+      std::tie(ec, bucket_config) = f.get();
+    }
 
     if (ec) {
       return build_exception(
@@ -617,38 +638,36 @@ Connection::handle_range_scan_op(PyObject* kwargs)
         "Cannot perform kv range scan operation.  Unable to get vbucket map.", __FILE__, __LINE__);
     }
 
-    auto agent_group =
-      couchbase::core::agent_group(*io_, couchbase::core::agent_group_config{ { cluster_ } });
-    agent_group.open_bucket(bucket_name);
-    auto agent = agent_group.get_agent(bucket_name);
+    bool has_agent = false;
+    std::optional<couchbase::core::scan_result> scan_result;
+    {
+      gil_release_guard no_gil;
+      auto agent_group =
+        couchbase::core::agent_group(*io_, couchbase::core::agent_group_config{ { cluster_ } });
+      agent_group.open_bucket(bucket_name);
+      auto agent = agent_group.get_agent(bucket_name);
+      if (agent.has_value()) {
+        has_agent = true;
+        auto orchestrator = couchbase::core::range_scan_orchestrator(*io_,
+                                                                     agent.value(),
+                                                                     bucket_config->vbmap.value(),
+                                                                     scope_name,
+                                                                     collection_name,
+                                                                     scan_type,
+                                                                     orchestrator_options);
+        auto started = orchestrator.scan();
+        if (started.has_value()) {
+          scan_result.emplace(std::move(started.value()));
+        }
+      }
+    }
 
-    if (!agent.has_value()) {
+    if (!has_agent) {
       return raise_unsuccessful_operation(
         "Cannot perform kv range scan operation.  Unable to get operation agent.",
         __FILE__,
         __LINE__);
     }
-
-    auto orchestrator_options =
-      py_to_cbpp<couchbase::core::range_scan_orchestrator_options>(pyObj_orchestrator_opts);
-
-    // The generated converter dispatches on the tag the request builder writes into the dict.
-    auto scan_type = py_to_cbpp<std::variant<std::monostate,
-                                             couchbase::core::range_scan,
-                                             couchbase::core::prefix_scan,
-                                             couchbase::core::sampling_scan>>(pyObj_scan_type);
-    if (PyErr_Occurred() != nullptr) {
-      return nullptr;
-    }
-
-    auto orchestrator = couchbase::core::range_scan_orchestrator(*io_,
-                                                                 agent.value(),
-                                                                 bucket_config->vbmap.value(),
-                                                                 scope_name,
-                                                                 collection_name,
-                                                                 scan_type,
-                                                                 orchestrator_options);
-    auto scan_result = orchestrator.scan();
     if (!scan_result.has_value()) {
       return raise_unsuccessful_operation(
         "Cannot perform kv scan operation.  Unable to start scan operation.", __FILE__, __LINE__);

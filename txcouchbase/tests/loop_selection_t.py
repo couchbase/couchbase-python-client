@@ -34,7 +34,7 @@ import json
 import os
 import subprocess  # nosec
 import sys
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -89,7 +89,7 @@ class TxLoopSelectionUnitTests:
     # one tree's own.
 
     @pytest.fixture(name='reactor_probe', scope='class')
-    def import_txcouchbase_in_a_subprocess(self) -> Dict[str, Any]:
+    def import_txcouchbase_in_a_subprocess(self) -> dict[str, Any]:
         env = dict(os.environ)
         env['PYTHONPATH'] = os.pathsep.join(filter(None, [_PACKAGE_PARENT_DIR,
                                                           os.environ.get('PYTHONPATH')]))
@@ -100,23 +100,23 @@ class TxLoopSelectionUnitTests:
                               timeout=120)
         assert proc.returncode == 0, (f'Importing txcouchbase exited with {proc.returncode}.\n'
                                       f'{proc.stderr}')
-        probe: Dict[str, Any] = json.loads(proc.stdout)
+        probe: dict[str, Any] = json.loads(proc.stdout)
         return probe
 
-    def test_reactor_is_installed_with_the_resolved_loop(self, reactor_probe: Dict[str, Any]) -> None:
+    def test_reactor_is_installed_with_the_resolved_loop(self, reactor_probe: dict[str, Any]) -> None:
         assert reactor_probe['reactor_loop_is_resolved_loop'] is True, (
             f"the reactor holds a {reactor_probe['reactor_loop_type']} that is not the loop "
             f'get_event_loop() returns; _validate_loop will reject every cluster.')
 
-    def test_reactor_loop_is_a_selector_loop(self, reactor_probe: Dict[str, Any]) -> None:
+    def test_reactor_loop_is_a_selector_loop(self, reactor_probe: dict[str, Any]) -> None:
         assert reactor_probe['is_selector_loop'] is True, (
             f"reactor installed with a {reactor_probe['reactor_loop_type']}, which Twisted's "
             f'asyncioreactor does not support.')
 
     def test_rejected_thread_default_is_closed_and_replaced(self,
-                                                            reactor_probe: Dict[str, Any]) -> None:
+                                                            reactor_probe: dict[str, Any]) -> None:
         assert reactor_probe['reactor_loop_replaced_the_default'] is True
         assert reactor_probe['rejected_loop_closed'] is True
 
-    def test_resolved_loop_survives_the_import(self, reactor_probe: Dict[str, Any]) -> None:
+    def test_resolved_loop_survives_the_import(self, reactor_probe: dict[str, Any]) -> None:
         assert reactor_probe['reactor_loop_closed'] is False

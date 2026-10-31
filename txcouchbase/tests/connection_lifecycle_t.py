@@ -28,12 +28,19 @@ import pytest
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import DocumentNotFoundException
 from couchbase.options import ClusterOptions
+from tests.environments.test_environment import TestProtocol
 from tests.environments.twisted_environment import (SuiteRequirements,
                                                     TwistedTestEnvironment,
                                                     build_twisted_environment,
                                                     run_in_reactor_thread,
                                                     teardown_twisted_environment)
+from txcouchbase.bucket import Bucket
 from txcouchbase.cluster import Cluster
+from txcouchbase.protocol.classic._bucket_impl import TxBucketImpl
+from txcouchbase.protocol.classic._cluster_impl import TxClusterImpl
+
+# What is checked here is the connect futures of classic's client adapter and its bucket chain.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 
 class TxConnectionChainingTests(SuiteRequirements):
@@ -63,13 +70,25 @@ class TxConnectionChainingTests(SuiteRequirements):
         return Cluster(cb_env.config.get_connection_string(),
                        ClusterOptions(PasswordAuthenticator(username, pw)))
 
-    # `flaky` here means "opens a connection", as it does on the five close tests in the sync
+    @staticmethod
+    def _classic_impl(cluster: Cluster) -> TxClusterImpl:
+        impl = cluster._impl
+        assert isinstance(impl, TxClusterImpl)
+        return impl
+
+    @staticmethod
+    def _classic_bucket_impl(bucket: Bucket) -> TxBucketImpl:
+        impl = bucket._impl
+        assert isinstance(impl, TxBucketImpl)
+        return impl
+
+    # `flaky` here means "opens a connection", as it does on the close tests in the sync
     # cluster_t: a connection attempt against a shared cluster is the retryable part.
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_bucket_on_connect_completes_the_cluster_connect(self, cb_env: TwistedTestEnvironment) -> None:
         cluster = self._unconnected_cluster(cb_env)
         try:
-            connect_ft = cluster._impl.client_adapter.connect_ft
+            connect_ft = self._classic_impl(cluster).client_adapter.connect_ft
             # The constructor starts the connect without waiting, so the future is here and
             # pending.  A cluster built to skip connecting has None.
             assert connect_ft is not None and connect_ft.done() is False
@@ -80,8 +99,8 @@ class TxConnectionChainingTests(SuiteRequirements):
             # The only wait in this test, and what completes the cluster connect: the bucket
             # had nothing to open a bucket on until then.
             assert connect_ft.done() is True
-            assert cluster._impl.connection is not None
-            assert bucket._impl.bucket_connect_ft.done() is True
+            assert self._classic_impl(cluster).connection is not None
+            assert self._classic_bucket_impl(bucket).bucket_connect_ft.done() is True
         finally:
             run_in_reactor_thread(cluster.close)
 
@@ -99,9 +118,9 @@ class TxConnectionChainingTests(SuiteRequirements):
             # here, on an operation submitted against a connection that does not exist.
             run_in_reactor_thread(collection.upsert, key, doc)
 
-            connect_ft = cluster._impl.client_adapter.connect_ft
+            connect_ft = self._classic_impl(cluster).client_adapter.connect_ft
             assert connect_ft is not None and connect_ft.done() is True
-            assert bucket._impl.bucket_connect_ft.done() is True
+            assert self._classic_bucket_impl(bucket).bucket_connect_ft.done() is True
 
             result = run_in_reactor_thread(collection.get, key)
             assert result.content_as[dict] == doc

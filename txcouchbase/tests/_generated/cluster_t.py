@@ -92,8 +92,7 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
         report_id = str(uuid4())
         # Whether the query succeeds is beside the point: a server-side failure still means a
         # query endpoint was opened, and that endpoint appearing in the report is what is
-        # under test.  `.execute()` is not used: the rows are drained instead, which is what
-        # lets this test generate for txcouchbase, whose N1QLRequest has no execute().
+        # under test.
         #
         # The rows are not counted either: a query that returns none has still opened the
         # endpoint.  Counting them would make this test wait on the index behind the bucket

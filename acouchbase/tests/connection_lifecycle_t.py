@@ -31,21 +31,36 @@
 # out of `close()`, where the caller cannot act on it.
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator
+import asyncio
+import threading
+from collections.abc import AsyncGenerator, Callable
+from types import SimpleNamespace
+from typing import (TYPE_CHECKING,
+                    Any,
+                    cast)
 from uuid import uuid4
 
 import pytest
 import pytest_asyncio
 
 from acouchbase.cluster import Cluster
+from acouchbase.protocol.classic._client_adapter import AsyncClientAdapter
 from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import DocumentNotFoundException
 from couchbase.options import ClusterOptions
+from couchbase.protocol.classic._bucket_types import OpenBucketRequest
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   build_async_environment,
                                                   teardown_async_environment)
-from tests.environments.test_environment import SuiteRequirements
+from tests.environments.test_environment import SuiteRequirements, TestProtocol
+
+if TYPE_CHECKING:
+    from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
+
+# What is checked here is classic's client adapter: its close guards, how it resolves a future the
+# caller cancelled, and the connect futures it and the bucket chain.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 BUCKET_NAME = 'default'
 CONNSTR = 'couchbase://localhost'
@@ -53,6 +68,20 @@ CONNSTR = 'couchbase://localhost'
 
 def _fail_if_called(*args: Any, **kwargs: Any) -> None:
     raise AssertionError('close started a connection in order to tear one down')
+
+
+def _submit_kv(adapter: AsyncClientAdapter, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Callable[[Any], None]]:
+    submitted: list[Any] = []
+    monkeypatch.setattr(adapter, '_binding_map', SimpleNamespace(kv_ops={0: submitted.append}))
+    ft = adapter.execute_collection_request(0, cast('PycbcCoreKeyValueRequest', SimpleNamespace()))
+    return ft, submitted[0].callback
+
+
+def _submit_bucket(adapter: AsyncClientAdapter, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Callable[[Any], None]]:
+    submitted: list[dict[str, Any]] = []
+    monkeypatch.setattr(adapter, '_execute_req', lambda ft, method, req_dict: submitted.append(req_dict))
+    ft = adapter.execute_bucket_request(OpenBucketRequest(BUCKET_NAME))
+    return ft, submitted[0]['callback']
 
 
 class AsyncConnectionLifecycleUnitTests:
@@ -112,6 +141,32 @@ class AsyncConnectionLifecycleUnitTests:
 
         assert adapter._closed is True
 
+    # The core answers on its own thread, possibly after a caller that stopped waiting has cancelled
+    # the future.  Resolving it then would report InvalidStateError to the loop for every such call.
+    @pytest.mark.parametrize('submit', [_submit_kv, _submit_bucket], ids=['key value', 'bucket'])
+    @pytest.mark.asyncio
+    async def test_a_response_to_a_cancelled_request_is_dropped(self,
+                                                                unconnected_cluster: AsyncClusterImpl,
+                                                                monkeypatch: pytest.MonkeyPatch,
+                                                                submit: Any) -> None:
+        adapter = unconnected_cluster.client_adapter
+        monkeypatch.setattr(adapter, '_ensure_connected', lambda: None)
+        reported: list[dict[str, Any]] = []
+        adapter.loop.set_exception_handler(lambda loop, context: reported.append(context))
+        try:
+            ft, callback = submit(adapter, monkeypatch)
+            ft.cancel()
+            core = threading.Thread(target=callback, args=('result',))
+            core.start()
+            core.join()
+            for _ in range(3):
+                await asyncio.sleep(0)
+        finally:
+            adapter.loop.set_exception_handler(None)
+
+        assert ft.cancelled()
+        assert reported == []
+
     @pytest.mark.asyncio
     async def test_close_does_not_surface_a_failed_connect(self, unconnected_cluster: AsyncClusterImpl) -> None:
         adapter = unconnected_cluster.client_adapter
@@ -131,7 +186,9 @@ class AsyncConnectionChainingTests(SuiteRequirements):
     #
     # `acouchbase.Cluster(...)` returns before it is connected, as does every handle taken
     # from it, and what makes that usable is that each connect chains onto the one above it.
-    # Neither test calls `on_connect()`, because the point is that nothing has to.
+    # Neither chaining test calls `on_connect()`, because the point is that nothing has to.
+    # The third test is classic's `connected` across that lifecycle, which no
+    # protocol-neutral interface carries.
 
     # Both tests write their own key through a cluster of their own, so the shared corpus
     # would be seeded and never read.
@@ -151,7 +208,13 @@ class AsyncConnectionChainingTests(SuiteRequirements):
         return Cluster(cb_env.config.get_connection_string(),
                        ClusterOptions(PasswordAuthenticator(username, pw)))
 
-    # `flaky` here means "opens a connection", as it does on the five close tests in the sync
+    @staticmethod
+    def _classic_impl(cluster: Cluster) -> AsyncClusterImpl:
+        impl = cluster._impl
+        assert isinstance(impl, AsyncClusterImpl)
+        return impl
+
+    # `flaky` here means "opens a connection", as it does on the close tests in the sync
     # cluster_t: a connection attempt against a shared cluster is the retryable part.
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.asyncio
@@ -159,7 +222,7 @@ class AsyncConnectionChainingTests(SuiteRequirements):
                                                                    cb_env: AsyncTestEnvironment) -> None:
         cluster = self._unconnected_cluster(cb_env)
         try:
-            connect_ft = cluster._impl.client_adapter.connect_ft
+            connect_ft = self._classic_impl(cluster).client_adapter.connect_ft
             # The constructor starts the connect without waiting, so the future is here and
             # pending.  A cluster built to skip connecting has None.
             assert connect_ft is not None and connect_ft.done() is False
@@ -170,8 +233,10 @@ class AsyncConnectionChainingTests(SuiteRequirements):
             # The only await in this test, and what completes the cluster connect: the bucket
             # had nothing to open a bucket on until then.
             assert connect_ft.done() is True
-            assert cluster._impl.connection is not None
-            assert bucket._impl.bucket_connect_ft.done() is True
+            assert self._classic_impl(cluster).connection is not None
+            from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
+            bucket_impl = bucket._impl
+            assert isinstance(bucket_impl, AsyncBucketImpl) and bucket_impl.bucket_connect_ft.done() is True
         finally:
             await cluster.close()
 
@@ -191,9 +256,11 @@ class AsyncConnectionChainingTests(SuiteRequirements):
             # fails here, on an operation submitted against a connection that does not exist.
             await collection.upsert(key, doc)
 
-            connect_ft = cluster._impl.client_adapter.connect_ft
+            connect_ft = self._classic_impl(cluster).client_adapter.connect_ft
             assert connect_ft is not None and connect_ft.done() is True
-            assert bucket._impl.bucket_connect_ft.done() is True
+            from acouchbase.protocol.classic._bucket_impl import AsyncBucketImpl
+            bucket_impl = bucket._impl
+            assert isinstance(bucket_impl, AsyncBucketImpl) and bucket_impl.bucket_connect_ft.done() is True
 
             result = await collection.get(key)
             assert result.content_as[dict] == doc
@@ -205,3 +272,16 @@ class AsyncConnectionChainingTests(SuiteRequirements):
                 # cleanup must not replace it with one about the cleanup.
                 pass
             await cluster.close()
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    @pytest.mark.asyncio
+    async def test_connected_reflects_connect_and_close(self, cb_env: AsyncTestEnvironment) -> None:
+        cluster = self._unconnected_cluster(cb_env)
+        impl = self._classic_impl(cluster)
+        try:
+            assert impl.connected is False
+            await cluster.on_connect()
+            assert impl.connected is True
+        finally:
+            await cluster.close()
+        assert impl.connected is False

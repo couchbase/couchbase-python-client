@@ -35,10 +35,8 @@ import asyncio
 import selectors
 import sys
 import threading
-from typing import (Callable,
-                    Dict,
-                    Tuple,
-                    TypeVar)
+from collections.abc import Callable
+from typing import TypeVar
 
 from acouchbase import LoopValidator, get_event_loop
 
@@ -67,8 +65,8 @@ def _rejected_loop() -> asyncio.AbstractEventLoop:
 
 
 def _in_fresh_thread(fn: Callable[[], T]) -> T:
-    outcome: Dict[str, T] = {}
-    errors: Dict[str, BaseException] = {}
+    outcome: dict[str, T] = {}
+    errors: dict[str, BaseException] = {}
 
     def run() -> None:
         try:
@@ -84,7 +82,7 @@ def _in_fresh_thread(fn: Callable[[], T]) -> T:
     return outcome['value']
 
 
-def _resolve_while_running(loop: asyncio.AbstractEventLoop) -> Tuple[bool, bool, bool]:
+def _resolve_while_running(loop: asyncio.AbstractEventLoop) -> tuple[bool, bool, bool]:
     # Whether the resolved loop is the running one, whether resolution closed it, and whether
     # it is still the thread default afterwards.
     asyncio.set_event_loop(loop)
@@ -106,7 +104,7 @@ class AsyncLoopSelectionUnitTests:
 
     def test_rejected_loop_verdict(self) -> None:
         # The premise every other test rests on, asserted rather than assumed.
-        def check() -> Tuple[bool, bool]:
+        def check() -> tuple[bool, bool]:
             accepted, rejected = _accepted_loop(), _rejected_loop()
             try:
                 return (LoopValidator._is_valid_loop(accepted),
@@ -132,7 +130,7 @@ class AsyncLoopSelectionUnitTests:
         assert still_default is True
 
     def test_accepted_loop_is_returned_when_not_running(self) -> None:
-        def check() -> Tuple[bool, bool]:
+        def check() -> tuple[bool, bool]:
             loop = _accepted_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -144,7 +142,7 @@ class AsyncLoopSelectionUnitTests:
         assert _in_fresh_thread(check) == (True, False)
 
     def test_rejected_loop_is_closed_and_replaced_when_not_running(self) -> None:
-        def check() -> Tuple[bool, bool, bool, bool]:
+        def check() -> tuple[bool, bool, bool, bool]:
             loop = _rejected_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -165,7 +163,7 @@ class AsyncLoopSelectionUnitTests:
         assert installed is True
 
     def test_supplied_loop_is_returned_when_accepted(self) -> None:
-        def check() -> Tuple[bool, bool]:
+        def check() -> tuple[bool, bool]:
             loop = _accepted_loop()
             try:
                 return get_event_loop(loop) is loop, loop.is_closed()

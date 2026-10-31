@@ -290,9 +290,17 @@ class _ScanConnection:
     def __init__(self, scan: _ScanIterator) -> None:
         self._scan = scan
         self.submit_threads: list[int] = []
+        self.needs_loop: asyncio.AbstractEventLoop | None = None
 
     def pycbc_kv_range_scan(self, **kwargs: Any) -> _ScanIterator:
         self.submit_threads.append(threading.get_ident())
+        if self.needs_loop is not None:
+            # A start that can only finish once the loop has run a callback, as one waiting on
+            # an IO thread that needs the loop's operations to complete does.
+            ran = threading.Event()
+            self.needs_loop.call_soon_threadsafe(ran.set)
+            if not ran.wait(5):
+                raise AssertionError('the scan start blocked the loop it was waiting on')
         return self._scan
 
 
@@ -311,13 +319,23 @@ def _scan_executor(scan: _ScanIterator) -> tuple[ClassicAsyncRangeScanExecutor, 
 class ClassicAsyncRangeScanExecutorUnitTests:
 
     @pytest.mark.asyncio
-    async def test_the_scan_is_read_in_one_worker(self) -> None:
+    async def test_the_scan_is_started_and_read_in_one_worker(self) -> None:
         scan = _ScanIterator([_scan_item('k1'), _scan_item('k2')])
-        executor, _ = _scan_executor(scan)
+        executor, connection = _scan_executor(scan)
         rows = await AsyncRowIterator(executor).execute()
         assert [r.id for r in rows] == ['k1', 'k2']
-        assert threading.get_ident() not in scan.read_threads
-        assert len(set(scan.read_threads)) == 1
+        assert threading.get_ident() not in connection.submit_threads
+        assert set(scan.read_threads) == set(connection.submit_threads)
+
+    @pytest.mark.asyncio
+    async def test_the_loop_runs_while_the_scan_starts(self) -> None:
+        # Regression guard (PYCBC-1982): the core's scan start waits on the server, so on the loop
+        # an operation already in flight could not complete until it returned.  Here the start
+        # waits on a callback only the loop can run.
+        executor, connection = _scan_executor(_ScanIterator([_scan_item('k1')]))
+        connection.needs_loop = asyncio.get_running_loop()
+        rows = await AsyncRowIterator(executor).execute()
+        assert [r.id for r in rows] == ['k1']
 
     @pytest.mark.asyncio
     async def test_the_end_of_the_scan_releases_the_worker(self) -> None:

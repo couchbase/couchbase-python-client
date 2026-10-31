@@ -44,6 +44,18 @@ if TYPE_CHECKING:
     from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 
 
+def _set_result(ft: Future[Any], result: Any) -> None:
+    # Runs on the loop, where a caller that stopped waiting has already cancelled the future.  The
+    # core cannot know that, so the check is made here rather than on the core's thread.
+    if not ft.done():
+        ft.set_result(result)
+
+
+def _set_exception(ft: Future[Any], exc: BaseException) -> None:
+    if not ft.done():
+        ft.set_exception(exc)
+
+
 class AsyncClientAdapter:
 
     def __init__(self,
@@ -131,11 +143,11 @@ class AsyncClientAdapter:
         ft = self.loop.create_future()
 
         def _callback(result: Any) -> None:
-            self.loop.call_soon_threadsafe(ft.set_result, result)
+            self.loop.call_soon_threadsafe(_set_result, ft, result)
 
         def _errback(exc: Any) -> None:
             excptn = ErrorMapper.build_exception(exc)
-            self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+            self.loop.call_soon_threadsafe(_set_exception, ft, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         self._execute_req(ft, req.binding_method, req_dict)
@@ -155,11 +167,11 @@ class AsyncClientAdapter:
         ft = self.loop.create_future()
 
         def _callback(result: Any) -> None:
-            self.loop.call_soon_threadsafe(ft.set_result, result)
+            self.loop.call_soon_threadsafe(_set_result, ft, result)
 
         def _errback(exc: Any) -> None:
             excptn = ErrorMapper.build_exception(exc)
-            self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+            self.loop.call_soon_threadsafe(_set_exception, ft, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
@@ -189,13 +201,13 @@ class AsyncClientAdapter:
         def _callback(result: Any) -> None:
             if obs_handler and hasattr(result, 'core_span'):
                 obs_handler.process_core_span(result.core_span)
-            self.loop.call_soon_threadsafe(ft.set_result, result)
+            self.loop.call_soon_threadsafe(_set_result, ft, result)
 
         def _errback(exc: Any) -> None:
             if obs_handler and hasattr(exc, 'core_span'):
                 obs_handler.process_core_span(exc.core_span)
             excptn = ErrorMapper.build_exception(exc)
-            self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+            self.loop.call_soon_threadsafe(_set_exception, ft, excptn)
 
         req.callback = _callback
         req.errback = _errback
@@ -222,12 +234,12 @@ class AsyncClientAdapter:
 
         def _callback(_: Any) -> None:
             if not ft.done():
-                self.loop.call_soon_threadsafe(ft.set_result, None)
+                self.loop.call_soon_threadsafe(_set_result, ft, None)
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret)
             if not ft.done():
-                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(_set_exception, ft, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
@@ -248,14 +260,14 @@ class AsyncClientAdapter:
             if obs_handler and hasattr(ret, 'core_span'):
                 obs_handler.process_core_span(ret.core_span)
             if not ft.done():
-                self.loop.call_soon_threadsafe(ft.set_result, ret)
+                self.loop.call_soon_threadsafe(_set_result, ft, ret)
 
         def _errback(ret: Any) -> None:
             if obs_handler and hasattr(ret, 'core_span'):
                 obs_handler.process_core_span(ret.core_span)
             excptn = ErrorMapper.build_exception(ret, mapping=req.error_map)
             if not ft.done():
-                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(_set_exception, ft, excptn)
 
         req_dict = req.req_to_dict(obs_handler=obs_handler, callback=_callback, errback=_errback)
         if not self.connected:
@@ -306,12 +318,12 @@ class AsyncClientAdapter:
         def _callback(_: Any) -> None:
             if not ft.done():
                 self._reset_connection()
-                self.loop.call_soon_threadsafe(ft.set_result, None)
+                self.loop.call_soon_threadsafe(_set_result, ft, None)
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret)
             if not ft.done():
-                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(_set_exception, ft, excptn)
 
         req_dict = req.req_to_dict(callback=_callback, errback=_errback)
         if not self.connected:
@@ -343,12 +355,12 @@ class AsyncClientAdapter:
 
         def _callback(_: Any) -> None:
             if not ft.done():
-                self.loop.call_soon_threadsafe(ft.set_result, None)
+                self.loop.call_soon_threadsafe(_set_result, ft, None)
 
         def _errback(ret: Any) -> None:
             excptn = ErrorMapper.build_exception(ret)
             if not ft.done():
-                self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+                self.loop.call_soon_threadsafe(_set_exception, ft, excptn)
 
         req_dict = self._connect_req.req_to_dict(callback=_callback, errback=_errback)
         self._execute_req(ft, self._connect_req.binding_method, req_dict)

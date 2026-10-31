@@ -15,11 +15,22 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 
 from couchbase.auth import PasswordAuthenticator
+from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 from couchbase.protocol.classic._cluster_impl import ClusterImpl
+from tests.environments.test_environment import (SuiteRequirements,
+                                                 SyncTestEnvironment,
+                                                 TestProtocol,
+                                                 build_environment,
+                                                 teardown_environment)
+
+# What is checked here is classic's client adapter and the connection it reports.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 BUCKET_NAME = 'default'
 CONNSTR = 'couchbase://localhost'
@@ -76,3 +87,33 @@ class SyncConnectionLifecycleUnitTests:
     def test_operation_raises_when_never_connected(self, unconnected_cluster: ClusterImpl) -> None:
         with pytest.raises(RuntimeError):
             unconnected_cluster.client_adapter._ensure_connected()
+
+
+class SyncConnectedPropertyTests(SuiteRequirements):
+    # The connect end of the lifecycle, so it opens a real cluster where the class above opens
+    # none.  `connected` is classic's report of its core connection and no protocol-neutral
+    # interface carries it.
+
+    NUM_DOCS = 0
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, SyncConnectedPropertyTests)
+        yield env
+        teardown_environment(env, SyncConnectedPropertyTests)
+
+    # `flaky` means "opens a connection", as it does on the close tests in cluster_t.
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_connected_reflects_connect_and_close(self, cb_env: SyncTestEnvironment) -> None:
+        username, pw = cb_env.config.get_username_and_pw()
+        cluster = Cluster.connect(cb_env.config.get_connection_string(),
+                                  ClusterOptions(PasswordAuthenticator(username, pw)))
+        impl = cluster._impl
+        assert isinstance(impl, ClusterImpl)
+        try:
+            assert impl.connected is True
+        finally:
+            cluster.close()
+        assert impl.connected is False

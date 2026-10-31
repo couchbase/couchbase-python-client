@@ -100,8 +100,7 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
         report_id = str(uuid4())
         # Whether the query succeeds is beside the point: a server-side failure still means a
         # query endpoint was opened, and that endpoint appearing in the report is what is
-        # under test.  `.execute()` is not used: the rows are drained instead, which is what
-        # lets this test generate for txcouchbase, whose N1QLRequest has no execute().
+        # under test.
         #
         # The rows are not counted either: a query that returns none has still opened the
         # endpoint.  Counting them would make this test wait on the index behind the bucket
@@ -271,16 +270,15 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
                              reason='txcouchbase.Cluster has no connect() classmethod')
 class ClusterCloseTestSuite(SuiteRequirements):
     # Separate from ClusterDiagnosticsTestSuite because these tests cannot share
-    # `cb_env.cluster` with anything: each one closes the cluster it is testing.
-    # Connectedness is read as `cluster._impl.connected`, a deliberate reach: whether a
-    # connection is open is internal state and no public property is wanted for it.  The
-    # five `flaky` markers mean "opens a connection".
+    # `cb_env.cluster` with anything: each one closes the cluster it is testing.  A closed
+    # cluster is observed through what it refuses, never through impl state, which no protocol
+    # reports alike; whether classic's connection is open is connection_lifecycle_t's
+    # concern.  The four `flaky` markers mean "opens a connection".
 
     NUM_DOCS = 0
 
     TEST_MANIFEST = [
         'test_await_on_close_cluster',
-        'test_connected_property_after_close',
         'test_management_operations_after_close',
         'test_multiple_close_cluster',
         'test_operations_after_close',
@@ -297,14 +295,6 @@ class ClusterCloseTestSuite(SuiteRequirements):
 
     @pytest.mark.asyncio
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
-    async def test_connected_property_after_close(self, cb_env: AsyncTestEnvironment) -> None:
-        cluster: Cluster = await self._connect(cb_env)
-        assert cluster._impl.connected is True
-        await cluster.close()
-        assert cluster._impl.connected is False
-
-    @pytest.mark.asyncio
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     async def test_management_operations_after_close(self, cb_env: AsyncTestEnvironment) -> None:
         cluster: Cluster = await self._connect(cb_env)
         bucket_name = cb_env.bucket.name
@@ -314,7 +304,6 @@ class ClusterCloseTestSuite(SuiteRequirements):
         bucket = cluster.bucket(bucket_name)
 
         await cluster.close()
-        assert cluster._impl.connected is False
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             await cluster.buckets().get_all_buckets()
@@ -344,19 +333,15 @@ class ClusterCloseTestSuite(SuiteRequirements):
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     async def test_multiple_close_cluster(self, cb_env: AsyncTestEnvironment) -> None:
         cluster: Cluster = await self._connect(cb_env)
-        assert cluster._impl.connected is True
+        # Returning is the assertion: a repeated close is a no-op, not an error.
         for _ in range(10):
             await cluster.close()
-        assert cluster._impl.connected is False
 
     @pytest.mark.asyncio
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     async def test_operations_after_close(self, cb_env: AsyncTestEnvironment) -> None:
         cluster: Cluster = await self._connect(cb_env)
-        assert cluster._impl.connected is True
-
         await cluster.close()
-        assert cluster._impl.connected is False
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             await cluster.ping()
@@ -394,9 +379,8 @@ class ClusterCloseTestSuite(SuiteRequirements):
         conn_string = cb_env.config.get_connection_string()
         username, pw = cb_env.config.get_username_and_pw()
         cluster = Cluster(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
-        assert cluster._impl.connected is False
+        # Returning is the assertion: closing a cluster nothing has awaited does not raise.
         await cluster.close()
-        assert cluster._impl.connected is False
 
 
 class ClusterDiagnosticsTests(ClusterDiagnosticsTestSuite):

@@ -16,7 +16,9 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Any
+from typing import (Any,
+                    Protocol,
+                    runtime_checkable)
 from uuid import uuid4
 
 import pytest
@@ -25,13 +27,23 @@ from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
 from couchbase.cluster import Cluster
+from couchbase.common._cluster_settings import ClusterSettings
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import ClusterOptions
 from tests.environments.test_environment import (SuiteRequirements,
                                                  SyncTestEnvironment,
+                                                 TestProtocol,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
+
+
+@runtime_checkable
+class _ClassicClusterImpl(Protocol):
+    # What these tests read off classic's cluster impl, past the interface the facade holds it as.
+    _cluster_settings: ClusterSettings
+
+    def get_connection_info(self) -> dict[str, Any]: ...
 
 
 @pytest.mark.testgen_exclude('acouchbase',
@@ -65,18 +77,21 @@ class JwtAuthenticatorUnitTests:
 
 class ClusterCredentialsTestSuite(SuiteRequirements):
     # Not generated for txcouchbase, and the reason is capability rather than shape:
-    # `txcouchbase.Cluster` has no `set_authenticator`, and its cluster impl has neither
-    # `update_credentials` nor `get_connection_info`.  On the async impl both are plain
-    # `def` going through `execute_cluster_request_sync`, so nothing here is awaited except
-    # the connect and the close.
+    # `txcouchbase.Cluster` has no `set_authenticator`, so nothing reaches the
+    # `update_credentials` its impl inherits.  On the async impl it and `get_connection_info`
+    # are plain `def` going through `execute_cluster_request_sync`, so nothing here is awaited
+    # except the connect and the close.
     #
     # Only test_set_authenticator_reflected_in_connection_info opens a cluster of its own,
     # and that is the rule: it is the one test that succeeds in changing credentials, so it
-    # is the one that must not hold a cluster anything else will use.  Reading
-    # `cluster._impl.get_connection_info()` is the same deliberate reach into internal state
-    # that cluster_t settles for `cluster._impl.connected`.
+    # is the one that must not hold a cluster anything else will use.
+    #
+    # Classic-only, because every assertion here is about classic's core: it rejects a swap
+    # of authenticator type, and `get_connection_info()` is how the credentials it holds are
+    # read back.
 
     NUM_DOCS = 0
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
 
     TEST_MANIFEST = [
         'test_set_authenticator_failure_does_not_change_state',
@@ -96,10 +111,16 @@ class ClusterCredentialsTestSuite(SuiteRequirements):
         username, pw = cb_env.config.get_username_and_pw()
         return Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
 
+    @staticmethod
+    def _classic_impl(cluster: Cluster) -> _ClassicClusterImpl:
+        impl = cluster._impl
+        assert isinstance(impl, _ClassicClusterImpl)
+        return impl
+
     def test_set_authenticator_reflected_in_connection_info(self, cb_env: SyncTestEnvironment) -> None:
         cluster: Cluster = self._connect(cb_env)
         try:
-            assert 'credentials' in cluster._impl.get_connection_info()
+            assert 'credentials' in self._classic_impl(cluster).get_connection_info()
 
             new_user = f'pycbc_{uuid4().hex[:8]}'
             new_pass = f'pw_{uuid4().hex[:8]}'
@@ -108,7 +129,7 @@ class ClusterCredentialsTestSuite(SuiteRequirements):
             # The credentials are never used: nothing here issues an operation after the swap,
             # and a PasswordAuthenticator does not re-authenticate the connections already
             # open.  What is under test is that the core origin now carries them.
-            credentials = cluster._impl.get_connection_info()['credentials']
+            credentials = self._classic_impl(cluster).get_connection_info()['credentials']
             assert credentials['username'] == new_user
             assert credentials['password'] == new_pass
         finally:
@@ -129,18 +150,19 @@ class ClusterCredentialsTestSuite(SuiteRequirements):
             cb_env.cluster.set_authenticator(JwtAuthenticator('some.jwt.token'))
 
     def test_set_authenticator_failure_does_not_change_state(self, cb_env: SyncTestEnvironment) -> None:
-        credentials_before = cb_env.cluster._impl.get_connection_info()['credentials']
+        impl = self._classic_impl(cb_env.cluster)
+        credentials_before = impl.get_connection_info()['credentials']
         # update_credentials has two side effects and writes the Python-side one second, only
         # once the core call has returned.  So a rejected swap has to leave both views alone,
         # and the Python-side mirror is the one that would drift if that order ever changed.
-        auth_before = dict(cb_env.cluster._impl._cluster_settings.auth)
+        auth_before = dict(impl._cluster_settings.auth)
 
         with pytest.raises(InvalidArgumentException):
             cb_env.cluster.set_authenticator(CertificateAuthenticator(cert_path=self.CERT_PATH,
                                                                       key_path=self.KEY_PATH))
 
-        assert cb_env.cluster._impl.get_connection_info()['credentials'] == credentials_before
-        assert cb_env.cluster._impl._cluster_settings.auth == auth_before
+        assert impl.get_connection_info()['credentials'] == credentials_before
+        assert impl._cluster_settings.auth == auth_before
 
 
 class ClusterCredentialsTests(ClusterCredentialsTestSuite):
