@@ -22,9 +22,6 @@ import subprocess  # nosec
 import sys
 from dataclasses import dataclass, field
 from sysconfig import get_config_var
-from typing import (Dict,
-                    List,
-                    Optional)
 
 from setuptools import Command, Extension
 
@@ -227,14 +224,14 @@ class CMakeConfig:
     build_type: str
     num_threads: int
     set_cpm_cache: bool
-    env: Dict[str, str] = field(default_factory=dict)
-    config_args: List[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+    config_args: list[str] = field(default_factory=list)
 
     @classmethod
     def create_cmake_config(cls,  # noqa: C901
                             output_dir: str,
                             source_dir: str,
-                            set_cpm_cache: Optional[bool] = None
+                            set_cpm_cache: bool | None = None
                             ) -> CMakeConfig:
         env = os.environ.copy()
         num_threads = env.pop('PYCBC_CMAKE_PARALLEL_THREADS', '4')

@@ -42,32 +42,75 @@ recursive = true
 [tool.mypy]
 # Kept here rather than in a separate mypy.ini so tool config stays in one file, matching
 # autopep8 / isort / pytest above.  Semantically identical to the [mypy] ini form.
-files = ["tests", "couchbase/tests", "acouchbase/tests", "txcouchbase/tests", "couchbase/common/result.py",
+# An SDK module is promoted onto the gate by naming its file here.  A per-module
+# `follow_imports = "normal"` override does not promote it: the override leaves the module's
+# errors unreported, and naming the file reports them.
+files = ["tests", "couchbase/tests", "acouchbase/tests", "txcouchbase/tests",
+         "couchbase/common/result.py", "couchbase/common/n1ql.py",
+         "couchbase/common/analytics.py", "couchbase/common/search.py",
+         "couchbase/common/search_queries.py", "couchbase/protocol/classic/_result.py",
+         "couchbase/protocol/classic/_metadata.py",
          "couchbase/common/config_profiles.py", "couchbase/common/option_enums.py",
          "couchbase/protocol/classic/_error_mapping.py", "couchbase/common/exceptions.py",
-         "couchbase/common/options.py", "couchbase/common/subdocument.py", "couchbase/common/diagnostics.py",
-         "couchbase/common/_option_spec.py", "couchbase/common/_operations.py",
-         "couchbase/protocol/classic/_bindings.py", "txcouchbase/protocol/classic/_deferred.py",
-         "couchbase/common/warnings.py", "couchbase/common/_supportability.py",
-         "couchbase/common/_option_diagnostics.py", "couchbase/common/_option_args.py",
-         "couchbase/protocol/classic/_wire.py", "couchbase/common/_transforms.py", "couchbase/common/protocol.py",
-         "couchbase/common/_observability", "couchbase/protocol/classic/_client_adapter.py",
-         "couchbase/protocol/classic/_collection_types.py", "couchbase/common/_registry.py",
-         "couchbase/protocol/classic/_registry.py", "couchbase/common/_utils.py", "couchbase/common/auth.py",
-         "couchbase/common/serializer.py", "couchbase/common/transcoder.py", "couchbase/common/_tracing.py",
-         "couchbase/common/_durability.py", "couchbase/common/durability.py",
-         "couchbase/common/mutation_state.py", "couchbase/common/n1ql.py", "couchbase/common/analytics.py",
-         "couchbase/common/views.py", "couchbase/common/_streaming.py",
-         "acouchbase/protocol/classic/_streaming.py", "txcouchbase/protocol/classic/_streaming.py",
-         "couchbase/protocol/classic/_n1ql.py", "couchbase/protocol/classic/_analytics.py",
-         "couchbase/protocol/classic/_views.py", "couchbase/protocol/classic/_bucket_req_builder.py",
-         "couchbase/protocol/classic/_bucket_types.py", "couchbase/common/search.py",
-         "couchbase/common/search_queries.py", "couchbase/common/search_scoring.py",
+         "couchbase/common/options.py", "couchbase/common/management",
+         "couchbase/common/subdocument.py", "couchbase/protocol/classic/_subdocument.py",
+         "couchbase/common/diagnostics.py", "couchbase/common/views.py",
+         "couchbase/common/_option_spec.py", "couchbase/protocol/classic/_streaming.py",
+         "couchbase/common/_operations.py", "couchbase/protocol/classic/_bindings.py",
+         "couchbase/common/_streaming.py", "acouchbase/protocol/classic/_streaming.py",
+         "couchbase/protocol/classic/_range_scan.py", "acouchbase/protocol/classic/_range_scan.py",
+         "txcouchbase/protocol/classic/_streaming.py", "txcouchbase/protocol/classic/_deferred.py",
+         "couchbase/result.py", "acouchbase/result.py",
+         "couchbase/protocol/classic/_pycbc_core", "couchbase/common/warnings.py",
+         "couchbase/common/_supportability.py", "couchbase/common/_option_diagnostics.py",
+         "couchbase/common/_option_args.py", "couchbase/protocol/classic/_wire.py",
+         "couchbase/protocol/classic/_option_wire.py",
+         "couchbase/common/_transforms.py", "couchbase/common/protocol.py",
+         "couchbase/common/kv_range_scan.py", "couchbase/common/search_scoring.py",
          "couchbase/common/vector_search.py", "couchbase/common/search_request.py",
-         "couchbase/protocol/classic/_search.py", "couchbase/protocol/classic/_metadata.py",
-         "couchbase/protocol/classic/_streaming.py", "couchbase/protocol/classic/_cluster_req_builder.py",
-         "couchbase/protocol/classic/_cluster_types.py", "couchbase/protocol/classic/_scope_req_builder.py",
-         "couchbase/protocol/classic/_scope_types.py"]
+         "couchbase/common/_observability", "couchbase/protocol/classic/_n1ql.py",
+         "couchbase/protocol/classic/_analytics.py", "couchbase/protocol/classic/_views.py",
+         "couchbase/protocol/classic/_search.py", "couchbase/protocol/classic/_binding_map.py",
+         "couchbase/protocol/classic/_client_adapter.py", "couchbase/protocol/classic/_cluster_impl.py",
+         "couchbase/protocol/classic/_cluster_req_builder.py",
+         "couchbase/protocol/classic/_cluster_types.py", "couchbase/protocol/classic/_bucket_impl.py",
+         "couchbase/protocol/classic/_bucket_req_builder.py",
+         "couchbase/protocol/classic/_bucket_types.py", "couchbase/protocol/classic/_scope_impl.py",
+         "couchbase/protocol/classic/_scope_req_builder.py",
+         "couchbase/protocol/classic/_scope_types.py",
+         "couchbase/protocol/classic/_collection_impl.py",
+         "couchbase/protocol/classic/_legacy_datastructures.py",
+         "couchbase/protocol/classic/_collection_req_builder.py",
+         "couchbase/protocol/classic/_collection_types.py",
+         "couchbase/protocol/classic/_collection_multi_req_builder.py",
+         "couchbase/protocol/classic/_collection_multi_types.py",
+         "couchbase/common/_logging.py", "couchbase/protocol/classic/_logging_config.py",
+         "couchbase/protocol/classic/_transactions_req_builder.py",
+         "couchbase/protocol/classic/_transactions_impl.py",
+         "acouchbase/protocol/classic/_transactions_impl.py",
+         "couchbase/common/_interfaces", "couchbase/common/_capabilities.py",
+         "couchbase/protocol/classic/_capabilities.py", "couchbase/common/_registry.py",
+         "couchbase/protocol/classic/_registry.py",
+         "couchbase/transactions/transactions.py",
+         "acouchbase/transactions/transactions.py", "couchbase/transactions/transactions_get_multi.py",
+         "couchbase/datastructures.py", "acouchbase/datastructures.py",
+         "acouchbase/protocol/classic/_client_adapter.py",
+         "acouchbase/protocol/classic/_cluster_impl.py", "acouchbase/protocol/classic/_bucket_impl.py",
+         "acouchbase/protocol/classic/_scope_impl.py",
+         "acouchbase/protocol/classic/_collection_impl.py",
+         "txcouchbase/protocol/classic/_cluster_impl.py", "txcouchbase/protocol/classic/_bucket_impl.py",
+         "txcouchbase/protocol/classic/_scope_impl.py",
+         "txcouchbase/protocol/classic/_collection_impl.py",
+         "couchbase/protocol/classic/_management", "acouchbase/protocol/classic/_management",
+         "txcouchbase/protocol/classic/_management",
+         "couchbase/common/_utils.py", "couchbase/common/auth.py",
+         "couchbase/common/serializer.py", "couchbase/common/transcoder.py",
+         "couchbase/common/_tracing.py", "couchbase/common/otel_tracer.py",
+         "couchbase/common/_durability.py", "couchbase/common/durability.py",
+         "couchbase/common/mutation_state.py", "couchbase/common/encryption",
+         "couchbase/common/transactions/transaction_get_result.py",
+         "couchbase/common/transactions/transaction_keyspace.py",
+         "couchbase/common/transactions/transaction_query_results.py"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
@@ -109,20 +152,32 @@ module = ["couchbase", "couchbase.*",
           "txcouchbase", "txcouchbase.*"]
 follow_imports = "silent"
 
-# `follow_imports = silent` does not suppress errors inside .pyi files: mypy always
-# processes stubs.  This one carries three pre-existing defects (a missing return type and
-# two unsolvable TypeVars).  They are real, but they are SDK stub bugs, and annotating the
-# SDK is deliberately out of scope here.  Silenced explicitly so they are a recorded
-# exclusion rather than an unexplained three-error floor.
-[[tool.mypy.overrides]]
-module = "couchbase.protocol.classic._pycbc_core._core"
-ignore_errors = true
-
 # Third-party packages that ship no stubs.  These are test-only dependencies and none of
 # them appear in an annotation we care about checking.
 [[tool.mypy.overrides]]
 module = ["faker.*", "faker_vehicle.*", "faker_vehicle", "xdist.*"]
 ignore_missing_imports = true
+
+# Ruff enforces one thing here so far: annotations are spelled the way python_requires>=3.10
+# allows, `X | None` and `dict[...]` rather than `Optional[X]` and `Dict[...]`.  flake8, isort and
+# autopep8 still own linting, import order and formatting, so `select` names only these rules.
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+# pre-commit passes file names, and ruff checks a named file even when `exclude` matches it
+# unless this is set.
+force-exclude = true
+extend-exclude = ["deps", "src", "examples"]
+
+[tool.ruff.lint]
+select = ["UP006", "UP007", "UP035", "UP045", "TID251"]
+
+# UP035 rejects importing the aliases PEP 585 replaced, but `Optional` and `Union` are not among
+# them, and a `# type:` comment, which ruff does not read, can keep either alive.  Banning the
+# import catches every use, the comments included.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Optional".msg = "Write `X | None`."
+"typing.Union".msg = "Write `X | Y`."
 
 [tool.isort]
 multi_line_output = 1

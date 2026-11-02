@@ -1,3 +1,5 @@
+# Notes and scripts that never ship, kept out of every hook.
+exclude: ^\.ai_discussions/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -41,6 +43,12 @@ repos:
             --max-line-length=120,
             --max-complexity=10
           ]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Keep in step with `ruff` in dev_requirements.txt.  Rules and scope are in [tool.ruff] in
+    # pyproject.toml, which selects only the annotation-syntax rules for now.
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
   - repo: https://github.com/pre-commit/mirrors-mypy
     # Keep this rev in step with `mypy` in dev_requirements.txt.  The hook runs in its own
     # isolated env, so a skew here means the gate enforces a different mypy than the one
@@ -62,6 +70,7 @@ repos:
           - pytest~=8.3.5
           - pytest-asyncio~=1.1
           - Twisted~=24.7
+          - opentelemetry-api~=1.22
 
   - repo: local
     hooks:
@@ -79,13 +88,58 @@ repos:
         # touch that file.
         pass_filenames: false
         files: ^(tests/|(a|tx)?couchbase/tests/|tools/audit_type_ignores\.py)
-      - id: autogen-operations
-        name: operations table against the Op enum it generates
-        entry: python -m tools.autogen operations check
+      - id: check-type-comments
+        name: no type comments in the SDK packages
+        # Rationale in the module docstring.
+        entry: python tools/check_type_comments.py
         language: python
-        additional_dependencies: [click, jinja2, pyyaml]
         pass_filenames: false
-        files: ^(tools/autogen/(cli\.py|(config|templates|core|commands)/operations[./])|couchbase/common/_operations\.py$)
+        files: ^((a|tx)?couchbase/.*\.py|tools/check_type_comments\.py)$
+      - id: check-protocol-free-tests
+        name: shared tests do not reach into the classic protocol
+        # A test that runs on every protocol may not import classic or its binding, or read an
+        # object's executor, stream or connection, unless it is declared classic-only.
+        # Rationale in the module docstring.
+        entry: python tools/check_protocol_free_tests.py
+        language: python
+        pass_filenames: false
+        files: ^(tests/|(a|tx)?couchbase/tests/|tools/check_protocol_free_tests\.py)
+      - id: check-binding-free-imports
+        name: modules outside classic import without the native extension, against a baseline
+        # Each module is imported in an interpreter that refuses the package's extensions, so it
+        # needs what the modules import at load: typing-extensions below 3.13, Twisted for
+        # txcouchbase and the OpenTelemetry API for `couchbase.otel_tracer`.  A module that fails
+        # for want of one is reported as unchecked, not passed.  Rationale in the module docstring.
+        entry: python tools/check_binding_free_imports.py
+        language: python
+        additional_dependencies: ['typing-extensions>=4.14', 'Twisted~=24.7', 'opentelemetry-api~=1.22']
+        pass_filenames: false
+        files: ^((a|tx)?couchbase/.*\.py|tools/check_binding_free_imports\.py|tools/binding_free_imports_baseline\.txt)$
+      - id: check-api-parity
+        name: the three public APIs agree on their facades, against a list of explained differences
+        # Imports the facades, so it needs what they import at load, as the hook above does.
+        # Rationale in the module docstring.
+        entry: python tools/check_api_parity.py
+        language: python
+        additional_dependencies: ['typing-extensions>=4.14', 'Twisted~=24.7']
+        pass_filenames: false
+        files: ^((a|tx)?couchbase/.*\.py|tools/check_api_parity\.py|tools/api_parity_exemptions\.txt)$
+      - id: check-public-api
+        name: every public module's __all__ and bindings agree with the public inventory
+        # Imports every public module, so it needs what they import at load, as the hooks above do,
+        # the OpenTelemetry API included.  Rationale in the module docstring.
+        entry: python tools/check_public_api.py
+        language: python
+        additional_dependencies: ['typing-extensions>=4.14', 'Twisted~=24.7', 'opentelemetry-api~=1.22', 'PyYAML~=6.0']
+        pass_filenames: false
+        files: ^((a|tx)?couchbase/.*\.py|examples/.*\.py|tools/check_public_api\.py|tools/public_api\.yaml)$
+      - id: check-capabilities
+        name: every capability is declared, checked and reached through require()
+        # Reads source only, so it needs nothing installed.  Rationale in the module docstring.
+        entry: python tools/check_capabilities.py
+        language: python
+        pass_filenames: false
+        files: ^((a|tx)?couchbase/.*\.py|tools/check_capabilities\.py|tools/check_api_parity\.py)$
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
@@ -106,6 +160,15 @@ repos:
             "--line-length 120",
             "--order-by-type True"
           ]
+  - repo: local
+    hooks:
+      - id: autogen-operations
+        name: operations table against the Op enum it generates
+        entry: python -m tools.autogen operations check
+        language: python
+        additional_dependencies: [click, jinja2, pyyaml]
+        pass_filenames: false
+        files: ^(tools/autogen/(cli\.py|(config|templates|core|commands)/operations[./])|couchbase/common/_operations\.py$)
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.9
     hooks:

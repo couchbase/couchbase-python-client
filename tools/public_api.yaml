@@ -1,0 +1,3255 @@
+# The public inventory: per public module, its public names and its compat names.
+# Public is written to the module's __all__. Compat stays bound at that path and only shrinks.
+# A name in neither list is private or bound only for the module's own use.
+# tools/check_public_api.py holds the tree to it.
+# counterparts, at the end, says what acouchbase and txcouchbase have at each couchbase path.
+
+modules:
+  acouchbase:
+    public:
+      - configure_logging
+      - couchbase_loop_factory
+      - enable_protocol_logger_to_save_network_traffic_to_file
+      - get_event_loop
+      - get_metadata
+      - get_transactions_protocol
+    compat: []
+  acouchbase.analytics:
+    public:
+      - AnalyticsError
+      - AnalyticsMetaData
+      - AnalyticsMetrics
+      - AnalyticsScanConsistency
+      - AnalyticsStatus
+      - AnalyticsWarning
+    compat:
+      - AnalyticsQuery
+  acouchbase.auth:
+    public:
+      - AuthDomain
+      - Authenticator
+      - CertificateAuthenticator
+      - JwtAuthenticator
+      - PasswordAuthenticator
+    compat: []
+  acouchbase.binary_collection:
+    public:
+      - BinaryCollection
+    compat: []
+  acouchbase.bucket:
+    public:
+      - AsyncBucket
+      - Bucket
+    compat: []
+  acouchbase.cluster:
+    public:
+      - AsyncCluster
+      - Cluster
+      - get_event_loop
+    compat: []
+  acouchbase.collection:
+    public:
+      - AsyncCollection
+      - Collection
+    compat: []
+  acouchbase.constants:
+    public:
+      - FMT_BYTES
+      - FMT_COMMON_MASK
+      - FMT_JSON
+      - FMT_LEGACY_MASK
+      - FMT_PICKLE
+      - FMT_UTF8
+    compat: []
+  acouchbase.datastructures:
+    public:
+      - CouchbaseList
+      - CouchbaseMap
+      - CouchbaseQueue
+      - CouchbaseSet
+    compat: []
+  acouchbase.diagnostics:
+    public:
+      - ClusterState
+      - EndpointDiagnosticsReport
+      - EndpointPingReport
+      - EndpointState
+      - PingState
+      - ServiceType
+    compat: []
+  acouchbase.durability:
+    public:
+      - ClientDurability
+      - Durability
+      - DurabilityLevel
+      - DurabilityType
+      - PersistTo
+      - PersistToExtended
+      - ReplicateTo
+      - ServerDurability
+    compat: []
+  acouchbase.encryption:
+    public:
+      - CryptoManager
+      - Decrypter
+      - Encrypter
+      - EncryptionResult
+      - Key
+      - Keyring
+    compat: []
+  acouchbase.encryption.crypto_manager:
+    public:
+      - CryptoManager
+    compat: []
+  acouchbase.encryption.decrypter:
+    public:
+      - Decrypter
+    compat: []
+  acouchbase.encryption.encrypter:
+    public:
+      - Encrypter
+    compat: []
+  acouchbase.encryption.encryption_result:
+    public:
+      - EncryptionResult
+    compat: []
+  acouchbase.encryption.key:
+    public:
+      - Key
+    compat: []
+  acouchbase.encryption.keyring:
+    public:
+      - Keyring
+    compat: []
+  acouchbase.exceptions:
+    public:
+      - AlreadyQueriedException
+      - AmbiguousTimeoutException
+      - AnalyticsErrorContext
+      - AnalyticsLinkExistsException
+      - AnalyticsLinkNotFoundException
+      - AuthenticationException
+      - BucketAlreadyExistsException
+      - BucketDoesNotExistException
+      - BucketNotFlushableException
+      - BucketNotFoundException
+      - CASMismatchException
+      - CannotReviveLivingDocumentException
+      - CasMismatchException
+      - CollectionAlreadyExistsException
+      - CollectionNotFoundException
+      - CouchbaseErrorCategory
+      - CouchbaseException
+      - CryptoException
+      - CryptoKeyNotFoundException
+      - DatasetAlreadyExistsException
+      - DatasetNotFoundException
+      - DataverseAlreadyExistsException
+      - DataverseNotFoundException
+      - DecrypterAlreadyExistsException
+      - DecrypterNotFoundException
+      - DecryptionFailureException
+      - DeltaInvalidException
+      - DesignDocumentNotFoundException
+      - DocumentExistsException
+      - DocumentLockedException
+      - DocumentNotFoundException
+      - DocumentNotJsonException
+      - DocumentNotLockedException
+      - DocumentUnretrievableException
+      - DurabilityImpossibleException
+      - DurabilityInvalidLevelException
+      - DurabilitySyncWriteAmbiguousException
+      - DurabilitySyncWriteInProgressException
+      - DurableWriteReCommitInProgressException
+      - EncrypterAlreadyExistsException
+      - EncrypterNotFoundException
+      - EncryptionFailureException
+      - ErrorContext
+      - ErrorContextType
+      - EventingFunctionAlreadyDeployedException
+      - EventingFunctionCollectionNotFoundException
+      - EventingFunctionCompilationFailureException
+      - EventingFunctionIdenticalKeyspaceException
+      - EventingFunctionNotBootstrappedException
+      - EventingFunctionNotDeployedException
+      - EventingFunctionNotFoundException
+      - EventingFunctionNotUnDeployedException
+      - FeatureNotFoundException
+      - FeatureUnavailableException
+      - GenericErrorContext
+      - GroupNotFoundException
+      - HTTPErrorContext
+      - HTTPException
+      - InternalSDKException
+      - InternalServerFailureException
+      - InvalidArgumentException
+      - InvalidCipherTextException
+      - InvalidCryptoKeyException
+      - InvalidIndexException
+      - InvalidValueException
+      - KeyValueErrorContext
+      - KeyspaceNotFoundException
+      - ManagementErrorContext
+      - MissingConnectionException
+      - MissingTokenException
+      - MutationTokenOutdatedException
+      - NoChildrenException
+      - NumberTooBigException
+      - ParsingFailedException
+      - PathExistsException
+      - PathInvalidException
+      - PathMismatchException
+      - PathNotFoundException
+      - PathTooBigException
+      - PathTooDeepException
+      - QueryErrorContext
+      - QueryIndexAlreadyExistsException
+      - QueryIndexNotFoundException
+      - QueueEmpty
+      - QuotaLimitedException
+      - RangeScanCompletedException
+      - RateLimitedException
+      - RequestCanceledException
+      - ScopeAlreadyExistsException
+      - ScopeNotFoundException
+      - SearchErrorContext
+      - SearchIndexNotFoundException
+      - ServiceUnavailableException
+      - SubdocCantInsertValueException
+      - SubdocPathMismatchException
+      - SubdocumentErrorContext
+      - TemporaryFailException
+      - TimeoutException
+      - TransactionCommitAmbiguous
+      - TransactionException
+      - TransactionExpired
+      - TransactionFailed
+      - TransactionOperationFailed
+      - TransactionsErrorContext
+      - UnAmbiguousTimeoutException
+      - UnsuccessfulOperationException
+      - UnsupportedOperation
+      - UserNotFoundException
+      - ValueFormatException
+      - ValueTooDeepException
+      - ValueTooLargeException
+      - ViewErrorContext
+      - WatchQueryIndexTimeoutException
+      - XattrCannotModifyVirtualAttributeException
+      - XattrInvalidKeyComboException
+      - XattrNoAccessException
+      - XattrUnknownMacroException
+      - XattrUnknownVirtualAttributeException
+    compat: []
+  acouchbase.kv_range_scan:
+    public:
+      - PrefixScan
+      - RangeScan
+      - SamplingScan
+      - ScanTerm
+      - ScanType
+    compat: []
+  acouchbase.management:
+    public: []
+    compat: []
+  acouchbase.management.analytics:
+    public:
+      - AnalyticsDataType
+      - AnalyticsDataset
+      - AnalyticsEncryptionLevel
+      - AnalyticsIndex
+      - AnalyticsIndexManager
+      - AnalyticsLink
+      - AnalyticsLinkType
+      - AzureBlobExternalAnalyticsLink
+      - CouchbaseAnalyticsEncryptionSettings
+      - CouchbaseRemoteAnalyticsLink
+      - S3ExternalAnalyticsLink
+    compat: []
+  acouchbase.management.buckets:
+    public:
+      - BucketDescribeResult
+      - BucketManager
+      - BucketSettings
+      - BucketType
+      - CompressionMode
+      - ConflictResolutionType
+      - CreateBucketSettings
+      - EjectionMethod
+      - EvictionPolicyType
+      - StorageBackend
+    compat: []
+  acouchbase.management.collections:
+    public:
+      - CollectionManager
+      - CollectionSpec
+      - CreateCollectionSettings
+      - ScopeSpec
+      - UpdateCollectionSettings
+    compat: []
+  acouchbase.management.eventing:
+    public:
+      - EventingFunction
+      - EventingFunctionBucketAccess
+      - EventingFunctionBucketBinding
+      - EventingFunctionConstantBinding
+      - EventingFunctionDcpBoundary
+      - EventingFunctionDeploymentStatus
+      - EventingFunctionKeyspace
+      - EventingFunctionLanguageCompatibility
+      - EventingFunctionLogLevel
+      - EventingFunctionManager
+      - EventingFunctionProcessingStatus
+      - EventingFunctionSettings
+      - EventingFunctionState
+      - EventingFunctionStatus
+      - EventingFunctionUrlAuthBasic
+      - EventingFunctionUrlAuthBearer
+      - EventingFunctionUrlAuthDigest
+      - EventingFunctionUrlBinding
+      - EventingFunctionUrlNoAuth
+      - EventingFunctionsStatus
+      - ScopeEventingFunctionManager
+    compat: []
+  acouchbase.management.options:
+    public:
+      - AllowQueryingSearchIndexOptions
+      - AnalyzeDocumentSearchIndexOptions
+      - BucketDescribeOptions
+      - BuildDeferredQueryIndexOptions
+      - ChangePasswordOptions
+      - ConnectLinkOptions
+      - CreateAnalyticsIndexOptions
+      - CreateBucketOptions
+      - CreateCollectionOptions
+      - CreateDatasetOptions
+      - CreateDataverseOptions
+      - CreateLinkAnalyticsOptions
+      - CreatePrimaryQueryIndexOptions
+      - CreateQueryIndexOptions
+      - CreateScopeOptions
+      - DeployFunctionOptions
+      - DisallowQueryingSearchIndexOptions
+      - DisconnectLinkOptions
+      - DropAnalyticsIndexOptions
+      - DropBucketOptions
+      - DropCollectionOptions
+      - DropDatasetOptions
+      - DropDataverseOptions
+      - DropDesignDocumentOptions
+      - DropFunctionOptions
+      - DropGroupOptions
+      - DropLinkAnalyticsOptions
+      - DropPrimaryQueryIndexOptions
+      - DropQueryIndexOptions
+      - DropScopeOptions
+      - DropSearchIndexOptions
+      - DropUserOptions
+      - EventingFunctionOptions
+      - FlushBucketOptions
+      - FreezePlanSearchIndexOptions
+      - FunctionsStatusOptions
+      - GetAllAnalyticsIndexesOptions
+      - GetAllBucketOptions
+      - GetAllDatasetOptions
+      - GetAllDesignDocumentsOptions
+      - GetAllFunctionOptions
+      - GetAllGroupsOptions
+      - GetAllQueryIndexOptions
+      - GetAllScopesOptions
+      - GetAllSearchIndexStatsOptions
+      - GetAllSearchIndexesOptions
+      - GetAllUsersOptions
+      - GetBucketOptions
+      - GetDesignDocumentOptions
+      - GetFunctionOptions
+      - GetGroupOptions
+      - GetLinksAnalyticsOptions
+      - GetPendingMutationsOptions
+      - GetRolesOptions
+      - GetSearchIndexOptions
+      - GetSearchIndexStatsOptions
+      - GetSearchIndexedDocumentsCountOptions
+      - GetUserOptions
+      - PauseFunctionOptions
+      - PauseIngestSearchIndexOptions
+      - PublishDesignDocumentOptions
+      - ReplaceLinkAnalyticsOptions
+      - ResumeFunctionOptions
+      - ResumeIngestSearchIndexOptions
+      - UndeployFunctionOptions
+      - UnfreezePlanSearchIndexOptions
+      - UpdateBucketOptions
+      - UpdateCollectionOptions
+      - UpsertDesignDocumentOptions
+      - UpsertFunctionOptions
+      - UpsertGroupOptions
+      - UpsertSearchIndexOptions
+      - UpsertUserOptions
+      - WatchQueryIndexOptions
+    compat: []
+  acouchbase.management.queries:
+    public:
+      - CollectionQueryIndexManager
+      - QueryIndex
+      - QueryIndexManager
+    compat: []
+  acouchbase.management.search:
+    public:
+      - ScopeSearchIndexManager
+      - SearchIndex
+      - SearchIndexManager
+    compat: []
+  acouchbase.management.users:
+    public:
+      - Group
+      - Origin
+      - Role
+      - RoleAndDescription
+      - RoleAndOrigins
+      - User
+      - UserAndMetadata
+      - UserManager
+    compat: []
+  acouchbase.management.views:
+    public:
+      - DesignDocument
+      - DesignDocumentNamespace
+      - View
+      - ViewIndexManager
+    compat: []
+  acouchbase.mutation_state:
+    public:
+      - MutationState
+    compat: []
+  acouchbase.n1ql:
+    public:
+      - QueryError
+      - QueryMetaData
+      - QueryMetrics
+      - QueryProfile
+      - QueryScanConsistency
+      - QueryStatus
+      - QueryWarning
+    compat:
+      - N1QLQuery
+  acouchbase.observability:
+    public:
+      - get_otel_meter
+      - get_otel_tracer
+    compat: []
+  acouchbase.observability.metrics:
+    public:
+      - Meter
+      - ValueRecorder
+    compat: []
+  acouchbase.observability.otel_metrics:
+    public:
+      - OtelWrapperMeter
+      - OtelWrapperValueRecorder
+      - get_otel_meter
+    compat: []
+  acouchbase.observability.otel_tracing:
+    public:
+      - OtelWrapperSpan
+      - OtelWrapperTracer
+      - get_otel_tracer
+    compat: []
+  acouchbase.observability.tracing:
+    public:
+      - RequestSpan
+      - RequestTracer
+      - SpanAttributeValue
+      - SpanAttributes
+      - SpanStatusCode
+    compat: []
+  acouchbase.options:
+    public:
+      - AcceptableInts
+      - AnalyticsOptions
+      - AppendMultiOptions
+      - AppendOptions
+      - CONFIG_PROFILES
+      - ClusterMetricsOptions
+      - ClusterOptions
+      - ClusterOrphanReportingOptions
+      - ClusterTimeoutOptions
+      - ClusterTracingOptions
+      - Compression
+      - ConfigProfile
+      - ConfigProfiles
+      - ConstrainedInt
+      - DecrementMultiOptions
+      - DecrementOptions
+      - DeltaValue
+      - DiagnosticsOptions
+      - ExistsMultiOptions
+      - ExistsOptions
+      - GetAllReplicasMultiOptions
+      - GetAllReplicasOptions
+      - GetAndLockMultiOptions
+      - GetAndLockOptions
+      - GetAndTouchOptions
+      - GetAnyReplicaMultiOptions
+      - GetAnyReplicaOptions
+      - GetMultiOptions
+      - GetOptions
+      - IncrementMultiOptions
+      - IncrementOptions
+      - InsertMultiOptions
+      - InsertOptions
+      - IpProtocol
+      - KnownConfigProfiles
+      - LockMode
+      - LockMultiOptions
+      - LookupInAllReplicasOptions
+      - LookupInAnyReplicaOptions
+      - LookupInOptions
+      - MutateInOptions
+      - MutationMultiOptions
+      - MutationOptions
+      - NoValueMultiOptions
+      - OptionValidationMode
+      - PingOptions
+      - PrependMultiOptions
+      - PrependOptions
+      - QueryOptions
+      - RemoveMultiOptions
+      - RemoveOptions
+      - ReplaceMultiOptions
+      - ReplaceOptions
+      - ScanOptions
+      - SearchOptions
+      - SignedInt64
+      - TLSVerifyMode
+      - TouchMultiOptions
+      - TouchOptions
+      - TransactionConfig
+      - TransactionGetMultiOptions
+      - TransactionGetMultiReplicasFromPreferredServerGroupOptions
+      - TransactionGetOptions
+      - TransactionGetReplicaFromPreferredServerGroupOptions
+      - TransactionInsertOptions
+      - TransactionOptions
+      - TransactionQueryOptions
+      - TransactionReplaceOptions
+      - UnlockMultiOptions
+      - UnlockOptions
+      - UnsignedInt32
+      - UnsignedInt64
+      - UpsertMultiOptions
+      - UpsertOptions
+      - VectorSearchOptions
+      - ViewOptions
+      - WaitUntilReadyOptions
+      - WanDevelopmentProfile
+    compat:
+      - forward_args
+      - get_valid_args
+      - get_valid_multi_args
+  acouchbase.otel_tracer:
+    public:
+      - CouchbaseOtelSpan
+      - CouchbaseOtelTracer
+    compat: []
+  acouchbase.protocol:
+    public: []
+    compat: []
+  acouchbase.protocol.classic:
+    public: []
+    compat: []
+  acouchbase.replica_reads:
+    public:
+      - ReadPreference
+    compat: []
+  acouchbase.result:
+    public:
+      - AsyncAnalyticsResult
+      - AsyncQueryResult
+      - AsyncScanResultIterable
+      - AsyncSearchResult
+      - AsyncViewResult
+      - ClusterInfoResult
+      - ContentProxy
+      - ContentSubdocProxy
+      - CounterResult
+      - DiagnosticsResult
+      - ExistsResult
+      - GetReplicaResult
+      - GetResult
+      - LookupInReplicaResult
+      - LookupInResult
+      - MultiCounterResult
+      - MultiExistsResult
+      - MultiGetReplicaResult
+      - MultiGetResult
+      - MultiMutationResult
+      - MultiResult
+      - MultiResultType
+      - MutateInResult
+      - MutationResult
+      - MutationToken
+      - OperationResult
+      - PingResult
+      - Result
+      - ScanResult
+      - ValueResult
+    compat: []
+  acouchbase.scope:
+    public:
+      - AsyncScope
+      - Scope
+    compat: []
+  acouchbase.search:
+    public:
+      - BooleanFieldQuery
+      - BooleanQuery
+      - ConjunctionQuery
+      - DateFacet
+      - DateRangeQuery
+      - DisjunctionQuery
+      - DocIdQuery
+      - Facet
+      - GeoBoundingBoxQuery
+      - GeoDistanceQuery
+      - GeoPolygonQuery
+      - HighlightStyle
+      - MatchAllQuery
+      - MatchNoneQuery
+      - MatchOperator
+      - MatchPhraseQuery
+      - MatchQuery
+      - NumericFacet
+      - NumericRangeQuery
+      - PhraseQuery
+      - PrefixQuery
+      - QueryStringQuery
+      - RawQuery
+      - RegexQuery
+      - SearchDateRangeFacet
+      - SearchFacetResult
+      - SearchMetaData
+      - SearchMetrics
+      - SearchNumericRangeFacet
+      - SearchQuery
+      - SearchRequest
+      - SearchRow
+      - SearchRowFields
+      - SearchRowLocation
+      - SearchRowLocations
+      - SearchScanConsistency
+      - SearchTermFacet
+      - Sort
+      - SortField
+      - SortGeoDistance
+      - SortID
+      - SortScore
+      - TermFacet
+      - TermQuery
+      - TermRangeQuery
+      - WildcardQuery
+    compat:
+      - SearchQueryBuilder
+  acouchbase.search_scoring:
+    public:
+      - ReciprocalRankFusion
+      - RelativeScoreFusion
+      - ScoringNone
+      - SearchScoring
+    compat: []
+  acouchbase.serializer:
+    public:
+      - DefaultJsonSerializer
+      - Serializer
+    compat: []
+  acouchbase.subdocument:
+    public:
+      - ArrayValues
+      - LookupInMacro
+      - MutationMacro
+      - Spec
+      - StoreSemantics
+      - SubDocOp
+      - SubDocStatus
+      - array_addunique
+      - array_append
+      - array_insert
+      - array_prepend
+      - convert_macro_cas_to_cas
+      - count
+      - counter
+      - decrement
+      - exists
+      - get
+      - get_full
+      - increment
+      - insert
+      - remove
+      - replace
+      - upsert
+      - with_expiry
+    compat: []
+  acouchbase.transactions:
+    public:
+      - AttemptContext
+      - TransactionGetMultiMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupResult
+      - TransactionGetMultiReplicasFromPreferredServerGroupSpec
+      - TransactionGetMultiResult
+      - TransactionGetMultiSpec
+      - TransactionGetResult
+      - TransactionKeyspace
+      - TransactionQueryResults
+      - TransactionResult
+      - Transactions
+    compat: []
+  acouchbase.transactions.transaction_get_result:
+    public:
+      - TransactionGetResult
+    compat: []
+  acouchbase.transactions.transaction_keyspace:
+    public:
+      - TransactionKeyspace
+    compat: []
+  acouchbase.transactions.transaction_query_results:
+    public:
+      - TransactionQueryResults
+    compat: []
+  acouchbase.transactions.transaction_result:
+    public:
+      - TransactionResult
+    compat: []
+  acouchbase.transactions.transactions:
+    public:
+      - AttemptContext
+      - Transactions
+    compat: []
+  acouchbase.transactions.transactions_get_multi:
+    public:
+      - TransactionGetMultiMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupResult
+      - TransactionGetMultiReplicasFromPreferredServerGroupSpec
+      - TransactionGetMultiResult
+      - TransactionGetMultiSpec
+      - TransactionMultiContentProxy
+    compat: []
+  acouchbase.transcoder:
+    public:
+      - JSONTranscoder
+      - LegacyTranscoder
+      - RawBinaryTranscoder
+      - RawJSONTranscoder
+      - RawStringTranscoder
+      - Transcoder
+    compat: []
+  acouchbase.vector_search:
+    public:
+      - VectorQuery
+      - VectorQueryCombination
+      - VectorSearch
+    compat: []
+  acouchbase.views:
+    public:
+      - ViewErrorMode
+      - ViewMetaData
+      - ViewOrdering
+      - ViewRow
+      - ViewScanConsistency
+    compat:
+      - ViewQuery
+  couchbase:
+    public:
+      - configure_logging
+      - enable_protocol_logger_to_save_network_traffic_to_file
+      - get_metadata
+      - get_transactions_protocol
+    compat: []
+  couchbase.analytics:
+    public:
+      - AnalyticsError
+      - AnalyticsMetaData
+      - AnalyticsMetrics
+      - AnalyticsScanConsistency
+      - AnalyticsStatus
+      - AnalyticsWarning
+    compat:
+      - AnalyticsOptions
+      - AnalyticsQuery
+  couchbase.auth:
+    public:
+      - AuthDomain
+      - Authenticator
+      - CertificateAuthenticator
+      - JwtAuthenticator
+      - PasswordAuthenticator
+    compat: []
+  couchbase.binary_collection:
+    public:
+      - BinaryCollection
+    compat: []
+  couchbase.bucket:
+    public:
+      - Bucket
+    compat:
+      - PingOptions
+      - ViewErrorMode
+      - ViewOptions
+      - ViewOrdering
+      - ViewScanConsistency
+  couchbase.cluster:
+    public:
+      - Cluster
+    compat:
+      - ClusterOptions
+      - ClusterTimeoutOptions
+      - ClusterTracingOptions
+      - Compression
+      - DiagnosticsOptions
+      - QueryOptions
+      - QueryProfile
+      - QueryScanConsistency
+  couchbase.collection:
+    public:
+      - Collection
+    compat:
+      - AppendOptions
+      - CBCollection
+      - ConstrainedInt
+      - DecrementOptions
+      - DeltaValue
+      - ExistsOptions
+      - GetAllReplicasOptions
+      - GetAndLockOptions
+      - GetAndTouchOptions
+      - GetAnyReplicaOptions
+      - GetOptions
+      - IncrementOptions
+      - InsertOptions
+      - LookupInOptions
+      - PrependOptions
+      - RemoveOptions
+      - ReplaceOptions
+      - Scope
+      - SignedInt64
+      - TouchOptions
+      - UnlockOptions
+      - UpsertOptions
+  couchbase.common:
+    public: []
+    compat: []
+  couchbase.common.analytics:
+    public:
+      - AnalyticsError
+      - AnalyticsMetaData
+      - AnalyticsMetrics
+      - AnalyticsProblem
+      - AnalyticsScanConsistency
+      - AnalyticsStatus
+      - AnalyticsWarning
+    compat: []
+  couchbase.common.auth:
+    public:
+      - AuthDomain
+      - Authenticator
+      - CertificateAuthenticator
+      - JwtAuthenticator
+      - PasswordAuthenticator
+    compat: []
+  couchbase.common.config_profiles:
+    public:
+      - CONFIG_PROFILES
+      - ConfigProfile
+      - ConfigProfiles
+      - KnownConfigProfiles
+      - WanDevelopmentProfile
+    compat: []
+  couchbase.common.constants:
+    public:
+      - FMT_BYTES
+      - FMT_COMMON_MASK
+      - FMT_JSON
+      - FMT_LEGACY_MASK
+      - FMT_PICKLE
+      - FMT_UTF8
+    compat: []
+  couchbase.common.diagnostics:
+    public:
+      - ClusterState
+      - EndpointDiagnosticsReport
+      - EndpointPingReport
+      - EndpointState
+      - PingState
+      - ServiceType
+    compat: []
+  couchbase.common.durability:
+    public:
+      - ClientDurability
+      - Durability
+      - DurabilityLevel
+      - DurabilityType
+      - PersistTo
+      - PersistToExtended
+      - ReplicateTo
+      - ServerDurability
+    compat: []
+  couchbase.common.encryption:
+    public:
+      - CryptoManager
+      - Decrypter
+      - Encrypter
+      - EncryptionResult
+      - Key
+      - Keyring
+    compat: []
+  couchbase.common.encryption.crypto_manager:
+    public:
+      - CryptoManager
+    compat: []
+  couchbase.common.encryption.decrypter:
+    public:
+      - Decrypter
+    compat: []
+  couchbase.common.encryption.encrypter:
+    public:
+      - Encrypter
+    compat: []
+  couchbase.common.encryption.encryption_result:
+    public:
+      - EncryptionResult
+    compat: []
+  couchbase.common.encryption.key:
+    public:
+      - Key
+    compat: []
+  couchbase.common.encryption.keyring:
+    public:
+      - Keyring
+    compat: []
+  couchbase.common.exceptions:
+    public:
+      - AlreadyQueriedException
+      - AmbiguousTimeoutException
+      - AnalyticsErrorContext
+      - AnalyticsLinkExistsException
+      - AnalyticsLinkNotFoundException
+      - AuthenticationException
+      - BucketAlreadyExistsException
+      - BucketDoesNotExistException
+      - BucketNotFlushableException
+      - BucketNotFoundException
+      - CASMismatchException
+      - CannotReviveLivingDocumentException
+      - CasMismatchException
+      - CollectionAlreadyExistsException
+      - CollectionNotFoundException
+      - CouchbaseErrorCategory
+      - CouchbaseException
+      - CryptoException
+      - CryptoKeyNotFoundException
+      - DatasetAlreadyExistsException
+      - DatasetNotFoundException
+      - DataverseAlreadyExistsException
+      - DataverseNotFoundException
+      - DecrypterAlreadyExistsException
+      - DecrypterNotFoundException
+      - DecryptionFailureException
+      - DeltaInvalidException
+      - DesignDocumentNotFoundException
+      - DocumentExistsException
+      - DocumentLockedException
+      - DocumentNotFoundException
+      - DocumentNotJsonException
+      - DocumentNotLockedException
+      - DocumentUnretrievableException
+      - DurabilityImpossibleException
+      - DurabilityInvalidLevelException
+      - DurabilitySyncWriteAmbiguousException
+      - DurabilitySyncWriteInProgressException
+      - DurableWriteReCommitInProgressException
+      - EncrypterAlreadyExistsException
+      - EncrypterNotFoundException
+      - EncryptionFailureException
+      - ErrorContext
+      - ErrorContextType
+      - EventingFunctionAlreadyDeployedException
+      - EventingFunctionCollectionNotFoundException
+      - EventingFunctionCompilationFailureException
+      - EventingFunctionIdenticalKeyspaceException
+      - EventingFunctionNotBootstrappedException
+      - EventingFunctionNotDeployedException
+      - EventingFunctionNotFoundException
+      - EventingFunctionNotUnDeployedException
+      - FeatureNotFoundException
+      - FeatureUnavailableException
+      - GenericErrorContext
+      - GroupNotFoundException
+      - HTTPErrorContext
+      - HTTPException
+      - InternalSDKException
+      - InternalServerFailureException
+      - InvalidArgumentException
+      - InvalidCipherTextException
+      - InvalidCryptoKeyException
+      - InvalidIndexException
+      - InvalidValueException
+      - KeyValueErrorContext
+      - KeyspaceNotFoundException
+      - ManagementErrorContext
+      - MissingConnectionException
+      - MissingTokenException
+      - MutationTokenOutdatedException
+      - NoChildrenException
+      - NumberTooBigException
+      - ParsingFailedException
+      - PathExistsException
+      - PathInvalidException
+      - PathMismatchException
+      - PathNotFoundException
+      - PathTooBigException
+      - PathTooDeepException
+      - QueryErrorContext
+      - QueryIndexAlreadyExistsException
+      - QueryIndexNotFoundException
+      - QueueEmpty
+      - QuotaLimitedException
+      - RangeScanCompletedException
+      - RateLimitedException
+      - RequestCanceledException
+      - ScopeAlreadyExistsException
+      - ScopeNotFoundException
+      - SearchErrorContext
+      - SearchIndexNotFoundException
+      - ServiceUnavailableException
+      - SubdocCantInsertValueException
+      - SubdocPathMismatchException
+      - SubdocumentErrorContext
+      - TemporaryFailException
+      - TimeoutException
+      - TransactionCommitAmbiguous
+      - TransactionException
+      - TransactionExpired
+      - TransactionFailed
+      - TransactionOperationFailed
+      - TransactionsErrorContext
+      - UnAmbiguousTimeoutException
+      - UnsuccessfulOperationException
+      - UnsupportedOperation
+      - UserNotFoundException
+      - ValueFormatException
+      - ValueTooDeepException
+      - ValueTooLargeException
+      - ViewErrorContext
+      - WatchQueryIndexTimeoutException
+      - XattrCannotModifyVirtualAttributeException
+      - XattrInvalidKeyComboException
+      - XattrNoAccessException
+      - XattrUnknownMacroException
+      - XattrUnknownVirtualAttributeException
+    compat: []
+  couchbase.common.kv_range_scan:
+    public:
+      - PrefixScan
+      - RangeScan
+      - SamplingScan
+      - ScanTerm
+      - ScanType
+    compat: []
+  couchbase.common.management:
+    public: []
+    compat: []
+  couchbase.common.management.analytics:
+    public:
+      - AnalyticsDataType
+      - AnalyticsDataset
+      - AnalyticsEncryptionLevel
+      - AnalyticsIndex
+      - AnalyticsLink
+      - AnalyticsLinkType
+      - AzureBlobExternalAnalyticsLink
+      - CouchbaseAnalyticsEncryptionSettings
+      - CouchbaseRemoteAnalyticsLink
+      - S3ExternalAnalyticsLink
+    compat: []
+  couchbase.common.management.buckets:
+    public:
+      - BucketDescribeResult
+      - BucketSettings
+      - BucketSettingsKwargs
+      - BucketType
+      - CompressionMode
+      - ConflictResolutionType
+      - CreateBucketSettings
+      - CreateBucketSettingsKwargs
+      - EjectionMethod
+      - EvictionPolicyType
+      - StorageBackend
+    compat: []
+  couchbase.common.management.collections:
+    public:
+      - CollectionSpec
+      - CreateCollectionSettings
+      - ScopeSpec
+      - UpdateCollectionSettings
+    compat: []
+  couchbase.common.management.eventing:
+    public:
+      - EventingFunction
+      - EventingFunctionBucketAccess
+      - EventingFunctionBucketBinding
+      - EventingFunctionConstantBinding
+      - EventingFunctionDcpBoundary
+      - EventingFunctionDeploymentStatus
+      - EventingFunctionKeyspace
+      - EventingFunctionLanguageCompatibility
+      - EventingFunctionLogLevel
+      - EventingFunctionProcessingStatus
+      - EventingFunctionSettings
+      - EventingFunctionState
+      - EventingFunctionStatus
+      - EventingFunctionUrlAuth
+      - EventingFunctionUrlAuthBasic
+      - EventingFunctionUrlAuthBearer
+      - EventingFunctionUrlAuthDigest
+      - EventingFunctionUrlBinding
+      - EventingFunctionUrlNoAuth
+      - EventingFunctionsStatus
+    compat: []
+  couchbase.common.management.options:
+    public:
+      - AllowQueryingSearchIndexOptions
+      - AllowQueryingSearchIndexOptionsKwargs
+      - AnalyzeDocumentSearchIndexOptions
+      - AnalyzeDocumentSearchIndexOptionsKwargs
+      - BucketDescribeOptions
+      - BucketDescribeOptionsKwargs
+      - BuildDeferredQueryIndexOptions
+      - BuildDeferredQueryIndexOptionsKwargs
+      - ChangePasswordOptions
+      - ChangePasswordOptionsKwargs
+      - ConnectLinkOptions
+      - ConnectLinkOptionsKwargs
+      - CreateAnalyticsIndexOptions
+      - CreateAnalyticsIndexOptionsKwargs
+      - CreateBucketOptions
+      - CreateBucketOptionsKwargs
+      - CreateCollectionOptions
+      - CreateCollectionOptionsKwargs
+      - CreateDatasetOptions
+      - CreateDatasetOptionsKwargs
+      - CreateDataverseOptions
+      - CreateDataverseOptionsKwargs
+      - CreateLinkAnalyticsOptions
+      - CreateLinkAnalyticsOptionsKwargs
+      - CreatePrimaryQueryIndexOptions
+      - CreatePrimaryQueryIndexOptionsKwargs
+      - CreateQueryIndexOptions
+      - CreateQueryIndexOptionsKwargs
+      - CreateScopeOptions
+      - CreateScopeOptionsKwargs
+      - DeployFunctionOptions
+      - DeployFunctionOptionsKwargs
+      - DisallowQueryingSearchIndexOptions
+      - DisallowQueryingSearchIndexOptionsKwargs
+      - DisconnectLinkOptions
+      - DisconnectLinkOptionsKwargs
+      - DropAnalyticsIndexOptions
+      - DropAnalyticsIndexOptionsKwargs
+      - DropBucketOptions
+      - DropBucketOptionsKwargs
+      - DropCollectionOptions
+      - DropCollectionOptionsKwargs
+      - DropDatasetOptions
+      - DropDatasetOptionsKwargs
+      - DropDataverseOptions
+      - DropDataverseOptionsKwargs
+      - DropDesignDocumentOptions
+      - DropDesignDocumentOptionsKwargs
+      - DropFunctionOptions
+      - DropFunctionOptionsKwargs
+      - DropGroupOptions
+      - DropGroupOptionsKwargs
+      - DropLinkAnalyticsOptions
+      - DropLinkAnalyticsOptionsKwargs
+      - DropPrimaryQueryIndexOptions
+      - DropPrimaryQueryIndexOptionsKwargs
+      - DropQueryIndexOptions
+      - DropQueryIndexOptionsKwargs
+      - DropScopeOptions
+      - DropScopeOptionsKwargs
+      - DropSearchIndexOptions
+      - DropSearchIndexOptionsKwargs
+      - DropUserOptions
+      - DropUserOptionsKwargs
+      - EventingFunctionOptions
+      - EventingFunctionOptionsKwargs
+      - FlushBucketOptions
+      - FlushBucketOptionsKwargs
+      - FreezePlanSearchIndexOptions
+      - FreezePlanSearchIndexOptionsKwargs
+      - FunctionsStatusOptions
+      - FunctionsStatusOptionsKwargs
+      - GetAllAnalyticsIndexesOptions
+      - GetAllAnalyticsIndexesOptionsKwargs
+      - GetAllBucketOptions
+      - GetAllBucketOptionsKwargs
+      - GetAllDatasetOptions
+      - GetAllDatasetOptionsKwargs
+      - GetAllDesignDocumentsOptions
+      - GetAllDesignDocumentsOptionsKwargs
+      - GetAllFunctionOptions
+      - GetAllFunctionOptionsKwargs
+      - GetAllGroupsOptions
+      - GetAllGroupsOptionsKwargs
+      - GetAllQueryIndexOptions
+      - GetAllQueryIndexOptionsKwargs
+      - GetAllScopesOptions
+      - GetAllScopesOptionsKwargs
+      - GetAllSearchIndexStatsOptions
+      - GetAllSearchIndexStatsOptionsKwargs
+      - GetAllSearchIndexesOptions
+      - GetAllSearchIndexesOptionsKwargs
+      - GetAllUsersOptions
+      - GetAllUsersOptionsKwargs
+      - GetBucketOptions
+      - GetBucketOptionsKwargs
+      - GetDesignDocumentOptions
+      - GetDesignDocumentOptionsKwargs
+      - GetFunctionOptions
+      - GetFunctionOptionsKwargs
+      - GetGroupOptions
+      - GetGroupOptionsKwargs
+      - GetLinksAnalyticsOptions
+      - GetLinksAnalyticsOptionsKwargs
+      - GetPendingMutationsOptions
+      - GetPendingMutationsOptionsKwargs
+      - GetRolesOptions
+      - GetRolesOptionsKwargs
+      - GetSearchIndexOptions
+      - GetSearchIndexOptionsKwargs
+      - GetSearchIndexStatsOptions
+      - GetSearchIndexStatsOptionsKwargs
+      - GetSearchIndexedDocumentsCountOptions
+      - GetSearchIndexedDocumentsCountOptionsKwargs
+      - GetUserOptions
+      - GetUserOptionsKwargs
+      - PauseFunctionOptions
+      - PauseFunctionOptionsKwargs
+      - PauseIngestSearchIndexOptions
+      - PauseIngestSearchIndexOptionsKwargs
+      - PublishDesignDocumentOptions
+      - PublishDesignDocumentOptionsKwargs
+      - ReplaceLinkAnalyticsOptions
+      - ReplaceLinkAnalyticsOptionsKwargs
+      - ResumeFunctionOptions
+      - ResumeFunctionOptionsKwargs
+      - ResumeIngestSearchIndexOptions
+      - ResumeIngestSearchIndexOptionsKwargs
+      - UndeployFunctionOptions
+      - UndeployFunctionOptionsKwargs
+      - UnfreezePlanSearchIndexOptions
+      - UnfreezePlanSearchIndexOptionsKwargs
+      - UpdateBucketOptions
+      - UpdateBucketOptionsKwargs
+      - UpdateCollectionOptions
+      - UpdateCollectionOptionsKwargs
+      - UpsertDesignDocumentOptions
+      - UpsertDesignDocumentOptionsKwargs
+      - UpsertFunctionOptions
+      - UpsertFunctionOptionsKwargs
+      - UpsertGroupOptions
+      - UpsertGroupOptionsKwargs
+      - UpsertSearchIndexOptions
+      - UpsertSearchIndexOptionsKwargs
+      - UpsertUserOptions
+      - UpsertUserOptionsKwargs
+      - WatchQueryIndexOptions
+      - WatchQueryIndexOptionsKwargs
+    compat: []
+  couchbase.common.management.queries:
+    public:
+      - QueryIndex
+    compat: []
+  couchbase.common.management.search:
+    public:
+      - SearchIndex
+    compat: []
+  couchbase.common.management.users:
+    public:
+      - Group
+      - Origin
+      - Role
+      - RoleAndDescription
+      - RoleAndOrigins
+      - SetInputType
+      - User
+      - UserAndMetadata
+    compat: []
+  couchbase.common.management.views:
+    public:
+      - DesignDocument
+      - DesignDocumentNamespace
+      - View
+    compat: []
+  couchbase.common.mutation_state:
+    public:
+      - MutationState
+    compat: []
+  couchbase.common.n1ql:
+    public:
+      - QueryError
+      - QueryMetaData
+      - QueryMetrics
+      - QueryProblem
+      - QueryProfile
+      - QueryScanConsistency
+      - QueryStatus
+      - QueryWarning
+    compat: []
+  couchbase.common.observability:
+    public:
+      - get_otel_meter
+      - get_otel_tracer
+    compat: []
+  couchbase.common.observability.metrics:
+    public:
+      - Meter
+      - ValueRecorder
+    compat: []
+  couchbase.common.observability.otel_metrics:
+    public:
+      - OtelWrapperMeter
+      - OtelWrapperValueRecorder
+      - get_otel_meter
+    compat: []
+  couchbase.common.observability.otel_tracing:
+    public:
+      - OtelWrapperSpan
+      - OtelWrapperTracer
+      - get_otel_tracer
+    compat: []
+  couchbase.common.observability.tracing:
+    public:
+      - RequestSpan
+      - RequestTracer
+      - SpanAttributeValue
+      - SpanAttributes
+      - SpanStatusCode
+    compat: []
+  couchbase.common.option_enums:
+    public:
+      - Compression
+      - IpProtocol
+      - LockMode
+      - OptionValidationMode
+      - TLSVerifyMode
+    compat: []
+  couchbase.common.options:
+    public:
+      - AcceptableInts
+      - AnalyticsOptions
+      - AnalyticsOptionsKwargs
+      - AppendMultiOptions
+      - AppendMultiOptionsKwargs
+      - AppendOptions
+      - AppendOptionsKwargs
+      - ClusterMetricsOptions
+      - ClusterMetricsOptionsKwargs
+      - ClusterOptions
+      - ClusterOptionsKwargs
+      - ClusterOrphanReportingOptions
+      - ClusterOrphanReportingOptionsKwargs
+      - ClusterTimeoutOptions
+      - ClusterTimeoutOptionsKwargs
+      - ClusterTracingOptions
+      - ClusterTracingOptionsKwargs
+      - ConstrainedInt
+      - DecrementMultiOptions
+      - DecrementMultiOptionsKwargs
+      - DecrementOptions
+      - DecrementOptionsKwargs
+      - DeltaValue
+      - DiagnosticsOptions
+      - DiagnosticsOptionsKwargs
+      - ExistsMultiOptions
+      - ExistsMultiOptionsKwargs
+      - ExistsOptions
+      - ExistsOptionsKwargs
+      - GetAllReplicasMultiOptions
+      - GetAllReplicasMultiOptionsKwargs
+      - GetAllReplicasOptions
+      - GetAllReplicasOptionsKwargs
+      - GetAndLockMultiOptions
+      - GetAndLockMultiOptionsKwargs
+      - GetAndLockOptions
+      - GetAndLockOptionsKwargs
+      - GetAndTouchOptions
+      - GetAndTouchOptionsKwargs
+      - GetAnyReplicaMultiOptions
+      - GetAnyReplicaMultiOptionsKwargs
+      - GetAnyReplicaOptions
+      - GetAnyReplicaOptionsKwargs
+      - GetMultiOptions
+      - GetMultiOptionsKwargs
+      - GetOptions
+      - GetOptionsKwargs
+      - IncrementMultiOptions
+      - IncrementMultiOptionsKwargs
+      - IncrementOptions
+      - IncrementOptionsKwargs
+      - InsertMultiOptions
+      - InsertMultiOptionsKwargs
+      - InsertOptions
+      - InsertOptionsKwargs
+      - LockMultiOptions
+      - LookupInAllReplicasOptions
+      - LookupInAllReplicasOptionsKwargs
+      - LookupInAnyReplicaOptions
+      - LookupInAnyReplicaOptionsKwargs
+      - LookupInOptions
+      - LookupInOptionsKwargs
+      - MutateInOptions
+      - MutateInOptionsKwargs
+      - MutationMultiOptions
+      - MutationOptions
+      - NoValueMultiOptions
+      - PingOptions
+      - PingOptionsKwargs
+      - PrependMultiOptions
+      - PrependMultiOptionsKwargs
+      - PrependOptions
+      - PrependOptionsKwargs
+      - QueryOptions
+      - QueryOptionsKwargs
+      - RemoveMultiOptions
+      - RemoveMultiOptionsKwargs
+      - RemoveOptions
+      - RemoveOptionsKwargs
+      - ReplaceMultiOptions
+      - ReplaceMultiOptionsKwargs
+      - ReplaceOptions
+      - ReplaceOptionsKwargs
+      - ScanOptions
+      - ScanOptionsKwargs
+      - SearchOptions
+      - SearchOptionsKwargs
+      - SignedInt64
+      - TouchMultiOptions
+      - TouchMultiOptionsKwargs
+      - TouchOptions
+      - TouchOptionsKwargs
+      - TransactionConfig
+      - TransactionConfigKwargs
+      - TransactionGetMultiOptions
+      - TransactionGetMultiOptionsKwargs
+      - TransactionGetMultiReplicasFromPreferredServerGroupOptions
+      - TransactionGetMultiReplicasFromPreferredServerGroupOptionsKwargs
+      - TransactionGetOptions
+      - TransactionGetOptionsKwargs
+      - TransactionGetReplicaFromPreferredServerGroupOptions
+      - TransactionGetReplicaFromPreferredServerGroupOptionsKwargs
+      - TransactionInsertOptions
+      - TransactionInsertOptionsKwargs
+      - TransactionOptions
+      - TransactionOptionsKwargs
+      - TransactionQueryOptions
+      - TransactionQueryOptionsKwargs
+      - TransactionReplaceOptions
+      - TransactionReplaceOptionsKwargs
+      - UnlockMultiOptions
+      - UnlockMultiOptionsKwargs
+      - UnlockOptions
+      - UnlockOptionsKwargs
+      - UnsignedInt32
+      - UnsignedInt64
+      - UpsertMultiOptions
+      - UpsertMultiOptionsKwargs
+      - UpsertOptions
+      - UpsertOptionsKwargs
+      - VectorSearchOptions
+      - VectorSearchOptionsKwargs
+      - ViewOptions
+      - ViewOptionsKwargs
+      - WaitUntilReadyOptions
+      - WaitUntilReadyOptionsKwargs
+    compat: []
+  couchbase.common.otel_tracer:
+    public:
+      - CouchbaseOtelSpan
+      - CouchbaseOtelTracer
+    compat: []
+  couchbase.common.protocol:
+    public:
+      - CouchbaseProtocol
+    compat: []
+  couchbase.common.replica_reads:
+    public:
+      - ReadPreference
+    compat: []
+  couchbase.common.result:
+    public:
+      - ClusterInfoResult
+      - ContentProxy
+      - ContentSubdocProxy
+      - CounterResult
+      - DiagnosticsResult
+      - ExistsResult
+      - GetReplicaResult
+      - GetResult
+      - LookupInReplicaResult
+      - LookupInResult
+      - MultiCounterResult
+      - MultiExistsResult
+      - MultiGetReplicaResult
+      - MultiGetResult
+      - MultiMutationResult
+      - MultiResult
+      - MultiResultType
+      - MutateInResult
+      - MutationResult
+      - MutationToken
+      - OperationResult
+      - PingResult
+      - Result
+      - ScanResult
+      - ValueResult
+    compat: []
+  couchbase.common.search:
+    public:
+      - DateFacet
+      - Facet
+      - HighlightStyle
+      - MatchOperator
+      - NumericFacet
+      - SearchDateRangeFacet
+      - SearchFacetResult
+      - SearchMetaData
+      - SearchMetrics
+      - SearchNumericRangeFacet
+      - SearchRow
+      - SearchRowFields
+      - SearchRowLocation
+      - SearchRowLocations
+      - SearchScanConsistency
+      - SearchTermFacet
+      - Sort
+      - SortField
+      - SortGeoDistance
+      - SortID
+      - SortScore
+      - TermFacet
+    compat: []
+  couchbase.common.search_queries:
+    public:
+      - BooleanFieldQuery
+      - BooleanQuery
+      - CompoundQueryType
+      - ConjunctionQuery
+      - DateRangeQuery
+      - DisjunctionQuery
+      - DocIdQuery
+      - GeoBoundingBoxQuery
+      - GeoDistanceQuery
+      - GeoPolygonQuery
+      - MatchAllQuery
+      - MatchNoneQuery
+      - MatchPhraseQuery
+      - MatchQuery
+      - NumericRangeQuery
+      - PhraseQuery
+      - PrefixQuery
+      - QueryStringQuery
+      - RawQuery
+      - RegexQuery
+      - RegexpQuery
+      - SearchQuery
+      - TermQuery
+      - TermRangeQuery
+      - WildcardQuery
+    compat: []
+  couchbase.common.search_request:
+    public:
+      - SearchRequest
+    compat: []
+  couchbase.common.search_scoring:
+    public:
+      - ReciprocalRankFusion
+      - RelativeScoreFusion
+      - ScoringNone
+      - SearchScoring
+    compat: []
+  couchbase.common.serializer:
+    public:
+      - DefaultJsonSerializer
+      - Serializer
+    compat: []
+  couchbase.common.subdocument:
+    public:
+      - ArrayValues
+      - LookupInMacro
+      - MutationMacro
+      - Spec
+      - StoreSemantics
+      - SubDocOp
+      - SubDocStatus
+      - array_addunique
+      - array_append
+      - array_insert
+      - array_prepend
+      - convert_macro_cas_to_cas
+      - count
+      - counter
+      - decrement
+      - exists
+      - get
+      - get_full
+      - increment
+      - insert
+      - remove
+      - replace
+      - upsert
+      - with_expiry
+    compat: []
+  couchbase.common.transactions:
+    public: []
+    compat: []
+  couchbase.common.transactions.transaction_get_result:
+    public:
+      - TransactionGetResult
+    compat: []
+  couchbase.common.transactions.transaction_keyspace:
+    public:
+      - TransactionKeyspace
+    compat: []
+  couchbase.common.transactions.transaction_query_results:
+    public:
+      - TransactionQueryResults
+    compat: []
+  couchbase.common.transactions.transaction_result:
+    public:
+      - TransactionResult
+    compat: []
+  couchbase.common.transactions.transactions_get_multi:
+    public:
+      - TransactionGetMultiMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupResult
+      - TransactionGetMultiReplicasFromPreferredServerGroupSpec
+      - TransactionGetMultiResult
+      - TransactionGetMultiSpec
+      - TransactionMultiContentProxy
+    compat: []
+  couchbase.common.transcoder:
+    public:
+      - JSONTranscoder
+      - LegacyTranscoder
+      - RawBinaryTranscoder
+      - RawJSONTranscoder
+      - RawStringTranscoder
+      - Transcoder
+    compat: []
+  couchbase.common.vector_search:
+    public:
+      - VectorQuery
+      - VectorQueryCombination
+      - VectorSearch
+    compat: []
+  couchbase.common.views:
+    public:
+      - ViewErrorMode
+      - ViewMetaData
+      - ViewOrdering
+      - ViewRow
+      - ViewScanConsistency
+    compat: []
+  couchbase.common.warnings:
+    public:
+      - CouchbaseApplicabilityWarning
+      - CouchbaseDeprecationWarning
+      - CouchbaseOptionWarning
+      - CouchbaseWarning
+    compat: []
+  couchbase.constants:
+    public:
+      - FMT_BYTES
+      - FMT_COMMON_MASK
+      - FMT_JSON
+      - FMT_LEGACY_MASK
+      - FMT_PICKLE
+      - FMT_UTF8
+    compat: []
+  couchbase.datastructures:
+    public:
+      - CouchbaseList
+      - CouchbaseMap
+      - CouchbaseQueue
+      - CouchbaseSet
+    compat: []
+  couchbase.diagnostics:
+    public:
+      - ClusterState
+      - EndpointDiagnosticsReport
+      - EndpointPingReport
+      - EndpointState
+      - PingState
+      - ServiceType
+    compat: []
+  couchbase.durability:
+    public:
+      - ClientDurability
+      - Durability
+      - DurabilityLevel
+      - DurabilityType
+      - PersistTo
+      - PersistToExtended
+      - ReplicateTo
+      - ServerDurability
+    compat: []
+  couchbase.encryption:
+    public:
+      - CryptoManager
+      - Decrypter
+      - Encrypter
+      - EncryptionResult
+      - Key
+      - Keyring
+    compat: []
+  couchbase.encryption.crypto_manager:
+    public:
+      - CryptoManager
+    compat: []
+  couchbase.encryption.decrypter:
+    public:
+      - Decrypter
+    compat: []
+  couchbase.encryption.encrypter:
+    public:
+      - Encrypter
+    compat: []
+  couchbase.encryption.encryption_result:
+    public:
+      - EncryptionResult
+    compat: []
+  couchbase.encryption.key:
+    public:
+      - Key
+    compat: []
+  couchbase.encryption.keyring:
+    public:
+      - Keyring
+    compat: []
+  couchbase.exceptions:
+    public:
+      - AlreadyQueriedException
+      - AmbiguousTimeoutException
+      - AnalyticsErrorContext
+      - AnalyticsLinkExistsException
+      - AnalyticsLinkNotFoundException
+      - AuthenticationException
+      - BucketAlreadyExistsException
+      - BucketDoesNotExistException
+      - BucketNotFlushableException
+      - BucketNotFoundException
+      - CASMismatchException
+      - CannotReviveLivingDocumentException
+      - CasMismatchException
+      - CollectionAlreadyExistsException
+      - CollectionNotFoundException
+      - CouchbaseErrorCategory
+      - CouchbaseException
+      - CryptoException
+      - CryptoKeyNotFoundException
+      - DatasetAlreadyExistsException
+      - DatasetNotFoundException
+      - DataverseAlreadyExistsException
+      - DataverseNotFoundException
+      - DecrypterAlreadyExistsException
+      - DecrypterNotFoundException
+      - DecryptionFailureException
+      - DeltaInvalidException
+      - DesignDocumentNotFoundException
+      - DocumentExistsException
+      - DocumentLockedException
+      - DocumentNotFoundException
+      - DocumentNotJsonException
+      - DocumentNotLockedException
+      - DocumentUnretrievableException
+      - DurabilityImpossibleException
+      - DurabilityInvalidLevelException
+      - DurabilitySyncWriteAmbiguousException
+      - DurabilitySyncWriteInProgressException
+      - DurableWriteReCommitInProgressException
+      - EncrypterAlreadyExistsException
+      - EncrypterNotFoundException
+      - EncryptionFailureException
+      - ErrorContext
+      - ErrorContextType
+      - EventingFunctionAlreadyDeployedException
+      - EventingFunctionCollectionNotFoundException
+      - EventingFunctionCompilationFailureException
+      - EventingFunctionIdenticalKeyspaceException
+      - EventingFunctionNotBootstrappedException
+      - EventingFunctionNotDeployedException
+      - EventingFunctionNotFoundException
+      - EventingFunctionNotUnDeployedException
+      - FeatureNotFoundException
+      - FeatureUnavailableException
+      - GenericErrorContext
+      - GroupNotFoundException
+      - HTTPErrorContext
+      - HTTPException
+      - InternalSDKException
+      - InternalServerFailureException
+      - InvalidArgumentException
+      - InvalidCipherTextException
+      - InvalidCryptoKeyException
+      - InvalidIndexException
+      - InvalidValueException
+      - KeyValueErrorContext
+      - KeyspaceNotFoundException
+      - ManagementErrorContext
+      - MissingConnectionException
+      - MissingTokenException
+      - MutationTokenOutdatedException
+      - NoChildrenException
+      - NumberTooBigException
+      - ParsingFailedException
+      - PathExistsException
+      - PathInvalidException
+      - PathMismatchException
+      - PathNotFoundException
+      - PathTooBigException
+      - PathTooDeepException
+      - QueryErrorContext
+      - QueryIndexAlreadyExistsException
+      - QueryIndexNotFoundException
+      - QueueEmpty
+      - QuotaLimitedException
+      - RangeScanCompletedException
+      - RateLimitedException
+      - RequestCanceledException
+      - ScopeAlreadyExistsException
+      - ScopeNotFoundException
+      - SearchErrorContext
+      - SearchIndexNotFoundException
+      - ServiceUnavailableException
+      - SubdocCantInsertValueException
+      - SubdocPathMismatchException
+      - SubdocumentErrorContext
+      - TemporaryFailException
+      - TimeoutException
+      - TransactionCommitAmbiguous
+      - TransactionException
+      - TransactionExpired
+      - TransactionFailed
+      - TransactionOperationFailed
+      - TransactionsErrorContext
+      - UnAmbiguousTimeoutException
+      - UnsuccessfulOperationException
+      - UnsupportedOperation
+      - UserNotFoundException
+      - ValueFormatException
+      - ValueTooDeepException
+      - ValueTooLargeException
+      - ViewErrorContext
+      - WatchQueryIndexTimeoutException
+      - XattrCannotModifyVirtualAttributeException
+      - XattrInvalidKeyComboException
+      - XattrNoAccessException
+      - XattrUnknownMacroException
+      - XattrUnknownVirtualAttributeException
+    compat: []
+  couchbase.kv_range_scan:
+    public:
+      - PrefixScan
+      - RangeScan
+      - SamplingScan
+      - ScanTerm
+      - ScanType
+    compat: []
+  couchbase.management:
+    public: []
+    compat: []
+  couchbase.management.analytics:
+    public:
+      - AnalyticsDataType
+      - AnalyticsDataset
+      - AnalyticsEncryptionLevel
+      - AnalyticsIndex
+      - AnalyticsIndexManager
+      - AnalyticsLink
+      - AnalyticsLinkType
+      - AzureBlobExternalAnalyticsLink
+      - CouchbaseAnalyticsEncryptionSettings
+      - CouchbaseRemoteAnalyticsLink
+      - S3ExternalAnalyticsLink
+    compat: []
+  couchbase.management.buckets:
+    public:
+      - BucketDescribeResult
+      - BucketManager
+      - BucketSettings
+      - BucketType
+      - CompressionMode
+      - ConflictResolutionType
+      - CreateBucketSettings
+      - EjectionMethod
+      - EvictionPolicyType
+      - StorageBackend
+    compat: []
+  couchbase.management.collections:
+    public:
+      - CollectionManager
+      - CollectionSpec
+      - CreateCollectionSettings
+      - ScopeSpec
+      - UpdateCollectionSettings
+    compat: []
+  couchbase.management.eventing:
+    public:
+      - EventingFunction
+      - EventingFunctionBucketAccess
+      - EventingFunctionBucketBinding
+      - EventingFunctionConstantBinding
+      - EventingFunctionDcpBoundary
+      - EventingFunctionDeploymentStatus
+      - EventingFunctionKeyspace
+      - EventingFunctionLanguageCompatibility
+      - EventingFunctionLogLevel
+      - EventingFunctionManager
+      - EventingFunctionProcessingStatus
+      - EventingFunctionSettings
+      - EventingFunctionState
+      - EventingFunctionStatus
+      - EventingFunctionUrlAuthBasic
+      - EventingFunctionUrlAuthBearer
+      - EventingFunctionUrlAuthDigest
+      - EventingFunctionUrlBinding
+      - EventingFunctionUrlNoAuth
+      - EventingFunctionsStatus
+      - ScopeEventingFunctionManager
+    compat: []
+  couchbase.management.options:
+    public:
+      - AllowQueryingSearchIndexOptions
+      - AnalyzeDocumentSearchIndexOptions
+      - BucketDescribeOptions
+      - BuildDeferredQueryIndexOptions
+      - ChangePasswordOptions
+      - ConnectLinkOptions
+      - CreateAnalyticsIndexOptions
+      - CreateBucketOptions
+      - CreateCollectionOptions
+      - CreateDatasetOptions
+      - CreateDataverseOptions
+      - CreateLinkAnalyticsOptions
+      - CreatePrimaryQueryIndexOptions
+      - CreateQueryIndexOptions
+      - CreateScopeOptions
+      - DeployFunctionOptions
+      - DisallowQueryingSearchIndexOptions
+      - DisconnectLinkOptions
+      - DropAnalyticsIndexOptions
+      - DropBucketOptions
+      - DropCollectionOptions
+      - DropDatasetOptions
+      - DropDataverseOptions
+      - DropDesignDocumentOptions
+      - DropFunctionOptions
+      - DropGroupOptions
+      - DropLinkAnalyticsOptions
+      - DropPrimaryQueryIndexOptions
+      - DropQueryIndexOptions
+      - DropScopeOptions
+      - DropSearchIndexOptions
+      - DropUserOptions
+      - EventingFunctionOptions
+      - FlushBucketOptions
+      - FreezePlanSearchIndexOptions
+      - FunctionsStatusOptions
+      - GetAllAnalyticsIndexesOptions
+      - GetAllBucketOptions
+      - GetAllDatasetOptions
+      - GetAllDesignDocumentsOptions
+      - GetAllFunctionOptions
+      - GetAllGroupsOptions
+      - GetAllQueryIndexOptions
+      - GetAllScopesOptions
+      - GetAllSearchIndexStatsOptions
+      - GetAllSearchIndexesOptions
+      - GetAllUsersOptions
+      - GetBucketOptions
+      - GetDesignDocumentOptions
+      - GetFunctionOptions
+      - GetGroupOptions
+      - GetLinksAnalyticsOptions
+      - GetPendingMutationsOptions
+      - GetRolesOptions
+      - GetSearchIndexOptions
+      - GetSearchIndexStatsOptions
+      - GetSearchIndexedDocumentsCountOptions
+      - GetUserOptions
+      - PauseFunctionOptions
+      - PauseIngestSearchIndexOptions
+      - PublishDesignDocumentOptions
+      - ReplaceLinkAnalyticsOptions
+      - ResumeFunctionOptions
+      - ResumeIngestSearchIndexOptions
+      - UndeployFunctionOptions
+      - UnfreezePlanSearchIndexOptions
+      - UpdateBucketOptions
+      - UpdateCollectionOptions
+      - UpsertDesignDocumentOptions
+      - UpsertFunctionOptions
+      - UpsertGroupOptions
+      - UpsertSearchIndexOptions
+      - UpsertUserOptions
+      - WatchQueryIndexOptions
+    compat: []
+  couchbase.management.queries:
+    public:
+      - CollectionQueryIndexManager
+      - QueryIndex
+      - QueryIndexManager
+    compat: []
+  couchbase.management.search:
+    public:
+      - ScopeSearchIndexManager
+      - SearchIndex
+      - SearchIndexManager
+    compat: []
+  couchbase.management.users:
+    public:
+      - Group
+      - Origin
+      - Role
+      - RoleAndDescription
+      - RoleAndOrigins
+      - User
+      - UserAndMetadata
+      - UserManager
+    compat: []
+  couchbase.management.views:
+    public:
+      - DesignDocument
+      - DesignDocumentNamespace
+      - View
+      - ViewIndexManager
+    compat: []
+  couchbase.metrics:
+    public: []
+    compat:
+      - CouchbaseMeter
+      - CouchbaseValueRecorder
+  couchbase.mutation_state:
+    public:
+      - MutationState
+    compat:
+      - MutationToken
+  couchbase.n1ql:
+    public:
+      - QueryError
+      - QueryMetaData
+      - QueryMetrics
+      - QueryProfile
+      - QueryScanConsistency
+      - QueryStatus
+      - QueryWarning
+    compat:
+      - N1QLQuery
+  couchbase.observability:
+    public:
+      - get_otel_meter
+      - get_otel_tracer
+    compat: []
+  couchbase.observability.metrics:
+    public:
+      - Meter
+      - ValueRecorder
+    compat: []
+  couchbase.observability.otel_metrics:
+    public:
+      - OtelWrapperMeter
+      - OtelWrapperValueRecorder
+      - get_otel_meter
+    compat: []
+  couchbase.observability.otel_tracing:
+    public:
+      - OtelWrapperSpan
+      - OtelWrapperTracer
+      - get_otel_tracer
+    compat: []
+  couchbase.observability.tracing:
+    public:
+      - RequestSpan
+      - RequestTracer
+      - SpanAttributeValue
+      - SpanAttributes
+      - SpanStatusCode
+    compat: []
+  couchbase.options:
+    public:
+      - AcceptableInts
+      - AnalyticsOptions
+      - AppendMultiOptions
+      - AppendOptions
+      - CONFIG_PROFILES
+      - ClusterMetricsOptions
+      - ClusterOptions
+      - ClusterOrphanReportingOptions
+      - ClusterTimeoutOptions
+      - ClusterTracingOptions
+      - Compression
+      - ConfigProfile
+      - ConfigProfiles
+      - ConstrainedInt
+      - DecrementMultiOptions
+      - DecrementOptions
+      - DeltaValue
+      - DiagnosticsOptions
+      - ExistsMultiOptions
+      - ExistsOptions
+      - GetAllReplicasMultiOptions
+      - GetAllReplicasOptions
+      - GetAndLockMultiOptions
+      - GetAndLockOptions
+      - GetAndTouchOptions
+      - GetAnyReplicaMultiOptions
+      - GetAnyReplicaOptions
+      - GetMultiOptions
+      - GetOptions
+      - IncrementMultiOptions
+      - IncrementOptions
+      - InsertMultiOptions
+      - InsertOptions
+      - IpProtocol
+      - KnownConfigProfiles
+      - LockMode
+      - LockMultiOptions
+      - LookupInAllReplicasOptions
+      - LookupInAnyReplicaOptions
+      - LookupInOptions
+      - MutateInOptions
+      - MutationMultiOptions
+      - MutationOptions
+      - NoValueMultiOptions
+      - OptionValidationMode
+      - PingOptions
+      - PrependMultiOptions
+      - PrependOptions
+      - QueryOptions
+      - RemoveMultiOptions
+      - RemoveOptions
+      - ReplaceMultiOptions
+      - ReplaceOptions
+      - ScanOptions
+      - SearchOptions
+      - SignedInt64
+      - TLSVerifyMode
+      - TouchMultiOptions
+      - TouchOptions
+      - TransactionConfig
+      - TransactionGetMultiOptions
+      - TransactionGetMultiReplicasFromPreferredServerGroupOptions
+      - TransactionGetOptions
+      - TransactionGetReplicaFromPreferredServerGroupOptions
+      - TransactionInsertOptions
+      - TransactionOptions
+      - TransactionQueryOptions
+      - TransactionReplaceOptions
+      - UnlockMultiOptions
+      - UnlockOptions
+      - UnsignedInt32
+      - UnsignedInt64
+      - UpsertMultiOptions
+      - UpsertOptions
+      - VectorSearchOptions
+      - ViewOptions
+      - WaitUntilReadyOptions
+      - WanDevelopmentProfile
+    compat:
+      - DefaultJsonSerializer
+      - DurabilityParser
+      - InvalidArgumentException
+      - Supportability
+      - forward_args
+      - get_valid_args
+      - get_valid_multi_args
+      - timedelta_as_milliseconds
+      - timedelta_as_timestamp
+      - validate_int
+  couchbase.otel_tracer:
+    public:
+      - CouchbaseOtelSpan
+      - CouchbaseOtelTracer
+    compat: []
+  couchbase.protocol:
+    public: []
+    compat: []
+  couchbase.protocol.classic:
+    public: []
+    compat: []
+  couchbase.replica_reads:
+    public:
+      - ReadPreference
+    compat: []
+  couchbase.result:
+    public:
+      - AnalyticsResult
+      - ClusterInfoResult
+      - ContentProxy
+      - ContentSubdocProxy
+      - CounterResult
+      - DiagnosticsResult
+      - ExistsResult
+      - GetReplicaResult
+      - GetResult
+      - LookupInReplicaResult
+      - LookupInResult
+      - MultiCounterResult
+      - MultiExistsResult
+      - MultiGetReplicaResult
+      - MultiGetResult
+      - MultiMutationResult
+      - MultiResult
+      - MultiResultType
+      - MutateInResult
+      - MutationResult
+      - MutationToken
+      - OperationResult
+      - PingResult
+      - QueryResult
+      - Result
+      - ScanResult
+      - ScanResultIterable
+      - SearchResult
+      - ValueResult
+      - ViewResult
+    compat:
+      - HttpResult
+  couchbase.scope:
+    public:
+      - Scope
+    compat: []
+  couchbase.search:
+    public:
+      - BooleanFieldQuery
+      - BooleanQuery
+      - ConjunctionQuery
+      - DateFacet
+      - DateRangeQuery
+      - DisjunctionQuery
+      - DocIdQuery
+      - Facet
+      - GeoBoundingBoxQuery
+      - GeoDistanceQuery
+      - GeoPolygonQuery
+      - HighlightStyle
+      - MatchAllQuery
+      - MatchNoneQuery
+      - MatchOperator
+      - MatchPhraseQuery
+      - MatchQuery
+      - NumericFacet
+      - NumericRangeQuery
+      - PhraseQuery
+      - PrefixQuery
+      - QueryStringQuery
+      - RawQuery
+      - RegexQuery
+      - SearchDateRangeFacet
+      - SearchFacetResult
+      - SearchMetaData
+      - SearchMetrics
+      - SearchNumericRangeFacet
+      - SearchQuery
+      - SearchRequest
+      - SearchRow
+      - SearchRowFields
+      - SearchRowLocation
+      - SearchRowLocations
+      - SearchScanConsistency
+      - SearchTermFacet
+      - Sort
+      - SortField
+      - SortGeoDistance
+      - SortID
+      - SortScore
+      - TermFacet
+      - TermQuery
+      - TermRangeQuery
+      - WildcardQuery
+    compat:
+      - NoChildrenException
+      - SearchOptions
+      - SearchQueryBuilder
+  couchbase.search_scoring:
+    public:
+      - ReciprocalRankFusion
+      - RelativeScoreFusion
+      - ScoringNone
+      - SearchScoring
+    compat: []
+  couchbase.serializer:
+    public:
+      - DefaultJsonSerializer
+      - Serializer
+    compat: []
+  couchbase.subdocument:
+    public:
+      - ArrayValues
+      - LookupInMacro
+      - MutationMacro
+      - Spec
+      - StoreSemantics
+      - SubDocOp
+      - SubDocStatus
+      - array_addunique
+      - array_append
+      - array_insert
+      - array_prepend
+      - convert_macro_cas_to_cas
+      - count
+      - counter
+      - decrement
+      - exists
+      - get
+      - get_full
+      - increment
+      - insert
+      - remove
+      - replace
+      - upsert
+      - with_expiry
+    compat:
+      - MutateInOptions
+  couchbase.tracing:
+    public: []
+    compat:
+      - CouchbaseSpan
+      - CouchbaseTracer
+  couchbase.transactions:
+    public:
+      - AttemptContext
+      - TransactionGetMultiMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupResult
+      - TransactionGetMultiReplicasFromPreferredServerGroupSpec
+      - TransactionGetMultiResult
+      - TransactionGetMultiSpec
+      - TransactionGetResult
+      - TransactionKeyspace
+      - TransactionQueryResults
+      - TransactionResult
+      - Transactions
+    compat: []
+  couchbase.transactions.transaction_get_result:
+    public:
+      - TransactionGetResult
+    compat: []
+  couchbase.transactions.transaction_keyspace:
+    public:
+      - TransactionKeyspace
+    compat: []
+  couchbase.transactions.transaction_query_results:
+    public:
+      - TransactionQueryResults
+    compat: []
+  couchbase.transactions.transaction_result:
+    public:
+      - TransactionResult
+    compat: []
+  couchbase.transactions.transactions:
+    public:
+      - AttemptContext
+      - Transactions
+    compat: []
+  couchbase.transactions.transactions_get_multi:
+    public:
+      - TransactionGetMultiMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupMode
+      - TransactionGetMultiReplicasFromPreferredServerGroupResult
+      - TransactionGetMultiReplicasFromPreferredServerGroupSpec
+      - TransactionGetMultiResult
+      - TransactionGetMultiSpec
+      - TransactionMultiContentProxy
+    compat: []
+  couchbase.transcoder:
+    public:
+      - JSONTranscoder
+      - LegacyTranscoder
+      - RawBinaryTranscoder
+      - RawJSONTranscoder
+      - RawStringTranscoder
+      - Transcoder
+    compat:
+      - DefaultJsonSerializer
+      - FMT_BYTES
+      - FMT_COMMON_MASK
+      - FMT_JSON
+      - FMT_LEGACY_MASK
+      - FMT_PICKLE
+      - FMT_UTF8
+  couchbase.vector_search:
+    public:
+      - VectorQuery
+      - VectorQueryCombination
+      - VectorSearch
+    compat: []
+  couchbase.views:
+    public:
+      - ViewErrorMode
+      - ViewMetaData
+      - ViewOrdering
+      - ViewRow
+      - ViewScanConsistency
+    compat:
+      - ViewQuery
+  txcouchbase:
+    public:
+      - configure_logging
+      - enable_protocol_logger_to_save_network_traffic_to_file
+      - get_metadata
+      - get_transactions_protocol
+    compat: []
+  txcouchbase.analytics:
+    public:
+      - AnalyticsError
+      - AnalyticsMetaData
+      - AnalyticsMetrics
+      - AnalyticsScanConsistency
+      - AnalyticsStatus
+      - AnalyticsWarning
+    compat: []
+  txcouchbase.auth:
+    public:
+      - AuthDomain
+      - Authenticator
+      - CertificateAuthenticator
+      - JwtAuthenticator
+      - PasswordAuthenticator
+    compat: []
+  txcouchbase.binary_collection:
+    public:
+      - BinaryCollection
+    compat: []
+  txcouchbase.bucket:
+    public:
+      - Bucket
+      - TxBucket
+    compat: []
+  txcouchbase.cluster:
+    public:
+      - Cluster
+      - TxCluster
+    compat: []
+  txcouchbase.collection:
+    public:
+      - Collection
+      - TxCollection
+    compat: []
+  txcouchbase.constants:
+    public:
+      - FMT_BYTES
+      - FMT_COMMON_MASK
+      - FMT_JSON
+      - FMT_LEGACY_MASK
+      - FMT_PICKLE
+      - FMT_UTF8
+    compat: []
+  txcouchbase.diagnostics:
+    public:
+      - ClusterState
+      - EndpointDiagnosticsReport
+      - EndpointPingReport
+      - EndpointState
+      - PingState
+      - ServiceType
+    compat: []
+  txcouchbase.durability:
+    public:
+      - ClientDurability
+      - Durability
+      - DurabilityLevel
+      - DurabilityType
+      - PersistTo
+      - PersistToExtended
+      - ReplicateTo
+      - ServerDurability
+    compat: []
+  txcouchbase.encryption:
+    public:
+      - CryptoManager
+      - Decrypter
+      - Encrypter
+      - EncryptionResult
+      - Key
+      - Keyring
+    compat: []
+  txcouchbase.encryption.crypto_manager:
+    public:
+      - CryptoManager
+    compat: []
+  txcouchbase.encryption.decrypter:
+    public:
+      - Decrypter
+    compat: []
+  txcouchbase.encryption.encrypter:
+    public:
+      - Encrypter
+    compat: []
+  txcouchbase.encryption.encryption_result:
+    public:
+      - EncryptionResult
+    compat: []
+  txcouchbase.encryption.key:
+    public:
+      - Key
+    compat: []
+  txcouchbase.encryption.keyring:
+    public:
+      - Keyring
+    compat: []
+  txcouchbase.exceptions:
+    public:
+      - AlreadyQueriedException
+      - AmbiguousTimeoutException
+      - AnalyticsErrorContext
+      - AnalyticsLinkExistsException
+      - AnalyticsLinkNotFoundException
+      - AuthenticationException
+      - BucketAlreadyExistsException
+      - BucketDoesNotExistException
+      - BucketNotFlushableException
+      - BucketNotFoundException
+      - CASMismatchException
+      - CannotReviveLivingDocumentException
+      - CasMismatchException
+      - CollectionAlreadyExistsException
+      - CollectionNotFoundException
+      - CouchbaseErrorCategory
+      - CouchbaseException
+      - CryptoException
+      - CryptoKeyNotFoundException
+      - DatasetAlreadyExistsException
+      - DatasetNotFoundException
+      - DataverseAlreadyExistsException
+      - DataverseNotFoundException
+      - DecrypterAlreadyExistsException
+      - DecrypterNotFoundException
+      - DecryptionFailureException
+      - DeltaInvalidException
+      - DesignDocumentNotFoundException
+      - DocumentExistsException
+      - DocumentLockedException
+      - DocumentNotFoundException
+      - DocumentNotJsonException
+      - DocumentNotLockedException
+      - DocumentUnretrievableException
+      - DurabilityImpossibleException
+      - DurabilityInvalidLevelException
+      - DurabilitySyncWriteAmbiguousException
+      - DurabilitySyncWriteInProgressException
+      - DurableWriteReCommitInProgressException
+      - EncrypterAlreadyExistsException
+      - EncrypterNotFoundException
+      - EncryptionFailureException
+      - ErrorContext
+      - ErrorContextType
+      - EventingFunctionAlreadyDeployedException
+      - EventingFunctionCollectionNotFoundException
+      - EventingFunctionCompilationFailureException
+      - EventingFunctionIdenticalKeyspaceException
+      - EventingFunctionNotBootstrappedException
+      - EventingFunctionNotDeployedException
+      - EventingFunctionNotFoundException
+      - EventingFunctionNotUnDeployedException
+      - FeatureNotFoundException
+      - FeatureUnavailableException
+      - GenericErrorContext
+      - GroupNotFoundException
+      - HTTPErrorContext
+      - HTTPException
+      - InternalSDKException
+      - InternalServerFailureException
+      - InvalidArgumentException
+      - InvalidCipherTextException
+      - InvalidCryptoKeyException
+      - InvalidIndexException
+      - InvalidValueException
+      - KeyValueErrorContext
+      - KeyspaceNotFoundException
+      - ManagementErrorContext
+      - MissingConnectionException
+      - MissingTokenException
+      - MutationTokenOutdatedException
+      - NoChildrenException
+      - NumberTooBigException
+      - ParsingFailedException
+      - PathExistsException
+      - PathInvalidException
+      - PathMismatchException
+      - PathNotFoundException
+      - PathTooBigException
+      - PathTooDeepException
+      - QueryErrorContext
+      - QueryIndexAlreadyExistsException
+      - QueryIndexNotFoundException
+      - QueueEmpty
+      - QuotaLimitedException
+      - RangeScanCompletedException
+      - RateLimitedException
+      - RequestCanceledException
+      - ScopeAlreadyExistsException
+      - ScopeNotFoundException
+      - SearchErrorContext
+      - SearchIndexNotFoundException
+      - ServiceUnavailableException
+      - SubdocCantInsertValueException
+      - SubdocPathMismatchException
+      - SubdocumentErrorContext
+      - TemporaryFailException
+      - TimeoutException
+      - TransactionCommitAmbiguous
+      - TransactionException
+      - TransactionExpired
+      - TransactionFailed
+      - TransactionOperationFailed
+      - TransactionsErrorContext
+      - UnAmbiguousTimeoutException
+      - UnsuccessfulOperationException
+      - UnsupportedOperation
+      - UserNotFoundException
+      - ValueFormatException
+      - ValueTooDeepException
+      - ValueTooLargeException
+      - ViewErrorContext
+      - WatchQueryIndexTimeoutException
+      - XattrCannotModifyVirtualAttributeException
+      - XattrInvalidKeyComboException
+      - XattrNoAccessException
+      - XattrUnknownMacroException
+      - XattrUnknownVirtualAttributeException
+    compat: []
+  txcouchbase.management:
+    public: []
+    compat: []
+  txcouchbase.management.analytics:
+    public:
+      - AnalyticsDataType
+      - AnalyticsDataset
+      - AnalyticsEncryptionLevel
+      - AnalyticsIndex
+      - AnalyticsIndexManager
+      - AnalyticsLink
+      - AnalyticsLinkType
+      - AzureBlobExternalAnalyticsLink
+      - CouchbaseAnalyticsEncryptionSettings
+      - CouchbaseRemoteAnalyticsLink
+      - S3ExternalAnalyticsLink
+    compat: []
+  txcouchbase.management.buckets:
+    public:
+      - BucketDescribeResult
+      - BucketManager
+      - BucketSettings
+      - BucketType
+      - CompressionMode
+      - ConflictResolutionType
+      - CreateBucketSettings
+      - EjectionMethod
+      - EvictionPolicyType
+      - StorageBackend
+    compat: []
+  txcouchbase.management.collections:
+    public:
+      - CollectionManager
+      - CollectionSpec
+      - CreateCollectionSettings
+      - ScopeSpec
+      - UpdateCollectionSettings
+    compat: []
+  txcouchbase.management.options:
+    public:
+      - AllowQueryingSearchIndexOptions
+      - AnalyzeDocumentSearchIndexOptions
+      - BucketDescribeOptions
+      - BuildDeferredQueryIndexOptions
+      - ChangePasswordOptions
+      - ConnectLinkOptions
+      - CreateAnalyticsIndexOptions
+      - CreateBucketOptions
+      - CreateCollectionOptions
+      - CreateDatasetOptions
+      - CreateDataverseOptions
+      - CreateLinkAnalyticsOptions
+      - CreatePrimaryQueryIndexOptions
+      - CreateQueryIndexOptions
+      - CreateScopeOptions
+      - DeployFunctionOptions
+      - DisallowQueryingSearchIndexOptions
+      - DisconnectLinkOptions
+      - DropAnalyticsIndexOptions
+      - DropBucketOptions
+      - DropCollectionOptions
+      - DropDatasetOptions
+      - DropDataverseOptions
+      - DropDesignDocumentOptions
+      - DropFunctionOptions
+      - DropGroupOptions
+      - DropLinkAnalyticsOptions
+      - DropPrimaryQueryIndexOptions
+      - DropQueryIndexOptions
+      - DropScopeOptions
+      - DropSearchIndexOptions
+      - DropUserOptions
+      - EventingFunctionOptions
+      - FlushBucketOptions
+      - FreezePlanSearchIndexOptions
+      - FunctionsStatusOptions
+      - GetAllAnalyticsIndexesOptions
+      - GetAllBucketOptions
+      - GetAllDatasetOptions
+      - GetAllDesignDocumentsOptions
+      - GetAllFunctionOptions
+      - GetAllGroupsOptions
+      - GetAllQueryIndexOptions
+      - GetAllScopesOptions
+      - GetAllSearchIndexStatsOptions
+      - GetAllSearchIndexesOptions
+      - GetAllUsersOptions
+      - GetBucketOptions
+      - GetDesignDocumentOptions
+      - GetFunctionOptions
+      - GetGroupOptions
+      - GetLinksAnalyticsOptions
+      - GetPendingMutationsOptions
+      - GetRolesOptions
+      - GetSearchIndexOptions
+      - GetSearchIndexStatsOptions
+      - GetSearchIndexedDocumentsCountOptions
+      - GetUserOptions
+      - PauseFunctionOptions
+      - PauseIngestSearchIndexOptions
+      - PublishDesignDocumentOptions
+      - ReplaceLinkAnalyticsOptions
+      - ResumeFunctionOptions
+      - ResumeIngestSearchIndexOptions
+      - UndeployFunctionOptions
+      - UnfreezePlanSearchIndexOptions
+      - UpdateBucketOptions
+      - UpdateCollectionOptions
+      - UpsertDesignDocumentOptions
+      - UpsertFunctionOptions
+      - UpsertGroupOptions
+      - UpsertSearchIndexOptions
+      - UpsertUserOptions
+      - WatchQueryIndexOptions
+    compat: []
+  txcouchbase.management.queries:
+    public:
+      - QueryIndex
+      - QueryIndexManager
+    compat: []
+  txcouchbase.management.search:
+    public:
+      - ScopeSearchIndexManager
+      - SearchIndex
+      - SearchIndexManager
+    compat: []
+  txcouchbase.management.users:
+    public:
+      - Group
+      - Origin
+      - Role
+      - RoleAndDescription
+      - RoleAndOrigins
+      - User
+      - UserAndMetadata
+      - UserManager
+    compat: []
+  txcouchbase.management.views:
+    public:
+      - DesignDocument
+      - DesignDocumentNamespace
+      - View
+      - ViewIndexManager
+    compat: []
+  txcouchbase.mutation_state:
+    public:
+      - MutationState
+    compat: []
+  txcouchbase.n1ql:
+    public:
+      - QueryError
+      - QueryMetaData
+      - QueryMetrics
+      - QueryProfile
+      - QueryScanConsistency
+      - QueryStatus
+      - QueryWarning
+    compat: []
+  txcouchbase.observability:
+    public:
+      - get_otel_meter
+      - get_otel_tracer
+    compat: []
+  txcouchbase.observability.metrics:
+    public:
+      - Meter
+      - ValueRecorder
+    compat: []
+  txcouchbase.observability.otel_metrics:
+    public:
+      - OtelWrapperMeter
+      - OtelWrapperValueRecorder
+      - get_otel_meter
+    compat: []
+  txcouchbase.observability.otel_tracing:
+    public:
+      - OtelWrapperSpan
+      - OtelWrapperTracer
+      - get_otel_tracer
+    compat: []
+  txcouchbase.observability.tracing:
+    public:
+      - RequestSpan
+      - RequestTracer
+      - SpanAttributeValue
+      - SpanAttributes
+      - SpanStatusCode
+    compat: []
+  txcouchbase.options:
+    public:
+      - AcceptableInts
+      - AnalyticsOptions
+      - AppendMultiOptions
+      - AppendOptions
+      - CONFIG_PROFILES
+      - ClusterMetricsOptions
+      - ClusterOptions
+      - ClusterOrphanReportingOptions
+      - ClusterTimeoutOptions
+      - ClusterTracingOptions
+      - Compression
+      - ConfigProfile
+      - ConfigProfiles
+      - ConstrainedInt
+      - DecrementMultiOptions
+      - DecrementOptions
+      - DeltaValue
+      - DiagnosticsOptions
+      - ExistsMultiOptions
+      - ExistsOptions
+      - GetAllReplicasMultiOptions
+      - GetAllReplicasOptions
+      - GetAndLockMultiOptions
+      - GetAndLockOptions
+      - GetAndTouchOptions
+      - GetAnyReplicaMultiOptions
+      - GetAnyReplicaOptions
+      - GetMultiOptions
+      - GetOptions
+      - IncrementMultiOptions
+      - IncrementOptions
+      - InsertMultiOptions
+      - InsertOptions
+      - IpProtocol
+      - KnownConfigProfiles
+      - LockMode
+      - LockMultiOptions
+      - LookupInAllReplicasOptions
+      - LookupInAnyReplicaOptions
+      - LookupInOptions
+      - MutateInOptions
+      - MutationMultiOptions
+      - MutationOptions
+      - NoValueMultiOptions
+      - OptionValidationMode
+      - PingOptions
+      - PrependMultiOptions
+      - PrependOptions
+      - QueryOptions
+      - RemoveMultiOptions
+      - RemoveOptions
+      - ReplaceMultiOptions
+      - ReplaceOptions
+      - ScanOptions
+      - SearchOptions
+      - SignedInt64
+      - TLSVerifyMode
+      - TouchMultiOptions
+      - TouchOptions
+      - TransactionConfig
+      - TransactionGetMultiOptions
+      - TransactionGetMultiReplicasFromPreferredServerGroupOptions
+      - TransactionGetOptions
+      - TransactionGetReplicaFromPreferredServerGroupOptions
+      - TransactionInsertOptions
+      - TransactionOptions
+      - TransactionQueryOptions
+      - TransactionReplaceOptions
+      - UnlockMultiOptions
+      - UnlockOptions
+      - UnsignedInt32
+      - UnsignedInt64
+      - UpsertMultiOptions
+      - UpsertOptions
+      - VectorSearchOptions
+      - ViewOptions
+      - WaitUntilReadyOptions
+      - WanDevelopmentProfile
+    compat:
+      - forward_args
+      - get_valid_args
+      - get_valid_multi_args
+  txcouchbase.otel_tracer:
+    public:
+      - CouchbaseOtelSpan
+      - CouchbaseOtelTracer
+    compat: []
+  txcouchbase.protocol:
+    public: []
+    compat: []
+  txcouchbase.protocol.classic:
+    public: []
+    compat: []
+  txcouchbase.replica_reads:
+    public:
+      - ReadPreference
+    compat: []
+  txcouchbase.result:
+    public:
+      - AnalyticsResult
+      - ClusterInfoResult
+      - ContentProxy
+      - ContentSubdocProxy
+      - CounterResult
+      - DiagnosticsResult
+      - ExistsResult
+      - GetReplicaResult
+      - GetResult
+      - LookupInReplicaResult
+      - LookupInResult
+      - MultiCounterResult
+      - MultiExistsResult
+      - MultiGetReplicaResult
+      - MultiGetResult
+      - MultiMutationResult
+      - MultiResult
+      - MultiResultType
+      - MutateInResult
+      - MutationResult
+      - MutationToken
+      - OperationResult
+      - PingResult
+      - QueryResult
+      - Result
+      - ScanResult
+      - SearchResult
+      - ValueResult
+      - ViewResult
+    compat: []
+  txcouchbase.scope:
+    public:
+      - Scope
+      - TxScope
+    compat: []
+  txcouchbase.search:
+    public:
+      - BooleanFieldQuery
+      - BooleanQuery
+      - ConjunctionQuery
+      - DateFacet
+      - DateRangeQuery
+      - DisjunctionQuery
+      - DocIdQuery
+      - Facet
+      - GeoBoundingBoxQuery
+      - GeoDistanceQuery
+      - GeoPolygonQuery
+      - HighlightStyle
+      - MatchAllQuery
+      - MatchNoneQuery
+      - MatchOperator
+      - MatchPhraseQuery
+      - MatchQuery
+      - NumericFacet
+      - NumericRangeQuery
+      - PhraseQuery
+      - PrefixQuery
+      - QueryStringQuery
+      - RawQuery
+      - RegexQuery
+      - SearchDateRangeFacet
+      - SearchFacetResult
+      - SearchMetaData
+      - SearchMetrics
+      - SearchNumericRangeFacet
+      - SearchQuery
+      - SearchRequest
+      - SearchRow
+      - SearchRowFields
+      - SearchRowLocation
+      - SearchRowLocations
+      - SearchScanConsistency
+      - SearchTermFacet
+      - Sort
+      - SortField
+      - SortGeoDistance
+      - SortID
+      - SortScore
+      - TermFacet
+      - TermQuery
+      - TermRangeQuery
+      - WildcardQuery
+    compat: []
+  txcouchbase.search_scoring:
+    public:
+      - ReciprocalRankFusion
+      - RelativeScoreFusion
+      - ScoringNone
+      - SearchScoring
+    compat: []
+  txcouchbase.serializer:
+    public:
+      - DefaultJsonSerializer
+      - Serializer
+    compat: []
+  txcouchbase.subdocument:
+    public:
+      - ArrayValues
+      - LookupInMacro
+      - MutationMacro
+      - Spec
+      - StoreSemantics
+      - SubDocOp
+      - SubDocStatus
+      - array_addunique
+      - array_append
+      - array_insert
+      - array_prepend
+      - convert_macro_cas_to_cas
+      - count
+      - counter
+      - decrement
+      - exists
+      - get
+      - get_full
+      - increment
+      - insert
+      - remove
+      - replace
+      - upsert
+      - with_expiry
+    compat: []
+  txcouchbase.transcoder:
+    public:
+      - JSONTranscoder
+      - LegacyTranscoder
+      - RawBinaryTranscoder
+      - RawJSONTranscoder
+      - RawStringTranscoder
+      - Transcoder
+    compat: []
+  txcouchbase.vector_search:
+    public:
+      - VectorQuery
+      - VectorQueryCombination
+      - VectorSearch
+    compat: []
+  txcouchbase.views:
+    public:
+      - ViewErrorMode
+      - ViewMetaData
+      - ViewOrdering
+      - ViewRow
+      - ViewScanConsistency
+    compat: []
+
+# Per public couchbase module outside common/, what each other API has at its path: own, a module
+# the API writes; shim, one tools/check_public_api.py --write renders from the entry above; or none,
+# with the reason.  Calls confirmed 2026-10-08.
+counterparts:
+  couchbase:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.analytics:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.auth:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.binary_collection:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.bucket:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.cluster:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.collection:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.constants:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.datastructures:
+    acouchbase: own
+    txcouchbase: 'none: Twisted has no datastructures'
+  couchbase.diagnostics:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.durability:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.encryption:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.encryption.crypto_manager:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.encryption.decrypter:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.encryption.encrypter:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.encryption.encryption_result:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.encryption.key:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.encryption.keyring:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.exceptions:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.kv_range_scan:
+    acouchbase: shim
+    txcouchbase: 'none: Twisted has no range scan'
+  couchbase.management:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.management.analytics:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.management.buckets:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.management.collections:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.management.eventing:
+    acouchbase: own
+    txcouchbase: 'none: Twisted has no eventing function manager'
+  couchbase.management.options:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.management.queries:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.management.search:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.management.users:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.management.views:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.metrics:
+    acouchbase: 'none: publishes nothing; its deprecated classes stay on couchbase alone'
+    txcouchbase: 'none: publishes nothing; its deprecated classes stay on couchbase alone'
+  couchbase.mutation_state:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.n1ql:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.observability:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.observability.metrics:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.observability.otel_metrics:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.observability.otel_tracing:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.observability.tracing:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.options:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.otel_tracer:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.protocol:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.protocol.classic:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.replica_reads:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.result:
+    acouchbase: own
+    txcouchbase: shim
+  couchbase.scope:
+    acouchbase: own
+    txcouchbase: own
+  couchbase.search:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.search_scoring:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.serializer:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.subdocument:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.tracing:
+    acouchbase: 'none: publishes nothing; its deprecated classes stay on couchbase alone'
+    txcouchbase: 'none: publishes nothing; its deprecated classes stay on couchbase alone'
+  couchbase.transactions:
+    acouchbase: shim
+    txcouchbase: 'none: Twisted has no transactions'
+  couchbase.transactions.transaction_get_result:
+    acouchbase: shim
+    txcouchbase: 'none: Twisted has no transactions'
+  couchbase.transactions.transaction_keyspace:
+    acouchbase: shim
+    txcouchbase: 'none: Twisted has no transactions'
+  couchbase.transactions.transaction_query_results:
+    acouchbase: shim
+    txcouchbase: 'none: Twisted has no transactions'
+  couchbase.transactions.transaction_result:
+    acouchbase: shim
+    txcouchbase: 'none: Twisted has no transactions'
+  couchbase.transactions.transactions:
+    acouchbase: own
+    txcouchbase: 'none: Twisted has no transactions'
+  couchbase.transactions.transactions_get_multi:
+    acouchbase: shim
+    txcouchbase: 'none: Twisted has no transactions'
+  couchbase.transcoder:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.vector_search:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.views:
+    acouchbase: shim
+    txcouchbase: shim

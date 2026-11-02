@@ -5,6 +5,7 @@ autopep8==2.3.2
 isort==5.13.2
 mypy~=2.3
 pre-commit~=4.2.0
+ruff==0.16.9
 Faker~=37.1
 faker-vehicle~=0.2
 pytest~=8.3.5

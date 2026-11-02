@@ -42,7 +42,7 @@ package_data = {}
 # some more Windows tomfoolery...
 if platform.system() == 'Windows':
     # glob so both build modes match: _core.pyd (abi3) and _core.cp3XY-win_amd64.pyd
-    package_data = {'couchbase.protocol.classic._pycbc_core': ['_core*.pyd']}
+    package_data['couchbase.protocol.classic._pycbc_core'] = ['_core*.pyd']
 
 # request installing cmake from PyPI if no CMake executable was found.
 # otherwise, we want to use the system executable.

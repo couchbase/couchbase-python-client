@@ -1,0 +1,3 @@
+# Written by tools/check_binding_free_imports.py --update.  One line per module outside
+# the classic protocol that still cannot be imported without the native extension.
+# A line leaves when its module imports.

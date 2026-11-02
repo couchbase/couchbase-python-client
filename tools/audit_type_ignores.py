@@ -43,9 +43,6 @@ from __future__ import annotations
 import pathlib
 import re
 import sys
-from typing import (List,
-                    Set,
-                    Tuple)
 
 # The trees audited, relative to the repo root.  The same four paths as ``files`` in
 # ``[tool.mypy]``, and a tree renamed in one has to be renamed in the other.
@@ -58,7 +55,7 @@ ROOTS = (
 
 # (path, error code) pairs allowed to carry no PYCBC key.  Add an entry only when no
 # future change could retire the suppression, and comment why.
-STRUCTURAL: Set[Tuple[str, str]] = {
+STRUCTURAL: set[tuple[str, str]] = {
     # Twisted's reactor is installed at runtime and typed as a module, so callLater is
     # invisible to the checker.  Not our code and not our stub, so there is no ticket to
     # point at.  A cast does not work either: zope declares interface methods without
@@ -82,9 +79,8 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # the behaviour under test.  Same shape as the BucketSettings(name=None) entry above:
     # widening the annotation to accept it would be the defect, and a cast would assert the
     # very thing the test disproves.
-    ('couchbase/tests/bucket_t.py', 'call-overload'),
-    ('couchbase/tests/cluster_t.py', 'call-overload'),
-    # The inverse of the two entries above, and the reason it is permanent is the same.
+    #
+    # The same two files also carry the inverse, permanent for the same reason.
     # PingOptions.service_types is annotated homogeneous, Iterable[ServiceType] or
     # Iterable[str], because that is what callers should write.  The request builders convert
     # per element, so a mixed iterable works, and test_ping_mixed_services guards that it keeps
@@ -105,17 +101,6 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # where ClusterOptions wants a typed options object: classic refuses the values as it maps
     # them at connect, so the refusal is tested where it happens.  Permanent for the same reason.
     ('couchbase/tests/classic_connect_options_t.py', 'arg-type'),
-    ('couchbase/tests/connection_t.py', 'call-overload'),
-    # tracing_kv_multi_t hands a legacy parent span to two multi option classes, because the
-    # tracer the suite's cluster was built with is what produces the span: under
-    # TracingType.Legacy there is no other kind to hand over, which is also the position a
-    # caller who configured a deprecated tracer is in.  The multi classes annotate parent_span
-    # as RequestSpan because that is what callers should write, while maybe_get_parent_span
-    # accepts the legacy protocol with a deprecation warning, so the combination works and this
-    # suite is what guards that it keeps working.  Same shape as the PingOptions.service_types
-    # entry above: widening the annotation to promise the legacy form is the change nobody
-    # should make, so no ticket retires this; PYCBC-1922 is where the narrow shape was chosen.
-    ('couchbase/tests/tracing_kv_multi_t.py', 'arg-type'),
     # The two search request builder suites pass a SearchRequest to build_search_query_request
     # inside pytest.raises(InvalidArgumentException), because refusing it is the behaviour
     # under test: search() takes a request and search_query() takes a query, and the refusal
@@ -158,7 +143,7 @@ KEY = re.compile(r'PYCBC-\d+')
 class MissingRoots(Exception):
     """Paths in ROOTS that are not directories."""
 
-    def __init__(self, missing: List[str]) -> None:
+    def __init__(self, missing: list[str]) -> None:
         super().__init__(', '.join(missing))
         self.missing = missing
 
@@ -166,7 +151,7 @@ class MissingRoots(Exception):
 class Site:
     """One ``# type: ignore`` occurrence."""
 
-    def __init__(self, path: str, line: int, codes: Tuple[str, ...], key: str | None) -> None:
+    def __init__(self, path: str, line: int, codes: tuple[str, ...], key: str | None) -> None:
         self.path = path
         self.line = line
         # Empty for a bare ignore.
@@ -178,7 +163,7 @@ class Site:
         return f'{where:<50}[{", ".join(self.codes) or "BARE"}]  {self.key or ""}'.rstrip()
 
 
-def collect(roots: Tuple[str, ...]) -> List[Site]:
+def collect(roots: tuple[str, ...]) -> list[Site]:
     """Every ignore in *roots*, in path order.
 
     Done by reading files rather than by shelling out to grep: a long line truncated in a
@@ -192,7 +177,7 @@ def collect(roots: Tuple[str, ...]) -> List[Site]:
     missing = [r for r in roots if not pathlib.Path(r).is_dir()]
     if missing:
         raise MissingRoots(missing)
-    sites: List[Site] = []
+    sites: list[Site] = []
     for root in roots:
         for path in sorted(pathlib.Path(root).rglob('*.py')):
             if SKIP_DIRS.intersection(path.parts):
@@ -207,9 +192,9 @@ def collect(roots: Tuple[str, ...]) -> List[Site]:
     return sites
 
 
-def violations(sites: List[Site]) -> List[Tuple[Site, str]]:
+def violations(sites: list[Site]) -> list[tuple[Site, str]]:
     """The sites that break the rule, each with the reason."""
-    found: List[Tuple[Site, str]] = []
+    found: list[tuple[Site, str]] = []
     for site in sites:
         if not site.codes:
             found.append((site, 'bare: needs a specific error code'))

@@ -1,0 +1,53 @@
+# Read by tools/check_api_parity.py.  One line per intended difference between the three public
+# APIs: `<qualified name or fnmatch pattern>: <why>`.  The name is the one that is absent, or the one
+# that exists on one side only.  A line that matches no difference fails the check, so this file is
+# always the exact list of what differs.
+
+# The multi operations batch synchronous calls; an async caller batches with the event loop.
+acouchbase.collection.AsyncCollection.*_multi: sync only, an async caller gathers single operations
+acouchbase.binary_collection.BinaryCollection.*_multi: sync only, an async caller gathers single operations
+txcouchbase.collection.Collection.*_multi: sync only, an async caller gathers single operations
+txcouchbase.binary_collection.BinaryCollection.*_multi: sync only, an async caller gathers single operations
+
+# The deprecated per-operation datastructure methods were never added to the async APIs.
+acouchbase.collection.AsyncCollection.list_*: deprecated sync only, use CouchbaseList
+acouchbase.collection.AsyncCollection.map_*: deprecated sync only, use CouchbaseMap
+acouchbase.collection.AsyncCollection.set_*: deprecated sync only, use CouchbaseSet
+acouchbase.collection.AsyncCollection.queue_*: deprecated sync only, use CouchbaseQueue
+txcouchbase.collection.Collection.list_*: deprecated sync only
+txcouchbase.collection.Collection.map_*: deprecated sync only
+txcouchbase.collection.Collection.set_*: deprecated sync only
+txcouchbase.collection.Collection.queue_*: deprecated sync only
+
+# Connection lifecycle that only an event loop needs.
+acouchbase.cluster.AsyncCluster.loop: async only, the event loop the cluster runs on
+txcouchbase.cluster.Cluster.loop: async only, the event loop the cluster runs on
+acouchbase.cluster.AsyncCluster.on_connect: async only, awaits the connection the constructor starts
+txcouchbase.cluster.Cluster.on_connect: async only, a Deferred for the connection the constructor starts
+acouchbase.bucket.AsyncBucket.on_connect: async only, awaits the bucket being opened
+txcouchbase.bucket.Bucket.on_connect: async only, a Deferred for the bucket being opened
+acouchbase.scope.AsyncScope.connection: deprecated async only property, goes when it is removed
+
+# txcouchbase covers a subset of the API on purpose.
+txcouchbase.cluster.Cluster.connect: comes in a later change of its own, with the txcouchbase tests regenerated
+txcouchbase.cluster.Cluster.transactions: transactions are not offered on txcouchbase
+txcouchbase.transactions.transactions.*: transactions are not offered on txcouchbase
+txcouchbase.cluster.Cluster.eventing_functions: eventing management is not offered on txcouchbase
+txcouchbase.scope.Scope.eventing_functions: eventing management is not offered on txcouchbase
+txcouchbase.management.eventing.*: eventing management is not offered on txcouchbase
+txcouchbase.cluster.Cluster.set_authenticator: not offered on txcouchbase
+txcouchbase.collection.Collection.scan: range scan is not offered on txcouchbase
+txcouchbase.collection.Collection.query_indexes: collection-level query index management is not offered on txcouchbase
+txcouchbase.management.queries.CollectionQueryIndexManager: collection-level query index management is not offered on txcouchbase
+txcouchbase.collection.Collection.couchbase_*: datastructures are not offered on txcouchbase
+txcouchbase.datastructures.*: datastructures are not offered on txcouchbase
+
+# The bucket opens on the event loop once the cluster is connected, so the call cannot fail the way the
+# synchronous open does; a bucket that cannot be opened fails the first operation awaited on it.
+acouchbase.cluster.AsyncCluster.bucket(raises): async bucket open is deferred to the event loop, nothing raises at the call
+txcouchbase.cluster.Cluster.bucket(raises): async bucket open is deferred to the reactor, nothing raises at the call
+
+# The async cluster info waits for the connection the constructor started, so it cannot fail for being
+# called before it the way the synchronous call does.
+acouchbase.cluster.AsyncCluster.cluster_info(raises): waits for the connection, so no RuntimeError for calling early
+txcouchbase.cluster.Cluster.cluster_info(raises): waits for the connection, so no RuntimeError for calling early
