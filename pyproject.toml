@@ -124,12 +124,6 @@ ignore_errors = true
 module = ["faker.*", "faker_vehicle.*", "faker_vehicle", "xdist.*"]
 ignore_missing_imports = true
 
-# BRIDGE: modules the shared code names for typing only, ahead of the change that adds them.  Each
-# change drops the names it adds.  Removed by PYCBC-2016.
-[[tool.mypy.overrides]]
-module = ["couchbase.common._interfaces.*"]
-ignore_missing_imports = true
-
 [tool.isort]
 multi_line_output = 1
 force_grid_wrap = 3

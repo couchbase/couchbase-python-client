@@ -258,9 +258,3 @@ from couchbase.common.exceptions import XattrInvalidKeyComboException  # noqa: F
 from couchbase.common.exceptions import XattrNoAccessException  # noqa: F401
 from couchbase.common.exceptions import XattrUnknownMacroException  # noqa: F401
 from couchbase.common.exceptions import XattrUnknownVirtualAttributeException  # noqa: F401
-
-# BRIDGE: the old error tables, imported from here by the logic package.  Removed by
-# PYCBC-2016.
-from couchbase.logic._legacy_errors import PYCBC_ERROR_MAP  # noqa: F401, E402
-from couchbase.logic._legacy_errors import ExceptionMap  # noqa: F401, E402
-from couchbase.protocol.classic._error_mapping import ErrorMapper  # noqa: F401, E402

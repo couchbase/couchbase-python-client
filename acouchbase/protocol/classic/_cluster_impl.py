@@ -86,7 +86,6 @@ log = logging.getLogger(__name__)
 
 
 class AsyncClusterImpl:
-
     def __init__(self,
                  connstr: str,
                  *options: ClusterOptions,

@@ -42,7 +42,6 @@ if TYPE_CHECKING:
 
 
 class BucketImpl:
-
     def __init__(self, bucket_name: str, cluster_impl: ClusterImpl) -> None:
         self._bucket_name = bucket_name
         self._client_adapter: ClientAdapter = cluster_impl._client_adapter

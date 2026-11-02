@@ -45,7 +45,6 @@ if TYPE_CHECKING:
 
 
 class AsyncBucketImpl:
-
     def __init__(self, bucket_name: str, cluster_impl: AsyncClusterImpl) -> None:
         self._bucket_name = bucket_name
         self._client_adapter: AsyncClientAdapter = cluster_impl._client_adapter

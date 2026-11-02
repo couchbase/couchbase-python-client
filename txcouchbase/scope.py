@@ -41,7 +41,6 @@ if TYPE_CHECKING:
 
 
 class Scope:
-
     def __init__(self, bucket: TxBucket, scope_name: str):
         self._impl: TxScopeInterface = bucket._impl.scope(scope_name)
 

@@ -97,7 +97,6 @@ def normalize_connection_info(res: dict[str, Any]) -> dict[str, Any]:
 
 
 class ClusterImpl:
-
     def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: object) -> None:
         skip_connect = kwargs.pop('skip_connect', None)
         kwargs['_histogram_factory'] = pycbc_hdr_histogram
