@@ -1,7 +1,4 @@
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING, Any
 
 from .sdk_workload import SdkWorkload
 from .workload import Workload
@@ -18,8 +15,8 @@ class WorkloadBuilder:
     @staticmethod
     def build_workload(workload,  # type: Any
                        run_id,    # type: str
-                       conn=None,  # type: Optional[Union[Cluster, AsyncCluster]]
-                       span_owner=None  # type: Optional[SpanOwner]
+                       conn=None,  # type: Cluster | AsyncCluster | None
+                       span_owner=None  # type: SpanOwner | None
                        ) -> Workload:
         """Factory function, builds and returns the appropriate workload instance.
 

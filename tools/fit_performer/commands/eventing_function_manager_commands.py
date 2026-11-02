@@ -1,11 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import (Iterable,
-                    Optional,
-                    Union)
 
 from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionBucketAccess,
@@ -105,7 +103,7 @@ def _reverse(mapping):
 class EventingFunctionManagerCommandOptions(SdkCommandOptions):
 
     @staticmethod
-    def get_timeout(options) -> Optional[timedelta]:
+    def get_timeout(options) -> timedelta | None:
         # The eventing protocol uses a google.protobuf.Duration rather than the timeout_msecs used elsewhere
         if not options.HasField('timeout'):
             return None
@@ -733,7 +731,7 @@ class UpsertFunctionCommand(SdkCommand):
 class EventingFunctionManagerCommandBuilder:
     @staticmethod
     def build_command(  # noqa: C901
-            eventing_cmd,  # type: Union[eventing_pb.Command | scope_eventing_pb.Command]
+            eventing_cmd,  # type: eventing_pb.Command | scope_eventing_pb.Command
             **cmd_kwargs):
         cmd_type = eventing_cmd.WhichOneof('command')
         if getattr(eventing_cmd, cmd_type).HasField('options'):

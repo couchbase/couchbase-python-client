@@ -1,7 +1,5 @@
 import logging
-from typing import (TYPE_CHECKING,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING
 
 from .multi_process_executor import MultiProcessExecutor
 from .multi_thread_executor import MultiThreadExecutor
@@ -22,8 +20,8 @@ class WorkloadExecutorBuilder:
                        cached_conn,  # type: ConnectionCache
                        stream_owner,  # type: StreamOwner
                        counters,     # type: Counters
-                       span_owner=None,  # type: Optional[SpanOwner]
-                       ) -> Union[MultiProcessExecutor, MultiThreadExecutor]:
+                       span_owner=None,  # type: SpanOwner | None
+                       ) -> MultiProcessExecutor | MultiThreadExecutor:
         """ Factory function, builds and returns the appropriate workload executor instance.
 
         Args:

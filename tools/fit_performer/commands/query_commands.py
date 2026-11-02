@@ -5,7 +5,7 @@ import logging
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from google.protobuf import duration_pb2 as duration
 from google.protobuf import timestamp_pb2 as timestamp
@@ -27,7 +27,7 @@ from .sdk_commands import (SdkCommand,
                            validate_command)
 
 if TYPE_CHECKING:
-    from couchbase._utils import JSONType
+    from couchbase.common._utils import JSONType
     from couchbase.n1ql import (QueryMetaData,
                                 QueryMetrics,
                                 QueryWarning)
@@ -188,7 +188,7 @@ class QueryCommandResult(SdkCommandResult):
     @classmethod
     def to_query_result(cls,
                         query_result,   # type: QueryResult
-                        rows,           # type: List[JSONType]
+                        rows,           # type: list[JSONType]
                         content_as,     # type: content_pb.ContentAs
                         ) -> query_pb.QueryResult:
         """ Converts a Couchbase QueryResult rows and metadata to the equivalent Protobuf QueryResult object
@@ -218,8 +218,8 @@ class QueryCommandResult(SdkCommandResult):
 
     @classmethod
     def to_query_meta_data_warnings(cls,
-                                    warnings,  # type: List[QueryWarning]
-                                    ) -> List[query_pb.QueryWarning]:
+                                    warnings,  # type: list[QueryWarning]
+                                    ) -> list[query_pb.QueryWarning]:
         """ Converts a Couchbase List[QueryWarning] to the equivalent Protobuf List[QueryWarning] object
         """
         return [query_pb.QueryWarning(code=qw.code(), message=qw.message()) for qw in warnings]

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import (Any,
-                    Dict,
-                    Iterable,
-                    Union)
+from typing import Any
 
 import google.protobuf.timestamp_pb2 as timestamp_pb
 
@@ -295,9 +293,9 @@ class DropCollectionCommand(SdkCommand):
 class CollectionManagerCommandBuilder:
     @classmethod
     def _get_collection_settings(cls,
-                                 proto_settings: Union[collection_manager_pb.CreateCollectionSettings,
-                                                       collection_manager_pb.UpdateCollectionSettings]
-                                 ) -> Union[CreateCollectionSettings, UpdateCollectionSettings]:
+                                 proto_settings: (collection_manager_pb.CreateCollectionSettings |
+                                                  collection_manager_pb.UpdateCollectionSettings)
+                                 ) -> CreateCollectionSettings | UpdateCollectionSettings:
         if isinstance(proto_settings, collection_manager_pb.CreateCollectionSettings):
             settings_cls = CreateCollectionSettings
         else:
@@ -312,7 +310,7 @@ class CollectionManagerCommandBuilder:
     @classmethod
     def build_command(cls,
                       coll_mgr_cmd: collection_manager_pb.Command,
-                      **cmd_kwargs: Dict[str, Any]
+                      **cmd_kwargs: dict[str, Any]
                       ) -> SdkCommand:
         cmd_type = coll_mgr_cmd.WhichOneof('command')
         cmd = getattr(coll_mgr_cmd, cmd_type)

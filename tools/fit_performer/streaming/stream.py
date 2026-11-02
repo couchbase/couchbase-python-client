@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from threading import (Event,
                        Lock,
                        Thread)
-from typing import (TYPE_CHECKING,
-                    Iterator,
-                    Union)
+from typing import TYPE_CHECKING
 
 from ..generated.run import top_level_pb2 as run
 from ..generated.shared import exceptions_pb2 as exceptions
@@ -22,7 +21,7 @@ if TYPE_CHECKING:
 class Stream:
     def __init__(self,
                  run_id,  # type: str
-                 results,  # type: Union[mp.SimpleQueue, queue.Queue]
+                 results,  # type: mp.SimpleQueue | queue.Queue
                  stream_type,  # type: streams.Type
                  stream_id,  # type: str
                  on_demand,  # type: bool
@@ -120,7 +119,7 @@ class Stream:
     @classmethod
     def build_stream(cls,
                      run_id,  # type: str
-                     results,  # type: Union[mp.SimpleQueue, queue.Queue]
+                     results,  # type: mp.SimpleQueue | queue.Queue
                      sdk_command,  # type: SdkCommand
                      iterator,  # type: Iterator
                      ) -> Stream:

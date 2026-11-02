@@ -2,7 +2,6 @@ import os
 import tempfile
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Union
 
 from acouchbase.cluster import AsyncCluster
 from couchbase.auth import (CertificateAuthenticator,
@@ -25,10 +24,10 @@ class ConnectionCache:
     options: ClusterOptions = None
     mp_cluster_options: ClusterOptions = None
     obs_config: object = None
-    cluster: Union[AsyncCluster, Cluster] = None
-    tracer: Optional[RequestTracer] = None
+    cluster: AsyncCluster | Cluster = None
+    tracer: RequestTracer | None = None
     tracer_provider: object = None
-    meter: Optional[Meter] = None
+    meter: Meter | None = None
     meter_provider: object = None
 
     def close(self):
@@ -96,7 +95,7 @@ class ClusterConnectOptions:
         return ClusterOptions(**kwargs)
 
     @staticmethod
-    def _get_trust_store_path(config) -> Optional[str]:
+    def _get_trust_store_path(config) -> str | None:
         if config is None:
             return None
 
@@ -117,7 +116,7 @@ class ClusterConnectOptions:
         return path
 
     @staticmethod
-    def create_authenticator(auth_message, trust_store_path: Optional[str] = None):
+    def create_authenticator(auth_message, trust_store_path: str | None = None):
         """Create an authenticator from a proto authenticator message.
 
         This method can be used both during cluster connection and for
@@ -154,7 +153,7 @@ class ClusterConnectOptions:
         raise NotImplementedError(f"Authenticator type '{which_auth}' is not supported.")
 
     @staticmethod
-    def _get_authenticator(request, trust_store_path: Optional[str]):
+    def _get_authenticator(request, trust_store_path: str | None):
         if request.HasField('authenticator'):
             return ClusterConnectOptions.create_authenticator(request.authenticator, trust_store_path)
 

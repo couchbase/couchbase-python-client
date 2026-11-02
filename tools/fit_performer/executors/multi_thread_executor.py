@@ -4,9 +4,7 @@ import logging
 import queue
 import threading
 from concurrent.futures import ThreadPoolExecutor, wait
-from typing import (TYPE_CHECKING,
-                    List,
-                    Optional)
+from typing import TYPE_CHECKING
 
 from ..workloads import WorkloadBuilder
 from .workload_executor import WorkloadExecutor
@@ -18,11 +16,11 @@ if TYPE_CHECKING:
     from ..workloads import Counters, Workload
 
 
-def execute_workload(workloads,  # type: List[Workload]
+def execute_workload(workloads,  # type: list[Workload]
                      counters,  # type: Counters
                      connection,  # type: Cluster
                      results,  # type: queue.Queue
-                     stream_owner,  # type: Optional[StreamOwner]
+                     stream_owner,  # type: StreamOwner | None
                      ) -> None:
     """ Execute the given workloads in the current thread
 

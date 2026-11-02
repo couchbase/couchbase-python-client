@@ -7,9 +7,7 @@ from queue import (Empty,
                    Queue)
 from threading import Timer
 from time import perf_counter_ns
-from typing import (Dict,
-                    Optional,
-                    TypedDict)
+from typing import TypedDict
 
 import psutil
 from google.protobuf import timestamp_pb2 as timestamp
@@ -18,7 +16,7 @@ from ..generated.metrics.top_level_pb2 import Result as MetricsResult
 from ..generated.run.top_level_pb2 import Result
 
 if sys.version_info < (3, 10):
-    from typing_extensions import TypeAlias
+    from typing import TypeAlias
 else:
     from typing import TypeAlias
 
@@ -35,7 +33,7 @@ class ThreadCPU(TypedDict):
     system_time: int
 
 
-threads_cpu: TypeAlias = Dict[int, ThreadCPU]
+threads_cpu: TypeAlias = dict[int, ThreadCPU]
 
 
 class ReportQueue(Queue):
@@ -56,7 +54,7 @@ class MetricsReporter(Timer):
     def __init__(self,
                  run_id: str,
                  interval: float,
-                 proc: Optional[psutil.Process] = None,
+                 proc: psutil.Process | None = None,
                  args=None,
                  kwargs=None):
         super().__init__(interval, self._compute_metrics, args, kwargs)
@@ -82,7 +80,7 @@ class MetricsReporter(Timer):
         cpu_percent = ((delta_cpu * 1000) / time_delta) * 100
         return cpu_percent
 
-    def _calc_proc_threads_cpu_percent(self, t1: threads_cpu, t2: threads_cpu, time_delta: float) -> Dict[str, float]:
+    def _calc_proc_threads_cpu_percent(self, t1: threads_cpu, t2: threads_cpu, time_delta: float) -> dict[str, float]:
         delta_threads = {}
         for tid, cpu in t2.items():
             t1_match = t1.get(tid, None)

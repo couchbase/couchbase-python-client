@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from datetime import date, timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import (TYPE_CHECKING,
-                    Dict,
-                    Iterator,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING
 
 from google.protobuf import timestamp_pb2 as timestamp_pb
 
@@ -189,7 +186,7 @@ class SearchCommandOptions(SdkCommandOptions):
                 if proto_sort.field.HasField('mode'):
                     sort.mode = proto_sort.field.mode
                 if proto_sort.field.HasField('missing'):
-                    sort.mode = proto_sort.field.missing
+                    sort.missing = proto_sort.field.missing
                 res.append(sort)
 
             elif sort_type == 'geo_distance':
@@ -344,8 +341,8 @@ class SearchCommandResult(SdkCommandResult):
                                   result,  # type: SearchResult
                                   initiated,  # type: timestamp_pb.Timestamp
                                   elapsed_nanos,  # type: int
-                                  fields_as=None,  # type: Optional[content_pb.ContentAs]
-                                  ) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+                                  fields_as=None,  # type: content_pb.ContentAs | None
+                                  ) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         logger = logging.getLogger(__name__)
         rows = [cls.to_search_row_result(r, initiated, elapsed_nanos, fields_as=fields_as, return_as_search_row=True)
                 for r in result.rows()]
@@ -375,8 +372,8 @@ class SearchCommandResult(SdkCommandResult):
                                   result,  # type: SearchResult
                                   initiated,  # type: timestamp_pb.Timestamp
                                   stream_id,  # type: str
-                                  fields_as=None,  # type: Optional[content_pb.ContentAs]
-                                  ) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+                                  fields_as=None,  # type: content_pb.ContentAs | None
+                                  ) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         logger = logging.getLogger(__name__)
         iterator = result.rows()
 
@@ -407,10 +404,10 @@ class SearchCommandResult(SdkCommandResult):
                              search_row,  # type: SearchRow
                              initiated,  # type: timestamp_pb.Timestamp
                              elapsed_nanos,  # type: int
-                             stream_id=None,  # type: Optional[str]
-                             fields_as=None,  # type: Optional[content_pb.ContentAs]
-                             return_as_search_row=False  # type: Optional[bool]
-                             ) -> Union[run_pb.Result, search_pb.SearchRow]:
+                             stream_id=None,  # type: str | None
+                             fields_as=None,  # type: content_pb.ContentAs | None
+                             return_as_search_row=False  # type: bool | None
+                             ) -> run_pb.Result | search_pb.SearchRow:
         locations = []
         if search_row.locations is not None:
             for loc in search_row.locations.get_all():
@@ -420,7 +417,7 @@ class SearchCommandResult(SdkCommandResult):
                     position=loc.position,
                     start=loc.start,
                     end=loc.end,
-                    array_positions=[] if loc.array_positions is None else [pos.value for pos in loc.array_positions]
+                    array_positions=[] if loc.array_positions is None else list(loc.array_positions)
                 ))
 
         kwargs = {
@@ -447,11 +444,11 @@ class SearchCommandResult(SdkCommandResult):
 
     @classmethod
     def to_search_facets_result(cls,
-                                search_facets,  # type: Dict[str, SearchFacetResult]
+                                search_facets,  # type: dict[str, SearchFacetResult]
                                 initiated,  # type: timestamp_pb.Timestamp
-                                stream_id=None,  # type: Optional[str]
-                                return_as_search_facets=False,  # type: Optional[bool]
-                                ) -> Union[run_pb.Result, search_pb.SearchFacets]:
+                                stream_id=None,  # type: str | None
+                                return_as_search_facets=False,  # type: bool | None
+                                ) -> run_pb.Result | search_pb.SearchFacets:
         proto_facets = search_pb.SearchFacets()
         for key, facet_result in search_facets.items():
             proto_facets.facets[key].name = facet_result.name
@@ -474,9 +471,9 @@ class SearchCommandResult(SdkCommandResult):
     def to_search_meta_data_result(cls,
                                    search_meta_data,  # type: SearchMetaData
                                    initiated,  # type: timestamp_pb.Timestamp
-                                   stream_id=None,  # type: Optional[str]
-                                   return_as_search_meta_data=False,  # type: Optional[bool]
-                                   ) -> Union[run_pb.Result, search_pb.SearchMetaData]:
+                                   stream_id=None,  # type: str | None
+                                   return_as_search_meta_data=False,  # type: bool | None
+                                   ) -> run_pb.Result | search_pb.SearchMetaData:
 
         metrics = search_meta_data.metrics()
         proto_metrics = None
@@ -846,7 +843,7 @@ class SearchQueryBuilder:
 
     @classmethod
     def build_phrase_query(cls, raw_query):
-        builder = cls(PhraseQuery(*raw_query.terms), raw_query)
+        builder = cls(PhraseQuery(terms=list(raw_query.terms)), raw_query)
         builder.set_primitive_fields('field', 'boost')
         return builder.query
 

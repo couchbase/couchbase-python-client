@@ -7,10 +7,7 @@ import weakref
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from time import sleep
-from typing import (TYPE_CHECKING,
-                    List,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING
 
 from acouchbase.cluster import AsyncCluster
 from couchbase.cluster import Cluster
@@ -129,11 +126,11 @@ def init_process(queue,  # type: mp.Queue
     current_p.set_otel(tracer, tracer_provider, meter, meter_provider, span_contexts or {})
 
 
-def execute_workload(workloads,  # type: List[Workload]
+def execute_workload(workloads,  # type: list[Workload]
                      counters,  # type: Counters
                      hostname,  # type: str
                      options,  # type: ClusterOptions
-                     retries=5  # type: Optional[int]
+                     retries=5  # type: int | None
                      ) -> None:
     """ Execute the given workloads in the current process
 
@@ -228,10 +225,10 @@ class MultiProcessExecutor(WorkloadExecutor):
         self._pool = _CTX.Pool(self._num_workers, initializer=init_process, initargs=args)
 
     def set_connection(self,
-                       conn=None,  # type: Optional[Union[AsyncCluster, Cluster]]
-                       hostname=None,  # type: Optional[str]
-                       options=None,  # type: Optional[ClusterOptions]
-                       retries=5,  # type: Optional[int]
+                       conn=None,  # type: AsyncCluster | Cluster | None
+                       hostname=None,  # type: str | None
+                       options=None,  # type: ClusterOptions | None
+                       retries=5,  # type: int | None
                        ) -> None:
         pass
 

@@ -1,13 +1,10 @@
 from datetime import timedelta
 
 from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, use: from couchbase.options import PingOptions
-from couchbase.bucket import PingOptions
 from couchbase.cluster import Cluster
 from couchbase.diagnostics import PingState, ServiceType
 from couchbase.exceptions import UnAmbiguousTimeoutException
-from couchbase.options import WaitUntilReadyOptions
+from couchbase.options import PingOptions, WaitUntilReadyOptions
 
 
 def ok(cluster):

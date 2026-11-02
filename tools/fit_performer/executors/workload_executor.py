@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 import multiprocessing as mp
 import queue
 from abc import ABC, abstractmethod
-from typing import (TYPE_CHECKING,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 
@@ -21,7 +21,7 @@ class WorkloadExecutor(ABC):
 
     @property
     @abstractmethod
-    def results(self) -> Union[mp.Queue, queue.Queue]:
+    def results(self) -> mp.Queue | queue.Queue:
         raise NotImplementedError('results property must be implemented by concrete class.')
 
     @property
@@ -32,9 +32,9 @@ class WorkloadExecutor(ABC):
     # @TODO:  Would this sort of method be useful?  Ponder...
     @abstractmethod
     def set_connection(self,
-                       conn=None,  # type: Optional[Union[AsyncCluster, Cluster]]
-                       hostname=None,  # type: Optional[str]
-                       options=None,  # type: Optional[ClusterOptions]
+                       conn=None,  # type: AsyncCluster | Cluster | None
+                       hostname=None,  # type: str | None
+                       options=None,  # type: ClusterOptions | None
                        ) -> None:
         raise NotImplementedError('set_connection method must be implemented by concrete class.')
 

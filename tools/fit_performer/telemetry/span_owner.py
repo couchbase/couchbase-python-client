@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Dict, Optional
 
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
@@ -14,10 +13,10 @@ class SpanOwner:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._spans: Dict[str, object] = {}
+        self._spans: dict[str, object] = {}
         self._logger = logging.getLogger(__name__)
 
-    def get_span(self, span_id: str) -> Optional[object]:
+    def get_span(self, span_id: str) -> object | None:
         with self._lock:
             return self._spans.get(span_id)
 
@@ -55,7 +54,7 @@ class SpanOwner:
         with self._lock:
             self._spans.clear()
 
-    def export_contexts(self) -> Dict[str, str]:
+    def export_contexts(self) -> dict[str, str]:
         prop = TraceContextTextMapPropagator()
         result = {}
         with self._lock:
@@ -68,7 +67,7 @@ class SpanOwner:
         return result
 
     @classmethod
-    def from_worker_contexts(cls, span_contexts: Dict[str, str]) -> SpanOwner:
+    def from_worker_contexts(cls, span_contexts: dict[str, str]) -> SpanOwner:
         """Build a SpanOwner populated with remote-parent proxies from W3C traceparents."""
         owner = cls()
         prop = TraceContextTextMapPropagator()

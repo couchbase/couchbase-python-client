@@ -3,15 +3,12 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import Iterable, Iterator
 from datetime import timedelta
 from functools import wraps
 from random import randint
 from time import perf_counter_ns, time
-from typing import (TYPE_CHECKING,
-                    Iterable,
-                    Iterator,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING
 
 from google.protobuf import timestamp_pb2 as timestamp
 
@@ -156,7 +153,7 @@ class KvCommandOptions(SdkCommandOptions):
         return timedelta(seconds=duration.seconds)
 
     @staticmethod
-    def convert_expiry(expiry: basic_pb.Expiry) -> Optional[timedelta]:
+    def convert_expiry(expiry: basic_pb.Expiry) -> timedelta | None:
         exp_type = expiry.WhichOneof("expiryType")
         if exp_type == "relativeSecs":
             return timedelta(seconds=expiry.relativeSecs)
@@ -165,7 +162,7 @@ class KvCommandOptions(SdkCommandOptions):
         return None
 
     @staticmethod
-    def get_expiry(options) -> Optional[timedelta]:
+    def get_expiry(options) -> timedelta | None:
         if not options.HasField("expiry"):
             return None
 
@@ -559,7 +556,7 @@ class KvCommandResult(SdkCommandResult):
                                 initiated: timestamp.Timestamp,
                                 stream_id: str,
                                 content_as: content_pb.ContentAs,
-                                ) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+                                ) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         try:
             iterator = result.rows()
             cnt = 0
@@ -665,7 +662,7 @@ class KvCommandResult(SdkCommandResult):
                                                   initiated: timestamp.Timestamp,
                                                   stream_id: str,
                                                   raw_specs: Iterable[kv_lookup_in_pb.LookupInSpec],
-                                                  ) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+                                                  ) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         try:
             cnt = 0
             while True:
@@ -700,7 +697,7 @@ class KvCommandResult(SdkCommandResult):
                                             initiated: timestamp.Timestamp,
                                             stream_id: str,
                                             content_as: content_pb.ContentAs,
-                                            ) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+                                            ) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         try:
             cnt = 0
             while True:
@@ -1239,7 +1236,7 @@ class ScanCommand(SdkCommand):
         )
 
     @staticmethod
-    def _get_scan_term(term_choice) -> Optional[ScanTerm]:
+    def _get_scan_term(term_choice) -> ScanTerm | None:
         choice_type = term_choice.WhichOneof('choice')
         if choice_type == 'term':
             scan_term = term_choice.term
@@ -1252,7 +1249,7 @@ class ScanCommand(SdkCommand):
             raise ValueError(f"Scan term choice '{choice_type}' not supported")
 
     @KvCommandResult.as_scan_result_stream
-    def execute_command(self) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+    def execute_command(self) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         return self._collection.scan(self._scan_type, self._options)
 
     @staticmethod
@@ -1360,7 +1357,7 @@ class LookupInAllReplicasCommand(SdkCommand):
         return self._stream_config
 
     @KvCommandResult.as_lookup_in_all_replicas_result_stream
-    def execute_command(self) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+    def execute_command(self) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         return self._collection.lookup_in_all_replicas(self._doc_id, self._specs, self._options)
 
     def set_options(self):
@@ -1809,7 +1806,7 @@ class GetAllReplicasCommand(SdkCommand):
         return self._stream_config
 
     @KvCommandResult.as_get_all_replicas_result_stream
-    def execute_command(self) -> Iterator[Union[run_pb.Result, exceptions_pb.Exception]]:
+    def execute_command(self) -> Iterator[run_pb.Result | exceptions_pb.Exception]:
         return self._collection.get_all_replicas(self._doc_id, self._options)
 
     def set_options(self):

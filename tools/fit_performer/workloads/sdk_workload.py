@@ -1,9 +1,6 @@
 import logging
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Iterator,
-                    Optional,
-                    Union)
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 from ..commands import SdkCommandBuilder, SdkCommandResult
 from ..streaming import Stream
@@ -33,8 +30,8 @@ class SdkWorkload(Workload):
         return self._num_commands
 
     def execute(self,
-                results,  # type:  Union[mp.Queue, queue.Queue]
-                stream_owner=None,  # type: Optional[StreamOwner]
+                results,  # type:  mp.Queue | queue.Queue
+                stream_owner=None,  # type: StreamOwner | None
                 ) -> None:
 
         executed_cmd_count = 0
@@ -45,8 +42,8 @@ class SdkWorkload(Workload):
 
     def execute_command(self,
                         command,  # type: Any
-                        results,  # type:  Union[mp.Queue, queue.Queue]
-                        stream_owner=None,  # type: Optional[StreamOwner]
+                        results,  # type:  mp.Queue | queue.Queue
+                        stream_owner=None,  # type: StreamOwner | None
                         ) -> None:
         try:
             sdk_command = SdkCommandBuilder.build_command(self._conn, command, self._counters, self._span_owner)

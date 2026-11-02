@@ -1,7 +1,6 @@
 import logging
 from copy import deepcopy
 from datetime import timedelta
-from typing import Dict
 from uuid import uuid4
 
 import grpc
@@ -63,7 +62,7 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
 
     def __init__(self):
         self._logger: logging.Logger = logging.getLogger()
-        self._conns: Dict[str, ConnectionCache] = {}
+        self._conns: dict[str, ConnectionCache] = {}
         self._stream_owner: StreamOwner = StreamOwner()
         self._span_owner: SpanOwner = SpanOwner()
         # A single counter registry, owned for the performer's lifetime and shared into every run's

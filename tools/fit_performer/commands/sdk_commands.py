@@ -3,14 +3,11 @@ from __future__ import annotations
 import json
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import (Any,
-                    Callable,
-                    Dict,
-                    Iterator,
-                    Union)
+from typing import Any
 
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (AmbiguousTimeoutException,
@@ -64,7 +61,8 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   UserNotFoundException,
                                   ValueTooDeepException,
                                   WatchQueryIndexTimeoutException)
-from couchbase.mutation_state import MutationState, MutationToken
+from couchbase.mutation_state import MutationState
+from couchbase.result import MutationToken
 from couchbase.transcoder import (JSONTranscoder,
                                   LegacyTranscoder,
                                   RawBinaryTranscoder,
@@ -114,7 +112,7 @@ class SdkCommand(ABC):
         raise NotImplementedError('create_command method must be implemented by concrete class.')
 
     @abstractmethod
-    def execute_command(self) -> Union[run_pb.Result, Iterator[Union[run_pb.Result, exceptions_pb.Exception]]]:
+    def execute_command(self) -> run_pb.Result | Iterator[run_pb.Result | exceptions_pb.Exception]:
         """ Execute SdkCommand.
 
         Returns:
@@ -435,8 +433,8 @@ class SdkCommandResult:
         return f"{exc.message} {json.dumps(exc.error_context, cls=SdkErrorContextEncoder)}"
 
 
-def validate_command(validation_dict,  # type: Dict[str, Callable[[Any], bool]]
-                     **kwargs,  # type: Dict[str, Any]
+def validate_command(validation_dict,  # type: dict[str, Callable[[Any], bool]]
+                     **kwargs,  # type: dict[str, Any]
                      ) -> bool:
     """Validate SDK Command options.
 

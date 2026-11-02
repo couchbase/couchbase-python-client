@@ -1,18 +1,11 @@
 import uuid
 
 from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, import ALL options from `couchbase.options`
-from couchbase.cluster import (Cluster,
-                               ClusterOptions,
-                               QueryOptions,
-                               QueryScanConsistency)
+from couchbase.cluster import Cluster
 from couchbase.exceptions import ParsingFailedException
 from couchbase.mutation_state import MutationState
-
-# use this to not have deprecation warnings
-# from couchbase.options import ClusterOptions, QueryOptions
-# from couchbase.n1ql import QueryScanConsistency
+from couchbase.n1ql import QueryScanConsistency
+from couchbase.options import ClusterOptions, QueryOptions
 
 
 def main():

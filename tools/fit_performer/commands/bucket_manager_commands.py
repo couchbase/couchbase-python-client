@@ -4,9 +4,7 @@ import logging
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import (Any,
-                    Dict,
-                    List)
+from typing import Any
 
 import google.protobuf.timestamp_pb2 as timestamp_pb
 
@@ -170,7 +168,7 @@ class BucketManagerCommandResult(SdkCommandResult):
         return bucket_manager_pb.BucketSettings(**kwargs)
 
     @classmethod
-    def to_get_all_buckets_result(cls, sdk_res: List[BucketSettings]):
+    def to_get_all_buckets_result(cls, sdk_res: list[BucketSettings]):
         res = bucket_manager_pb.GetAllBucketsResult()
         for settings in sdk_res:
             res.result[settings.name] = cls.to_bucket_settings(settings)
@@ -371,7 +369,7 @@ class UpdateBucketCommand(SdkCommand):
 
 class BucketManagerCommandBuilder:
     @staticmethod
-    def _get_bucket_settings_kwargs(proto_settings: bucket_manager_pb.BucketSettings) -> Dict[str, Any]:  # noqa: C901
+    def _get_bucket_settings_kwargs(proto_settings: bucket_manager_pb.BucketSettings) -> dict[str, Any]:  # noqa: C901
         kwargs = {
             'name': proto_settings.name,
             'ram_quota_mb': proto_settings.ram_quota_MB,
@@ -422,7 +420,7 @@ class BucketManagerCommandBuilder:
     @classmethod
     def build_command(cls,
                       bucket_mgr_cmd: bucket_manager_pb.Command,
-                      **cmd_kwargs: Dict[str, Any]
+                      **cmd_kwargs: dict[str, Any]
                       ) -> SdkCommand:
         cmd_type = bucket_mgr_cmd.WhichOneof('command')
         cmd = getattr(bucket_mgr_cmd, cmd_type)

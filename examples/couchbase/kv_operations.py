@@ -2,23 +2,21 @@ from datetime import timedelta
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-
-# **DEPRECATED**, import ALL options from `couchbase.options`
-from couchbase.collection import (DecrementOptions,
-                                  DeltaValue,
-                                  GetOptions,
-                                  IncrementOptions,
-                                  InsertOptions,
-                                  RemoveOptions,
-                                  ReplaceOptions,
-                                  SignedInt64,
-                                  UpsertOptions)
 from couchbase.durability import (ClientDurability,
                                   Durability,
                                   PersistTo,
                                   ReplicateTo,
                                   ServerDurability)
 from couchbase.exceptions import CASMismatchException, CouchbaseException
+from couchbase.options import (DecrementOptions,
+                               DeltaValue,
+                               GetOptions,
+                               IncrementOptions,
+                               InsertOptions,
+                               RemoveOptions,
+                               ReplaceOptions,
+                               SignedInt64,
+                               UpsertOptions)
 
 cluster = Cluster(
     "couchbase://localhost",

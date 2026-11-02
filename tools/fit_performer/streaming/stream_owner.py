@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..generated.streams.top_level_pb2 import CancelRequest, RequestItemsRequest
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class StreamOwner:
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self._streams: Dict[str, Stream] = {}
+        self._streams: dict[str, Stream] = {}
 
     def cancel(self,
                request,  # type: CancelRequest

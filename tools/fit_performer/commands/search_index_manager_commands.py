@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from functools import wraps
 from time import perf_counter_ns
-from typing import Iterable
 
 from google.protobuf import timestamp_pb2 as timestamp_pb
 

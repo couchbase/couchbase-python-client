@@ -5,12 +5,6 @@ from couchbase.cluster import Cluster
 from couchbase.exceptions import (QueryIndexAlreadyExistsException,
                                   QueryIndexNotFoundException,
                                   WatchQueryIndexTimeoutException)
-
-# **DEPRECATED**, import ALL management options from `couchbase.management.options`
-# from couchbase.management.queries import (CreatePrimaryQueryIndexOptions,
-#                                           CreateQueryIndexOptions,
-#                                           DropQueryIndexOptions,
-#                                           WatchQueryIndexOptions)
 from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
                                           CreateQueryIndexOptions,
                                           DropQueryIndexOptions,

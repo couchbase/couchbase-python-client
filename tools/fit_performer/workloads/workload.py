@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Optional,
-                    Union)
+from typing import TYPE_CHECKING, Any
 
 from .bounds import build_bounds_executor
 
@@ -25,7 +22,7 @@ class Workload(ABC):
     def __init__(self,
                  workload: Any,
                  run_id: str,
-                 conn: Union[Cluster, AsyncCluster] = None
+                 conn: Cluster | AsyncCluster = None
                  ):
         """ Initialize a workload instance.
 
@@ -42,8 +39,8 @@ class Workload(ABC):
         self._logger = logging.getLogger(__name__)
 
         # The workload's counters & bounds, set via set_counters_and_bounds.
-        self._bounds: Optional[BoundsExecutor] = None
-        self._counters: Optional[Counters] = None
+        self._bounds: BoundsExecutor | None = None
+        self._counters: Counters | None = None
 
     @property
     @abstractmethod
@@ -54,7 +51,7 @@ class Workload(ABC):
 
     @abstractmethod
     def set_connection(self,
-                       connection  # type: Union[Cluster, AsyncCluster]
+                       connection  # type: Cluster | AsyncCluster
                        ) -> None:
         """ Set a workload's connection.
 
@@ -70,8 +67,8 @@ class Workload(ABC):
 
     @abstractmethod
     def execute(self,
-                results,  # type:  Union[mp.Queue, queue.Queue]
-                stream_owner=None,  # type: Optional[StreamOwner]
+                results,  # type:  mp.Queue | queue.Queue
+                stream_owner=None,  # type: StreamOwner | None
                 ) -> None:
         """ Execute a workload.
 

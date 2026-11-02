@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from google.protobuf import timestamp_pb2 as timestamp
 
@@ -174,7 +174,7 @@ class QueryIndexManagerCommandResult(SdkCommandResult):
 
     @classmethod
     def to_query_indexes(cls,
-                         sdk_query_indexes  # type: List[QueryIndex]
+                         sdk_query_indexes  # type: list[QueryIndex]
                          ) -> query_index_manager_pb.QueryIndexes:
         return query_index_manager_pb.QueryIndexes(
             indexes=[cls.to_query_index(sdk_index) for sdk_index in sdk_query_indexes]
