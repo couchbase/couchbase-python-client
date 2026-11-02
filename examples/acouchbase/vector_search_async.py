@@ -5,15 +5,15 @@ import pathlib
 from typing import List, Optional
 from uuid import uuid4
 
-import couchbase.search as search
+import acouchbase.search as search
 from acouchbase import get_event_loop
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import AsyncCluster
 from acouchbase.collection import AsyncCollection
-from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import DocumentNotFoundException, QueryIndexAlreadyExistsException
-from couchbase.management.search import SearchIndex
-from couchbase.options import ClusterOptions, SearchOptions
-from couchbase.vector_search import VectorQuery, VectorSearch
+from acouchbase.exceptions import DocumentNotFoundException, QueryIndexAlreadyExistsException
+from acouchbase.management.search import SearchIndex
+from acouchbase.options import ClusterOptions, SearchOptions
+from acouchbase.vector_search import VectorQuery, VectorSearch
 
 # NOTE:  These paths should be updated accordingly if going to use.  The paths are currently setup for running w/in
 #        the couchbase-python-client root directory.

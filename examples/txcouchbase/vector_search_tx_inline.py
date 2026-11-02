@@ -10,14 +10,16 @@ from uuid import uuid4
 
 from twisted.internet import reactor, defer, task
 
-import couchbase.search as search
-from couchbase.auth import PasswordAuthenticator
+import txcouchbase.search as search
+from txcouchbase.auth import PasswordAuthenticator
 from txcouchbase.cluster import TxCluster
 from txcouchbase.collection import TxCollection
-from couchbase.exceptions import DocumentNotFoundException, QueryIndexAlreadyExistsException, CouchbaseException
-from couchbase.management.search import SearchIndex
-from couchbase.options import ClusterOptions, SearchOptions
-from couchbase.vector_search import VectorQuery, VectorSearch
+from txcouchbase.exceptions import (CouchbaseException,
+                                    DocumentNotFoundException,
+                                    QueryIndexAlreadyExistsException)
+from txcouchbase.management.search import SearchIndex
+from txcouchbase.options import ClusterOptions, SearchOptions
+from txcouchbase.vector_search import VectorQuery, VectorSearch
 
 # NOTE:  These paths should be updated accordingly if going to use.  The paths are currently setup for running w/in
 #        the couchbase-python-client root directory.

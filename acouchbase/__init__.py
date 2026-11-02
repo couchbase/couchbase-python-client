@@ -13,9 +13,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+__all__ = [
+    'configure_logging',
+    'couchbase_loop_factory',
+    'enable_protocol_logger_to_save_network_traffic_to_file',
+    'get_event_loop',
+    'get_metadata',
+    'get_transactions_protocol',
+]
+
 import asyncio
 import selectors
-from typing import Optional
+from typing import TYPE_CHECKING, Any
+
+from couchbase.common._logging import configure_logging, enable_protocol_logger_to_save_network_traffic_to_file
 
 
 class LoopValidator:
@@ -92,7 +103,7 @@ def couchbase_loop_factory() -> asyncio.AbstractEventLoop:
     return asyncio.SelectorEventLoop(selector)
 
 
-def get_event_loop(evloop: Optional[asyncio.AbstractEventLoop] = None) -> asyncio.AbstractEventLoop:
+def get_event_loop(evloop: asyncio.AbstractEventLoop | None = None) -> asyncio.AbstractEventLoop:
     """
     Get an event loop compatible with acouchbase.
 
@@ -100,9 +111,23 @@ def get_event_loop(evloop: Optional[asyncio.AbstractEventLoop] = None) -> asynci
     are not compatible with acouchbase as they don't implement all members in the abstract base class.
 
     Args:
-        evloop (asyncio.AbstractEventLoop, optional): An optional event loop to validate. If not provided, the default event loop will be used.
+        evloop (asyncio.AbstractEventLoop, optional): An optional event loop to validate. If not provided, the default
+            event loop will be used.
 
     Returns:
         The preferred event loop, if compatible, otherwise, a compatible alternative event loop.
-    """  # noqa: E501
+    """
     return LoopValidator.get_event_loop(evloop)
+
+
+if TYPE_CHECKING:
+    from couchbase.protocol.classic._pycbc_core.core_metadata import get_metadata  # noqa: F401
+    from couchbase.protocol.classic._pycbc_core.core_metadata import get_transactions_protocol  # noqa: F401
+
+
+# Read from the C++ core, so they load the binding only when asked for.
+def __getattr__(name: str) -> Any:
+    if name in ('get_metadata', 'get_transactions_protocol'):
+        from couchbase.protocol.classic._pycbc_core import core_metadata
+        return getattr(core_metadata, name)
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

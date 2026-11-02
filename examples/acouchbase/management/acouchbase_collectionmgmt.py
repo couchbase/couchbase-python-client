@@ -1,12 +1,12 @@
 import asyncio
 
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import (CollectionAlreadyExistsException,
-                                  CollectionNotFoundException,
-                                  ScopeAlreadyExistsException,
-                                  ScopeNotFoundException)
-from couchbase.management.collections import CollectionSpec
+from acouchbase.exceptions import (CollectionAlreadyExistsException,
+                                   CollectionNotFoundException,
+                                   ScopeAlreadyExistsException,
+                                   ScopeNotFoundException)
+from acouchbase.management.collections import CollectionSpec
 
 
 async def retry(func, *args, back_off=0.5, limit=5, **kwargs):

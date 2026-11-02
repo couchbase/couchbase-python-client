@@ -1,12 +1,12 @@
 import asyncio
 
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException
-from couchbase.management.buckets import (BucketSettings,
-                                          BucketType,
-                                          ConflictResolutionType,
-                                          CreateBucketSettings)
+from acouchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException
+from acouchbase.management.buckets import (BucketSettings,
+                                           BucketType,
+                                           ConflictResolutionType,
+                                           CreateBucketSettings)
 
 
 async def retry(func, *args, back_off=0.5, limit=5, **kwargs):

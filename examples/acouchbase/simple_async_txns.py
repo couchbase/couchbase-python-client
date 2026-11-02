@@ -3,10 +3,10 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster
-from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import TransactionFailed
-from couchbase.options import ClusterOptions, TransactionConfig
+from acouchbase.exceptions import TransactionFailed
+from acouchbase.options import ClusterOptions, TransactionConfig
 
 if TYPE_CHECKING:
     from acouchbase.transactions import AttemptContext

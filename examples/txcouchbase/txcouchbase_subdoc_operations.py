@@ -6,24 +6,22 @@ import txcouchbase  # nopep8 # isort:skip # noqa: E402, F401
 
 from twisted.internet import defer, reactor
 
-import couchbase.subdocument as SD
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, use from couchbase.options import MutateInOptions
-from couchbase.collection import MutateInOptions
-from couchbase.durability import (ClientDurability,
-                                  Durability,
-                                  PersistTo,
-                                  ReplicateTo,
-                                  ServerDurability)
-from couchbase.exceptions import (CASMismatchException,
-                                  CouchbaseException,
-                                  DocumentExistsException,
-                                  PathExistsException,
-                                  PathNotFoundException,
-                                  SubdocCantInsertValueException,
-                                  SubdocPathMismatchException)
+import txcouchbase.subdocument as SD
+from txcouchbase.auth import PasswordAuthenticator
 from txcouchbase.cluster import Cluster
+from txcouchbase.durability import (ClientDurability,
+                                    Durability,
+                                    PersistTo,
+                                    ReplicateTo,
+                                    ServerDurability)
+from txcouchbase.exceptions import (CASMismatchException,
+                                    CouchbaseException,
+                                    DocumentExistsException,
+                                    PathExistsException,
+                                    PathNotFoundException,
+                                    SubdocCantInsertValueException,
+                                    SubdocPathMismatchException)
+from txcouchbase.options import MutateInOptions
 
 
 JSON_DOC = {

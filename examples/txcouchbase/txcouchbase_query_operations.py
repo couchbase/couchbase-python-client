@@ -6,19 +6,12 @@ import txcouchbase  # nopep8 # isort:skip # noqa: E402, F401
 
 from twisted.internet import defer, reactor
 
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, import ALL options from `couchbase.options`
-from couchbase.cluster import (ClusterOptions,
-                               QueryOptions,
-                               QueryScanConsistency)
-from couchbase.exceptions import ParsingFailedException
-from couchbase.mutation_state import MutationState
+from txcouchbase.auth import PasswordAuthenticator
 from txcouchbase.cluster import Cluster
-
-# use this to not have deprecation warnings
-# from couchbase.options import ClusterOptions, QueryOptions
-# from couchbase.n1ql import QueryScanConsistency
+from txcouchbase.exceptions import ParsingFailedException
+from txcouchbase.mutation_state import MutationState
+from txcouchbase.n1ql import QueryScanConsistency
+from txcouchbase.options import ClusterOptions, QueryOptions
 
 
 @defer.inlineCallbacks

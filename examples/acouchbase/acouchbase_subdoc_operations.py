@@ -1,25 +1,21 @@
 
-# @TODO: change back to subdocument to match 3.x???
-import couchbase.subdocument as SD
+import acouchbase.subdocument as SD
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-
-# import couchbase.subdocument as SD
-# **DEPRECATED**, use from couchbase.options import MutateInOptions
-from couchbase.collection import MutateInOptions
-from couchbase.durability import (ClientDurability,
-                                  Durability,
-                                  PersistTo,
-                                  ReplicateTo,
-                                  ServerDurability)
-from couchbase.exceptions import (CASMismatchException,
-                                  CouchbaseException,
-                                  DocumentExistsException,
-                                  DurabilityImpossibleException,
-                                  PathExistsException,
-                                  PathNotFoundException,
-                                  SubdocCantInsertValueException,
-                                  SubdocPathMismatchException)
+from acouchbase.durability import (ClientDurability,
+                                   Durability,
+                                   PersistTo,
+                                   ReplicateTo,
+                                   ServerDurability)
+from acouchbase.exceptions import (CASMismatchException,
+                                   CouchbaseException,
+                                   DocumentExistsException,
+                                   DurabilityImpossibleException,
+                                   PathExistsException,
+                                   PathNotFoundException,
+                                   SubdocCantInsertValueException,
+                                   SubdocPathMismatchException)
+from acouchbase.options import MutateInOptions
 
 JSON_DOC = {
     "name": "Douglas Reynholm",

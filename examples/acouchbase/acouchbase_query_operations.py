@@ -1,18 +1,11 @@
 import uuid
 
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, import ALL options from `couchbase.options`
-from couchbase.cluster import (ClusterOptions,
-                               QueryOptions,
-                               QueryScanConsistency)
-from couchbase.exceptions import ParsingFailedException
-from couchbase.mutation_state import MutationState
-
-# use this to not have deprecation warnings
-# from couchbase.options import ClusterOptions, QueryOptions
-# from couchbase.n1ql import QueryScanConsistency
+from acouchbase.exceptions import ParsingFailedException
+from acouchbase.mutation_state import MutationState
+from acouchbase.n1ql import QueryScanConsistency
+from acouchbase.options import ClusterOptions, QueryOptions
 
 
 async def main():

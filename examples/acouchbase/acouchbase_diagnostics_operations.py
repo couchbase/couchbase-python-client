@@ -1,13 +1,10 @@
 from datetime import timedelta
 
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, use: from couchbase.options import PingOptions
-from couchbase.bucket import PingOptions
-from couchbase.diagnostics import PingState, ServiceType
-from couchbase.exceptions import UnAmbiguousTimeoutException
-from couchbase.options import WaitUntilReadyOptions
+from acouchbase.diagnostics import PingState, ServiceType
+from acouchbase.exceptions import UnAmbiguousTimeoutException
+from acouchbase.options import PingOptions, WaitUntilReadyOptions
 
 
 async def ok(cluster):

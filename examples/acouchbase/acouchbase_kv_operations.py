@@ -1,25 +1,22 @@
 from datetime import timedelta
 
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, use: from couchbase.options import DeltaValue, SignedInt64
-# **DEPRECATED**, import ALL options from `couchbase.options`
-from couchbase.collection import (DecrementOptions,
-                                  DeltaValue,
-                                  GetOptions,
-                                  IncrementOptions,
-                                  InsertOptions,
-                                  RemoveOptions,
-                                  ReplaceOptions,
-                                  SignedInt64,
-                                  UpsertOptions)
-from couchbase.durability import (ClientDurability,
-                                  Durability,
-                                  PersistTo,
-                                  ReplicateTo,
-                                  ServerDurability)
-from couchbase.exceptions import CASMismatchException, CouchbaseException
+from acouchbase.durability import (ClientDurability,
+                                   Durability,
+                                   PersistTo,
+                                   ReplicateTo,
+                                   ServerDurability)
+from acouchbase.exceptions import CASMismatchException, CouchbaseException
+from acouchbase.options import (DecrementOptions,
+                                DeltaValue,
+                                GetOptions,
+                                IncrementOptions,
+                                InsertOptions,
+                                RemoveOptions,
+                                ReplaceOptions,
+                                SignedInt64,
+                                UpsertOptions)
 
 
 async def main():

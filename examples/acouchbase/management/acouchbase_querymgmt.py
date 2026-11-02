@@ -1,20 +1,14 @@
 from datetime import timedelta
 
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import (QueryIndexAlreadyExistsException,
-                                  QueryIndexNotFoundException,
-                                  WatchQueryIndexTimeoutException)
-
-# **DEPRECATED**, import ALL management options from `couchbase.management.options`
-# from couchbase.management.queries import (CreatePrimaryQueryIndexOptions,
-#                                           CreateQueryIndexOptions,
-#                                           DropQueryIndexOptions,
-#                                           WatchQueryIndexOptions)
-from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
-                                          CreateQueryIndexOptions,
-                                          DropQueryIndexOptions,
-                                          WatchQueryIndexOptions)
+from acouchbase.exceptions import (QueryIndexAlreadyExistsException,
+                                   QueryIndexNotFoundException,
+                                   WatchQueryIndexTimeoutException)
+from acouchbase.management.options import (CreatePrimaryQueryIndexOptions,
+                                           CreateQueryIndexOptions,
+                                           DropQueryIndexOptions,
+                                           WatchQueryIndexOptions)
 
 
 async def main():

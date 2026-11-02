@@ -6,14 +6,11 @@ import txcouchbase  # nopep8 # isort:skip # noqa: E402, F401
 
 from twisted.internet import defer, reactor
 
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, use: from couchbase.options import PingOptions
-from couchbase.bucket import PingOptions
-from couchbase.diagnostics import PingState, ServiceType
-from couchbase.exceptions import UnAmbiguousTimeoutException
-from couchbase.options import WaitUntilReadyOptions
+from txcouchbase.auth import PasswordAuthenticator
 from txcouchbase.cluster import Cluster
+from txcouchbase.diagnostics import PingState, ServiceType
+from txcouchbase.exceptions import UnAmbiguousTimeoutException
+from txcouchbase.options import PingOptions, WaitUntilReadyOptions
 
 
 @defer.inlineCallbacks

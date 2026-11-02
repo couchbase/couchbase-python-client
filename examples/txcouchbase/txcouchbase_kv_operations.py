@@ -6,26 +6,23 @@ import txcouchbase  # nopep8 # isort:skip # noqa: E402, F401
 
 from twisted.internet import defer, reactor
 
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, use: from couchbase.options import DeltaValue, SignedInt64
-# **DEPRECATED**, import ALL options from `couchbase.options`
-from couchbase.collection import (DecrementOptions,
-                                  DeltaValue,
-                                  GetOptions,
-                                  IncrementOptions,
-                                  InsertOptions,
-                                  RemoveOptions,
-                                  ReplaceOptions,
-                                  SignedInt64,
-                                  UpsertOptions)
-from couchbase.durability import (ClientDurability,
-                                  Durability,
-                                  PersistTo,
-                                  ReplicateTo,
-                                  ServerDurability)
-from couchbase.exceptions import CASMismatchException, CouchbaseException
+from txcouchbase.auth import PasswordAuthenticator
 from txcouchbase.cluster import Cluster
+from txcouchbase.durability import (ClientDurability,
+                                    Durability,
+                                    PersistTo,
+                                    ReplicateTo,
+                                    ServerDurability)
+from txcouchbase.exceptions import CASMismatchException, CouchbaseException
+from txcouchbase.options import (DecrementOptions,
+                                 DeltaValue,
+                                 GetOptions,
+                                 IncrementOptions,
+                                 InsertOptions,
+                                 RemoveOptions,
+                                 ReplaceOptions,
+                                 SignedInt64,
+                                 UpsertOptions)
 
 
 @defer.inlineCallbacks

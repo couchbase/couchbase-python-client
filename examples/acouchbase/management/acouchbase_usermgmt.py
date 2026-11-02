@@ -1,10 +1,7 @@
+from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
-
-# **DEPRECATED**, import ALL management options from `couchbase.management.options`
-# from couchbase.management.queries import CreatePrimaryQueryIndexOptions
-from couchbase.management.options import CreatePrimaryQueryIndexOptions
-from couchbase.management.users import Role, User
+from acouchbase.management.options import CreatePrimaryQueryIndexOptions
+from acouchbase.management.users import Role, User
 
 
 async def main():
