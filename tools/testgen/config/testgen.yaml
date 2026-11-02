@@ -156,12 +156,10 @@ suites:
       acouchbase: acouchbase/tests/cluster_additions_t.py
 
   # Only one of connection_t's five classes generates at all.  The four cluster-free classes
-  # drive ClusterSettings, which every tree imports from couchbase.common._cluster_settings,
-  # through three thin constructors that forward *options, **kwargs to it identically.
-  # Generating them would be 125 tests per tree to check three one-line calls, so the file
-  # states that contract once instead, in
-  # ClusterOptionsUnitTests.test_every_api_tree_parses_a_connection_the_same_way, which builds
-  # all three impls from one options object and compares eight settings fields.
+  # call ClusterSettings.build_cluster_settings directly, the parse every tree's cluster runs,
+  # so a generated copy would run identical code.  That every tree's cluster forwards to it
+  # unchanged is stated once, in classic_connect_options_t, which builds all three classic
+  # impls from one options object and compares eight settings fields.
   #
   # ConnectionTestSuite does generate, because what it asserts is what the *core* reports back
   # through the cluster impl's get_connection_info(), and that is per-tree code.  txcouchbase is
@@ -265,14 +263,18 @@ not_generated:
     - couchbase/tests/bucket_settings_req_builder_t.py
     - couchbase/tests/bucketmgmt_bucket_settings_t.py
     - couchbase/tests/classic_bindings_t.py
+    - couchbase/tests/classic_connect_options_t.py
     - couchbase/tests/classic_streaming_t.py
     - couchbase/tests/classic_wire_t.py
+    - couchbase/tests/cluster_options_completeness_t.py
     - couchbase/tests/cluster_req_builder_t.py
+    - couchbase/tests/cluster_result_types_t.py
     - couchbase/tests/collection_req_builder_t.py
     - couchbase/tests/diagnostics_t.py
     - couchbase/tests/env_bringup_t.py
     - couchbase/tests/eventingmgmt_function_types_t.py
     - couchbase/tests/exceptions_t.py
+    - couchbase/tests/impl_registry_t.py
     - couchbase/tests/kv_options_completeness_t.py
     - couchbase/tests/kv_result_types_t.py
     - couchbase/tests/logging_env_t.py
@@ -282,6 +284,7 @@ not_generated:
     - couchbase/tests/no_op_observability_t.py
     - couchbase/tests/option_diagnostics_t.py
     - couchbase/tests/pycbc_core_t.py
+    - couchbase/tests/protocol_gates_t.py
     - couchbase/tests/query_metadata_t.py
     - couchbase/tests/query_params_t.py
     - couchbase/tests/scope_req_builder_t.py
@@ -289,6 +292,7 @@ not_generated:
     - couchbase/tests/search_params_t.py
     - couchbase/tests/search_result_types_t.py
     - couchbase/tests/streaming_rows_t.py
+    - couchbase/tests/supportability_t.py
     - couchbase/tests/threshold_logging_t.py
     - couchbase/tests/view_result_types_t.py
     - couchbase/tests/viewmgmt_view_types_t.py

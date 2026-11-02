@@ -101,6 +101,10 @@ STRUCTURAL: Set[Tuple[str, str]] = {
     # of these annotations to accept the input would be the defect, and a cast would assert
     # exactly what the test exists to disprove.
     ('couchbase/tests/connection_t.py', 'arg-type'),
+    # classic_connect_options_t's timeout and orphan _fail suites do the same with a plain dict
+    # where ClusterOptions wants a typed options object: classic refuses the values as it maps
+    # them at connect, so the refusal is tested where it happens.  Permanent for the same reason.
+    ('couchbase/tests/classic_connect_options_t.py', 'arg-type'),
     ('couchbase/tests/connection_t.py', 'call-overload'),
     # tracing_kv_multi_t hands a legacy parent span to two multi option classes, because the
     # tracer the suite's cluster was built with is what produces the span: under

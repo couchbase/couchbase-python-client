@@ -28,6 +28,8 @@ __all__ = [
 
 from enum import IntEnum
 
+from couchbase.common._supportability import DURABILITY_LEVEL_READ, Supportability
+
 
 class ReplicateTo(IntEnum):
     """
@@ -99,6 +101,11 @@ class DurabilityLevel(IntEnum):
 
     @classmethod
     def from_server_str(cls, value: str) -> DurabilityLevel:
+        """
+        .. deprecated:: 4.7.0
+            The SDK returns a :class:`DurabilityLevel` member wherever it reads a durability level from the server.
+        """
+        Supportability.method_deprecated('from_server_str', message=DURABILITY_LEVEL_READ)
         if value == 'majority_and_persist_to_active':
             return cls.MAJORITY_AND_PERSIST_TO_ACTIVE
         elif value == 'none':

@@ -28,6 +28,8 @@ from couchbase.common.warnings import CouchbaseDeprecationWarning
 _SDK_PACKAGES = frozenset(('couchbase', 'acouchbase', 'txcouchbase'))
 _TEST_PACKAGE = 'tests'
 
+DURABILITY_LEVEL_READ = 'The SDK returns a DurabilityLevel member wherever it reads a durability level from the server.'
+
 _T = TypeVar('_T')
 
 
