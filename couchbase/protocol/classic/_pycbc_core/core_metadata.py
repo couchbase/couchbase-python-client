@@ -15,7 +15,9 @@
 
 
 import json
-from typing import Any
+from typing import (Any,
+                    Literal,
+                    overload)
 
 from couchbase.protocol.classic._pycbc_core import CXXCBC_METADATA
 
@@ -30,6 +32,18 @@ _METADATA_KEYS = [
     'txns_forward_compat_protocol_version',
     'version'
 ]
+
+
+@overload
+def get_metadata(as_str: Literal[False] = False, detailed: bool = False) -> dict[str, Any]: ...
+
+
+@overload
+def get_metadata(as_str: Literal[True], detailed: bool = False) -> str: ...
+
+
+@overload
+def get_metadata(as_str: bool = False, detailed: bool = False) -> dict[str, Any] | str: ...
 
 
 def get_metadata(as_str: bool = False, detailed: bool = False) -> dict[str, Any] | str:

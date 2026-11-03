@@ -53,8 +53,8 @@ if _HAS_OTEL:
         def record_value(self, value: int) -> None:
             # The SDK records value in micros and will place a special __unit tag in the tags set to 's'
             # So self._unit == 's' is indication that we should convert from micros to seconds
-            value = value / 1_000_000 if self._unit == 's' else value
-            self._histogram.record(float(value), attributes=self._attributes)
+            recorded = value / 1_000_000 if self._unit == 's' else float(value)
+            self._histogram.record(recorded, attributes=self._attributes)
 
     class OtelWrapperMeter(Meter):
         """

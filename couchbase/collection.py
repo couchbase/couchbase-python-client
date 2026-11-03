@@ -2213,7 +2213,7 @@ class Collection:
         return CollectionQueryIndexManager(self._impl.query_index_mgmt(), self._impl.bucket_name)
 
     @staticmethod
-    def default_name():
+    def default_name() -> str:
         return "_default"
 
 

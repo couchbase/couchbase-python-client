@@ -1,4 +1,5 @@
 # The public inventory: per public module, its public names and its compat names.
+# docs: true marks a user-facing module, whose public names get a reference page.
 # Public is written to the module's __all__. Compat stays bound at that path and only shrinks.
 # A name in neither list is private or bound only for the module's own use.
 # tools/check_public_api.py holds the tree to it.
@@ -6,6 +7,7 @@
 
 modules:
   acouchbase:
+    docs: true
     public:
       - configure_logging
       - couchbase_loop_factory
@@ -33,21 +35,25 @@ modules:
       - PasswordAuthenticator
     compat: []
   acouchbase.binary_collection:
+    docs: true
     public:
       - BinaryCollection
     compat: []
   acouchbase.bucket:
+    docs: true
     public:
       - AsyncBucket
       - Bucket
     compat: []
   acouchbase.cluster:
+    docs: true
     public:
       - AsyncCluster
       - Cluster
       - get_event_loop
     compat: []
   acouchbase.collection:
+    docs: true
     public:
       - AsyncCollection
       - Collection
@@ -62,6 +68,7 @@ modules:
       - FMT_UTF8
     compat: []
   acouchbase.datastructures:
+    docs: true
     public:
       - CouchbaseList
       - CouchbaseMap
@@ -254,6 +261,7 @@ modules:
     public: []
     compat: []
   acouchbase.management.analytics:
+    docs: true
     public:
       - AnalyticsDataType
       - AnalyticsDataset
@@ -268,6 +276,7 @@ modules:
       - S3ExternalAnalyticsLink
     compat: []
   acouchbase.management.buckets:
+    docs: true
     public:
       - BucketDescribeResult
       - BucketManager
@@ -281,6 +290,7 @@ modules:
       - StorageBackend
     compat: []
   acouchbase.management.collections:
+    docs: true
     public:
       - CollectionManager
       - CollectionSpec
@@ -289,6 +299,7 @@ modules:
       - UpdateCollectionSettings
     compat: []
   acouchbase.management.eventing:
+    docs: true
     public:
       - EventingFunction
       - EventingFunctionBucketAccess
@@ -390,18 +401,21 @@ modules:
       - WatchQueryIndexOptions
     compat: []
   acouchbase.management.queries:
+    docs: true
     public:
       - CollectionQueryIndexManager
       - QueryIndex
       - QueryIndexManager
     compat: []
   acouchbase.management.search:
+    docs: true
     public:
       - ScopeSearchIndexManager
       - SearchIndex
       - SearchIndexManager
     compat: []
   acouchbase.management.users:
+    docs: true
     public:
       - Group
       - Origin
@@ -413,6 +427,7 @@ modules:
       - UserManager
     compat: []
   acouchbase.management.views:
+    docs: true
     public:
       - DesignDocument
       - DesignDocumentNamespace
@@ -564,6 +579,7 @@ modules:
       - ReadPreference
     compat: []
   acouchbase.result:
+    docs: true
     public:
       - AsyncAnalyticsResult
       - AsyncQueryResult
@@ -597,6 +613,7 @@ modules:
       - ValueResult
     compat: []
   acouchbase.scope:
+    docs: true
     public:
       - AsyncScope
       - Scope
@@ -722,6 +739,7 @@ modules:
       - TransactionResult
     compat: []
   acouchbase.transactions.transactions:
+    docs: true
     public:
       - AttemptContext
       - Transactions
@@ -761,6 +779,7 @@ modules:
     compat:
       - ViewQuery
   couchbase:
+    docs: true
     public:
       - configure_logging
       - enable_protocol_logger_to_save_network_traffic_to_file
@@ -768,6 +787,7 @@ modules:
       - get_transactions_protocol
     compat: []
   couchbase.analytics:
+    docs: true
     public:
       - AnalyticsError
       - AnalyticsMetaData
@@ -779,6 +799,7 @@ modules:
       - AnalyticsOptions
       - AnalyticsQuery
   couchbase.auth:
+    docs: true
     public:
       - AuthDomain
       - Authenticator
@@ -787,10 +808,12 @@ modules:
       - PasswordAuthenticator
     compat: []
   couchbase.binary_collection:
+    docs: true
     public:
       - BinaryCollection
     compat: []
   couchbase.bucket:
+    docs: true
     public:
       - Bucket
     compat:
@@ -800,6 +823,7 @@ modules:
       - ViewOrdering
       - ViewScanConsistency
   couchbase.cluster:
+    docs: true
     public:
       - Cluster
     compat:
@@ -812,6 +836,7 @@ modules:
       - QueryProfile
       - QueryScanConsistency
   couchbase.collection:
+    docs: true
     public:
       - Collection
     compat:
@@ -1681,6 +1706,7 @@ modules:
       - FMT_UTF8
     compat: []
   couchbase.datastructures:
+    docs: true
     public:
       - CouchbaseList
       - CouchbaseMap
@@ -1688,6 +1714,7 @@ modules:
       - CouchbaseSet
     compat: []
   couchbase.diagnostics:
+    docs: true
     public:
       - ClusterState
       - EndpointDiagnosticsReport
@@ -1697,6 +1724,7 @@ modules:
       - ServiceType
     compat: []
   couchbase.durability:
+    docs: true
     public:
       - ClientDurability
       - Durability
@@ -1708,6 +1736,7 @@ modules:
       - ServerDurability
     compat: []
   couchbase.encryption:
+    docs: true
     public:
       - CryptoManager
       - Decrypter
@@ -1741,6 +1770,7 @@ modules:
       - Keyring
     compat: []
   couchbase.exceptions:
+    docs: true
     public:
       - AlreadyQueriedException
       - AmbiguousTimeoutException
@@ -1862,6 +1892,7 @@ modules:
       - XattrUnknownVirtualAttributeException
     compat: []
   couchbase.kv_range_scan:
+    docs: true
     public:
       - PrefixScan
       - RangeScan
@@ -1873,6 +1904,7 @@ modules:
     public: []
     compat: []
   couchbase.management.analytics:
+    docs: true
     public:
       - AnalyticsDataType
       - AnalyticsDataset
@@ -1887,6 +1919,7 @@ modules:
       - S3ExternalAnalyticsLink
     compat: []
   couchbase.management.buckets:
+    docs: true
     public:
       - BucketDescribeResult
       - BucketManager
@@ -1900,6 +1933,7 @@ modules:
       - StorageBackend
     compat: []
   couchbase.management.collections:
+    docs: true
     public:
       - CollectionManager
       - CollectionSpec
@@ -1908,6 +1942,7 @@ modules:
       - UpdateCollectionSettings
     compat: []
   couchbase.management.eventing:
+    docs: true
     public:
       - EventingFunction
       - EventingFunctionBucketAccess
@@ -1932,6 +1967,7 @@ modules:
       - ScopeEventingFunctionManager
     compat: []
   couchbase.management.options:
+    docs: true
     public:
       - AllowQueryingSearchIndexOptions
       - AnalyzeDocumentSearchIndexOptions
@@ -2009,18 +2045,21 @@ modules:
       - WatchQueryIndexOptions
     compat: []
   couchbase.management.queries:
+    docs: true
     public:
       - CollectionQueryIndexManager
       - QueryIndex
       - QueryIndexManager
     compat: []
   couchbase.management.search:
+    docs: true
     public:
       - ScopeSearchIndexManager
       - SearchIndex
       - SearchIndexManager
     compat: []
   couchbase.management.users:
+    docs: true
     public:
       - Group
       - Origin
@@ -2032,6 +2071,7 @@ modules:
       - UserManager
     compat: []
   couchbase.management.views:
+    docs: true
     public:
       - DesignDocument
       - DesignDocumentNamespace
@@ -2044,11 +2084,13 @@ modules:
       - CouchbaseMeter
       - CouchbaseValueRecorder
   couchbase.mutation_state:
+    docs: true
     public:
       - MutationState
     compat:
       - MutationToken
   couchbase.n1ql:
+    docs: true
     public:
       - QueryError
       - QueryMetaData
@@ -2060,11 +2102,13 @@ modules:
     compat:
       - N1QLQuery
   couchbase.observability:
+    docs: true
     public:
       - get_otel_meter
       - get_otel_tracer
     compat: []
   couchbase.observability.metrics:
+    docs: true
     public:
       - Meter
       - ValueRecorder
@@ -2082,6 +2126,7 @@ modules:
       - get_otel_tracer
     compat: []
   couchbase.observability.tracing:
+    docs: true
     public:
       - RequestSpan
       - RequestTracer
@@ -2090,6 +2135,7 @@ modules:
       - SpanStatusCode
     compat: []
   couchbase.options:
+    docs: true
     public:
       - AcceptableInts
       - AnalyticsOptions
@@ -2192,10 +2238,12 @@ modules:
     public: []
     compat: []
   couchbase.replica_reads:
+    docs: true
     public:
       - ReadPreference
     compat: []
   couchbase.result:
+    docs: true
     public:
       - AnalyticsResult
       - ClusterInfoResult
@@ -2230,10 +2278,12 @@ modules:
     compat:
       - HttpResult
   couchbase.scope:
+    docs: true
     public:
       - Scope
     compat: []
   couchbase.search:
+    docs: true
     public:
       - BooleanFieldQuery
       - BooleanQuery
@@ -2286,6 +2336,7 @@ modules:
       - SearchOptions
       - SearchQueryBuilder
   couchbase.search_scoring:
+    docs: true
     public:
       - ReciprocalRankFusion
       - RelativeScoreFusion
@@ -2293,11 +2344,13 @@ modules:
       - SearchScoring
     compat: []
   couchbase.serializer:
+    docs: true
     public:
       - DefaultJsonSerializer
       - Serializer
     compat: []
   couchbase.subdocument:
+    docs: true
     public:
       - ArrayValues
       - LookupInMacro
@@ -2331,6 +2384,7 @@ modules:
       - CouchbaseSpan
       - CouchbaseTracer
   couchbase.transactions:
+    docs: true
     public:
       - AttemptContext
       - TransactionGetMultiMode
@@ -2362,6 +2416,7 @@ modules:
       - TransactionResult
     compat: []
   couchbase.transactions.transactions:
+    docs: true
     public:
       - AttemptContext
       - Transactions
@@ -2377,6 +2432,7 @@ modules:
       - TransactionMultiContentProxy
     compat: []
   couchbase.transcoder:
+    docs: true
     public:
       - JSONTranscoder
       - LegacyTranscoder
@@ -2393,12 +2449,14 @@ modules:
       - FMT_PICKLE
       - FMT_UTF8
   couchbase.vector_search:
+    docs: true
     public:
       - VectorQuery
       - VectorQueryCombination
       - VectorSearch
     compat: []
   couchbase.views:
+    docs: true
     public:
       - ViewErrorMode
       - ViewMetaData
@@ -2408,6 +2466,7 @@ modules:
     compat:
       - ViewQuery
   txcouchbase:
+    docs: true
     public:
       - configure_logging
       - enable_protocol_logger_to_save_network_traffic_to_file
@@ -2432,20 +2491,24 @@ modules:
       - PasswordAuthenticator
     compat: []
   txcouchbase.binary_collection:
+    docs: true
     public:
       - BinaryCollection
     compat: []
   txcouchbase.bucket:
+    docs: true
     public:
       - Bucket
       - TxBucket
     compat: []
   txcouchbase.cluster:
+    docs: true
     public:
       - Cluster
       - TxCluster
     compat: []
   txcouchbase.collection:
+    docs: true
     public:
       - Collection
       - TxCollection
@@ -2637,6 +2700,7 @@ modules:
     public: []
     compat: []
   txcouchbase.management.analytics:
+    docs: true
     public:
       - AnalyticsDataType
       - AnalyticsDataset
@@ -2651,6 +2715,7 @@ modules:
       - S3ExternalAnalyticsLink
     compat: []
   txcouchbase.management.buckets:
+    docs: true
     public:
       - BucketDescribeResult
       - BucketManager
@@ -2664,6 +2729,7 @@ modules:
       - StorageBackend
     compat: []
   txcouchbase.management.collections:
+    docs: true
     public:
       - CollectionManager
       - CollectionSpec
@@ -2749,17 +2815,20 @@ modules:
       - WatchQueryIndexOptions
     compat: []
   txcouchbase.management.queries:
+    docs: true
     public:
       - QueryIndex
       - QueryIndexManager
     compat: []
   txcouchbase.management.search:
+    docs: true
     public:
       - ScopeSearchIndexManager
       - SearchIndex
       - SearchIndexManager
     compat: []
   txcouchbase.management.users:
+    docs: true
     public:
       - Group
       - Origin
@@ -2771,6 +2840,7 @@ modules:
       - UserManager
     compat: []
   txcouchbase.management.views:
+    docs: true
     public:
       - DesignDocument
       - DesignDocumentNamespace
@@ -2953,6 +3023,7 @@ modules:
       - ViewResult
     compat: []
   txcouchbase.scope:
+    docs: true
     public:
       - Scope
       - TxScope

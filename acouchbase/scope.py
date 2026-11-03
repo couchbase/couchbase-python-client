@@ -66,20 +66,20 @@ class AsyncScope:
         return self._impl.connection
 
     @property
-    def name(self):
+    def name(self) -> str:
         """
             str: The name of this :class:`~acouchbase.scope.Scope` instance.
         """
         return self._impl.name
 
     @property
-    def bucket_name(self):
+    def bucket_name(self) -> str:
         """
             str: The name of the bucket in which this :class:`~acouchbase.scope.Scope` instance belongs.
         """
         return self._impl.bucket_name
 
-    def collection(self, name) -> Collection:
+    def collection(self, name: str) -> Collection:
         """Creates a :class:`~acouchbase.collection.Collection` instance of the specified collection.
 
         Args:

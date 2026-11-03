@@ -30,7 +30,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (TYPE_CHECKING,
                     Any,
-                    Protocol)
+                    Protocol,
+                    TypeVar,
+                    cast)
 
 from couchbase.common.exceptions import DocumentNotFoundException, InvalidIndexException
 from couchbase.common.transcoder import Transcoder
@@ -38,6 +40,8 @@ from couchbase.common.transcoder import Transcoder
 if TYPE_CHECKING:
     from acouchbase.collection import Collection as AsyncCollection
     from couchbase.collection import Collection
+
+_T = TypeVar('_T')
 
 
 class _GetMultiResultSource(Protocol):
@@ -99,7 +103,7 @@ class TransactionMultiContentProxy:
     def __init__(self, content_as_index: Callable[[int], Any]) -> None:
         self._content_as_index = content_as_index
 
-    def __getitem__(self, type_: Any) -> Callable[[int], Any]:
+    def __getitem__(self, type_: type[_T] | Callable[[Any], _T]) -> Callable[[int], _T]:
         """
 
         Args:
@@ -108,7 +112,8 @@ class TransactionMultiContentProxy:
         Returns:
             the content cast to the given type, if possible
         """
-        return lambda index: type_(self._content_as_index(index))
+        convert = cast(Callable[[Any], _T], type_)
+        return lambda index: convert(self._content_as_index(index))
 
 
 class TransactionGetMultiResult:

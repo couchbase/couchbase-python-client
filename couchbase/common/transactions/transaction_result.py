@@ -22,14 +22,14 @@ class TransactionResult(dict):
 
     @property
     def transaction_id(self) -> str:
-        return self.get("transaction_id", None)
+        return self['transaction_id']
 
     @property
     def unstaging_complete(self) -> bool:
-        return self.get("unstaging_complete", None)
+        return self['unstaging_complete']
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{type(self).__name__}({super().__repr__()})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{type(self).__name__}({super().__str__()})"

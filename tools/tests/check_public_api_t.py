@@ -15,6 +15,8 @@ from tools.check_public_api import (BINDING,
                                     common_problems,
                                     coverage_problems,
                                     defined_names,
+                                    docs_problems,
+                                    documented,
                                     example_api,
                                     example_problems,
                                     import_problems,
@@ -61,6 +63,8 @@ def _write(tmp_path: pathlib.Path, text: str) -> pathlib.Path:
 def test_read_inventory(tmp_path: pathlib.Path) -> None:
     path = _write(tmp_path, 'modules:\n  a.b:\n    public:\n      - X\n      - Y\n    compat: []\n')
     assert read_inventory(path) == {'a.b': Entry(('X', 'Y'), ())}
+    path = _write(tmp_path, 'modules:\n  a.b:\n    docs: true\n    public:\n      - X\n    compat: []\n')
+    assert read_inventory(path) == {'a.b': Entry(('X',), (), docs=True)}
 
 
 @pytest.mark.parametrize('lists, message', [
@@ -68,6 +72,9 @@ def test_read_inventory(tmp_path: pathlib.Path) -> None:
     ('public:\n      - X\n      - X\n    compat: []', 'not sorted'),
     ('public:\n      - _X\n    compat: []', 'underscored'),
     ('public:\n      - X\n    compat:\n      - X', 'both public and compat'),
+    ('doc: true\n    public: []\n    compat: []', r"unknown keys \['doc'\]"),
+    ('docs: false\n    public: []\n    compat: []', 'docs is False; write true, or leave it out'),
+    ('docs: 1\n    public: []\n    compat: []', 'docs is 1'),
 ])
 def test_read_inventory_refuses_a_malformed_entry(tmp_path: pathlib.Path, lists: str, message: str) -> None:
     path = _write(tmp_path, f'modules:\n  a.b:\n    {lists}\n')
@@ -332,6 +339,39 @@ def test_twin_problems_name_a_common_twins_public_name_bound_and_not_listed(tmp_
         "couchbase.thing: binds ['Shared'], public on couchbase.common.thing, and does not list them"]
     inventory['couchbase.thing'] = Entry(('SyncOnly',), ('Shared',))
     assert twin_problems(tree, inventory) == []
+
+
+def test_docs_problems_name_a_flag_where_no_page_belongs() -> None:
+    page, plain = Entry(('X',), (), docs=True), Entry(('X',), ())
+    inventory = {'couchbase.a': page, 'acouchbase.a': page, 'txcouchbase.a': page,
+                 'couchbase.b': page, 'acouchbase.b': plain,
+                 'couchbase.c': plain, 'txcouchbase.c': page,
+                 'couchbase.common.a': page, 'couchbase.protocol.classic': page,
+                 'acouchbase.protocol.classic': page}
+    counterparts = {'couchbase.a': {'acouchbase': 'own', 'txcouchbase': 'shim'},
+                    'couchbase.b': {'acouchbase': 'own', 'txcouchbase': 'none: x'},
+                    'couchbase.c': {'acouchbase': 'none: x', 'txcouchbase': 'own'},
+                    'couchbase.protocol.classic': {'acouchbase': 'shim', 'txcouchbase': 'none: x'}}
+    assert docs_problems(inventory, counterparts) == [
+        "acouchbase.protocol.classic: docs: true on a module that is not own; its names have couchbase's page",
+        'couchbase.common.a: docs: true under common/ or protocol/; flag the module that publishes it',
+        'couchbase.protocol.classic: docs: true under common/ or protocol/; flag the module that publishes it',
+        "txcouchbase.a: docs: true on a module that is not own; its names have couchbase's page",
+        'acouchbase.b: docs: true on one of it and couchbase.b only; flag both or neither',
+        'txcouchbase.c: docs: true on one of it and couchbase.c only; flag both or neither',
+    ]
+    inventory.update({'acouchbase.b': page, 'couchbase.c': page, 'txcouchbase.a': plain,
+                      'couchbase.common.a': plain, 'couchbase.protocol.classic': plain,
+                      'acouchbase.protocol.classic': plain})
+    assert docs_problems(inventory, counterparts) == []
+
+
+def test_documented_follows_each_flagged_name_to_its_definition(tmp_path: pathlib.Path) -> None:
+    tree = _tree(tmp_path, TREE)
+    inventory = {'couchbase.thing': Entry(('Shared', 'SyncOnly', 'Served'), ('Kept',), docs=True),
+                 'couchbase.facade': Entry(('Facade', 'Shared'), ())}
+    assert documented(tree, inventory) == {('couchbase.common.thing', 'Shared'),
+                                           ('couchbase.thing', 'SyncOnly'), ('couchbase.thing', 'Served')}
 
 
 @pytest.mark.parametrize('path, expected', [

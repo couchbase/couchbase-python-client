@@ -115,7 +115,7 @@ class AsyncBucket:
         scope = self.default_scope()
         return scope.collection(collection_name)
 
-    def default_collection(self):
+    def default_collection(self) -> Collection:
         """Creates a :class:`~acouchbase.collection.Collection` instance of the default collection.
 
         Returns:

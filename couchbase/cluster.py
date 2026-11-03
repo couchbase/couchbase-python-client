@@ -48,10 +48,7 @@ if TYPE_CHECKING:
     from couchbase.common._interfaces._cluster import ClusterInterface
     from couchbase.common._utils import JSONType
     from couchbase.options import (AnalyticsOptions,
-                                   ClusterOptions,
-                                   DiagnosticsOptions,
                                    PingOptions,
-                                   QueryOptions,
                                    SearchOptions,
                                    WaitUntilReadyOptions)
     from couchbase.search import SearchQuery, SearchRequest
@@ -253,7 +250,7 @@ class Cluster:
         """
         self._impl.wait_until_ready(timeout, opts, **kwargs)
 
-    def query(self, statement: str, *options: QueryOptions | JSONType, **kwargs: Any) -> QueryResult:
+    def query(self, statement: str, *options: options.QueryOptions | JSONType, **kwargs: Any) -> QueryResult:
         """Executes a N1QL query against the cluster.
 
         .. note::

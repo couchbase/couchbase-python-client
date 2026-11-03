@@ -32,7 +32,6 @@ from couchbase.scope import Scope
 if TYPE_CHECKING:
     from couchbase.cluster import Cluster
     from couchbase.common._interfaces._bucket import BucketInterface
-    from couchbase.options import PingOptions, ViewOptions
 
 
 class Bucket:
@@ -57,7 +56,7 @@ class Bucket:
     def name(self) -> str:
         return self._impl.bucket_name
 
-    def close(self):
+    def close(self) -> None:
         """Shuts down this bucket instance. Cleaning up all resources associated with it.
 
         .. warning::

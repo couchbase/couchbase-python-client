@@ -24,7 +24,9 @@ __all__ = [
 
 import asyncio
 import selectors
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    TypeGuard)
 
 from couchbase.common._logging import configure_logging, enable_protocol_logger_to_save_network_traffic_to_file
 
@@ -51,21 +53,20 @@ class LoopValidator:
             # No event loop exists in the current thread.
             evloop = None
 
-        gen_new_loop = not LoopValidator._is_valid_loop(evloop)
-        if gen_new_loop:
-            # Only attempt to close the loop if it actually exists
-            if evloop is not None and not evloop.is_closed():
-                evloop.close()
+        if LoopValidator._is_valid_loop(evloop):
+            return evloop
 
-            selector = selectors.SelectSelector()
-            new_loop = asyncio.SelectorEventLoop(selector)
-            asyncio.set_event_loop(new_loop)
-            return new_loop
+        # Only attempt to close the loop if it actually exists
+        if evloop is not None and not evloop.is_closed():
+            evloop.close()
 
-        return evloop
+        selector = selectors.SelectSelector()
+        new_loop = asyncio.SelectorEventLoop(selector)
+        asyncio.set_event_loop(new_loop)
+        return new_loop
 
     @staticmethod
-    def _is_valid_loop(evloop: asyncio.AbstractEventLoop) -> bool:
+    def _is_valid_loop(evloop: asyncio.AbstractEventLoop | None) -> TypeGuard[asyncio.AbstractEventLoop]:
         if not evloop:
             return False
         for meth in LoopValidator.REQUIRED_METHODS:
@@ -76,7 +77,7 @@ class LoopValidator:
         return True
 
     @staticmethod
-    def get_event_loop(evloop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
+    def get_event_loop(evloop: asyncio.AbstractEventLoop | None) -> asyncio.AbstractEventLoop:
         if LoopValidator._is_valid_loop(evloop):
             return evloop
         return LoopValidator._get_working_loop()

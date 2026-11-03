@@ -51,6 +51,17 @@ The examples under ``examples/`` are read too, as source.  The check fails on:
     ``acouchbase`` or ``txcouchbase`` directory imports from its own API wherever that API's
     counterpart publishes the name.  So what an example teaches is the supported path.
 
+A module entry may also carry ``docs: true``: the module is user-facing, and its public names get a
+reference page, a docstring and a repr.  ``documented()`` is that set, each name followed to where it
+is defined, so the checks that hold those names to a standard read their scope from here.  The flag
+is ``true`` or absent.  The check fails on:
+
+11. **A flag where no page belongs**: on a ``couchbase`` module under ``common/`` or ``protocol/``, whose
+    names reach a page through the module that publishes them, or on an ``acouchbase`` or
+    ``txcouchbase`` module that is not ``own``, since a shim's names are ``couchbase``'s objects.
+12. **An ``own`` counterpart flagged differently from its ``couchbase`` module.**  So no API's page for a
+    path is missing while another API has one.
+
 The inventory itself must keep each list sorted, with no duplicates, no underscored names and no name
 in both lists.
 
@@ -84,6 +95,7 @@ import yaml
 INVENTORY = pathlib.Path(__file__).with_name('public_api.yaml')
 PACKAGES = ('couchbase', 'acouchbase', 'txcouchbase')
 COMMON = 'couchbase.common'
+PROTOCOL = 'couchbase.protocol'
 BINDING = 'couchbase.protocol.classic._pycbc_core'
 EXCLUDED_DIRS = frozenset({'tests', '_generated'})
 EXAMPLES = 'examples'
@@ -93,6 +105,10 @@ ALLOWED_OUTSIDE_COMMON = frozenset({'couchbase._version'})
 class Entry(NamedTuple):
     public: tuple[str, ...]
     compat: tuple[str, ...]
+    docs: bool = False
+
+    def tiers(self) -> dict[str, tuple[str, ...]]:
+        return {'public': self.public, 'compat': self.compat}
 
 
 def module_name(path: str) -> str:
@@ -127,8 +143,13 @@ def read_inventory(path: pathlib.Path) -> dict[str, Entry]:
     modules = yaml.safe_load(path.read_text())['modules']
     inventory = {}
     for module, lists in modules.items():
-        entry = Entry(tuple(lists['public'] or ()), tuple(lists['compat'] or ()))
-        for tier, names in entry._asdict().items():
+        unknown = sorted(set(lists) - {'public', 'compat', 'docs'})
+        if unknown:
+            raise ValueError(f'{path.name}: {module} has unknown keys {unknown}')
+        if lists.get('docs', True) is not True:
+            raise ValueError(f'{path.name}: {module} docs is {lists["docs"]!r}; write true, or leave it out')
+        entry = Entry(tuple(lists['public'] or ()), tuple(lists['compat'] or ()), 'docs' in lists)
+        for tier, names in entry.tiers().items():
             if list(names) != sorted(set(names)):
                 raise ValueError(f'{path.name}: {module} {tier} is not sorted, or holds a name twice')
             underscored = [n for n in names if n.startswith('_')]
@@ -225,7 +246,7 @@ def module_problems(name: str, entry: Entry) -> list[str]:
         details = [f'{label} {names}' for label, names in (('not public', extra), ('missing', missing),
                                                            ('twice', twice)) if names]
         found.append(f'{name}: __all__ differs from the public list: {"; ".join(details)}')
-    found += [f'{name}.{n}: listed as {tier} and not bound' for tier, names in entry._asdict().items()
+    found += [f'{name}.{n}: listed as {tier} and not bound' for tier, names in entry.tiers().items()
               for n in names if not binds(module, n)]
     return found
 
@@ -333,6 +354,10 @@ class Tree:
 
 def _in_common(module: str) -> bool:
     return module == COMMON or module.startswith(f'{COMMON}.')
+
+
+def _in_protocol(module: str) -> bool:
+    return module == PROTOCOL or module.startswith(f'{PROTOCOL}.')
 
 
 OWN, SHIM, NONE = 'own', 'shim', 'none'
@@ -494,6 +519,35 @@ def coverage_problems(inventory: dict[str, Entry], counterparts: dict[str, dict[
     return found
 
 
+def docs_problems(inventory: dict[str, Entry], counterparts: dict[str, dict[str, str]]) -> list[str]:
+    """``docs: true`` sits only on a module that gets a page, and on every API's own module at a path."""
+    found = []
+    for module, entry in sorted(inventory.items()):
+        api = module.split('.')[0]
+        if not entry.docs:
+            continue
+        if api == 'couchbase' and (_in_common(module) or _in_protocol(module)):
+            found.append(f'{module}: docs: true under common/ or protocol/; flag the module that publishes it')
+        elif api in APIS and counterparts.get(f'couchbase{module[len(api):]}', {}).get(api) != OWN:
+            found.append(f'{module}: docs: true on a module that is not own; its names have couchbase\'s page')
+    for module, apis in sorted(counterparts.items()):
+        for api, kind in sorted(apis.items()):
+            other = twin(api, module)
+            if kind == OWN and module in inventory and other in inventory and (
+                    inventory[module].docs != inventory[other].docs):
+                found.append(f'{other}: docs: true on one of it and {module} only; flag both or neither')
+    return found
+
+
+def documented(tree: Tree, inventory: dict[str, Entry]) -> set[tuple[str, str]]:
+    """Each public name of a ``docs: true`` module, as the module that defines it and the name.
+
+    A name the SDK does not define, as one the native binding serves, is given at the flagged module.
+    """
+    return {(tree.defined_in(module, name) or module, name)
+            for module, entry in inventory.items() if entry.docs for name in entry.public}
+
+
 def agreement_problems(module: str, other: str, shared: Iterable[str], entry: Entry) -> list[str]:
     """``other`` publishes every name it shares with ``module``, as the same object."""
     missing = [n for n in shared if n not in entry.public]
@@ -558,6 +612,7 @@ def counterpart_problems(root: pathlib.Path, inventory: dict[str, Entry],
                          counterparts: dict[str, dict[str, str]]) -> list[str]:
     tree = Tree(root)
     found = coverage_problems(inventory, counterparts) + twin_problems(tree, inventory)
+    found += docs_problems(inventory, counterparts)
     for module, apis in sorted(counterparts.items()):
         for api, kind in sorted(apis.items()):
             other = twin(api, module)

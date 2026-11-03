@@ -44,8 +44,7 @@ import pathlib
 import re
 import sys
 
-# The trees audited, relative to the repo root.  The same four paths as ``files`` in
-# ``[tool.mypy]``, and a tree renamed in one has to be renamed in the other.
+# The test trees, relative to the repo root.
 ROOTS = (
     'tests',
     'couchbase/tests',

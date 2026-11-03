@@ -52,7 +52,8 @@ from dataclasses import (asdict,
 from datetime import datetime
 from typing import (Any,
                     Generic,
-                    TypedDict)
+                    TypedDict,
+                    cast)
 
 if sys.version_info >= (3, 13):
     from typing import TypeVar
@@ -378,6 +379,9 @@ class Result:
         return None
 
 
+_T = TypeVar('_T')
+
+
 class ContentProxy:
     """
     Used to provide access to Result content via Result.content_as[type]
@@ -386,7 +390,7 @@ class ContentProxy:
     def __init__(self, content: Any) -> None:
         self._content = content
 
-    def __getitem__(self, type_: Any) -> Any:
+    def __getitem__(self, type_: type[_T] | Callable[[Any], _T]) -> _T:
         """
 
         Args:
@@ -395,7 +399,7 @@ class ContentProxy:
         Returns:
             the content cast to the given type, if possible
         """
-        return type_(self._content)
+        return cast(Callable[[Any], _T], type_)(self._content)
 
 
 class ContentSubdocProxy:
@@ -410,11 +414,11 @@ class ContentSubdocProxy:
         self._serializer = serializer
         self._fields = fields
 
-    def _parse_content_at_index(self, index: int, type_: Any) -> Any:
+    def _parse_content_at_index(self, index: int, type_: type[_T] | Callable[[Any], _T]) -> _T:
         item = _parse_subdocument_content_as(self._serializer, self._fields, index)
-        return type_(item)
+        return cast(Callable[[Any], _T], type_)(item)
 
-    def __getitem__(self, type_: Any) -> Callable[[int], Any]:
+    def __getitem__(self, type_: type[_T] | Callable[[Any], _T]) -> Callable[[int], _T]:
         """
 
         Args:
@@ -461,9 +465,9 @@ class GetReplicaResult(Result):
         return self._record.is_replica
 
     @property
-    def content_as(self) -> Any:
+    def content_as(self) -> ContentProxy:
         """
-            Any: The contents of the document.
+            :class:`ContentProxy`: The contents of the document.
 
             Get the value as a dict::
 
@@ -517,9 +521,9 @@ class GetResult(Result):
         return _expiry_as_datetime(self._record.expiry)
 
     @property
-    def content_as(self) -> Any:
+    def content_as(self) -> ContentProxy:
         """
-            Any: The contents of the document.
+            :class:`ContentProxy`: The contents of the document.
 
             Get the value as a dict::
 
@@ -864,9 +868,9 @@ class ScanResult(Result):
         return None if body is None else _expiry_as_datetime(body.expiry)
 
     @property
-    def content_as(self) -> Any:
+    def content_as(self) -> ContentProxy:
         """
-            Any: The contents of the document.
+            :class:`ContentProxy`: The contents of the document.
 
             Get the value as a dict::
 

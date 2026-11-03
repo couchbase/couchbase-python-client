@@ -51,7 +51,6 @@ from couchbase.common.observability.tracing import (RequestSpan,
                                                     SpanAttributes,
                                                     SpanAttributeValue,
                                                     SpanStatusCode)
-from couchbase.common.options import ClusterTracingOptions
 
 logger = logging.getLogger('couchbase.threshold')
 
@@ -508,7 +507,7 @@ def _microseconds(settings: Mapping[str, Any], key: str, default: timedelta) -> 
 
 class ThresholdLoggingTracer(RequestTracer):
 
-    def __init__(self, config: ClusterTracingOptions | None = None) -> None:
+    def __init__(self, config: Mapping[str, Any] | None = None) -> None:
         settings: Mapping[str, Any] = config if config is not None else {}
         self._emit_interval = _duration(settings, 'tracing_threshold_queue_flush_interval', timedelta(seconds=10))
         self._sample_size: int = validate_int(settings.get('tracing_threshold_queue_size', 10))

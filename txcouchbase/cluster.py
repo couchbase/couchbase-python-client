@@ -82,7 +82,7 @@ class Cluster:
         """
         return self._impl.close_connection_deferred()
 
-    def bucket(self, bucket_name):
+    def bucket(self, bucket_name: str) -> Bucket:
         """Creates a Bucket instance to a specific bucket.
 
         .. seealso::

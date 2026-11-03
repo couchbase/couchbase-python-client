@@ -145,7 +145,7 @@ def parse_query_string_options(query_str: str) -> tuple[dict[str, Any], dict[str
     options = parse_qs(query_str)
 
     # @TODO:  issue warning if it is overriding cluster options?
-    legacy_query_str_opts = {}
+    legacy_query_str_opts: dict[str, str | list[str]] = {}
     for k, v in options.items():
         if k not in LEGACY_CONNSTR_QUERY_ARGS.keys():
             continue
@@ -235,7 +235,8 @@ def build_authenticator(cluster_opts: dict[str, Any]) -> dict[str, Any]:  # noqa
         if len(sasl_opts) > 1:
             warnings.warn('sasl_mech_force and allowed_sasl_mechanisms are both set; sasl_mech_force applies.',
                           CouchbaseOptionWarning, stacklevel=_caller_stacklevel())
-        mechanisms = sasl_opts.get('sasl_mech_force', sasl_opts.get('allowed_sasl_mechanisms'))
+        mechanisms = (sasl_opts['sasl_mech_force'] if 'sasl_mech_force' in sasl_opts
+                      else sasl_opts['allowed_sasl_mechanisms'])
         authenticator._allowed_sasl_mechanisms = csv_or_list(mechanisms)
 
     if len(auth_kwargs.keys()) > 0:
