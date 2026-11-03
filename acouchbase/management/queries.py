@@ -22,12 +22,21 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.common.management.queries import QueryIndex
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._query_index_mgmt import AsyncQueryIndexMgmtInterface
+    from couchbase.common.management.options import (BuildDeferredQueryIndexOptionsKwargs,
+                                                     CreatePrimaryQueryIndexOptionsKwargs,
+                                                     CreateQueryIndexOptionsKwargs,
+                                                     DropPrimaryQueryIndexOptionsKwargs,
+                                                     DropQueryIndexOptionsKwargs,
+                                                     GetAllQueryIndexOptionsKwargs,
+                                                     WatchQueryIndexOptionsKwargs)
     from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                               CreatePrimaryQueryIndexOptions,
                                               CreateQueryIndexOptions,
@@ -46,7 +55,7 @@ class QueryIndexManager:
                            index_name: str,
                            keys: Iterable[str],
                            options: CreateQueryIndexOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[CreateQueryIndexOptionsKwargs]) -> None:
         """Creates a new query index.
 
         Args:
@@ -68,7 +77,7 @@ class QueryIndexManager:
     async def create_primary_index(self,
                                    bucket_name: str,
                                    options: CreatePrimaryQueryIndexOptions | None = None,
-                                   **kwargs: Any) -> None:
+                                   **kwargs: Unpack[CreatePrimaryQueryIndexOptionsKwargs]) -> None:
         """Creates a new primary query index.
 
         Args:
@@ -88,7 +97,7 @@ class QueryIndexManager:
                          bucket_name: str,
                          index_name: str,
                          options: DropQueryIndexOptions | None = None,
-                         **kwargs: Any) -> None:
+                         **kwargs: Unpack[DropQueryIndexOptionsKwargs]) -> None:
         """Drops an existing query index.
 
         Args:
@@ -109,7 +118,7 @@ class QueryIndexManager:
     async def drop_primary_index(self,
                                  bucket_name: str,
                                  options: DropPrimaryQueryIndexOptions | None = None,
-                                 **kwargs: Any) -> None:
+                                 **kwargs: Unpack[DropPrimaryQueryIndexOptionsKwargs]) -> None:
         """Drops an existing primary query index.
 
         Args:
@@ -128,7 +137,7 @@ class QueryIndexManager:
     async def get_all_indexes(self,
                               bucket_name: str,
                               options: GetAllQueryIndexOptions | None = None,
-                              **kwargs: Any) -> Iterable[QueryIndex]:
+                              **kwargs: Unpack[GetAllQueryIndexOptionsKwargs]) -> Iterable[QueryIndex]:
         """Returns a list of indexes for a specific bucket.
 
         Args:
@@ -149,7 +158,7 @@ class QueryIndexManager:
     async def build_deferred_indexes(self,
                                      bucket_name: str,
                                      options: BuildDeferredQueryIndexOptions | None = None,
-                                     **kwargs: Any) -> None:
+                                     **kwargs: Unpack[BuildDeferredQueryIndexOptionsKwargs]) -> None:
         """Starts building any indexes which were previously created with ``deferred=True``.
 
         Args:
@@ -168,7 +177,7 @@ class QueryIndexManager:
                             bucket_name: str,
                             index_names: Iterable[str],
                             options: WatchQueryIndexOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[WatchQueryIndexOptionsKwargs]) -> None:
         """Waits for a number of indexes to finish creation and be ready to use.
 
         Args:
@@ -197,7 +206,7 @@ class CollectionQueryIndexManager:
                            index_name: str,
                            keys: Iterable[str],
                            options: CreateQueryIndexOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[CreateQueryIndexOptionsKwargs]) -> None:
         """Creates a new query index.
 
         Args:
@@ -214,7 +223,9 @@ class CollectionQueryIndexManager:
         """
         await self._impl.create_index(self._bucket_name, index_name, keys, options, **kwargs)
 
-    async def create_primary_index(self, options: CreatePrimaryQueryIndexOptions | None = None, **kwargs: Any) -> None:
+    async def create_primary_index(self,
+                                   options: CreatePrimaryQueryIndexOptions | None = None,
+                                   **kwargs: Unpack[CreatePrimaryQueryIndexOptionsKwargs]) -> None:
         """Creates a new primary query index.
 
         Args:
@@ -231,7 +242,7 @@ class CollectionQueryIndexManager:
     async def drop_index(self,
                          index_name: str,
                          options: DropQueryIndexOptions | None = None,
-                         **kwargs: Any) -> None:
+                         **kwargs: Unpack[DropQueryIndexOptionsKwargs]) -> None:
         """Drops an existing query index.
 
         Args:
@@ -247,7 +258,9 @@ class CollectionQueryIndexManager:
         """
         await self._impl.drop_index(self._bucket_name, index_name, options, **kwargs)
 
-    async def drop_primary_index(self, options: DropPrimaryQueryIndexOptions | None = None, **kwargs: Any) -> None:
+    async def drop_primary_index(self,
+                                 options: DropPrimaryQueryIndexOptions | None = None,
+                                 **kwargs: Unpack[DropPrimaryQueryIndexOptionsKwargs]) -> None:
         """Drops an existing primary query index.
 
         Args:
@@ -263,7 +276,7 @@ class CollectionQueryIndexManager:
 
     async def get_all_indexes(self,
                               options: GetAllQueryIndexOptions | None = None,
-                              **kwargs: Any) -> Iterable[QueryIndex]:
+                              **kwargs: Unpack[GetAllQueryIndexOptionsKwargs]) -> Iterable[QueryIndex]:
         """Returns a list of indexes for a specific collection.
 
         Args:
@@ -279,7 +292,7 @@ class CollectionQueryIndexManager:
 
     async def build_deferred_indexes(self,
                                      options: BuildDeferredQueryIndexOptions | None = None,
-                                     **kwargs: Any) -> None:
+                                     **kwargs: Unpack[BuildDeferredQueryIndexOptionsKwargs]) -> None:
         """Starts building any indexes which were previously created with ``deferred=True``.
 
         Args:
@@ -294,7 +307,7 @@ class CollectionQueryIndexManager:
     async def watch_indexes(self,
                             index_names: Iterable[str],
                             options: WatchQueryIndexOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[WatchQueryIndexOptionsKwargs]) -> None:
         """Waits for a number of indexes to finish creation and be ready to use.
 
         Args:

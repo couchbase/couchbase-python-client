@@ -45,6 +45,7 @@ from tests.environments.tracing_environment import TracingEnvironment, TracingTy
 from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
 from tests.tracing_validators import KeyValueSpanValidator
+from tests.untyped import untyped_kwargs
 
 # Deliberately the wrong type, and annotated Any so that saying so is the test rather than
 # something the type checker has to be told to ignore.  append and prepend take str or bytes; a
@@ -282,7 +283,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Append, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Append)
-        await cb_env.collection.binary().append(key, b'XXX', span=parent)
+        await cb_env.collection.binary().append(key, b'XXX', **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Append, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -293,7 +294,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Prepend, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Prepend)
-        await cb_env.collection.binary().prepend(key, b'XXX', span=parent)
+        await cb_env.collection.binary().prepend(key, b'XXX', **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Prepend, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -305,7 +306,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Increment, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Increment)
-        await cb_env.collection.binary().increment(key, span=parent)
+        await cb_env.collection.binary().increment(key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Increment, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -317,7 +318,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Decrement, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Decrement)
-        await cb_env.collection.binary().decrement(key, span=parent)
+        await cb_env.collection.binary().decrement(key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Decrement, parent_span=parent)
 
 

@@ -47,8 +47,15 @@ from couchbase.result import (ClusterInfoResult,
                               PingResult)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._cluster import AsyncClusterInterface
     from couchbase.common._utils import JSONType
+    from couchbase.common.options import (ClusterKwargs,
+                                          DiagnosticsOptionsKwargs,
+                                          PingOptionsKwargs,
+                                          SearchOptionsKwargs,
+                                          WaitUntilReadyKwargs)
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    DiagnosticsOptions,
@@ -92,7 +99,7 @@ class AsyncCluster:
 
     """
 
-    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: Any) -> None:
+    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: Unpack[ClusterKwargs]) -> None:
         impl = resolve(ASYNC_CLUSTER, CouchbaseProtocol.from_connstr(connstr))
         self._impl: AsyncClusterInterface = impl(connstr, *options, **kwargs)
 
@@ -198,7 +205,7 @@ class AsyncCluster:
         """
         return await self._impl.get_cluster_info()
 
-    async def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
+    async def ping(self, opts: PingOptions | None = None, **kwargs: Unpack[PingOptionsKwargs]) -> PingResult:
         """Performs a ping operation against the cluster.
 
         The ping operation pings the services which are specified
@@ -215,7 +222,9 @@ class AsyncCluster:
         """
         return await self._impl.ping(opts, **kwargs)
 
-    async def diagnostics(self, opts: DiagnosticsOptions | None = None, **kwargs: Any) -> DiagnosticsResult:
+    async def diagnostics(self,
+                          opts: DiagnosticsOptions | None = None,
+                          **kwargs: Unpack[DiagnosticsOptionsKwargs]) -> DiagnosticsResult:
         """Performs a diagnostic operation against the cluster.
 
         The diagnostic operations returns a report about the current active connections with the cluster.
@@ -234,7 +243,7 @@ class AsyncCluster:
     async def wait_until_ready(self,
                                timeout: timedelta,
                                opts: WaitUntilReadyOptions | None = None,
-                               **kwargs: Any) -> None:
+                               **kwargs: Unpack[WaitUntilReadyKwargs]) -> None:
         """Wait until the cluster is ready for use.
 
             Check the current connections to see if the desired state has been reached.  If not,
@@ -290,7 +299,9 @@ class AsyncCluster:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.QueryOptions`
+                override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             :class:`~acouchbase.result.AsyncQueryResult`: An instance of a
@@ -363,7 +374,9 @@ class AsyncCluster:
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.AnalyticsOptions`
+                override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             :class:`~acouchbase.result.AsyncAnalyticsResult`: An instance of a
@@ -422,7 +435,7 @@ class AsyncCluster:
                      index: str,
                      query: SearchQuery,
                      options: SearchOptions | None = None,
-                     **kwargs: Any) -> AsyncSearchResult:
+                     **kwargs: Unpack[SearchOptionsKwargs]) -> AsyncSearchResult:
         """Executes an search query against the cluster.
 
         .. deprecated:: 4.1.11
@@ -524,7 +537,7 @@ class AsyncCluster:
                index: str,
                request: SearchRequest | SearchQuery,
                options: SearchOptions | None = None,
-               **kwargs: Any) -> AsyncSearchResult:
+               **kwargs: Unpack[SearchOptionsKwargs]) -> AsyncSearchResult:
         """Executes an search against the cluster.
 
         .. note::
@@ -691,7 +704,7 @@ class AsyncCluster:
         return EventingFunctionManager(self._impl.eventing_function_mgmt())
 
     @staticmethod
-    async def connect(connstr: str, *options: ClusterOptions, **kwargs: Any) -> AsyncCluster:
+    async def connect(connstr: str, *options: ClusterOptions, **kwargs: Unpack[ClusterKwargs]) -> AsyncCluster:
         """Create a Couchbase Cluster and connect
 
         Args:

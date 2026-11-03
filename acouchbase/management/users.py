@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.common.management.users import (Group,
                                                Origin,
@@ -38,7 +38,19 @@ from couchbase.common.management.users import (Group,
                                                UserAndMetadata)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._user_mgmt import AsyncUserMgmtInterface
+    from couchbase.common.management.options import (ChangePasswordOptionsKwargs,
+                                                     DropGroupOptionsKwargs,
+                                                     DropUserOptionsKwargs,
+                                                     GetAllGroupsOptionsKwargs,
+                                                     GetAllUsersOptionsKwargs,
+                                                     GetGroupOptionsKwargs,
+                                                     GetRolesOptionsKwargs,
+                                                     GetUserOptionsKwargs,
+                                                     UpsertGroupOptionsKwargs,
+                                                     UpsertUserOptionsKwargs)
     from couchbase.management.options import (ChangePasswordOptions,
                                               DropGroupOptions,
                                               DropUserOptions,
@@ -59,7 +71,7 @@ class UserManager:
     async def get_user(self,
                        username: str,
                        options: GetUserOptions | None = None,
-                       **kwargs: Any) -> UserAndMetadata:
+                       **kwargs: Unpack[GetUserOptionsKwargs]) -> UserAndMetadata:
         """Returns a user by its username.
 
         Args:
@@ -79,7 +91,7 @@ class UserManager:
 
     async def get_all_users(self,
                             options: GetAllUsersOptions | None = None,
-                            **kwargs: Any) -> Iterable[UserAndMetadata]:
+                            **kwargs: Unpack[GetAllUsersOptionsKwargs]) -> Iterable[UserAndMetadata]:
         """Returns a list of all existing users.
 
         Args:
@@ -96,7 +108,7 @@ class UserManager:
     async def upsert_user(self,
                           user: User,
                           options: UpsertUserOptions | None = None,
-                          **kwargs: Any) -> None:
+                          **kwargs: Unpack[UpsertUserOptionsKwargs]) -> None:
         """Creates a new user or updates an existing user.
 
         Args:
@@ -115,7 +127,7 @@ class UserManager:
     async def drop_user(self,
                         username: str,
                         options: DropUserOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[DropUserOptionsKwargs]) -> None:
         """Drops an existing user.
 
         Args:
@@ -133,7 +145,7 @@ class UserManager:
     async def change_password(self,
                               new_password: str,
                               options: ChangePasswordOptions | None = None,
-                              **kwargs: Any) -> None:
+                              **kwargs: Unpack[ChangePasswordOptionsKwargs]) -> None:
         """Changes the password of the currently authenticated user. SDK must be re-started and a new connection
          established after running, as the previous credentials will no longer be valid.
 
@@ -150,7 +162,9 @@ class UserManager:
         """
         await self._impl.change_password(new_password, options, **kwargs)
 
-    async def get_roles(self, options: GetRolesOptions | None = None, **kwargs: Any) -> Iterable[RoleAndDescription]:
+    async def get_roles(self,
+                        options: GetRolesOptions | None = None,
+                        **kwargs: Unpack[GetRolesOptionsKwargs]) -> Iterable[RoleAndDescription]:
         """Returns a list of roles available on the server.
 
         Args:
@@ -167,7 +181,7 @@ class UserManager:
     async def get_group(self,
                         group_name: str,
                         options: GetGroupOptions | None = None,
-                        **kwargs: Any) -> Group:
+                        **kwargs: Unpack[GetGroupOptionsKwargs]) -> Group:
         """Returns a group by it's name.
 
         Args:
@@ -185,7 +199,9 @@ class UserManager:
         """
         return await self._impl.get_group(group_name, options, **kwargs)
 
-    async def get_all_groups(self, options: GetAllGroupsOptions | None = None, **kwargs: Any) -> Iterable[Group]:
+    async def get_all_groups(self,
+                             options: GetAllGroupsOptions | None = None,
+                             **kwargs: Unpack[GetAllGroupsOptionsKwargs]) -> Iterable[Group]:
         """Returns a list of all existing groups.
 
         Args:
@@ -202,7 +218,7 @@ class UserManager:
     async def upsert_group(self,
                            group: Group,
                            options: UpsertGroupOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[UpsertGroupOptionsKwargs]) -> None:
         """Creates a new group or updates an existing group.
 
         Args:
@@ -221,7 +237,7 @@ class UserManager:
     async def drop_group(self,
                          group_name: str,
                          options: DropGroupOptions | None = None,
-                         **kwargs: Any) -> None:
+                         **kwargs: Unpack[DropGroupOptionsKwargs]) -> None:
         """Drops an existing group.
 
         Args:

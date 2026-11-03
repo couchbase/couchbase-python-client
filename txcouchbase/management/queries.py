@@ -21,14 +21,23 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from twisted.internet.defer import Deferred
 
 from couchbase.common.management.queries import QueryIndex
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._query_index_mgmt import TxQueryIndexMgmtInterface
+    from couchbase.common.management.options import (BuildDeferredQueryIndexOptionsKwargs,
+                                                     CreatePrimaryQueryIndexOptionsKwargs,
+                                                     CreateQueryIndexOptionsKwargs,
+                                                     DropPrimaryQueryIndexOptionsKwargs,
+                                                     DropQueryIndexOptionsKwargs,
+                                                     GetAllQueryIndexOptionsKwargs,
+                                                     WatchQueryIndexOptionsKwargs)
     from couchbase.management.options import (BuildDeferredQueryIndexOptions,
                                               CreatePrimaryQueryIndexOptions,
                                               CreateQueryIndexOptions,
@@ -48,7 +57,7 @@ class QueryIndexManager:
                      index_name: str,
                      keys: Iterable[str],
                      options: CreateQueryIndexOptions | None = None,
-                     **kwargs: Any) -> Deferred[None]:
+                     **kwargs: Unpack[CreateQueryIndexOptionsKwargs]) -> Deferred[None]:
         """Creates a new query index.
 
         Args:
@@ -70,7 +79,7 @@ class QueryIndexManager:
     def create_primary_index(self,
                              bucket_name: str,
                              options: CreatePrimaryQueryIndexOptions | None = None,
-                             **kwargs: Any) -> Deferred[None]:
+                             **kwargs: Unpack[CreatePrimaryQueryIndexOptionsKwargs]) -> Deferred[None]:
         """Creates a new primary query index.
 
         Args:
@@ -90,7 +99,7 @@ class QueryIndexManager:
                    bucket_name: str,
                    index_name: str,
                    options: DropQueryIndexOptions | None = None,
-                   **kwargs: Any) -> Deferred[None]:
+                   **kwargs: Unpack[DropQueryIndexOptionsKwargs]) -> Deferred[None]:
         """Drops an existing query index.
 
         Args:
@@ -111,7 +120,7 @@ class QueryIndexManager:
     def drop_primary_index(self,
                            bucket_name: str,
                            options: DropPrimaryQueryIndexOptions | None = None,
-                           **kwargs: Any) -> Deferred[None]:
+                           **kwargs: Unpack[DropPrimaryQueryIndexOptionsKwargs]) -> Deferred[None]:
         """Drops an existing primary query index.
 
         Args:
@@ -130,7 +139,7 @@ class QueryIndexManager:
     def get_all_indexes(self,
                         bucket_name: str,
                         options: GetAllQueryIndexOptions | None = None,
-                        **kwargs: Any) -> Deferred[Iterable[QueryIndex]]:
+                        **kwargs: Unpack[GetAllQueryIndexOptionsKwargs]) -> Deferred[Iterable[QueryIndex]]:
         """Returns a list of indexes for a specific bucket.
 
         Args:
@@ -151,7 +160,7 @@ class QueryIndexManager:
     def build_deferred_indexes(self,
                                bucket_name: str,
                                options: BuildDeferredQueryIndexOptions | None = None,
-                               **kwargs: Any) -> Deferred[None]:
+                               **kwargs: Unpack[BuildDeferredQueryIndexOptionsKwargs]) -> Deferred[None]:
         """Starts building any indexes which were previously created with ``deferred=True``.
 
         Args:
@@ -170,7 +179,7 @@ class QueryIndexManager:
                       bucket_name: str,
                       index_names: Iterable[str],
                       options: WatchQueryIndexOptions | None = None,
-                      **kwargs: Any) -> Deferred[None]:
+                      **kwargs: Unpack[WatchQueryIndexOptionsKwargs]) -> Deferred[None]:
         """Waits for a number of indexes to finish creation and be ready to use.
 
         Args:

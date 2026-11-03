@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.common.management.analytics import (AnalyticsDataset,
                                                    AnalyticsDataType,
@@ -44,7 +44,24 @@ from couchbase.common.management.analytics import (AnalyticsDataset,
                                                    S3ExternalAnalyticsLink)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._analytics_mgmt import AsyncAnalyticsMgmtInterface
+    from couchbase.common.management.options import (ConnectLinkOptionsKwargs,
+                                                     CreateAnalyticsIndexOptionsKwargs,
+                                                     CreateDatasetOptionsKwargs,
+                                                     CreateDataverseOptionsKwargs,
+                                                     CreateLinkAnalyticsOptionsKwargs,
+                                                     DisconnectLinkOptionsKwargs,
+                                                     DropAnalyticsIndexOptionsKwargs,
+                                                     DropDatasetOptionsKwargs,
+                                                     DropDataverseOptionsKwargs,
+                                                     DropLinkAnalyticsOptionsKwargs,
+                                                     GetAllAnalyticsIndexesOptionsKwargs,
+                                                     GetAllDatasetOptionsKwargs,
+                                                     GetLinksAnalyticsOptionsKwargs,
+                                                     GetPendingMutationsOptionsKwargs,
+                                                     ReplaceLinkAnalyticsOptionsKwargs)
     from couchbase.management.options import (ConnectLinkOptions,
                                               CreateAnalyticsIndexOptions,
                                               CreateDatasetOptions,
@@ -71,7 +88,7 @@ class AnalyticsIndexManager:
     async def create_dataverse(self,
                                dataverse_name: str,
                                options: CreateDataverseOptions | None = None,
-                               **kwargs: Any) -> None:
+                               **kwargs: Unpack[CreateDataverseOptionsKwargs]) -> None:
         """Creates a new analytics dataverse.
 
         Args:
@@ -90,7 +107,7 @@ class AnalyticsIndexManager:
     async def drop_dataverse(self,
                              dataverse_name: str,
                              options: DropDataverseOptions | None = None,
-                             **kwargs: Any) -> None:
+                             **kwargs: Unpack[DropDataverseOptionsKwargs]) -> None:
         """Drops an existing analytics dataverse.
 
         Args:
@@ -110,7 +127,7 @@ class AnalyticsIndexManager:
                              dataset_name: str,
                              bucket_name: str,
                              options: CreateDatasetOptions | None = None,
-                             **kwargs: Any) -> None:
+                             **kwargs: Unpack[CreateDatasetOptionsKwargs]) -> None:
         """Creates a new analytics dataset over a bucket.
 
         Args:
@@ -130,7 +147,7 @@ class AnalyticsIndexManager:
     async def drop_dataset(self,
                            dataset_name: str,
                            options: DropDatasetOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[DropDatasetOptionsKwargs]) -> None:
         """Drops an existing analytics dataset.
 
         Args:
@@ -147,7 +164,7 @@ class AnalyticsIndexManager:
 
     async def get_all_datasets(self,
                                options: GetAllDatasetOptions | None = None,
-                               **kwargs: Any) -> Iterable[AnalyticsDataset]:
+                               **kwargs: Unpack[GetAllDatasetOptionsKwargs]) -> Iterable[AnalyticsDataset]:
         """Returns every analytics dataset.
 
         Args:
@@ -165,7 +182,7 @@ class AnalyticsIndexManager:
                            dataset_name: str,
                            fields: dict[str, AnalyticsDataType],
                            options: CreateAnalyticsIndexOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[CreateAnalyticsIndexOptionsKwargs]) -> None:
         """Creates a new analytics index on a dataset.
 
         Args:
@@ -186,7 +203,7 @@ class AnalyticsIndexManager:
                          index_name: str,
                          dataset_name: str,
                          options: DropAnalyticsIndexOptions | None = None,
-                         **kwargs: Any) -> None:
+                         **kwargs: Unpack[DropAnalyticsIndexOptionsKwargs]) -> None:
         """Drops an existing analytics index.
 
         Args:
@@ -203,7 +220,7 @@ class AnalyticsIndexManager:
 
     async def get_all_indexes(self,
                               options: GetAllAnalyticsIndexesOptions | None = None,
-                              **kwargs: Any) -> Iterable[AnalyticsIndex]:
+                              **kwargs: Unpack[GetAllAnalyticsIndexesOptionsKwargs]) -> Iterable[AnalyticsIndex]:
         """Returns every analytics index.
 
         Args:
@@ -216,7 +233,9 @@ class AnalyticsIndexManager:
         """
         return await self._impl.get_all_indexes(options, **kwargs)
 
-    async def connect_link(self, options: ConnectLinkOptions | None = None, **kwargs: Any) -> None:
+    async def connect_link(self,
+                           options: ConnectLinkOptions | None = None,
+                           **kwargs: Unpack[ConnectLinkOptionsKwargs]) -> None:
         """Connects a link, so that its datasets start receiving data.
 
         Args:
@@ -225,7 +244,9 @@ class AnalyticsIndexManager:
         """
         await self._impl.connect_link(options, **kwargs)
 
-    async def disconnect_link(self, options: DisconnectLinkOptions | None = None, **kwargs: Any) -> None:
+    async def disconnect_link(self,
+                              options: DisconnectLinkOptions | None = None,
+                              **kwargs: Unpack[DisconnectLinkOptionsKwargs]) -> None:
         """Disconnects a link, so that its datasets stop receiving data.
 
         Args:
@@ -237,7 +258,7 @@ class AnalyticsIndexManager:
 
     async def get_pending_mutations(self,
                                     options: GetPendingMutationsOptions | None = None,
-                                    **kwargs: Any) -> dict[str, int]:
+                                    **kwargs: Unpack[GetPendingMutationsOptionsKwargs]) -> dict[str, int]:
         """Returns how many mutations each dataset has yet to process.
 
         Args:
@@ -253,7 +274,7 @@ class AnalyticsIndexManager:
     async def create_link(self,
                           link: AnalyticsLink,
                           options: CreateLinkAnalyticsOptions | None = None,
-                          **kwargs: Any) -> None:
+                          **kwargs: Unpack[CreateLinkAnalyticsOptionsKwargs]) -> None:
         """Creates a new analytics link.
 
         Args:
@@ -274,7 +295,7 @@ class AnalyticsIndexManager:
     async def replace_link(self,
                            link: AnalyticsLink,
                            options: ReplaceLinkAnalyticsOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[ReplaceLinkAnalyticsOptionsKwargs]) -> None:
         """Replaces an existing analytics link.
 
         Args:
@@ -296,7 +317,7 @@ class AnalyticsIndexManager:
                         link_name: str,
                         dataverse_name: str,
                         options: DropLinkAnalyticsOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[DropLinkAnalyticsOptionsKwargs]) -> None:
         """Drops an existing analytics link.
 
         Args:
@@ -315,7 +336,7 @@ class AnalyticsIndexManager:
 
     async def get_links(self,
                         options: GetLinksAnalyticsOptions | None = None,
-                        **kwargs: Any) -> Iterable[AnalyticsLink]:
+                        **kwargs: Unpack[GetLinksAnalyticsOptionsKwargs]) -> Iterable[AnalyticsLink]:
         """Returns the analytics links, all of them unless the options narrow the search.
 
         Args:

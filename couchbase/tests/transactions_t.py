@@ -79,6 +79,7 @@ from tests.suite_fixtures import TopologySuite
 from tests.test_features import (EnvironmentFeatures,
                                  ServerFeatures,
                                  TestProtocol)
+from tests.untyped import untyped_kwargs
 
 # What the _assert_option_* helpers accept.  The three classes share no base but `dict`,
 # and each goes to a different core type, so the union is the type.
@@ -1045,19 +1046,19 @@ class TransactionTestSuite(TopologySuite):
 
         def txn_logic(ctx: AttemptContext) -> None:
             with pytest.raises(TypeError, match="'bogus'"):
-                ctx.get(cb_env.collection, key, bogus=True)
+                ctx.get(cb_env.collection, key, **untyped_kwargs(bogus=True))
             with pytest.raises(TypeError, match="'bogus'"):
-                ctx.insert(cb_env.collection, new_key, value, bogus=True)
+                ctx.insert(cb_env.collection, new_key, value, **untyped_kwargs(bogus=True))
             get_res = ctx.get(cb_env.collection, key)
             with pytest.raises(TypeError, match="'bogus'"):
-                ctx.replace(get_res, value, bogus=True)
+                ctx.replace(get_res, value, **untyped_kwargs(bogus=True))
             with pytest.raises(TypeError, match="'bogus'"):
-                ctx.remove(get_res, bogus=True)
+                ctx.remove(get_res, **untyped_kwargs(bogus=True))
             with pytest.raises(TypeError, match="'bogus'"):
-                ctx.get_multi([TransactionGetMultiSpec(cb_env.collection, key)], bogus=True)
+                ctx.get_multi([TransactionGetMultiSpec(cb_env.collection, key)], **untyped_kwargs(bogus=True))
             spec = TransactionGetMultiReplicasFromPreferredServerGroupSpec(cb_env.collection, key)
             with pytest.raises(TypeError, match="'bogus'"):
-                ctx.get_multi_replicas_from_preferred_server_group([spec], bogus=True)
+                ctx.get_multi_replicas_from_preferred_server_group([spec], **untyped_kwargs(bogus=True))
 
         cb_env.cluster.transactions.run(txn_logic)
         assert cb_env.collection.exists(key).exists is True, 'A rejected remove must leave the document.'

@@ -27,7 +27,23 @@ from typing import TYPE_CHECKING, Any
 from couchbase.common.management.search import SearchIndex
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._search_index_mgmt import AsyncSearchIndexMgmtInterface
+    from couchbase.common.management.options import (AllowQueryingSearchIndexOptionsKwargs,
+                                                     AnalyzeDocumentSearchIndexOptionsKwargs,
+                                                     DisallowQueryingSearchIndexOptionsKwargs,
+                                                     DropSearchIndexOptionsKwargs,
+                                                     FreezePlanSearchIndexOptionsKwargs,
+                                                     GetAllSearchIndexesOptionsKwargs,
+                                                     GetAllSearchIndexStatsOptionsKwargs,
+                                                     GetSearchIndexedDocumentsCountOptionsKwargs,
+                                                     GetSearchIndexOptionsKwargs,
+                                                     GetSearchIndexStatsOptionsKwargs,
+                                                     PauseIngestSearchIndexOptionsKwargs,
+                                                     ResumeIngestSearchIndexOptionsKwargs,
+                                                     UnfreezePlanSearchIndexOptionsKwargs,
+                                                     UpsertSearchIndexOptionsKwargs)
     from couchbase.management.options import (AllowQueryingSearchIndexOptions,
                                               AnalyzeDocumentSearchIndexOptions,
                                               DisallowQueryingSearchIndexOptions,
@@ -52,7 +68,7 @@ class SearchIndexManager:
     async def upsert_index(self,
                            index: SearchIndex,
                            options: UpsertSearchIndexOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[UpsertSearchIndexOptionsKwargs]) -> None:
         """Creates or updates an index.
 
         Args:
@@ -69,7 +85,7 @@ class SearchIndexManager:
     async def drop_index(self,
                          index_name: str,
                          options: DropSearchIndexOptions | None = None,
-                         **kwargs: Any) -> None:
+                         **kwargs: Unpack[DropSearchIndexOptionsKwargs]) -> None:
         """Drops an index.
 
         Args:
@@ -86,7 +102,7 @@ class SearchIndexManager:
     async def get_index(self,
                         index_name: str,
                         options: GetSearchIndexOptions | None = None,
-                        **kwargs: Any) -> SearchIndex:
+                        **kwargs: Unpack[GetSearchIndexOptionsKwargs]) -> SearchIndex:
         """Fetches an index from the server if it exists.
 
         Args:
@@ -105,7 +121,7 @@ class SearchIndexManager:
 
     async def get_all_indexes(self,
                               options: GetAllSearchIndexesOptions | None = None,
-                              **kwargs: Any) -> Iterable[SearchIndex]:
+                              **kwargs: Unpack[GetAllSearchIndexesOptionsKwargs]) -> Iterable[SearchIndex]:
         """Fetches all indexes from the server.
 
         Args:
@@ -121,7 +137,7 @@ class SearchIndexManager:
     async def get_indexed_documents_count(self,
                                           index_name: str,
                                           options: GetSearchIndexedDocumentsCountOptions | None = None,
-                                          **kwargs: Any) -> int:
+                                          **kwargs: Unpack[GetSearchIndexedDocumentsCountOptionsKwargs]) -> int:
         """Retrieves the number of documents that have been indexed for an index.
 
         Args:
@@ -141,7 +157,7 @@ class SearchIndexManager:
     async def pause_ingest(self,
                            index_name: str,
                            options: PauseIngestSearchIndexOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[PauseIngestSearchIndexOptionsKwargs]) -> None:
         """Pauses updates and maintenance for an index.
 
         Args:
@@ -158,7 +174,7 @@ class SearchIndexManager:
     async def resume_ingest(self,
                             index_name: str,
                             options: ResumeIngestSearchIndexOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[ResumeIngestSearchIndexOptionsKwargs]) -> None:
         """Resumes updates and maintenance for an index.
 
         Args:
@@ -175,7 +191,7 @@ class SearchIndexManager:
     async def allow_querying(self,
                              index_name: str,
                              options: AllowQueryingSearchIndexOptions | None = None,
-                             **kwargs: Any) -> None:
+                             **kwargs: Unpack[AllowQueryingSearchIndexOptionsKwargs]) -> None:
         """Allows querying against an index.
 
         Args:
@@ -192,7 +208,7 @@ class SearchIndexManager:
     async def disallow_querying(self,
                                 index_name: str,
                                 options: DisallowQueryingSearchIndexOptions | None = None,
-                                **kwargs: Any) -> None:
+                                **kwargs: Unpack[DisallowQueryingSearchIndexOptionsKwargs]) -> None:
         """Disallows querying against an index.
 
         Args:
@@ -209,7 +225,7 @@ class SearchIndexManager:
     async def freeze_plan(self,
                           index_name: str,
                           options: FreezePlanSearchIndexOptions | None = None,
-                          **kwargs: Any) -> None:
+                          **kwargs: Unpack[FreezePlanSearchIndexOptionsKwargs]) -> None:
         """Freezes the assignment of index partitions to nodes for an index.
 
         Args:
@@ -226,7 +242,7 @@ class SearchIndexManager:
     async def unfreeze_plan(self,
                             index_name: str,
                             options: UnfreezePlanSearchIndexOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[UnfreezePlanSearchIndexOptionsKwargs]) -> None:
         """Unfreezes the assignment of index partitions to nodes for an index.
 
         Args:
@@ -244,7 +260,7 @@ class SearchIndexManager:
                                index_name: str,
                                document: Any,
                                options: AnalyzeDocumentSearchIndexOptions | None = None,
-                               **kwargs: Any) -> dict[str, Any]:
+                               **kwargs: Unpack[AnalyzeDocumentSearchIndexOptionsKwargs]) -> dict[str, Any]:
         """Allows to see how a document is analyzed against a specific index.
 
         Args:
@@ -265,7 +281,7 @@ class SearchIndexManager:
     async def get_index_stats(self,
                               index_name: str,
                               options: GetSearchIndexStatsOptions | None = None,
-                              **kwargs: Any) -> dict[str, Any]:
+                              **kwargs: Unpack[GetSearchIndexStatsOptionsKwargs]) -> dict[str, Any]:
         """Retrieves metrics, timings and counters for a given index.
 
         **UNCOMMITTED**
@@ -288,7 +304,7 @@ class SearchIndexManager:
 
     async def get_all_index_stats(self,
                                   options: GetAllSearchIndexStatsOptions | None = None,
-                                  **kwargs: Any) -> dict[str, Any]:
+                                  **kwargs: Unpack[GetAllSearchIndexStatsOptionsKwargs]) -> dict[str, Any]:
         """Retrieves statistics on search service. Information is provided on documents, partition indexes, mutations,
         compactions, queries, and more.
 
@@ -315,7 +331,7 @@ class ScopeSearchIndexManager:
     async def upsert_index(self,
                            index: SearchIndex,
                            options: UpsertSearchIndexOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[UpsertSearchIndexOptionsKwargs]) -> None:
         """Creates or updates an index.
 
         Args:
@@ -332,7 +348,7 @@ class ScopeSearchIndexManager:
     async def drop_index(self,
                          index_name: str,
                          options: DropSearchIndexOptions | None = None,
-                         **kwargs: Any) -> None:
+                         **kwargs: Unpack[DropSearchIndexOptionsKwargs]) -> None:
         """Drops an index.
 
         Args:
@@ -349,7 +365,7 @@ class ScopeSearchIndexManager:
     async def get_index(self,
                         index_name: str,
                         options: GetSearchIndexOptions | None = None,
-                        **kwargs: Any) -> SearchIndex:
+                        **kwargs: Unpack[GetSearchIndexOptionsKwargs]) -> SearchIndex:
         """Fetches an index from the server if it exists.
 
         Args:
@@ -368,7 +384,7 @@ class ScopeSearchIndexManager:
 
     async def get_all_indexes(self,
                               options: GetAllSearchIndexesOptions | None = None,
-                              **kwargs: Any) -> Iterable[SearchIndex]:
+                              **kwargs: Unpack[GetAllSearchIndexesOptionsKwargs]) -> Iterable[SearchIndex]:
         """Fetches all indexes from the server.
 
         Args:
@@ -384,7 +400,7 @@ class ScopeSearchIndexManager:
     async def get_indexed_documents_count(self,
                                           index_name: str,
                                           options: GetSearchIndexedDocumentsCountOptions | None = None,
-                                          **kwargs: Any) -> int:
+                                          **kwargs: Unpack[GetSearchIndexedDocumentsCountOptionsKwargs]) -> int:
         """Retrieves the number of documents that have been indexed for an index.
 
         Args:
@@ -404,7 +420,7 @@ class ScopeSearchIndexManager:
     async def pause_ingest(self,
                            index_name: str,
                            options: PauseIngestSearchIndexOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[PauseIngestSearchIndexOptionsKwargs]) -> None:
         """Pauses updates and maintenance for an index.
 
         Args:
@@ -421,7 +437,7 @@ class ScopeSearchIndexManager:
     async def resume_ingest(self,
                             index_name: str,
                             options: ResumeIngestSearchIndexOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[ResumeIngestSearchIndexOptionsKwargs]) -> None:
         """Resumes updates and maintenance for an index.
 
         Args:
@@ -438,7 +454,7 @@ class ScopeSearchIndexManager:
     async def allow_querying(self,
                              index_name: str,
                              options: AllowQueryingSearchIndexOptions | None = None,
-                             **kwargs: Any) -> None:
+                             **kwargs: Unpack[AllowQueryingSearchIndexOptionsKwargs]) -> None:
         """Allows querying against an index.
 
         Args:
@@ -455,7 +471,7 @@ class ScopeSearchIndexManager:
     async def disallow_querying(self,
                                 index_name: str,
                                 options: DisallowQueryingSearchIndexOptions | None = None,
-                                **kwargs: Any) -> None:
+                                **kwargs: Unpack[DisallowQueryingSearchIndexOptionsKwargs]) -> None:
         """Disallows querying against an index.
 
         Args:
@@ -472,7 +488,7 @@ class ScopeSearchIndexManager:
     async def freeze_plan(self,
                           index_name: str,
                           options: FreezePlanSearchIndexOptions | None = None,
-                          **kwargs: Any) -> None:
+                          **kwargs: Unpack[FreezePlanSearchIndexOptionsKwargs]) -> None:
         """Freezes the assignment of index partitions to nodes for an index.
 
         Args:
@@ -489,7 +505,7 @@ class ScopeSearchIndexManager:
     async def unfreeze_plan(self,
                             index_name: str,
                             options: UnfreezePlanSearchIndexOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[UnfreezePlanSearchIndexOptionsKwargs]) -> None:
         """Unfreezes the assignment of index partitions to nodes for an index.
 
         Args:
@@ -507,7 +523,7 @@ class ScopeSearchIndexManager:
                                index_name: str,
                                document: Any,
                                options: AnalyzeDocumentSearchIndexOptions | None = None,
-                               **kwargs: Any) -> dict[str, Any]:
+                               **kwargs: Unpack[AnalyzeDocumentSearchIndexOptionsKwargs]) -> dict[str, Any]:
         """Allows to see how a document is analyzed against a specific index.
 
         Args:
@@ -528,7 +544,7 @@ class ScopeSearchIndexManager:
     async def get_index_stats(self,
                               index_name: str,
                               options: GetSearchIndexStatsOptions | None = None,
-                              **kwargs: Any) -> dict[str, Any]:
+                              **kwargs: Unpack[GetSearchIndexStatsOptionsKwargs]) -> dict[str, Any]:
         """Retrieves metrics, timings and counters for a given index.
 
         .. note::
@@ -552,7 +568,7 @@ class ScopeSearchIndexManager:
 
     async def get_all_index_stats(self,
                                   options: GetAllSearchIndexStatsOptions | None = None,
-                                  **kwargs: Any) -> dict[str, Any]:
+                                  **kwargs: Unpack[GetAllSearchIndexStatsOptionsKwargs]) -> dict[str, Any]:
         """Retrieves statistics on search service. Information is provided on documents, partition indexes, mutations,
         compactions, queries, and more.
 

@@ -47,8 +47,15 @@ from txcouchbase.management.users import UserManager
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._cluster import TxClusterInterface
     from couchbase.common._utils import JSONType
+    from couchbase.common.options import (ClusterKwargs,
+                                          DiagnosticsOptionsKwargs,
+                                          PingOptionsKwargs,
+                                          SearchOptionsKwargs,
+                                          WaitUntilReadyKwargs)
     from couchbase.options import (AnalyticsOptions,
                                    ClusterOptions,
                                    QueryOptions,
@@ -58,7 +65,7 @@ if TYPE_CHECKING:
 
 class Cluster:
 
-    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: Any) -> None:
+    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: Unpack[ClusterKwargs]) -> None:
         impl = resolve(TX_CLUSTER, CouchbaseProtocol.from_connstr(connstr))
         self._impl: TxClusterInterface = impl(connstr, *options, **kwargs)
 
@@ -118,7 +125,7 @@ class Cluster:
         """
         return self._impl.get_cluster_info_deferred()
 
-    def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> Deferred[PingResult]:
+    def ping(self, opts: PingOptions | None = None, **kwargs: Unpack[PingOptionsKwargs]) -> Deferred[PingResult]:
         """Performs a ping operation against the cluster.
 
         The ping operation pings the services which are specified
@@ -134,7 +141,9 @@ class Cluster:
         """
         return self._impl.ping_deferred(opts, **kwargs)
 
-    def diagnostics(self, opts: DiagnosticsOptions | None = None, **kwargs: Any) -> Deferred[DiagnosticsResult]:
+    def diagnostics(self,
+                    opts: DiagnosticsOptions | None = None,
+                    **kwargs: Unpack[DiagnosticsOptionsKwargs]) -> Deferred[DiagnosticsResult]:
         """Performs a diagnostic operation against the cluster.
 
         The diagnostic operations returns a report about the current active connections with the cluster.
@@ -152,7 +161,7 @@ class Cluster:
     def wait_until_ready(self,
                          timeout: timedelta,
                          opts: WaitUntilReadyOptions | None = None,
-                         **kwargs: Any) -> Deferred[None]:
+                         **kwargs: Unpack[WaitUntilReadyKwargs]) -> Deferred[None]:
         """Wait until the cluster is ready for use.
 
             Check the current connections to see if the desired state has been reached.  If not,
@@ -192,7 +201,9 @@ class Cluster:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.QueryOptions`
+                override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             Deferred[:class:`~couchbase.result.QueryResult`]: An instance of a :class:`~couchbase.result.QueryResult`
@@ -221,7 +232,9 @@ class Cluster:
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.AnalyticsOptions`
+                override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             Deferred[:class:`~couchbase.result.AnalyticsResult`]: An instance of a
@@ -234,7 +247,7 @@ class Cluster:
                      index: str,
                      query: SearchQuery,
                      options: SearchOptions | None = None,
-                     **kwargs: Any) -> Deferred[SearchResult]:
+                     **kwargs: Unpack[SearchOptionsKwargs]) -> Deferred[SearchResult]:
         """Executes an search query against the cluster.
 
         .. deprecated:: 4.1.11
@@ -271,7 +284,7 @@ class Cluster:
                index: str,
                request: SearchRequest | SearchQuery,
                options: SearchOptions | None = None,
-               **kwargs: Any) -> Deferred[SearchResult]:
+               **kwargs: Unpack[SearchOptionsKwargs]) -> Deferred[SearchResult]:
         """Executes an search against the cluster.
 
         .. note::

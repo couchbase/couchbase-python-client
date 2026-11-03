@@ -39,7 +39,7 @@ __all__ = [
     'ScopeEventingFunctionManager',
 ]
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.common.management.eventing import EventingFunctionBucketAccess  # noqa: F401
 from couchbase.common.management.eventing import EventingFunctionBucketBinding  # noqa: F401
@@ -73,7 +73,18 @@ from couchbase.management.options import (DeployFunctionOptions,
                                           UpsertFunctionOptions)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._eventing_function_mgmt import EventingFunctionMgmtInterface
+    from couchbase.common.management.options import (DeployFunctionOptionsKwargs,
+                                                     DropFunctionOptionsKwargs,
+                                                     FunctionsStatusOptionsKwargs,
+                                                     GetAllFunctionOptionsKwargs,
+                                                     GetFunctionOptionsKwargs,
+                                                     PauseFunctionOptionsKwargs,
+                                                     ResumeFunctionOptionsKwargs,
+                                                     UndeployFunctionOptionsKwargs,
+                                                     UpsertFunctionOptionsKwargs)
 
 
 class EventingFunctionManager:
@@ -88,7 +99,7 @@ class EventingFunctionManager:
     def upsert_function(self,
                         function: EventingFunction,
                         options: UpsertFunctionOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[UpsertFunctionOptionsKwargs]) -> None:
         """Creates an eventing function, or replaces one of the same name.
 
         Args:
@@ -112,7 +123,7 @@ class EventingFunctionManager:
     def drop_function(self,
                       name: str,
                       options: DropFunctionOptions | None = None,
-                      **kwargs: Any) -> None:
+                      **kwargs: Unpack[DropFunctionOptionsKwargs]) -> None:
         """Drops an eventing function.
 
         Args:
@@ -130,7 +141,7 @@ class EventingFunctionManager:
     def deploy_function(self,
                         name: str,
                         options: DeployFunctionOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[DeployFunctionOptionsKwargs]) -> None:
         """Deploys an eventing function.
 
         Args:
@@ -146,7 +157,9 @@ class EventingFunctionManager:
         """
         self._impl.deploy_function(name, options, **kwargs)
 
-    def get_all_functions(self, options: GetAllFunctionOptions | None = None, **kwargs: Any) -> list[EventingFunction]:
+    def get_all_functions(self,
+                          options: GetAllFunctionOptions | None = None,
+                          **kwargs: Unpack[GetAllFunctionOptionsKwargs]) -> list[EventingFunction]:
         """Returns every eventing function.
 
         Args:
@@ -162,7 +175,7 @@ class EventingFunctionManager:
     def get_function(self,
                      name: str,
                      options: GetFunctionOptions | None = None,
-                     **kwargs: Any) -> EventingFunction:
+                     **kwargs: Unpack[GetFunctionOptionsKwargs]) -> EventingFunction:
         """Returns an eventing function.
 
         Args:
@@ -181,7 +194,7 @@ class EventingFunctionManager:
     def pause_function(self,
                        name: str,
                        options: PauseFunctionOptions | None = None,
-                       **kwargs: Any) -> None:
+                       **kwargs: Unpack[PauseFunctionOptionsKwargs]) -> None:
         """Pauses a deployed eventing function.
 
         Args:
@@ -199,7 +212,7 @@ class EventingFunctionManager:
     def resume_function(self,
                         name: str,
                         options: ResumeFunctionOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[ResumeFunctionOptionsKwargs]) -> None:
         """Resumes a paused eventing function.
 
         Args:
@@ -217,7 +230,7 @@ class EventingFunctionManager:
     def undeploy_function(self,
                           name: str,
                           options: UndeployFunctionOptions | None = None,
-                          **kwargs: Any) -> None:
+                          **kwargs: Unpack[UndeployFunctionOptionsKwargs]) -> None:
         """Undeploys an eventing function.
 
         Args:
@@ -232,7 +245,9 @@ class EventingFunctionManager:
         """
         self._impl.undeploy_function(name, options, **kwargs)
 
-    def functions_status(self, options: FunctionsStatusOptions | None = None, **kwargs: Any) -> EventingFunctionsStatus:
+    def functions_status(self,
+                         options: FunctionsStatusOptions | None = None,
+                         **kwargs: Unpack[FunctionsStatusOptionsKwargs]) -> EventingFunctionsStatus:
         """Returns the status of every eventing function.
 
         Args:
@@ -255,7 +270,7 @@ class ScopeEventingFunctionManager:
     def upsert_function(self,
                         function: EventingFunction,
                         options: UpsertFunctionOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[UpsertFunctionOptionsKwargs]) -> None:
         """Creates an eventing function, or replaces one of the same name.
 
         Args:
@@ -279,7 +294,7 @@ class ScopeEventingFunctionManager:
     def drop_function(self,
                       name: str,
                       options: DropFunctionOptions | None = None,
-                      **kwargs: Any) -> None:
+                      **kwargs: Unpack[DropFunctionOptionsKwargs]) -> None:
         """Drops an eventing function.
 
         Args:
@@ -297,7 +312,7 @@ class ScopeEventingFunctionManager:
     def deploy_function(self,
                         name: str,
                         options: DeployFunctionOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[DeployFunctionOptionsKwargs]) -> None:
         """Deploys an eventing function.
 
         Args:
@@ -313,7 +328,9 @@ class ScopeEventingFunctionManager:
         """
         self._impl.deploy_function(name, options, **kwargs)
 
-    def get_all_functions(self, options: GetAllFunctionOptions | None = None, **kwargs: Any) -> list[EventingFunction]:
+    def get_all_functions(self,
+                          options: GetAllFunctionOptions | None = None,
+                          **kwargs: Unpack[GetAllFunctionOptionsKwargs]) -> list[EventingFunction]:
         """Returns every eventing function.
 
         Args:
@@ -329,7 +346,7 @@ class ScopeEventingFunctionManager:
     def get_function(self,
                      name: str,
                      options: GetFunctionOptions | None = None,
-                     **kwargs: Any) -> EventingFunction:
+                     **kwargs: Unpack[GetFunctionOptionsKwargs]) -> EventingFunction:
         """Returns an eventing function.
 
         Args:
@@ -348,7 +365,7 @@ class ScopeEventingFunctionManager:
     def pause_function(self,
                        name: str,
                        options: PauseFunctionOptions | None = None,
-                       **kwargs: Any) -> None:
+                       **kwargs: Unpack[PauseFunctionOptionsKwargs]) -> None:
         """Pauses a deployed eventing function.
 
         Args:
@@ -366,7 +383,7 @@ class ScopeEventingFunctionManager:
     def resume_function(self,
                         name: str,
                         options: ResumeFunctionOptions | None = None,
-                        **kwargs: Any) -> None:
+                        **kwargs: Unpack[ResumeFunctionOptionsKwargs]) -> None:
         """Resumes a paused eventing function.
 
         Args:
@@ -384,7 +401,7 @@ class ScopeEventingFunctionManager:
     def undeploy_function(self,
                           name: str,
                           options: UndeployFunctionOptions | None = None,
-                          **kwargs: Any) -> None:
+                          **kwargs: Unpack[UndeployFunctionOptionsKwargs]) -> None:
         """Undeploys an eventing function.
 
         Args:
@@ -399,7 +416,9 @@ class ScopeEventingFunctionManager:
         """
         self._impl.undeploy_function(name, options, **kwargs)
 
-    def functions_status(self, options: FunctionsStatusOptions | None = None, **kwargs: Any) -> EventingFunctionsStatus:
+    def functions_status(self,
+                         options: FunctionsStatusOptions | None = None,
+                         **kwargs: Unpack[FunctionsStatusOptionsKwargs]) -> EventingFunctionsStatus:
         """Returns the status of every eventing function.
 
         Args:

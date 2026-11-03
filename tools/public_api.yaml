@@ -1380,6 +1380,7 @@ modules:
       - AppendMultiOptionsKwargs
       - AppendOptions
       - AppendOptionsKwargs
+      - ClusterKwargs
       - ClusterMetricsOptions
       - ClusterMetricsOptionsKwargs
       - ClusterOptions
@@ -1497,6 +1498,7 @@ modules:
       - VectorSearchOptionsKwargs
       - ViewOptions
       - ViewOptionsKwargs
+      - WaitUntilReadyKwargs
       - WaitUntilReadyOptions
       - WaitUntilReadyOptionsKwargs
     compat: []

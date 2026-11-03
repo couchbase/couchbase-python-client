@@ -20,14 +20,20 @@ __all__ = [
     'BinaryCollection',
 ]
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from twisted.internet.defer import Deferred
 
 from couchbase.result import CounterResult, MutationResult
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._binary_collection import TxBinaryCollectionInterface
+    from couchbase.common.options import (AppendOptionsKwargs,
+                                          DecrementOptionsKwargs,
+                                          IncrementOptionsKwargs,
+                                          PrependOptionsKwargs)
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    IncrementOptions,
@@ -42,7 +48,7 @@ class BinaryCollection:
     def increment(self,
                   key: str,
                   opts: IncrementOptions | None = None,
-                  **kwargs: Any) -> Deferred[CounterResult]:
+                  **kwargs: Unpack[IncrementOptionsKwargs]) -> Deferred[CounterResult]:
         """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
@@ -64,7 +70,7 @@ class BinaryCollection:
     def decrement(self,
                   key: str,
                   opts: DecrementOptions | None = None,
-                  **kwargs: Any) -> Deferred[CounterResult]:
+                  **kwargs: Unpack[DecrementOptionsKwargs]) -> Deferred[CounterResult]:
         """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
@@ -87,7 +93,7 @@ class BinaryCollection:
                key: str,
                value: str | bytes | bytearray,
                opts: AppendOptions | None = None,
-               **kwargs: Any) -> Deferred[MutationResult]:
+               **kwargs: Unpack[AppendOptionsKwargs]) -> Deferred[MutationResult]:
         """Appends the specified value to the beginning of document of the specified key.
 
         Args:
@@ -111,7 +117,7 @@ class BinaryCollection:
                 key: str,
                 value: str | bytes | bytearray,
                 opts: PrependOptions | None = None,
-                **kwargs: Any) -> Deferred[MutationResult]:
+                **kwargs: Unpack[PrependOptionsKwargs]) -> Deferred[MutationResult]:
         """Prepends the specified value to the beginning of document of the specified key.
 
         Args:

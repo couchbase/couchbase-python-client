@@ -1072,3 +1072,13 @@ class WrappedSpan:
         if self._wrapped_tracer.is_legacy:
             return cast(LegacySpanProtocol, self._request_span)
         return None
+
+
+def parent_span_kwargs(span: WrappedSpan | None) -> dict[str, Any]:
+    """The keywords that parent an operation on a span the SDK made for an outer one.
+
+    `parent_span` is typed as the `RequestSpan` a caller passes, and the handler also takes a
+    `WrappedSpan`, which is how a datastructure call parents the key-value operations it makes.
+    Passing it as untyped keywords keeps the internal type off the public signature.
+    """
+    return {'parent_span': span}

@@ -31,8 +31,11 @@ from txcouchbase.collection import Collection
 from txcouchbase.management.search import ScopeSearchIndexManager
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._scope import TxScopeInterface
     from couchbase.common._utils import JSONType
+    from couchbase.common.options import SearchOptionsKwargs
     from couchbase.options import (AnalyticsOptions,
                                    QueryOptions,
                                    SearchOptions)
@@ -87,7 +90,9 @@ class Scope:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.QueryOptions`
+                override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             Deferred[:class:`~couchbase.result.QueryResult`]: An instance of a :class:`~couchbase.result.QueryResult`
@@ -115,7 +120,9 @@ class Scope:
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.AnalyticsOptions`
+                override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             Deferred[:class:`~couchbase.result.AnalyticsResult`]: An instance of a
@@ -128,7 +135,7 @@ class Scope:
                      index: str,
                      query: SearchQuery,
                      options: SearchOptions | None = None,
-                     **kwargs: Any) -> Deferred[SearchResult]:
+                     **kwargs: Unpack[SearchOptionsKwargs]) -> Deferred[SearchResult]:
         """Executes an search query against the scope.
 
         .. deprecated:: 4.1.11
@@ -162,7 +169,7 @@ class Scope:
                index: str,
                request: SearchRequest | SearchQuery,
                options: SearchOptions | None = None,
-               **kwargs: Any) -> Deferred[SearchResult]:
+               **kwargs: Unpack[SearchOptionsKwargs]) -> Deferred[SearchResult]:
         """Executes an search against the scope.
 
         .. note::

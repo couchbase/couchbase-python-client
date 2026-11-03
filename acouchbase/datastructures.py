@@ -35,7 +35,7 @@ from typing import (TYPE_CHECKING,
                     NoReturn,
                     TypeVar)
 
-from couchbase.common._observability import ObservableRequestHandler
+from couchbase.common._observability import ObservableRequestHandler, parent_span_kwargs
 from couchbase.common._operations import Op
 from couchbase.exceptions import (CasMismatchException,
                                   DocumentExistsException,
@@ -108,30 +108,30 @@ class _Datastructure:
             return await fn()
         except DocumentNotFoundException:
             try:
-                await self._collection.insert(self._key, self._empty(), parent_span=parent_span)
+                await self._collection.insert(self._key, self._empty(), **parent_span_kwargs(parent_span))
             except DocumentExistsException:
                 pass
             return await fn()
 
     async def _get(self, parent_span: WrappedSpan | None = None) -> GetResult:
-        return await self._create_if_missing(lambda: self._collection.get(self._key, parent_span=parent_span),
+        return await self._create_if_missing(lambda: self._collection.get(self._key, **parent_span_kwargs(parent_span)),
                                              parent_span)
 
     async def _lookup_in(self, spec: Spec, parent_span: WrappedSpan | None) -> LookupInResult:
         return await self._create_if_missing(
-            lambda: self._collection.lookup_in(self._key, (spec,), parent_span=parent_span), parent_span)
+            lambda: self._collection.lookup_in(self._key, (spec,), **parent_span_kwargs(parent_span)), parent_span)
 
     async def _mutate_in(self, spec: Spec, parent_span: WrappedSpan | None, create: bool = True) -> None:
         if create:
             await self._create_if_missing(
-                lambda: self._collection.mutate_in(self._key, (spec,), parent_span=parent_span), parent_span)
+                lambda: self._collection.mutate_in(self._key, (spec,), **parent_span_kwargs(parent_span)), parent_span)
         else:
-            await self._collection.mutate_in(self._key, (spec,), parent_span=parent_span)
+            await self._collection.mutate_in(self._key, (spec,), **parent_span_kwargs(parent_span))
 
     async def _clear(self, op: Op) -> None:
         with self._span(op) as span:
             try:
-                await self._collection.remove(self._key, parent_span=span)
+                await self._collection.remove(self._key, **parent_span_kwargs(span))
             except DocumentNotFoundException:
                 pass
 
@@ -441,7 +441,7 @@ class CouchbaseSet(_Datastructure):
                     await self._collection.mutate_in(self._key,
                                                      (remove(f'[{val_idx}]'),),
                                                      cas=get_res.cas,
-                                                     parent_span=span)
+                                                     **parent_span_kwargs(span))
                     break
                 except CasMismatchException:
                     pass
@@ -535,14 +535,16 @@ class CouchbaseQueue(_Datastructure):
             time_left = timeout_millis
             while True:
                 try:
-                    sd_res = await self._collection.lookup_in(self._key, (subdoc_get('[-1]'),), parent_span=span)
+                    sd_res = await self._collection.lookup_in(self._key,
+                                                              (subdoc_get('[-1]'),),
+                                                              **parent_span_kwargs(span))
                     val = _first_value(sd_res)
 
                     try:
                         await self._collection.mutate_in(self._key,
                                                          (remove('[-1]'),),
                                                          cas=sd_res.cas,
-                                                         parent_span=span)
+                                                         **parent_span_kwargs(span))
                         return val
                     except CasMismatchException:
                         pass

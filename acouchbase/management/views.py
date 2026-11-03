@@ -23,14 +23,21 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.common.management.views import (DesignDocument,
                                                DesignDocumentNamespace,
                                                View)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._view_index_mgmt import AsyncViewIndexMgmtInterface
+    from couchbase.common.management.options import (DropDesignDocumentOptionsKwargs,
+                                                     GetAllDesignDocumentsOptionsKwargs,
+                                                     GetDesignDocumentOptionsKwargs,
+                                                     PublishDesignDocumentOptionsKwargs,
+                                                     UpsertDesignDocumentOptionsKwargs)
     from couchbase.management.options import (DropDesignDocumentOptions,
                                               GetAllDesignDocumentsOptions,
                                               GetDesignDocumentOptions,
@@ -48,7 +55,7 @@ class ViewIndexManager:
                                   design_doc_name: str,
                                   namespace: DesignDocumentNamespace,
                                   options: GetDesignDocumentOptions | None = None,
-                                  **kwargs: Any) -> DesignDocument:
+                                  **kwargs: Unpack[GetDesignDocumentOptionsKwargs]) -> DesignDocument:
         """Returns a design document.
 
         Args:
@@ -70,7 +77,8 @@ class ViewIndexManager:
     async def get_all_design_documents(self,
                                        namespace: DesignDocumentNamespace,
                                        options: GetAllDesignDocumentsOptions | None = None,
-                                       **kwargs: Any) -> Iterable[DesignDocument]:
+                                       **kwargs: Unpack[GetAllDesignDocumentsOptionsKwargs]
+                                       ) -> Iterable[DesignDocument]:
         """Returns every design document in a namespace.
 
         Args:
@@ -91,7 +99,7 @@ class ViewIndexManager:
                                      design_doc_data: DesignDocument,
                                      namespace: DesignDocumentNamespace,
                                      options: UpsertDesignDocumentOptions | None = None,
-                                     **kwargs: Any) -> None:
+                                     **kwargs: Unpack[UpsertDesignDocumentOptionsKwargs]) -> None:
         """Creates a design document, or replaces one of the same name.
 
         Args:
@@ -110,7 +118,7 @@ class ViewIndexManager:
                                    design_doc_name: str,
                                    namespace: DesignDocumentNamespace,
                                    options: DropDesignDocumentOptions | None = None,
-                                   **kwargs: Any) -> None:
+                                   **kwargs: Unpack[DropDesignDocumentOptionsKwargs]) -> None:
         """Drops an existing design document.
 
         Args:
@@ -129,7 +137,7 @@ class ViewIndexManager:
     async def publish_design_document(self,
                                       design_doc_name: str,
                                       options: PublishDesignDocumentOptions | None = None,
-                                      **kwargs: Any) -> None:
+                                      **kwargs: Unpack[PublishDesignDocumentOptionsKwargs]) -> None:
         """Copies a design document from the development namespace to production.
 
         The copy is a get followed by an upsert, and the timeout covers both.

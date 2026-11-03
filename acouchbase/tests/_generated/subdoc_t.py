@@ -64,6 +64,7 @@ from tests.suite_fixtures import TopologySuite
 from tests.test_features import (EnvironmentFeatures,
                                  ServerFeatures,
                                  TestProtocol)
+from tests.untyped import untyped_kwargs
 
 # Hoisted out of the decorator below.  Inline, the same comprehension needs two `# noqa: E501`
 # to fit, and the noqa hides the expression rather than the line length.
@@ -995,7 +996,7 @@ class SubDocumentTestSuite(TopologySuite):
         with pytest.raises(DocumentExistsException):
             await cb_env.collection.mutate_in(key,
                                               (SD.insert('new_path', 'im new'),),
-                                              insert_doc=True)
+                                              **untyped_kwargs(insert_doc=True))
 
     @pytest.mark.asyncio
     async def test_mutate_in_insert_semantics_kwargs(self, cb_env: AsyncTestEnvironment) -> None:
@@ -1006,7 +1007,7 @@ class SubDocumentTestSuite(TopologySuite):
 
         await cb_env.collection.mutate_in(key,
                                           (SD.insert('new_path', 'im new'),),
-                                          insert_doc=True)
+                                          **untyped_kwargs(insert_doc=True))
 
         res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
@@ -1192,7 +1193,7 @@ class SubDocumentTestSuite(TopologySuite):
         with pytest.raises(DocumentNotFoundException):
             await cb_env.collection.mutate_in(key,
                                               (SD.upsert('new_path', 'im new'),),
-                                              replace_doc=True)
+                                              **untyped_kwargs(replace_doc=True))
 
     @pytest.mark.asyncio
     async def test_mutate_in_replace_semantics_kwargs(self, cb_env: AsyncTestEnvironment) -> None:
@@ -1200,7 +1201,7 @@ class SubDocumentTestSuite(TopologySuite):
 
         await cb_env.collection.mutate_in(key,
                                           (SD.upsert('new_path', 'im new'),),
-                                          replace_doc=True)
+                                          **untyped_kwargs(replace_doc=True))
 
         res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict]['new_path'] == 'im new'
@@ -1265,17 +1266,17 @@ class SubDocumentTestSuite(TopologySuite):
         with pytest.raises(InvalidArgumentException):
             await cb_env.collection.mutate_in(key,
                                               (SD.upsert('new_path', 'im new'),),
-                                              insert_doc=True, upsert_doc=True)
+                                              **untyped_kwargs(insert_doc=True, upsert_doc=True))
 
         with pytest.raises(InvalidArgumentException):
             await cb_env.collection.mutate_in(key,
                                               (SD.upsert('new_path', 'im new'),),
-                                              insert_doc=True, replace_doc=True)
+                                              **untyped_kwargs(insert_doc=True, replace_doc=True))
 
         with pytest.raises(InvalidArgumentException):
             await cb_env.collection.mutate_in(key,
                                               (SD.upsert('new_path', 'im new'),),
-                                              upsert_doc=True, replace_doc=True)
+                                              **untyped_kwargs(upsert_doc=True, replace_doc=True))
 
     @pytest.mark.asyncio
     async def test_mutate_in_upsert_semantics(self, cb_env: AsyncTestEnvironment) -> None:
@@ -1300,7 +1301,7 @@ class SubDocumentTestSuite(TopologySuite):
 
         await cb_env.collection.mutate_in(key,
                                           (SD.upsert('new_path', 'im new'),),
-                                          upsert_doc=True)
+                                          **untyped_kwargs(upsert_doc=True))
 
         res = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}

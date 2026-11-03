@@ -23,6 +23,7 @@ __all__ = [
     'AppendMultiOptionsKwargs',
     'AppendOptions',
     'AppendOptionsKwargs',
+    'ClusterKwargs',
     'ClusterMetricsOptions',
     'ClusterMetricsOptionsKwargs',
     'ClusterOptions',
@@ -140,6 +141,7 @@ __all__ = [
     'VectorSearchOptionsKwargs',
     'ViewOptions',
     'ViewOptionsKwargs',
+    'WaitUntilReadyKwargs',
     'WaitUntilReadyOptions',
     'WaitUntilReadyOptionsKwargs',
 ]
@@ -694,6 +696,35 @@ class ClusterOptionsKwargs(TypedDict, total=False):
     app_telemetry_ping_timeout: timedelta | None
     allow_enterprise_analytics: bool | None
     enable_lazy_connections: bool | None
+    bootstrap_timeout: timedelta | None
+    resolve_timeout: timedelta | None
+    connect_timeout: timedelta | None
+    kv_timeout: timedelta | None
+    kv_durable_timeout: timedelta | None
+    views_timeout: timedelta | None
+    query_timeout: timedelta | None
+    analytics_timeout: timedelta | None
+    search_timeout: timedelta | None
+    management_timeout: timedelta | None
+    dns_srv_timeout: timedelta | None
+    idle_http_connection_timeout: timedelta | None
+    config_idle_redial_timeout: timedelta | None
+    config_total_timeout: timedelta | None
+    tracing_threshold_kv: timedelta | None
+    tracing_threshold_view: timedelta | None
+    tracing_threshold_query: timedelta | None
+    tracing_threshold_search: timedelta | None
+    tracing_threshold_analytics: timedelta | None
+    tracing_threshold_eventing: timedelta | None
+    tracing_threshold_management: timedelta | None
+    tracing_threshold_queue_size: int | None
+    tracing_threshold_queue_flush_interval: timedelta | None
+    tracing_orphaned_queue_size: int | None
+    tracing_orphaned_queue_flush_interval: timedelta | None
+
+
+class ClusterKwargs(ClusterOptionsKwargs, total=False):
+    authenticator: Authenticator
 
 
 class ClusterOptions(dict):
@@ -1100,6 +1131,12 @@ class WaitUntilReadyOptionsKwargs(TypedDict, total=False):
     desired_state: ClusterState | None
     service_types: Iterable[ServiceType] | Iterable[str] | None
     timeout: timedelta | None
+    parent_span: RequestSpan | None
+
+
+class WaitUntilReadyKwargs(TypedDict, total=False):
+    desired_state: ClusterState | None
+    service_types: Iterable[ServiceType] | Iterable[str] | None
     parent_span: RequestSpan | None
 
 

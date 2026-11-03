@@ -45,6 +45,7 @@ from tests.environments.twisted_environment import (ConnectionStrategy,
 from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
 from tests.tracing_validators import KeyValueSpanValidator
+from tests.untyped import untyped_kwargs
 
 # Deliberately the wrong type, and annotated Any so that saying so is the test rather than
 # something the type checker has to be told to ignore.  append and prepend take str or bytes; a
@@ -261,7 +262,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Append, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Append)
-        run_in_reactor_thread(cb_env.collection.binary().append, key, b'XXX', span=parent)
+        run_in_reactor_thread(cb_env.collection.binary().append, key, b'XXX', **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Append, parent_span=parent)
 
     def test_prepend_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
@@ -271,7 +272,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Prepend, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Prepend)
-        run_in_reactor_thread(cb_env.collection.binary().prepend, key, b'XXX', span=parent)
+        run_in_reactor_thread(cb_env.collection.binary().prepend, key, b'XXX', **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Prepend, parent_span=parent)
 
     def test_increment_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
@@ -281,7 +282,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Increment, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Increment)
-        run_in_reactor_thread(cb_env.collection.binary().increment, key, span=parent)
+        run_in_reactor_thread(cb_env.collection.binary().increment, key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Increment, parent_span=parent)
 
     def test_decrement_with_parent(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
@@ -291,7 +292,7 @@ class BinaryTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Decrement, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Decrement)
-        run_in_reactor_thread(cb_env.collection.binary().decrement, key, span=parent)
+        run_in_reactor_thread(cb_env.collection.binary().decrement, key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Decrement, parent_span=parent)
 
 

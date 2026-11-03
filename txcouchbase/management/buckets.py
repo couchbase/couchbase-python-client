@@ -28,7 +28,7 @@ __all__ = [
     'StorageBackend',
 ]
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from twisted.internet.defer import Deferred
 
@@ -43,7 +43,16 @@ from couchbase.common.management.buckets import (BucketDescribeResult,
                                                  StorageBackend)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._bucket_mgmt import TxBucketMgmtInterface
+    from couchbase.common.management.options import (BucketDescribeOptionsKwargs,
+                                                     CreateBucketOptionsKwargs,
+                                                     DropBucketOptionsKwargs,
+                                                     FlushBucketOptionsKwargs,
+                                                     GetAllBucketOptionsKwargs,
+                                                     GetBucketOptionsKwargs,
+                                                     UpdateBucketOptionsKwargs)
     from couchbase.management.options import (BucketDescribeOptions,
                                               CreateBucketOptions,
                                               DropBucketOptions,
@@ -60,7 +69,7 @@ class BucketManager:
     def create_bucket(self,
                       settings: CreateBucketSettings,
                       options: CreateBucketOptions | None = None,
-                      **kwargs: Any) -> Deferred[None]:
+                      **kwargs: Unpack[CreateBucketOptionsKwargs]) -> Deferred[None]:
         """Creates a new bucket.
 
         Args:
@@ -83,7 +92,7 @@ class BucketManager:
     def update_bucket(self,
                       settings: BucketSettings,
                       options: UpdateBucketOptions | None = None,
-                      **kwargs: Any) -> Deferred[None]:
+                      **kwargs: Unpack[UpdateBucketOptionsKwargs]) -> Deferred[None]:
         """Update the settings for an existing bucket.
 
         Args:
@@ -105,7 +114,7 @@ class BucketManager:
     def drop_bucket(self,
                     bucket_name: str,
                     options: DropBucketOptions | None = None,
-                    **kwargs: Any) -> Deferred[None]:
+                    **kwargs: Unpack[DropBucketOptionsKwargs]) -> Deferred[None]:
         """Drops an existing bucket.
 
         Args:
@@ -123,7 +132,7 @@ class BucketManager:
     def get_bucket(self,
                    bucket_name: str,
                    options: GetBucketOptions | None = None,
-                   **kwargs: Any) -> Deferred[BucketSettings]:
+                   **kwargs: Unpack[GetBucketOptionsKwargs]) -> Deferred[BucketSettings]:
         """Fetches the settings in use for a specified bucket.
 
         Args:
@@ -143,7 +152,7 @@ class BucketManager:
 
     def get_all_buckets(self,
                         options: GetAllBucketOptions | None = None,
-                        **kwargs: Any) -> Deferred[list[BucketSettings]]:
+                        **kwargs: Unpack[GetAllBucketOptionsKwargs]) -> Deferred[list[BucketSettings]]:
         """Returns a list of existing buckets in the cluster.
 
         Args:
@@ -160,7 +169,7 @@ class BucketManager:
     def flush_bucket(self,
                      bucket_name: str,
                      options: FlushBucketOptions | None = None,
-                     **kwargs: Any) -> Deferred[None]:
+                     **kwargs: Unpack[FlushBucketOptionsKwargs]) -> Deferred[None]:
         """Flushes the bucket, deleting all the existing data that is stored in it.
 
         Args:
@@ -180,7 +189,7 @@ class BucketManager:
     def bucket_describe(self,
                         bucket_name: str,
                         options: BucketDescribeOptions | None = None,
-                        **kwargs: Any) -> Deferred[BucketDescribeResult]:
+                        **kwargs: Unpack[BucketDescribeOptionsKwargs]) -> Deferred[BucketDescribeResult]:
         """Provides details on provided the bucket.
 
         Args:

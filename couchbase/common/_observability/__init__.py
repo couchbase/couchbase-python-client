@@ -15,7 +15,8 @@
 
 from .handler import (KeyspaceDetails,
                       ObservableRequestHandler,
-                      WrappedSpan)
+                      WrappedSpan,
+                      parent_span_kwargs)
 from .logging_meter import (LoggingMeter,
                             PercentileHistogram,
                             PercentileHistogramFactory)
@@ -58,5 +59,6 @@ __all__ = [
     'ThresholdLoggingTracer',
     'TracerProtocol',
     'WrappedSpan',
-    'WrappedTracer'
+    'WrappedTracer',
+    'parent_span_kwargs'
 ]

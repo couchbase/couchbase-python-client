@@ -110,14 +110,13 @@ class AttemptContextInterface(Protocol):
                 options: TransactionReplaceOptions | None = None,
                 **kwargs: Any) -> TransactionGetResult: ...
 
-    def remove(self, txn_get_result: TransactionGetResult, **kwargs: Any) -> None: ...
+    def remove(self, txn_get_result: TransactionGetResult) -> None: ...
 
 
 class SupportsTransactionsQuery(Protocol):
     def query(self,
               query: str,
-              options: TransactionQueryOptions | None = None,
-              **kwargs: Any) -> TransactionQueryResults: ...
+              options: TransactionQueryOptions | None = None) -> TransactionQueryResults: ...
 
 
 class SupportsTransactionsPreferredServerGroup(Protocol):
@@ -181,14 +180,13 @@ class AsyncAttemptContextInterface(Protocol):
                 options: TransactionReplaceOptions | None = None,
                 **kwargs: Any) -> Awaitable[TransactionGetResult]: ...
 
-    def remove(self, txn_get_result: TransactionGetResult, **kwargs: Any) -> Awaitable[None]: ...
+    def remove(self, txn_get_result: TransactionGetResult) -> Awaitable[None]: ...
 
 
 class AsyncSupportsTransactionsQuery(Protocol):
     def query(self,
               query: str,
-              options: TransactionQueryOptions | None = None,
-              **kwargs: Any) -> Awaitable[TransactionQueryResults]: ...
+              options: TransactionQueryOptions | None = None) -> Awaitable[TransactionQueryResults]: ...
 
 
 class AsyncSupportsTransactionsPreferredServerGroup(Protocol):

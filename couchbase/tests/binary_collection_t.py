@@ -38,6 +38,7 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
+from tests.untyped import untyped_kwargs
 
 
 class BinaryCollectionTestSuite(SuiteRequirements):
@@ -124,19 +125,19 @@ class BinaryCollectionTestSuite(SuiteRequirements):
         key = cb_env.get_new_counter_doc_keys(1)[0]
 
         with pytest.raises(InvalidArgumentException):
-            cb_env.collection.binary().increment(key, delta=5)
+            cb_env.collection.binary().increment(key, **untyped_kwargs(delta=5))
 
         with pytest.raises(InvalidArgumentException):
-            cb_env.collection.binary().decrement(key, delta=5)
+            cb_env.collection.binary().decrement(key, **untyped_kwargs(delta=5))
 
     def test_counter_bad_initial_value(self, cb_env: SyncTestEnvironment) -> None:
         key = cb_env.get_new_counter_doc_keys(1)[0]
 
         with pytest.raises(InvalidArgumentException):
-            cb_env.collection.binary().increment(key, initial=100)
+            cb_env.collection.binary().increment(key, **untyped_kwargs(initial=100))
 
         with pytest.raises(InvalidArgumentException):
-            cb_env.collection.binary().decrement(key, initial=100)
+            cb_env.collection.binary().decrement(key, **untyped_kwargs(initial=100))
 
     def test_counter_decrement(self, cb_env: SyncTestEnvironment) -> None:
         key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)

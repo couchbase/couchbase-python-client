@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from twisted.internet.defer import Deferred
 
@@ -32,7 +32,14 @@ from couchbase.common.management.views import (DesignDocument,
                                                View)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._view_index_mgmt import TxViewIndexMgmtInterface
+    from couchbase.common.management.options import (DropDesignDocumentOptionsKwargs,
+                                                     GetAllDesignDocumentsOptionsKwargs,
+                                                     GetDesignDocumentOptionsKwargs,
+                                                     PublishDesignDocumentOptionsKwargs,
+                                                     UpsertDesignDocumentOptionsKwargs)
     from couchbase.management.options import (DropDesignDocumentOptions,
                                               GetAllDesignDocumentsOptions,
                                               GetDesignDocumentOptions,
@@ -50,7 +57,7 @@ class ViewIndexManager:
                             design_doc_name: str,
                             namespace: DesignDocumentNamespace,
                             options: GetDesignDocumentOptions | None = None,
-                            **kwargs: Any) -> Deferred[DesignDocument]:
+                            **kwargs: Unpack[GetDesignDocumentOptionsKwargs]) -> Deferred[DesignDocument]:
         """Returns a design document.
 
         Args:
@@ -72,7 +79,8 @@ class ViewIndexManager:
     def get_all_design_documents(self,
                                  namespace: DesignDocumentNamespace,
                                  options: GetAllDesignDocumentsOptions | None = None,
-                                 **kwargs: Any) -> Deferred[Iterable[DesignDocument]]:
+                                 **kwargs: Unpack[GetAllDesignDocumentsOptionsKwargs]
+                                 ) -> Deferred[Iterable[DesignDocument]]:
         """Returns every design document in a namespace.
 
         Args:
@@ -93,7 +101,7 @@ class ViewIndexManager:
                                design_doc_data: DesignDocument,
                                namespace: DesignDocumentNamespace,
                                options: UpsertDesignDocumentOptions | None = None,
-                               **kwargs: Any) -> Deferred[None]:
+                               **kwargs: Unpack[UpsertDesignDocumentOptionsKwargs]) -> Deferred[None]:
         """Creates a design document, or replaces one of the same name.
 
         Args:
@@ -112,7 +120,7 @@ class ViewIndexManager:
                              design_doc_name: str,
                              namespace: DesignDocumentNamespace,
                              options: DropDesignDocumentOptions | None = None,
-                             **kwargs: Any) -> Deferred[None]:
+                             **kwargs: Unpack[DropDesignDocumentOptionsKwargs]) -> Deferred[None]:
         """Drops an existing design document.
 
         Args:
@@ -131,7 +139,7 @@ class ViewIndexManager:
     def publish_design_document(self,
                                 design_doc_name: str,
                                 options: PublishDesignDocumentOptions | None = None,
-                                **kwargs: Any) -> Deferred[None]:
+                                **kwargs: Unpack[PublishDesignDocumentOptionsKwargs]) -> Deferred[None]:
         """Copies a design document from the development namespace to production.
 
         The copy is a get followed by an upsert, and the timeout covers both.

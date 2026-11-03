@@ -42,6 +42,7 @@ from tests.environments.twisted_environment import (CollectionStrategy,
                                                     run_in_reactor_thread,
                                                     teardown_twisted_environment)
 from tests.manifest import validate_test_manifest
+from tests.untyped import untyped_kwargs
 
 
 class BinaryCollectionTestSuite(SuiteRequirements):
@@ -128,19 +129,19 @@ class BinaryCollectionTestSuite(SuiteRequirements):
         key = cb_env.get_new_counter_doc_keys(1)[0]
 
         with pytest.raises(InvalidArgumentException):
-            run_in_reactor_thread(cb_env.collection.binary().increment, key, delta=5)
+            run_in_reactor_thread(cb_env.collection.binary().increment, key, **untyped_kwargs(delta=5))
 
         with pytest.raises(InvalidArgumentException):
-            run_in_reactor_thread(cb_env.collection.binary().decrement, key, delta=5)
+            run_in_reactor_thread(cb_env.collection.binary().decrement, key, **untyped_kwargs(delta=5))
 
     def test_counter_bad_initial_value(self, cb_env: TwistedTestEnvironment) -> None:
         key = cb_env.get_new_counter_doc_keys(1)[0]
 
         with pytest.raises(InvalidArgumentException):
-            run_in_reactor_thread(cb_env.collection.binary().increment, key, initial=100)
+            run_in_reactor_thread(cb_env.collection.binary().increment, key, **untyped_kwargs(initial=100))
 
         with pytest.raises(InvalidArgumentException):
-            run_in_reactor_thread(cb_env.collection.binary().decrement, key, initial=100)
+            run_in_reactor_thread(cb_env.collection.binary().decrement, key, **untyped_kwargs(initial=100))
 
     def test_counter_decrement(self, cb_env: TwistedTestEnvironment) -> None:
         key, value = cb_env.get_existing_doc_by_type(DocType.COUNTER)

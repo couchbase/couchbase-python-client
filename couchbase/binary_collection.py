@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.result import (CounterResult,
                               MultiCounterResult,
@@ -29,7 +29,17 @@ from couchbase.result import (CounterResult,
                               MutationResult)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._binary_collection import BinaryCollectionInterface
+    from couchbase.common.options import (AppendMultiOptionsKwargs,
+                                          AppendOptionsKwargs,
+                                          DecrementMultiOptionsKwargs,
+                                          DecrementOptionsKwargs,
+                                          IncrementMultiOptionsKwargs,
+                                          IncrementOptionsKwargs,
+                                          PrependMultiOptionsKwargs,
+                                          PrependOptionsKwargs)
     from couchbase.options import (AppendMultiOptions,
                                    AppendOptions,
                                    DecrementMultiOptions,
@@ -48,7 +58,7 @@ class BinaryCollection:
     def increment(self,
                   key: str,
                   opts: IncrementOptions | None = None,
-                  **kwargs: Any) -> CounterResult:
+                  **kwargs: Unpack[IncrementOptionsKwargs]) -> CounterResult:
         """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
@@ -93,7 +103,7 @@ class BinaryCollection:
     def decrement(self,
                   key: str,
                   opts: DecrementOptions | None = None,
-                  **kwargs: Any) -> CounterResult:
+                  **kwargs: Unpack[DecrementOptionsKwargs]) -> CounterResult:
         """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
         option (defaults to 1).
 
@@ -139,7 +149,7 @@ class BinaryCollection:
                key: str,
                value: str | bytes | bytearray,
                opts: AppendOptions | None = None,
-               **kwargs: Any) -> MutationResult:
+               **kwargs: Unpack[AppendOptionsKwargs]) -> MutationResult:
         """Appends the specified value to the beginning of document of the specified key.
 
         Args:
@@ -192,7 +202,7 @@ class BinaryCollection:
                 key: str,
                 value: str | bytes | bytearray,
                 opts: PrependOptions | None = None,
-                **kwargs: Any) -> MutationResult:
+                **kwargs: Unpack[PrependOptionsKwargs]) -> MutationResult:
         """Prepends the specified value to the beginning of document of the specified key.
 
         Args:
@@ -244,7 +254,7 @@ class BinaryCollection:
     def append_multi(self,
                      keys_and_values: Mapping[str, str | bytes | bytearray],
                      opts: AppendMultiOptions | None = None,
-                     **kwargs: Any) -> MultiMutationResult:
+                     **kwargs: Unpack[AppendMultiOptionsKwargs]) -> MultiMutationResult:
         """For each key-value pair, appends the specified value to the end of the document specified by the key.
 
         Args:
@@ -338,7 +348,7 @@ class BinaryCollection:
     def prepend_multi(self,
                       keys_and_values: Mapping[str, str | bytes | bytearray],
                       opts: PrependMultiOptions | None = None,
-                      **kwargs: Any) -> MultiMutationResult:
+                      **kwargs: Unpack[PrependMultiOptionsKwargs]) -> MultiMutationResult:
         """For each key-value pair, prepends the specified value to the beginning of the document specified
         by the key.
 
@@ -433,7 +443,7 @@ class BinaryCollection:
     def increment_multi(self,
                         keys: list[str],
                         opts: IncrementMultiOptions | None = None,
-                        **kwargs: Any) -> MultiCounterResult:
+                        **kwargs: Unpack[IncrementMultiOptionsKwargs]) -> MultiCounterResult:
         """For each key in the provided list, increments the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
 
@@ -516,7 +526,7 @@ class BinaryCollection:
     def decrement_multi(self,
                         keys: list[str],
                         opts: DecrementMultiOptions | None = None,
-                        **kwargs: Any) -> MultiCounterResult:
+                        **kwargs: Unpack[DecrementMultiOptionsKwargs]) -> MultiCounterResult:
         """For each key in the provided list, decrements the ASCII value of the document, specified by the key,
         by the amount indicated in the delta option (defaults to 1).
 

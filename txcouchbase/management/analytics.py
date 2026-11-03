@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from twisted.internet.defer import Deferred
 
@@ -46,7 +46,24 @@ from couchbase.common.management.analytics import (AnalyticsDataset,
                                                    S3ExternalAnalyticsLink)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._analytics_mgmt import TxAnalyticsMgmtInterface
+    from couchbase.common.management.options import (ConnectLinkOptionsKwargs,
+                                                     CreateAnalyticsIndexOptionsKwargs,
+                                                     CreateDatasetOptionsKwargs,
+                                                     CreateDataverseOptionsKwargs,
+                                                     CreateLinkAnalyticsOptionsKwargs,
+                                                     DisconnectLinkOptionsKwargs,
+                                                     DropAnalyticsIndexOptionsKwargs,
+                                                     DropDatasetOptionsKwargs,
+                                                     DropDataverseOptionsKwargs,
+                                                     DropLinkAnalyticsOptionsKwargs,
+                                                     GetAllAnalyticsIndexesOptionsKwargs,
+                                                     GetAllDatasetOptionsKwargs,
+                                                     GetLinksAnalyticsOptionsKwargs,
+                                                     GetPendingMutationsOptionsKwargs,
+                                                     ReplaceLinkAnalyticsOptionsKwargs)
     from couchbase.management.options import (ConnectLinkOptions,
                                               CreateAnalyticsIndexOptions,
                                               CreateDatasetOptions,
@@ -73,7 +90,7 @@ class AnalyticsIndexManager:
     def create_dataverse(self,
                          dataverse_name: str,
                          options: CreateDataverseOptions | None = None,
-                         **kwargs: Any) -> Deferred[None]:
+                         **kwargs: Unpack[CreateDataverseOptionsKwargs]) -> Deferred[None]:
         """Creates a new analytics dataverse.
 
         Args:
@@ -92,7 +109,7 @@ class AnalyticsIndexManager:
     def drop_dataverse(self,
                        dataverse_name: str,
                        options: DropDataverseOptions | None = None,
-                       **kwargs: Any) -> Deferred[None]:
+                       **kwargs: Unpack[DropDataverseOptionsKwargs]) -> Deferred[None]:
         """Drops an existing analytics dataverse.
 
         Args:
@@ -112,7 +129,7 @@ class AnalyticsIndexManager:
                        dataset_name: str,
                        bucket_name: str,
                        options: CreateDatasetOptions | None = None,
-                       **kwargs: Any) -> Deferred[None]:
+                       **kwargs: Unpack[CreateDatasetOptionsKwargs]) -> Deferred[None]:
         """Creates a new analytics dataset over a bucket.
 
         Args:
@@ -132,7 +149,7 @@ class AnalyticsIndexManager:
     def drop_dataset(self,
                      dataset_name: str,
                      options: DropDatasetOptions | None = None,
-                     **kwargs: Any) -> Deferred[None]:
+                     **kwargs: Unpack[DropDatasetOptionsKwargs]) -> Deferred[None]:
         """Drops an existing analytics dataset.
 
         Args:
@@ -149,7 +166,7 @@ class AnalyticsIndexManager:
 
     def get_all_datasets(self,
                          options: GetAllDatasetOptions | None = None,
-                         **kwargs: Any) -> Deferred[Iterable[AnalyticsDataset]]:
+                         **kwargs: Unpack[GetAllDatasetOptionsKwargs]) -> Deferred[Iterable[AnalyticsDataset]]:
         """Returns every analytics dataset.
 
         Args:
@@ -167,7 +184,7 @@ class AnalyticsIndexManager:
                      dataset_name: str,
                      fields: dict[str, AnalyticsDataType],
                      options: CreateAnalyticsIndexOptions | None = None,
-                     **kwargs: Any) -> Deferred[None]:
+                     **kwargs: Unpack[CreateAnalyticsIndexOptionsKwargs]) -> Deferred[None]:
         """Creates a new analytics index on a dataset.
 
         Args:
@@ -188,7 +205,7 @@ class AnalyticsIndexManager:
                    index_name: str,
                    dataset_name: str,
                    options: DropAnalyticsIndexOptions | None = None,
-                   **kwargs: Any) -> Deferred[None]:
+                   **kwargs: Unpack[DropAnalyticsIndexOptionsKwargs]) -> Deferred[None]:
         """Drops an existing analytics index.
 
         Args:
@@ -205,7 +222,7 @@ class AnalyticsIndexManager:
 
     def get_all_indexes(self,
                         options: GetAllAnalyticsIndexesOptions | None = None,
-                        **kwargs: Any) -> Deferred[Iterable[AnalyticsIndex]]:
+                        **kwargs: Unpack[GetAllAnalyticsIndexesOptionsKwargs]) -> Deferred[Iterable[AnalyticsIndex]]:
         """Returns every analytics index.
 
         Args:
@@ -218,7 +235,9 @@ class AnalyticsIndexManager:
         """
         return self._impl.get_all_indexes_deferred(options, **kwargs)
 
-    def connect_link(self, options: ConnectLinkOptions | None = None, **kwargs: Any) -> Deferred[None]:
+    def connect_link(self,
+                     options: ConnectLinkOptions | None = None,
+                     **kwargs: Unpack[ConnectLinkOptionsKwargs]) -> Deferred[None]:
         """Connects a link, so that its datasets start receiving data.
 
         Args:
@@ -227,7 +246,9 @@ class AnalyticsIndexManager:
         """
         return self._impl.connect_link_deferred(options, **kwargs)
 
-    def disconnect_link(self, options: DisconnectLinkOptions | None = None, **kwargs: Any) -> Deferred[None]:
+    def disconnect_link(self,
+                        options: DisconnectLinkOptions | None = None,
+                        **kwargs: Unpack[DisconnectLinkOptionsKwargs]) -> Deferred[None]:
         """Disconnects a link, so that its datasets stop receiving data.
 
         Args:
@@ -239,7 +260,7 @@ class AnalyticsIndexManager:
 
     def get_pending_mutations(self,
                               options: GetPendingMutationsOptions | None = None,
-                              **kwargs: Any) -> Deferred[dict[str, int]]:
+                              **kwargs: Unpack[GetPendingMutationsOptionsKwargs]) -> Deferred[dict[str, int]]:
         """Returns how many mutations each dataset has yet to process.
 
         Args:
@@ -255,7 +276,7 @@ class AnalyticsIndexManager:
     def create_link(self,
                     link: AnalyticsLink,
                     options: CreateLinkAnalyticsOptions | None = None,
-                    **kwargs: Any) -> Deferred[None]:
+                    **kwargs: Unpack[CreateLinkAnalyticsOptionsKwargs]) -> Deferred[None]:
         """Creates a new analytics link.
 
         Args:
@@ -276,7 +297,7 @@ class AnalyticsIndexManager:
     def replace_link(self,
                      link: AnalyticsLink,
                      options: ReplaceLinkAnalyticsOptions | None = None,
-                     **kwargs: Any) -> Deferred[None]:
+                     **kwargs: Unpack[ReplaceLinkAnalyticsOptionsKwargs]) -> Deferred[None]:
         """Replaces an existing analytics link.
 
         Args:
@@ -298,7 +319,7 @@ class AnalyticsIndexManager:
                   link_name: str,
                   dataverse_name: str,
                   options: DropLinkAnalyticsOptions | None = None,
-                  **kwargs: Any) -> Deferred[None]:
+                  **kwargs: Unpack[DropLinkAnalyticsOptionsKwargs]) -> Deferred[None]:
         """Drops an existing analytics link.
 
         Args:
@@ -317,7 +338,7 @@ class AnalyticsIndexManager:
 
     def get_links(self,
                   options: GetLinksAnalyticsOptions | None = None,
-                  **kwargs: Any) -> Deferred[Iterable[AnalyticsLink]]:
+                  **kwargs: Unpack[GetLinksAnalyticsOptionsKwargs]) -> Deferred[Iterable[AnalyticsLink]]:
         """Returns the analytics links, all of them unless the options narrow the search.
 
         Args:

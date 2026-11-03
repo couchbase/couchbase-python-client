@@ -274,14 +274,11 @@ class AttemptContextImpl:
         req = self._request_builder.build_replace_request(txn_get_result, value, transcoder)
         return TransactionGetResult(_execute(transaction_op, req), transcoder)
 
-    def remove(self, txn_get_result: TransactionGetResult, **kwargs: Any) -> None:
-        check_keywords('remove', kwargs)
+    def remove(self, txn_get_result: TransactionGetResult) -> None:
         _execute(transaction_op, self._request_builder.build_remove_request(txn_get_result))
 
     def query(self,
               query: str,
-              options: TransactionQueryOptions | None = None,
-              **kwargs: Any) -> TransactionQueryResults:
-        check_keywords('query', kwargs)
+              options: TransactionQueryOptions | None = None) -> TransactionQueryResults:
         req = self._request_builder.build_query_request(query, options)
         return TransactionQueryResults(_execute(transaction_query_op, req))

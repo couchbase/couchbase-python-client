@@ -20,7 +20,7 @@ __all__ = [
     'TxBucket',
 ]
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from twisted.internet.defer import Deferred
 
@@ -31,7 +31,10 @@ from txcouchbase.management.views import ViewIndexManager
 from txcouchbase.scope import Scope
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._bucket import TxBucketInterface
+    from couchbase.common.options import PingOptionsKwargs, ViewOptionsKwargs
     from couchbase.options import PingOptions, ViewOptions
     from txcouchbase.cluster import TxCluster
 
@@ -100,7 +103,7 @@ class Bucket:
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> Deferred[PingResult]:
+    def ping(self, opts: PingOptions | None = None, **kwargs: Unpack[PingOptionsKwargs]) -> Deferred[PingResult]:
         """Performs a ping operation against the bucket.
 
         The ping operation pings the services which are specified
@@ -120,7 +123,7 @@ class Bucket:
                    design_doc: str,
                    view_name: str,
                    view_options: ViewOptions | None = None,
-                   **kwargs: Any) -> Deferred[ViewResult]:
+                   **kwargs: Unpack[ViewOptionsKwargs]) -> Deferred[ViewResult]:
         """Executes a View query against the bucket.
 
         .. deprecated:: 4.6.0

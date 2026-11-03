@@ -34,9 +34,12 @@ from couchbase.options import (AnalyticsOptions,
                                SearchOptions)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from acouchbase.bucket import AsyncBucket
     from couchbase.common._interfaces._scope import AsyncScopeInterface
     from couchbase.common._utils import JSONType
+    from couchbase.common.options import SearchOptionsKwargs
     from couchbase.search import SearchQuery, SearchRequest
 
 
@@ -109,7 +112,9 @@ class AsyncScope:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.QueryOptions`
+                override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             :class:`~acouchbase.result.AsyncQueryResult`: An instance of a
@@ -183,7 +188,9 @@ class AsyncScope:
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~couchbase.options.AnalyticsOptions`
+                override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
+                options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
+                cannot collide with an option name.
 
         Returns:
             :class:`~acouchbase.result.AsyncAnalyticsResult`: An instance of a
@@ -242,7 +249,7 @@ class AsyncScope:
                      index: str,
                      query: SearchQuery,
                      options: SearchOptions | None = None,
-                     **kwargs: Any) -> AsyncSearchResult:
+                     **kwargs: Unpack[SearchOptionsKwargs]) -> AsyncSearchResult:
         """Executes an search query against the scope.
 
         .. deprecated:: 4.1.11
@@ -340,7 +347,7 @@ class AsyncScope:
                index: str,
                request: SearchRequest | SearchQuery,
                options: SearchOptions | None = None,
-               **kwargs: Any) -> AsyncSearchResult:
+               **kwargs: Unpack[SearchOptionsKwargs]) -> AsyncSearchResult:
         """Executes an search against the scope.
 
         .. note::

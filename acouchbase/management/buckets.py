@@ -28,7 +28,7 @@ __all__ = [
     'StorageBackend',
 ]
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.common.management.buckets import (BucketDescribeResult,
                                                  BucketSettings,
@@ -41,7 +41,16 @@ from couchbase.common.management.buckets import (BucketDescribeResult,
                                                  StorageBackend)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._bucket_mgmt import AsyncBucketMgmtInterface
+    from couchbase.common.management.options import (BucketDescribeOptionsKwargs,
+                                                     CreateBucketOptionsKwargs,
+                                                     DropBucketOptionsKwargs,
+                                                     FlushBucketOptionsKwargs,
+                                                     GetAllBucketOptionsKwargs,
+                                                     GetBucketOptionsKwargs,
+                                                     UpdateBucketOptionsKwargs)
     from couchbase.management.options import (BucketDescribeOptions,
                                               CreateBucketOptions,
                                               DropBucketOptions,
@@ -58,7 +67,7 @@ class BucketManager:
     async def create_bucket(self,
                             settings: CreateBucketSettings,
                             options: CreateBucketOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[CreateBucketOptionsKwargs]) -> None:
         """Creates a new bucket.
 
         Args:
@@ -78,7 +87,7 @@ class BucketManager:
     async def update_bucket(self,
                             settings: BucketSettings,
                             options: UpdateBucketOptions | None = None,
-                            **kwargs: Any) -> None:
+                            **kwargs: Unpack[UpdateBucketOptionsKwargs]) -> None:
         """Update the settings for an existing bucket.
 
         Args:
@@ -97,7 +106,7 @@ class BucketManager:
     async def drop_bucket(self,
                           bucket_name: str,
                           options: DropBucketOptions | None = None,
-                          **kwargs: Any) -> None:
+                          **kwargs: Unpack[DropBucketOptionsKwargs]) -> None:
         """Drops an existing bucket.
 
         Args:
@@ -115,7 +124,7 @@ class BucketManager:
     async def get_bucket(self,
                          bucket_name: str,
                          options: GetBucketOptions | None = None,
-                         **kwargs: Any) -> BucketSettings:
+                         **kwargs: Unpack[GetBucketOptionsKwargs]) -> BucketSettings:
         """Fetches the settings in use for a specified bucket.
 
         Args:
@@ -135,7 +144,7 @@ class BucketManager:
 
     async def get_all_buckets(self,
                               options: GetAllBucketOptions | None = None,
-                              **kwargs: Any) -> list[BucketSettings]:
+                              **kwargs: Unpack[GetAllBucketOptionsKwargs]) -> list[BucketSettings]:
         """Returns a list of existing buckets in the cluster.
 
         Args:
@@ -152,7 +161,7 @@ class BucketManager:
     async def flush_bucket(self,
                            bucket_name: str,
                            options: FlushBucketOptions | None = None,
-                           **kwargs: Any) -> None:
+                           **kwargs: Unpack[FlushBucketOptionsKwargs]) -> None:
         """Flushes the bucket, deleting all the existing data that is stored in it.
 
         Args:
@@ -172,7 +181,7 @@ class BucketManager:
     async def bucket_describe(self,
                               bucket_name: str,
                               options: BucketDescribeOptions | None = None,
-                              **kwargs: Any) -> BucketDescribeResult:
+                              **kwargs: Unpack[BucketDescribeOptionsKwargs]) -> BucketDescribeResult:
         """Provides details on provided the bucket.
 
         Args:

@@ -25,9 +25,7 @@ __all__ = [
 
 import sys
 from collections.abc import Iterable
-from typing import (TYPE_CHECKING,
-                    Any,
-                    overload)
+from typing import TYPE_CHECKING, overload
 
 if sys.version_info >= (3, 13):
     from warnings import deprecated
@@ -47,8 +45,15 @@ from couchbase.management.options import (CreateCollectionOptions,
 
 if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
+    from typing_extensions import Unpack
 
     from couchbase.common._interfaces._collection_mgmt import TxCollectionMgmtInterface
+    from couchbase.common.management.options import (CreateCollectionOptionsKwargs,
+                                                     CreateScopeOptionsKwargs,
+                                                     DropCollectionOptionsKwargs,
+                                                     DropScopeOptionsKwargs,
+                                                     GetAllScopesOptionsKwargs,
+                                                     UpdateCollectionOptionsKwargs)
 
 
 class CollectionManager:
@@ -59,7 +64,7 @@ class CollectionManager:
     def create_scope(self,
                      scope_name: str,
                      options: CreateScopeOptions | None = None,
-                     **kwargs: Any) -> Deferred[None]:
+                     **kwargs: Unpack[CreateScopeOptionsKwargs]) -> Deferred[None]:
         """Creates a new scope.
 
         Args:
@@ -80,7 +85,7 @@ class CollectionManager:
     def drop_scope(self,
                    scope_name: str,
                    options: DropScopeOptions | None = None,
-                   **kwargs: Any) -> Deferred[None]:
+                   **kwargs: Unpack[DropScopeOptionsKwargs]) -> Deferred[None]:
         """Drops an existing scope.
 
         Args:
@@ -100,7 +105,7 @@ class CollectionManager:
 
     def get_all_scopes(self,
                        options: GetAllScopesOptions | None = None,
-                       **kwargs: Any) -> Deferred[Iterable[ScopeSpec]]:
+                       **kwargs: Unpack[GetAllScopesOptionsKwargs]) -> Deferred[Iterable[ScopeSpec]]:
         """Returns all configured scopes along with their collections.
 
         Args:
@@ -120,7 +125,7 @@ class CollectionManager:
     def create_collection(self,
                           collection: CollectionSpec,
                           options: CreateCollectionOptions | None = None,
-                          **kwargs: Any
+                          **kwargs: Unpack[CreateCollectionOptionsKwargs]
                           ) -> Deferred[None]:
         ...
 
@@ -130,7 +135,7 @@ class CollectionManager:
                           collection_name: str,
                           settings: CreateCollectionSettings | None = None,
                           options: CreateCollectionOptions | None = None,
-                          **kwargs: Any
+                          **kwargs: Unpack[CreateCollectionOptionsKwargs]
                           ) -> Deferred[None]:
         ...
 
@@ -164,7 +169,7 @@ class CollectionManager:
                           collection_name: str,
                           settings: UpdateCollectionSettings,
                           options: UpdateCollectionOptions | None = None,
-                          **kwargs: Any) -> Deferred[None]:
+                          **kwargs: Unpack[UpdateCollectionOptionsKwargs]) -> Deferred[None]:
         """Updates a collection in a specified scope.
 
         Args:
@@ -189,7 +194,7 @@ class CollectionManager:
     def drop_collection(self,
                         collection: CollectionSpec,
                         options: DropCollectionOptions | None = None,
-                        **kwargs: Any
+                        **kwargs: Unpack[DropCollectionOptionsKwargs]
                         ) -> Deferred[None]:
         ...
 
@@ -198,7 +203,7 @@ class CollectionManager:
                         scope_name: str,
                         collection_name: str,
                         options: DropCollectionOptions | None = None,
-                        **kwargs: Any) -> Deferred[None]:
+                        **kwargs: Unpack[DropCollectionOptionsKwargs]) -> Deferred[None]:
         ...
 
     def drop_collection(self, *args: object, **kwargs: object) -> Deferred[None]:

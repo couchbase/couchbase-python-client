@@ -60,6 +60,7 @@ from tests.suite_fixtures import TopologySuite
 from tests.test_features import (EnvironmentFeatures,
                                  ServerFeatures,
                                  TestProtocol)
+from tests.untyped import untyped_kwargs
 
 # Hoisted out of the decorator below.  Inline, the same comprehension needs two `# noqa: E501`
 # to fit, and the noqa hides the expression rather than the line length.
@@ -934,7 +935,7 @@ class SubDocumentTestSuite(TopologySuite):
         with pytest.raises(DocumentExistsException):
             cb_env.collection.mutate_in(key,
                                         (SD.insert('new_path', 'im new'),),
-                                        insert_doc=True)
+                                        **untyped_kwargs(insert_doc=True))
 
     def test_mutate_in_insert_semantics_kwargs(self, cb_env: SyncTestEnvironment) -> None:
         key = cb_env.get_new_doc(key_only=True)
@@ -944,7 +945,7 @@ class SubDocumentTestSuite(TopologySuite):
 
         cb_env.collection.mutate_in(key,
                                     (SD.insert('new_path', 'im new'),),
-                                    insert_doc=True)
+                                    **untyped_kwargs(insert_doc=True))
 
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
@@ -1121,14 +1122,14 @@ class SubDocumentTestSuite(TopologySuite):
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.mutate_in(key,
                                         (SD.upsert('new_path', 'im new'),),
-                                        replace_doc=True)
+                                        **untyped_kwargs(replace_doc=True))
 
     def test_mutate_in_replace_semantics_kwargs(self, cb_env: SyncTestEnvironment) -> None:
         key = cb_env.get_existing_doc_by_type(DocType.VEHICLE, key_only=True)
 
         cb_env.collection.mutate_in(key,
                                     (SD.upsert('new_path', 'im new'),),
-                                    replace_doc=True)
+                                    **untyped_kwargs(replace_doc=True))
 
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict]['new_path'] == 'im new'
@@ -1189,17 +1190,17 @@ class SubDocumentTestSuite(TopologySuite):
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.mutate_in(key,
                                         (SD.upsert('new_path', 'im new'),),
-                                        insert_doc=True, upsert_doc=True)
+                                        **untyped_kwargs(insert_doc=True, upsert_doc=True))
 
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.mutate_in(key,
                                         (SD.upsert('new_path', 'im new'),),
-                                        insert_doc=True, replace_doc=True)
+                                        **untyped_kwargs(insert_doc=True, replace_doc=True))
 
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.mutate_in(key,
                                         (SD.upsert('new_path', 'im new'),),
-                                        upsert_doc=True, replace_doc=True)
+                                        **untyped_kwargs(upsert_doc=True, replace_doc=True))
 
     def test_mutate_in_upsert_semantics(self, cb_env: SyncTestEnvironment) -> None:
         key = cb_env.get_new_doc(key_only=True)
@@ -1222,7 +1223,7 @@ class SubDocumentTestSuite(TopologySuite):
 
         cb_env.collection.mutate_in(key,
                                     (SD.upsert('new_path', 'im new'),),
-                                    upsert_doc=True)
+                                    **untyped_kwargs(upsert_doc=True))
 
         res = TestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}

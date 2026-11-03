@@ -238,14 +238,11 @@ class AsyncAttemptContextImpl:
         req = self._request_builder.build_replace_request(txn_get_result, value, transcoder)
         return self._execute(transaction_op, req, lambda res: TransactionGetResult(res, transcoder))
 
-    def remove(self, txn_get_result: TransactionGetResult, **kwargs: Any) -> Future[None]:
-        check_keywords('remove', kwargs)
+    def remove(self, txn_get_result: TransactionGetResult) -> Future[None]:
         return self._execute(transaction_op, self._request_builder.build_remove_request(txn_get_result), _discard)
 
     def query(self,
               query: str,
-              options: TransactionQueryOptions | None = None,
-              **kwargs: Any) -> Future[TransactionQueryResults]:
-        check_keywords('query', kwargs)
+              options: TransactionQueryOptions | None = None) -> Future[TransactionQueryResults]:
         req = self._request_builder.build_query_request(query, options)
         return self._execute(transaction_query_op, req, TransactionQueryResults)

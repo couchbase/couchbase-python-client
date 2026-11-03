@@ -19,7 +19,7 @@ __all__ = [
     'Bucket',
 ]
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.collection import Collection
 from couchbase.common import options
@@ -30,6 +30,8 @@ from couchbase.result import PingResult, ViewResult
 from couchbase.scope import Scope
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.cluster import Cluster
     from couchbase.common._interfaces._bucket import BucketInterface
 
@@ -112,7 +114,7 @@ class Bucket:
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    def ping(self, opts: options.PingOptions | None = None, **kwargs: Any) -> PingResult:
+    def ping(self, opts: options.PingOptions | None = None, **kwargs: Unpack[options.PingOptionsKwargs]) -> PingResult:
         """Performs a ping operation against the bucket.
 
         The ping operation pings the services which are specified
@@ -133,7 +135,7 @@ class Bucket:
                    design_doc: str,
                    view_name: str,
                    view_options: options.ViewOptions | None = None,
-                   **kwargs: Any) -> ViewResult:
+                   **kwargs: Unpack[options.ViewOptionsKwargs]) -> ViewResult:
         """Executes a View query against the bucket.
 
         .. deprecated:: 4.6.0

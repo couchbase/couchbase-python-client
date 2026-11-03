@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from twisted.internet.defer import Deferred
 
@@ -40,7 +40,19 @@ from couchbase.common.management.users import (Group,
                                                UserAndMetadata)
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from couchbase.common._interfaces._user_mgmt import TxUserMgmtInterface
+    from couchbase.common.management.options import (ChangePasswordOptionsKwargs,
+                                                     DropGroupOptionsKwargs,
+                                                     DropUserOptionsKwargs,
+                                                     GetAllGroupsOptionsKwargs,
+                                                     GetAllUsersOptionsKwargs,
+                                                     GetGroupOptionsKwargs,
+                                                     GetRolesOptionsKwargs,
+                                                     GetUserOptionsKwargs,
+                                                     UpsertGroupOptionsKwargs,
+                                                     UpsertUserOptionsKwargs)
     from couchbase.management.options import (ChangePasswordOptions,
                                               DropGroupOptions,
                                               DropUserOptions,
@@ -61,7 +73,7 @@ class UserManager:
     def get_user(self,
                  username: str,
                  options: GetUserOptions | None = None,
-                 **kwargs: Any) -> Deferred[UserAndMetadata]:
+                 **kwargs: Unpack[GetUserOptionsKwargs]) -> Deferred[UserAndMetadata]:
         """Returns a user by its username.
 
         Args:
@@ -81,7 +93,7 @@ class UserManager:
 
     def get_all_users(self,
                       options: GetAllUsersOptions | None = None,
-                      **kwargs: Any) -> Deferred[Iterable[UserAndMetadata]]:
+                      **kwargs: Unpack[GetAllUsersOptionsKwargs]) -> Deferred[Iterable[UserAndMetadata]]:
         """Returns a list of all existing users.
 
         Args:
@@ -98,7 +110,7 @@ class UserManager:
     def upsert_user(self,
                     user: User,
                     options: UpsertUserOptions | None = None,
-                    **kwargs: Any) -> Deferred[None]:
+                    **kwargs: Unpack[UpsertUserOptionsKwargs]) -> Deferred[None]:
         """Creates a new user or updates an existing user.
 
         Args:
@@ -117,7 +129,7 @@ class UserManager:
     def drop_user(self,
                   username: str,
                   options: DropUserOptions | None = None,
-                  **kwargs: Any) -> Deferred[None]:
+                  **kwargs: Unpack[DropUserOptionsKwargs]) -> Deferred[None]:
         """Drops an existing user.
 
         Args:
@@ -135,7 +147,7 @@ class UserManager:
     def change_password(self,
                         new_password: str,
                         options: ChangePasswordOptions | None = None,
-                        **kwargs: Any) -> Deferred[None]:
+                        **kwargs: Unpack[ChangePasswordOptionsKwargs]) -> Deferred[None]:
         """Changes the password of the currently authenticated user. SDK must be re-started and a new connection
          established after running, as the previous credentials will no longer be valid.
 
@@ -154,7 +166,7 @@ class UserManager:
 
     def get_roles(self,
                   options: GetRolesOptions | None = None,
-                  **kwargs: Any) -> Deferred[Iterable[RoleAndDescription]]:
+                  **kwargs: Unpack[GetRolesOptionsKwargs]) -> Deferred[Iterable[RoleAndDescription]]:
         """Returns a list of roles available on the server.
 
         Args:
@@ -171,7 +183,7 @@ class UserManager:
     def get_group(self,
                   group_name: str,
                   options: GetGroupOptions | None = None,
-                  **kwargs: Any) -> Deferred[Group]:
+                  **kwargs: Unpack[GetGroupOptionsKwargs]) -> Deferred[Group]:
         """Returns a group by it's name.
 
         Args:
@@ -189,7 +201,9 @@ class UserManager:
         """
         return self._impl.get_group_deferred(group_name, options, **kwargs)
 
-    def get_all_groups(self, options: GetAllGroupsOptions | None = None, **kwargs: Any) -> Deferred[Iterable[Group]]:
+    def get_all_groups(self,
+                       options: GetAllGroupsOptions | None = None,
+                       **kwargs: Unpack[GetAllGroupsOptionsKwargs]) -> Deferred[Iterable[Group]]:
         """Returns a list of all existing groups.
 
         Args:
@@ -206,7 +220,7 @@ class UserManager:
     def upsert_group(self,
                      group: Group,
                      options: UpsertGroupOptions | None = None,
-                     **kwargs: Any) -> Deferred[None]:
+                     **kwargs: Unpack[UpsertGroupOptionsKwargs]) -> Deferred[None]:
         """Creates a new group or updates an existing group.
 
         Args:
@@ -225,7 +239,7 @@ class UserManager:
     def drop_group(self,
                    group_name: str,
                    options: DropGroupOptions | None = None,
-                   **kwargs: Any) -> Deferred[None]:
+                   **kwargs: Unpack[DropGroupOptionsKwargs]) -> Deferred[None]:
         """Drops an existing group.
 
         Args:

@@ -20,7 +20,7 @@ __all__ = [
     'Bucket',
 ]
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from acouchbase.collection import Collection
 from acouchbase.management.collections import CollectionManager
@@ -30,8 +30,11 @@ from acouchbase.scope import Scope
 from couchbase.result import PingResult
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from acouchbase.cluster import AsyncCluster
     from couchbase.common._interfaces._bucket import AsyncBucketInterface
+    from couchbase.common.options import PingOptionsKwargs, ViewOptionsKwargs
     from couchbase.options import PingOptions, ViewOptions
 
 
@@ -125,7 +128,7 @@ class AsyncBucket:
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
-    async def ping(self, opts: PingOptions | None = None, **kwargs: Any) -> PingResult:
+    async def ping(self, opts: PingOptions | None = None, **kwargs: Unpack[PingOptionsKwargs]) -> PingResult:
         """Performs a ping operation against the bucket.
 
         The ping operation pings the services which are specified
@@ -146,7 +149,7 @@ class AsyncBucket:
                    design_doc: str,
                    view_name: str,
                    view_options: ViewOptions | None = None,
-                   **kwargs: Any) -> AsyncViewResult:
+                   **kwargs: Unpack[ViewOptionsKwargs]) -> AsyncViewResult:
         """Executes a View query against the bucket.
 
         .. deprecated:: 4.6.0

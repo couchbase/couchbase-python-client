@@ -21,10 +21,18 @@ __all__ = [
 ]
 
 import logging
+import sys
 from collections.abc import (Awaitable,
                              Callable,
                              Coroutine)
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    overload)
+
+if sys.version_info >= (3, 13):
+    from warnings import deprecated
+else:
+    from typing_extensions import deprecated
 
 from couchbase.common._capabilities import Capability, require
 from couchbase.common._supportability import Supportability
@@ -34,9 +42,17 @@ from couchbase.common.exceptions import (TransactionExpired,
 from couchbase.transactions.transaction_result import TransactionResult
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
     from acouchbase.collection import AsyncCollection
     from couchbase.common._interfaces._transactions import AsyncAttemptContextInterface, AsyncTransactionsInterface
     from couchbase.common._utils import JSONType
+    from couchbase.common.options import (TransactionGetMultiOptionsKwargs,
+                                          TransactionGetMultiReplicasFromPreferredServerGroupOptionsKwargs,
+                                          TransactionGetOptionsKwargs,
+                                          TransactionGetReplicaFromPreferredServerGroupOptionsKwargs,
+                                          TransactionInsertOptionsKwargs,
+                                          TransactionReplaceOptionsKwargs)
     from couchbase.options import (TransactionGetMultiOptions,
                                    TransactionGetMultiReplicasFromPreferredServerGroupOptions,
                                    TransactionGetOptions,
@@ -61,6 +77,20 @@ class Transactions:
     def __init__(self, impl: AsyncTransactionsInterface) -> None:
         self._impl = impl
 
+    @overload
+    @deprecated("Pass ``transaction_options`` instead of ``per_txn_config``.")
+    async def run(self,
+                  txn_logic: Callable[[AttemptContext], Coroutine[Any, Any, None]],
+                  *,
+                  per_txn_config: TransactionOptions) -> TransactionResult:
+        ...
+
+    @overload
+    async def run(self,
+                  txn_logic: Callable[[AttemptContext], Coroutine[Any, Any, None]],
+                  transaction_options: TransactionOptions | None = None) -> TransactionResult:
+        ...
+
     async def run(self,
                   txn_logic: Callable[[AttemptContext], Coroutine[Any, Any, None]],
                   transaction_options: TransactionOptions | None = None,
@@ -72,10 +102,10 @@ class Transactions:
                 transaction logic to perform.
             transaction_options (:class:`~couchbase.options.TransactionOptions`): Options to override those in the
                 :class:`~couchbase.options.TransactionConfig` for this transaction only.
-            **kwargs (dict[str, Any]): Override options for this transaction only - currently unimplemented.
+            per_txn_config (:class:`~couchbase.options.TransactionOptions`): The same as ``transaction_options``.
 
                 .. deprecated:: 4.1.0
-                    The ``per_txn_config`` keyword is deprecated; pass ``transaction_options`` instead.
+                    Pass ``transaction_options`` instead.
 
         Returns:
             :class:`~couchbase.transactions.TransactionResult`: Results of the transaction.
@@ -141,7 +171,7 @@ class AttemptContext:
             coll: AsyncCollection,
             key: str,
             options: TransactionGetOptions | None = None,
-            **kwargs: Any) -> Awaitable[TransactionGetResult]:
+            **kwargs: Unpack[TransactionGetOptionsKwargs]) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction.
 
@@ -167,7 +197,7 @@ class AttemptContext:
             coll: AsyncCollection,
             key: str,
             options: TransactionGetReplicaFromPreferredServerGroupOptions | None = None,
-            **kwargs: Any
+            **kwargs: Unpack[TransactionGetReplicaFromPreferredServerGroupOptionsKwargs]
     ) -> Awaitable[TransactionGetResult]:
         """
         Get a document within this transaction from any replica in the preferred server group that is specified in
@@ -197,7 +227,7 @@ class AttemptContext:
     def get_multi(self,
                   specs: list[TransactionGetMultiSpec] | tuple[TransactionGetMultiSpec, ...],
                   options: TransactionGetMultiOptions | None = None,
-                  **kwargs: Any) -> Awaitable[TransactionGetMultiResult]:
+                  **kwargs: Unpack[TransactionGetMultiOptionsKwargs]) -> Awaitable[TransactionGetMultiResult]:
         """
         Get a document within this transaction.
 
@@ -223,7 +253,7 @@ class AttemptContext:
             specs: (list[TransactionGetMultiReplicasFromPreferredServerGroupSpec]
                     | tuple[TransactionGetMultiReplicasFromPreferredServerGroupSpec, ...]),
             options: TransactionGetMultiReplicasFromPreferredServerGroupOptions | None = None,
-            **kwargs: Any
+            **kwargs: Unpack[TransactionGetMultiReplicasFromPreferredServerGroupOptionsKwargs]
     ) -> Awaitable[TransactionGetMultiReplicasFromPreferredServerGroupResult]:
         """
         Get multiple documents within this transaction from any replica.
@@ -251,7 +281,7 @@ class AttemptContext:
                key: str,
                value: JSONType,
                options: TransactionInsertOptions | None = None,
-               **kwargs: Any) -> Awaitable[TransactionGetResult]:
+               **kwargs: Unpack[TransactionInsertOptionsKwargs]) -> Awaitable[TransactionGetResult]:
         """
         Insert a new document within a transaction.
 
@@ -277,7 +307,7 @@ class AttemptContext:
                 txn_get_result: TransactionGetResult,
                 value: JSONType,
                 options: TransactionReplaceOptions | None = None,
-                **kwargs: Any) -> Awaitable[TransactionGetResult]:
+                **kwargs: Unpack[TransactionReplaceOptionsKwargs]) -> Awaitable[TransactionGetResult]:
         """
         Replace the contents of a document within a transaction.
 
@@ -298,32 +328,29 @@ class AttemptContext:
         """
         return self._impl.replace(txn_get_result, value, options, **kwargs)
 
-    def remove(self, txn_get_result: TransactionGetResult, **kwargs: Any) -> Awaitable[None]:
+    def remove(self, txn_get_result: TransactionGetResult) -> Awaitable[None]:
         """
         Remove a document in a transaction.
 
         Args:
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to delete.
-            **kwargs (dict[str, Any]): currently unused.
         Returns:
             Awaitable[None]
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
         """
-        return self._impl.remove(txn_get_result, **kwargs)
+        return self._impl.remove(txn_get_result)
 
     def query(self,
               query: str,
-              options: TransactionQueryOptions | None = None,
-              **kwargs: Any) -> Awaitable[TransactionQueryResults]:
+              options: TransactionQueryOptions | None = None) -> Awaitable[TransactionQueryResults]:
         """
         Perform a query within a transaction.
 
         Args:
             query (str): Query to perform.
             options (:class:`couchbase.transactions.TransactionQueryOptions`): Query options to use, if any.
-            **kwargs (dict[str, Any]): currently unused.
 
         Returns:
             Awaitable[:class:`couchbase.transactions.TransactionQueryResult`]
@@ -334,4 +361,4 @@ class AttemptContext:
                 necessarily be rolled back, a CouchbaseException other than TransactionOperationFailed will be raised.
                 If handled, the transaction will not rollback.
         """
-        return require(self._impl, Capability.TRANSACTIONS_QUERY).query(query, options, **kwargs)
+        return require(self._impl, Capability.TRANSACTIONS_QUERY).query(query, options)

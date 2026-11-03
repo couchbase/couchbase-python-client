@@ -33,6 +33,7 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterOptions
 from tests.manifest import validate_test_manifest
 from tests.test_features import TestProtocol
+from tests.untyped import SKIP_CONNECT
 
 CONNSTR = 'couchbase://localhost'
 NUM_THREADS = 16
@@ -80,7 +81,7 @@ class TransactionsPropertyRaceTestSuite:
     def cluster_without_core_connection(self) -> Cluster:
         return Cluster(CONNSTR,
                        ClusterOptions(PasswordAuthenticator('Administrator', 'password')),
-                       skip_connect='TEST_SKIP_CONNECT')
+                       **SKIP_CONNECT)
 
     @pytest.fixture(name='race_cluster')
     def cluster_with_the_connection_guard_stubbed(self,

@@ -61,6 +61,7 @@ from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
 from tests.test_features import EnvironmentFeatures, ServerFeatures
 from tests.tracing_validators import KeyValueSpanValidator
+from tests.untyped import untyped_kwargs
 
 ONE_SECOND = timedelta(seconds=1)
 FIVE_SECONDS = timedelta(seconds=5)
@@ -619,7 +620,7 @@ class KeyValueTracingTestSuite(TopologySuite):
 
         key, value = cb_env.get_new_doc()
         parent = kv_validator.new_parent_span(Op.Insert)
-        await cb_env.collection.insert(key, value, span=parent)
+        await cb_env.collection.insert(key, value, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Insert, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -630,7 +631,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Replace, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Replace)
-        await cb_env.collection.replace(key, value, span=parent)
+        await cb_env.collection.replace(key, value, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Replace, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -641,7 +642,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Upsert, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Upsert)
-        await cb_env.collection.upsert(key, value, span=parent)
+        await cb_env.collection.upsert(key, value, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Upsert, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -652,7 +653,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Exists, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Exists)
-        await cb_env.collection.exists(key, span=parent)
+        await cb_env.collection.exists(key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Exists, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -663,7 +664,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.Get, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.Get)
-        await cb_env.collection.get(key, span=parent)
+        await cb_env.collection.get(key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Get, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -677,7 +678,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.GetAllReplicas, parent_span=parent, nested_ops=REPLICA_READ_OPS)
 
         parent = kv_validator.new_parent_span(Op.GetAllReplicas)
-        await cb_env.collection.get_all_replicas(key, span=parent)
+        await cb_env.collection.get_all_replicas(key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.GetAllReplicas, parent_span=parent, nested_ops=REPLICA_READ_OPS)
 
     @pytest.mark.asyncio
@@ -695,7 +696,7 @@ class KeyValueTracingTestSuite(TopologySuite):
                                     server_duration_gt_zero=False)
 
         parent = kv_validator.new_parent_span(Op.GetAnyReplica)
-        await cb_env.collection.get_any_replica(key, span=parent)
+        await cb_env.collection.get_any_replica(key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.GetAnyReplica,
                                     parent_span=parent,
                                     nested_ops=REPLICA_READ_OPS,
@@ -712,7 +713,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         # A fresh key, because the one above is still locked.
         key = await cb_env.get_existing_doc(key_only=True)
         parent = kv_validator.new_parent_span(Op.GetAndLock)
-        await cb_env.collection.get_and_lock(key, ONE_SECOND, span=parent)
+        await cb_env.collection.get_and_lock(key, ONE_SECOND, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.GetAndLock, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -725,7 +726,7 @@ class KeyValueTracingTestSuite(TopologySuite):
 
         key = await cb_env.get_existing_doc(key_only=True)
         parent = kv_validator.new_parent_span(Op.GetAndTouch)
-        await cb_env.collection.get_and_touch(key, ONE_SECOND, span=parent)
+        await cb_env.collection.get_and_touch(key, ONE_SECOND, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.GetAndTouch, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -737,7 +738,7 @@ class KeyValueTracingTestSuite(TopologySuite):
 
         key = await cb_env.get_existing_doc(key_only=True)
         parent = kv_validator.new_parent_span(Op.Touch)
-        await cb_env.collection.touch(key, ONE_SECOND, span=parent)
+        await cb_env.collection.touch(key, ONE_SECOND, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Touch, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -749,7 +750,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.LookupIn, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.LookupIn)
-        await cb_env.collection.lookup_in(key, LOOKUP_IN_SPECS, span=parent)
+        await cb_env.collection.lookup_in(key, LOOKUP_IN_SPECS, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.LookupIn, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -768,7 +769,7 @@ class KeyValueTracingTestSuite(TopologySuite):
                                     nested_ops=SUBDOC_REPLICA_READ_OPS)
 
         parent = kv_validator.new_parent_span(Op.LookupInAllReplicas)
-        await cb_env.collection.lookup_in_all_replicas(key, LOOKUP_IN_SPECS, span=parent)
+        await cb_env.collection.lookup_in_all_replicas(key, LOOKUP_IN_SPECS, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.LookupInAllReplicas,
                                     parent_span=parent,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS)
@@ -791,7 +792,7 @@ class KeyValueTracingTestSuite(TopologySuite):
                                     server_duration_gt_zero=False)
 
         parent = kv_validator.new_parent_span(Op.LookupInAnyReplica)
-        await cb_env.collection.lookup_in_any_replica(key, LOOKUP_IN_SPECS, span=parent)
+        await cb_env.collection.lookup_in_any_replica(key, LOOKUP_IN_SPECS, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.LookupInAnyReplica,
                                     parent_span=parent,
                                     nested_ops=SUBDOC_REPLICA_READ_OPS,
@@ -806,7 +807,7 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.MutateIn, parent_span=parent)
 
         parent = kv_validator.new_parent_span(Op.MutateIn)
-        await cb_env.collection.mutate_in(key, MUTATE_IN_SPECS, span=parent)
+        await cb_env.collection.mutate_in(key, MUTATE_IN_SPECS, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.MutateIn, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -818,7 +819,7 @@ class KeyValueTracingTestSuite(TopologySuite):
 
         key = await cb_env.get_existing_doc(key_only=True)
         parent = kv_validator.new_parent_span(Op.Remove)
-        await cb_env.collection.remove(key, span=parent)
+        await cb_env.collection.remove(key, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Remove, parent_span=parent)
 
     @pytest.mark.asyncio
@@ -831,7 +832,7 @@ class KeyValueTracingTestSuite(TopologySuite):
 
         result = await cb_env.collection.get_and_lock(key, FIVE_SECONDS)
         parent = kv_validator.new_parent_span(Op.Unlock)
-        await cb_env.collection.unlock(key, result.cas, span=parent)
+        await cb_env.collection.unlock(key, result.cas, **untyped_kwargs(span=parent))
         kv_validator.validate_kv_op(Op.Unlock, parent_span=parent)
 
 
