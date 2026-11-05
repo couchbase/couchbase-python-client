@@ -32,5 +32,5 @@ class TransactionQueryResults:
     def execute(self) -> None:
         return
 
-    def __str__(self) -> str:
-        return f'TransactionQueryResult{{res={self._res}}}'
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}(res={self._res})'

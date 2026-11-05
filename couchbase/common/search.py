@@ -105,7 +105,7 @@ class SearchMetrics:
         return self._record.total_rows
 
     def __repr__(self) -> str:
-        return f'SearchMetrics:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class SearchMetaData:
@@ -126,7 +126,7 @@ class SearchMetaData:
         return self._record.client_context_id
 
     def __repr__(self) -> str:
-        return f'SearchMetaData:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 @dataclass
@@ -245,9 +245,7 @@ class SearchRowLocations:
         return self._locations == other._locations
 
     def __repr__(self) -> str:
-        if self._locations:
-            return f'SearchRowLocations({list(self._locations)})'
-        return str(None)
+        return f'{type(self).__name__}({list(self._locations)})'
 
 
 class SearchRowFields(dict):
@@ -441,6 +439,9 @@ class Sort:
         """
         return _encode_sort(self)
 
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.as_encodable()})'
+
 
 class SortScore(Sort):
     """
@@ -599,6 +600,9 @@ class Facet:
     @field.setter
     def field(self, value: str) -> None:
         self._field = _required(self, 'field', value)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.encodable})'
 
 
 class TermFacet(Facet):

@@ -51,7 +51,7 @@ class ViewMetaData:
         return self._record.total_rows
 
     def __repr__(self) -> str:
-        return f'ViewMetaData({asdict(self._record)})'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 @dataclass

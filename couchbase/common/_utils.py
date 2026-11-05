@@ -49,3 +49,22 @@ def to_form_str(params: dict[str, Any]) -> str:
         encoded_params.append('{0}={1}'.format(quote(k), quote(str(v))))
 
     return '&'.join(encoded_params)
+
+
+class _Redacted:
+    def __repr__(self) -> str:
+        return '<redacted>'
+
+
+_REDACTED = _Redacted()
+
+
+def redacted(value: object) -> object:
+    """Stands in for a secret in a repr, keeping only whether it is set."""
+    return None if value is None else _REDACTED
+
+
+def fields_repr(obj: object, **fields: object) -> str:
+    """``Name(key=value, ...)``, the name taken from the object's class so a subclass prints its own."""
+    body = ', '.join(f'{k}={v!r}' for k, v in fields.items())
+    return f'{type(obj).__name__}({body})'

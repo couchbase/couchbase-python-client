@@ -4,6 +4,7 @@ __all__ = [
     'SearchRequest',
 ]
 
+from couchbase.common._utils import fields_repr
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.search_queries import SearchQuery
 from couchbase.common.vector_search import VectorSearch
@@ -119,3 +120,9 @@ class SearchRequest:
             :class:`~couchbase.search.SearchRequest`: The created search request.
         """
         return cls(query)
+
+    def __repr__(self) -> str:
+        if self._search_query is None:
+            return fields_repr(self, query=self._vector_search)
+        text = fields_repr(self, query=self._search_query)
+        return text if self._vector_search is None else f'{text}.with_vector_search({self._vector_search!r})'

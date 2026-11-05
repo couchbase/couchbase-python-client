@@ -22,6 +22,7 @@ __all__ = [
 import logging
 from typing import Any, Protocol
 
+from couchbase.common._utils import fields_repr
 from couchbase.common.result import ContentProxy
 from couchbase.common.transcoder import Transcoder
 
@@ -62,5 +63,6 @@ class TransactionGetResult:
             self._decoded_value = self._transcoder.decode_value(val, flags)
         return ContentProxy(self._decoded_value)
 
-    def __str__(self) -> str:
-        return f'TransactionGetResult{{id={self.id}, cas={self.cas}, value={self.content_as[str]} }}'
+    def __repr__(self) -> str:
+        value, flags = self._res.get('value')
+        return fields_repr(self, id=self.id, cas=self.cas, value=value, flags=flags)

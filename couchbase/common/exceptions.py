@@ -200,7 +200,7 @@ class ErrorContext:
         return self._base
 
     def __repr__(self) -> str:
-        return f'ErrorContext({self._base})'
+        return f'{type(self).__name__}({self._base})'
 
 
 class HTTPErrorContext(ErrorContext):
@@ -233,7 +233,7 @@ class HTTPErrorContext(ErrorContext):
         return self._http_err_ctx.get("client_context_id", None)
 
     def __repr__(self) -> str:
-        return f'HTTPErrorContext({self._http_err_ctx})'
+        return f'{type(self).__name__}({self._http_err_ctx})'
 
 
 class KeyValueErrorContext(ErrorContext):
@@ -263,7 +263,7 @@ class KeyValueErrorContext(ErrorContext):
         return self._kv_err_ctx.get("collection_name", None)
 
     def __repr__(self) -> str:
-        return "KeyValueErrorContext:{}".format(self._kv_err_ctx)
+        return f'{type(self).__name__}({self._kv_err_ctx})'
 
 
 class ManagementErrorContext(ErrorContext):
@@ -291,7 +291,7 @@ class ManagementErrorContext(ErrorContext):
         return self._mgmt_err_ctx.get("client_context_id", None)
 
     def __repr__(self) -> str:
-        return f'ManagementErrorContext({self._mgmt_err_ctx})'
+        return f'{type(self).__name__}({self._mgmt_err_ctx})'
 
 
 class TransactionsErrorContext(ErrorContext):
@@ -322,8 +322,8 @@ class TransactionsErrorContext(ErrorContext):
     def retry_reasons(self) -> set[str] | None:
         return None
 
-    def __str__(self) -> str:
-        return f'TransactionsErrorContext{{{self.txn_err_ctx}}}'
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.txn_err_ctx})'
 
 
 class AnalyticsErrorContext(HTTPErrorContext):
@@ -351,7 +351,7 @@ class AnalyticsErrorContext(HTTPErrorContext):
         return self._analytics_err_ctx.get("parameters", None)
 
     def __repr__(self) -> str:
-        return f'AnalyticsErrorContext({self._get_base()})'
+        return f'{type(self).__name__}({self._get_base()})'
 
 
 class QueryErrorContext(HTTPErrorContext):
@@ -379,7 +379,7 @@ class QueryErrorContext(HTTPErrorContext):
         return self._query_err_ctx.get("parameters", None)
 
     def __repr__(self) -> str:
-        return f'QueryErrorContext({self._get_base()})'
+        return f'{type(self).__name__}({self._get_base()})'
 
 
 class SearchErrorContext(HTTPErrorContext):
@@ -403,7 +403,7 @@ class SearchErrorContext(HTTPErrorContext):
         return self._search_err_ctx.get("parameters", None)
 
     def __repr__(self) -> str:
-        return f'SearchErrorContext({self._get_base()})'
+        return f'{type(self).__name__}({self._get_base()})'
 
 
 class ViewErrorContext(HTTPErrorContext):
@@ -427,7 +427,7 @@ class ViewErrorContext(HTTPErrorContext):
         return self._view_err_ctx.get("query_string", None)
 
     def __repr__(self) -> str:
-        return f'ViewErrorContext({self._get_base()})'
+        return f'{type(self).__name__}({self._get_base()})'
 
 
 class SubdocumentErrorContext(KeyValueErrorContext):
@@ -451,7 +451,7 @@ class SubdocumentErrorContext(KeyValueErrorContext):
         return self._subdoc_err_ctx.get("deleted", False)
 
     def __repr__(self) -> str:
-        return f'SubdocumentErrorContext({self._get_base()})'
+        return f'{type(self).__name__}({self._get_base()})'
 
 
 class GenericErrorContext(ErrorContext):
@@ -459,9 +459,6 @@ class GenericErrorContext(ErrorContext):
     A context for a failure that belongs to no one service, with no fields beyond the ones every
     context carries.
     """
-
-    def __repr__(self) -> str:
-        return f'GenericErrorContext({self._get_base()})'
 
 
 ErrorContextType = (AnalyticsErrorContext

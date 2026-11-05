@@ -29,6 +29,7 @@ __all__ = [
 from enum import IntEnum
 
 from couchbase.common._supportability import DURABILITY_LEVEL_READ, Supportability
+from couchbase.common._utils import fields_repr
 
 
 class ReplicateTo(IntEnum):
@@ -143,6 +144,9 @@ class ClientDurability:
     def persist_to(self) -> PersistTo | PersistToExtended:
         return self._persist_to
 
+    def __repr__(self) -> str:
+        return fields_repr(self, replicate_to=self._replicate_to, persist_to=self._persist_to)
+
 
 class ServerDurability:
 
@@ -158,6 +162,9 @@ class ServerDurability:
     @property
     def level(self) -> DurabilityLevel:
         return self._level
+
+    def __repr__(self) -> str:
+        return fields_repr(self, level=self._level)
 
 
 DurabilityType = ClientDurability | ServerDurability

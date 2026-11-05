@@ -158,7 +158,7 @@ class SearchResultTypesUnitTests:
         locations = SearchRowLocations()
 
         assert (locations.get_all(), locations.fields(), locations.terms()) == ([], [], set())
-        assert repr(locations) == 'None'
+        assert repr(locations) == 'SearchRowLocations([])'
 
     def test_row_constructs_with_its_defaults(self) -> None:
         row = SearchRow(index='hotels_6c1a', id='hotel_1', score=1.25)

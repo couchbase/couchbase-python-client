@@ -30,11 +30,23 @@ from couchbase.exceptions import (TransactionCommitAmbiguous,
 from couchbase.transactions import TransactionResult
 from couchbase.transactions.transaction_get_result import TransactionGetResult
 from couchbase.transactions.transactions import AttemptContext, Transactions
-from couchbase.transcoder import JSONTranscoder, RawBinaryTranscoder
+from couchbase.transcoder import (JSONTranscoder,
+                                  RawBinaryTranscoder,
+                                  Transcoder)
 from tests.test_features import TestProtocol
 
 if TYPE_CHECKING:
     from couchbase.common._interfaces._transactions import TransactionsInterface
+
+
+class _UndecodableTranscoder(Transcoder):
+    # Raises on decode, so a test that reads a result through it shows the body was never decoded.
+
+    def encode_value(self, value: Any) -> tuple[bytes, int]:
+        raise NotImplementedError
+
+    def decode_value(self, value: bytes, flags: int | None) -> Any:
+        raise AssertionError('decoded')
 
 
 class _FakeAttempt:
@@ -213,6 +225,12 @@ class TransactionGetResultUnitTests:
         result = TransactionGetResult(cast(Any, {'id': 'key', 'cas': 1, 'value': (body, flags)}), transcoder)
 
         assert result.content_as[type(expected)] == expected
+
+    def test_repr_prints_the_encoded_value_without_decoding_it(self) -> None:
+        result = TransactionGetResult(cast(Any, {'id': 'key', 'cas': 1, 'value': (b'{"a":1}', 2 << 24)}),
+                                      _UndecodableTranscoder())
+
+        assert repr(result) == "TransactionGetResult(id='key', cas=1, value=b'{\"a\":1}', flags=33554432)"
 
 
 # The log under test is classic's.

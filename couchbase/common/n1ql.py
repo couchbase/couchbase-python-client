@@ -110,7 +110,7 @@ class QueryProblem(object):
         return self._record.message
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class QueryWarning(QueryProblem):
@@ -194,7 +194,7 @@ class QueryMetrics(object):
         return UnsignedInt64(self._record.warning_count)
 
     def __repr__(self) -> str:
-        return f'QueryMetrics:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class QueryMetaData:
@@ -268,7 +268,7 @@ class QueryMetaData:
         return self._record.profile
 
     def __repr__(self) -> str:
-        return f'QueryMetaData:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class QueryScanConsistency(Enum):

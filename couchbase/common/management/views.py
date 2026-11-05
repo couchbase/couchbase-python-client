@@ -25,6 +25,8 @@ import json
 from enum import Enum
 from typing import Any
 
+from couchbase.common._utils import fields_repr
+
 
 class DesignDocumentNamespace(Enum):
     PRODUCTION = False
@@ -82,6 +84,9 @@ class View:
     @classmethod
     def from_json(cls, json_view: dict[str, Any]) -> View:
         return cls(**json_view)
+
+    def __repr__(self) -> str:
+        return fields_repr(self, map=self._map, reduce=self._reduce)
 
 
 class DesignDocument(object):
@@ -142,5 +147,4 @@ class DesignDocument(object):
         return cls(name, views, namespace=ns, rev=rev)
 
     def __repr__(self) -> str:
-        output = self.as_dict(self.namespace)
-        return f'DesignDocument({output})'
+        return fields_repr(self, name=self._name, views=self._views, namespace=self._namespace, rev=self._rev)

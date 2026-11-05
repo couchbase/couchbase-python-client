@@ -228,9 +228,9 @@ class ClusterResultTypesUnitTests:
         assert _version_reads(info) == ('8.0.1-2000', 8.0, None, 2000, True, False)
 
     @pytest.mark.parametrize('build, prefix', [
-        (lambda: _diagnostics([]), 'DiagnosticsResult:'),
-        (lambda: PingResult(_ping_from_core(_ping_report({}))), 'PingResult:'),
-        (lambda: _cluster_info('7.6.2-3721-enterprise'), 'ClusterInfoResult:'),
+        (lambda: _diagnostics([]), 'DiagnosticsResult({'),
+        (lambda: PingResult(_ping_from_core(_ping_report({}))), 'PingResult({'),
+        (lambda: _cluster_info('7.6.2-3721-enterprise'), 'ClusterInfoResult({'),
     ])
     def test_repr_prints_the_record(self, build: Callable[[], Any], prefix: str) -> None:
         text = repr(build())

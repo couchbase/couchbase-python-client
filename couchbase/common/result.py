@@ -483,7 +483,7 @@ class GetReplicaResult(Result):
         return self._transcoder.decode_value(self._record.value, self._record.flags)
 
     def __repr__(self) -> str:
-        return f'GetReplicaResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class GetResult(Result):
@@ -539,7 +539,7 @@ class GetResult(Result):
         return self._transcoder.decode_value(self._record.value, self._record.flags)
 
     def __repr__(self) -> str:
-        return f'GetResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class ExistsResult(Result):
@@ -567,7 +567,7 @@ class ExistsResult(Result):
         return self._record.exists
 
     def __repr__(self) -> str:
-        return f'ExistsResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class _MutationTokenDict(TypedDict):
@@ -617,7 +617,7 @@ class MutationToken:
         return self._token
 
     def __repr__(self) -> str:
-        return "MutationToken:{}".format(self._token)
+        return f'{type(self).__name__}({self._token})'
 
     def __hash__(self) -> int:
         return hash(self.as_tuple())
@@ -657,7 +657,7 @@ class MutationResult(Result):
         return self._mutation_token
 
     def __repr__(self) -> str:
-        return f'MutationResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class LookupInResult(Result):
@@ -698,7 +698,7 @@ class LookupInResult(Result):
         return _decode_subdoc_fields(self._serializer, self._record.fields)
 
     def __repr__(self) -> str:
-        return f'LookupInResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class LookupInReplicaResult(Result):
@@ -746,7 +746,7 @@ class LookupInReplicaResult(Result):
         return _decode_subdoc_fields(self._serializer, self._record.fields)
 
     def __repr__(self) -> str:
-        return f'LookupInReplicaResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class MutateInResult(MutationResult):
@@ -777,7 +777,7 @@ class MutateInResult(MutationResult):
         return _decode_subdoc_fields(self._serializer, self._record.fields)
 
     def __repr__(self) -> str:
-        return f'MutateInResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class CounterResult(MutationResult):
@@ -809,7 +809,7 @@ class CounterResult(MutationResult):
         return self._record.content
 
     def __repr__(self) -> str:
-        return f'CounterResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class ScanResult(Result):
@@ -894,7 +894,7 @@ class ScanResult(Result):
         return self._transcoder.decode_value(body.value, body.flags)
 
     def __repr__(self) -> str:
-        return f'ScanResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class MultiResult:
@@ -960,7 +960,7 @@ class MultiGetReplicaResult(MultiResult, Generic[_ReplicaValueType]):
         for k, v in self._results.items():
             output_results.append(f'{k}:{v}')
 
-        return f'MultiGetReplicaResult( {", ".join(output_results)} )'
+        return f'{type(self).__name__}({", ".join(output_results)})'
 
 
 class MultiGetResult(MultiResult):
@@ -986,7 +986,7 @@ class MultiGetResult(MultiResult):
         for k, v in self._results.items():
             output_results.append(f'{k}:{v}')
 
-        return f'MultiGetResult( {", ".join(output_results)} )'
+        return f'{type(self).__name__}({", ".join(output_results)})'
 
 
 class MultiExistsResult:
@@ -1032,7 +1032,7 @@ class MultiExistsResult:
         for k, v in self._results.items():
             output_results.append(f'{k}:{v}')
 
-        return f'MultiExistsResult( {", ".join(output_results)} )'
+        return f'{type(self).__name__}({", ".join(output_results)})'
 
 
 class MultiMutationResult:
@@ -1078,7 +1078,7 @@ class MultiMutationResult:
         for k, v in self._results.items():
             output_results.append(f'{k}:{v}')
 
-        return f'MultiMutationResult( {", ".join(output_results)} )'
+        return f'{type(self).__name__}({", ".join(output_results)})'
 
 
 MultiResultType = MultiGetResult | MultiMutationResult
@@ -1127,7 +1127,7 @@ class MultiCounterResult:
         for k, v in self._results.items():
             output_results.append(f'{k}:{v}')
 
-        return f'MultiCounterResult( {", ".join(output_results)} )'
+        return f'{type(self).__name__}({", ".join(output_results)})'
 
 
 class _ClusterReport(Result):
@@ -1258,7 +1258,7 @@ class DiagnosticsResult(_ClusterReport):
         return json.dumps(return_val)
 
     def __repr__(self) -> str:
-        return f'DiagnosticsResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class PingResult(_ClusterReport):
@@ -1312,7 +1312,7 @@ class PingResult(_ClusterReport):
         return json.dumps(return_val)
 
     def __repr__(self) -> str:
-        return f'PingResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class ClusterInfoResult:
@@ -1388,7 +1388,7 @@ class ClusterInfoResult:
         return self._version.edition.upper() == edition
 
     def __repr__(self) -> str:
-        return f'ClusterInfoResult:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class OperationResult:
@@ -1408,7 +1408,7 @@ class OperationResult:
         return self._mutation_token
 
     def __repr__(self) -> str:
-        return f'OperationResult(mutation_token={self._mutation_token}, cas={self._cas})'
+        return f'{type(self).__name__}(mutation_token={self._mutation_token}, cas={self._cas})'
 
 
 class ValueResult:
@@ -1434,4 +1434,4 @@ class ValueResult:
         return self._mutation_token
 
     def __repr__(self) -> str:
-        return f'OperationResult(mutation_token={self._mutation_token}, cas={self._cas})'
+        return f'{type(self).__name__}(mutation_token={self._mutation_token}, cas={self._cas})'

@@ -44,7 +44,9 @@ from enum import Enum
 from typing import Any
 
 from couchbase.common._transforms import timedelta_as_milliseconds
-from couchbase.common._utils import is_null_or_empty
+from couchbase.common._utils import (fields_repr,
+                                     is_null_or_empty,
+                                     redacted)
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.n1ql import QueryScanConsistency
 
@@ -432,6 +434,9 @@ class EventingFunctionUrlAuthBasic(EventingFunctionUrlAuth):
     username: str | None = None
     password: str | None = None
 
+    def __repr__(self) -> str:
+        return fields_repr(self, username=self.username, password=redacted(self.password))
+
 
 @dataclass
 class EventingFunctionUrlAuthDigest(EventingFunctionUrlAuth):
@@ -446,6 +451,9 @@ class EventingFunctionUrlAuthDigest(EventingFunctionUrlAuth):
     username: str | None = None
     password: str | None = None
 
+    def __repr__(self) -> str:
+        return fields_repr(self, username=self.username, password=redacted(self.password))
+
 
 @dataclass
 class EventingFunctionUrlAuthBearer(EventingFunctionUrlAuth):
@@ -457,6 +465,9 @@ class EventingFunctionUrlAuthBearer(EventingFunctionUrlAuth):
     """
 
     key: str | None = None
+
+    def __repr__(self) -> str:
+        return fields_repr(self, key=redacted(self.key))
 
 
 @dataclass

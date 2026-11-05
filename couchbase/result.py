@@ -129,7 +129,7 @@ class _ScanResultIterable:
         self._executor.cancel_scan()
 
     def __repr__(self) -> str:
-        return '{}:{}'.format(type(self).__name__, self._request)
+        return f'{type(self).__name__}({self._request})'
 
 
 class ScanResultIterable(_ScanResultIterable):
@@ -172,7 +172,7 @@ class _QueryResult(Generic[_ExecuteT]):
         return self._request.final_metadata()
 
     def __repr__(self) -> str:
-        return '{}:{}'.format(type(self).__name__, self._request)
+        return f'{type(self).__name__}({self._request})'
 
 
 class QueryResult(_QueryResult[list[Any]]):
@@ -209,7 +209,7 @@ class _AnalyticsResult:
         return self._request.final_metadata()
 
     def __repr__(self) -> str:
-        return '{}:{}'.format(type(self).__name__, self._request)
+        return f'{type(self).__name__}({self._request})'
 
 
 class AnalyticsResult(_AnalyticsResult):
@@ -254,7 +254,7 @@ class _SearchResult:
         return None if final_metadata is None else final_metadata.facets
 
     def __repr__(self) -> str:
-        return '{}:{}'.format(type(self).__name__, self._request)
+        return f'{type(self).__name__}({self._request})'
 
 
 class SearchResult(_SearchResult):
@@ -291,7 +291,7 @@ class _ViewResult:
         return self._request.final_metadata()
 
     def __repr__(self) -> str:
-        return '{}:{}'.format(type(self).__name__, self._request)
+        return f'{type(self).__name__}({self._request})'
 
 
 class ViewResult(_ViewResult):

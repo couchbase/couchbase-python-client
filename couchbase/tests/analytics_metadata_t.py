@@ -132,12 +132,12 @@ class AnalyticsMetaDataUnitTests:
     def test_problem_repr(self) -> None:
         metadata = _metadata()
 
-        assert repr(metadata.errors()[0]) == "AnalyticsError:{'code': 24045, 'message': 'an error'}"
-        assert repr(metadata.warnings()[0]) == "AnalyticsWarning:{'code': 1, 'message': 'a warning'}"
+        assert repr(metadata.errors()[0]) == "AnalyticsError({'code': 24045, 'message': 'an error'})"
+        assert repr(metadata.warnings()[0]) == "AnalyticsWarning({'code': 1, 'message': 'a warning'})"
 
     def test_metadata_repr_names_the_class(self) -> None:
-        assert repr(_metadata()).startswith('AnalyticsMetaData:{')
-        assert repr(_metadata().metrics()).startswith('AnalyticsMetrics:{')
+        assert repr(_metadata()).startswith('AnalyticsMetaData({')
+        assert repr(_metadata().metrics()).startswith('AnalyticsMetrics({')
 
     def test_metrics_counts(self) -> None:
         metrics = _metadata().metrics()

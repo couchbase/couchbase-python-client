@@ -32,6 +32,7 @@ from typing import (Any,
                     TypeAlias,
                     TypeVar)
 
+from couchbase.common._utils import fields_repr, redacted
 from couchbase.common.auth import AuthDomain
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.management._users import UserManagementUtils
@@ -106,6 +107,9 @@ class Role:
             collection=raw_data.get("collection", None)
         )
 
+    def __repr__(self) -> str:
+        return fields_repr(self, name=self._name, bucket=self._bucket, scope=self._scope, collection=self._collection)
+
 
 class RoleAndDescription:
 
@@ -146,6 +150,10 @@ class RoleAndDescription:
             ce=raw_data.get('ce', None)
         )
 
+    def __repr__(self) -> str:
+        return fields_repr(self, role=self._role, display_name=self._display_name,
+                           description=self._description, ce=self._ce)
+
 
 class Origin:
     """
@@ -167,6 +175,9 @@ class Origin:
     @property
     def name(self) -> str | None:
         return self._name
+
+    def __repr__(self) -> str:
+        return fields_repr(self, type=self._type, name=self._name)
 
 
 class RoleAndOrigins:
@@ -194,6 +205,9 @@ class RoleAndOrigins:
             origins=list(map(lambda o: Origin(**o), origin_data))
             if origin_data else []
         )
+
+    def __repr__(self) -> str:
+        return fields_repr(self, role=self._role, origins=self._origins)
 
 
 class User:
@@ -291,6 +305,10 @@ class User:
             groups=set(group_data) if group_data else None
         )
 
+    def __repr__(self) -> str:
+        return fields_repr(self, username=self._username, display_name=self._display_name, groups=self._groups,
+                           roles=self._roles, password=redacted(self._password))
+
 
 class UserAndMetadata:
     """
@@ -385,6 +403,10 @@ class UserAndMetadata:
             raw_data=raw_data
         )
 
+    def __repr__(self) -> str:
+        return fields_repr(self, domain=self._domain, user=self._user, effective_roles=self._effective_roles,
+                           password_changed=self._password_changed, external_groups=self._external_groups)
+
 
 class Group:
     def __init__(self,
@@ -454,3 +476,7 @@ class Group:
                 r), raw_data.get('roles', []))),
             ldap_group_reference=raw_data.get('ldap_group_ref', None)
         )
+
+    def __repr__(self) -> str:
+        return fields_repr(self, name=self._name, description=self._description, roles=self._roles,
+                           ldap_group_reference=self._ldap_group_reference)

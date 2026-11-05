@@ -25,6 +25,7 @@ __all__ = [
 from abc import ABC, abstractmethod
 from typing import Any
 
+from couchbase.common._utils import fields_repr
 from couchbase.common.exceptions import InvalidArgumentException
 
 
@@ -63,6 +64,9 @@ class SearchScoring(ABC):
             **INTERNAL**
         """
         return self._params
+
+    def __repr__(self) -> str:
+        return fields_repr(self, **{k: v for k, v in self._params.items() if k != 'scoring_type'})
 
 
 class ReciprocalRankFusion(SearchScoring):

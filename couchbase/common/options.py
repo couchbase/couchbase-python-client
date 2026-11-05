@@ -2832,11 +2832,8 @@ class ConstrainedInt:
     def __hash__(self) -> int:
         return hash(self.value)
 
-    def __str__(self) -> str:
-        return "{cls_name} with value {value}".format(cls_name=type(self).__name__, value=self.value)
-
     def __repr__(self) -> str:
-        return str(self)
+        return f'{type(self).__name__}({self.value})'
 
 
 class DeltaValue(ConstrainedInt):

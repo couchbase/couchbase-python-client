@@ -26,11 +26,15 @@ __all__ = [
 from enum import IntEnum
 from typing import Any
 
+from couchbase.common._utils import fields_repr, redacted
 from couchbase.common.exceptions import InvalidArgumentException
 
 
 class Authenticator(dict):
-    pass
+    _REDACTED_KEYS = frozenset({'password', 'jwt_token', 'key_path'})
+
+    def __repr__(self) -> str:
+        return fields_repr(self, **{k: redacted(v) if k in self._REDACTED_KEYS else v for k, v in self.items()})
 
 
 class PasswordAuthenticator(Authenticator):
@@ -93,6 +97,10 @@ class PasswordAuthenticator(Authenticator):
 
         return d
 
+    def __repr__(self) -> str:
+        return fields_repr(self, username=self._username, password=redacted(self._password), cert_path=self._cert_path,
+                           allowed_sasl_mechanisms=self._allowed_sasl_mechanisms)
+
     @staticmethod
     def ldap_compatible(username: str, password: str) -> PasswordAuthenticator:
         auth = PasswordAuthenticator(username, password, allowed_sasl_mechanisms=['PLAIN'])
@@ -125,6 +133,9 @@ class JwtAuthenticator(Authenticator):
 
     def valid_keys(self) -> list[str]:
         return ['jwt_token']
+
+    def __repr__(self) -> str:
+        return fields_repr(self, token=redacted(self._token))
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -168,6 +179,10 @@ class CertificateAuthenticator(Authenticator):
 
     def valid_keys(self) -> list[str]:
         return ['cert_path', 'key_path', 'trust_store_path']
+
+    def __repr__(self) -> str:
+        return fields_repr(self, cert_path=self._cert_path, key_path=redacted(self._key_path),
+                           trust_store_path=self._trust_store_path)
 
     def as_dict(self) -> dict[str, Any]:
         d = {

@@ -9,7 +9,7 @@ __all__ = [
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from couchbase.common._utils import is_null_or_empty
+from couchbase.common._utils import fields_repr, is_null_or_empty
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.options import VectorSearchOptions
 
@@ -183,6 +183,11 @@ class VectorQuery:
         """
         return cls(field_name, vector, num_candidates=num_candidates, boost=boost, prefilter=prefilter)
 
+    def __repr__(self) -> str:
+        return fields_repr(self, field_name=self._field_name,
+                           vector=self._vector if self._vector is not None else self._vector_base64,
+                           num_candidates=self._num_candidates, boost=self._boost, prefilter=self._prefilter)
+
 
 class VectorSearch:
     """ Represents a vector search.
@@ -242,3 +247,6 @@ class VectorSearch:
             :class:`~couchbase.vector_search.VectorSearch`: The created vector search.
         """
         return cls([query])
+
+    def __repr__(self) -> str:
+        return fields_repr(self, queries=self._queries, options=self._options)

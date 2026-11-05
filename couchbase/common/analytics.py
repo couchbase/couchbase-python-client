@@ -107,7 +107,7 @@ class AnalyticsProblem(object):
         return self._record.message
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class AnalyticsWarning(AnalyticsProblem):
@@ -145,7 +145,7 @@ class AnalyticsMetrics(object):
         return UnsignedInt64(self._record.warning_count)
 
     def __repr__(self) -> str:
-        return f'AnalyticsMetrics:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class AnalyticsMetaData:
@@ -176,7 +176,7 @@ class AnalyticsMetaData:
         return AnalyticsMetrics(self._record.metrics)
 
     def __repr__(self) -> str:
-        return f'AnalyticsMetaData:{asdict(self._record)}'
+        return f'{type(self).__name__}({asdict(self._record)})'
 
 
 class AnalyticsScanConsistency(Enum):

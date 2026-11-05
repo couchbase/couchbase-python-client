@@ -17,6 +17,8 @@ __all__ = [
     'Key',
 ]
 
+from couchbase.common._utils import fields_repr, redacted
+
 
 class Key:
     def __init__(self, id: str, bytes_: bytes | bytearray) -> None:
@@ -30,3 +32,6 @@ class Key:
     @property
     def bytes(self) -> bytes:
         return self._bytes
+
+    def __repr__(self) -> str:
+        return fields_repr(self, id=self._id, bytes_=redacted(self._bytes))

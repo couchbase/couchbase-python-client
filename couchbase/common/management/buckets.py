@@ -38,7 +38,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.common._supportability import Supportability
 from couchbase.common._transforms import seconds_to_timedelta
-from couchbase.common._utils import is_null_or_empty
+from couchbase.common._utils import fields_repr, is_null_or_empty
 from couchbase.common.durability import DurabilityLevel
 from couchbase.common.exceptions import InvalidArgumentException
 
@@ -221,6 +221,9 @@ class BucketSettings(dict):
             settings['bucket_type'] = BucketType.COUCHBASE
         self.update((k, v) for k, v in settings.items() if v is not None)
 
+    def __repr__(self) -> str:
+        return fields_repr(self, **self)
+
     @property
     def bucket_type(self) -> BucketType | None:
         """BucketType {couchbase (sent on wire as membase), memcached, ephemeral}
@@ -382,12 +385,6 @@ class BucketSettings(dict):
 
         return cls(**output)
 
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({super().__repr__()})"
-
-    def __str__(self) -> str:
-        return self.__repr__()
-
 
 class CreateBucketSettingsKwargs(TypedDict, total=False):
     name: Required[str]
@@ -412,12 +409,6 @@ class CreateBucketSettingsKwargs(TypedDict, total=False):
 class CreateBucketSettings(BucketSettings):
     def __init__(self, **kwargs: Unpack[CreateBucketSettingsKwargs]) -> None:
         self._fill(dict(kwargs))
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({super().__repr__()})"
-
-    def __str__(self) -> str:
-        return self.__repr__()
 
 
 @dataclass

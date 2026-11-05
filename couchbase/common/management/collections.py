@@ -26,6 +26,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from couchbase.common._supportability import Supportability
+from couchbase.common._utils import fields_repr
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -55,6 +56,9 @@ class CreateCollectionSettings:
         """
         return self._history
 
+    def __repr__(self) -> str:
+        return fields_repr(self, max_expiry=self._max_expiry, history=self._history)
+
 
 class UpdateCollectionSettings:
     """
@@ -79,6 +83,9 @@ class UpdateCollectionSettings:
             default to the bucket-level setting
         """
         return self._history
+
+    def __repr__(self) -> str:
+        return fields_repr(self, max_expiry=self._max_expiry, history=self._history)
 
 
 class CollectionSpec:
@@ -137,6 +144,10 @@ class CollectionSpec:
         """
         return self._scope_name
 
+    def __repr__(self) -> str:
+        return fields_repr(self, collection_name=self._name, scope_name=self._scope_name, max_expiry=self._max_expiry,
+                           history=self._history)
+
 
 class ScopeSpec:
     def __init__(self, name: str, collections: Iterable[CollectionSpec]) -> None:
@@ -156,3 +167,6 @@ class ScopeSpec:
             list[:class:`.CollectionSpec`]: A list of the scope's collections.
         """
         return self._collections
+
+    def __repr__(self) -> str:
+        return fields_repr(self, name=self._name, collections=self._collections)

@@ -387,14 +387,14 @@ class KVResultTypesUnitTests:
 
     @pytest.mark.parametrize('build, expected', [
         (lambda: GetResult(_get_from_core(_core_get())),
-         "GetResult:{'cas': 11, 'value': b'{\"a\": 1}', 'flags': 33554438, 'expiry': None}"),
+         "GetResult({'cas': 11, 'value': b'{\"a\": 1}', 'flags': 33554438, 'expiry': None})"),
         (lambda: MutationResult(_mutation_from_core({'cas': 11})),
-         "MutationResult:{'cas': 11, 'mutation_token': None}"),
+         "MutationResult({'cas': 11, 'mutation_token': None})"),
         (lambda: CounterResult(_counter_from_core(_core_counter())),
-         "CounterResult:{'cas': 11, 'content': 7, 'mutation_token': {'partition_id': 12, 'partition_uuid': 34, "
-         "'sequence_number': 56, 'bucket_name': 'default'}}"),
+         "CounterResult({'cas': 11, 'content': 7, 'mutation_token': {'partition_id': 12, 'partition_uuid': 34, "
+         "'sequence_number': 56, 'bucket_name': 'default'}})"),
         (lambda: ScanResult(_scan_item_from_core(_core_scan_item(with_body=False)), True, None),
-         "ScanResult:{'id': 'doc-1', 'body': None}"),
+         "ScanResult({'id': 'doc-1', 'body': None})"),
     ])
     def test_repr_prints_the_record(self, build: Callable[[], Any], expected: str) -> None:
         assert repr(build()) == expected

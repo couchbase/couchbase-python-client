@@ -138,13 +138,13 @@ class QueryMetaDataUnitTests:
         metadata = _metadata()
 
         assert repr(metadata.errors()[0]) == (
-            "QueryError:{'code': 3000, 'message': 'an error', 'reason': 12, 'retry': True}")
+            "QueryError({'code': 3000, 'message': 'an error', 'reason': 12, 'retry': True})")
         assert repr(metadata.warnings()[0]) == (
-            "QueryWarning:{'code': 1080, 'message': 'a warning', 'reason': None, 'retry': None}")
+            "QueryWarning({'code': 1080, 'message': 'a warning', 'reason': None, 'retry': None})")
 
     def test_metadata_repr_names_the_class(self) -> None:
-        assert repr(_metadata()).startswith('QueryMetaData:{')
-        assert repr(_metadata().metrics()).startswith('QueryMetrics:{')
+        assert repr(_metadata()).startswith('QueryMetaData({')
+        assert repr(_metadata().metrics()).startswith('QueryMetrics({')
 
     def test_metrics_counts(self) -> None:
         metrics = _metadata().metrics()

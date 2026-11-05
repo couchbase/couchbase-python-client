@@ -47,6 +47,7 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Any
 
 from couchbase.common._supportability import Supportability
+from couchbase.common._utils import fields_repr
 from couchbase.common.exceptions import InvalidArgumentException
 
 if TYPE_CHECKING:
@@ -156,6 +157,9 @@ class MutationMacro():
     def value_crc32c(cls) -> MutationMacro:
         return cls("${Mutation.value_crc32c}")
 
+    def __repr__(self) -> str:
+        return fields_repr(self, value=self._value)
+
 
 class Spec(tuple):
     """Represents a sub-operation to perform."""
@@ -164,10 +168,7 @@ class Spec(tuple):
         return super().__new__(cls, tuple(args))
 
     def __repr__(self) -> str:
-        details = []
-        details.extend([repr(x) for x in self[1:]])
-        return '{0}<{1}>'.format(self.__class__.__name__,
-                                 ', '.join(details))
+        return f"{type(self).__name__}({', '.join(repr(x) for x in self[1:])})"
 
 
 class ArrayValues(tuple):
@@ -175,7 +176,7 @@ class ArrayValues(tuple):
         return super(ArrayValues, cls).__new__(cls, tuple(args))
 
     def __repr__(self) -> str:
-        return 'ArrayValues({0})'.format(tuple.__repr__(self))
+        return f"{type(self).__name__}({', '.join(repr(x) for x in self)})"
 
 
 def exists(path: str,

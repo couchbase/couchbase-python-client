@@ -22,6 +22,7 @@ __all__ = [
 from typing import TYPE_CHECKING
 
 from couchbase.common._supportability import Supportability
+from couchbase.common._utils import fields_repr
 from couchbase.common.exceptions import InvalidArgumentException
 
 if TYPE_CHECKING:
@@ -94,3 +95,6 @@ class TransactionKeyspace:
     @property
     def collection(self) -> str:
         return self._collection
+
+    def __repr__(self) -> str:
+        return fields_repr(self, bucket=self._bucket, scope=self._scope, collection=self._collection)

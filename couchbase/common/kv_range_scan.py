@@ -26,6 +26,7 @@ __all__ = [
 from abc import ABC
 from typing import Any
 
+from couchbase.common._utils import fields_repr
 from couchbase.common.exceptions import InvalidArgumentException
 
 
@@ -48,6 +49,9 @@ class ScanTerm:
             'term': self._term,
             'exclusive': self._exclusive
         }
+
+    def __repr__(self) -> str:
+        return fields_repr(self, term=self._term, exclusive=self._exclusive)
 
 
 class ScanType(ABC):
@@ -72,6 +76,9 @@ class RangeScan(ScanType):
     def end(self) -> ScanTerm | None:
         return self._end
 
+    def __repr__(self) -> str:
+        return fields_repr(self, start=self._start, end=self._end)
+
 
 class PrefixScan(ScanType):
     """A PrefixScan performs a scan on a given prefix
@@ -83,6 +90,9 @@ class PrefixScan(ScanType):
     @property
     def prefix(self) -> str:
         return self._prefix
+
+    def __repr__(self) -> str:
+        return fields_repr(self, prefix=self._prefix)
 
 
 class SamplingScan(ScanType):
@@ -100,3 +110,6 @@ class SamplingScan(ScanType):
     @property
     def seed(self) -> int | None:
         return self._seed
+
+    def __repr__(self) -> str:
+        return fields_repr(self, limit=self._limit, seed=self._seed)

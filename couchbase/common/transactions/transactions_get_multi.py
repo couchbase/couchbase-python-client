@@ -156,7 +156,7 @@ class TransactionGetMultiResult:
                 content.append(None)
             else:
                 content.append(self.content_as[str](idx))
-        return f'TransactionGetMultiResult(content_list={content})'
+        return f'{type(self).__name__}(content_list={content})'
 
     def __str__(self) -> str:
         return self.__repr__()
@@ -202,7 +202,7 @@ class TransactionGetMultiReplicasFromPreferredServerGroupResult:
                 content.append(None)
             else:
                 content.append(self.content_as[str](idx))
-        return f'TransactionGetMultiReplicasFromPreferredServerGroupResult(content_list={content})'
+        return f'{type(self).__name__}(content_list={content})'
 
     def __str__(self) -> str:
         return self.__repr__()

@@ -71,7 +71,7 @@ class OptionValueUnitTests:
     @pytest.mark.parametrize('cls', [DeltaValue, SignedInt64, UnsignedInt64])
     def test_a_constrained_int_prints_its_class_name(self, cls: type) -> None:
         value = cls(5)
-        assert str(value) == repr(value) == '{} with value 5'.format(cls.__name__)
+        assert str(value) == repr(value) == f'{cls.__name__}(5)'
 
     # Regression guard (PYCBC-1952): query and analytics metrics are UnsignedInt64 values.
     @pytest.mark.parametrize('cls', [DeltaValue, SignedInt64, UnsignedInt64])

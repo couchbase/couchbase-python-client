@@ -166,6 +166,9 @@ class EndpointDiagnosticsReport:
                   'last_activity_us': r.last_activity_us}
         return {k: v for k, v in output.items() if v is not None}
 
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.as_dict()})'
+
 
 class EndpointPingReport:
 
@@ -219,4 +222,4 @@ class EndpointPingReport:
         return {k: v for k, v in output.items() if v is not None}
 
     def __repr__(self) -> str:
-        return "EndpointPingReport:{}".format(self.as_dict())
+        return f'{type(self).__name__}({self.as_dict()})'

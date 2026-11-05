@@ -22,6 +22,7 @@ __all__ = [
 import base64
 from typing import Any
 
+from couchbase.common._utils import fields_repr
 from couchbase.common.exceptions import CryptoKeyNotFoundException, InvalidArgumentException
 
 
@@ -94,3 +95,6 @@ class EncryptionResult:
 
         except Exception as ex:  # noqa: F841
             return False
+
+    def __repr__(self) -> str:
+        return fields_repr(self, **self._map)

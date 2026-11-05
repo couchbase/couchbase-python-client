@@ -33,7 +33,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from couchbase.common._utils import is_null_or_empty, to_form_str
+from couchbase.common._utils import (fields_repr,
+                                     is_null_or_empty,
+                                     redacted,
+                                     to_form_str)
 from couchbase.common.exceptions import InvalidArgumentException
 
 
@@ -218,6 +221,10 @@ class CouchbaseAnalyticsEncryptionSettings:
 
         return encryption_settings
 
+    def __repr__(self) -> str:
+        return fields_repr(self, encryption_level=self._encryption_level, certificate=self._certificate,
+                           client_certificate=self._client_certificate, client_key=redacted(self._client_key))
+
 
 class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
     def __init__(self,
@@ -335,6 +342,11 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
         return CouchbaseRemoteAnalyticsLink(
             dataverse, link_name, hostname, encryption, username)
 
+    def __repr__(self) -> str:
+        return fields_repr(self, dataverse=self._dataverse, link_name=self._link_name,
+                           hostname=self._hostname, encryption=self._encryption, username=self._username,
+                           password=redacted(self._password))
+
 
 class S3ExternalAnalyticsLink(AnalyticsLink):
     def __init__(
@@ -433,6 +445,13 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
 
         return S3ExternalAnalyticsLink(
             dataverse, link_name, access_key_id, region, service_endpoint=service_endpoint)
+
+    def __repr__(self) -> str:
+        return fields_repr(self, dataverse=self._dataverse, link_name=self._link_name,
+                           access_key_id=self._access_key_id, region=self._region,
+                           secret_access_key=redacted(self._secret_access_key),
+                           session_token=redacted(self._session_token),
+                           service_endpoint=self._service_endpoint)
 
 
 class AzureBlobExternalAnalyticsLink(AnalyticsLink):
@@ -545,3 +564,10 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
                                               account_name=account_name,
                                               blob_endpoint=blob_endpoint,
                                               endpoint_suffix=endpoint_suffix)
+
+    def __repr__(self) -> str:
+        return fields_repr(self, dataverse=self._dataverse, link_name=self._link_name,
+                           connection_string=redacted(self._connection_string),
+                           account_name=self._account_name, account_key=redacted(self._account_key),
+                           shared_access_signature=redacted(self._shared_access_signature),
+                           blob_endpoint=self._blob_endpoint, endpoint_suffix=self._endpoint_suffix)

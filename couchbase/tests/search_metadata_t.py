@@ -112,8 +112,8 @@ class SearchMetaDataUnitTests:
         assert metadata.errors() == {'pindex-1': 'an error'}
 
     def test_metadata_repr_names_the_class(self) -> None:
-        assert repr(_metadata()).startswith('SearchMetaData:{')
-        assert repr(_metadata().metrics()).startswith('SearchMetrics:{')
+        assert repr(_metadata()).startswith('SearchMetaData({')
+        assert repr(_metadata().metrics()).startswith('SearchMetrics({')
 
     def test_metrics(self) -> None:
         metrics = _metadata().metrics()
