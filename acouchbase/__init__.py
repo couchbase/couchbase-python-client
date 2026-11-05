@@ -94,8 +94,7 @@ class LoopValidator:
 
 
 def couchbase_loop_factory() -> asyncio.AbstractEventLoop:
-    """
-    Dumb factory that simply builds a SelectorEventLoop.
+    """Dumb factory that simply builds a SelectorEventLoop.
 
     Returns:
         A SelectorEventLoop instance.
@@ -105,8 +104,7 @@ def couchbase_loop_factory() -> asyncio.AbstractEventLoop:
 
 
 def get_event_loop(evloop: asyncio.AbstractEventLoop | None = None) -> asyncio.AbstractEventLoop:
-    """
-    Get an event loop compatible with acouchbase.
+    """Get an event loop compatible with acouchbase.
 
     Some Event loops, such as ProactorEventLoop (the default asyncio event loop for Python 3.8 on Windows)
     are not compatible with acouchbase as they don't implement all members in the abstract base class.

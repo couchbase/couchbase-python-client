@@ -39,6 +39,10 @@ if TYPE_CHECKING:
 
 
 class BinaryCollection:
+    """The operations on a collection's binary documents and counters.
+
+    Get one from :meth:`~acouchbase.collection.Collection.binary`.
+    """
 
     def __init__(self, impl: AsyncBinaryCollectionInterface) -> None:
         self._impl = impl
@@ -47,13 +51,12 @@ class BinaryCollection:
                         key: str,
                         opts: IncrementOptions | None = None,
                         **kwargs: Unpack[IncrementOptionsKwargs]) -> CounterResult:
-        """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
-        option (defaults to 1).
+        """Increments the counter held in a document by the delta option, which defaults to 1.
 
         Args:
             key (str): The key of the document to increment.
             opts (:class:`~couchbase.options.IncrementOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.IncrementOptions`
 
         Returns:
@@ -65,7 +68,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple increment operation::
 
                 from acouchbase.options import IncrementOptions, SignedInt64
@@ -93,13 +95,12 @@ class BinaryCollection:
                         key: str,
                         opts: DecrementOptions | None = None,
                         **kwargs: Unpack[DecrementOptionsKwargs]) -> CounterResult:
-        """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
-        option (defaults to 1).
+        """Decrements the counter held in a document by the delta option, which defaults to 1.
 
         Args:
             key (str): The key of the document to decrement.
             opts (:class:`~couchbase.options.DecrementOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.DecrementOptions`
 
         Returns:
@@ -111,7 +112,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple decrement operation::
 
                 from acouchbase.options import DecrementOptions, SignedInt64
@@ -146,7 +146,7 @@ class BinaryCollection:
             key (str): The key of the document to append to.
             value (str | bytes | bytearray): The value to append to the document.
             opts (:class:`~couchbase.options.AppendOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AppendOptions`
 
         Returns:
@@ -158,7 +158,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple append string operation::
 
                 # ... other code ...
@@ -200,7 +199,7 @@ class BinaryCollection:
             key (str): The key of the document to prepend to.
             value (str | bytes | bytearray): The value to prepend to the document.
             opts (:class:`~couchbase.options.PrependOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.PrependOptions`
 
         Returns:
@@ -212,7 +211,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple prepend string operation::
 
                 # ... other code ...

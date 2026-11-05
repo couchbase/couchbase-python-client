@@ -137,6 +137,14 @@ class _Datastructure:
 
 
 class CouchbaseList(_Datastructure):
+    """CouchbaseList provides a simplified interface for storing a list within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the list.
+        collection (:class:`~acouchbase.collection.Collection`): The :class:`~acouchbase.collection.Collection`
+            where the list belongs.
+    """
+
     def __init__(self, key: str, collection: AsyncCollection) -> None:
         super().__init__(key, collection)
         self._full_list: Iterator[Any] | None = None
@@ -253,8 +261,7 @@ class CouchbaseList(_Datastructure):
             return (await self._get(span)).content_as[list]
 
     async def clear(self) -> None:
-        """Clears the list.
-        """
+        """Clears the list."""
         await self._clear(Op.ListClear)
 
     def __aiter__(self) -> CouchbaseList:
@@ -275,6 +282,13 @@ class CouchbaseList(_Datastructure):
 
 
 class CouchbaseMap(_Datastructure):
+    """CouchbaseMap provides a simplified interface for storing a map within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the map.
+        collection (:class:`~acouchbase.collection.Collection`): The :class:`~acouchbase.collection.Collection`
+            where the map belongs.
+    """
 
     def _empty(self) -> dict[str, Any]:
         return {}
@@ -372,8 +386,7 @@ class CouchbaseMap(_Datastructure):
             return (await self._get(span)).content_as[dict]
 
     async def clear(self) -> None:
-        """Clears the map.
-        """
+        """Clears the map."""
         await self._clear(Op.MapClear)
 
     async def items(self) -> Generator[tuple[str, Any], None, None]:
@@ -388,12 +401,19 @@ class CouchbaseMap(_Datastructure):
 
 
 class CouchbaseSet(_Datastructure):
+    """CouchbaseSet provides a simplified interface for storing a set within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the set.
+        collection (:class:`~acouchbase.collection.Collection`): The :class:`~acouchbase.collection.Collection`
+            where the set belongs.
+    """
 
     async def add(self, value: Any) -> bool:
-        """Adds a new item to the set. Returning whether the item already existed in the set or not.
+        """Adds a value to the set, unless the set already holds it.
 
         Args:
-            value (Any):
+            value (Any): The value to add.
 
         Returns:
             bool:  True if the value was added, False otherwise (meaning the value already
@@ -484,8 +504,7 @@ class CouchbaseSet(_Datastructure):
             return _first_value(sd_res)
 
     async def clear(self) -> None:
-        """Clears the set.
-        """
+        """Clears the set."""
         await self._clear(Op.SetClear)
 
     async def values(self) -> list[Any]:
@@ -499,6 +518,14 @@ class CouchbaseSet(_Datastructure):
 
 
 class CouchbaseQueue(_Datastructure):
+    """CouchbaseQueue provides a simplified interface for storing a queue within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the queue.
+        collection (:class:`~acouchbase.collection.Collection`): The :class:`~acouchbase.collection.Collection`
+            where the queue belongs.
+    """
+
     def __init__(self, key: str, collection: AsyncCollection) -> None:
         super().__init__(key, collection)
         self._full_queue: Iterator[Any] | None = None
@@ -576,8 +603,7 @@ class CouchbaseQueue(_Datastructure):
             return _first_value(sd_res)
 
     async def clear(self) -> None:
-        """Clears the queue.
-        """
+        """Clears the queue."""
         await self._clear(Op.QueueClear)
 
     def __iter__(self) -> NoReturn:

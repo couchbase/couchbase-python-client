@@ -104,7 +104,7 @@ class EventingFunctionManager:
             function (:class:`.EventingFunction`): The function to create or replace.
             options (:class:`~couchbase.management.options.UpsertFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the function is not an
@@ -128,7 +128,7 @@ class EventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.DropFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -146,7 +146,7 @@ class EventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.DeployFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -163,7 +163,7 @@ class EventingFunctionManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[list[:class:`.EventingFunction`]]: The functions.
@@ -179,7 +179,7 @@ class EventingFunctionManager:
         Args:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.GetFunctionOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[:class:`.EventingFunction`]: The function.
@@ -199,7 +199,7 @@ class EventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.PauseFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -217,7 +217,7 @@ class EventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.ResumeFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -235,7 +235,7 @@ class EventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.UndeployFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -251,7 +251,7 @@ class EventingFunctionManager:
         Args:
             options (:class:`~couchbase.management.options.FunctionsStatusOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[:class:`.EventingFunctionsStatus`]: The status of each function.
@@ -275,7 +275,7 @@ class ScopeEventingFunctionManager:
             function (:class:`.EventingFunction`): The function to create or replace.
             options (:class:`~couchbase.management.options.UpsertFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the function is not an
@@ -299,7 +299,7 @@ class ScopeEventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.DropFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -317,7 +317,7 @@ class ScopeEventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.DeployFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -334,7 +334,7 @@ class ScopeEventingFunctionManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[list[:class:`.EventingFunction`]]: The functions.
@@ -350,7 +350,7 @@ class ScopeEventingFunctionManager:
         Args:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.GetFunctionOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[:class:`.EventingFunction`]: The function.
@@ -370,7 +370,7 @@ class ScopeEventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.PauseFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -388,7 +388,7 @@ class ScopeEventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.ResumeFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -406,7 +406,7 @@ class ScopeEventingFunctionManager:
             name (str): The name of the eventing function.
             options (:class:`~couchbase.management.options.UndeployFunctionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.EventingFunctionNotFoundException`: If the function does not exist.
@@ -422,7 +422,7 @@ class ScopeEventingFunctionManager:
         Args:
             options (:class:`~couchbase.management.options.FunctionsStatusOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[:class:`.EventingFunctionsStatus`]: The status of each function.

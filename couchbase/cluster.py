@@ -78,7 +78,7 @@ class Cluster:
         options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
             Some operations allow the global options to be overriden by passing in options to the
             operation.
-        **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+        **kwargs: keyword arguments that can be used in place or to
             overrride provided :class:`~couchbase.options.ClusterOptions`
 
     Raises:
@@ -95,10 +95,7 @@ class Cluster:
 
     @property
     def transactions(self) -> Transactions:
-        """
-            :class:`~couchbase.transactions.Transactions`: A Transactions instance which can be used to
-                perform transactions on this cluster.
-        """
+        """Runs transactions on this cluster."""
         return self._impl.transactions
 
     def close(self) -> None:
@@ -133,7 +130,7 @@ class Cluster:
         return Bucket(self, bucket_name)
 
     def cluster_info(self) -> ClusterInfoResult:
-        """Retrieve the Couchbase cluster information
+        """Retrieve the Couchbase cluster information.
 
         .. note::
             If using Couchbase Server version < 6.6, a bucket *must* be opened prior to calling
@@ -161,6 +158,8 @@ class Cluster:
 
         Args:
             opts (:class:`~couchbase.options.PingOptions`): Optional parameters for this operation.
+            **kwargs: keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.PingOptions`
 
         Returns:
             :class:`~couchbase.result.PingResult`: A report which describes the outcome of the ping operations
@@ -179,6 +178,8 @@ class Cluster:
 
         Args:
             opts (:class:`~couchbase.options.DiagnosticsOptions`): Optional parameters for this operation.
+            **kwargs: keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.DiagnosticsOptions`
 
         Returns:
             :class:`~couchbase.result.DiagnosticsResult`: A report which describes current active connections
@@ -232,7 +233,7 @@ class Cluster:
             timeout (timedelta): Amount of time to wait for cluster to be ready before a
                 :class:`~couchbase.exceptions.UnAmbiguousTimeoutException` is raised.
             opts (:class:`~couchbase.options.WaitUntilReadyOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.WaitUntilReadyOptions`
 
         Raises:
@@ -240,7 +241,6 @@ class Cluster:
                 the cluster being ready for use.
 
         Example:
-
             Wait until the cluster is ready to use KV and query services::
 
                 from couchbase.auth import PasswordAuthenticator
@@ -271,7 +271,7 @@ class Cluster:
         Args:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -343,7 +343,7 @@ class Cluster:
             statement (str): The analytics SQL++ statement to execute.
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -423,7 +423,7 @@ class Cluster:
             query (:class:`~couchbase.search.SearchQuery`): Type of search query to perform.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -526,7 +526,7 @@ class Cluster:
                     Passing a :class:`~couchbase.search.SearchQuery` is deprecated; wrap it with
                     :meth:`~couchbase.search.SearchRequest.create` instead.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -601,9 +601,7 @@ class Cluster:
         return self._impl.search(index, request, options, **kwargs)
 
     def buckets(self) -> BucketManager:
-        """
-        Get a :class:`~couchbase.management.buckets.BucketManager` which can be used to manage the buckets
-        of this cluster.
+        """Get a manager for the buckets of this cluster.
 
         Returns:
             :class:`~couchbase.management.buckets.BucketManager`: A :class:`~couchbase.management.buckets.BucketManager`
@@ -612,9 +610,7 @@ class Cluster:
         return BucketManager(self._impl.bucket_mgmt())
 
     def users(self) -> UserManager:
-        """
-        Get a :class:`~couchbase.management.users.UserManager` which can be used to manage the users
-        of this cluster.
+        """Get a manager for the users of this cluster.
 
         Returns:
             :class:`~couchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager`
@@ -623,9 +619,7 @@ class Cluster:
         return UserManager(self._impl.user_mgmt())
 
     def query_indexes(self) -> QueryIndexManager:
-        """
-        Get a :class:`~couchbase.management.queries.QueryIndexManager` which can be used to manage the query
-        indexes of this cluster.
+        """Get a manager for the query indexes of this cluster.
 
         Returns:
             :class:`~couchbase.management.queries.QueryIndexManager`: A
@@ -634,9 +628,7 @@ class Cluster:
         return QueryIndexManager(self._impl.query_index_mgmt())
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
-        """
-        Get a :class:`~couchbase.management.analytics.AnalyticsIndexManager` which can be used to manage the analytics
-        dataverses, dataset, indexes and links of this cluster.
+        """Get a manager for the analytics dataverses, datasets, indexes and links of this cluster.
 
         Returns:
             :class:`~couchbase.management.analytics.AnalyticsIndexManager`: An
@@ -645,9 +637,7 @@ class Cluster:
         return AnalyticsIndexManager(self._impl.analytics_mgmt())
 
     def search_indexes(self) -> SearchIndexManager:
-        """
-        Get a :class:`~couchbase.management.search.SearchIndexManager` which can be used to manage the search
-        indexes of this cluster.
+        """Get a manager for the search indexes of this cluster.
 
         Returns:
             :class:`~couchbase.management.search.SearchIndexManager`: A
@@ -657,9 +647,7 @@ class Cluster:
         return SearchIndexManager(self._impl.search_index_mgmt())
 
     def eventing_functions(self) -> EventingFunctionManager:
-        """
-        Get a :class:`~couchbase.management.eventing.EventingFunctionManager` which can be used to manage the
-        eventing functions of this cluster.
+        """Get a manager for the eventing functions of this cluster.
 
         .. note::
             Eventing function management is an **uncommitted** API that is unlikely to change,
@@ -674,7 +662,7 @@ class Cluster:
 
     @staticmethod
     def connect(connstr: str, *options: options.ClusterOptions, **kwargs: Unpack[options.ClusterKwargs]) -> Cluster:
-        """Create a Couchbase Cluster and connect
+        """Create a cluster and connect to it.
 
         Args:
             connstr (str):
@@ -688,11 +676,12 @@ class Cluster:
             options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
                 Some operations allow the global options to be overriden by passing in options to the
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 overrride provided :class:`~couchbase.options.ClusterOptions`
 
         Returns:
             :class:`.Cluster`: If successful, a connect Couchbase Cluster instance.
+
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If no :class:`~couchbase.auth.Authenticator`
                 is provided.  Also raised if an invalid `ClusterOption` is provided.

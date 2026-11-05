@@ -73,6 +73,10 @@ log = logging.getLogger('couchbase.transactions')
 
 
 class Transactions:
+    """Runs transactions on a cluster.
+
+    Get it from the cluster's ``transactions`` property.
+    """
 
     def __init__(self, impl: TransactionsInterface) -> None:
         self._impl = impl
@@ -95,13 +99,14 @@ class Transactions:
             txn_logic: Callable[[AttemptContext], None],
             transaction_options: TransactionOptions | None = None,
             **kwargs: Any) -> TransactionResult:
-        """ Run a set of operations within a transaction.
+        """Run a set of operations within a transaction.
 
         Args:
             txn_logic (Callable[:class:`~couchbase.transactions.AttemptContext`]): The transaction logic to perform.
             transaction_options (:class:`~couchbase.options.TransactionOptions`): Options to override those in the
                 :class:`~couchbase.options.TransactionConfig` for this transaction only.
-            per_txn_config (:class:`~couchbase.options.TransactionOptions`): The same as ``transaction_options``.
+            **kwargs: Accepts ``per_txn_config``, the same as ``transaction_options``. Any other
+                keyword is ignored.
 
                 .. deprecated:: 4.1.0
                     Pass ``transaction_options`` instead.
@@ -131,7 +136,6 @@ class Transactions:
                 cluster.transactions.run(txn_logic)
 
         """
-
         opts = transaction_options or None
         if 'per_txn_config' in kwargs:
             Supportability.method_param_deprecated('per_txn_config', 'transaction_options')
@@ -165,11 +169,21 @@ class Transactions:
             return TransactionResult(res)
 
     def close(self) -> None:
+        """Close the transactions.
+
+        No transactions can be run on this instance afterwards. There is no need to call this, as the transactions close
+        automatically when the transactions object goes out of scope.
+        """
         self._impl.close()
         log.info("transactions closed")
 
 
 class AttemptContext:
+    """The operations a transaction's logic performs, within one attempt of the transaction.
+
+    :meth:`Transactions.run` passes it to the logic, and runs the logic again with a new attempt when an attempt has to
+    be retried.
+    """
 
     def __init__(self, impl: AttemptContextInterface) -> None:
         self._impl = impl
@@ -179,22 +193,23 @@ class AttemptContext:
             key: str,
             options: TransactionGetOptions | None = None,
             **kwargs: Unpack[TransactionGetOptionsKwargs]) -> TransactionGetResult:
-        """
-        Get a document within this transaction.
+        """Get a document within this transaction.
 
         Args:
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
             options (:class:`~couchbase.options.TransactionGetOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetOptions`
 
         Returns:
             :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
-                to other transaction operations. Or `None` if the document was not found.
+                to other transaction operations.
+
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
+            :class:`couchbase.exceptions.DocumentNotFoundException`: If the document does not exist.
         """
         return self._impl.get(coll, key, options, **kwargs)
 
@@ -205,21 +220,22 @@ class AttemptContext:
             options: TransactionGetReplicaFromPreferredServerGroupOptions | None = None,
             **kwargs: Unpack[TransactionGetReplicaFromPreferredServerGroupOptionsKwargs]
     ) -> TransactionGetResult:
-        """
-        Get a document within this transaction from any replica in the preferred server group that has been specified in
-            the :class:`couchbase.options.ClusterOptions`.
+        """Get a document within this transaction from a replica in the preferred server group.
+
+        The preferred server group is set in :class:`~couchbase.options.ClusterOptions`.
 
         Args:
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
             options (:class:`~couchbase.options.TransactionGetReplicaFromPreferredServerGroupOptions`): Optional
                 parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetReplicaFromPreferredServerGroupOptions`
 
         Returns:
             :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
-                to other transaction operations. Or `None` if the document was not found.
+                to other transaction operations.
+
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
@@ -234,15 +250,14 @@ class AttemptContext:
                   specs: list[TransactionGetMultiSpec] | tuple[TransactionGetMultiSpec, ...],
                   options: TransactionGetMultiOptions | None = None,
                   **kwargs: Unpack[TransactionGetMultiOptionsKwargs]) -> TransactionGetMultiResult:
-        """
-        Get multiple documents within this transaction.
+        """Get multiple documents within this transaction.
 
         Args:
             specs (list[:class:`~couchbase.transactions.TransactionGetMultiSpec`] | tuple[:class:`~couchbase.transactions.TransactionGetMultiSpec`]):
                 The required information for the documents involved for this operation.
             options (:class:`~couchbase.options.TransactionGetMultiOptions`, optional): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetMultiOptions`
 
         Returns:
@@ -261,20 +276,20 @@ class AttemptContext:
             options: TransactionGetMultiReplicasFromPreferredServerGroupOptions | None = None,
             **kwargs: Unpack[TransactionGetMultiReplicasFromPreferredServerGroupOptionsKwargs]
     ) -> TransactionGetMultiReplicasFromPreferredServerGroupResult:
-        """
-        Get multiple documents within this transaction from any replica.
+        """Get multiple documents within this transaction from replicas in the preferred server group.
 
         Args:
             specs (list[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`] | tuple[:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupSpec`]):
                 The required information for the documents involved for this operation.
             options (:class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`, optional):
                 Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`
 
         Returns:
             :class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupResult`: Collection of
             results from the operation.
+
         Raises:
             :class:`~couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
@@ -288,20 +303,20 @@ class AttemptContext:
                value: JSONType,
                options: TransactionInsertOptions | None = None,
                **kwargs: Unpack[TransactionInsertOptionsKwargs]) -> TransactionGetResult:
-        """
-        Insert a new document within a transaction.
+        """Insert a new document within a transaction.
 
         Args:
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
             value (:class:`couchbase.common._utils.JSONType):  Contents of the document.
             options (:class:`~couchbase.options.TransactionInsertOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionInsertOptions`
 
         Returns:
            :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
                 to other transaction operations.
+
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
@@ -313,20 +328,20 @@ class AttemptContext:
                 value: JSONType,
                 options: TransactionReplaceOptions | None = None,
                 **kwargs: Unpack[TransactionReplaceOptionsKwargs]) -> TransactionGetResult:
-        """
-        Replace the contents of a document within a transaction.
+        """Replace the contents of a document within a transaction.
 
         Args:
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to replace, gotten from a
               previous call to another transaction operation.
             value (:class:`couchbase.common._utils.JSONType):  The new contents of the document.
             options (:class:`~couchbase.options.TransactionReplaceOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionReplaceOptions`
 
         Returns:
            :class:`couchbase.transactions.TransactionGetResult`: Document in collection, in a form useful for passing
                 to other transaction operations.
+
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
@@ -335,11 +350,11 @@ class AttemptContext:
         return self._impl.replace(txn_get_result, value, options, **kwargs)
 
     def remove(self, txn_get_result: TransactionGetResult) -> None:
-        """
-        Remove a document in a transaction.
+        """Remove a document in a transaction.
 
         Args:
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to delete.
+
         Returns:
             None
         Raises:
@@ -351,8 +366,7 @@ class AttemptContext:
     def query(self,
               query: str,
               options: TransactionQueryOptions | None = None) -> TransactionQueryResults:
-        """
-        Perform a query within a transaction.
+        """Perform a query within a transaction.
 
         Args:
             query (str): Query to perform.

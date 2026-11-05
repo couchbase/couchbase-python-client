@@ -79,15 +79,21 @@ if TYPE_CHECKING:
 
 
 class Collection:
+    """A collection in a scope, and the key-value operations on its documents.
+
+    Get one from :meth:`~txcouchbase.scope.Scope.collection`.
+
+    Args:
+        scope (:class:`~txcouchbase.scope.Scope`): The scope the collection belongs to.
+        name (str): The name of the collection.
+    """
 
     def __init__(self, scope: TxScope, name: str) -> None:
         self._impl: TxCollectionInterface = scope._impl.collection(name)
 
     @property
     def name(self) -> str:
-        """
-            str: The name of this :class:`~.Collection` instance.
-        """
+        """The name of this collection."""
         return self._impl.name
 
     def get(self,
@@ -99,7 +105,7 @@ class Collection:
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetOptions`
 
         Returns:
@@ -115,13 +121,12 @@ class Collection:
                         key: str,
                         opts: GetAnyReplicaOptions | None = None,
                         **kwargs: Unpack[GetAnyReplicaOptionsKwargs]) -> Deferred[GetReplicaResult]:
-        """Retrieves the value of a document from the collection leveraging both active and all available replicas
-        returning the first available.
+        """Retrieves a document from whichever of the active copy and the replicas answers first.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAnyReplicaOptions`
 
         Returns:
@@ -143,7 +148,7 @@ class Collection:
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAllReplicasOptions`
 
         Returns:
@@ -165,7 +170,7 @@ class Collection:
         Args:
             key (str): The key for the document to check existence.
             opts (:class:`~couchbase.options.ExistsOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsOptions`
 
         Returns:
@@ -184,7 +189,7 @@ class Collection:
             key (str): Document key to insert.
             value (DocumentValue): The value of the document to insert.
             opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertOptions`
 
         Returns:
@@ -208,7 +213,7 @@ class Collection:
             key (str): Document key to upsert.
             value (DocumentValue): The value of the document to upsert.
             opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertOptions`
 
         Returns:
@@ -228,7 +233,7 @@ class Collection:
             key (str): Document key to replace.
             value (DocumentValue): The value of the document to replace.
             opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceOptions`
 
         Returns:
@@ -250,7 +255,7 @@ class Collection:
         Args:
             key (str): Key for the document to remove.
             opts (:class:`~couchbase.options.RemoveOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.RemoveOptions`
 
         Returns:
@@ -274,7 +279,7 @@ class Collection:
             key (str): Key for the document to touch.
             expiry (timedelta): The new expiry for the document.
             opts (:class:`~couchbase.options.TouchOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TouchOptions`
 
         Returns:
@@ -298,7 +303,7 @@ class Collection:
             key (str): The key for the document retrieve and set expiry time.
             expiry (timedelta):  The new expiry to apply to the document.
             opts (:class:`~couchbase.options.GetAndTouchOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndTouchOptions`
 
         Returns:
@@ -321,7 +326,7 @@ class Collection:
             key (str): The key for the document to lock and retrieve.
             lock_time (timedelta):  The amount of time to lock the document.
             opts (:class:`~couchbase.options.GetAndLockOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndLockOptions`
 
         Returns:
@@ -344,7 +349,7 @@ class Collection:
             key (str): The key for the document to unlock.
             cas (int): The CAS of the document, used to validate lock ownership.
             opts (:class:`~couchbase.options.UnlockOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockOptions`
 
         Raises:
@@ -360,15 +365,14 @@ class Collection:
                   spec: Iterable[Spec],
                   opts: LookupInOptions | None = None,
                   **kwargs: Unpack[LookupInOptionsKwargs]) -> Deferred[LookupInResult]:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value.
+        """Fetches individual fields of a document, or information about them.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInOptions`
 
         Returns:
@@ -386,16 +390,14 @@ class Collection:
                               spec: Iterable[Spec],
                               opts: LookupInAnyReplicaOptions | None = None,
                               **kwargs: Unpack[LookupInAnyReplicaOptionsKwargs]) -> Deferred[LookupInReplicaResult]:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value. It leverages both active and all available replicas
-        returning the first available
+        """Fetches fields of a document from whichever of the active copy and the replicas answers first.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAnyReplicaOptions`
 
         Returns:
@@ -414,15 +416,14 @@ class Collection:
                                opts: LookupInAllReplicasOptions | None = None,
                                **kwargs: Unpack[LookupInAllReplicasOptionsKwargs]
                                ) -> Deferred[Iterable[LookupInReplicaResult]]:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value, returning results from both active and all available replicas
+        """Fetches fields of a document from the active copy and every available replica.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAllReplicasOptions`
 
         Returns:
@@ -441,15 +442,16 @@ class Collection:
                   spec: Iterable[Spec],
                   opts: MutateInOptions | None = None,
                   **kwargs: Unpack[MutateInOptionsKwargs]) -> Deferred[MutateInResult]:
-        """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
-        within a document. Also enables access to document extended-attributes (i.e. xattrs).
+        """Atomically modifies individual fields of a document.
+
+        The fields may include the document's extended attributes (xattrs).
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the operations to
                 perform on the document.
             opts (:class:`~couchbase.options.MutateInOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.MutateInOptions`
 
         Returns:
@@ -463,8 +465,7 @@ class Collection:
         return self._impl.mutate_in_deferred(key, spec, opts, **kwargs)
 
     def binary(self) -> BinaryCollection:
-        """Creates a BinaryCollection instance, allowing access to various binary operations
-        possible against a collection.
+        """Get the binary operations on this collection.
 
         .. seealso::
             :class:`~txcouchbase.binary_collection.BinaryCollection`
@@ -476,6 +477,7 @@ class Collection:
 
     @staticmethod
     def default_name() -> str:
+        """The name of a bucket's default collection."""
         return "_default"
 
 

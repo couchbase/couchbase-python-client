@@ -56,6 +56,7 @@ class Bucket:
 
     @property
     def name(self) -> str:
+        """The name of this bucket."""
         return self._impl.bucket_name
 
     def close(self) -> None:
@@ -123,6 +124,8 @@ class Bucket:
 
         Args:
             opts (:class:`~couchbase.options.PingOptions`): Optional parameters for this operation.
+            **kwargs: keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.PingOptions`
 
         Returns:
             :class:`~couchbase.result.PingResult`: A report which describes the outcome of the ping operations
@@ -156,7 +159,7 @@ class Bucket:
             design_doc (str): The name of the design document containing the view to execute.
             view_name (str): The name of the view to execute.
             view_options (:class:`~.options.ViewOptions`): Optional parameters for the view query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~.options.ViewOptions`
 
         Returns:
@@ -182,9 +185,7 @@ class Bucket:
         return self._impl.view_query(design_doc, view_name, view_options, **kwargs)
 
     def collections(self) -> CollectionManager:
-        """
-        Get a :class:`~couchbase.management.collections.CollectionManager` which can be used to manage the scopes and
-        collections of this bucket.
+        """Get a manager for the scopes and collections of this bucket.
 
         Returns:
             :class:`~couchbase.management.collections.CollectionManager`: A
@@ -193,9 +194,7 @@ class Bucket:
         return CollectionManager(self._impl.collection_mgmt())
 
     def view_indexes(self) -> ViewIndexManager:
-        """
-        Get a :class:`~couchbase.management.views.ViewIndexManager` which can be used to manage the view design
-        documents and views of this bucket.
+        """Get a manager for the view design documents and views of this bucket.
 
         .. deprecated:: 4.6.0
 

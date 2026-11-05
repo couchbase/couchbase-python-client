@@ -76,7 +76,7 @@ class BucketManager:
             settings (:class:`.CreateBucketSettings`): The settings to use for the new bucket.
             options (:class:`~couchbase.management.options.CreateBucketOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -96,7 +96,7 @@ class BucketManager:
             settings (:class:`.BucketSettings`): The settings to use for the new bucket.
             options (:class:`~couchbase.management.options.UpdateBucketOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -115,7 +115,7 @@ class BucketManager:
             bucket_name (str): The name of the bucket to drop.
             options (:class:`~couchbase.management.options.DropBucketOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -133,7 +133,7 @@ class BucketManager:
             bucket_name (str): The name of the bucket to fetch.
             options (:class:`~couchbase.management.options.GetBucketOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -152,7 +152,7 @@ class BucketManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllBucketOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -170,7 +170,7 @@ class BucketManager:
             bucket_name (str): The name of the bucket to flush.
             options (:class:`~couchbase.management.options.FlushBucketOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -190,7 +190,7 @@ class BucketManager:
             bucket_name (str): The name of the bucket to describe.
             options (:class:`~couchbase.management.options.BucketDescribeOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:

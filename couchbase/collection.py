@@ -76,15 +76,21 @@ if TYPE_CHECKING:
 
 
 class Collection:
+    """A collection in a scope, and the key-value operations on its documents.
+
+    Get one from :meth:`~couchbase.scope.Scope.collection`.
+
+    Args:
+        scope (:class:`~couchbase.scope.Scope`): The scope the collection belongs to.
+        name (str): The name of the collection.
+    """
 
     def __init__(self, scope: Scope, name: str) -> None:
         self._impl: CollectionInterface = scope._impl.collection(name)
 
     @property
     def name(self) -> str:
-        """
-            str: The name of this :class:`~.Collection` instance.
-        """
+        """The name of this collection."""
         return self._impl.name
 
     def get(self,
@@ -96,7 +102,7 @@ class Collection:
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetOptions`
 
         Returns:
@@ -107,7 +113,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple get operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -134,13 +139,12 @@ class Collection:
                         key: str,
                         opts: options.GetAnyReplicaOptions | None = None,
                         **kwargs: Unpack[options.GetAnyReplicaOptionsKwargs]) -> GetReplicaResult:
-        """Retrieves the value of a document from the collection leveraging both active and all available replicas
-        returning the first available.
+        """Retrieves a document from whichever of the active copy and the replicas answers first.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAnyReplicaOptions`
 
         Returns:
@@ -151,7 +155,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple get_any_replica operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -185,7 +188,7 @@ class Collection:
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAllReplicasOptions`
 
         Returns:
@@ -197,7 +200,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple get_all_replicas operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -250,14 +252,13 @@ class Collection:
         Args:
             key (str): The key for the document to check existence.
             opts (:class:`~couchbase.options.ExistsOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsOptions`
 
         Returns:
             :class:`~couchbase.result.ExistsResult`: An instance of :class:`~couchbase.result.ExistsResult`.
 
         Examples:
-
             Simple exists operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -293,7 +294,7 @@ class Collection:
             key (str): Document key to insert.
             value (DocumentValue): The value of the document to insert.
             opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertOptions`
 
         Returns:
@@ -304,7 +305,6 @@ class Collection:
                 server.
 
         Examples:
-
             Simple insert operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -355,14 +355,13 @@ class Collection:
             key (str): Document key to upsert.
             value (DocumentValue): The value of the document to upsert.
             opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertOptions`
 
         Returns:
             :class:`~couchbase.result.MutationResult`: An instance of :class:`~couchbase.result.MutationResult`.
 
         Examples:
-
             Simple upsert operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -413,7 +412,7 @@ class Collection:
             key (str): Document key to replace.
             value (DocumentValue): The value of the document to replace.
             opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceOptions`
 
         Returns:
@@ -424,7 +423,6 @@ class Collection:
                 server.
 
         Examples:
-
             Simple replace operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -463,7 +461,7 @@ class Collection:
         Args:
             key (str): Key for the document to remove.
             opts (:class:`~couchbase.options.RemoveOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.RemoveOptions`
 
         Returns:
@@ -474,7 +472,6 @@ class Collection:
                 server.
 
         Examples:
-
             Simple remove operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -507,7 +504,7 @@ class Collection:
             key (str): Key for the document to touch.
             expiry (timedelta): The new expiry for the document.
             opts (:class:`~couchbase.options.TouchOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TouchOptions`
 
         Returns:
@@ -518,7 +515,6 @@ class Collection:
                 server.
 
         Examples:
-
             Simple touch operation::
 
                 from datetime import timedelta
@@ -557,7 +553,7 @@ class Collection:
             key (str): The key for the document retrieve and set expiry time.
             expiry (timedelta):  The new expiry to apply to the document.
             opts (:class:`~couchbase.options.GetAndTouchOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndTouchOptions`
 
         Returns:
@@ -568,7 +564,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple get and touch operation::
 
                 from datetime import timedelta
@@ -610,7 +605,7 @@ class Collection:
             key (str): The key for the document to lock and retrieve.
             lock_time (timedelta):  The amount of time to lock the document.
             opts (:class:`~couchbase.options.GetAndLockOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndLockOptions`
 
         Returns:
@@ -621,7 +616,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple get and lock operation::
 
                 from datetime import timedelta
@@ -663,7 +657,7 @@ class Collection:
             key (str): The key for the document to unlock.
             cas (int): The CAS of the document, used to validate lock ownership.
             opts (:class:`~couchbase.options.UnlockOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockOptions`
 
         Raises:
@@ -673,7 +667,6 @@ class Collection:
             :class:`~couchbase.exceptions.DocumentLockedException`: If the provided cas is invalid.
 
         Examples:
-
             Simple unlock operation::
 
                 from datetime import timedelta
@@ -697,15 +690,14 @@ class Collection:
                   spec: Iterable[Spec],
                   opts: options.LookupInOptions | None = None,
                   **kwargs: Unpack[options.LookupInOptionsKwargs]) -> LookupInResult:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value.
+        """Fetches individual fields of a document, or information about them.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInOptions`
 
         Returns:
@@ -716,7 +708,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple look-up in operation::
 
                 import couchbase.subdocument as SD
@@ -754,16 +745,14 @@ class Collection:
                               spec: Iterable[Spec],
                               opts: LookupInAnyReplicaOptions | None = None,
                               **kwargs: Unpack[options.LookupInAnyReplicaOptionsKwargs]) -> LookupInReplicaResult:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value. It leverages both active and all available replicas
-        returning the first available
+        """Fetches fields of a document from whichever of the active copy and the replicas answers first.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAnyReplicaOptions`
 
         Returns:
@@ -775,7 +764,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple lookup_in_any_replica operation::
 
                 import couchbase.subdocument as SD
@@ -815,15 +803,14 @@ class Collection:
                                opts: LookupInAllReplicasOptions | None = None,
                                **kwargs: Unpack[options.LookupInAllReplicasOptionsKwargs]
                                ) -> Iterable[LookupInReplicaResult]:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value, returning results from both active and all available replicas
+        """Fetches fields of a document from the active copy and every available replica.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAllReplicasOptions`
 
         Returns:
@@ -836,7 +823,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple lookup_in_all_replicas operation::
 
                 import couchbase.subdocument as SD
@@ -896,15 +882,16 @@ class Collection:
                   spec: Iterable[Spec],
                   opts: MutateInOptions | None = None,
                   **kwargs: Unpack[options.MutateInOptionsKwargs]) -> MutateInResult:
-        """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
-        within a document. Also enables access to document extended-attributes (i.e. xattrs).
+        """Atomically modifies individual fields of a document.
+
+        The fields may include the document's extended attributes (xattrs).
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the operations to
                 perform on the document.
             opts (:class:`~couchbase.options.MutateInOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.MutateInOptions`
 
         Returns:
@@ -915,7 +902,6 @@ class Collection:
                 on the server.
 
         Examples:
-
             Simple mutate-in operation::
 
                 import couchbase.subdocument as SD
@@ -963,7 +949,7 @@ class Collection:
                 :class:`~couchbase.kv_range_scan.PrefixScan` or
                 :class:`~couchbase.kv_range_scan.SamplingScan` instance.
             opts (:class:`~couchbase.options.ScanOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ScanOptions`
 
         Raises:
@@ -976,7 +962,6 @@ class Collection:
             :class:`~couchbase.result.ScanResultIterable`: An instance of :class:`~couchbase.result.ScanResultIterable`.
 
         Examples:
-
             Simple range scan operation::
 
                 from couchbase.kv_range_scan import RangeScan
@@ -998,8 +983,7 @@ class Collection:
         return self._impl.scan(scan_type, opts, **kwargs)
 
     def binary(self) -> BinaryCollection:
-        """Creates a BinaryCollection instance, allowing access to various binary operations
-        possible against a collection.
+        """Get the binary operations on this collection.
 
         .. seealso::
             :class:`~couchbase.binary_collection.BinaryCollection`
@@ -1036,7 +1020,7 @@ class Collection:
             key (str): The key for the list document.
             value (JSONType): The value to append to the list.
             create (bool, optional): Whether the list should be created if it does not exist.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1057,7 +1041,7 @@ class Collection:
                      create: bool | None = False,
                      **kwargs: object
                      ) -> OperationResult:
-        """ Add an item to the beginning of a list.
+        """Add an item to the beginning of a list.
 
         .. deprecated:: 4.0.0
             Use :meth:`.CouchbaseList.prepend` instead.
@@ -1066,7 +1050,7 @@ class Collection:
             key (str): The key for the list document.
             value (JSONType): The value to prepend to the list.
             create (bool, optional): Whether the list should be created if it does not exist.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1096,7 +1080,7 @@ class Collection:
             key (str): The key for the list document.
             index (int): The position to replace.
             value (JSONType): The value to prepend to the list.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1121,7 +1105,7 @@ class Collection:
         Args:
             key (str): The key for the list document.
             index (int): The position to retrieve.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1146,7 +1130,7 @@ class Collection:
         Args:
             key (str): The key for the list document.
             index (int): The position to remove.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1170,7 +1154,7 @@ class Collection:
 
         Args:
             key (str): The key for the list document.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1214,7 +1198,7 @@ class Collection:
             mapkey (str): The key in the map to set.
             value (Any): The value to use.
             create (bool, optional): Whether the map should be created if it does not exist.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1238,7 +1222,7 @@ class Collection:
         Args:
             key (str): The key for the map document.
             mapkey (str): The key in the map to set.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1262,7 +1246,7 @@ class Collection:
         Args:
             key (str): The key for the map document.
             mapkey (str): The key in the map to set.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1285,7 +1269,7 @@ class Collection:
 
         Args:
             key (str): The key for the map document.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1327,7 +1311,7 @@ class Collection:
             key (str): The key for the set document.
             value (Any): The value to add to the set.
             create (bool, optional): Whether the set should be created if it does not exist.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1350,7 +1334,7 @@ class Collection:
         Args:
             key (str): The key for the set document.
             value (Any): The value to remove from the set.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1375,7 +1359,7 @@ class Collection:
 
         Args:
             key (str): The key for the set document.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1390,7 +1374,7 @@ class Collection:
         return legacy.set_size(key, **kwargs)
 
     def set_contains(self, key: str, value: Any, **kwargs: object) -> bool:
-        """Determine if an item exists in a set
+        """Determine if an item exists in a set.
 
         .. deprecated:: 4.0.0
             Use :meth:`.CouchbaseSet.contains` instead.
@@ -1398,7 +1382,7 @@ class Collection:
         Args:
             key (str): The key for the set document.
             value (Any):  The value to check for.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1439,7 +1423,7 @@ class Collection:
             key (str): The key for the queue document.
             value (Any):  The value to add.
             create (bool, optional): Whether the queue should be created if it does not exist.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1466,7 +1450,7 @@ class Collection:
 
         Args:
             key (str): The key for the queue document.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -1510,7 +1494,7 @@ class Collection:
         Args:
             keys (list[str]): The keys to use for the multiple get operations.
             opts (:class:`~couchbase.options.GetMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetMultiOptions`
 
         Returns:
@@ -1523,7 +1507,6 @@ class Collection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple get-multi operation::
 
                 collection = bucket.default_collection()
@@ -1570,13 +1553,12 @@ class Collection:
                               opts: GetAnyReplicaMultiOptions | None = None,
                               **kwargs: Unpack[options.GetAnyReplicaMultiOptionsKwargs]
                               ) -> MultiGetReplicaResult[GetReplicaResult]:
-        """For each key in the provided list, retrieve the document associated with the key from the collection
-        leveraging both active and all available replicas returning the first available.
+        """Retrieves each document from whichever of the active copy and the replicas answers first.
 
         Args:
             keys (list[str]): The keys to use for the multiple get operations.
             opts (:class:`~couchbase.options.GetAnyReplicaMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAnyReplicaMultiOptions`
 
         Returns:
@@ -1590,7 +1572,6 @@ class Collection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple get_any_replica_multi operation::
 
                 collection = bucket.default_collection()
@@ -1645,13 +1626,12 @@ class Collection:
                                opts: GetAllReplicasMultiOptions | None = None,
                                **kwargs: Unpack[options.GetAllReplicasMultiOptionsKwargs]
                                ) -> MultiGetReplicaResult[list[GetReplicaResult]]:
-        """For each key in the provided list, retrieve the document from the collection returning both
-        active and all available replicas.
+        """Retrieves each document from the active copy and every available replica.
 
         Args:
             keys (list[str]): The keys to use for the multiple get operations.
             opts (:class:`~couchbase.options.GetAllReplicasMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAllReplicasMultiOptions`
 
         Returns:
@@ -1665,7 +1645,6 @@ class Collection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple get_all_replicas_multi operation::
 
                 collection = bucket.default_collection()
@@ -1742,7 +1721,7 @@ class Collection:
             keys (list[str]): The keys to use for the multiple lock operations.
             lock_time (timedelta):  The amount of time to lock the documents.
             opts (:class:`~couchbase.options.GetAndLockMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndLockMultiOptions`
 
         Returns:
@@ -1755,7 +1734,6 @@ class Collection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple get_and_lock_multi operation::
 
                 collection = bucket.default_collection()
@@ -1807,14 +1785,13 @@ class Collection:
         Args:
             keys (list[str]): The keys to use for the multiple exists operations.
             opts (:class:`~couchbase.options.ExistsMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsMultiOptions`
 
         Returns:
             :class:`~couchbase.result.MultiExistsResult`: An instance of :class:`~couchbase.result.MultiExistsResult`.
 
         Examples:
-
             Simple exists_multi operation::
 
                 collection = bucket.default_collection()
@@ -1858,14 +1835,13 @@ class Collection:
                      keys_and_docs: Mapping[str, DocumentValue],
                      opts: InsertMultiOptions | None = None,
                      **kwargs: Unpack[options.InsertMultiOptionsKwargs]) -> MultiMutationResult:
-        """For each key, value pair in the provided dict, inserts a new document to the collection,
-        failing if the document already exists.
+        """Inserts a new document for each key-value pair, failing for a key whose document already exists.
 
         Args:
             keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple insert
                 operations.
             opts (:class:`~couchbase.options.InsertMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertMultiOptions`
 
         Returns:
@@ -1878,7 +1854,6 @@ class Collection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple insert_multi operation::
 
                 collection = bucket.default_collection()
@@ -1938,14 +1913,13 @@ class Collection:
                      keys_and_docs: Mapping[str, DocumentValue],
                      opts: UpsertMultiOptions | None = None,
                      **kwargs: Unpack[options.UpsertMultiOptionsKwargs]) -> MultiMutationResult:
-        """For each key, value pair in the provided dict, upserts a document to the collection. This operation
-        succeeds whether or not the document already exists.
+        """Upserts a document for each key-value pair, whether or not the document already exists.
 
         Args:
             keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple upsert
                 operations.
             opts (:class:`~couchbase.options.UpsertMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertMultiOptions`
 
         Returns:
@@ -1953,7 +1927,6 @@ class Collection:
             :class:`~couchbase.result.MultiMutationResult`.
 
         Examples:
-
             Simple upsert_multi operation::
 
                 collection = bucket.default_collection()
@@ -2013,14 +1986,13 @@ class Collection:
                       keys_and_docs: Mapping[str, DocumentValue],
                       opts: ReplaceMultiOptions | None = None,
                       **kwargs: Unpack[options.ReplaceMultiOptionsKwargs]) -> MultiMutationResult:
-        """For each key, value pair in the provided dict, replaces the value of a document in the collection.
-        This operation fails if the document does not exist.
+        """Replaces the document for each key-value pair, failing for a key whose document does not exist.
 
         Args:
             keys_and_docs (Mapping[str, DocumentValue]): The keys and values/docs to use for the multiple replace
                 operations.
             opts (:class:`~couchbase.options.ReplaceMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceMultiOptions`
 
         Returns:
@@ -2033,7 +2005,6 @@ class Collection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple replace_multi operation::
 
                 collection = bucket.default_collection()
@@ -2099,13 +2070,12 @@ class Collection:
                      keys: list[str],
                      opts: RemoveMultiOptions | None = None,
                      **kwargs: Unpack[options.RemoveMultiOptionsKwargs]) -> MultiMutationResult:
-        """For each key in the provided list, remove the existing document.  This operation fails
-        if the document does not exist.
+        """Removes the document for each key, failing for a key whose document does not exist.
 
         Args:
             keys (list[str]): The keys to use for the multiple remove operations.
             opts (:class:`~couchbase.options.RemoveMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.RemoveMultiOptions`
 
         Returns:
@@ -2118,7 +2088,6 @@ class Collection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple remove_multi operation::
 
                 collection = bucket.default_collection()
@@ -2158,14 +2127,13 @@ class Collection:
                     expiry: timedelta,
                     opts: TouchMultiOptions | None = None,
                     **kwargs: Unpack[options.TouchMultiOptionsKwargs]) -> MultiMutationResult:
-        """For each key in the provided list, update the expiry on an existing document. This operation fails
-        if the document does not exist.
+        """Updates the expiry of the document for each key, failing for a key whose document does not exist.
 
         Args:
             keys (list[str]): The keys to use for the multiple touch operations.
             expiry (timedelta): The new expiry for the document.
             opts (:class:`~couchbase.options.TouchMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TouchMultiOptions`
 
         Returns:
@@ -2184,13 +2152,12 @@ class Collection:
                      keys: MultiResultType | dict[str, int],
                      opts: UnlockMultiOptions | None = None,
                      **kwargs: Unpack[options.UnlockMultiOptionsKwargs]) -> dict[str, CouchbaseException | None]:
-        """For each result in the provided :class:`~couchbase.result.MultiResultType` in the provided list,
-        unlocks a previously locked document. This operation fails if the document does not exist.
+        """Unlocks the document behind each result, failing for one whose document does not exist.
 
         Args:
             keys (MultiResultType | dict[str, int]): The result from a previous multi operation.
             opts (:class:`~couchbase.options.UnlockMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockMultiOptions`
 
         Returns:
@@ -2210,9 +2177,7 @@ class Collection:
         return self._impl.unlock_multi(keys, opts, **kwargs)
 
     def query_indexes(self) -> CollectionQueryIndexManager:
-        """
-        Get a :class:`~couchbase.management.queries.CollectionQueryIndexManager` which can be used to manage the query
-        indexes of this cluster.
+        """Get a manager for the query indexes of this collection.
 
         Returns:
             :class:`~couchbase.management.queries.CollectionQueryIndexManager`: A
@@ -2222,6 +2187,7 @@ class Collection:
 
     @staticmethod
     def default_name() -> str:
+        """The name of a bucket's default collection."""
         return "_default"
 
 
@@ -2358,7 +2324,8 @@ class UpsertOptions(options.UpsertOptions):  # noqa: F811
 
 @Supportability.class_deprecated('couchbase.collection.Collection')
 class CBCollection(Collection):
-    """
+    """**DEPRECATED** A collection.
+
     .. deprecated:: 4.0.0
         Use :class:`~couchbase.collection.Collection` instead.
     """

@@ -60,8 +60,7 @@ class AsyncScope:
 
     @property
     def connection(self) -> object:
-        """
-        **INTERNAL**
+        """**INTERNAL** The scope's connection.
 
         .. deprecated:: 4.7.0
         """
@@ -70,16 +69,12 @@ class AsyncScope:
 
     @property
     def name(self) -> str:
-        """
-            str: The name of this :class:`~acouchbase.scope.Scope` instance.
-        """
+        """The name of this scope."""
         return self._impl.name
 
     @property
     def bucket_name(self) -> str:
-        """
-            str: The name of the bucket in which this :class:`~acouchbase.scope.Scope` instance belongs.
-        """
+        """The name of the bucket this scope belongs to."""
         return self._impl.bucket_name
 
     def collection(self, name: str) -> Collection:
@@ -111,7 +106,7 @@ class AsyncScope:
         Args:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -187,7 +182,7 @@ class AsyncScope:
             statement (str): The analytics SQL++ statement to execute.
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -264,7 +259,7 @@ class AsyncScope:
             query (:class:`~couchbase.search.SearchQuery`): Type of search query to perform.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -367,7 +362,7 @@ class AsyncScope:
                     Passing a :class:`~couchbase.search.SearchQuery` is deprecated; wrap it with
                     :meth:`~couchbase.search.SearchRequest.create` instead.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -436,9 +431,7 @@ class AsyncScope:
         return self._impl.search(index, request, options, **kwargs)
 
     def search_indexes(self) -> ScopeSearchIndexManager:
-        """
-        Get a :class:`~acouchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
-        indexes of this scope.
+        """Get a manager for the search indexes of this scope.
 
         Returns:
             :class:`~acouchbase.management.search.ScopeSearchIndexManager`: A
@@ -448,9 +441,7 @@ class AsyncScope:
         return ScopeSearchIndexManager(self._impl.search_index_mgmt())
 
     def eventing_functions(self) -> ScopeEventingFunctionManager:
-        """
-        Get a :class:`~acouchbase.management.eventing.ScopeEventingFunctionManager` which can be used to manage the
-        eventing functions of this scope.
+        """Get a manager for the eventing functions of this scope.
 
         Returns:
             :class:`~acouchbase.management.eventing.ScopeEventingFunctionManager`: A
@@ -461,6 +452,7 @@ class AsyncScope:
 
     @staticmethod
     def default_name() -> str:
+        """The name of a bucket's default scope."""
         return "_default"
 
 

@@ -63,7 +63,7 @@ class ViewIndexManager:
             namespace (:class:`.DesignDocumentNamespace`): Whether the design document is in development or production.
             options (:class:`~couchbase.management.options.GetDesignDocumentOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[:class:`.DesignDocument`]: The design document.
@@ -85,7 +85,7 @@ class ViewIndexManager:
             namespace (:class:`.DesignDocumentNamespace`): Whether the design document is in development or production.
             options (:class:`~couchbase.management.options.GetAllDesignDocumentsOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Awaitable[Iterable[:class:`.DesignDocument`]]: The design documents.
@@ -107,7 +107,7 @@ class ViewIndexManager:
             namespace (:class:`.DesignDocumentNamespace`): Whether the design document is in development or production.
             options (:class:`~couchbase.management.options.UpsertDesignDocumentOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the design_doc_data or namespace is not given.
@@ -126,7 +126,7 @@ class ViewIndexManager:
             namespace (:class:`.DesignDocumentNamespace`): Whether the design document is in development or production.
             options (:class:`~couchbase.management.options.DropDesignDocumentOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the design_doc_name or namespace is not given.
@@ -146,7 +146,7 @@ class ViewIndexManager:
             design_doc_name (str): The name of the development design document to publish.
             options (:class:`~couchbase.management.options.PublishDesignDocumentOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the design_doc_name is not given.

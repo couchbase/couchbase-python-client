@@ -71,7 +71,7 @@ class QueryIndexManager:
             keys (Iterable[str]): The keys which this index should cover.
             options (:class:`~couchbase.management.options.CreateQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -91,7 +91,7 @@ class QueryIndexManager:
             bucket_name (str): The name of the bucket this index is for.
             options (:class:`~couchbase.management.options.CreatePrimaryQueryIndexOptions`): Optional parameters for
                 this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -112,7 +112,7 @@ class QueryIndexManager:
             index_name (str): The name of the index to drop.
             options (:class:`~couchbase.management.options.DropQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -132,7 +132,7 @@ class QueryIndexManager:
             bucket_name (str): The name of the bucket this index to drop.
             options (:class:`~couchbase.management.options.DropPrimaryQueryIndexOptions`): Optional parameters for
                 this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -151,7 +151,7 @@ class QueryIndexManager:
             bucket_name (str): The name of the bucket to fetch indexes for.
             options (:class:`~couchbase.management.options.GetAllQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -172,7 +172,7 @@ class QueryIndexManager:
             bucket_name (str): The name of the bucket to perform build on.
             options (:class:`~couchbase.management.options.BuildDeferredQueryIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -192,7 +192,7 @@ class QueryIndexManager:
             index_names (Iterable[str]): The names of the indexes to watch.
             options (:class:`~couchbase.management.options.WatchQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -223,7 +223,7 @@ class CollectionQueryIndexManager:
             keys (Iterable[str]): The keys which this index should cover.
             options (:class:`~couchbase.management.options.CreateQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -240,7 +240,7 @@ class CollectionQueryIndexManager:
         Args:
             options (:class:`~couchbase.management.options.CreatePrimaryQueryIndexOptions`): Optional parameters for
                 this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -258,7 +258,7 @@ class CollectionQueryIndexManager:
             index_name (str): The name of the index to drop.
             options (:class:`~couchbase.management.options.DropQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -275,7 +275,7 @@ class CollectionQueryIndexManager:
         Args:
             options (:class:`~couchbase.management.options.DropPrimaryQueryIndexOptions`): Optional parameters for
                 this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -291,7 +291,7 @@ class CollectionQueryIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -308,7 +308,7 @@ class CollectionQueryIndexManager:
         Args:
             options (:class:`~couchbase.management.options.BuildDeferredQueryIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         """
@@ -324,7 +324,7 @@ class CollectionQueryIndexManager:
             index_names (Iterable[str]): The names of the indexes to watch.
             options (:class:`~couchbase.management.options.WatchQueryIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:

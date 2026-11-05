@@ -88,7 +88,7 @@ class AsyncCluster:
         options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
             Some operations allow the global options to be overriden by passing in options to the
             operation.
-        **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+        **kwargs: keyword arguments that can be used in place or to
             overrride provided :class:`~couchbase.options.ClusterOptions`
 
     Raises:
@@ -105,17 +105,12 @@ class AsyncCluster:
 
     @property
     def loop(self) -> AbstractEventLoop:
-        """
-        **INTERNAL**
-        """
+        """**INTERNAL** The event loop the cluster runs on."""
         return self._impl.loop
 
     @property
     def transactions(self) -> Transactions:
-        """
-            :class:`~acouchbase.transactions.Transactions`: A Transactions instance which can be used to
-                perform transactions on this cluster.
-        """
+        """Runs transactions on this cluster."""
         return self._impl.transactions
 
     async def on_connect(self) -> None:
@@ -187,7 +182,7 @@ class AsyncCluster:
         return AsyncBucket(self, bucket_name)
 
     async def cluster_info(self) -> ClusterInfoResult:
-        """Retrieve the Couchbase cluster information
+        """Retrieve the Couchbase cluster information.
 
         .. note::
             If using Couchbase Server version < 6.6, a bucket *must* be opened prior to calling
@@ -214,6 +209,8 @@ class AsyncCluster:
 
         Args:
             opts (:class:`~couchbase.options.PingOptions`): Optional parameters for this operation.
+            **kwargs: keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.PingOptions`
 
         Returns:
             Awaitable[:class:`~couchbase.result.PingResult`]: A report which describes the outcome of the
@@ -232,6 +229,8 @@ class AsyncCluster:
 
         Args:
             opts (:class:`~couchbase.options.DiagnosticsOptions`): Optional parameters for this operation.
+            **kwargs: keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.DiagnosticsOptions`
 
         Returns:
             Awaitable[:class:`~couchbase.result.DiagnosticsResult`]: A report which describes current active
@@ -259,7 +258,7 @@ class AsyncCluster:
             timeout (timedelta): Amount of time to wait for cluster to be ready before a
                 :class:`~couchbase.exceptions.UnAmbiguousTimeoutException` is raised.
             opts (:class:`~couchbase.options.WaitUntilReadyOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.WaitUntilReadyOptions`
 
         Raises:
@@ -267,7 +266,6 @@ class AsyncCluster:
                 the cluster being ready for use.
 
         Example:
-
             Wait until the cluster is ready to use KV and query services::
 
                 from acouchbase.cluster import Cluster
@@ -298,7 +296,7 @@ class AsyncCluster:
         Args:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -373,7 +371,7 @@ class AsyncCluster:
             statement (str): The analytics SQL++ statement to execute.
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -454,7 +452,7 @@ class AsyncCluster:
             query (:class:`~couchbase.search.SearchQuery`): Type of search query to perform.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -557,7 +555,7 @@ class AsyncCluster:
                     Passing a :class:`~couchbase.search.SearchQuery` is deprecated; wrap it with
                     :meth:`~couchbase.search.SearchRequest.create` instead.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -632,9 +630,7 @@ class AsyncCluster:
         return self._impl.search(index, request, options, **kwargs)
 
     def buckets(self) -> BucketManager:
-        """
-        Get a :class:`~acouchbase.management.buckets.BucketManager` which can be used to manage the buckets
-        of this cluster.
+        """Get a manager for the buckets of this cluster.
 
         Returns:
             :class:`~acouchbase.management.buckets.BucketManager`: A
@@ -643,9 +639,7 @@ class AsyncCluster:
         return BucketManager(self._impl.bucket_mgmt())
 
     def users(self) -> UserManager:
-        """
-        Get a :class:`~acouchbase.management.users.UserManager` which can be used to manage the users
-        of this cluster.
+        """Get a manager for the users of this cluster.
 
         Returns:
             :class:`~acouchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager`
@@ -654,9 +648,7 @@ class AsyncCluster:
         return UserManager(self._impl.user_mgmt())
 
     def query_indexes(self) -> QueryIndexManager:
-        """
-        Get a :class:`~acouchbase.management.queries.QueryIndexManager` which can be used to manage the query
-        indexes of this cluster.
+        """Get a manager for the query indexes of this cluster.
 
         Returns:
             :class:`~acouchbase.management.queries.QueryIndexManager`: A
@@ -665,9 +657,7 @@ class AsyncCluster:
         return QueryIndexManager(self._impl.query_index_mgmt())
 
     def analytics_indexes(self) -> AnalyticsIndexManager:
-        """
-        Get a :class:`~acouchbase.management.analytics.AnalyticsIndexManager` which can be used to manage the analytics
-        dataverses, dataset, indexes and links of this cluster.
+        """Get a manager for the analytics dataverses, datasets, indexes and links of this cluster.
 
         Returns:
             :class:`~acouchbase.management.analytics.AnalyticsIndexManager`: An
@@ -676,9 +666,7 @@ class AsyncCluster:
         return AnalyticsIndexManager(self._impl.analytics_mgmt())
 
     def search_indexes(self) -> SearchIndexManager:
-        """
-        Get a :class:`~acouchbase.management.search.SearchIndexManager` which can be used to manage the search
-        indexes of this cluster.
+        """Get a manager for the search indexes of this cluster.
 
         Returns:
             :class:`~acouchbase.management.search.SearchIndexManager`: A
@@ -688,9 +676,7 @@ class AsyncCluster:
         return SearchIndexManager(self._impl.search_index_mgmt())
 
     def eventing_functions(self) -> EventingFunctionManager:
-        """
-        Get a :class:`~acouchbase.management.eventing.EventingFunctionManager` which can be used to manage the
-        eventing functions of this cluster.
+        """Get a manager for the eventing functions of this cluster.
 
         .. note::
             Eventing function management is an **uncommitted** API that is unlikely to change,
@@ -705,7 +691,7 @@ class AsyncCluster:
 
     @staticmethod
     async def connect(connstr: str, *options: ClusterOptions, **kwargs: Unpack[ClusterKwargs]) -> AsyncCluster:
-        """Create a Couchbase Cluster and connect
+        """Create a cluster and connect to it.
 
         Args:
             connstr (str):
@@ -719,7 +705,7 @@ class AsyncCluster:
             options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
                 Some operations allow the global options to be overriden by passing in options to the
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 overrride provided :class:`~couchbase.options.ClusterOptions`
 
         Returns:

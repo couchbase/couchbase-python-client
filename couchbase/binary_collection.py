@@ -51,6 +51,10 @@ if TYPE_CHECKING:
 
 
 class BinaryCollection:
+    """The operations on a collection's binary documents and counters.
+
+    Get one from :meth:`~couchbase.collection.Collection.binary`.
+    """
 
     def __init__(self, impl: BinaryCollectionInterface) -> None:
         self._impl = impl
@@ -59,13 +63,12 @@ class BinaryCollection:
                   key: str,
                   opts: IncrementOptions | None = None,
                   **kwargs: Unpack[IncrementOptionsKwargs]) -> CounterResult:
-        """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
-        option (defaults to 1).
+        """Increments the counter held in a document by the delta option, which defaults to 1.
 
         Args:
             key (str): The key of the document to increment.
             opts (:class:`~couchbase.options.IncrementOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.IncrementOptions`
 
         Returns:
@@ -76,7 +79,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple increment operation::
 
                 from couchbase.options import IncrementOptions, SignedInt64
@@ -104,13 +106,12 @@ class BinaryCollection:
                   key: str,
                   opts: DecrementOptions | None = None,
                   **kwargs: Unpack[DecrementOptionsKwargs]) -> CounterResult:
-        """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
-        option (defaults to 1).
+        """Decrements the counter held in a document by the delta option, which defaults to 1.
 
         Args:
             key (str): The key of the document to decrement.
             opts (:class:`~couchbase.options.DecrementOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.DecrementOptions`
 
         Returns:
@@ -121,7 +122,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple decrement operation::
 
                 from couchbase.options import DecrementOptions, SignedInt64
@@ -156,7 +156,7 @@ class BinaryCollection:
             key (str): The key of the document to append to.
             value (str | bytes | bytearray): The value to append to the document.
             opts (:class:`~couchbase.options.AppendOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AppendOptions`
 
         Returns:
@@ -167,7 +167,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple append string operation::
 
                 # ... other code ...
@@ -209,7 +208,7 @@ class BinaryCollection:
             key (str): The key of the document to prepend to.
             value (str | bytes | bytearray): The value to prepend to the document.
             opts (:class:`~couchbase.options.PrependOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.PrependOptions`
 
         Returns:
@@ -220,7 +219,6 @@ class BinaryCollection:
                 on the server.
 
         Examples:
-
             Simple prepend string operation::
 
                 # ... other code ...
@@ -262,7 +260,7 @@ class BinaryCollection:
                 append operations.  Each key should correspond to the document to append to and each value should
                 correspond to the value to append to the document.
             opts (:class:`~couchbase.options.AppendMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AppendMultiOptions`
 
         Returns:
@@ -275,7 +273,6 @@ class BinaryCollection:
                 as a match to the key, but is not raised.
 
         Examples:
-
             Simple append-multi string operation::
 
                 # ... other code ...
@@ -349,15 +346,14 @@ class BinaryCollection:
                       keys_and_values: Mapping[str, str | bytes | bytearray],
                       opts: PrependMultiOptions | None = None,
                       **kwargs: Unpack[PrependMultiOptionsKwargs]) -> MultiMutationResult:
-        """For each key-value pair, prepends the specified value to the beginning of the document specified
-        by the key.
+        """Prepends each value to the beginning of the document its key names.
 
         Args:
             keys_and_values (Mapping[str, str | bytes | bytearray]): The key-value pairs to use for the multiple
                 prepend operations.  Each key should correspond to the document to prepend to and each value should
                 correspond to the value to prepend to the document.
             opts (:class:`~couchbase.options.PrependMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.PrependMultiOptions`
 
         Returns:
@@ -370,7 +366,6 @@ class BinaryCollection:
                 to the key, but is not raised.
 
         Examples:
-
             Simple prepend-multi string operation::
 
                 # ... other code ...
@@ -444,14 +439,13 @@ class BinaryCollection:
                         keys: list[str],
                         opts: IncrementMultiOptions | None = None,
                         **kwargs: Unpack[IncrementMultiOptionsKwargs]) -> MultiCounterResult:
-        """For each key in the provided list, increments the ASCII value of the document, specified by the key,
-        by the amount indicated in the delta option (defaults to 1).
+        """Increments the counter held in each document by the delta option, which defaults to 1.
 
         Args:
             keys (list[str]): The keys to use for the multiple increment operations.  Each key should correspond
                 to the document to increment.
             opts (:class:`~couchbase.options.IncrementMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.IncrementMultiOptions`
 
         Returns:
@@ -464,7 +458,6 @@ class BinaryCollection:
                 as a match to the key, but is not raised.
 
         Examples:
-
             Simple increment-multi operation, set initial value::
 
                 from couchbase.options import IncrementMultiOptions, SignedInt64
@@ -527,14 +520,13 @@ class BinaryCollection:
                         keys: list[str],
                         opts: DecrementMultiOptions | None = None,
                         **kwargs: Unpack[DecrementMultiOptionsKwargs]) -> MultiCounterResult:
-        """For each key in the provided list, decrements the ASCII value of the document, specified by the key,
-        by the amount indicated in the delta option (defaults to 1).
+        """Decrements the counter held in each document by the delta option, which defaults to 1.
 
         Args:
             keys (list[str]): The keys to use for the multiple decrement operations.  Each key should correspond
                 to the document to decrement.
             opts (:class:`~couchbase.options.DecrementMultiOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.DecrementMultiOptions`
 
         Returns:
@@ -547,7 +539,6 @@ class BinaryCollection:
                 match to the key, but is not raised.
 
         Examples:
-
             Simple decrement-multi operation, set initial value::
 
                 from couchbase.options import DecrementMultiOptions, SignedInt64

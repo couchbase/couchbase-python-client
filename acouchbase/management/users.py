@@ -79,7 +79,7 @@ class UserManager:
             username (str): The name of the user to retrieve.
             options (:class:`~couchbase.management.options.GetUserOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -98,7 +98,7 @@ class UserManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllUsersOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -116,7 +116,7 @@ class UserManager:
             user (:class:`.User`): The user to create or update.
             options (:class:`~couchbase.management.options.UpsertUserOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -135,7 +135,7 @@ class UserManager:
             username (str): The name of the user to drop.
             options (:class:`~couchbase.management.options.DropUserOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -156,7 +156,7 @@ class UserManager:
             new_password (str): The new password for the user.
             options (:class:`~couchbase.management.options.ChangePasswordOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -172,7 +172,7 @@ class UserManager:
         Args:
             options (:class:`~couchbase.management.options.GetRolesOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -190,7 +190,7 @@ class UserManager:
             group_name (str): The name of the group to retrieve.
             options (:class:`~couchbase.management.options.GetGroupOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -209,7 +209,7 @@ class UserManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllGroupsOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -227,7 +227,7 @@ class UserManager:
             group (:class:`.Group`): The group to create or update.
             options (:class:`~couchbase.management.options.UpsertGroupOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -246,7 +246,7 @@ class UserManager:
             group_name (str): The name of the group to drop.
             options (:class:`~couchbase.management.options.DropGroupOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:

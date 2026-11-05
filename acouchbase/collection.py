@@ -85,15 +85,21 @@ if TYPE_CHECKING:
 
 
 class AsyncCollection:
+    """A collection in a scope, and the key-value operations on its documents.
+
+    Get one from :meth:`~acouchbase.scope.Scope.collection`.
+
+    Args:
+        scope (:class:`~acouchbase.scope.Scope`): The scope the collection belongs to.
+        name (str): The name of the collection.
+    """
 
     def __init__(self, scope: AsyncScope, name: str) -> None:
         self._impl: AsyncCollectionInterface = scope._impl.collection(name)
 
     @property
     def name(self) -> str:
-        """
-            str: The name of this :class:`~.Collection` instance.
-        """
+        """The name of this collection."""
         return self._impl.name
 
     async def get(self,
@@ -105,7 +111,7 @@ class AsyncCollection:
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetOptions`
 
         Returns:
@@ -117,7 +123,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple get operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -144,13 +149,12 @@ class AsyncCollection:
                               key: str,
                               opts: GetAnyReplicaOptions | None = None,
                               **kwargs: Unpack[GetAnyReplicaOptionsKwargs]) -> GetReplicaResult:
-        """Retrieves the value of a document from the collection leveraging both active and all available replicas
-        returning the first available.
+        """Retrieves a document from whichever of the active copy and the replicas answers first.
 
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAnyReplicaOptions`
 
         Returns:
@@ -161,7 +165,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple get_any_replica operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -196,7 +199,7 @@ class AsyncCollection:
         Args:
             key (str): The key for the document to retrieve.
             opts (:class:`~couchbase.options.GetAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAllReplicasOptions`
 
         Returns:
@@ -208,7 +211,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple get_all_replicas operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -263,7 +265,7 @@ class AsyncCollection:
         Args:
             key (str): The key for the document to check existence.
             opts (:class:`~couchbase.options.ExistsOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ExistsOptions`
 
         Returns:
@@ -271,7 +273,6 @@ class AsyncCollection:
             of :class:`~couchbase.result.ExistsResult` if successful.
 
         Examples:
-
             Simple exists operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -307,7 +308,7 @@ class AsyncCollection:
             key (str): Document key to insert.
             value (DocumentValue): The value of the document to insert.
             opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.InsertOptions`
 
         Returns:
@@ -319,7 +320,6 @@ class AsyncCollection:
                 server.
 
         Examples:
-
             Simple insert operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -370,7 +370,7 @@ class AsyncCollection:
             key (str): Document key to upsert.
             value (DocumentValue): The value of the document to upsert.
             opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UpsertOptions`
 
         Returns:
@@ -378,7 +378,6 @@ class AsyncCollection:
             of :class:`~couchbase.result.MutationResult` if successful.
 
         Examples:
-
             Simple upsert operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -429,7 +428,7 @@ class AsyncCollection:
             key (str): Document key to replace.
             value (DocumentValue): The value of the document to replace.
             opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ReplaceOptions`
 
         Returns:
@@ -441,7 +440,6 @@ class AsyncCollection:
                 server.
 
         Examples:
-
             Simple replace operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -480,7 +478,7 @@ class AsyncCollection:
         Args:
             key (str): Key for the document to remove.
             opts (:class:`~couchbase.options.RemoveOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.RemoveOptions`
 
         Returns:
@@ -492,7 +490,6 @@ class AsyncCollection:
                 server.
 
         Examples:
-
             Simple remove operation::
 
                 bucket = cluster.bucket('travel-sample')
@@ -525,7 +522,7 @@ class AsyncCollection:
             key (str): Key for the document to touch.
             expiry (timedelta): The new expiry for the document.
             opts (:class:`~couchbase.options.TouchOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TouchOptions`
 
         Returns:
@@ -537,7 +534,6 @@ class AsyncCollection:
                 server.
 
         Examples:
-
             Simple touch operation::
 
                 from datetime import timedelta
@@ -576,7 +572,7 @@ class AsyncCollection:
             key (str): The key for the document retrieve and set expiry time.
             expiry (timedelta):  The new expiry to apply to the document.
             opts (:class:`~couchbase.options.GetAndTouchOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndTouchOptions`
 
         Returns:
@@ -588,7 +584,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple get and touch operation::
 
                 from datetime import timedelta
@@ -630,7 +625,7 @@ class AsyncCollection:
             key (str): The key for the document to lock and retrieve.
             lock_time (timedelta):  The amount of time to lock the document.
             opts (:class:`~couchbase.options.GetAndLockOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.GetAndLockOptions`
 
         Returns:
@@ -642,7 +637,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple get and lock operation::
 
                 from datetime import timedelta
@@ -684,7 +678,7 @@ class AsyncCollection:
             key (str): The key for the document to unlock.
             cas (int): The CAS of the document, used to validate lock ownership.
             opts (:class:`~couchbase.options.UnlockOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.UnlockOptions`
 
         Returns:
@@ -697,7 +691,6 @@ class AsyncCollection:
             :class:`~couchbase.exceptions.DocumentLockedException`: If the provided cas is invalid.
 
         Examples:
-
             Simple unlock operation::
 
                 from datetime import timedelta
@@ -721,15 +714,14 @@ class AsyncCollection:
                         spec: Iterable[Spec],
                         opts: LookupInOptions | None = None,
                         **kwargs: Unpack[LookupInOptionsKwargs]) -> LookupInResult:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value.
+        """Fetches individual fields of a document, or information about them.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInOptions`
 
         Returns:
@@ -741,7 +733,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple look-up in operation::
 
                 import couchbase.subdocument as SD
@@ -779,16 +770,14 @@ class AsyncCollection:
                                     spec: Iterable[Spec],
                                     opts: LookupInAnyReplicaOptions | None = None,
                                     **kwargs: Unpack[LookupInAnyReplicaOptionsKwargs]) -> LookupInReplicaResult:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value. It leverages both active and all available replicas
-        returning the first available
+        """Fetches fields of a document from whichever of the active copy and the replicas answers first.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAnyReplicaOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAnyReplicaOptions`
 
         Returns:
@@ -800,7 +789,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple lookup_in_any_replica operation::
 
                 import couchbase.subdocument as SD
@@ -840,15 +828,14 @@ class AsyncCollection:
                                      opts: LookupInAllReplicasOptions | None = None,
                                      **kwargs: Unpack[LookupInAllReplicasOptionsKwargs]
                                      ) -> Iterable[LookupInReplicaResult]:
-        """Performs a lookup-in operation against a document, fetching individual fields or information
-        about specific fields inside the document value, returning results from both active and all available replicas
+        """Fetches fields of a document from the active copy and every available replica.
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
                 from the document.
             opts (:class:`~couchbase.options.LookupInAllReplicasOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.LookupInAllReplicasOptions`
 
         Returns:
@@ -861,7 +848,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple lookup_in_all_replicas operation::
 
                 import couchbase.subdocument as SD
@@ -921,15 +907,16 @@ class AsyncCollection:
                         spec: Iterable[Spec],
                         opts: MutateInOptions | None = None,
                         **kwargs: Unpack[MutateInOptionsKwargs]) -> MutateInResult:
-        """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
-        within a document. Also enables access to document extended-attributes (i.e. xattrs).
+        """Atomically modifies individual fields of a document.
+
+        The fields may include the document's extended attributes (xattrs).
 
         Args:
             key (str): The key for the document look in.
             spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the operations to
                 perform on the document.
             opts (:class:`~couchbase.options.MutateInOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.MutateInOptions`
 
         Returns:
@@ -941,7 +928,6 @@ class AsyncCollection:
                 on the server.
 
         Examples:
-
             Simple mutate-in operation::
 
                 import couchbase.subdocument as SD
@@ -989,7 +975,7 @@ class AsyncCollection:
                 :class:`~couchbase.kv_range_scan.PrefixScan` or
                 :class:`~couchbase.kv_range_scan.SamplingScan` instance.
             opts (:class:`~couchbase.options.ScanOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.ScanOptions`
 
         Raises:
@@ -1003,7 +989,6 @@ class AsyncCollection:
             :class:`~acouchbase.result.AsyncScanResultIterable`.
 
         Examples:
-
             Simple range scan operation::
 
                 from acouchbase.kv_range_scan import RangeScan
@@ -1025,8 +1010,7 @@ class AsyncCollection:
         return self._impl.scan(scan_type, opts, **kwargs)
 
     def binary(self) -> BinaryCollection:
-        """Creates a BinaryCollection instance, allowing access to various binary operations
-        possible against a collection.
+        """Get the binary operations on this collection.
 
         .. seealso::
             :class:`~acouchbase.binary_collection.BinaryCollection`
@@ -1086,9 +1070,7 @@ class AsyncCollection:
         return CouchbaseQueue(key, self)
 
     def query_indexes(self) -> CollectionQueryIndexManager:
-        """
-        Get a :class:`~acouchbase.management.queries.CollectionQueryIndexManager` which can be used to manage the query
-        indexes of this cluster.
+        """Get a manager for the query indexes of this collection.
 
         Returns:
             :class:`~acouchbase.management.queries.CollectionQueryIndexManager`: A
@@ -1098,6 +1080,7 @@ class AsyncCollection:
 
     @staticmethod
     def default_name() -> str:
+        """The name of a bucket's default collection."""
         return "_default"
 
 

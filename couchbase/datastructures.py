@@ -134,8 +134,7 @@ class _Datastructure:
 
 
 class CouchbaseList(_Datastructure):
-    """
-    CouchbaseList provides a simplified interface for storing lists within a Couchbase document.
+    """CouchbaseList provides a simplified interface for storing lists within a Couchbase document.
 
     Args:
         key (str): Document key to use for the list.
@@ -260,8 +259,7 @@ class CouchbaseList(_Datastructure):
             return self._get(span).content_as[list]
 
     def clear(self) -> None:
-        """Clears the list.
-        """
+        """Clears the list."""
         self._clear(Op.ListClear)
 
     def __iter__(self) -> CouchbaseList:
@@ -275,8 +273,7 @@ class CouchbaseList(_Datastructure):
 
 
 class CouchbaseMap(_Datastructure):
-    """
-    CouchbaseMap provides a simplified interface for storing a map within a Couchbase document.
+    """CouchbaseMap provides a simplified interface for storing a map within a Couchbase document.
 
     Args:
         key (str): Document key to use for the map.
@@ -381,8 +378,7 @@ class CouchbaseMap(_Datastructure):
             return self._get(span).content_as[dict]
 
     def clear(self) -> None:
-        """Clears the map.
-        """
+        """Clears the map."""
         self._clear(Op.MapClear)
 
     def items(self) -> Generator[tuple[str, Any], None, None]:
@@ -397,8 +393,7 @@ class CouchbaseMap(_Datastructure):
 
 
 class CouchbaseSet(_Datastructure):
-    """
-    CouchbaseSet provides a simplified interface for storing a set within a Couchbase document.
+    """CouchbaseSet provides a simplified interface for storing a set within a Couchbase document.
 
     Args:
         key (str): Document key to use for the set.
@@ -408,10 +403,10 @@ class CouchbaseSet(_Datastructure):
     """
 
     def add(self, value: Any) -> bool:
-        """Adds a new item to the set. Returning whether the item already existed in the set or not.
+        """Adds a value to the set, unless the set already holds it.
 
         Args:
-            value (Any):
+            value (Any): The value to add.
 
         Returns:
             bool:  True if the value was added, False otherwise (meaning the value already
@@ -502,8 +497,7 @@ class CouchbaseSet(_Datastructure):
             return _first_value(sd_res)
 
     def clear(self) -> None:
-        """Clears the set.
-        """
+        """Clears the set."""
         self._clear(Op.SetClear)
 
     def values(self) -> list[Any]:
@@ -517,8 +511,7 @@ class CouchbaseSet(_Datastructure):
 
 
 class CouchbaseQueue(_Datastructure):
-    """
-    CouchbaseQueue provides a simplified interface for storing a queue within a Couchbase document.
+    """CouchbaseQueue provides a simplified interface for storing a queue within a Couchbase document.
 
     Args:
         key (str): Document key to use for the queue.
@@ -602,8 +595,7 @@ class CouchbaseQueue(_Datastructure):
             return _first_value(sd_res)
 
     def clear(self) -> None:
-        """Clears the queue.
-        """
+        """Clears the queue."""
         self._clear(Op.QueueClear)
 
     def __iter__(self) -> CouchbaseQueue:

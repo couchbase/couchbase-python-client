@@ -98,9 +98,6 @@ convention = "google"
 "**/{tests,protocol}/**" = ["D"]
 "**/_[!_]*.py" = ["D"]
 "{setup,conftest,couchbase_version,pycbc_build_setup}.py" = ["D"]
-# Not yet brought to the docstring rules.  Each line goes as its area is done.
-"{couchbase,acouchbase,txcouchbase}/{__init__,cluster,bucket,scope,collection,binary_collection,datastructures}.py" = ["D"]
-"{couchbase,acouchbase,txcouchbase}/transactions/transactions.py" = ["D"]
 
 # UP035 rejects importing the aliases PEP 585 replaced, but `Optional` and `Union` are not among
 # them, and a `# type:` comment, which ruff does not read, can keep either alive.  Banning the

@@ -44,21 +44,26 @@ if TYPE_CHECKING:
 
 
 class Scope:
+    """A scope in a bucket: its collections, and the queries and searches run against it.
+
+    Get one from :meth:`~txcouchbase.bucket.Bucket.scope`.
+
+    Args:
+        bucket (:class:`~txcouchbase.bucket.Bucket`): The bucket the scope belongs to.
+        scope_name (str): The name of the scope.
+    """
+
     def __init__(self, bucket: TxBucket, scope_name: str):
         self._impl: TxScopeInterface = bucket._impl.scope(scope_name)
 
     @property
     def name(self) -> str:
-        """
-            str: The name of this :class:`~.Scope` instance.
-        """
+        """The name of this scope."""
         return self._impl.name
 
     @property
     def bucket_name(self) -> str:
-        """
-            str: The name of the bucket in which this :class:`~.Scope` instance belongs.
-        """
+        """The name of the bucket this scope belongs to."""
         return self._impl.bucket_name
 
     def collection(self, name: str) -> Collection:
@@ -89,7 +94,7 @@ class Scope:
         Args:
             statement (str): The N1QL statement to execute.
             options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.QueryOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``QueryOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -119,7 +124,7 @@ class Scope:
             statement (str): The analytics SQL++ statement to execute.
             options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.AnalyticsOptions`.  A keyword that is not one of its
                 options is sent as a named parameter; prefer ``AnalyticsOptions(named_parameters=...)``, which
                 cannot collide with an option name.
@@ -150,7 +155,7 @@ class Scope:
             query (:class:`~couchbase.search.SearchQuery`): Type of search query to perform.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -189,7 +194,7 @@ class Scope:
                     Passing a :class:`~couchbase.search.SearchQuery` is deprecated; wrap it with
                     :meth:`~couchbase.search.SearchRequest.create` instead.
             options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used in place or to
+            **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
@@ -200,9 +205,7 @@ class Scope:
         return self._impl.search_deferred(index, request, options, **kwargs)
 
     def search_indexes(self) -> ScopeSearchIndexManager:
-        """
-        Get a :class:`~txcouchbase.management.search.ScopeSearchIndexManager` which can be used to manage the search
-        indexes of this scope.
+        """Get a manager for the search indexes of this scope.
 
         Returns:
             :class:`~txcouchbase.management.search.ScopeSearchIndexManager`: A
@@ -213,6 +216,7 @@ class Scope:
 
     @staticmethod
     def default_name() -> str:
+        """The name of a bucket's default scope."""
         return "_default"
 
 

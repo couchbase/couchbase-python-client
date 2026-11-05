@@ -71,7 +71,7 @@ class CollectionManager:
             scope_name (str): The name of the scope.
             options (:class:`~couchbase.management.options.CreateScopeOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -89,7 +89,7 @@ class CollectionManager:
             scope_name (str): The name of the scope.
             options (:class:`~couchbase.management.options.DropScopeOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
 
@@ -106,7 +106,7 @@ class CollectionManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllScopesOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Returns:
@@ -147,7 +147,7 @@ class CollectionManager:
             settings (:class:`~.CreateCollectionSettings`, optional): Settings to apply for the collection
             options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
@@ -170,7 +170,7 @@ class CollectionManager:
             settings (:class:`~.UpdateCollectionSettings`): Settings to apply for the collection
             options (:class:`~couchbase.management.options.UpdateCollectionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
@@ -207,7 +207,7 @@ class CollectionManager:
             collection_name (str): The name of the collection to be dropped.
             options (:class:`~couchbase.management.options.DropCollectionOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
+            **kwargs: keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:

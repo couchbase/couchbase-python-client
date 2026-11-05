@@ -97,7 +97,7 @@ class AnalyticsIndexManager:
             dataverse_name (str): The name of the dataverse to create.
             options (:class:`~couchbase.management.options.CreateDataverseOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataverse_name is not a str.
@@ -116,7 +116,7 @@ class AnalyticsIndexManager:
             dataverse_name (str): The name of the dataverse to drop.
             options (:class:`~couchbase.management.options.DropDataverseOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataverse_name is not a str.
@@ -137,7 +137,7 @@ class AnalyticsIndexManager:
             bucket_name (str): The name of the bucket the dataset reads from.
             options (:class:`~couchbase.management.options.CreateDatasetOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataset_name or bucket_name is not a str.
@@ -155,7 +155,7 @@ class AnalyticsIndexManager:
         Args:
             dataset_name (str): The name of the dataset to drop.
             options (:class:`~couchbase.management.options.DropDatasetOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the dataset_name is not a str.
@@ -172,7 +172,7 @@ class AnalyticsIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllDatasetOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Iterable[:class:`.AnalyticsDataset`]: The datasets.
@@ -193,7 +193,7 @@ class AnalyticsIndexManager:
             fields (dict[str, :class:`.AnalyticsDataType`]): The fields the index covers, each mapped to its type.
             options (:class:`~couchbase.management.options.CreateAnalyticsIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or dataset_name is not a str, or
@@ -213,7 +213,7 @@ class AnalyticsIndexManager:
             dataset_name (str): The name of the dataset the index is on.
             options (:class:`~couchbase.management.options.DropAnalyticsIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index_name or dataset_name is not a str.
@@ -228,7 +228,7 @@ class AnalyticsIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllAnalyticsIndexesOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Iterable[:class:`.AnalyticsIndex`]: The indexes.
@@ -242,7 +242,7 @@ class AnalyticsIndexManager:
 
         Args:
             options (:class:`~couchbase.management.options.ConnectLinkOptions`): Optional parameters for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
         """
         self._impl.connect_link(options, **kwargs)
 
@@ -254,7 +254,7 @@ class AnalyticsIndexManager:
         Args:
             options (:class:`~couchbase.management.options.DisconnectLinkOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
         """
         self._impl.disconnect_link(options, **kwargs)
 
@@ -266,7 +266,7 @@ class AnalyticsIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetPendingMutationsOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             dict[str, int]: The number of pending mutations, keyed by dataverse and dataset name.
@@ -284,7 +284,7 @@ class AnalyticsIndexManager:
                 :class:`.S3ExternalAnalyticsLink` or :class:`.AzureBlobExternalAnalyticsLink`.
             options (:class:`~couchbase.management.options.CreateLinkAnalyticsOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the link is not an :class:`.AnalyticsLink`, or
@@ -305,7 +305,7 @@ class AnalyticsIndexManager:
                 :class:`.S3ExternalAnalyticsLink` or :class:`.AzureBlobExternalAnalyticsLink`.
             options (:class:`~couchbase.management.options.ReplaceLinkAnalyticsOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the link is not an :class:`.AnalyticsLink`, or
@@ -327,7 +327,7 @@ class AnalyticsIndexManager:
             dataverse_name (str): The name of the dataverse the link is in.
             options (:class:`~couchbase.management.options.DropLinkAnalyticsOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the link_name or dataverse_name is not a str.
@@ -344,7 +344,7 @@ class AnalyticsIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetLinksAnalyticsOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Iterable[:class:`.AnalyticsLink`]: The links.

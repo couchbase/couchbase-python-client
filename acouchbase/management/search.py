@@ -79,7 +79,7 @@ class SearchIndexManager:
             index (:class:`.SearchIndex`): The index definition.
             options (:class:`~couchbase.management.options.UpsertSearchIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index definition is invalid.
@@ -96,7 +96,7 @@ class SearchIndexManager:
             index_name (str): The name of the index.
             options (:class:`~couchbase.management.options.DropSearchIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -113,7 +113,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.GetSearchIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             :class:`.SearchIndex`: The index definition if it exists.
@@ -131,7 +131,7 @@ class SearchIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllSearchIndexesOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Iterable[:class:`.SearchIndex`]: A list of all indexes.
@@ -148,7 +148,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.GetSearchIndexedDocumentsCountOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             int: The number of documents indexed for the specified index.
@@ -168,7 +168,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.PauseIngestSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -185,7 +185,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.ResumeIngestSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -202,7 +202,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.AllowQueryingSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -219,7 +219,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.DisallowQueryingSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -236,7 +236,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.FreezePlanSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -253,7 +253,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.UnfreezePlanSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -272,7 +272,7 @@ class SearchIndexManager:
             document (Any): The document to analyze.
             options (:class:`~couchbase.management.options.AnalyzeDocumentSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             dict[str, Any]: The analyzed sections for the document.
@@ -296,7 +296,7 @@ class SearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.GetSearchIndexStatsOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             dict[str, Any]: The stats for the index.
@@ -320,7 +320,7 @@ class SearchIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllSearchIndexStatsOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             dict[str, Any]: The stats report.
@@ -344,7 +344,7 @@ class ScopeSearchIndexManager:
             index (:class:`.SearchIndex`): The index definition.
             options (:class:`~couchbase.management.options.UpsertSearchIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the index definition is invalid.
@@ -361,7 +361,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the index.
             options (:class:`~couchbase.management.options.DropSearchIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -378,7 +378,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.GetSearchIndexOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             :class:`.SearchIndex`: The index definition if it exists.
@@ -396,7 +396,7 @@ class ScopeSearchIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllSearchIndexesOptions`): Optional parameters for this
                 operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             Iterable[:class:`.SearchIndex`]: A list of all indexes.
@@ -413,7 +413,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.GetSearchIndexedDocumentsCountOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             int: The number of documents indexed for the specified index.
@@ -433,7 +433,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.PauseIngestSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -450,7 +450,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.ResumeIngestSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -467,7 +467,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.AllowQueryingSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -484,7 +484,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.DisallowQueryingSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -501,7 +501,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.FreezePlanSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -518,7 +518,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.UnfreezePlanSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Raises:
             :class:`~couchbase.exceptions.SearchIndexNotFoundException`: If the index does not exist.
@@ -537,7 +537,7 @@ class ScopeSearchIndexManager:
             document (Any): The document to analyze.
             options (:class:`~couchbase.management.options.AnalyzeDocumentSearchIndexOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             dict[str, Any]: The analyzed sections for the document.
@@ -562,7 +562,7 @@ class ScopeSearchIndexManager:
             index_name (str): The name of the search index.
             options (:class:`~couchbase.management.options.GetSearchIndexStatsOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             dict[str, Any]: The stats for the index.
@@ -587,7 +587,7 @@ class ScopeSearchIndexManager:
         Args:
             options (:class:`~couchbase.management.options.GetAllSearchIndexStatsOptions`): Optional parameters
                 for this operation.
-            **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters for this operation.
+            **kwargs: keyword arguments that can be used as optional parameters for this operation.
 
         Returns:
             dict[str, Any]: The stats report.
